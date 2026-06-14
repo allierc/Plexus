@@ -1,0 +1,20 @@
+# Red (soft) cells behave like ants: lay pheromone, steer along existing pheromone
+# while moving forward -> self-reinforcing trails (stigmergy). Blue cells just wander.
+name: ant
+seed: 0
+n_frames: 1500
+record_every: 6
+sets:
+  cell:
+    n: 150
+    dim: 2
+    types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}
+  particle: {parent: cell, per_parent: 60, dim: 2, radius: 0.012, density: 1.0}
+fields:
+  pheromone: {frame: grid, res: 160, diffusion: 0.02, decay: 0.04, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 300.0, rot: 0.06}          # persistent forward motion
+  - {op: trail, at: "cell[type=soft]", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}
+  - {op: secrete, at: "cell[type=soft]", to: pheromone, rate: 2.0} # ants lay pheromone
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 1200, drag: 0.6}
+schedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]

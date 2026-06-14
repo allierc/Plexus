@@ -46,6 +46,14 @@ class GridField(Field):
         ):
             flat.index_add_(0, ix * self.res + iy, w * amount)
 
+    def sample(self, pos):                             # bilinear field value at pos
+        i0, i1, f = self._corners(pos)
+        wx, wy = f[:, 0], f[:, 1]
+        g = self.grid
+        a = g[i0[:, 0], i0[:, 1]]; b = g[i1[:, 0], i0[:, 1]]
+        c = g[i0[:, 0], i1[:, 1]]; d = g[i1[:, 0], i1[:, 1]]
+        return (a * (1 - wx) + b * wx) * (1 - wy) + (c * (1 - wx) + d * wx) * wy
+
     def gather_grad(self, pos):                        # field -> object (sampled gradient)
         gx, gy = torch.gradient(self.grid, spacing=1.0 / self.res)   # physical units
         i0, i1, f = self._corners(pos)

@@ -10,6 +10,14 @@ Every archived scenario: thumbnail (start→end), exact spec, seed, and generic 
 
 - soft: path 0.96, aspect 1.10->1.19, nnd 0.101->0.102; stiff: path 0.21, aspect 1.12->1.12, nnd 0.101->0.079
 
+### ant
+
+![ant](archive/ant/thumb.png)
+
+150 cells × 60 particles, 251 frames, finite=True. [spec](archive/ant/scenario.yaml)
+
+- soft: path 7.21, aspect 1.14->9.55, nnd 0.074->0.028; stiff: path 3.97, aspect 1.15->1.53, nnd 0.082->0.033
+
 ### chase
 
 ![chase](archive/chase/thumb.png)
