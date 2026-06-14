@@ -1,0 +1,21 @@
+# Reproduces the original tissue_mpm.gif pattern: 600 cells; soft (red) cells
+# secrete + follow a chemical and condense into many small clusters, stiff (blue)
+# stay dispersed. No motility (cells settle into clusters rather than wander).
+name: clusters
+seed: 0
+n_frames: 600
+record_every: 1
+sets:
+  cell:
+    n: 600
+    dim: 2
+    types: {soft: {fraction: 0.5, youngs: 20}, stiff: {fraction: 0.5, youngs: 300}}
+  particle: {parent: cell, per_parent: 100, dim: 2, radius: 0.012, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+operators:
+  - {op: boids, at: cell, radius: 0.06, cohesion: 0.05, align: 0.1, separate: 0.4}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4}
+  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}
+  - {op: sense, at: "cell[type=soft]", from: chemical, gain: 200.0}
+schedule: [aggregate, boids, secrete, chemical.diffuse, sense, mpm]

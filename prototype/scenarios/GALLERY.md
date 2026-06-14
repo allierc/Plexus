@@ -26,6 +26,14 @@ Every archived scenario: thumbnail (start→end), exact spec, seed, and generic 
 
 - soft: path 0.78, aspect 1.10->1.26, nnd 0.101->0.098; stiff: path 0.42, aspect 1.12->1.12, nnd 0.101->0.072
 
+### clusters
+
+![clusters](archive/clusters/thumb.png)
+
+600 cells × 100 particles, 601 frames, finite=True. [spec](archive/clusters/scenario.yaml)
+
+- soft: path 2.51, aspect 1.13->153.85, nnd 0.040->0.008; stiff: path 0.37, aspect 1.12->1.12, nnd 0.040->0.037
+
 ### collapse
 
 ![collapse](archive/collapse/thumb.png)
