@@ -3,17 +3,34 @@
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{listings}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
-\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
 
 \definecolor{cset}{RGB}{31,119,180}
 \definecolor{cfield}{RGB}{44,160,44}
 \definecolor{cop}{RGB}{214,39,40}
 \definecolor{cgray}{RGB}{120,120,120}
 
-\title{\textbf{TissueGraph}\\[2pt]
-\large Hierarchical sets and operators for differentiable tissue}
+\lstdefinestyle{yaml}{
+  basicstyle=\ttfamily\scriptsize,
+  frame=single,
+  backgroundcolor=\color{gray!7},
+  columns=fullflexible,
+  breaklines=true,
+  keepspaces=true,
+  showstringspaces=false,
+  commentstyle=\color{cgray}\itshape,
+  morecomment=[l]{\#},
+}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\textbf{TissueGraph}\\[3pt]
+\large A blueprint for differentiable tissue: hierarchical sets, operators,\\
+and an LLM-driven simulation layer}
 \author{Janelia Research Campus}
 \date{\today}
 
@@ -24,13 +41,23 @@
 Living tissues couple biochemical signalling, cellular interaction, mechanical
 force, and collective dynamics across scales. The frameworks built so far
 (\textsc{CellGraph}, \textsc{NeuralGraph}, \textsc{MPMGraph},
-\textsc{MetabolismGraph}) each implement \emph{one} graph type. A tissue needs
-them coexisting. We define the missing primitive: a \textbf{hierarchical graph
-container} stated in the language of \textbf{sets} and \textbf{operators}. A
-tissue is a stack of sets linked by containment; dynamics are operators --- GNNs
-implementing ODE vector fields and Laplacians --- dispatched by relation. Every
-existing framework becomes a set of registered operators plus a schedule.
+\textsc{MetabolismGraph}) each implement \emph{one} graph type; a tissue needs
+them coexisting. This document is a single blueprint, distilled from a working
+prototype, for building one repository that unifies them. It has three parts:
+(i) the missing primitive --- a \textbf{hierarchical graph container} stated in
+the language of \textbf{sets} and \textbf{operators}; (ii) the \textbf{contract}
+that lets a large language model (LLM) drive a registry of low-level operators
+through a declarative \emph{simulation} specification; and (iii) the
+\textbf{experiment} --- ten distinct simulations and an emergent ant-trail model,
+all produced from the same code by changing only the simulation file --- with the
+lessons that follow for how to construct the repository.
 \end{abstract}
+
+\tableofcontents
+\bigskip
+
+\part*{Part I --- The abstraction}
+\addcontentsline{toc}{section}{Part I --- The abstraction}
 
 \section{Two entities: sets and fields}
 
@@ -41,45 +68,44 @@ particles, cells, populations). The hierarchy is a sequence of \textbf{partition
 \]
 so that a cell \emph{is} the fibre $\pi_1^{-1}(c)$ of its particles. A
 \textbf{field} $f:\Omega\to\mathbb{R}^c$ is a continuum on its own grid, bound to
-one level. Fields do not nest; they form a flat set, each tagged with the level
-it couples to (Fig.~\ref{fig:hier}).
+exactly one level. Fields do not nest; they form a flat set, each tagged with the
+level it couples to (Fig.~\ref{fig:hier}).
 
 \begin{figure}[h]
 \centering
 \begin{tikzpicture}[
-  font=\small,
-  set/.style={draw=cset,thick,rounded corners,fill=cset!8,minimum width=20mm,minimum height=7mm},
-  leaf/.style={draw=cset,fill=cset!4,rounded corners,minimum width=18mm,minimum height=6mm},
-  fld/.style={draw=cfield,thick,fill=cfield!10,minimum width=22mm,minimum height=6mm},
-  rel/.style={-{Stealth[length=2mm]},cgray},
-  cont/.style={-{Stealth[length=2.2mm]},cset,thick},
+  font=\footnotesize,
+  set/.style={draw=cset,thick,rounded corners,fill=cset!10,minimum width=26mm,minimum height=8mm},
+  leaf/.style={draw=cset,rounded corners,fill=cset!4,minimum width=24mm,minimum height=7.5mm},
+  fld/.style={draw=cfield,thick,rounded corners,fill=cfield!12,minimum width=34mm,minimum height=8mm},
+  cont/.style={-{Stealth[length=2.6mm]},cset,thick},
+  ex/.style={{Stealth[length=2mm]}-{Stealth[length=2mm]},cfield,thick},
 ]
-% hierarchy spine
-\node[set] (org) {organism $S_3$};
-\node[set,below=7mm of org] (pop) {population $S_2$};
-\node[set,below=7mm of pop] (cell) {cell $S_1$};
-\node[leaf,below=9mm of cell,xshift=-13mm] (part) {particle $S_0$};
-\node[leaf,below=9mm of cell,xshift=13mm] (mol) {molecule $S_0$};
-
-\draw[cont] (part) -- node[right,font=\scriptsize,cset]{$\pi_0$} (cell);
-\draw[cont] (mol) -- (cell);
-\draw[cont] (cell) -- node[right,font=\scriptsize,cset]{$\pi_1$} (pop);
-\draw[cont] (pop) -- node[right,font=\scriptsize,cset]{$\pi_2$} (org);
-
-% fields on the right, each coupled to a level
-\node[fld,right=26mm of cell] (fmorph) {morphogen (grid)};
-\node[fld,below=6mm of fmorph] (fchem) {chemoattr. (implicit)};
-\node[fld,right=26mm of part,yshift=-1mm] (fmet) {metabolite (grid)};
-
-\draw[rel,cfield] (cell.east) -- node[above,font=\scriptsize,cfield]{Exchange} (fmorph.west);
-\draw[rel,cfield] (pop.east) to[out=0,in=120] (fchem.north west);
-\draw[rel,cfield] (part.east) -- node[above,font=\scriptsize,cfield]{P2G/G2P} (fmet.west);
-
-\node[font=\scriptsize,cset,left=1mm of org,align=right] {containment\\$\pi_k$};
+% left spine (containment), bottom-up
+\node[set] (org)  at (0,7.5) {organism $S_3$};
+\node[set] (pop)  at (0,5.0) {population $S_2$};
+\node[set] (cell) at (0,2.5) {cell $S_1$};
+\node[leaf] (part) at (0,0.0) {particle $S_0$};
+\node[leaf] (mol)  at (-3.4,0.0) {molecule $S_0$};
+\draw[cont] (part) -- node[right,font=\scriptsize,pos=0.45]{$\pi_0$} (cell);
+\draw[cont] (mol.north) -- (cell.south west);
+\draw[cont] (cell) -- node[right,font=\scriptsize,pos=0.45]{$\pi_1$} (pop);
+\draw[cont] (pop)  -- node[right,font=\scriptsize,pos=0.45]{$\pi_2$} (org);
+\node[cset,font=\scriptsize,rotate=90] at (-1.55,5.0) {containment $\pi_k$};
+% right column (fields), each at the height of the level it couples to
+\node[fld] (fchem)  at (6.3,5.0) {chemoattractant (implicit)};
+\node[fld] (fmorph) at (6.3,2.5) {morphogen (grid)};
+\node[fld] (fmet)   at (6.3,0.0) {metabolite (grid)};
+\draw[ex] (pop.east)  -- node[above,font=\scriptsize,cfield]{Exchange} (fchem.west);
+\draw[ex] (cell.east) -- (fmorph.west);
+\draw[ex] (part.east) -- node[above,font=\scriptsize,cfield]{P2G/G2P} (fmet.west);
 \end{tikzpicture}
-\caption{The container. \textcolor{cset}{Blue}: sets linked by containment
-$\pi_k$ (the tree). \textcolor{cfield}{Green}: fields, flat, each on its own
-grid, each bound to one level by an \emph{Exchange} relation.}
+\caption{The container. \textcolor{cset}{Blue}: sets on a single containment spine,
+linked bottom-up by the partition maps $\pi_k$ (a cell is the set of its particles;
+molecules are a second leaf of the cell). \textcolor{cfield}{Green}: fields --- a
+flat collection, each on its own grid, each bound by a bidirectional
+\emph{Exchange} relation to the one level it couples to (drawn at that level's
+height). No field nests inside the hierarchy.}
 \label{fig:hier}
 \end{figure}
 
@@ -108,30 +134,23 @@ contribution, dispatched by the relation it acts on. There are exactly four kind
   g/.style={rectangle,draw=cfield,fill=cfield!12,minimum width=5mm,minimum height=5mm},
   a/.style={-{Stealth[length=1.6mm]},cop,thick},
 ]
-% Lateral
 \begin{scope}[local bounding box=L]
   \node[n] (a1){}; \node[n,right=6mm of a1](a2){}; \node[n,below=5mm of a1,xshift=3mm](a3){};
   \draw[a] (a1)--(a2); \draw[a] (a1)--(a3); \draw[a] (a2)--(a3);
 \end{scope}
 \node[below=1mm of L,align=center]{\textbf{Lateral}\\$\mathcal{O}_E$};
-
-% Aggregate up
 \begin{scope}[shift={(34mm,0)},local bounding box=A]
   \node[p] (par){parent};
   \node[n,below=6mm of par,xshift=-6mm](c1){}; \node[n,below=6mm of par,xshift=6mm](c2){};
   \draw[a] (c1)--(par); \draw[a] (c2)--(par);
 \end{scope}
 \node[below=1mm of A,align=center]{\textbf{Aggregate}$\uparrow$\\$\sum_\pi$};
-
-% Broadcast down
 \begin{scope}[shift={(64mm,0)},local bounding box=B]
   \node[p] (par2){parent};
   \node[n,below=6mm of par2,xshift=-6mm](d1){}; \node[n,below=6mm of par2,xshift=6mm](d2){};
   \draw[a] (par2)--(d1); \draw[a] (par2)--(d2);
 \end{scope}
 \node[below=1mm of B,align=center]{\textbf{Broadcast}$\downarrow$\\$\pi^*$};
-
-% Exchange
 \begin{scope}[shift={(96mm,0)},local bounding box=E]
   \node[n] (o1){}; \node[n,below=5mm of o1](o2){};
   \node[g,right=8mm of o1](g1){}; \node[g,below=0mm of g1](g2){};
@@ -142,8 +161,8 @@ contribution, dispatched by the relation it acts on. There are exactly four kind
 \end{tikzpicture}
 \caption{The four operators. \emph{Lateral} acts within a set; \emph{Aggregate}
 and \emph{Broadcast} move across containment $\pi$; \emph{Exchange} scatters
-($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field. P2G/G2P and the
-metabolite--reaction graph are both Exchange.}
+($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field. P2G/G2P (mechanics)
+and the metabolite--reaction graph are both Exchange.}
 \label{fig:ops}
 \end{figure}
 
@@ -153,11 +172,13 @@ Broadcast$\downarrow$. ``Object changes field, field moves object'' $=$
 $\mathcal{S}$ then $\mathcal{G}$.
 
 \section{Dynamics: a schedule}
+\label{sec:schedule}
 
-A model is a multi-rate composition of operators, $\;\mathcal{O}_n\circ\cdots\circ
-\mathcal{O}_1$, declared as a \texttt{Schedule}. Operators are pure (return
-deltas); the schedule sums per set and integrates, so rollout stays
-differentiable. The LLM agentic loop searches over schedules and operator
+A simulation is a multi-rate composition of operators,
+$\;\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1$, declared as a \code{Schedule}.
+Operators are pure (they return deltas); the schedule sums them per set and
+integrates, so rollout stays differentiable and any number of operators may write
+the same set in one tick. The LLM searches over schedules and operator
 parameterizations --- one well-defined action space instead of per-domain code.
 
 \section{Glossary}
@@ -168,21 +189,330 @@ parameterizations --- one well-defined action space instead of per-domain code.
 \toprule
 \textbf{Concept} & \textbf{Set/operator term} & \textbf{Symbol} & \textbf{Code} \\
 \midrule
-collection of like nodes & set (level)          & $S_k$                       & \texttt{Level} \\
-a single node            & element              & $x\in S_k$                  & row of \texttt{Level.state} \\
-learnable per-node code  & embedding            & $a_i$                       & \texttt{Level.embedding} \\
-containment              & partition            & $\pi_k\!:\!S_k\!\to\!S_{k+1}$& \texttt{Level.parent} \\
-within-set links         & relation             & $E\subseteq S_k\times S_k$  & \texttt{Level.edge\_index} \\
-continuum quantity       & field                & $f:\Omega\to\mathbb{R}^c$   & \texttt{Field} \\
-dynamics (GNN)           & operator: ODE+Laplacian & $\mathcal{O}$            & \texttt{Operator} \\
-within-set op            & lateral              & $\mathcal{O}_E$             & \texttt{Lateral} \\
-up op                    & reduction over fibres& $\sum_\pi$                  & \texttt{Aggregate} \\
-down op                  & lift                 & $\pi^{*}$                   & \texttt{Broadcast} \\
-set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \texttt{Exchange} \\
-the container            & hierarchy            & $(S_\bullet,F_\bullet,\pi_\bullet)$ & \texttt{Hierarchy} \\
-the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ & \texttt{Schedule} \\
+collection of like nodes & set (level)          & $S_k$                       & \code{Level} \\
+a single node            & element              & $x\in S_k$                  & row of \code{Level.state} \\
+learnable per-node code  & embedding            & $a_i$                       & \code{Level.embedding} \\
+containment              & partition            & $\pi_k\!:\!S_k\!\to\!S_{k+1}$& \code{Level.parent} \\
+within-set links         & relation             & $E\subseteq S_k\times S_k$  & \code{Level.edge\_index} \\
+continuum quantity       & field                & $f:\Omega\to\mathbb{R}^c$   & \code{Field} \\
+dynamics (GNN)           & operator: ODE+Laplacian & $\mathcal{O}$            & \code{Operator} \\
+within-set op            & lateral              & $\mathcal{O}_E$             & \code{Lateral} \\
+up op                    & reduction over fibres& $\sum_\pi$                  & \code{Aggregate} \\
+down op                  & lift                 & $\pi^{*}$                   & \code{Broadcast} \\
+set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \code{Exchange} \\
+the container            & hierarchy            & $(S_\bullet,F_\bullet,\pi_\bullet)$ & \code{Hierarchy} \\
+the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ & \code{Schedule} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\part*{Part II --- The LLM\,$\leftrightarrow$\,registry methodology}
+\addcontentsline{toc}{section}{Part II --- The LLM/registry methodology}
+
+\section{Two layers and the contract between them}
+
+The prototype's purpose was not the tissue physics but figuring out \emph{how an
+LLM should drive a registry of low-level operators}. The answer is a strict
+two-layer split that meet only at a declarative, validated file --- the
+\textbf{simulation} specification.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}p{3.0cm}p{11.5cm}@{}}
+\toprule
+\textbf{INTENT} & natural language (``2000 cells, two mechanical types, a chemical that guides only one'')\\
+\quad$\downarrow$ \emph{LLM compiles} & bounded, schema-checked generation\\
+\textbf{SIMULATION} & \code{simulation.yaml} --- sets $\cdot$ fields $\cdot$ operators($+$selectors) $\cdot$ schedule\\
+\quad$\downarrow$ \emph{engine resolves} & names looked up in the registry\\
+\textbf{REGISTRY} & \code{@register\_operator} / \code{@register\_field} --- the only place code lives\\
+\quad$\downarrow$ & \\
+\textbf{ENGINE} & generic: build \code{Hierarchy} $\to$ run \code{Schedule} $\to$ \code{zarr} (written once)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The \textbf{simulation file is the contract}. The LLM owns everything above it
+(intent $\to$ simulation); the code owns everything below (operators). They never
+touch directly. This makes the system both LLM-drivable and human-auditable: the
+simulation is small, typed, and reviewable, unlike the 500-line flat
+\code{config.py} it replaces. Three properties make the contract enforceable, and
+they answer the three questions this experiment was built around
+(Table~\ref{tab:modes}).
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}p{3.6cm}p{6.6cm}p{4.2cm}@{}}
+\toprule
+\textbf{Question} & \textbf{Mechanism} & \textbf{Where} \\
+\midrule
+archive simulations & spec $+$ seed $+$ metrics $+$ thumbnail, name-keyed & \code{archive.py}, \code{GALLERY.md} \\
+missing model & registry lookup errors with the available set; add one \code{Operator} & \code{registry.get\_operator} \\
+missing property & operators \emph{declare} what they require; validator checks & \code{Operator.REQUIRES\_*} \\
+\bottomrule
+\end{tabular}
+\caption{The three operational modes (Sections~\ref{sec:archive}--\ref{sec:prop}).}
+\label{tab:modes}
+\end{table}
+
+\section{The simulation specification}
+
+A simulation is built from one vocabulary: \textbf{sets} (a leaf set declares its
+\code{parent} and \code{per\_parent}), \textbf{fields} (each \code{couples\_to} one
+set), \textbf{operators} (each acting at a \emph{selector} \code{set} or
+\code{set[attr=value]}), and a \textbf{schedule} (the per-frame ordered list).
+Listing~\ref{lst:agg} is a complete example.
+
+\begin{lstlisting}[style=yaml,caption={A complete simulation: soft cells secrete and follow a chemical and self-aggregate.},label=lst:agg]
+name: aggregate
+seed: 0
+n_frames: 250
+sets:
+  cell:
+    n: 100
+    types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}
+  particle: {parent: cell, per_parent: 100, radius: 0.02}   # containment
+fields:
+  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 15.0, rot: 0.4}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 800, drag: 4}
+  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}    # only pop 1 makes it
+  - {op: sense,  at: "cell[type=soft]", from: chemical, gain: 150.0} # only pop 1 follows it
+schedule: [aggregate, [motility], secrete, chemical.diffuse, sense, mpm]
+\end{lstlisting}
+
+The validator (prototype: \code{scenario\_schema.py}) guarantees that a file which
+loads is runnable: every \code{op} exists; every \code{at}/\code{to}/\code{from}
+references a declared set/field; type \code{fraction}s sum to one; every schedule
+token resolves. (One trap: never use a YAML~1.1 boolean key such as
+\code{on}/\code{off} --- we use \code{at}.)
+
+\section{Operator catalog}
+
+Operators are the system's vocabulary; it grows monotonically and every past
+simulation keeps working. The prototype catalog:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{op} & \textbf{kind} & \textbf{acts on} & \textbf{behaviour} \\
+\midrule
+\code{boids}    & lateral   & cell        & collective motion (cohesion/align/separate) \\
+\code{motility} & lateral   & cell        & active self-propulsion (wandering heading) \\
+\code{adhesion} & lateral   & cell        & type-specific cohesion $\to$ sorting \\
+\code{mpm}      & exchange  & particle    & MLS-MPM mechanics; soft/stiff via \code{youngs} \\
+\code{secrete}  & exchange  & cell$\to$field & deposit into a field \\
+\code{sense}    & exchange  & cell$\leftarrow$field & chemotactic accel up-gradient \\
+\code{trail}    & exchange  & cell        & Physarum 3-sensor pheromone steering (ants) \\
+\code{aggregate}& builtin   & ---         & cell pos/vel $=$ mean of its particles ($\uparrow$) \\
+\code{<field>.diffuse} & builtin & ---    & field self-update (Laplacian $+$ decay) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Natural language $\to$ simulation: the repeatable mapping}
+
+To make the LLM's compilation \emph{repeatable} (same request $\to$ same
+structure), it follows fixed rules; the most useful:
+
+\begin{enumerate}\itemsep2pt
+\item ``$N$ cells/agents'' $\to$ a set with \code{n: N}.
+\item ``made of $K$ X per cell'' $\to$ a contained set with \code{parent}/\code{per\_parent} (two levels).
+\item ``two types differing by $P$'' $\to$ \code{types:} with $P$ as a per-type property.
+\item ``mechanical/elastic/rigid'' $\to$ particles $+$ \code{mpm}; map stiffness to \code{youngs}.
+\item ``moves by boids / flock'' $\to$ \code{boids}; ``wanders / motile'' $\to$ \code{motility}.
+\item ``creates/secretes a chemical'' $\to$ a \code{field} $+$ \code{secrete};
+      ``follows / chemotaxis'' $\to$ \code{sense}; ``ant trails'' $\to$ \code{trail}.
+\item \textbf{``only population X does Y''} $\to$ the selector \code{at: cell[type=X]}.
+      This is the highest-leverage primitive: it scopes behaviour to a
+      subpopulation and lets two behaviours coexist.
+\end{enumerate}
+
+\section{Archiving simulations}
+\label{sec:archive}
+
+An archived simulation is four small files, keyed by name:
+\code{simulation.yaml} (the source of truth), \code{metrics.json} ($+$ seed),
+\code{thumb.png} (start$\to$end), optionally \code{run.gif}. Because every run is
+\textbf{bit-deterministic given (spec, seed)} (the engine forces
+\code{torch.use\_deterministic\_algorithms}), \emph{the spec is the archive} ---
+we do not store the trajectory, we regenerate it:
+\begin{itemize}\itemsep1pt
+\item reproduce exactly: \code{reproduce.py <name>}
+\item new realization: \code{reproduce.py <name> -{}-seed 7} (same dynamics, new draw)
+\item visualize differently: the run writes a generic \code{zarr}; point any visualizer at it.
+\end{itemize}
+\textbf{Design rule: archive the recipe, not the dish.} A simulation is $\sim$20
+lines of YAML, so thousands cost almost nothing, and \code{GALLERY.md} is the
+regenerable, always-current index.
+
+\section{When the present code is not enough (a missing model)}
+
+The pipeline fails loudly and points at the gap, e.g.\ for a request needing
+field advection or reaction--diffusion:
+\begin{lstlisting}[style=yaml]
+operator 'reaction_diffusion' not in registry.
+Available: ['adhesion','boids','mechanics','motility','mpm','secrete','sense','trail']
+\end{lstlisting}
+The fix is \textbf{one new \code{Operator} subclass} --- never an engine change:
+write \code{forward(self, H, mask) -> {set: accel}} (or mutate a field, return
+\code{\{\}}); decorate \code{@register\_operator}; declare its needs; reference it
+in the simulation. We exercised this live twice during the experiment: adding
+\code{adhesion} unlocked cell \emph{sorting}, and adding \code{trail} unlocked
+ant \emph{trail-following} --- each $\sim$20 lines, with the engine and all other
+simulations untouched.
+
+\section{When a cell/particle property does not exist}
+\label{sec:prop}
+
+Operators \emph{declare} what they need (\code{REQUIRES\_PARAMS},
+\code{REQUIRES\_TYPE\_PROPS}); the validator checks before running, resolving a
+property along the containment chain (\code{mpm} acts on particles but
+\code{youngs} lives on the parent cell's types):
+\begin{lstlisting}[style=yaml]
+# missing required property -> hard error, before any computation:
+operator 'mpm' requires property 'youngs' on every type of 'cell'; missing on type 'soft'.
+# property no operator reads -> warning (typo guard), run proceeds:
+[warn] property 'viscosity' on cell.soft is read by no operator (known: ['fraction','youngs'])
+\end{lstlisting}
+\textbf{Design rule: capabilities are declared, not discovered at a crash.} The
+operator that consumes a property is the single place that declares the
+requirement, turning a would-be \code{AttributeError} thousands of substeps deep
+into a one-line message up front.
+
+\part*{Part III --- The experiment}
+\addcontentsline{toc}{section}{Part III --- The experiment}
+
+\section{A spread of simulations from one registry}
+
+Once the vocabulary existed, ten qualitatively different behaviours were
+\emph{just different YAML} over the same code (Fig.~\ref{fig:sims}). Breadth comes
+from the intermediate representation, not from new code. Each is 600 cells or 100
+cells of $\sim$100 MLS-MPM particles; soft cells are red, stiff blue, the chemical
+field green.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_sims.png}
+\caption{End states of eight simulations, all generated from the same operator
+registry by changing only the simulation file. \emph{aggregate}: soft cells
+cluster on self-secreted chemical; \emph{disperse}: soft flee their own chemical;
+\emph{swarm}: boids flock; \emph{wander}: active gas; \emph{sort}: type-specific
+adhesion segregates the populations; \emph{chase}: a fast-decaying field makes
+moving hotspots; \emph{crystal}: pure repulsion spaces cells evenly;
+\emph{collapse}: low diffusion $+$ strong chemotaxis $\to$ one tight cluster.}
+\label{fig:sims}
+\end{figure}
+
+\section{Emergent ant trails}
+
+Adding the \code{trail} operator (a Physarum/Jones three-sensor rule: each ant
+samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest,
+while \code{motility} drives it forward and \code{secrete} lays pheromone) yields
+self-reinforcing trails that grow, are followed, and coarsen over long runs
+(Fig.~\ref{fig:ant}). Listing~\ref{lst:ant} is the full simulation.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_ant.png}
+\caption{Ant trail-following over a long run (pheromone in inferno, ant cells in
+cyan). A diffuse network of trails forms (left), reinforces, and \emph{coarsens
+into a few dominant trails} with ants marching along them (right) --- classic
+stigmergy.}
+\label{fig:ant}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_ant_variants.png}
+\caption{Ten ant variants, each the same \code{trail}$+$\code{motility}$+$\code{secrete}
+code with a few parameters changed (turn rate, sensor reach/angle, pheromone
+diffusion/decay, deposit rate, rotational noise). The parameter axes span the
+trail-formation regime --- from loose wandering to tight reinforced networks.}
+\label{fig:antvar}
+\end{figure}
+
+\begin{lstlisting}[style=yaml,caption={The ant simulation: red cells lay, follow, and reinforce pheromone trails.},label=lst:ant]
+name: ant
+seed: 0
+n_frames: 1500
+sets:
+  cell:
+    n: 150
+    types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}
+  particle: {parent: cell, per_parent: 60, radius: 0.012}
+fields:
+  pheromone: {frame: grid, res: 160, diffusion: 0.02, decay: 0.04, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 300.0, rot: 0.06}            # persistent forward motion
+  - {op: trail,  at: "cell[type=soft]", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}
+  - {op: secrete, at: "cell[type=soft]", to: pheromone, rate: 2.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}
+schedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]
+\end{lstlisting}
+
+\section{What the process taught us}
+
+\begin{enumerate}\itemsep2pt
+\item \textbf{The intermediate representation is the whole game.} Ten distinct
+behaviours and an ant model were all different YAML over the same code.
+\item \textbf{Selectors are the highest-leverage primitive.} \code{cell[type=soft]}
+expresses ``only population~1 does~X'' and lets behaviours coexist; every operator
+must honour the selector mask.
+\item \textbf{Verification must check \emph{intent}, not just ``it ran''.} The hard
+bugs were physical: unstable diffusion ($dt\!\cdot\!D>0.25$), wrong particle volume,
+unclamped accelerations blowing up MPM, cell inversion at very low stiffness, GPU
+non-determinism breaking reproducibility, and --- subtlest --- the \emph{wrong
+metric} (net displacement vs.\ nearest-neighbour clustering).
+\item \textbf{Honesty about regime.} Self-secreted chemotaxis aggregates only below
+a density threshold (above it the field is spatially flat --- correct physics); the
+simulation/verify output should state the regime, not silently show the one setting
+that worked.
+\item \textbf{Determinism is a feature you must force} (deterministic CUDA kernels),
+or ``reproduce with a new seed'' is meaningless.
+\end{enumerate}
+
+\part*{Part IV --- Building the repository}
+\addcontentsline{toc}{section}{Part IV --- Building the repository}
+
+\section{Proposed methodology}
+
+\paragraph{Layering (strict; no leaks across).}
+\begin{itemize}\itemsep1pt
+\item \code{models/base.py} --- entities, operator base, the capability-contract fields.
+\item \code{models/registry.py} --- the only name$\to$code map (entity / operator / field).
+\item \code{models/<domain>/*.py} --- operators, one concern per file, each declaring \code{REQUIRES\_*}.
+\item \code{simulation.py} --- the schema $+$ validator (the contract gatekeeper).
+\item \code{engine.py} --- generic; contains \textbf{no} simulation-specific logic.
+\item \code{viz.py} --- generic over the \code{Hierarchy}/\code{zarr}; swappable backends (2-D now, 3-D later).
+\item \code{archive.py} $+$ \code{simulations/} --- the growing, reproducible gallery.
+\end{itemize}
+
+\paragraph{The build loop (how LLM and code co-evolve).}
+\begin{enumerate}\itemsep1pt
+\item user states intent in natural language;
+\item LLM compiles $\to$ \code{simulation.yaml} (following the mapping rules);
+\item validator runs: unknown op $\to$ write one operator; missing property $\to$ fix
+spec or add the requirement; else it is runnable;
+\item engine runs; \textbf{verify} checks intent $+$ repeatability $+$ well-formedness;
+\item \code{archive.py} records spec$+$seed$+$metrics$+$thumb into the gallery;
+\item new capability $\to$ one new registered operator ($+$ its \code{REQUIRES\_*}),
+never an engine edit.
+\end{enumerate}
+
+\paragraph{Invariants to hold the line.}
+\begin{itemize}\itemsep1pt
+\item Code lives only behind the registry; the engine never branches on simulation names.
+\item Every operator honours its selector mask and declares its \code{REQUIRES\_*}.
+\item Every simulation ships an intent check; ``it ran'' $\neq$ ``it worked''.
+\item Archive the recipe (spec$+$seed); regenerate the dish.
+\item When a result holds only in a regime, the spec/verify says so.
+\end{itemize}
+
+This is the contract that lets the LLM operate at the top (intent $\to$ simulation,
+plus occasional single-operator authoring) while the low-level code stays a clean,
+growing, verifiable registry underneath.
 
 \end{document}
