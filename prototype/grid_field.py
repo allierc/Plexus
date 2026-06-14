@@ -37,8 +37,8 @@ class GridField(Field):
 
     # --- index helpers (bilinear) ---
     def _corners(self, pos):
-        g = pos.clamp(0, 1 - 1e-6) * self.res          # [N,2] continuous grid coords
-        i0 = g.floor().long()
+        g = torch.nan_to_num(pos, nan=0.5).clamp(0, 1 - 1e-6) * self.res   # [N,2] grid coords
+        i0 = g.floor().long().clamp(0, self.res - 1)
         f = g - i0.float()
         i1 = (i0 + 1).clamp(max=self.res - 1)
         return i0, i1, f                                # f in [0,1]

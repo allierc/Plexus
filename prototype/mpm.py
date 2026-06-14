@@ -87,8 +87,16 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     dpos_grid = offsets[None] - fx[:, None, :]                      # [N,9,2]
     new_C = 4 * inv_dx * (weight[..., None, None]
                           * (gvn[..., :, None] @ dpos_grid[..., None, :])).sum(1)
+    # robustness: bound velocity (CFL) and sanitize NaN/inf so a bad design can't
+    # poison the CUDA context -- it just produces a poor (low-food) trajectory.
+    new_V = torch.nan_to_num(new_V)
+    sp = new_V.norm(dim=1, keepdim=True).clamp(min=1e-9)
+    vmax = 0.4 * dx / dt
+    new_V = new_V * (sp.clamp(max=vmax) / sp)
+    new_C = torch.nan_to_num(new_C)
+    F = torch.nan_to_num(F, nan=1.0)
     margin = 2 * dx
-    X = (X + dt * new_V).clamp(margin, 1 - margin)
+    X = torch.nan_to_num(X + dt * new_V, nan=0.5).clamp(margin, 1 - margin)
     return X, new_V, new_C, F
 
 

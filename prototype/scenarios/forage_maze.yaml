@@ -17,6 +17,7 @@ sets:
     types: {A: {fraction: 0.5, youngs: 300}, B: {fraction: 0.5, youngs: 300}}  # both rigid
   particle: {parent: cell, per_parent: 50, radius: 0.012, density: 1.0}
 fields:
+  scent: {frame: grid, res: 96, diffusion: 0.04, decay: 0.02, couples_to: cell}   # deposited tracks
   food_signal: {frame: grid, res: 96, diffusion: 1.0, source: [0.82, 0.82, 1.0, 1.0], couples_to: cell}
   home_signal: {frame: grid, res: 96, diffusion: 1.0, source: [0.00, 0.00, 0.18, 0.18], couples_to: cell}
 operators:
@@ -24,5 +25,6 @@ operators:
   - {op: forage, at: cell, food: [0.82, 0.82, 1.0, 1.0], home: [0.0, 0.0, 0.18, 0.18]}
   - {op: sense, at: "cell[loaded=0]", from: food_signal, gain: 250.0}      # unloaded -> seek food
   - {op: sense, at: "cell[loaded=1]", from: home_signal, gain: 250.0}      # loaded -> return home
+  - {op: secrete, at: cell, to: scent, rate: 1.0}                          # lay chemoattractant track
   - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 1000, drag: 1.0}
-schedule: [aggregate, forage, [motility, sense], mpm]   # navigation fields are static (geodesic)
+schedule: [aggregate, forage, [motility, sense], secrete, scent.diffuse, mpm]
