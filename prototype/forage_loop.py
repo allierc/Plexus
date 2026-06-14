@@ -120,8 +120,8 @@ def main():
     print(f"[start] {len(PARAMS)} levers: {PARAMS}", flush=True)
     print("[start] rendering initial reference gif (~90s, no output until done)...", flush=True)
     # initial reference: render the default (starting) configuration before optimizing
-    init_u = (np.array([40., 180., 2.0, 0.30, 300., 700., 0.012, 60.])
-              - BOUNDS[:, 0]) / (BOUNDS[:, 1] - BOUNDS[:, 0])
+    init_u = (np.array([40., 180., 2.0, 0.30, 550., 700., 0.012, 60.])
+              - BOUNDS[:, 0]) / (BOUNDS[:, 1] - BOUNDS[:, 0])    # start with more rigid cells
     init_food = render_winner(init_u, "initial.gif", fps=40)
     winners_list = [{"k": 0, "food": init_food,
                      "params": BOUNDS[:, 0] + init_u * (BOUNDS[:, 1] - BOUNDS[:, 0]),

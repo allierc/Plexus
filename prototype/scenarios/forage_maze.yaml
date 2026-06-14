@@ -14,7 +14,7 @@ sets:
   cell:
     n: 60
     start: [0.02, 0.02, 0.18, 0.18]            # spawn at home
-    types: {A: {fraction: 0.5, youngs: 300}, B: {fraction: 0.5, youngs: 300}}  # both rigid
+    types: {A: {fraction: 0.5, youngs: 550}, B: {fraction: 0.5, youngs: 550}}  # both very rigid
   particle: {parent: cell, per_parent: 50, radius: 0.012, density: 1.0}
 fields:
   scent: {frame: grid, res: 96, diffusion: 0.04, decay: 0.02, couples_to: cell}   # deposited tracks
