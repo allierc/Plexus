@@ -129,10 +129,27 @@ def main():
     write_index(winners_list)
     print(f"[initial] food={init_food} -> initial.gif", flush=True)
 
+    winners = 0
+    last_winner = init_food                              # baseline to beat (initial.gif)
+
+    def maybe_winner(u, f):
+        nonlocal winners, last_winner
+        if f < last_winner + 20:                         # save a winner only on +20 food
+            return
+        winners += 1
+        gif = f"winner_{winners}.gif"
+        full = render_winner(u, gif, fps=40)
+        p = BOUNDS[:, 0] + u * (BOUNDS[:, 1] - BOUNDS[:, 0])
+        winners_list.append({"k": winners, "food": full, "params": p, "gif": gif})
+        write_index(winners_list)
+        last_winner = f
+        print(f"[WINNER {winners}] food={f:.0f} (full {full}) -> {gif}  "
+              + ", ".join(f"{k}={v:.2f}" for k, v in zip(PARAMS, p)), flush=True)
+
     X, Y = [], []
-    for _ in range(5):                                   # random seed
-        u = rng.random(D); X.append(u); Y.append(evaluate(u))
-    best = max(Y); winners = 0
+    for _ in range(5):                                   # random seed (winners can fire here)
+        u = rng.random(D); f = evaluate(u); X.append(u); Y.append(f); maybe_winner(u, f)
+    best = max(Y)
     print(f"[seed] best={best:.0f}  ({len(Y)} evals, {time.time()-t0:.0f}s)", flush=True)
 
     while time.time() - t0 < budget:
@@ -148,17 +165,8 @@ def main():
         unc = d.min(1)
         scale = (Ya.max() - Ya.min()) or 1.0
         u = cand[(mean + 0.6 * scale * unc).argmax()]      # lower exploration -> faster convergence
-        f = evaluate(u); X.append(u); Y.append(f)
-
-        if f >= best + max(5.0, 0.12 * best):           # significant new winner
-            best = f; winners += 1
-            gif = f"winner_{winners}.gif"
-            full = render_winner(u, gif, fps=40)
-            p = BOUNDS[:, 0] + u * (BOUNDS[:, 1] - BOUNDS[:, 0])
-            winners_list.append({"k": winners, "food": full, "params": p, "gif": gif})
-            write_index(winners_list)
-            print(f"[WINNER {winners}] search_food={f:.0f} full_food={full} -> {gif}  "
-                  + ", ".join(f"{k}={v:.2f}" for k, v in zip(PARAMS, p)), flush=True)
+        f = evaluate(u); X.append(u); Y.append(f); best = max(best, f)
+        maybe_winner(u, f)                                  # save a winner on +20 food
         if len(Y) % 10 == 0:
             save_curve(Y, best)
             print(f"  {len(Y)} evals, best={best:.0f}, {time.time()-t0:.0f}s", flush=True)
