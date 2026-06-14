@@ -25,8 +25,10 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from scenario_schema import load
 import engine2
 
-BOUNDS = np.array([[20., 120.], [80., 400.], [0.5, 3.0], [0.10, 0.60], [20., 600.]])
-PARAMS = ["motility.speed", "sense.gain", "mpm.drag", "motility.rot", "cell.youngs"]  # +material lever
+BOUNDS = np.array([[20., 120.], [80., 400.], [0.5, 3.0], [0.10, 0.60],
+                   [20., 600.], [400., 2000.], [0.008, 0.018], [30., 120.]])
+PARAMS = ["motility.speed", "sense.gain", "mpm.drag", "motility.rot",
+          "cell.youngs", "mpm.a_max", "particle.radius", "cell.n"]   # 8 levers
 SEARCH_FRAMES = 1500
 GIF_FRAMES = 1500
 DEVICE = "cuda"
@@ -42,9 +44,11 @@ def _apply(sc, p, n_frames):
         elif o.op == "sense":
             o.params["gain"] = float(p[1])
         elif o.op == "mpm":
-            o.params["drag"] = float(p[2])
+            o.params["drag"] = float(p[2]); o.params["a_max"] = float(p[5])
     for t in sc.sets["cell"]["types"].values():     # material lever: cell stiffness
         t["youngs"] = float(p[4])
+    sc.sets["particle"]["radius"] = float(p[6])      # cell size
+    sc.sets["cell"]["n"] = int(round(p[7]))          # fleet size
     return sc
 
 
@@ -116,7 +120,8 @@ def main():
     print(f"[start] {len(PARAMS)} levers: {PARAMS}", flush=True)
     print("[start] rendering initial reference gif (~90s, no output until done)...", flush=True)
     # initial reference: render the default (starting) configuration before optimizing
-    init_u = (np.array([60., 250., 1.0, 0.30, 300.]) - BOUNDS[:, 0]) / (BOUNDS[:, 1] - BOUNDS[:, 0])
+    init_u = (np.array([60., 250., 1.0, 0.30, 300., 1000., 0.012, 60.])
+              - BOUNDS[:, 0]) / (BOUNDS[:, 1] - BOUNDS[:, 0])
     init_food = render_winner(init_u, "initial.gif", fps=40)
     winners_list = [{"k": 0, "food": init_food,
                      "params": BOUNDS[:, 0] + init_u * (BOUNDS[:, 1] - BOUNDS[:, 0]),
@@ -132,13 +137,17 @@ def main():
 
     while time.time() - t0 < budget:
         Xa, Ya = np.array(X), np.array(Y)
-        cand = rng.random((4000, D))
+        best_u = Xa[Ya.argmax()]
+        # candidate pool = global exploration + LOCAL refinement around the best
+        glob = rng.random((2500, D))
+        loc = np.clip(best_u + rng.normal(0, 0.07, (2500, D)), 0, 1)
+        cand = np.vstack([glob, loc])
         d = np.linalg.norm(cand[:, None, :] - Xa[None, :, :], axis=2)
         w = np.exp(-(d / 0.22) ** 2) + 1e-9
         mean = (w * Ya[None, :]).sum(1) / w.sum(1)
         unc = d.min(1)
         scale = (Ya.max() - Ya.min()) or 1.0
-        u = cand[(mean + 2.0 * scale * unc).argmax()]
+        u = cand[(mean + 0.6 * scale * unc).argmax()]      # lower exploration -> faster convergence
         f = evaluate(u); X.append(u); Y.append(f)
 
         if f >= best + max(5.0, 0.12 * best):           # significant new winner
