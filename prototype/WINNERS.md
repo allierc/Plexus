@@ -2,6 +2,6 @@
 
 Each row is a significantly-better design found by UCB search; the gif shows it at 40 fps with loaded cells in green.
 
-| # | food delivered | motility.speed | sense.gain | mpm.drag | motility.rot | cell.youngs | gif |
-|---|---|---|---|---|---|---|---|
-| 0 | 50 | 60.00 | 250.00 | 1.00 | 0.30 | 300.00 | [initial.gif](initial.gif) |
+| # | food delivered | motility.speed | sense.gain | mpm.drag | motility.rot | cell.youngs | mpm.a_max | particle.radius | cell.n | gif |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 50 | 40.00 | 180.00 | 2.00 | 0.30 | 300.00 | 700.00 | 0.01 | 60.00 | [initial.gif](initial.gif) |
