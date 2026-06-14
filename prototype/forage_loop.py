@@ -27,8 +27,8 @@ import engine2
 
 BOUNDS = np.array([[20., 120.], [80., 400.], [0.5, 3.0], [0.10, 0.60], [20., 600.]])
 PARAMS = ["motility.speed", "sense.gain", "mpm.drag", "motility.rot", "cell.youngs"]  # +material lever
-SEARCH_FRAMES = 1800     # doubled: longer foraging -> clearer food signal
-GIF_FRAMES = 3000        # doubled: winner gifs show more foraging cycles
+SEARCH_FRAMES = 1500
+GIF_FRAMES = 1500
 DEVICE = "cuda"
 PAL = np.array([[1.0, 0.30, 0.30, 1.0], [0.30, 0.65, 1.0, 1.0]])   # type A red, B blue (RGBA)
 GREEN = np.array([0.15, 0.95, 0.25, 1.0])
