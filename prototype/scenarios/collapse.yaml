@@ -14,7 +14,7 @@ fields:
 operators:
   - {op: motility, at: cell, speed: 10.0, rot: 0.4}
   - {op: boids, at: cell, radius: 0.06, cohesion: 0.05, align: 0.1, separate: 0.3}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4, vmax: 6.0}
   - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}
   - {op: sense, at: "cell[type=soft]", from: chemical, gain: 300.0}
 schedule: [aggregate, [motility, boids], secrete, chemical.diffuse, sense, mpm]

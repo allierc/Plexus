@@ -13,7 +13,7 @@ fields:
   chemical: {frame: grid, res: 96, diffusion: 0.05, decay: 0.30, couples_to: cell}
 operators:
   - {op: motility, at: cell, speed: 40.0, rot: 0.4}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4, vmax: 6.0}
   - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 2.0}
   - {op: sense, at: "cell[type=soft]", from: chemical, gain: 250.0}
 schedule: [aggregate, motility, secrete, chemical.diffuse, sense, mpm]

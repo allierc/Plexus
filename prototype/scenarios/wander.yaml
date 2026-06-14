@@ -14,5 +14,5 @@ fields:
 operators:
   - {op: motility, at: cell, speed: 60.0, rot: 0.5}
   - {op: boids, at: cell, radius: 0.08, cohesion: 0.0, align: 0.0, separate: 0.6}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4, vmax: 6.0}
 schedule: [aggregate, [motility, boids], mpm]
