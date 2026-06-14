@@ -24,7 +24,7 @@ _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torc
 
 
 def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
-                   n_grid, dx, inv_dx, dt, p_vol, drag):
+                   n_grid, dx, inv_dx, dt, p_vol, drag, walls_flat):
     """One MLS-MPM substep. All tensors batched over particles. Pure -> compilable."""
     N = X.shape[0]
     eye = torch.eye(2, device=X.device).expand(N, 2, 2)
@@ -79,6 +79,7 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     gv[lo, :, 0] = gv[lo, :, 0].clamp(min=0); gv[hi, :, 0] = gv[hi, :, 0].clamp(max=0)
     gv[:, lo, 1] = gv[:, lo, 1].clamp(min=0); gv[:, hi, 1] = gv[:, hi, 1].clamp(max=0)
     gv = gv.view(n_grid * n_grid, 2)
+    gv = torch.where(walls_flat[:, None], torch.zeros_like(gv), gv)   # interior wall BC
 
     # --- G2P ---
     gvn = gv[flat].view(N, 9, 2)                                    # [N,9,2]
@@ -114,13 +115,16 @@ class MPMOperator(Exchange):
         cell_accel = cell_accel.clamp(-self.a_max, self.a_max)
         a_ext = cell_accel[p.parent]                       # broadcast down  [Np,2]
         offsets = _OFFSETS.to(p.state.device)
+        walls = getattr(H, "walls_mpm", None)              # interior obstacles (optional)
+        if walls is None:
+            walls = torch.zeros(self.n_grid * self.n_grid, dtype=torch.bool, device=p.state.device)
 
         fn = self.compiled or mlsmpm_substep
         X, V = p.state[:, :2], p.state[:, 2:4]
         C, F = p.C, p.F
         for _ in range(self.substeps):
             X, V, C, F = fn(X, V, C, F, p.mass, p.mu, p.la, a_ext, offsets,
-                            self.n_grid, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag)
+                            self.n_grid, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls)
         p.state = torch.cat([X, V], dim=1)
         p.C, p.F = C, F
         return {}

@@ -16,14 +16,24 @@ from tissue_graph.models.registry import register_field
 @register_field("grid", frame="eulerian")
 class GridField(Field):
     def __init__(self, name, couples_to, res=96, diffusion=0.1, decay=0.0,
-                 dt=0.05, device="cpu"):
+                 dt=0.05, device="cpu", walls=None, source=None, source_rate=0.0):
         super().__init__(name, couples_to)
         self.res = int(res)
         self.D = float(diffusion)
         self.decay = float(decay)
         self.dt = float(dt)
         self.device = device
+        self.source_rate = float(source_rate)
         self.register_buffer("grid", torch.zeros(self.res, self.res, device=device))
+        # optional static masks (maze): walls block diffusion, source injects chemical
+        self.register_buffer("walls", walls if walls is not None
+                             else torch.zeros(self.res, self.res, dtype=torch.bool, device=device))
+        self.register_buffer("source", source if source is not None
+                             else torch.zeros(self.res, self.res, dtype=torch.bool, device=device))
+
+    def equilibrate(self, n):                           # pre-solve the maze gradient
+        for _ in range(n):
+            self.step()
 
     # --- index helpers (bilinear) ---
     def _corners(self, pos):
@@ -64,11 +74,18 @@ class GridField(Field):
             return (a * (1 - wx) + b * wx) * (1 - wy) + (c * (1 - wx) + d * wx) * wy
         return torch.stack([sample(gx), sample(gy)], dim=1)   # [N,2]
 
-    def step(self):                                    # self-update: diffusion + decay
+    def step(self):                                    # self-update: diffusion + decay (+ walls, source)
         c = self.grid
-        # discrete Laplacian in grid-index units; stable while dt*D <= 0.25
-        lap = (
-            torch.roll(c, 1, 0) + torch.roll(c, -1, 0)
-            + torch.roll(c, 1, 1) + torch.roll(c, -1, 1) - 4 * c
-        )
-        self.grid = (c + self.dt * (self.D * lap - self.decay * c)).clamp(min=0.0)
+        w = self.walls
+        # no-flux at walls: a wall neighbour contributes no gradient (treated as == c)
+        lap = c.new_zeros(c.shape)
+        for d, ax in ((1, 0), (-1, 0), (1, 1), (-1, 1)):
+            cn = torch.roll(c, d, ax)
+            wn = torch.roll(w, d, ax)
+            cn = torch.where(wn, c, cn)               # wall neighbour -> no flux
+            lap = lap + (cn - c)
+        g = (c + self.dt * (self.D * lap - self.decay * c)).clamp(min=0.0)
+        if self.source_rate > 0:
+            g = g + self.dt * self.source_rate * self.source.float()
+        g = torch.where(w, torch.zeros_like(g), g)    # walls hold no chemical
+        self.grid = g

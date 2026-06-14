@@ -54,6 +54,7 @@ class Scenario:
     fields: dict
     operators: list[OpSpec]
     schedule: list
+    obstacles: list = field(default_factory=list)   # wall rectangles [x0,y0,x1,y1]
 
 
 _RESERVED = {"op", "at", "to", "from"}
@@ -164,4 +165,5 @@ def load(path: str) -> Scenario:
         fields=raw["fields"],
         operators=ops,
         schedule=raw["schedule"],
+        obstacles=raw.get("obstacles", []),
     )

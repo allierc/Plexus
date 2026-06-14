@@ -34,6 +34,46 @@ def _lame(E):
     return mu, la
 
 
+def _geodesic_potential(walls_np, source_np):
+    """Navigation potential = distance-to-source through OPEN corridors (BFS),
+    mapped so the field is high at the source and decreases with maze distance.
+    This is the steady state of source-diffusion-with-walls; gradient ascent on it
+    routes around obstacles. Unreachable/wall cells are 0."""
+    from collections import deque
+    res = walls_np.shape[0]
+    INF = 1 << 30
+    dist = np.full((res, res), INF, np.int64)
+    dq = deque()
+    src = np.argwhere(source_np & ~walls_np)
+    for i, j in src:
+        dist[i, j] = 0; dq.append((i, j))
+    while dq:
+        i, j = dq.popleft()
+        for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            a, b = i + di, j + dj
+            if 0 <= a < res and 0 <= b < res and not walls_np[a, b] and dist[a, b] == INF:
+                dist[a, b] = dist[i, j] + 1; dq.append((a, b))
+    reach = dist < INF
+    pot = np.zeros((res, res), np.float32)
+    if reach.any():
+        dmax = dist[reach].max()
+        pot[reach] = (dmax - dist[reach]).astype(np.float32) / max(dmax, 1)
+    pot[walls_np] = 0.0
+    return pot
+
+
+def _raster(rects, res, device):
+    """Rasterize a list of [x0,y0,x1,y1] rectangles to a boolean [res,res] grid.
+    grid[i,j] center is at ((i+0.5)/res, (j+0.5)/res) -- matches GridField/MPM indexing."""
+    c = (torch.arange(res, device=device).float() + 0.5) / res
+    X = c[:, None].expand(res, res)
+    Y = c[None, :].expand(res, res)
+    m = torch.zeros(res, res, dtype=torch.bool, device=device)
+    for r in rects:
+        m |= (X >= r[0]) & (X <= r[2]) & (Y >= r[1]) & (Y <= r[3])
+    return m
+
+
 def build(sc, device="cpu"):
     g = torch.Generator(device=device).manual_seed(sc.seed)
     H = Hierarchy()
@@ -55,16 +95,25 @@ def build(sc, device="cpu"):
         node_type[idx] = tid
         youngs[idx] = float(t["youngs"])
     cell.register_buffer("node_type", node_type)
+    cell.loaded = torch.zeros(Nc, dtype=torch.bool, device=device)   # forage state (unused otherwise)
     H.add_level(cell)
 
-    # disc centers on a jittered lattice (deterministic, non-overlapping)
     ps = sc.sets["particle"]
     ppc = int(ps["per_parent"]); rad = float(ps["radius"]); rho = float(ps.get("density", 1.0))
-    side = math.ceil(math.sqrt(Nc)); spacing = 1.0 / side
-    rows = (torch.arange(Nc, device=device) // side).float()
-    cols = (torch.arange(Nc, device=device) % side).float()
-    jit = (torch.rand(Nc, 2, generator=g, device=device) - 0.5) * spacing * 0.2
-    centers = torch.stack([(cols + 0.5) * spacing, (rows + 0.5) * spacing], 1) + jit
+    start_rect = cs.get("start")
+    if start_rect is not None:
+        # scatter cell centers uniformly in a start region (e.g. home)
+        x0, y0, x1, y1 = start_rect
+        centers = torch.rand(Nc, 2, generator=g, device=device)
+        centers[:, 0] = x0 + centers[:, 0] * (x1 - x0)
+        centers[:, 1] = y0 + centers[:, 1] * (y1 - y0)
+    else:
+        # disc centers on a jittered lattice (deterministic, non-overlapping)
+        side = math.ceil(math.sqrt(Nc)); spacing = 1.0 / side
+        rows = (torch.arange(Nc, device=device) // side).float()
+        cols = (torch.arange(Nc, device=device) % side).float()
+        jit = (torch.rand(Nc, 2, generator=g, device=device) - 0.5) * spacing * 0.2
+        centers = torch.stack([(cols + 0.5) * spacing, (rows + 0.5) * spacing], 1) + jit
 
     # --- particle level (L0): uniform disc around each cell center ---
     Np = Nc * ppc
@@ -86,23 +135,41 @@ def build(sc, device="cpu"):
     part.register_buffer("mass", torch.full((Np,), p_vol * rho, device=device))
     H.add_level(part)
 
+    # --- obstacles (maze): one mask, reused as BC by both fields and MPM ---
+    obstacles = getattr(sc, "obstacles", [])
+    n_grid = next((int(o.params.get("n_grid", 128)) for o in sc.operators if o.op == "mpm"), 128)
+    H.walls_mpm = (_raster(obstacles, n_grid, device).view(-1) if obstacles
+                   else torch.zeros(n_grid * n_grid, dtype=torch.bool, device=device))
+
     for fname, f in sc.fields.items():
-        # field dt chosen for diffusion stability (dt*D <= 0.25)
         dt_f = min(0.2 / max(f["diffusion"], 1e-6), 0.2)
-        H.add_field(GridField(fname, f["couples_to"], res=f["res"], diffusion=f["diffusion"],
-                              decay=f.get("decay", 0.0), dt=dt_f, device=device))
+        res = int(f["res"])
+        walls = _raster(obstacles, res, device) if obstacles else None
+        src = _raster([f["source"]], res, device) if f.get("source") else None
+        fld = GridField(fname, f["couples_to"], res=res, diffusion=f["diffusion"],
+                        decay=f.get("decay", 0.0), dt=dt_f, device=device,
+                        walls=walls, source=src, source_rate=f.get("source_rate", 0.0))
+        if f.get("source"):  # static navigation potential = geodesic distance to source
+            wnp = (walls.cpu().numpy() if walls is not None else np.zeros((res, res), bool))
+            pot = _geodesic_potential(wnp, src.cpu().numpy())
+            fld.grid = torch.from_numpy(pot).to(device)
+        H.add_field(fld)
     H.cell_accel = torch.zeros(Nc, 2, device=device)
     H.rng = torch.Generator(device=device).manual_seed(sc.seed + 12345)   # for motility
     return H
 
 
 def _mask(H, sel):
+    """Resolve a selector to a boolean mask -- recomputed every frame so that
+    state-dependent selectors (e.g. cell[loaded=1]) track the live state."""
     lvl = H.level(sel.set)
-    n = lvl.n
     if sel.attr is None:
-        return torch.ones(n, dtype=torch.bool, device=lvl.state.device)
-    tid = lvl.type_names.index(sel.val)
-    return lvl.node_type == tid
+        return torch.ones(lvl.n, dtype=torch.bool, device=lvl.state.device)
+    if sel.attr == "type":
+        return lvl.node_type == lvl.type_names.index(sel.val)
+    if sel.attr == "loaded":
+        return lvl.loaded == bool(int(sel.val))
+    raise ValueError(f"unknown selector attribute {sel.attr!r}")
 
 
 def _aggregate_up(H):
@@ -116,12 +183,16 @@ def _aggregate_up(H):
     cell.state = sums / cnt.clamp(min=1)
 
 
-def run(sc, out_path, device="cpu", compile_mpm=False):
+def run(sc, out_path=None, device="cpu", compile_mpm=False):
     H = build(sc, device)
-    inst = {o.op: (get_operator(o.op)({**o.params, "to": o.to, "from": o.frm}, device), _mask(H, o.on))
-            for o in sc.operators}
+    # instances as a list (op_name, object, selector) -> multiple ops of the same
+    # type are allowed; masks are resolved per-frame (dynamic selectors).
+    inst = [(o.op, get_operator(o.op)({**o.params, "to": o.to, "from": o.frm}, device), o.on)
+            for o in sc.operators]
     if compile_mpm:
-        inst["mpm"][0].compiled = torch.compile(_mpm.mlsmpm_substep, dynamic=False)
+        for nm, ob, _ in inst:
+            if nm == "mpm":
+                ob.compiled = torch.compile(_mpm.mlsmpm_substep, dynamic=False)
 
     cell, part = H.level("cell"), H.level("particle")
     fld_name = next(iter(sc.fields))
@@ -129,7 +200,9 @@ def run(sc, out_path, device="cpu", compile_mpm=False):
     n_rec = sc.n_frames // re + 1
     cen = np.zeros((n_rec, cell.n, 2), np.float32)
     ppos = np.zeros((n_rec, part.n, 2), np.float32)
+    loaded = np.zeros((n_rec, cell.n), bool)
     fhist = np.zeros((n_rec, H.fields[fld_name].res, H.fields[fld_name].res), np.float32)
+    delivered_t = np.zeros(n_rec, np.int32)
 
     rec = 0
     for frame in range(sc.n_frames + 1):
@@ -140,26 +213,34 @@ def run(sc, out_path, device="cpu", compile_mpm=False):
                     _aggregate_up(H)
                 elif tok.endswith(".diffuse"):
                     H.fields[tok[:-len(".diffuse")]].step()
-                elif tok == "mpm":
-                    inst["mpm"][0](H, None)
-                else:
-                    op, m = inst[tok]
-                    for _, d in op(H, m).items():
-                        H.cell_accel = H.cell_accel + d
+                else:                                  # run every operator of this name
+                    for nm, ob, sel in inst:
+                        if nm != tok:
+                            continue
+                        for _, d in ob(H, _mask(H, sel)).items():
+                            H.cell_accel = H.cell_accel + d
         if frame % re == 0:
             cen[rec] = cell.state[:, :2].cpu().numpy()
             ppos[rec] = part.state[:, :2].cpu().numpy()
+            loaded[rec] = cell.loaded.cpu().numpy()
             fhist[rec] = H.fields[fld_name].grid.cpu().numpy()
+            delivered_t[rec] = getattr(H, "food_delivered", 0)
             rec += 1
 
-    root = zarr.open_group(out_path, mode="w")
-    root.create_dataset("cell_pos", data=cen[:rec])
-    root.create_dataset("cell_type", data=cell.node_type.cpu().numpy())
-    root.create_dataset("particle_pos", data=ppos[:rec])
-    root.create_dataset("particle_parent", data=part.parent.cpu().numpy())
-    root.create_dataset(f"field_{fld_name}", data=fhist[:rec])
-    root.attrs.update(dict(name=sc.name, seed=sc.seed, type_names=cell.type_names,
-                           record_every=re, ppc=int(sc.sets["particle"]["per_parent"])))
-    return out_path, dict(cell_pos=cen[:rec], cell_type=cell.node_type.cpu().numpy(),
-                          particle_pos=ppos[:rec], parent=part.parent.cpu().numpy(),
-                          field=fhist[:rec], type_names=cell.type_names)
+    out = dict(cell_pos=cen[:rec], cell_type=cell.node_type.cpu().numpy(),
+               particle_pos=ppos[:rec], parent=part.parent.cpu().numpy(),
+               loaded=loaded[:rec], field=fhist[:rec], type_names=cell.type_names,
+               food_delivered=int(getattr(H, "food_delivered", 0)),
+               delivered_t=delivered_t[:rec],
+               walls=(_raster(getattr(sc, "obstacles", []), H.fields[fld_name].res, device).cpu().numpy()
+                      if getattr(sc, "obstacles", []) else None))
+    if out_path is not None:
+        root = zarr.open_group(out_path, mode="w")
+        for k in ("cell_pos", "cell_type", "particle_pos", "parent", "loaded", "delivered_t"):
+            root.create_dataset(k, data=out[k])
+        root.create_dataset(f"field_{fld_name}", data=out["field"])
+        if out["walls"] is not None:
+            root.create_dataset("walls", data=out["walls"])
+        root.attrs.update(dict(name=sc.name, seed=sc.seed, type_names=cell.type_names,
+                               record_every=re, food_delivered=out["food_delivered"]))
+    return out_path, out

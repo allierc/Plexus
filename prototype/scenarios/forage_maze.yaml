@@ -1,0 +1,28 @@
+# Maze foraging. Two rigid populations start at HOME (bottom-left), navigate a
+# walled maze to FOOD (top-right) up the food-signal gradient, pick up food
+# (loaded=1), then return home down... up the home-signal gradient, drop off, repeat.
+# Obstacles = wall rectangles -> one mask used as a boundary condition by BOTH the
+# MPM grid (cells can't enter) and the navigation fields (gradient routes around).
+name: forage_maze
+seed: 0
+n_frames: 1500
+record_every: 6
+obstacles:                       # [x0,y0,x1,y1] in [0,1]
+  - [0.30, 0.00, 0.36, 0.70]     # wall with a gap at the top
+  - [0.62, 0.30, 0.68, 1.00]     # wall with a gap at the bottom
+sets:
+  cell:
+    n: 60
+    start: [0.02, 0.02, 0.18, 0.18]            # spawn at home
+    types: {A: {fraction: 0.5, youngs: 300}, B: {fraction: 0.5, youngs: 300}}  # both rigid
+  particle: {parent: cell, per_parent: 50, radius: 0.012, density: 1.0}
+fields:
+  food_signal: {frame: grid, res: 96, diffusion: 1.0, source: [0.82, 0.82, 1.0, 1.0], couples_to: cell}
+  home_signal: {frame: grid, res: 96, diffusion: 1.0, source: [0.00, 0.00, 0.18, 0.18], couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 60.0, rot: 0.30}                       # exploration
+  - {op: forage, at: cell, food: [0.82, 0.82, 1.0, 1.0], home: [0.0, 0.0, 0.18, 0.18]}
+  - {op: sense, at: "cell[loaded=0]", from: food_signal, gain: 250.0}      # unloaded -> seek food
+  - {op: sense, at: "cell[loaded=1]", from: home_signal, gain: 250.0}      # loaded -> return home
+  - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 1000, drag: 1.0}
+schedule: [aggregate, forage, [motility, sense], mpm]   # navigation fields are static (geodesic)
