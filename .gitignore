@@ -8,3 +8,6 @@ docs/*.log
 docs/*.out
 docs/*.fls
 docs/*.fdb_latexmk
+prototype/*.gif
+prototype/*.png
+prototype/*.zarr

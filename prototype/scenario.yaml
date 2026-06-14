@@ -1,0 +1,36 @@
+# Scenario spec — the new "config". Compositional: every parameter lives next to
+# the thing it parameterizes. See SCENARIO_BIBLE.md for the authoring contract.
+name: boids_two_types_chemotaxis
+seed: 0
+n_frames: 400
+dt: 0.05
+
+sets:
+  cell:
+    n: 2000
+    dim: 2
+    damping: 0.5
+    types:                       # two populations, differing only by mechanics
+      soft:  {fraction: 0.5, elasticity: 0.15, rigidness: 0.06}
+      stiff: {fraction: 0.5, elasticity: 1.20, rigidness: 0.10}
+
+fields:
+  chemical:
+    frame: grid                  # its own grid; resolution independent of n cells
+    res: 96
+    diffusion: 1.5          # grid-index units (stable while dt*diffusion <= 0.25)
+    decay: 0.02
+    couples_to: cell
+
+operators:
+  - {op: boids,    at: cell, radius: 0.07, cohesion: 0.8, align: 0.5, separate: 1.5}
+  - {op: mechanics, at: cell}                         # reads per-type elasticity/rigidness
+  - {op: secrete,  at: cell, to: chemical, rate: 1.0} # ALL cells deposit
+  - {op: sense,    at: "cell[type=soft]", from: chemical, gain: 3.0}  # ONLY pop 1 follows
+
+schedule:                        # ordered, one outer tick = one frame
+  - [boids, mechanics]           # accelerations
+  - secrete                      # deposit into field
+  - chemical.diffuse             # field self-update (Laplacian + decay)
+  - sense                        # gated to soft cells -> chemotactic accel
+  - integrate                    # vel += dt*(acc - damping*vel); pos += dt*vel
