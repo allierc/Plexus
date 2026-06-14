@@ -24,7 +24,7 @@ _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torc
 
 
 def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
-                   n_grid, dx, inv_dx, dt, p_vol, drag, walls_flat):
+                   n_grid, dx, inv_dx, dt, p_vol, drag, walls_flat, vmax_user):
     """One MLS-MPM substep. All tensors batched over particles. Pure -> compilable."""
     N = X.shape[0]
     eye = torch.eye(2, device=X.device).expand(N, 2, 2)
@@ -91,7 +91,7 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     # poison the CUDA context -- it just produces a poor (low-food) trajectory.
     new_V = torch.nan_to_num(new_V)
     sp = new_V.norm(dim=1, keepdim=True).clamp(min=1e-9)
-    vmax = 0.4 * dx / dt
+    vmax = min(vmax_user, 0.4 * dx / dt)             # user cap, never above CFL
     new_V = new_V * (sp.clamp(max=vmax) / sp)
     new_C = torch.nan_to_num(new_C)
     F = torch.nan_to_num(F, nan=1.0)
@@ -111,6 +111,7 @@ class MPMOperator(Exchange):
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.a_max = float(params.get("a_max", 200.0))    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
+        self.vmax = float(params.get("vmax", 1e9))        # max cell speed (default: CFL only)
         self.dx = 1.0 / self.n_grid
         self.inv_dx = float(self.n_grid)
         self.compiled = None
@@ -132,7 +133,7 @@ class MPMOperator(Exchange):
         C, F = p.C, p.F
         for _ in range(self.substeps):
             X, V, C, F = fn(X, V, C, F, p.mass, p.mu, p.la, a_ext, offsets,
-                            self.n_grid, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls)
+                            self.n_grid, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls, self.vmax)
         p.state = torch.cat([X, V], dim=1)
         p.C, p.F = C, F
         return {}
