@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tissue-graph"
+version = "0.0.1"
+description = "Unified differentiable framework for inverse problems in living tissue: hierarchical sets + operators."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "torch_geometric",
+    "numpy",
+    "pyyaml",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

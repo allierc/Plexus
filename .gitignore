@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+*.pyc
+graphs_data/
+log/
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.fls
+docs/*.fdb_latexmk
