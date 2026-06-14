@@ -26,6 +26,8 @@ class BoidsOperator(Lateral):
         pos, vel = cell.state[:, :2], cell.state[:, 2:4]
         d = torch.cdist(pos, pos)
         W = ((d < self.r) & (d > 0)).float()
+        if mask is not None:                            # flock only within the selected subpop
+            W = W * mask.float()[None, :]
         count = W.sum(1).clamp(min=1.0)[:, None]
 
         cohesion = (W @ pos) / count - pos
@@ -34,4 +36,6 @@ class BoidsOperator(Lateral):
         separation = pos * S.sum(1)[:, None] - S @ pos
 
         accel = self.w_coh * cohesion + self.w_align * alignment + self.w_sep * separation
+        if mask is not None:
+            accel = accel * mask.float()[:, None]
         return {"cell": accel}

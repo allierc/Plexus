@@ -20,9 +20,12 @@ PALETTE = ["#e8483c", "#2f6fdb"]   # soft, stiff
 def main():
     in_path = sys.argv[1] if len(sys.argv) > 1 else "/tmp/tissue_mpm.zarr"
     out_path = sys.argv[2] if len(sys.argv) > 2 else "/tmp/tissue_mpm.gif"
-    cap = 30000
+    cap = 80000
     if "--max-particles" in sys.argv:
         cap = int(sys.argv[sys.argv.index("--max-particles") + 1])
+    dot = 0.5
+    if "--dot" in sys.argv:
+        dot = float(sys.argv[sys.argv.index("--dot") + 1])
 
     root = zarr.open_group(in_path, mode="r")
     pp = root["particle_pos"][:]                         # [T,Np,2]
@@ -46,17 +49,16 @@ def main():
     scs = []
     for tid, tname in enumerate(names):
         m = ptype == tid
-        s = ax.scatter(pp[0][m, 0], pp[0][m, 1], s=2, c=PALETTE[tid % 2], label=tname)
+        s = ax.scatter(pp[0][m, 0], pp[0][m, 1], s=dot, c=PALETTE[tid % 2], label=tname)
         scs.append((s, m))
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
-    ax.legend(loc="upper right", markerscale=4, fontsize=9)
-    title = ax.set_title("")
+    title = ax.set_title("", fontsize=7)
 
     def update(t):
         im.set_data(field[t].T)
         for s, m in scs:
             s.set_offsets(pp[t][m])
-        title.set_text(f"{root.attrs.get('name','')}  frame {t}/{T-1}")
+        title.set_text(f"frame {t}/{T-1}")
         return [im, title, *[s for s, _ in scs]]
 
     anim = FuncAnimation(fig, update, frames=T, blit=False)

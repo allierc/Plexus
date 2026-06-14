@@ -93,6 +93,8 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
 
 @register_operator("mpm", level="particle", kind="exchange")
 class MPMOperator(Exchange):
+    REQUIRES_TYPE_PROPS = ["youngs"]      # needs per-cell-type stiffness -> mu, la
+
     def __init__(self, params, device="cpu"):
         super().__init__()
         self.n_grid = int(params.get("n_grid", 128))

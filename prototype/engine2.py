@@ -92,6 +92,7 @@ def build(sc, device="cpu"):
         H.add_field(GridField(fname, f["couples_to"], res=f["res"], diffusion=f["diffusion"],
                               decay=f.get("decay", 0.0), dt=dt_f, device=device))
     H.cell_accel = torch.zeros(Nc, 2, device=device)
+    H.rng = torch.Generator(device=device).manual_seed(sc.seed + 12345)   # for motility
     return H
 
 

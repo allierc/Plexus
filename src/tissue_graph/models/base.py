@@ -129,6 +129,9 @@ class Operator(MessagePassing):
 
     KIND: str = None
     LEVEL: str = None
+    # capability contract (checked by the scenario validator before running):
+    REQUIRES_PARAMS: list = []        # param keys this operator must be given
+    REQUIRES_TYPE_PROPS: list = []    # per-type node properties it reads (e.g. "youngs")
 
     def __init__(self, config=None, device=None, aggr: str = "add"):
         super().__init__(aggr=aggr)

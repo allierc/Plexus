@@ -94,7 +94,50 @@ def load(path: str) -> Scenario:
             if fref is not None and fref not in raw["fields"]:
                 raise ValueError(f"operator {name!r} references unknown field {fref!r}")
         params = {k: v for k, v in o.items() if k not in _RESERVED}
+        # --- capability contract: operator declares what it requires (Q3) ---
+        cls = registry.get_operator(name)
+        have = set(o.keys())
+        for req in getattr(cls, "REQUIRES_PARAMS", []):
+            if req not in have:
+                raise ValueError(
+                    f"operator {name!r} requires param {req!r} (declared in "
+                    f"{cls.__name__}.REQUIRES_PARAMS); add it to the operator line."
+                )
+        # property may live on the set's types or be inherited from a parent set
+        def types_in_chain(set_name):
+            seen = set()
+            while set_name and set_name not in seen:
+                seen.add(set_name)
+                ts = raw["sets"][set_name].get("types")
+                if ts:
+                    return set_name, ts
+                set_name = raw["sets"][set_name].get("parent")
+            return None, {}
+        for prop in getattr(cls, "REQUIRES_TYPE_PROPS", []):
+            owner, set_types = types_in_chain(sel.set)
+            if not set_types:
+                raise ValueError(
+                    f"operator {name!r} requires per-type property {prop!r}, but neither "
+                    f"{sel.set!r} nor its parents declare `types`.")
+            for tname, t in set_types.items():
+                if prop not in t:
+                    raise ValueError(
+                        f"operator {name!r} requires property {prop!r} on every type of "
+                        f"{owner!r}; missing on type {tname!r}. "
+                        f"(declared in {cls.__name__}.REQUIRES_TYPE_PROPS)")
         ops.append(OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"), params=params))
+
+    # --- warn about per-type properties no operator reads (likely a typo) ---
+    used_props = set()
+    for o in raw["operators"]:
+        used_props |= set(getattr(registry.get_operator(o["op"]), "REQUIRES_TYPE_PROPS", []))
+    _KNOWN_TYPE_KEYS = {"fraction"} | used_props
+    for sname, s in raw["sets"].items():
+        for tname, t in s.get("types", {}).items():
+            for k in t:
+                if k not in _KNOWN_TYPE_KEYS:
+                    print(f"[warn] property {k!r} on {sname}.{tname} is read by no operator "
+                          f"(known: {sorted(_KNOWN_TYPE_KEYS)})")
 
     # --- schedule: every token resolves ---
     op_names = {o.op for o in ops}

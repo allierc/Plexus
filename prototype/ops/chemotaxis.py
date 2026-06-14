@@ -19,6 +19,8 @@ from tissue_graph.models.registry import register_operator
 
 @register_operator("secrete", level="cell", kind="exchange")
 class SecreteOperator(Exchange):
+    REQUIRES_PARAMS = ["to", "rate"]
+
     def __init__(self, params, device="cpu"):
         super().__init__()
         self.rate = float(params.get("rate", 1.0))
@@ -37,6 +39,8 @@ class SecreteOperator(Exchange):
 
 @register_operator("sense", level="cell", kind="exchange")
 class SenseOperator(Exchange):
+    REQUIRES_PARAMS = ["from", "gain"]
+
     def __init__(self, params, device="cpu"):
         super().__init__()
         self.gain = float(params.get("gain", 1.0))

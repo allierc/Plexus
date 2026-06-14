@@ -1,0 +1,18 @@
+# Strong boids + motility, no field -> a coherent moving flock (both types).
+name: swarm
+seed: 0
+n_frames: 250
+record_every: 4
+sets:
+  cell:
+    n: 100
+    dim: 2
+    types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}
+  particle: {parent: cell, per_parent: 100, dim: 2, radius: 0.02, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 40.0, rot: 0.3}
+  - {op: boids, at: cell, radius: 0.15, cohesion: 0.6, align: 1.2, separate: 0.8}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4}
+schedule: [aggregate, [motility, boids], mpm]

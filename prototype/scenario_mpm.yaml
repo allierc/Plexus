@@ -10,16 +10,16 @@ record_every: 4
 
 sets:
   cell:
-    n: 600
+    n: 50
     dim: 2
     types:                       # the two populations differ only in stiffness
-      soft:  {fraction: 0.5, youngs: 60}
-      stiff: {fraction: 0.5, youngs: 300}
+      soft:  {fraction: 0.5, youngs: 12}     # squishy red cells (deform visibly)
+      stiff: {fraction: 0.5, youngs: 300}    # rigid blue cells (stay round)
   particle:
     parent: cell                 # containment: particle in cell
-    per_parent: 100              # 100 material points per cell
+    per_parent: 200              # material points per cell
     dim: 2
-    radius: 0.012                # initial cell disc radius
+    radius: 0.045                # large cells (span ~6 grid cells -> deformation resolves)
     density: 1.0
 
 fields:
@@ -31,15 +31,16 @@ fields:
     couples_to: cell
 
 operators:
-  - {op: boids,  at: cell, radius: 0.06, cohesion: 0.05, align: 0.1, separate: 0.4}
-  - {op: mpm,    at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 600, drag: 5}
+  - {op: motility, at: cell, speed: 60.0, rot: 0.4}                  # active wandering (both types)
+  - {op: boids,  at: cell, radius: 0.09, cohesion: 0.3, align: 0.6, separate: 0.7}
+  - {op: mpm,    at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 3}
   - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}   # only pop 1 makes it
-  - {op: sense,  at: "cell[type=soft]", from: chemical, gain: 200.0} # only pop 1 follows it
+  - {op: sense,  at: "cell[type=soft]", from: chemical, gain: 150.0} # only pop 1 follows it
 
 schedule:                        # one tick = one frame
   - aggregate                    # cell pos/vel = mean of its particles (Aggregate up)
-  - boids                        # cell-level collective motion -> cell_accel
-  - secrete                      # all cells deposit chemical
+  - [motility, boids]            # active + collective motion -> cell_accel
+  - secrete                      # soft cells deposit chemical
   - chemical.diffuse             # field self-update
   - sense                        # soft cells read gradient -> cell_accel
   - mpm                          # particle mechanics; cell_accel broadcast down
