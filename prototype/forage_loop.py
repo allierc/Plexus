@@ -29,8 +29,8 @@ BOUNDS = np.array([[20., 120.], [80., 400.], [0.5, 3.0], [0.10, 0.60],
                    [20., 600.], [400., 2000.], [0.008, 0.018], [30., 120.]])
 PARAMS = ["motility.speed", "sense.gain", "mpm.drag", "motility.rot",
           "cell.youngs", "mpm.a_max", "particle.radius", "cell.n"]   # 8 levers
-SEARCH_FRAMES = 3000
-GIF_FRAMES = 3000
+SEARCH_FRAMES = 5000
+GIF_FRAMES = 5000
 DEVICE = "cuda"
 PAL = np.array([[1.0, 0.30, 0.30, 1.0], [0.30, 0.65, 1.0, 1.0]])   # type A red, B blue (RGBA)
 GREEN = np.array([0.15, 0.95, 0.25, 1.0])

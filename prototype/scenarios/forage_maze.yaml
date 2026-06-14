@@ -5,7 +5,7 @@
 # MPM grid (cells can't enter) and the navigation fields (gradient routes around).
 name: forage_maze
 seed: 0
-n_frames: 3000
+n_frames: 5000
 record_every: 6
 obstacles:                       # [x0,y0,x1,y1] in [0,1]
   - [0.30, 0.00, 0.36, 0.70]     # wall with a gap at the top
