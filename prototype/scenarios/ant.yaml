@@ -16,5 +16,5 @@ operators:
   - {op: motility, at: cell, speed: 300.0, rot: 0.06}          # persistent forward motion
   - {op: trail, at: "cell[type=soft]", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}
   - {op: secrete, at: "cell[type=soft]", to: pheromone, rate: 2.0} # ants lay pheromone
-  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 1200, drag: 0.6}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 1200, drag: 0.6, vmax: 6.0}
 schedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]
