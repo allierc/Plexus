@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import torch
 
-from tissue_graph.models.base import Exchange
-from tissue_graph.models.registry import register_operator
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
 
 # 3x3 stencil offsets, built once (CPU constant; moved to device in op)
 _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torch.float32)

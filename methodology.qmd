@@ -1,0 +1,208 @@
+---
+title: "The LLM ↔ registry methodology"
+subtitle: "Two layers, one contract, a small declarative language"
+---
+
+The prototype's purpose was not the tissue physics but figuring out *how an LLM
+should drive a registry of low-level operators*. The answer is a strict two-layer
+split that meets only at one declarative, validated file — the **spec**
+(`spec.yaml`). In effect this is a small domain-specific language: the spec is the
+*source*, the registered operators are the *primitives*, and the engine is the
+*interpreter*.
+
+## Two layers and the contract between them
+
+```{mermaid}
+flowchart TB
+  intent["<b>INTENT</b><br/>natural language — “2000 cells, two mechanical types,<br/>a chemical that guides only one”"]
+  spec["<b>SPEC</b> &nbsp; spec.yaml<br/>sets · fields · operators (+selectors) · schedule"]
+  reg["<b>REGISTRY</b><br/>@register_operator / @register_field — the only place code lives"]
+  eng["<b>ENGINE</b><br/>generic: build Hierarchy → run Schedule → zarr (written once)"]
+  intent -->|"LLM compiles — schema-checked generation"| spec
+  spec -->|"engine resolves names in the registry"| reg
+  reg --> eng
+```
+
+The **spec is the contract**. The LLM owns everything above it (intent → spec);
+the code owns everything below (operators). They never touch directly. This makes
+the system both LLM-drivable and human-auditable: the spec is small, typed, and
+reviewable, unlike the 500-line flat `config.py` it replaces.
+
+Being a small, typed, declarative file gives the contract the properties one
+wants of an interface between an unreliable generator and exacting code:
+
+- **Verifiable.** The spec is validated against the schema *before* anything
+  runs: an unregistered operator, a missing required property, or a malformed
+  selector is rejected up front, so a spec that loads is guaranteed runnable.
+  Beyond well-formedness, each simulation also ships an *intent* check that
+  measures whether the requested behaviour actually occurred — *"it ran" is not
+  "it worked"*.
+- **Reproducible.** A run is bit-deterministic given $(\text{spec},
+  \text{seed})$ — the engine forces deterministic kernels — so the same spec
+  yields the same trajectory, and a fresh seed draws a new realization of the
+  same dynamics.
+- **Saveable.** The spec is ~20 lines, so it version-controls, diffs, and
+  archives trivially; together with the seed it *is* the complete record. We
+  archive the recipe, not the dish: store spec + seed (plus metrics and a
+  thumbnail) and regenerate the trajectory on demand.
+- **Composable.** A variant is a base spec plus a handful of overrides, which
+  makes ablations and the optimizer's parameter sweeps cheap.
+- **Extensible.** New behaviour is one new registered operator; the operator
+  vocabulary grows monotonically, and every earlier spec keeps working.
+
+## The simulation language
+
+The contract is, in effect, a small **domain-specific language** in
+declarative-data form. Like any language it has *words* (vocabulary), *grammar*
+(a typed schema — required keys, type fractions summing to one, every operator
+registered, every schedule token resolving), and *semantics* (the engine builds
+the `Hierarchy` and iterates the schedule, $x_{t+1}=\Phi(x_t)$).
+
+Structurally this is an **entity–component–system** (ECS) architecture: sets are
+entities, their state buffers are components, operators are systems, and the
+schedule is the ECS system pipeline. We adopt that framing deliberately — it is
+the cleanest mental model and matches the engine one-to-one.
+
+| Construct | Semantics | Example |
+|---|---|---|
+| *Top level* | | |
+| `name` | run identifier | `name: aggregate` |
+| `seed` | RNG seed — fixes determinism | `seed: 0` |
+| `n_frames` | number of ticks to run | `n_frames: 250` |
+| `obstacles` | static walls; a boundary condition for both the MPM grid and field diffusion | `[[.3,0,.36,.7]]` |
+| `sets/fields/operators/schedule` | the four parts, detailed below | — |
+| *Set* ($S_k$ — an entity level / ECS entity) | | |
+| `n` | size of a top-level set | `n: 100` |
+| `parent` | containment target of a leaf set (the map $\pi_k$) | `parent: cell` |
+| `per_parent` | children per parent | `per_parent: 100` |
+| `types` | named sub-populations: fraction + per-type properties | `{soft: {fraction: .5, youngs: 12}}` |
+| *Field* (a continuum) | | |
+| `frame` | discretization (a grid) | `frame: grid` |
+| `res` | grid resolution | `res: 96` |
+| `diffusion`, `decay` | PDE coefficients | `diffusion: 0.1` |
+| `couples_to` | the one set this field exchanges with | `couples_to: cell` |
+| `source` | fixed source region (imposes a gradient) | `source: [.82,.82,1,1]` |
+| *Operator* (a system; one per list entry) | | |
+| `op` | which registered operator to run | `op: sense` |
+| `at` | selector — the subset it acts on | `at: cell[type=soft]` |
+| `to`/`from` | field an Exchange writes to / reads from | `from: chemical` |
+| ⟨params⟩ | operator-specific arguments | `gain: 150` |
+| *Selector* (sub-grammar) | | |
+| `set` | every node of the set | `cell` |
+| `set[attr=val]` | nodes matching `attr` (re-checked each tick) | `cell[loaded=1]` |
+| *Schedule* (sub-grammar; per-tick order) | | |
+| operator name | run that operator this tick | `sense` |
+| `[a, b]` | a group run in the same stage | `[motility, sense]` |
+| `aggregate` | builtin: Aggregate ↑ (parent = mean of children) | `aggregate` |
+| `name.diffuse` | builtin: advance that field one step | `chemical.diffuse` |
+
+The only genuine sub-grammars are the last two blocks — *selectors* and the
+*schedule*. Both are deliberately minimal but extend naturally: selectors to
+conjunctions and to geometric or temporal predicates (`cell[type=soft & loaded=0]`,
+`cell[x<0.5]`, `cell[age>10]`), and the schedule to explicit per-operator rates
+and nested loops.
+
+We keep the language as *declarative data* (YAML/JSON) rather than a bespoke
+syntax, so an LLM can emit it under schema-constrained decoding and a human can
+diff, review, and archive it; the grammar is pinned by a typed schema (Pydantic
+or JSON-Schema). Prior art worth borrowing: ECS engines (the scheduling model),
+SBML/Antimony (reaction–species vocabulary), NeuroML and MorpheusML/PhysiCell
+(multicellular specs), UFL (PDE operators), and NetLogo/Mesa (agent rules).
+
+## The simulation specification
+
+A complete simulation is a single `spec.yaml`. Below: two cell `types`,
+`particle`s contained in each `cell`, one chemical `field`, and a four-step
+`schedule`. Soft cells `secrete` the chemical and `sense` (climb) it, so they
+self-aggregate, while stiff cells — selected out by `cell[type=soft]` — do not.
+
+```yaml
+name: aggregate
+seed: 0
+n_frames: 250
+sets:
+  cell:
+    n: 100
+    types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}
+  particle: {parent: cell, per_parent: 100, radius: 0.02}   # containment
+fields:
+  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 15.0, rot: 0.4}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 800, drag: 4}
+  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}    # only pop 1 makes it
+  - {op: sense,  at: "cell[type=soft]", from: chemical, gain: 150.0} # only pop 1 follows it
+schedule: [aggregate, [motility], secrete, chemical.diffuse, sense, mpm]
+```
+
+The validator guarantees that a file which loads is runnable: every `op` exists;
+every `at`/`to`/`from` references a declared set/field; type `fraction`s sum to
+one; every schedule token resolves. (One trap: never use a YAML 1.1 boolean key
+such as `on`/`off` — we use `at`.)
+
+## Operator catalog
+
+Operators are the system's vocabulary; it grows monotonically and every past
+simulation keeps working. The prototype catalog:
+
+| op | kind | acts on | behaviour |
+|---|---|---|---|
+| `boids` | lateral | cell | collective motion (cohesion/align/separate) |
+| `motility` | lateral | cell | active self-propulsion (wandering heading) |
+| `adhesion` | lateral | cell | type-specific cohesion → sorting |
+| `mpm` | exchange | particle | MLS-MPM mechanics; soft/stiff via `youngs` |
+| `secrete` | exchange | cell → field | deposit into a field |
+| `sense` | exchange | cell ← field | chemotactic accel up-gradient |
+| `trail` | exchange | cell | Physarum 3-sensor pheromone steering (ants) |
+| `aggregate` | builtin | — | cell pos/vel = mean of its particles (↑) |
+| `<field>.diffuse` | builtin | — | field self-update (Laplacian + decay) |
+
+## Natural language → simulation: the repeatable mapping
+
+To make the LLM's compilation *repeatable* (same request → same structure), it
+follows fixed rules; the most useful:
+
+1. *"$N$ cells/agents"* → a set with `n: N`.
+2. *"made of $K$ X per cell"* → a contained set with `parent`/`per_parent` (two levels).
+3. *"two types differing by $P$"* → `types:` with $P$ as a per-type property.
+4. *"mechanical/elastic/rigid"* → particles + `mpm`; map stiffness to `youngs`.
+5. *"moves by boids / flock"* → `boids`; *"wanders / motile"* → `motility`.
+6. *"creates/secretes a chemical"* → a `field` + `secrete`; *"follows / chemotaxis"* → `sense`; *"ant trails"* → `trail`.
+7. **"only population X does Y"** → the selector `at: cell[type=X]`. This is the
+   highest-leverage primitive: it scopes behaviour to a subpopulation and lets two
+   behaviours coexist.
+
+## When the present code is not enough
+
+The pipeline fails loudly and points at the gap — e.g. for a request needing
+field advection or reaction–diffusion:
+
+```text
+operator 'reaction_diffusion' not in registry.
+Available: ['adhesion','boids','mechanics','motility','mpm','secrete','sense','trail']
+```
+
+The fix is **one new `Operator` subclass** — never an engine change: write
+`forward(self, H, mask) -> {set: accel}` (or mutate a field, return `{}`);
+decorate `@register_operator`; declare its needs; reference it in the
+simulation. We exercised this live twice during the experiment: adding `adhesion`
+unlocked cell *sorting*, and adding `trail` unlocked ant *trail-following* — each
+~20 lines, with the engine and all other simulations untouched.
+
+## When a cell/particle property does not exist
+
+Operators *declare* what they need (`REQUIRES_PARAMS`, `REQUIRES_TYPE_PROPS`);
+the validator checks before running, resolving a property along the containment
+chain (`mpm` acts on particles but `youngs` lives on the parent cell's types):
+
+```text
+# missing required property -> hard error, before any computation:
+operator 'mpm' requires property 'youngs' on every type of 'cell'; missing on type 'soft'.
+# property no operator reads -> warning (typo guard), run proceeds:
+[warn] property 'viscosity' on cell.soft is read by no operator (known: ['fraction','youngs'])
+```
+
+**Design rule: capabilities are declared, not discovered at a crash.** The
+operator that consumes a property is the single place that declares the
+requirement, turning a would-be `AttributeError` thousands of substeps deep into
+a one-line message up front.

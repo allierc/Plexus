@@ -14,8 +14,8 @@ from __future__ import annotations
 import math
 import torch
 
-from tissue_graph.models.base import Exchange
-from tissue_graph.models.registry import register_operator
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
 
 
 @register_operator("trail", level="cell", kind="exchange")

@@ -1,0 +1,113 @@
+---
+title: "Plexus"
+subtitle: "Toward a language and calculus of living systems"
+---
+
+Biology is not a single graph.
+
+Living systems combine cells, molecules, tissues, populations, and continuous
+fields across multiple spatial and temporal scales. Existing simulators
+typically focus on one layer of this hierarchy at a time: particle mechanics,
+cellular interactions, neural dynamics, reaction networks, or continuum fields.
+As a result, models become difficult to combine, extend, and reason about.
+
+Plexus starts from a different question:
+
+> What is the minimal language needed to describe a living system?
+
+Rather than building another domain-specific simulator, Plexus introduces a
+common representation based on **hierarchical sets**, **continuous fields**, and
+a small collection of **operators** acting between them. Cells contain particles
+and metabolites. Populations contain cells. Fields exchange information with
+discrete entities. Complex simulations emerge from composing a few primitive
+operations.
+
+The goal is not merely to predict trajectories, but to provide a *language* in
+which biological systems can be expressed, modified, optimized, and understood.
+A simulation becomes a program. A tissue becomes a composition of operators. A
+new biological hypothesis becomes a small change to a specification rather than a
+new software project.
+
+## A language, not a world model
+
+The goal of Plexus is not to learn a world model of biology. The goal is to
+define a language in which biological worlds can be *written*.
+
+Modern world models learn compressed latent representations whose internal
+structure is optimized for prediction. Such representations can be powerful, but
+their primitives are learned from data: they do not provide a natural language
+for expressing biological hypotheses, composing mechanisms across scales, or
+introducing new physical laws.
+
+Plexus takes the opposite approach. Its primitives are **explicit**: sets,
+fields, containment relations, and operators. A cell, a morphogen gradient, a
+mechanical substrate, and a neural circuit are all represented within the same
+formal framework. Dynamics arise from compositions of interpretable operators
+rather than opaque latent transitions.
+
+The question is therefore not *"Can we predict the next state?"* but *"What are
+the primitive concepts required to describe a living system?"* In this view the
+simulator is secondary — it is merely the **interpreter** of the language. The
+central object is the representation itself. Once a living system is expressed in
+the language of Plexus, it becomes possible to compose mechanisms across scales,
+perform inverse inference, optimize biological designs, and generate new models
+automatically.
+
+Plexus proposes that hierarchical sets, fields, and **four classes of operators**
+are sufficient to express a broad range of biological phenomena within a common
+**differentiable** framework.
+
+## Re-converging four frameworks
+
+Plexus re-converges four sibling frameworks that all forked from
+[`ParticleGraph`](https://github.com/allierc/ParticleGraph) and then drifted —
+each implements *one* graph type; a tissue needs them coexisting.
+
+| Framework | Domain | Becomes (in Plexus) |
+|---|---|---|
+| **CellGraph** | collective cell interactions | `Lateral` operators @ cell level |
+| **NeuralGraph** | neural / signalling networks | `Lateral` operators @ cell level |
+| **MPMGraph** | tissue mechanics, deformable matter | `Exchange` (P2G/G2P) @ particle level |
+| **MetabolismGraph** | bipartite reaction networks | `Exchange` (stoichiometry) @ molecule level |
+
+## What it looks like
+
+Qualitatively different collective behaviours, all produced from the *same code*
+by changing only a ~20-line specification — no new software per phenomenon.
+
+::: {layout-ncol=2}
+{{< video prototype/sim_1.mp4 title="aggregate — soft cells secrete a chemical and climb it" >}}
+
+{{< video prototype/sim_3.mp4 title="swarm — strong boids make the cells flock and move as one" >}}
+
+{{< video prototype/sim_6.mp4 title="sort — type-specific adhesion segregates two populations" >}}
+
+{{< video prototype/ant_1.mp4 title="ant trails — stigmergic pheromone trails self-organize" >}}
+:::
+
+And because every simulation is differentiable, biological designs can be
+*optimized*. Below, a foraging colony in a maze is tuned by black-box search —
+from a hand-set design (left) to the best found (right), which delivers food
+roughly five-fold faster.
+
+::: {layout-ncol=2}
+{{< video prototype/initial.mp4 title="initial hand-set colony" >}}
+
+{{< video prototype/winner_7.mp4 title="optimized colony (winner 7)" >}}
+:::
+
+## Read the blueprint
+
+This site distils a working prototype into a single blueprint, in four parts:
+
+- **[The abstraction](abstraction.qmd)** — the missing primitive: a hierarchical
+  graph container stated in the language of sets, fields, and four operators.
+- **[LLM ↔ registry](methodology.qmd)** — the two-layer contract and the small
+  declarative language that lets an LLM drive a registry of operators.
+- **[Simulations](experiment.qmd)** — ten distinct simulations, an emergent
+  ant-trail model, and a maze-foraging colony optimized end-to-end.
+- **[Building Plexus](building.qmd)** — the proposed repository methodology and
+  the invariants that hold the line.
+
+A static version with full schematics and glossary is in
+[`paper/plexus.pdf`](paper/plexus.pdf).

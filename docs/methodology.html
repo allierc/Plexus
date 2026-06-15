@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>The LLM ↔︎ registry methodology – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-4d9afe2b8d18ee9fa5d0d57b5ed4214d.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-70408cb9dc52a2002c2463371a30459f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-4b867a980d4940b6cdbfd45e315ae5ff.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<script src="site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./abstraction.html"> 
+<span class="menu-text">The abstraction</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link active" href="./methodology.html" aria-current="page"> 
+<span class="menu-text">LLM ↔︎ registry</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./experiment.html"> 
+<span class="menu-text">Simulations</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./building.html"> 
+<span class="menu-text">Building Plexus</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#two-layers-and-the-contract-between-them" id="toc-two-layers-and-the-contract-between-them" class="nav-link active" data-scroll-target="#two-layers-and-the-contract-between-them">Two layers and the contract between them</a></li>
+  <li><a href="#the-simulation-language" id="toc-the-simulation-language" class="nav-link" data-scroll-target="#the-simulation-language">The simulation language</a></li>
+  <li><a href="#the-simulation-specification" id="toc-the-simulation-specification" class="nav-link" data-scroll-target="#the-simulation-specification">The simulation specification</a></li>
+  <li><a href="#operator-catalog" id="toc-operator-catalog" class="nav-link" data-scroll-target="#operator-catalog">Operator catalog</a></li>
+  <li><a href="#natural-language-simulation-the-repeatable-mapping" id="toc-natural-language-simulation-the-repeatable-mapping" class="nav-link" data-scroll-target="#natural-language-simulation-the-repeatable-mapping">Natural language → simulation: the repeatable mapping</a></li>
+  <li><a href="#when-the-present-code-is-not-enough" id="toc-when-the-present-code-is-not-enough" class="nav-link" data-scroll-target="#when-the-present-code-is-not-enough">When the present code is not enough</a></li>
+  <li><a href="#when-a-cellparticle-property-does-not-exist" id="toc-when-a-cellparticle-property-does-not-exist" class="nav-link" data-scroll-target="#when-a-cellparticle-property-does-not-exist">When a cell/particle property does not exist</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">The LLM ↔︎ registry methodology</h1>
+<p class="subtitle lead">Two layers, one contract, a small declarative language</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The prototype’s purpose was not the tissue physics but figuring out <em>how an LLM should drive a registry of low-level operators</em>. The answer is a strict two-layer split that meets only at one declarative, validated file — the <strong>spec</strong> (<code>spec.yaml</code>). In effect this is a small domain-specific language: the spec is the <em>source</em>, the registered operators are the <em>primitives</em>, and the engine is the <em>interpreter</em>.</p>
+<section id="two-layers-and-the-contract-between-them" class="level2">
+<h2 class="anchored" data-anchor-id="two-layers-and-the-contract-between-them">Two layers and the contract between them</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart TB
+  intent["&lt;b&gt;INTENT&lt;/b&gt;&lt;br/&gt;natural language — “2000 cells, two mechanical types,&lt;br/&gt;a chemical that guides only one”"]
+  spec["&lt;b&gt;SPEC&lt;/b&gt; &amp;nbsp; spec.yaml&lt;br/&gt;sets · fields · operators (+selectors) · schedule"]
+  reg["&lt;b&gt;REGISTRY&lt;/b&gt;&lt;br/&gt;@register_operator / @register_field — the only place code lives"]
+  eng["&lt;b&gt;ENGINE&lt;/b&gt;&lt;br/&gt;generic: build Hierarchy → run Schedule → zarr (written once)"]
+  intent --&gt;|"LLM compiles — schema-checked generation"| spec
+  spec --&gt;|"engine resolves names in the registry"| reg
+  reg --&gt; eng
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The <strong>spec is the contract</strong>. The LLM owns everything above it (intent → spec); the code owns everything below (operators). They never touch directly. This makes the system both LLM-drivable and human-auditable: the spec is small, typed, and reviewable, unlike the 500-line flat <code>config.py</code> it replaces.</p>
+<p>Being a small, typed, declarative file gives the contract the properties one wants of an interface between an unreliable generator and exacting code:</p>
+<ul>
+<li><strong>Verifiable.</strong> The spec is validated against the schema <em>before</em> anything runs: an unregistered operator, a missing required property, or a malformed selector is rejected up front, so a spec that loads is guaranteed runnable. Beyond well-formedness, each simulation also ships an <em>intent</em> check that measures whether the requested behaviour actually occurred — <em>“it ran” is not “it worked”</em>.</li>
+<li><strong>Reproducible.</strong> A run is bit-deterministic given <span class="math inline">\((\text{spec},
+\text{seed})\)</span> — the engine forces deterministic kernels — so the same spec yields the same trajectory, and a fresh seed draws a new realization of the same dynamics.</li>
+<li><strong>Saveable.</strong> The spec is ~20 lines, so it version-controls, diffs, and archives trivially; together with the seed it <em>is</em> the complete record. We archive the recipe, not the dish: store spec + seed (plus metrics and a thumbnail) and regenerate the trajectory on demand.</li>
+<li><strong>Composable.</strong> A variant is a base spec plus a handful of overrides, which makes ablations and the optimizer’s parameter sweeps cheap.</li>
+<li><strong>Extensible.</strong> New behaviour is one new registered operator; the operator vocabulary grows monotonically, and every earlier spec keeps working.</li>
+</ul>
+</section>
+<section id="the-simulation-language" class="level2">
+<h2 class="anchored" data-anchor-id="the-simulation-language">The simulation language</h2>
+<p>The contract is, in effect, a small <strong>domain-specific language</strong> in declarative-data form. Like any language it has <em>words</em> (vocabulary), <em>grammar</em> (a typed schema — required keys, type fractions summing to one, every operator registered, every schedule token resolving), and <em>semantics</em> (the engine builds the <code>Hierarchy</code> and iterates the schedule, <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>).</p>
+<p>Structurally this is an <strong>entity–component–system</strong> (ECS) architecture: sets are entities, their state buffers are components, operators are systems, and the schedule is the ECS system pipeline. We adopt that framing deliberately — it is the cleanest mental model and matches the engine one-to-one.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Construct</th>
+<th>Semantics</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><em>Top level</em></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>name</code></td>
+<td>run identifier</td>
+<td><code>name: aggregate</code></td>
+</tr>
+<tr class="odd">
+<td><code>seed</code></td>
+<td>RNG seed — fixes determinism</td>
+<td><code>seed: 0</code></td>
+</tr>
+<tr class="even">
+<td><code>n_frames</code></td>
+<td>number of ticks to run</td>
+<td><code>n_frames: 250</code></td>
+</tr>
+<tr class="odd">
+<td><code>obstacles</code></td>
+<td>static walls; a boundary condition for both the MPM grid and field diffusion</td>
+<td><code>[[.3,0,.36,.7]]</code></td>
+</tr>
+<tr class="even">
+<td><code>sets/fields/operators/schedule</code></td>
+<td>the four parts, detailed below</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td><em>Set</em> (<span class="math inline">\(S_k\)</span> — an entity level / ECS entity)</td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>n</code></td>
+<td>size of a top-level set</td>
+<td><code>n: 100</code></td>
+</tr>
+<tr class="odd">
+<td><code>parent</code></td>
+<td>containment target of a leaf set (the map <span class="math inline">\(\pi_k\)</span>)</td>
+<td><code>parent: cell</code></td>
+</tr>
+<tr class="even">
+<td><code>per_parent</code></td>
+<td>children per parent</td>
+<td><code>per_parent: 100</code></td>
+</tr>
+<tr class="odd">
+<td><code>types</code></td>
+<td>named sub-populations: fraction + per-type properties</td>
+<td><code>{soft: {fraction: .5, youngs: 12}}</code></td>
+</tr>
+<tr class="even">
+<td><em>Field</em> (a continuum)</td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><code>frame</code></td>
+<td>discretization (a grid)</td>
+<td><code>frame: grid</code></td>
+</tr>
+<tr class="even">
+<td><code>res</code></td>
+<td>grid resolution</td>
+<td><code>res: 96</code></td>
+</tr>
+<tr class="odd">
+<td><code>diffusion</code>, <code>decay</code></td>
+<td>PDE coefficients</td>
+<td><code>diffusion: 0.1</code></td>
+</tr>
+<tr class="even">
+<td><code>couples_to</code></td>
+<td>the one set this field exchanges with</td>
+<td><code>couples_to: cell</code></td>
+</tr>
+<tr class="odd">
+<td><code>source</code></td>
+<td>fixed source region (imposes a gradient)</td>
+<td><code>source: [.82,.82,1,1]</code></td>
+</tr>
+<tr class="even">
+<td><em>Operator</em> (a system; one per list entry)</td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><code>op</code></td>
+<td>which registered operator to run</td>
+<td><code>op: sense</code></td>
+</tr>
+<tr class="even">
+<td><code>at</code></td>
+<td>selector — the subset it acts on</td>
+<td><code>at: cell[type=soft]</code></td>
+</tr>
+<tr class="odd">
+<td><code>to</code>/<code>from</code></td>
+<td>field an Exchange writes to / reads from</td>
+<td><code>from: chemical</code></td>
+</tr>
+<tr class="even">
+<td>⟨params⟩</td>
+<td>operator-specific arguments</td>
+<td><code>gain: 150</code></td>
+</tr>
+<tr class="odd">
+<td><em>Selector</em> (sub-grammar)</td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>set</code></td>
+<td>every node of the set</td>
+<td><code>cell</code></td>
+</tr>
+<tr class="odd">
+<td><code>set[attr=val]</code></td>
+<td>nodes matching <code>attr</code> (re-checked each tick)</td>
+<td><code>cell[loaded=1]</code></td>
+</tr>
+<tr class="even">
+<td><em>Schedule</em> (sub-grammar; per-tick order)</td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>operator name</td>
+<td>run that operator this tick</td>
+<td><code>sense</code></td>
+</tr>
+<tr class="even">
+<td><code>[a, b]</code></td>
+<td>a group run in the same stage</td>
+<td><code>[motility, sense]</code></td>
+</tr>
+<tr class="odd">
+<td><code>aggregate</code></td>
+<td>builtin: Aggregate ↑ (parent = mean of children)</td>
+<td><code>aggregate</code></td>
+</tr>
+<tr class="even">
+<td><code>name.diffuse</code></td>
+<td>builtin: advance that field one step</td>
+<td><code>chemical.diffuse</code></td>
+</tr>
+</tbody>
+</table>
+<p>The only genuine sub-grammars are the last two blocks — <em>selectors</em> and the <em>schedule</em>. Both are deliberately minimal but extend naturally: selectors to conjunctions and to geometric or temporal predicates (<code>cell[type=soft &amp; loaded=0]</code>, <code>cell[x&lt;0.5]</code>, <code>cell[age&gt;10]</code>), and the schedule to explicit per-operator rates and nested loops.</p>
+<p>We keep the language as <em>declarative data</em> (YAML/JSON) rather than a bespoke syntax, so an LLM can emit it under schema-constrained decoding and a human can diff, review, and archive it; the grammar is pinned by a typed schema (Pydantic or JSON-Schema). Prior art worth borrowing: ECS engines (the scheduling model), SBML/Antimony (reaction–species vocabulary), NeuroML and MorpheusML/PhysiCell (multicellular specs), UFL (PDE operators), and NetLogo/Mesa (agent rules).</p>
+</section>
+<section id="the-simulation-specification" class="level2">
+<h2 class="anchored" data-anchor-id="the-simulation-specification">The simulation specification</h2>
+<p>A complete simulation is a single <code>spec.yaml</code>. Below: two cell <code>types</code>, <code>particle</code>s contained in each <code>cell</code>, one chemical <code>field</code>, and a four-step <code>schedule</code>. Soft cells <code>secrete</code> the chemical and <code>sense</code> (climb) it, so they self-aggregate, while stiff cells — selected out by <code>cell[type=soft]</code> — do not.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> aggregate</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">seed</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">n_frames</span><span class="kw">:</span><span class="at"> </span><span class="dv">250</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">12</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">radius</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="kw">}</span><span class="co">   # containment</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">fields</span><span class="kw">:</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">chemical</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">frame</span><span class="kw">:</span><span class="at"> grid</span><span class="kw">,</span><span class="at"> </span><span class="fu">res</span><span class="kw">:</span><span class="at"> </span><span class="dv">96</span><span class="kw">,</span><span class="at"> </span><span class="fu">diffusion</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.1</span><span class="kw">,</span><span class="at"> </span><span class="fu">decay</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span><span class="kw">,</span><span class="at"> </span><span class="fu">couples_to</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> motility</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">speed</span><span class="kw">:</span><span class="at"> </span><span class="fl">15.0</span><span class="kw">,</span><span class="at"> </span><span class="fu">rot</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.4</span><span class="kw">}</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">substeps</span><span class="kw">:</span><span class="at"> </span><span class="dv">8</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span><span class="kw">}</span><span class="co">    # only pop 1 makes it</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at">  </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">gain</span><span class="kw">:</span><span class="at"> </span><span class="fl">150.0</span><span class="kw">}</span><span class="co"> # only pop 1 follows it</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> </span><span class="kw">[</span><span class="at">motility</span><span class="kw">],</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The validator guarantees that a file which loads is runnable: every <code>op</code> exists; every <code>at</code>/<code>to</code>/<code>from</code> references a declared set/field; type <code>fraction</code>s sum to one; every schedule token resolves. (One trap: never use a YAML 1.1 boolean key such as <code>on</code>/<code>off</code> — we use <code>at</code>.)</p>
+</section>
+<section id="operator-catalog" class="level2">
+<h2 class="anchored" data-anchor-id="operator-catalog">Operator catalog</h2>
+<p>Operators are the system’s vocabulary; it grows monotonically and every past simulation keeps working. The prototype catalog:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>op</th>
+<th>kind</th>
+<th>acts on</th>
+<th>behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>boids</code></td>
+<td>lateral</td>
+<td>cell</td>
+<td>collective motion (cohesion/align/separate)</td>
+</tr>
+<tr class="even">
+<td><code>motility</code></td>
+<td>lateral</td>
+<td>cell</td>
+<td>active self-propulsion (wandering heading)</td>
+</tr>
+<tr class="odd">
+<td><code>adhesion</code></td>
+<td>lateral</td>
+<td>cell</td>
+<td>type-specific cohesion → sorting</td>
+</tr>
+<tr class="even">
+<td><code>mpm</code></td>
+<td>exchange</td>
+<td>particle</td>
+<td>MLS-MPM mechanics; soft/stiff via <code>youngs</code></td>
+</tr>
+<tr class="odd">
+<td><code>secrete</code></td>
+<td>exchange</td>
+<td>cell → field</td>
+<td>deposit into a field</td>
+</tr>
+<tr class="even">
+<td><code>sense</code></td>
+<td>exchange</td>
+<td>cell ← field</td>
+<td>chemotactic accel up-gradient</td>
+</tr>
+<tr class="odd">
+<td><code>trail</code></td>
+<td>exchange</td>
+<td>cell</td>
+<td>Physarum 3-sensor pheromone steering (ants)</td>
+</tr>
+<tr class="even">
+<td><code>aggregate</code></td>
+<td>builtin</td>
+<td>—</td>
+<td>cell pos/vel = mean of its particles (↑)</td>
+</tr>
+<tr class="odd">
+<td><code>&lt;field&gt;.diffuse</code></td>
+<td>builtin</td>
+<td>—</td>
+<td>field self-update (Laplacian + decay)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="natural-language-simulation-the-repeatable-mapping" class="level2">
+<h2 class="anchored" data-anchor-id="natural-language-simulation-the-repeatable-mapping">Natural language → simulation: the repeatable mapping</h2>
+<p>To make the LLM’s compilation <em>repeatable</em> (same request → same structure), it follows fixed rules; the most useful:</p>
+<ol type="1">
+<li><em>“<span class="math inline">\(N\)</span> cells/agents”</em> → a set with <code>n: N</code>.</li>
+<li><em>“made of <span class="math inline">\(K\)</span> X per cell”</em> → a contained set with <code>parent</code>/<code>per_parent</code> (two levels).</li>
+<li><em>“two types differing by <span class="math inline">\(P\)</span>”</em> → <code>types:</code> with <span class="math inline">\(P\)</span> as a per-type property.</li>
+<li><em>“mechanical/elastic/rigid”</em> → particles + <code>mpm</code>; map stiffness to <code>youngs</code>.</li>
+<li><em>“moves by boids / flock”</em> → <code>boids</code>; <em>“wanders / motile”</em> → <code>motility</code>.</li>
+<li><em>“creates/secretes a chemical”</em> → a <code>field</code> + <code>secrete</code>; <em>“follows / chemotaxis”</em> → <code>sense</code>; <em>“ant trails”</em> → <code>trail</code>.</li>
+<li><strong>“only population X does Y”</strong> → the selector <code>at: cell[type=X]</code>. This is the highest-leverage primitive: it scopes behaviour to a subpopulation and lets two behaviours coexist.</li>
+</ol>
+</section>
+<section id="when-the-present-code-is-not-enough" class="level2">
+<h2 class="anchored" data-anchor-id="when-the-present-code-is-not-enough">When the present code is not enough</h2>
+<p>The pipeline fails loudly and points at the gap — e.g.&nbsp;for a request needing field advection or reaction–diffusion:</p>
+<pre class="text"><code>operator 'reaction_diffusion' not in registry.
+Available: ['adhesion','boids','mechanics','motility','mpm','secrete','sense','trail']</code></pre>
+<p>The fix is <strong>one new <code>Operator</code> subclass</strong> — never an engine change: write <code>forward(self, H, mask) -&gt; {set: accel}</code> (or mutate a field, return <code>{}</code>); decorate <code>@register_operator</code>; declare its needs; reference it in the simulation. We exercised this live twice during the experiment: adding <code>adhesion</code> unlocked cell <em>sorting</em>, and adding <code>trail</code> unlocked ant <em>trail-following</em> — each ~20 lines, with the engine and all other simulations untouched.</p>
+</section>
+<section id="when-a-cellparticle-property-does-not-exist" class="level2">
+<h2 class="anchored" data-anchor-id="when-a-cellparticle-property-does-not-exist">When a cell/particle property does not exist</h2>
+<p>Operators <em>declare</em> what they need (<code>REQUIRES_PARAMS</code>, <code>REQUIRES_TYPE_PROPS</code>); the validator checks before running, resolving a property along the containment chain (<code>mpm</code> acts on particles but <code>youngs</code> lives on the parent cell’s types):</p>
+<pre class="text"><code># missing required property -&gt; hard error, before any computation:
+operator 'mpm' requires property 'youngs' on every type of 'cell'; missing on type 'soft'.
+# property no operator reads -&gt; warning (typo guard), run proceeds:
+[warn] property 'viscosity' on cell.soft is read by no operator (known: ['fraction','youngs'])</code></pre>
+<p><strong>Design rule: capabilities are declared, not discovered at a crash.</strong> The operator that consumes a property is the single place that declares the requirement, turning a would-be <code>AttributeError</code> thousands of substeps deep into a one-line message up front.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

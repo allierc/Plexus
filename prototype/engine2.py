@@ -17,8 +17,8 @@ import zarr
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 torch.use_deterministic_algorithms(True, warn_only=True)
 
-from tissue_graph.models.base import Hierarchy, Level
-from tissue_graph.models.registry import get_operator
+from plexus.models.base import Hierarchy, Level
+from plexus.models.registry import get_operator
 
 import ops as _ops             # noqa: F401  boids/secrete/sense
 import mpm as _mpm             # noqa: F401  mpm operator

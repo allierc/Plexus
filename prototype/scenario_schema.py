@@ -14,8 +14,8 @@ from typing import Optional
 
 import yaml
 
-# importing tissue_graph populates base+registry but NOT the stub catalog
-from tissue_graph.models import registry  # noqa: F401
+# importing plexus populates base+registry but NOT the stub catalog
+from plexus.models import registry  # noqa: F401
 
 _SELECTOR_RE = re.compile(r"^(?P<set>\w+)(?:\[(?P<attr>\w+)=(?P<val>\w+)\])?$")
 

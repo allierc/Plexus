@@ -1,0 +1,35 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+    - "*.qmd"
+
+website:
+  title: "Plexus"
+  description: "A language and calculus of living systems."
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: abstraction.qmd
+        text: The abstraction
+      - href: methodology.qmd
+        text: LLM ↔ registry
+      - href: experiment.qmd
+        text: Simulations
+      - href: building.qmd
+        text: Building Plexus
+    tools:
+      - icon: github
+        href: https://github.com/allierc/Plexus
+  page-footer: "Cedric Allier · Janelia Research Campus · 2026"
+
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    toc: true
+    smooth-scroll: true
+    code-copy: true
+    code-overflow: wrap

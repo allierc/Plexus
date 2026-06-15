@@ -11,8 +11,8 @@ import numpy as np
 import torch
 import zarr
 
-from tissue_graph.models.base import Hierarchy, Level
-from tissue_graph.models.registry import get_operator
+from plexus.models.base import Hierarchy, Level
+from plexus.models.registry import get_operator
 
 import ops as _ops            # noqa: F401  registers boids/mechanics/secrete/sense
 from grid_field import GridField

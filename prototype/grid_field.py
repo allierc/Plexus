@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import torch
 
-from tissue_graph.models.base import Field
-from tissue_graph.models.registry import register_field
+from plexus.models.base import Field
+from plexus.models.registry import register_field
 
 
 @register_field("grid", frame="eulerian")

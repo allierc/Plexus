@@ -8,7 +8,7 @@ We therefore optimize the continuous behavioural parameters with a black-box
 **UCB** search (a kNN-surrogate upper-confidence acquisition): exploit where food
 is high, explore where the space is unsampled.
 
-See METHODOLOGY discussion in docs/tissue_graph for when gradient descent applies
+See METHODOLOGY discussion in docs/plexus for when gradient descent applies
 (smooth surrogate objective) and why UCB + gradient together is the general answer.
 
     python optimize.py            # ~20 evaluations, prints best, saves opt_curve.png

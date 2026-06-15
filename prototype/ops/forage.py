@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import torch
 
-from tissue_graph.models.base import Lateral
-from tissue_graph.models.registry import register_operator
+from plexus.models.base import Lateral
+from plexus.models.registry import register_operator
 
 
 @register_operator("forage", level="cell", kind="lateral")

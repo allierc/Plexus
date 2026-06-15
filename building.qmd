@@ -1,0 +1,53 @@
+---
+title: "Building Plexus"
+subtitle: "The proposed repository methodology"
+---
+
+The blueprint distils into a concrete repository structure, a build loop in which
+the LLM and the code co-evolve, and a short list of invariants that hold the line.
+
+## Layering (strict; no leaks across)
+
+- `models/base.py` — entities, operator base, the capability-contract fields.
+- `models/registry.py` — the only name→code map (entity / operator / field).
+- `models/<domain>/*.py` — operators, one concern per file, each declaring `REQUIRES_*`.
+- `simulation.py` — the schema + validator (the contract gatekeeper).
+- `engine.py` — generic; contains **no** simulation-specific logic.
+- `viz.py` — generic over the `Hierarchy`/`zarr`; swappable backends (2-D now, 3-D later).
+- `archive.py` + `simulations/` — the growing, reproducible gallery.
+
+## The build loop (how LLM and code co-evolve)
+
+```{mermaid}
+flowchart LR
+  A["user states intent<br/>(natural language)"] --> B["LLM compiles → spec.yaml<br/>(mapping rules)"]
+  B --> C{"validator"}
+  C -->|"unknown op"| D["write one operator"]
+  C -->|"missing property"| E["fix spec / add requirement"]
+  D --> C
+  E --> C
+  C -->|"runnable"| F["engine runs"]
+  F --> G["verify: intent +<br/>repeatability + well-formed"]
+  G --> H["archive.py records<br/>spec + seed + metrics + thumb"]
+```
+
+1. user states intent in natural language;
+2. LLM compiles → `spec.yaml` (following the mapping rules);
+3. validator runs: unknown op → write one operator; missing property → fix spec
+   or add the requirement; else it is runnable;
+4. engine runs; **verify** checks intent + repeatability + well-formedness;
+5. `archive.py` records spec + seed + metrics + thumb into the gallery;
+6. new capability → one new registered operator (+ its `REQUIRES_*`), never an
+   engine edit.
+
+## Invariants to hold the line
+
+- Code lives only behind the registry; the engine never branches on simulation names.
+- Every operator honours its selector mask and declares its `REQUIRES_*`.
+- Every simulation ships an intent check; "it ran" ≠ "it worked".
+- Archive the recipe (spec + seed); regenerate the dish.
+- When a result holds only in a regime, the spec/verify says so.
+
+This is the contract that lets the LLM operate at the top (intent → simulation,
+plus occasional single-operator authoring) while the low-level code stays a
+clean, growing, verifiable registry underneath.

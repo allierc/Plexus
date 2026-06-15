@@ -1,0 +1,191 @@
+[
+  {
+    "objectID": "methodology.html",
+    "href": "methodology.html",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "",
+    "text": "The prototype’s purpose was not the tissue physics but figuring out how an LLM should drive a registry of low-level operators. The answer is a strict two-layer split that meets only at one declarative, validated file — the spec (spec.yaml). In effect this is a small domain-specific language: the spec is the source, the registered operators are the primitives, and the engine is the interpreter."
+  },
+  {
+    "objectID": "methodology.html#two-layers-and-the-contract-between-them",
+    "href": "methodology.html#two-layers-and-the-contract-between-them",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "Two layers and the contract between them",
+    "text": "Two layers and the contract between them\n\n\n\n\n\nflowchart TB\n  intent[\"&lt;b&gt;INTENT&lt;/b&gt;&lt;br/&gt;natural language — “2000 cells, two mechanical types,&lt;br/&gt;a chemical that guides only one”\"]\n  spec[\"&lt;b&gt;SPEC&lt;/b&gt; &nbsp; spec.yaml&lt;br/&gt;sets · fields · operators (+selectors) · schedule\"]\n  reg[\"&lt;b&gt;REGISTRY&lt;/b&gt;&lt;br/&gt;@register_operator / @register_field — the only place code lives\"]\n  eng[\"&lt;b&gt;ENGINE&lt;/b&gt;&lt;br/&gt;generic: build Hierarchy → run Schedule → zarr (written once)\"]\n  intent --&gt;|\"LLM compiles — schema-checked generation\"| spec\n  spec --&gt;|\"engine resolves names in the registry\"| reg\n  reg --&gt; eng\n\n\n\n\n\n\nThe spec is the contract. The LLM owns everything above it (intent → spec); the code owns everything below (operators). They never touch directly. This makes the system both LLM-drivable and human-auditable: the spec is small, typed, and reviewable, unlike the 500-line flat config.py it replaces.\nBeing a small, typed, declarative file gives the contract the properties one wants of an interface between an unreliable generator and exacting code:\n\nVerifiable. The spec is validated against the schema before anything runs: an unregistered operator, a missing required property, or a malformed selector is rejected up front, so a spec that loads is guaranteed runnable. Beyond well-formedness, each simulation also ships an intent check that measures whether the requested behaviour actually occurred — “it ran” is not “it worked”.\nReproducible. A run is bit-deterministic given \\((\\text{spec},\n\\text{seed})\\) — the engine forces deterministic kernels — so the same spec yields the same trajectory, and a fresh seed draws a new realization of the same dynamics.\nSaveable. The spec is ~20 lines, so it version-controls, diffs, and archives trivially; together with the seed it is the complete record. We archive the recipe, not the dish: store spec + seed (plus metrics and a thumbnail) and regenerate the trajectory on demand.\nComposable. A variant is a base spec plus a handful of overrides, which makes ablations and the optimizer’s parameter sweeps cheap.\nExtensible. New behaviour is one new registered operator; the operator vocabulary grows monotonically, and every earlier spec keeps working."
+  },
+  {
+    "objectID": "methodology.html#the-simulation-language",
+    "href": "methodology.html#the-simulation-language",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "The simulation language",
+    "text": "The simulation language\nThe contract is, in effect, a small domain-specific language in declarative-data form. Like any language it has words (vocabulary), grammar (a typed schema — required keys, type fractions summing to one, every operator registered, every schedule token resolving), and semantics (the engine builds the Hierarchy and iterates the schedule, \\(x_{t+1}=\\Phi(x_t)\\)).\nStructurally this is an entity–component–system (ECS) architecture: sets are entities, their state buffers are components, operators are systems, and the schedule is the ECS system pipeline. We adopt that framing deliberately — it is the cleanest mental model and matches the engine one-to-one.\n\n\n\n\n\n\n\n\nConstruct\nSemantics\nExample\n\n\n\n\nTop level\n\n\n\n\nname\nrun identifier\nname: aggregate\n\n\nseed\nRNG seed — fixes determinism\nseed: 0\n\n\nn_frames\nnumber of ticks to run\nn_frames: 250\n\n\nobstacles\nstatic walls; a boundary condition for both the MPM grid and field diffusion\n[[.3,0,.36,.7]]\n\n\nsets/fields/operators/schedule\nthe four parts, detailed below\n—\n\n\nSet (\\(S_k\\) — an entity level / ECS entity)\n\n\n\n\nn\nsize of a top-level set\nn: 100\n\n\nparent\ncontainment target of a leaf set (the map \\(\\pi_k\\))\nparent: cell\n\n\nper_parent\nchildren per parent\nper_parent: 100\n\n\ntypes\nnamed sub-populations: fraction + per-type properties\n{soft: {fraction: .5, youngs: 12}}\n\n\nField (a continuum)\n\n\n\n\nframe\ndiscretization (a grid)\nframe: grid\n\n\nres\ngrid resolution\nres: 96\n\n\ndiffusion, decay\nPDE coefficients\ndiffusion: 0.1\n\n\ncouples_to\nthe one set this field exchanges with\ncouples_to: cell\n\n\nsource\nfixed source region (imposes a gradient)\nsource: [.82,.82,1,1]\n\n\nOperator (a system; one per list entry)\n\n\n\n\nop\nwhich registered operator to run\nop: sense\n\n\nat\nselector — the subset it acts on\nat: cell[type=soft]\n\n\nto/from\nfield an Exchange writes to / reads from\nfrom: chemical\n\n\n⟨params⟩\noperator-specific arguments\ngain: 150\n\n\nSelector (sub-grammar)\n\n\n\n\nset\nevery node of the set\ncell\n\n\nset[attr=val]\nnodes matching attr (re-checked each tick)\ncell[loaded=1]\n\n\nSchedule (sub-grammar; per-tick order)\n\n\n\n\noperator name\nrun that operator this tick\nsense\n\n\n[a, b]\na group run in the same stage\n[motility, sense]\n\n\naggregate\nbuiltin: Aggregate ↑ (parent = mean of children)\naggregate\n\n\nname.diffuse\nbuiltin: advance that field one step\nchemical.diffuse\n\n\n\nThe only genuine sub-grammars are the last two blocks — selectors and the schedule. Both are deliberately minimal but extend naturally: selectors to conjunctions and to geometric or temporal predicates (cell[type=soft & loaded=0], cell[x&lt;0.5], cell[age&gt;10]), and the schedule to explicit per-operator rates and nested loops.\nWe keep the language as declarative data (YAML/JSON) rather than a bespoke syntax, so an LLM can emit it under schema-constrained decoding and a human can diff, review, and archive it; the grammar is pinned by a typed schema (Pydantic or JSON-Schema). Prior art worth borrowing: ECS engines (the scheduling model), SBML/Antimony (reaction–species vocabulary), NeuroML and MorpheusML/PhysiCell (multicellular specs), UFL (PDE operators), and NetLogo/Mesa (agent rules)."
+  },
+  {
+    "objectID": "methodology.html#the-simulation-specification",
+    "href": "methodology.html#the-simulation-specification",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "The simulation specification",
+    "text": "The simulation specification\nA complete simulation is a single spec.yaml. Below: two cell types, particles contained in each cell, one chemical field, and a four-step schedule. Soft cells secrete the chemical and sense (climb) it, so they self-aggregate, while stiff cells — selected out by cell[type=soft] — do not.\nname: aggregate\nseed: 0\nn_frames: 250\nsets:\n  cell:\n    n: 100\n    types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}\n  particle: {parent: cell, per_parent: 100, radius: 0.02}   # containment\nfields:\n  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}\noperators:\n  - {op: motility, at: cell, speed: 15.0, rot: 0.4}\n  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 800, drag: 4}\n  - {op: secrete, at: \"cell[type=soft]\", to: chemical, rate: 1.0}    # only pop 1 makes it\n  - {op: sense,  at: \"cell[type=soft]\", from: chemical, gain: 150.0} # only pop 1 follows it\nschedule: [aggregate, [motility], secrete, chemical.diffuse, sense, mpm]\nThe validator guarantees that a file which loads is runnable: every op exists; every at/to/from references a declared set/field; type fractions sum to one; every schedule token resolves. (One trap: never use a YAML 1.1 boolean key such as on/off — we use at.)"
+  },
+  {
+    "objectID": "methodology.html#operator-catalog",
+    "href": "methodology.html#operator-catalog",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "Operator catalog",
+    "text": "Operator catalog\nOperators are the system’s vocabulary; it grows monotonically and every past simulation keeps working. The prototype catalog:\n\n\n\n\n\n\n\n\n\nop\nkind\nacts on\nbehaviour\n\n\n\n\nboids\nlateral\ncell\ncollective motion (cohesion/align/separate)\n\n\nmotility\nlateral\ncell\nactive self-propulsion (wandering heading)\n\n\nadhesion\nlateral\ncell\ntype-specific cohesion → sorting\n\n\nmpm\nexchange\nparticle\nMLS-MPM mechanics; soft/stiff via youngs\n\n\nsecrete\nexchange\ncell → field\ndeposit into a field\n\n\nsense\nexchange\ncell ← field\nchemotactic accel up-gradient\n\n\ntrail\nexchange\ncell\nPhysarum 3-sensor pheromone steering (ants)\n\n\naggregate\nbuiltin\n—\ncell pos/vel = mean of its particles (↑)\n\n\n&lt;field&gt;.diffuse\nbuiltin\n—\nfield self-update (Laplacian + decay)"
+  },
+  {
+    "objectID": "methodology.html#natural-language-simulation-the-repeatable-mapping",
+    "href": "methodology.html#natural-language-simulation-the-repeatable-mapping",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "Natural language → simulation: the repeatable mapping",
+    "text": "Natural language → simulation: the repeatable mapping\nTo make the LLM’s compilation repeatable (same request → same structure), it follows fixed rules; the most useful:\n\n“\\(N\\) cells/agents” → a set with n: N.\n“made of \\(K\\) X per cell” → a contained set with parent/per_parent (two levels).\n“two types differing by \\(P\\)” → types: with \\(P\\) as a per-type property.\n“mechanical/elastic/rigid” → particles + mpm; map stiffness to youngs.\n“moves by boids / flock” → boids; “wanders / motile” → motility.\n“creates/secretes a chemical” → a field + secrete; “follows / chemotaxis” → sense; “ant trails” → trail.\n“only population X does Y” → the selector at: cell[type=X]. This is the highest-leverage primitive: it scopes behaviour to a subpopulation and lets two behaviours coexist."
+  },
+  {
+    "objectID": "methodology.html#when-the-present-code-is-not-enough",
+    "href": "methodology.html#when-the-present-code-is-not-enough",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "When the present code is not enough",
+    "text": "When the present code is not enough\nThe pipeline fails loudly and points at the gap — e.g. for a request needing field advection or reaction–diffusion:\noperator 'reaction_diffusion' not in registry.\nAvailable: ['adhesion','boids','mechanics','motility','mpm','secrete','sense','trail']\nThe fix is one new Operator subclass — never an engine change: write forward(self, H, mask) -&gt; {set: accel} (or mutate a field, return {}); decorate @register_operator; declare its needs; reference it in the simulation. We exercised this live twice during the experiment: adding adhesion unlocked cell sorting, and adding trail unlocked ant trail-following — each ~20 lines, with the engine and all other simulations untouched."
+  },
+  {
+    "objectID": "methodology.html#when-a-cellparticle-property-does-not-exist",
+    "href": "methodology.html#when-a-cellparticle-property-does-not-exist",
+    "title": "The LLM ↔︎ registry methodology",
+    "section": "When a cell/particle property does not exist",
+    "text": "When a cell/particle property does not exist\nOperators declare what they need (REQUIRES_PARAMS, REQUIRES_TYPE_PROPS); the validator checks before running, resolving a property along the containment chain (mpm acts on particles but youngs lives on the parent cell’s types):\n# missing required property -&gt; hard error, before any computation:\noperator 'mpm' requires property 'youngs' on every type of 'cell'; missing on type 'soft'.\n# property no operator reads -&gt; warning (typo guard), run proceeds:\n[warn] property 'viscosity' on cell.soft is read by no operator (known: ['fraction','youngs'])\nDesign rule: capabilities are declared, not discovered at a crash. The operator that consumes a property is the single place that declares the requirement, turning a would-be AttributeError thousands of substeps deep into a one-line message up front."
+  },
+  {
+    "objectID": "experiment.html",
+    "href": "experiment.html",
+    "title": "A spread of simulations",
+    "section": "",
+    "text": "Once the vocabulary existed, qualitatively different behaviours were just different specs over the same code — breadth comes from the intermediate representation, not from new code. Each simulation is 100–600 cells of ~100 MLS-MPM particles (the two cell types in two colours over the shaded chemical field). All simulations below use a periodic (toroidal) domain."
+  },
+  {
+    "objectID": "experiment.html#ten-simulations-from-one-registry",
+    "href": "experiment.html#ten-simulations-from-one-registry",
+    "title": "A spread of simulations",
+    "section": "Ten simulations from one registry",
+    "text": "Ten simulations from one registry\nAcross all of them, only the operator choices and their parameters differ; the engine, the operators, and the schedule grammar are identical."
+  },
+  {
+    "objectID": "experiment.html#emergent-ant-trails",
+    "href": "experiment.html#emergent-ant-trails",
+    "title": "A spread of simulations",
+    "section": "Emergent ant trails",
+    "text": "Emergent ant trails\nAdding the trail operator (a Physarum/Jones three-sensor rule: each ant samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest, while motility drives it forward and secrete lays pheromone) yields self-reinforcing trails that grow, are followed, and coarsen over long runs — classic stigmergy.\n\nThe full simulation:\nname: ant\nseed: 0\nn_frames: 1500\nsets:\n  cell:\n    n: 150\n    types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}\n  particle: {parent: cell, per_parent: 60, radius: 0.012}\nfields:\n  pheromone: {frame: grid, res: 160, diffusion: 0.02, decay: 0.04, couples_to: cell}\noperators:\n  - {op: motility, at: cell, speed: 300.0, rot: 0.06}            # persistent forward motion\n  - {op: trail,  at: \"cell[type=soft]\", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}\n  - {op: secrete, at: \"cell[type=soft]\", to: pheromone, rate: 2.0}\n  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}\nschedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]\n\nTen variants, same code\nEach variant is the same trail + motility + secrete code with a few parameters changed (turn rate, sensor reach/angle, pheromone diffusion/decay, deposit rate, rotational noise). The parameter axes span the trail-formation regime — from loose wandering to tight reinforced networks."
+  },
+  {
+    "objectID": "experiment.html#cells-in-a-maze-foraging-and-optimization",
+    "href": "experiment.html#cells-in-a-maze-foraging-and-optimization",
+    "title": "A spread of simulations",
+    "section": "Cells in a maze: foraging and optimization",
+    "text": "Cells in a maze: foraging and optimization\nA harder simulation exercises more of the language: two rigid cell populations start at home (bottom-left), navigate a walled maze to food (top-right), pick food up, and carry it back. It adds three constructs — obstacles, a per-cell loaded state, and state-gated selectors (cell[loaded=0] seeks food, cell[loaded=1] returns home) — and answers the design question how does one model an obstacle: a wall is not a pairwise force but a static occupancy mask reused as a boundary condition by machinery already present. The same mask (i) zeroes the MPM grid velocity inside walls, so rigid cells cannot enter, and (ii) imposes no-flux on field diffusion, so a chemical routes around the walls. Two such fields — one sourced at food, one at home — become navigation gradients that solve the maze; unloaded and loaded cells climb opposite ones.\n\nOptimizing the colony\nBecause the whole simulation is differentiable and the spec is tiny, the colony can be optimized: search the behavioural parameters to deliver food as fast as possible. The objective — units delivered — comes from a discrete pick-up/drop-off and is therefore non-differentiable, so we use a black-box UCB search over eight levers (motility speed and rotation, sense gain, MPM drag and force cap, cell stiffness and size, colony size). Over a few dozen simulations it improves delivery roughly five-fold.\nThis echoes the differentiable-simulator design literature, where a smooth objective is optimized by gradients through the rollout; the general recipe is both — UCB or CEM for the discrete and structural choices, and gradient-through-rollout on a smooth surrogate for the continuous interior.\n\n\n\nOptimizing the colony. Best food delivered as UCB searches the eight-parameter design space, from the initial hand-set design to the best found — a slow, soft, high-drag, many-celled colony.\n\n\nThe optimizer keeps a log of every accepted improvement, which is itself the finding — it shows what makes a good forager:\n\nThe optimization log: the initial design and each significantly-better foraging design UCB found, with the eight tuned parameters. Food delivered rises from 120 to 587 (~5×).\n\n\n#\nfood\nspeed\ngain\ndrag\nrot\nyoungs\na_max\nradius\n\\(n\\)\n\n\n\n\ninit\n120\n40\n180\n2.00\n0.30\n550\n700\n0.01\n60\n\n\n1\n142\n74\n379\n2.54\n0.10\n517\n454\n0.02\n46\n\n\n2\n225\n106\n253\n1.25\n0.31\n36\n599\n0.01\n88\n\n\n3\n298\n83\n270\n0.97\n0.48\n78\n1362\n0.01\n93\n\n\n4\n423\n49\n391\n1.55\n0.18\n160\n1438\n0.01\n106\n\n\n5\n525\n21\n341\n2.99\n0.40\n24\n1633\n0.01\n120\n\n\n6\n553\n52\n400\n0.92\n0.56\n20\n880\n0.01\n116\n\n\n7\n587\n46\n342\n1.70\n0.39\n20\n988\n0.01\n120\n\n\n\nTwo parameters move monotonically to their bounds — the colony grows to its cap (\\(n\\approx120\\): more foragers deliver more food) and the cells soften to the floor (\\(\\text{youngs}\\to20\\): soft, deformable cells squeeze through the maze far better than the rigid ones we started from). Chemotaxis stays strong throughout (\\(\\text{gain}\\sim340\\)–\\(400\\)) and the cell radius sits at its minimum (smaller cells clear the gaps). The remaining knobs are traded off rather than maximized: the best design (winner_7) is a balanced, moderate-speed, moderate-drag colony, not any extreme. The headline is that the search rediscovered, with nothing hand-coded, that a large swarm of small, soft, strongly-chemotactic cells forages a maze best.\n\n\nInitial vs. optimized\nThe difference is visible in the trails themselves: the initial colony barely establishes a route, whereas the optimized one lays a strong chemoattractant highway that threads both maze gaps from home to food.\n\n\n\n\n\n\n\n\n\n\nThe full optimization trajectory, run by run:"
+  },
+  {
+    "objectID": "experiment.html#what-the-process-taught-us",
+    "href": "experiment.html#what-the-process-taught-us",
+    "title": "A spread of simulations",
+    "section": "What the process taught us",
+    "text": "What the process taught us\n\nThe intermediate representation is the whole game. Ten distinct behaviours and an ant model were all different YAML over the same code.\nSelectors are the highest-leverage primitive. cell[type=soft] expresses “only population 1 does X” and lets behaviours coexist; every operator must honour the selector mask.\nVerification must check intent, not just “it ran”. The hard bugs were physical: unstable diffusion (\\(dt\\cdot D&gt;0.25\\)), wrong particle volume, unclamped accelerations blowing up MPM, cell inversion at very low stiffness, GPU non-determinism breaking reproducibility, and — subtlest — the wrong metric (net displacement vs. nearest-neighbour clustering).\nHonesty about regime. Self-secreted chemotaxis aggregates only below a density threshold (above it the field is spatially flat — correct physics); the verify output should state the regime, not silently show the one setting that worked.\nDeterminism is a feature you must force (deterministic CUDA kernels), or “reproduce with a new seed” is meaningless.\nObstacles are boundary conditions, not forces. A wall is one static mask reused by the MPM grid (interior zero-velocity) and the diffusing fields (no-flux); maze navigation then falls out of the field’s gradient, with no special pathfinding code.\nCap speed below the CFL limit. Strong gradients otherwise drive cells to the grid’s stability ceiling, where they move ballistically (“asteroids”); an explicit max-speed clamp plus overdamped drag restores smooth, biological motion.\nDiscrete objectives need black-box search, differentiable ones admit gradients — use both. Food count (discrete) optimizes well under UCB; a smooth surrogate opens the gradient-through-rollout path, and the two compose.\nReproducibility needs full-precision provenance. Archiving rounded parameters made a winner re-simulate to a different score; the exact spec (and seed) must be stored, or the run is not bit-reproducible."
+  },
+  {
+    "objectID": "abstraction.html",
+    "href": "abstraction.html",
+    "title": "The abstraction",
+    "section": "",
+    "text": "The container is built from two kinds of object — sets and fields — and a small algebra of operators that move state between them. This is the missing primitive: the place where particle mechanics, cellular interaction, neural dynamics, and reaction networks all become the same kind of thing."
+  },
+  {
+    "objectID": "abstraction.html#two-entities-sets-and-fields",
+    "href": "abstraction.html#two-entities-sets-and-fields",
+    "title": "The abstraction",
+    "section": "Two entities: sets and fields",
+    "text": "Two entities: sets and fields\nA set \\(S_k\\) is a discrete collection of like entities at scale \\(k\\) — metabolites, particles, cells, populations, organisms. Adjacent scales are linked by parent maps\n\\[\\pi_k : S_k \\longrightarrow S_{k+1},\\]\nwhere \\(\\pi_k(x)\\) is the higher-level object that contains \\(x\\). A cell is built from two kinds of \\(S_0\\) entity — its particles (mechanics) and its metabolites (chemistry) — and \\(\\pi_0\\) sends each of them to the cell it belongs to, so \\(\\pi_0(x)=c\\) reads “\\(x\\) belongs to cell \\(c\\)”. The constituents of a given cell \\(c\\) are its fibre, the set of everything that maps to \\(c\\),\n\\[\\pi_0^{-1}(c)=\\{\\,x\\in S_0 : \\pi_0(x)=c\\,\\},\\]\nso a cell simply is the collection of its particles and metabolites.\n\n\n\n\n\nflowchart BT\n  mol[\"metabolite S₀\"] --&gt; cell[\"cell S₁\"]\n  part[\"particle S₀\"] --&gt; cell\n  cell --&gt;|π₁| pop[\"population S₂\"]\n  pop --&gt;|π₂| org[\"organism S₃\"]\n\n\n\n\n\n\nA field \\(f:\\Omega\\to\\mathbb{R}^q\\) is a continuous quantity defined on its own grid — morphogen concentration, pressure, substrate stiffness. Fields are not part of the containment hierarchy: they neither contain nor are contained by cells. Instead, each field is bound to exactly one set level through an exchange relation (particle–grid transfer, cell sampling, or population-level secretion and sensing); these couplings are the operators below."
+  },
+  {
+    "objectID": "abstraction.html#four-operators",
+    "href": "abstraction.html#four-operators",
+    "title": "The abstraction",
+    "section": "Four operators",
+    "text": "Four operators\nA GNN is an operator \\(\\mathcal{O}\\) returning a time-derivative contribution, dispatched by the relation it acts on. We use four kinds, one per relation the container admits:\n\\[\n\\begin{aligned}\n\\textbf{Lateral}\\quad   & \\mathcal{O}_E,\\ E\\subseteq S_k\\times S_k\n  && \\text{(ODE interaction } + \\text{ graph Laplacian)}\\\\\n\\textbf{Aggregate}\\ \\uparrow\\quad & \\textstyle\\sum_{\\pi}: S_k \\to S_{k+1}\n  && \\text{(reduction over fibres of } \\pi)\\\\\n\\textbf{Broadcast}\\ \\downarrow\\quad & \\pi^{*}: S_{k+1}\\to S_k\n  && \\text{(lift along } \\pi)\\\\\n\\textbf{Exchange}\\quad  & \\mathcal{S},\\mathcal{G}: S_k \\leftrightarrow F\n  && \\text{(scatter / gather; bipartite)}\n\\end{aligned}\n\\]\nTwo pieces of notation: \\(S_k\\times S_k\\) is the set of all node pairs, so an edge set \\(E\\subseteq S_k\\times S_k\\) is simply a graph on \\(S_k\\) — which nodes interact (e.g. neighbours within a cutoff radius, or a fixed connectome). And \\(\\mathcal{S},\\mathcal{G}\\) are the two halves of a field coupling: scatter \\(\\mathcal{S}:S_k\\to F\\) writes object state into the field, while gather \\(\\mathcal{G}:F\\to S_k\\) reads it back.\nLateral \\(\\mathcal{O}_E\\). Message passing within one scale along the edges \\(E\\). It carries the within-scale physics: pairwise interactions (forces, adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities over the edges. Examples: particle–particle elasticity, cell–cell flocking or adhesion, neuron–neuron signal propagation.\nAggregate \\(\\textstyle\\sum_\\pi\\) (up). Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.\nBroadcast \\(\\pi^{*}\\) (down). The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map \\(\\pi\\).\nExchange \\(\\mathcal{S},\\mathcal{G}\\). Couples a set to a field: scatter \\(\\mathcal{S}\\) deposits/secretes object state into the field, gather \\(\\mathcal{G}\\) samples/senses the field back onto the objects. The relation is bipartite (objects \\(\\leftrightarrow\\) grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing."
+  },
+  {
+    "objectID": "abstraction.html#dynamics-a-schedule",
+    "href": "abstraction.html#dynamics-a-schedule",
+    "title": "The abstraction",
+    "section": "Dynamics: a schedule",
+    "text": "Dynamics: a schedule\nA simulation is a multi-rate composition of operators, declared as a Schedule. In math terms, one tick is the composition\n\\[\\Phi=\\mathcal{O}_n\\circ\\cdots\\circ\\mathcal{O}_1,\\]\nand the dynamics is its iteration \\(x_{t+1}=\\Phi(x_t)\\) — a discrete flow (with “multi-rate” meaning some operators fire only on every \\(k\\)-th tick). Each operator is pure: instead of editing the state in place, it only returns its contribution — a delta \\(\\Delta_i\\) (a time-derivative term) for the sets it touches. The schedule sums the deltas acting on each set and integrates once per tick,\n\\[x_{t+1}=x_t+\\Delta t\\textstyle\\sum_i\\Delta_i.\\]\nTwo consequences follow: several operators may act on the same set in one tick (their deltas simply add — none overwrites another), and because nothing is mutated in place, gradients flow through the sums and the integrator, so the whole rollout stays differentiable. The LLM searches over schedules and operator parameterizations — one well-defined action space instead of per-domain code."
+  },
+  {
+    "objectID": "abstraction.html#glossary",
+    "href": "abstraction.html#glossary",
+    "title": "The abstraction",
+    "section": "Glossary",
+    "text": "Glossary\n\n\n\n\n\n\n\n\n\nConcept\nSet/operator term\nSymbol\nCode\n\n\n\n\ncollection of like nodes\nset (level)\n\\(S_k\\)\nLevel\n\n\na single node\nelement\n\\(x\\in S_k\\)\nrow of Level.state\n\n\nlearnable per-node code\nembedding\n\\(a_i\\)\nLevel.embedding\n\n\ncontainment\npartition\n\\(\\pi_k\\!:\\!S_k\\!\\to\\!S_{k+1}\\)\nLevel.parent\n\n\nwithin-set links\nrelation\n\\(E\\subseteq S_k\\times S_k\\)\nLevel.edge_index\n\n\ncontinuum quantity\nfield\n\\(f:\\Omega\\to\\mathbb{R}^c\\)\nField\n\n\ndynamics (GNN)\noperator: ODE+Laplacian\n\\(\\mathcal{O}\\)\nOperator\n\n\nwithin-set op\nlateral\n\\(\\mathcal{O}_E\\)\nLateral\n\n\nup op\nreduction over fibres\n\\(\\sum_\\pi\\)\nAggregate\n\n\ndown op\nlift\n\\(\\pi^{*}\\)\nBroadcast\n\n\nset \\(\\leftrightarrow\\) field op\ntransfer\n\\(\\mathcal{S},\\mathcal{G}\\)\nExchange\n\n\nthe container\nhierarchy\n\\((S_\\bullet,F_\\bullet,\\pi_\\bullet)\\)\nHierarchy\n\n\nthe model\ncomposition of ops\n\\(\\mathcal{O}_n\\!\\circ\\!\\cdots\\!\\circ\\!\\mathcal{O}_1\\)\nSchedule"
+  },
+  {
+    "objectID": "building.html",
+    "href": "building.html",
+    "title": "Building Plexus",
+    "section": "",
+    "text": "The blueprint distils into a concrete repository structure, a build loop in which the LLM and the code co-evolve, and a short list of invariants that hold the line."
+  },
+  {
+    "objectID": "building.html#layering-strict-no-leaks-across",
+    "href": "building.html#layering-strict-no-leaks-across",
+    "title": "Building Plexus",
+    "section": "Layering (strict; no leaks across)",
+    "text": "Layering (strict; no leaks across)\n\nmodels/base.py — entities, operator base, the capability-contract fields.\nmodels/registry.py — the only name→code map (entity / operator / field).\nmodels/&lt;domain&gt;/*.py — operators, one concern per file, each declaring REQUIRES_*.\nsimulation.py — the schema + validator (the contract gatekeeper).\nengine.py — generic; contains no simulation-specific logic.\nviz.py — generic over the Hierarchy/zarr; swappable backends (2-D now, 3-D later).\narchive.py + simulations/ — the growing, reproducible gallery."
+  },
+  {
+    "objectID": "building.html#the-build-loop-how-llm-and-code-co-evolve",
+    "href": "building.html#the-build-loop-how-llm-and-code-co-evolve",
+    "title": "Building Plexus",
+    "section": "The build loop (how LLM and code co-evolve)",
+    "text": "The build loop (how LLM and code co-evolve)\n\n\n\n\n\nflowchart LR\n  A[\"user states intent&lt;br/&gt;(natural language)\"] --&gt; B[\"LLM compiles → spec.yaml&lt;br/&gt;(mapping rules)\"]\n  B --&gt; C{\"validator\"}\n  C --&gt;|\"unknown op\"| D[\"write one operator\"]\n  C --&gt;|\"missing property\"| E[\"fix spec / add requirement\"]\n  D --&gt; C\n  E --&gt; C\n  C --&gt;|\"runnable\"| F[\"engine runs\"]\n  F --&gt; G[\"verify: intent +&lt;br/&gt;repeatability + well-formed\"]\n  G --&gt; H[\"archive.py records&lt;br/&gt;spec + seed + metrics + thumb\"]\n\n\n\n\n\n\n\nuser states intent in natural language;\nLLM compiles → spec.yaml (following the mapping rules);\nvalidator runs: unknown op → write one operator; missing property → fix spec or add the requirement; else it is runnable;\nengine runs; verify checks intent + repeatability + well-formedness;\narchive.py records spec + seed + metrics + thumb into the gallery;\nnew capability → one new registered operator (+ its REQUIRES_*), never an engine edit."
+  },
+  {
+    "objectID": "building.html#invariants-to-hold-the-line",
+    "href": "building.html#invariants-to-hold-the-line",
+    "title": "Building Plexus",
+    "section": "Invariants to hold the line",
+    "text": "Invariants to hold the line\n\nCode lives only behind the registry; the engine never branches on simulation names.\nEvery operator honours its selector mask and declares its REQUIRES_*.\nEvery simulation ships an intent check; “it ran” ≠ “it worked”.\nArchive the recipe (spec + seed); regenerate the dish.\nWhen a result holds only in a regime, the spec/verify says so.\n\nThis is the contract that lets the LLM operate at the top (intent → simulation, plus occasional single-operator authoring) while the low-level code stays a clean, growing, verifiable registry underneath."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Plexus",
+    "section": "",
+    "text": "Biology is not a single graph.\nLiving systems combine cells, molecules, tissues, populations, and continuous fields across multiple spatial and temporal scales. Existing simulators typically focus on one layer of this hierarchy at a time: particle mechanics, cellular interactions, neural dynamics, reaction networks, or continuum fields. As a result, models become difficult to combine, extend, and reason about.\nPlexus starts from a different question:\nRather than building another domain-specific simulator, Plexus introduces a common representation based on hierarchical sets, continuous fields, and a small collection of operators acting between them. Cells contain particles and metabolites. Populations contain cells. Fields exchange information with discrete entities. Complex simulations emerge from composing a few primitive operations.\nThe goal is not merely to predict trajectories, but to provide a language in which biological systems can be expressed, modified, optimized, and understood. A simulation becomes a program. A tissue becomes a composition of operators. A new biological hypothesis becomes a small change to a specification rather than a new software project."
+  },
+  {
+    "objectID": "index.html#a-language-not-a-world-model",
+    "href": "index.html#a-language-not-a-world-model",
+    "title": "Plexus",
+    "section": "A language, not a world model",
+    "text": "A language, not a world model\nThe goal of Plexus is not to learn a world model of biology. The goal is to define a language in which biological worlds can be written.\nModern world models learn compressed latent representations whose internal structure is optimized for prediction. Such representations can be powerful, but their primitives are learned from data: they do not provide a natural language for expressing biological hypotheses, composing mechanisms across scales, or introducing new physical laws.\nPlexus takes the opposite approach. Its primitives are explicit: sets, fields, containment relations, and operators. A cell, a morphogen gradient, a mechanical substrate, and a neural circuit are all represented within the same formal framework. Dynamics arise from compositions of interpretable operators rather than opaque latent transitions.\nThe question is therefore not “Can we predict the next state?” but “What are the primitive concepts required to describe a living system?” In this view the simulator is secondary — it is merely the interpreter of the language. The central object is the representation itself. Once a living system is expressed in the language of Plexus, it becomes possible to compose mechanisms across scales, perform inverse inference, optimize biological designs, and generate new models automatically.\nPlexus proposes that hierarchical sets, fields, and four classes of operators are sufficient to express a broad range of biological phenomena within a common differentiable framework."
+  },
+  {
+    "objectID": "index.html#re-converging-four-frameworks",
+    "href": "index.html#re-converging-four-frameworks",
+    "title": "Plexus",
+    "section": "Re-converging four frameworks",
+    "text": "Re-converging four frameworks\nPlexus re-converges four sibling frameworks that all forked from ParticleGraph and then drifted — each implements one graph type; a tissue needs them coexisting.\n\n\n\n\n\n\n\n\nFramework\nDomain\nBecomes (in Plexus)\n\n\n\n\nCellGraph\ncollective cell interactions\nLateral operators @ cell level\n\n\nNeuralGraph\nneural / signalling networks\nLateral operators @ cell level\n\n\nMPMGraph\ntissue mechanics, deformable matter\nExchange (P2G/G2P) @ particle level\n\n\nMetabolismGraph\nbipartite reaction networks\nExchange (stoichiometry) @ molecule level"
+  },
+  {
+    "objectID": "index.html#what-it-looks-like",
+    "href": "index.html#what-it-looks-like",
+    "title": "Plexus",
+    "section": "What it looks like",
+    "text": "What it looks like\nQualitatively different collective behaviours, all produced from the same code by changing only a ~20-line specification — no new software per phenomenon.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nAnd because every simulation is differentiable, biological designs can be optimized. Below, a foraging colony in a maze is tuned by black-box search — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster."
+  },
+  {
+    "objectID": "index.html#read-the-blueprint",
+    "href": "index.html#read-the-blueprint",
+    "title": "Plexus",
+    "section": "Read the blueprint",
+    "text": "Read the blueprint\nThis site distils a working prototype into a single blueprint, in four parts:\n\nThe abstraction — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.\nLLM ↔︎ registry — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.\nSimulations — ten distinct simulations, an emergent ant-trail model, and a maze-foraging colony optimized end-to-end.\nBuilding Plexus — the proposed repository methodology and the invariants that hold the line.\n\nA static version with full schematics and glossary is in paper/plexus.pdf."
+  }
+]
