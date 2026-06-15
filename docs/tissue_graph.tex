@@ -248,25 +248,24 @@ the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\
 The prototype's purpose was not the tissue physics but figuring out \emph{how an
 LLM should drive a registry of low-level operators}. The answer is a strict
 two-layer split that meets only at one declarative, validated file --- the
-\textbf{simulation spec}. In effect this is a small domain-specific language: the
-spec is the \emph{source}, the registered operators are the \emph{primitives}, and
-the engine is the \emph{interpreter}. The \code{simulation.yaml} is therefore not a
-simulation but a \emph{specification} of one; the simulation is the run the engine
-produces from it.
+\textbf{spec} (\code{spec.yaml}). In effect this is a small domain-specific
+language: the spec is the \emph{source}, the registered operators are the
+\emph{primitives}, and the engine is the \emph{interpreter}.
 
 \begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}p{3.0cm}p{11.5cm}@{}}
-\toprule
-\textbf{INTENT} & natural language (``2000 cells, two mechanical types, a chemical that guides only one'')\\
-\quad$\downarrow$ \emph{LLM compiles} & bounded, schema-checked generation\\
-\textbf{SPEC} & \code{simulation.yaml} --- sets $\cdot$ fields $\cdot$ operators($+$selectors) $\cdot$ schedule\\
-\quad$\downarrow$ \emph{engine resolves} & names looked up in the registry\\
-\textbf{REGISTRY} & \code{@register\_operator} / \code{@register\_field} --- the only place code lives\\
-\quad$\downarrow$ & \\
-\textbf{ENGINE} & generic: build \code{Hierarchy} $\to$ run \code{Schedule} $\to$ \code{zarr} (written once)\\
-\bottomrule
-\end{tabular}
+\begin{tikzpicture}[font=\footnotesize,
+  layer/.style={draw=cgray,rounded corners,align=left,text width=11.2cm,inner sep=6pt},
+  flow/.style={-{Stealth[length=2.6mm]},thick,cgray},
+  ann/.style={font=\scriptsize\itshape,fill=white,inner sep=2pt},
+]
+\node[layer] (intent) {\textbf{INTENT}\\[2pt]natural language --- ``2000 cells, two mechanical types, a chemical that guides only one''};
+\node[layer,below=10mm of intent] (spec) {\textbf{SPEC}\quad\code{spec.yaml}\\[2pt]sets $\cdot$ fields $\cdot$ operators ($+$selectors) $\cdot$ schedule};
+\node[layer,below=10mm of spec] (reg) {\textbf{REGISTRY}\\[2pt]\code{@register\_operator} / \code{@register\_field} --- the only place code lives};
+\node[layer,below=10mm of reg] (eng) {\textbf{ENGINE}\\[2pt]generic: build \code{Hierarchy} $\to$ run \code{Schedule} $\to$ \code{zarr} (written once)};
+\draw[flow] (intent) -- node[ann]{LLM compiles --- schema-checked generation} (spec);
+\draw[flow] (spec) -- node[ann]{engine resolves names in the registry} (reg);
+\draw[flow] (reg) -- (eng);
+\end{tikzpicture}
 \end{center}
 
 The \textbf{spec is the contract}. The LLM owns everything above it (intent $\to$
@@ -301,7 +300,7 @@ declarative-data form. Like any language it has \emph{words} (vocabulary),
 \item \textbf{Words}: \code{sets}, \code{fields}, \code{operators}, \code{selectors},
 \code{schedule}, plus keys such as \code{parent}/\code{per\_parent},
 \code{couples\_to}, \code{types}, and the registered operator names.
-\item \textbf{Grammar}: the typed schema of \code{simulation.yaml} --- required keys,
+\item \textbf{Grammar}: the typed schema of \code{spec.yaml} --- required keys,
 type fractions summing to one, every operator registered, every schedule token
 resolving. The schema \emph{is} the language definition.
 \item \textbf{Semantics}: the engine --- build the \code{Hierarchy} and iterate the
@@ -553,7 +552,7 @@ or ``reproduce with a new seed'' is meaningless.
 \paragraph{The build loop (how LLM and code co-evolve).}
 \begin{enumerate}\itemsep1pt
 \item user states intent in natural language;
-\item LLM compiles $\to$ \code{simulation.yaml} (following the mapping rules);
+\item LLM compiles $\to$ \code{spec.yaml} (following the mapping rules);
 \item validator runs: unknown op $\to$ write one operator; missing property $\to$ fix
 spec or add the requirement; else it is runnable;
 \item engine runs; \textbf{verify} checks intent $+$ repeatability $+$ well-formedness;
