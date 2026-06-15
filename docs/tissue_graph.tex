@@ -284,7 +284,7 @@ missing model & registry lookup errors with the available set; add one \code{Ope
 missing property & operators \emph{declare} what they require; validator checks & \code{Operator.REQUIRES\_*} \\
 \bottomrule
 \end{tabular}
-\caption{The three operational modes (Sections~\ref{sec:archive}--\ref{sec:prop}).}
+\caption{The three operational modes.}
 \label{tab:modes}
 \end{table}
 
@@ -362,24 +362,6 @@ structure), it follows fixed rules; the most useful:
       This is the highest-leverage primitive: it scopes behaviour to a
       subpopulation and lets two behaviours coexist.
 \end{enumerate}
-
-\section{Archiving simulations}
-\label{sec:archive}
-
-An archived simulation is four small files, keyed by name:
-\code{simulation.yaml} (the source of truth), \code{metrics.json} ($+$ seed),
-\code{thumb.png} (start$\to$end), optionally \code{run.gif}. Because every run is
-\textbf{bit-deterministic given (spec, seed)} (the engine forces
-\code{torch.use\_deterministic\_algorithms}), \emph{the spec is the archive} ---
-we do not store the trajectory, we regenerate it:
-\begin{itemize}\itemsep1pt
-\item reproduce exactly: \code{reproduce.py <name>}
-\item new realization: \code{reproduce.py <name> -{}-seed 7} (same dynamics, new draw)
-\item visualize differently: the run writes a generic \code{zarr}; point any visualizer at it.
-\end{itemize}
-\textbf{Design rule: archive the recipe, not the dish.} A simulation is $\sim$20
-lines of YAML, so thousands cost almost nothing, and \code{GALLERY.md} is the
-regenerable, always-current index.
 
 \section{When the present code is not enough (a missing model)}
 
