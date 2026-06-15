@@ -4,6 +4,7 @@
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{parskip}        % no paragraph indent; separate paragraphs by vertical space
 \usepackage{listings}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
@@ -290,6 +291,47 @@ missing property & operators \emph{declare} what they require; validator checks 
 \caption{The three operational modes.}
 \label{tab:modes}
 \end{table}
+
+\section{The simulation language}
+
+The contract above is, in effect, a small \textbf{domain-specific language} in
+declarative-data form. Like any language it has \emph{words} (vocabulary),
+\emph{grammar} (how they combine), and \emph{semantics} (what running them means):
+\begin{itemize}\itemsep1pt
+\item \textbf{Words}: \code{sets}, \code{fields}, \code{operators}, \code{selectors},
+\code{schedule}, plus keys such as \code{parent}/\code{per\_parent},
+\code{couples\_to}, \code{types}, and the registered operator names.
+\item \textbf{Grammar}: the typed schema of \code{simulation.yaml} --- required keys,
+type fractions summing to one, every operator registered, every schedule token
+resolving. The schema \emph{is} the language definition.
+\item \textbf{Semantics}: the engine --- build the \code{Hierarchy} and iterate the
+schedule, $x_{t+1}=\Phi(x_t)$.
+\end{itemize}
+
+Structurally this is an \textbf{entity--component--system} (ECS) architecture: sets
+are entities, their state buffers are components, operators are systems, and the
+schedule is the ECS system pipeline. We adopt that framing deliberately --- it is
+the cleanest mental model and matches the engine one-to-one.
+
+Most of the spec is plain typed key--value, but two pieces are genuine sub-grammars
+and are defined explicitly:
+\begin{itemize}\itemsep1pt
+\item \textbf{Selectors} --- a predicate language scoping an operator to a subset:
+\code{set} or \code{set[attr=val]} (e.g.\ \code{cell[type=soft]},
+\code{cell[loaded=1]}), re-evaluated each tick; extensible to conjunctions and to
+geometric or temporal predicates.
+\item \textbf{Schedule} --- an ordered, multi-rate sequence with parallel groups
+\code{[a,b]} and builtins (\code{aggregate}, \code{<field>.diffuse}).
+\end{itemize}
+
+We keep the language as \emph{declarative data} (YAML/JSON) rather than a bespoke
+syntax, so an LLM can emit it under schema-constrained decoding and a human can
+diff, review, and archive it; the grammar is pinned by a typed schema (Pydantic or
+JSON-Schema), and composition, overrides, and parameter sweeps (variants, ablations,
+the optimizer) are delegated to a config layer such as Hydra rather than reinvented.
+Prior art worth borrowing: ECS engines (the scheduling model), SBML/Antimony
+(reaction--species vocabulary), NeuroML and MorpheusML/PhysiCell (multicellular
+specs), UFL (PDE operators), and NetLogo/Mesa (agent rules).
 
 \section{The simulation specification}
 
