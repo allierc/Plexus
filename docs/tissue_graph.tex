@@ -298,36 +298,77 @@ operator vocabulary grows monotonically, and every earlier spec keeps working.
 \end{itemize}
 
 \section{The simulation language}
+\label{sec:language}
 
 The contract above is, in effect, a small \textbf{domain-specific language} in
 declarative-data form. Like any language it has \emph{words} (vocabulary),
-\emph{grammar} (how they combine), and \emph{semantics} (what running them means):
-\begin{itemize}\itemsep1pt
-\item \textbf{Words}: \code{sets}, \code{fields}, \code{operators}, \code{selectors},
-\code{schedule}, plus keys such as \code{parent}/\code{per\_parent},
-\code{couples\_to}, \code{types}, and the registered operator names.
-\item \textbf{Grammar}: the typed schema of \code{spec.yaml} --- required keys,
-type fractions summing to one, every operator registered, every schedule token
-resolving. The schema \emph{is} the language definition.
-\item \textbf{Semantics}: the engine --- build the \code{Hierarchy} and iterate the
-schedule, $x_{t+1}=\Phi(x_t)$.
-\end{itemize}
+\emph{grammar} (how they combine --- here a typed schema, which \emph{is} the
+language definition: required keys, type fractions summing to one, every operator
+registered, every schedule token resolving), and \emph{semantics} (what running
+them means: the engine builds the \code{Hierarchy} and iterates the schedule,
+$x_{t+1}=\Phi(x_t)$). Table~\ref{tab:lang} is the complete vocabulary; every
+construct in it appears in the example of Listing~\ref{lst:agg}.
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}l p{5.6cm} l@{}}
+\toprule
+\textbf{Construct} & \textbf{Semantics} & \textbf{Example} \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Top level}}\\
+\code{name}        & run identifier                                  & \code{name: aggregate}\\
+\code{seed}        & RNG seed --- fixes determinism                  & \code{seed: 0}\\
+\code{n\_frames}   & number of ticks to run                          & \code{n\_frames: 250}\\
+\code{obstacles}   & static walls; a boundary condition for both the MPM grid and field diffusion & \code{[[.3,0,.36,.7]]}\\
+\code{sets/fields/operators/schedule} & the four parts, detailed below       & ---\\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Set} ($S_k$ --- an entity level / ECS entity)}\\
+\code{n}           & size of a top-level set                         & \code{n: 100}\\
+\code{parent}      & containment target of a leaf set (the map $\pi_k$) & \code{parent: cell}\\
+\code{per\_parent} & children per parent                             & \code{per\_parent: 100}\\
+\code{types}       & named sub-populations: fraction $+$ per-type properties & \code{\{soft: \{fraction: .5, youngs: 12\}\}}\\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Field} (a continuum)}\\
+\code{frame}       & discretization (a grid)                         & \code{frame: grid}\\
+\code{res}         & grid resolution                                 & \code{res: 96}\\
+\code{diffusion}, \code{decay} & PDE coefficients                    & \code{diffusion: 0.1}\\
+\code{couples\_to} & the one set this field exchanges with           & \code{couples\_to: cell}\\
+\code{source}      & fixed source region (imposes a gradient)        & \code{source: [.82,.82,1,1]}\\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Operator} (a system; one per list entry)}\\
+\code{op}          & which registered operator to run                & \code{op: sense}\\
+\code{at}          & selector --- the subset it acts on              & \code{at: cell[type=soft]}\\
+\code{to}/\code{from} & field an Exchange writes to / reads from      & \code{from: chemical}\\
+$\langle$params$\rangle$ & operator-specific arguments               & \code{gain: 150}\\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Selector} (sub-grammar)}\\
+\code{set}            & every node of the set                        & \code{cell}\\
+\code{set[attr=val]}  & nodes matching \code{attr} (re-checked each tick) & \code{cell[loaded=1]}\\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Schedule} (sub-grammar; per-tick order)}\\
+operator name         & run that operator this tick                  & \code{sense}\\
+\code{[a, b]}         & a group run in the same stage                & \code{[motility, sense]}\\
+\code{aggregate}      & builtin: Aggregate$\uparrow$ (parent $=$ mean of children) & \code{aggregate}\\
+\code{name.diffuse}   & builtin: advance that field one step         & \code{chemical.diffuse}\\
+\bottomrule
+\end{tabular}
+\caption{The simulation language --- vocabulary, grammar (each construct's block is
+where it may appear), and semantics, with examples drawn from Listing~\ref{lst:agg}.}
+\label{tab:lang}
+\end{table}
 
 Structurally this is an \textbf{entity--component--system} (ECS) architecture: sets
 are entities, their state buffers are components, operators are systems, and the
 schedule is the ECS system pipeline. We adopt that framing deliberately --- it is
 the cleanest mental model and matches the engine one-to-one.
 
-Most of the spec is plain typed key--value, but two pieces are genuine sub-grammars
-and are defined explicitly:
-\begin{itemize}\itemsep1pt
-\item \textbf{Selectors} --- a predicate language scoping an operator to a subset:
-\code{set} or \code{set[attr=val]} (e.g.\ \code{cell[type=soft]},
-\code{cell[loaded=1]}), re-evaluated each tick; extensible to conjunctions and to
-geometric or temporal predicates.
-\item \textbf{Schedule} --- an ordered, multi-rate sequence with parallel groups
-\code{[a,b]} and builtins (\code{aggregate}, \code{<field>.diffuse}).
-\end{itemize}
+Most of the spec is plain typed key--value; the only genuine sub-grammars are the
+last two blocks of Table~\ref{tab:lang} --- \emph{selectors} and the
+\emph{schedule}. Both are deliberately minimal but extend naturally: selectors to
+conjunctions and to geometric or temporal predicates (\code{cell[type=soft \& loaded=0]},
+\code{cell[x<0.5]}, \code{cell[age>10]}), and the schedule to explicit per-operator
+rates and nested loops.
 
 We keep the language as \emph{declarative data} (YAML/JSON) rather than a bespoke
 syntax, so an LLM can emit it under schema-constrained decoding and a human can
@@ -340,11 +381,13 @@ specs), UFL (PDE operators), and NetLogo/Mesa (agent rules).
 
 \section{The simulation specification}
 
-A simulation is built from one vocabulary: \textbf{sets} (a leaf set declares its
-\code{parent} and \code{per\_parent}), \textbf{fields} (each \code{couples\_to} one
-set), \textbf{operators} (each acting at a \emph{selector} \code{set} or
-\code{set[attr=value]}), and a \textbf{schedule} (the per-frame ordered list).
-Listing~\ref{lst:agg} is a complete example.
+Using the language of Section~\ref{sec:language} (full vocabulary in
+Table~\ref{tab:lang}), a complete simulation is a single \code{spec.yaml}.
+Listing~\ref{lst:agg} shows one: two cell \code{types}, \code{particle}s contained
+in each \code{cell}, one chemical \code{field}, and a four-step \code{schedule}.
+Soft cells \code{secrete} the chemical and \code{sense} (climb) it, so they
+self-aggregate, while stiff cells --- selected out by \code{cell[type=soft]} ---
+do not.
 
 \begin{lstlisting}[style=yaml,caption={A complete simulation: soft cells secrete and follow a chemical and self-aggregate.},label=lst:agg]
 name: aggregate
@@ -518,6 +561,52 @@ operators:
 schedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]
 \end{lstlisting}
 
+\section{Cells in a maze: foraging and optimization}
+
+A harder simulation exercises more of the language: two rigid cell populations start
+at \emph{home} (bottom-left), navigate a walled \emph{maze} to \emph{food}
+(top-right), pick food up, and carry it back. It adds three constructs ---
+\code{obstacles}, a per-cell \code{loaded} state, and state-gated selectors
+(\code{cell[loaded=0]} seeks food, \code{cell[loaded=1]} returns home) --- and
+answers the design question \emph{how does one model an obstacle}: a wall is not a
+pairwise force but a \textbf{static occupancy mask reused as a boundary condition}
+by machinery already present. The same mask (i) zeroes the MPM grid velocity inside
+walls, so rigid cells cannot enter, and (ii) imposes no-flux on field diffusion, so
+a chemical \emph{routes around} the walls. Two such fields --- one sourced at food,
+one at home --- become navigation gradients that solve the maze; unloaded and loaded
+cells climb opposite ones (Fig.~\ref{fig:maze}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_maze.png}
+\caption{Maze foraging. Two rigid populations (red, blue) leave home (green box,
+bottom-left), thread the walls (grey) up the food gradient to the source (orange
+box, top-right), pick up food (green ring), and return home along the home gradient
+to drop it off. The delivered count rises as the colony forages.}
+\label{fig:maze}
+\end{figure}
+
+Because the whole simulation is differentiable and the spec is tiny, the colony can
+be \emph{optimized}: search the behavioural parameters to deliver food as fast as
+possible. The objective --- units delivered --- comes from a discrete
+pick-up/drop-off and is therefore non-differentiable, so we use a black-box
+\textbf{UCB} search over eight levers (motility speed and rotation, sense gain, MPM
+drag and force cap, cell stiffness and size, colony size). Over a few dozen
+simulations it improves delivery roughly five-fold (Fig.~\ref{fig:mazeopt}). This
+echoes the differentiable-simulator design literature, where a \emph{smooth}
+objective is optimized by gradients through the rollout; the general recipe is
+\textbf{both} --- UCB or CEM for the discrete and structural choices, and
+gradient-through-rollout on a smooth surrogate for the continuous interior.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.72\textwidth]{figures/fig_maze_opt.png}
+\caption{Optimizing the colony. Best food delivered as UCB searches the
+eight-parameter design space, from the initial hand-set design to the best found ---
+a slow, soft, high-drag, many-celled colony.}
+\label{fig:mazeopt}
+\end{figure}
+
 \section{What the process taught us}
 
 \begin{enumerate}\itemsep2pt
@@ -537,6 +626,20 @@ simulation/verify output should state the regime, not silently show the one sett
 that worked.
 \item \textbf{Determinism is a feature you must force} (deterministic CUDA kernels),
 or ``reproduce with a new seed'' is meaningless.
+\item \textbf{Obstacles are boundary conditions, not forces.} A wall is one static
+mask reused by the MPM grid (interior zero-velocity) and the diffusing fields
+(no-flux); maze navigation then falls out of the field's gradient, with no special
+pathfinding code.
+\item \textbf{Cap speed below the CFL limit.} Strong gradients otherwise drive cells
+to the grid's stability ceiling, where they move ballistically (``asteroids''); an
+explicit max-speed clamp plus overdamped drag restores smooth, biological motion.
+\item \textbf{Discrete objectives need black-box search, differentiable ones admit
+gradients --- use both.} Food count (discrete) optimizes well under UCB; a smooth
+surrogate opens the gradient-through-rollout path, and the two compose: UCB for
+structure, gradients for the continuous interior.
+\item \textbf{Reproducibility needs full-precision provenance.} Archiving rounded
+parameters made a winner re-simulate to a different score; the exact spec (and seed)
+must be stored, or the run is not bit-reproducible.
 \end{enumerate}
 
 \part*{Part IV --- Building the repository}
