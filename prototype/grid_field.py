@@ -16,7 +16,7 @@ from tissue_graph.models.registry import register_field
 @register_field("grid", frame="eulerian")
 class GridField(Field):
     def __init__(self, name, couples_to, res=96, diffusion=0.1, decay=0.0,
-                 dt=0.05, device="cpu", walls=None, source=None, source_rate=0.0):
+                 dt=0.05, device="cpu", walls=None, source=None, source_rate=0.0, periodic=False):
         super().__init__(name, couples_to)
         self.res = int(res)
         self.D = float(diffusion)
@@ -24,6 +24,7 @@ class GridField(Field):
         self.dt = float(dt)
         self.device = device
         self.source_rate = float(source_rate)
+        self.periodic = bool(periodic)
         self.register_buffer("grid", torch.zeros(self.res, self.res, device=device))
         # optional static masks (maze): walls block diffusion, source injects chemical
         self.register_buffer("walls", walls if walls is not None
@@ -37,10 +38,17 @@ class GridField(Field):
 
     # --- index helpers (bilinear) ---
     def _corners(self, pos):
-        g = torch.nan_to_num(pos, nan=0.5).clamp(0, 1 - 1e-6) * self.res   # [N,2] grid coords
-        i0 = g.floor().long().clamp(0, self.res - 1)
-        f = g - i0.float()
-        i1 = (i0 + 1).clamp(max=self.res - 1)
+        p = torch.nan_to_num(pos, nan=0.5)
+        if self.periodic:
+            g = torch.remainder(p, 1.0) * self.res
+            i0 = g.floor().long() % self.res
+            f = g - g.floor()
+            i1 = (i0 + 1) % self.res
+        else:
+            g = p.clamp(0, 1 - 1e-6) * self.res         # [N,2] grid coords
+            i0 = g.floor().long().clamp(0, self.res - 1)
+            f = g - i0.float()
+            i1 = (i0 + 1).clamp(max=self.res - 1)
         return i0, i1, f                                # f in [0,1]
 
     def scatter(self, pos, amount):                    # object -> field (deposit)
@@ -65,7 +73,12 @@ class GridField(Field):
         return (a * (1 - wx) + b * wx) * (1 - wy) + (c * (1 - wx) + d * wx) * wy
 
     def gather_grad(self, pos):                        # field -> object (sampled gradient)
-        gx, gy = torch.gradient(self.grid, spacing=1.0 / self.res)   # physical units
+        if self.periodic:                              # toroidal central difference
+            g = self.grid
+            gx = (torch.roll(g, -1, 0) - torch.roll(g, 1, 0)) * (0.5 * self.res)
+            gy = (torch.roll(g, -1, 1) - torch.roll(g, 1, 1)) * (0.5 * self.res)
+        else:
+            gx, gy = torch.gradient(self.grid, spacing=1.0 / self.res)   # physical units
         i0, i1, f = self._corners(pos)
         def sample(field2d):
             a = field2d[i0[:, 0], i0[:, 1]]; b = field2d[i1[:, 0], i0[:, 1]]

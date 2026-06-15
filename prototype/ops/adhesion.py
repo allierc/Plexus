@@ -27,9 +27,12 @@ class AdhesionOperator(Lateral):
     def forward(self, H, mask=None):
         cell = H.level("cell")
         pos, typ = cell.state[:, :2], cell.node_type
-        d = torch.cdist(pos, pos)
+        diff = pos[None, :, :] - pos[:, None, :]              # [N,N,2]  i -> j
+        if getattr(H, "periodic", False):
+            diff = torch.remainder(diff + 0.5, 1.0) - 0.5     # minimum-image
+        d = diff.norm(dim=2)
         same = (typ[:, None] == typ[None, :]).float()
         W = ((d < self.r) & (d > 0)).float() * same          # same-type neighbours
         cnt = W.sum(1).clamp(min=1.0)[:, None]
-        accel = self.strength * ((W @ pos) / cnt - pos)       # pull toward same-type centroid
+        accel = self.strength * (W[..., None] * diff).sum(1) / cnt   # pull toward same-type centroid
         return {"cell": accel}

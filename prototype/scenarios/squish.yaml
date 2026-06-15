@@ -1,6 +1,7 @@
 # Large, very soft cells dragged together by strong chemotaxis -> visible deformation.
 name: squish
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:

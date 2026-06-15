@@ -1,6 +1,7 @@
 # Low diffusion + strong chemotaxis -> soft cells collapse into one tight cluster.
 name: collapse
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:

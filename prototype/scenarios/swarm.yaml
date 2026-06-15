@@ -1,6 +1,7 @@
 # Strong boids + motility, no field -> a coherent moving flock (both types).
 name: swarm
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:

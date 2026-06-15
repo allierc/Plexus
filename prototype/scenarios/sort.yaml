@@ -1,6 +1,7 @@
 # Type-specific adhesion (differential adhesion) -> the two types segregate.
 name: sort
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:

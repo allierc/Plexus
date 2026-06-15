@@ -1,6 +1,7 @@
 # Fast-decaying, slow-spreading field -> hotspots move with the cells: soft chase them.
 name: chase
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:

@@ -2,6 +2,7 @@
 # while moving forward -> self-reinforcing trails (stigmergy). Blue cells just wander.
 name: ant
 seed: 0
+boundary: periodic
 n_frames: 1500
 record_every: 6
 sets:

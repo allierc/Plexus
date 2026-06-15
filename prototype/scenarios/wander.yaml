@@ -1,6 +1,7 @@
 # Pure active motility with mild repulsion -> a wandering gas of cells.
 name: wander
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:

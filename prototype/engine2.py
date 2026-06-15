@@ -141,6 +141,7 @@ def build(sc, device="cpu"):
     H.walls_mpm = (_raster(obstacles, n_grid, device).view(-1) if obstacles
                    else torch.zeros(n_grid * n_grid, dtype=torch.bool, device=device))
 
+    H.periodic = (getattr(sc, "boundary", "wall") == "periodic")
     for fname, f in sc.fields.items():
         dt_f = min(0.2 / max(f["diffusion"], 1e-6), 0.2)
         res = int(f["res"])
@@ -148,7 +149,8 @@ def build(sc, device="cpu"):
         src = _raster([f["source"]], res, device) if f.get("source") else None
         fld = GridField(fname, f["couples_to"], res=res, diffusion=f["diffusion"],
                         decay=f.get("decay", 0.0), dt=dt_f, device=device,
-                        walls=walls, source=src, source_rate=f.get("source_rate", 0.0))
+                        walls=walls, source=src, source_rate=f.get("source_rate", 0.0),
+                        periodic=H.periodic)
         if f.get("source"):  # static navigation potential = geodesic distance to source
             wnp = (walls.cpu().numpy() if walls is not None else np.zeros((res, res), bool))
             pot = _geodesic_potential(wnp, src.cpu().numpy())
@@ -173,14 +175,24 @@ def _mask(H, sel):
 
 
 def _aggregate_up(H):
-    """cell position/velocity = mean over its particles (Aggregate up)."""
+    """cell position/velocity = mean over its particles (Aggregate up).
+    On the torus, position uses a circular mean so a cell straddling the wrap is
+    not placed at the wrong midpoint."""
     cell, part = H.level("cell"), H.level("particle")
-    Nc = cell.n
-    sums = torch.zeros(Nc, 4, device=part.state.device)
-    sums.index_add_(0, part.parent, part.state)
-    cnt = torch.zeros(Nc, 1, device=part.state.device)
-    cnt.index_add_(0, part.parent, torch.ones(part.n, 1, device=part.state.device))
-    cell.state = sums / cnt.clamp(min=1)
+    Nc = cell.n; dev = part.state.device
+    cnt = torch.zeros(Nc, 1, device=dev)
+    cnt.index_add_(0, part.parent, torch.ones(part.n, 1, device=dev))
+    cnt = cnt.clamp(min=1)
+    vel = torch.zeros(Nc, 2, device=dev); vel.index_add_(0, part.parent, part.state[:, 2:4])
+    vel = vel / cnt
+    if getattr(H, "periodic", False):
+        ang = part.state[:, :2] * (2 * math.pi)
+        sc_ = torch.zeros(Nc, 2, device=dev); cc = torch.zeros(Nc, 2, device=dev)
+        sc_.index_add_(0, part.parent, torch.sin(ang)); cc.index_add_(0, part.parent, torch.cos(ang))
+        pos = torch.remainder(torch.atan2(sc_, cc) / (2 * math.pi), 1.0)
+    else:
+        pos = torch.zeros(Nc, 2, device=dev); pos.index_add_(0, part.parent, part.state[:, :2]); pos = pos / cnt
+    cell.state = torch.cat([pos, vel], dim=1)
 
 
 def run(sc, out_path=None, device="cpu", compile_mpm=False):

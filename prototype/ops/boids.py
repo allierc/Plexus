@@ -24,17 +24,18 @@ class BoidsOperator(Lateral):
     def forward(self, H, mask=None):
         cell = H.level("cell")
         pos, vel = cell.state[:, :2], cell.state[:, 2:4]
-        d = torch.cdist(pos, pos)
+        diff = pos[None, :, :] - pos[:, None, :]        # [N,N,2]  i -> j
+        if getattr(H, "periodic", False):
+            diff = torch.remainder(diff + 0.5, 1.0) - 0.5   # minimum-image (bc_dpos)
+        d = diff.norm(dim=2)
         W = ((d < self.r) & (d > 0)).float()
         if mask is not None:                            # flock only within the selected subpop
             W = W * mask.float()[None, :]
         count = W.sum(1).clamp(min=1.0)[:, None]
-
-        cohesion = (W @ pos) / count - pos
+        cohesion = (W[..., None] * diff).sum(1) / count        # toward neighbour centroid
         alignment = (W @ vel) / count - vel
         S = W / d.clamp(min=0.1 * self.r) ** 2          # soften 1/d^2 singularity
-        separation = pos * S.sum(1)[:, None] - S @ pos
-
+        separation = -(S[..., None] * diff).sum(1)             # push away from neighbours
         accel = self.w_coh * cohesion + self.w_align * alignment + self.w_sep * separation
         if mask is not None:
             accel = accel * mask.float()[:, None]

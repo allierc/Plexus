@@ -1,6 +1,7 @@
 # Soft cells secrete and follow a chemical -> self-aggregate into clusters.
 name: aggregate
 seed: 0
+boundary: periodic
 n_frames: 250
 record_every: 4
 sets:
