@@ -498,8 +498,8 @@ into a one-line message up front.
 Once the vocabulary existed, qualitatively different behaviours were \emph{just
 different specs} over the same code --- breadth comes from the intermediate
 representation, not from new code. Each simulation is 100--600 cells of $\sim$100
-MLS-MPM particles (soft cells red, stiff blue, the chemical field green); eight are
-shown in Fig.~\ref{fig:sims}:
+MLS-MPM particles (the two cell types in two colours over the shaded chemical
+field); eight are shown in Fig.~\ref{fig:sims}:
 \begin{itemize}\itemsep1pt
 \item \textbf{aggregate} --- soft cells secrete a chemical and climb it, clumping together;
 \item \textbf{disperse} --- soft cells flee their own chemical (negative gain), spreading apart;
@@ -532,8 +532,8 @@ self-reinforcing trails that grow, are followed, and coarsen over long runs
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_ant.png}
-\caption{Ant trail-following over a long run (pheromone in inferno, ant cells in
-cyan). A diffuse network of trails forms (left), reinforces, and \emph{coarsens
+\caption{Ant trail-following over a long run (three frames, early to late). A
+diffuse network of pheromone trails (shaded) forms, reinforces, and \emph{coarsens
 into a few dominant trails} with ants marching along them (right) --- classic
 stigmergy.}
 \label{fig:ant}
@@ -586,10 +586,10 @@ cells climb opposite ones (Fig.~\ref{fig:maze}).
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_maze.png}
-\caption{Maze foraging. Two rigid populations (red, blue) leave home (green box,
-bottom-left), thread the walls (grey) up the food gradient to the source (orange
-box, top-right), pick up food (green ring), and return home along the home gradient
-to drop it off. The delivered count rises as the colony forages.}
+\caption{Maze foraging (three frames, early to late). A colony leaves home
+(lower-left box), threads the walls up the food gradient to the source (upper-right
+box), picks up food, and carries it home along the home gradient to drop it off;
+shading is the deposited chemoattractant.}
 \label{fig:maze}
 \end{figure}
 
@@ -612,6 +612,19 @@ gradient-through-rollout on a smooth surrogate for the continuous interior.
 eight-parameter design space, from the initial hand-set design to the best found ---
 a slow, soft, high-drag, many-celled colony.}
 \label{fig:mazeopt}
+\end{figure}
+
+The difference is visible in the trails themselves (Fig.~\ref{fig:initwin}): the
+initial colony barely establishes a route, whereas the optimized one lays a strong
+chemoattractant highway that threads both maze gaps from home to food.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_init_vs_winner7.png}
+\caption{Initial design (top) versus the best found by UCB (bottom, \code{winner\_7}),
+each a single run shown as ten frames from early to late. The optimized colony forms
+a far more complete and persistent foraging trail.}
+\label{fig:initwin}
 \end{figure}
 
 \section{What the process taught us}
