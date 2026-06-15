@@ -10,3 +10,4 @@ Each row is a significantly-better design found by UCB search; the gif shows it 
 | 3 | 298 | 83.08 | 269.96 | 0.97 | 0.48 | 77.96 | 1362.49 | 0.01 | 93.24 | [winner_3.gif](winner_3.gif) |
 | 4 | 423 | 49.44 | 391.35 | 1.55 | 0.18 | 159.83 | 1437.55 | 0.01 | 105.90 | [winner_4.gif](winner_4.gif) |
 | 5 | 525 | 20.57 | 341.41 | 2.99 | 0.40 | 23.87 | 1632.80 | 0.01 | 119.58 | [winner_5.gif](winner_5.gif) |
+| 6 | 553 | 52.36 | 400.00 | 0.92 | 0.56 | 20.00 | 879.56 | 0.01 | 116.48 | [winner_6.gif](winner_6.gif) |
