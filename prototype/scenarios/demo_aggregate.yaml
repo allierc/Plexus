@@ -1,0 +1,24 @@
+# Demo 3 -- Chemotactic aggregation (self-secreted gradient).
+# Soft cells secrete a diffusible chemical and climb it (sense, gain>0), so they
+# self-aggregate into clusters. Above a density / below a diffusion threshold the
+# field saturates flat and aggregation stalls -- the regime the sweep maps.
+# Intent check (driver): mean nearest-neighbour distance must shrink over the run.
+name: demo_aggregate
+seed: 0
+boundary: periodic
+n_frames: 700
+record_every: 3
+sets:
+  cell:
+    n: 100
+    types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}
+  particle: {parent: cell, per_parent: 50, radius: 0.018, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 15.0, rot: 0.4}
+  - {op: boids, at: cell, radius: 0.06, cohesion: 0.05, align: 0.1, separate: 0.4}
+  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}     # only soft make it
+  - {op: sense,  at: "cell[type=soft]", from: chemical, gain: 150.0}  # only soft follow it
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4, vmax: 6.0}
+schedule: [aggregate, [motility, boids], secrete, chemical.diffuse, sense, mpm]

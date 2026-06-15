@@ -9,7 +9,7 @@ representation, not from new code. Each simulation is 100–600 cells of ~100
 MLS-MPM particles (the two cell types in two colours over the shaded chemical
 field). All simulations below use a **periodic** (toroidal) domain.
 
-## Ten simulations from one registry
+## Five simulations from one registry
 
 Across all of them, only the operator choices and their parameters differ; the
 engine, the operators, and the schedule grammar are identical.
@@ -17,23 +17,13 @@ engine, the operators, and the schedule grammar are identical.
 ::: {layout-ncol=2}
 {{< video prototype/sim_1.mp4 title="aggregate — soft cells secrete a chemical and climb it, clumping together" >}}
 
-{{< video prototype/sim_2.mp4 title="disperse — soft cells flee their own chemical (negative gain), spreading apart" >}}
-
 {{< video prototype/sim_3.mp4 title="swarm — strong boids make the cells flock and move as one" >}}
-
-{{< video prototype/sim_4.mp4 title="wander — active motility alone: a diffusive gas of cells" >}}
 
 {{< video prototype/sim_6.mp4 title="sort — type-specific adhesion segregates the two populations" >}}
 
 {{< video prototype/sim_7.mp4 title="chase — a fast-decaying field makes moving hotspots the cells chase" >}}
 
 {{< video prototype/sim_9.mp4 title="crystal — pure repulsion spaces the cells into a lattice" >}}
-
-{{< video prototype/sim_10.mp4 title="collapse — low diffusion + strong chemotaxis pulls soft cells into one tight cluster" >}}
-
-{{< video prototype/sim_5.mp4 title="squish — soft cells deform under crowding and confinement" >}}
-
-{{< video prototype/sim_8.mp4 title="mixed — competing cues produce a heterogeneous steady state" >}}
 :::
 
 ## Emergent ant trails
@@ -66,7 +56,7 @@ operators:
 schedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]
 ```
 
-### Ten variants, same code
+### Five variants, same code
 
 Each variant is the same `trail` + `motility` + `secrete` code with a few
 parameters changed (turn rate, sensor reach/angle, pheromone diffusion/decay,
@@ -76,21 +66,11 @@ regime — from loose wandering to tight reinforced networks.
 ::: {layout-ncol=2}
 {{< video prototype/ant_1.mp4 title="baseline" >}}
 
-{{< video prototype/ant_2.mp4 title="rich network — slower turning, denser trails" >}}
-
-{{< video prototype/ant_3.mp4 title="loose wander — weak steering" >}}
-
 {{< video prototype/ant_4.mp4 title="tight trails — low noise, strong turning" >}}
 
 {{< video prototype/ant_5.mp4 title="blurry — high pheromone diffusion" >}}
 
-{{< video prototype/ant_6.mp4 title="sharp permanent — low diffusion, slow decay" >}}
-
 {{< video prototype/ant_7.mp4 title="far sensor — long sensing reach" >}}
-
-{{< video prototype/ant_8.mp4 title="wiggly — short reach, wide sensor angle" >}}
-
-{{< video prototype/ant_9.mp4 title="strong pheromone — high deposit rate" >}}
 
 {{< video prototype/ant_10.mp4 title="ephemeral — fast decay, low deposit" >}}
 :::

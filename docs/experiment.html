@@ -360,10 +360,10 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#ten-simulations-from-one-registry" id="toc-ten-simulations-from-one-registry" class="nav-link active" data-scroll-target="#ten-simulations-from-one-registry">Ten simulations from one registry</a></li>
+  <li><a href="#five-simulations-from-one-registry" id="toc-five-simulations-from-one-registry" class="nav-link active" data-scroll-target="#five-simulations-from-one-registry">Five simulations from one registry</a></li>
   <li><a href="#emergent-ant-trails" id="toc-emergent-ant-trails" class="nav-link" data-scroll-target="#emergent-ant-trails">Emergent ant trails</a>
   <ul class="collapse">
-  <li><a href="#ten-variants-same-code" id="toc-ten-variants-same-code" class="nav-link" data-scroll-target="#ten-variants-same-code">Ten variants, same code</a></li>
+  <li><a href="#five-variants-same-code" id="toc-five-variants-same-code" class="nav-link" data-scroll-target="#five-variants-same-code">Five variants, same code</a></li>
   </ul></li>
   <li><a href="#cells-in-a-maze-foraging-and-optimization" id="toc-cells-in-a-maze-foraging-and-optimization" class="nav-link" data-scroll-target="#cells-in-a-maze-foraging-and-optimization">Cells in a maze: foraging and optimization</a>
   <ul class="collapse">
@@ -399,8 +399,8 @@ window.Quarto = {
 
 
 <p>Once the vocabulary existed, qualitatively different behaviours were <em>just different specs</em> over the same code — breadth comes from the intermediate representation, not from new code. Each simulation is 100–600 cells of ~100 MLS-MPM particles (the two cell types in two colours over the shaded chemical field). All simulations below use a <strong>periodic</strong> (toroidal) domain.</p>
-<section id="ten-simulations-from-one-registry" class="level2">
-<h2 class="anchored" data-anchor-id="ten-simulations-from-one-registry">Ten simulations from one registry</h2>
+<section id="five-simulations-from-one-registry" class="level2">
+<h2 class="anchored" data-anchor-id="five-simulations-from-one-registry">Five simulations from one registry</h2>
 <p>Across all of them, only the operator choices and their parameters differ; the engine, the operators, and the schedule grammar are identical.</p>
 <div class="quarto-layout-panel" data-layout-ncol="2">
 <div class="quarto-layout-row">
@@ -408,39 +408,20 @@ window.Quarto = {
 <div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="aggregate — soft cells secrete a chemical and climb it, clumping together"><source src="prototype/sim_1.mp4"></video></div>
 </div>
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="disperse — soft cells flee their own chemical (negative gain), spreading apart"><source src="prototype/sim_2.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="swarm — strong boids make the cells flock and move as one"><source src="prototype/sim_3.mp4"></video></div>
 </div>
 </div>
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="swarm — strong boids make the cells flock and move as one"><source src="prototype/sim_3.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="sort — type-specific adhesion segregates the two populations"><source src="prototype/sim_6.mp4"></video></div>
 </div>
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="wander — active motility alone: a diffusive gas of cells"><source src="prototype/sim_4.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="chase — a fast-decaying field makes moving hotspots the cells chase"><source src="prototype/sim_7.mp4"></video></div>
 </div>
 </div>
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="sort — type-specific adhesion segregates the two populations"><source src="prototype/sim_6.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="chase — a fast-decaying field makes moving hotspots the cells chase"><source src="prototype/sim_7.mp4"></video></div>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video7" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="crystal — pure repulsion spaces the cells into a lattice"><source src="prototype/sim_9.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video8" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="collapse — low diffusion + strong chemotaxis pulls soft cells into one tight cluster"><source src="prototype/sim_10.mp4"></video></div>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video9" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="squish — soft cells deform under crowding and confinement"><source src="prototype/sim_5.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video10" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="mixed — competing cues produce a heterogeneous steady state"><source src="prototype/sim_8.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="crystal — pure repulsion spaces the cells into a lattice"><source src="prototype/sim_9.mp4"></video></div>
 </div>
 </div>
 </div>
@@ -448,7 +429,7 @@ window.Quarto = {
 <section id="emergent-ant-trails" class="level2">
 <h2 class="anchored" data-anchor-id="emergent-ant-trails">Emergent ant trails</h2>
 <p>Adding the <code>trail</code> operator (a Physarum/Jones three-sensor rule: each ant samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest, while <code>motility</code> drives it forward and <code>secrete</code> lays pheromone) yields self-reinforcing trails that grow, are followed, and coarsen over long runs — classic stigmergy.</p>
-<div class="quarto-video"><video id="video_shortcode_videojs_video11" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="ant trail-following: a diffuse pheromone network forms, reinforces, and coarsens into a few dominant trails"><source src="prototype/ant_1.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="ant trail-following: a diffuse pheromone network forms, reinforces, and coarsens into a few dominant trails"><source src="prototype/ant_1.mp4"></video></div>
 <p>The full simulation:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> ant</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">seed</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
@@ -466,48 +447,29 @@ window.Quarto = {
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> pheromone</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">2.0</span><span class="kw">}</span></span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">substeps</span><span class="kw">:</span><span class="at"> </span><span class="dv">8</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">1200</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.6</span><span class="kw">}</span></span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> trail</span><span class="kw">,</span><span class="at"> motility</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> pheromone.diffuse</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<section id="ten-variants-same-code" class="level3">
-<h3 class="anchored" data-anchor-id="ten-variants-same-code">Ten variants, same code</h3>
+<section id="five-variants-same-code" class="level3">
+<h3 class="anchored" data-anchor-id="five-variants-same-code">Five variants, same code</h3>
 <p>Each variant is the same <code>trail</code> + <code>motility</code> + <code>secrete</code> code with a few parameters changed (turn rate, sensor reach/angle, pheromone diffusion/decay, deposit rate, rotational noise). The parameter axes span the trail-formation regime — from loose wandering to tight reinforced networks.</p>
 <div class="quarto-layout-panel" data-layout-ncol="2">
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video12" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="baseline"><source src="prototype/ant_1.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video7" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="baseline"><source src="prototype/ant_1.mp4"></video></div>
 </div>
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video13" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="rich network — slower turning, denser trails"><source src="prototype/ant_2.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video8" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="tight trails — low noise, strong turning"><source src="prototype/ant_4.mp4"></video></div>
 </div>
 </div>
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video14" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="loose wander — weak steering"><source src="prototype/ant_3.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video9" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="blurry — high pheromone diffusion"><source src="prototype/ant_5.mp4"></video></div>
 </div>
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video15" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="tight trails — low noise, strong turning"><source src="prototype/ant_4.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video10" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="far sensor — long sensing reach"><source src="prototype/ant_7.mp4"></video></div>
 </div>
 </div>
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video16" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="blurry — high pheromone diffusion"><source src="prototype/ant_5.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video17" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="sharp permanent — low diffusion, slow decay"><source src="prototype/ant_6.mp4"></video></div>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video18" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="far sensor — long sensing reach"><source src="prototype/ant_7.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video19" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="wiggly — short reach, wide sensor angle"><source src="prototype/ant_8.mp4"></video></div>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video20" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="strong pheromone — high deposit rate"><source src="prototype/ant_9.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video21" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="ephemeral — fast decay, low deposit"><source src="prototype/ant_10.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video11" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="ephemeral — fast decay, low deposit"><source src="prototype/ant_10.mp4"></video></div>
 </div>
 </div>
 </div>
@@ -650,15 +612,15 @@ window.Quarto = {
 <div class="quarto-layout-panel" data-layout-ncol="2">
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video22" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set design"><source src="prototype/initial.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video12" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set design"><source src="prototype/initial.mp4"></video></div>
 </div>
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video23" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="best found by UCB (winner 7)"><source src="prototype/winner_7.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video13" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="best found by UCB (winner 7)"><source src="prototype/winner_7.mp4"></video></div>
 </div>
 </div>
 </div>
 <p>The full optimization trajectory, run by run:</p>
-<div class="quarto-video"><video id="video_shortcode_videojs_video24" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="the seven accepted winners, init → winner 7"><source src="prototype/panel_winners.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video14" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="the seven accepted winners, init → winner 7"><source src="prototype/panel_winners.mp4"></video></div>
 </section>
 </section>
 <section id="what-the-process-taught-us" class="level2">
@@ -1120,16 +1082,6 @@ window.Quarto = {
 <script>videojs(video_shortcode_videojs_video12);</script>
 <script>videojs(video_shortcode_videojs_video13);</script>
 <script>videojs(video_shortcode_videojs_video14);</script>
-<script>videojs(video_shortcode_videojs_video15);</script>
-<script>videojs(video_shortcode_videojs_video16);</script>
-<script>videojs(video_shortcode_videojs_video17);</script>
-<script>videojs(video_shortcode_videojs_video18);</script>
-<script>videojs(video_shortcode_videojs_video19);</script>
-<script>videojs(video_shortcode_videojs_video20);</script>
-<script>videojs(video_shortcode_videojs_video21);</script>
-<script>videojs(video_shortcode_videojs_video22);</script>
-<script>videojs(video_shortcode_videojs_video23);</script>
-<script>videojs(video_shortcode_videojs_video24);</script>
 
 
 

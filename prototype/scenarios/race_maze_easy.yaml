@@ -1,0 +1,37 @@
+# Scenario 2a -- Race through an EASY maze (short dead ends).
+# Same self-generated-gradient navigation as race_pillars: attractant full at t=0,
+# reservoir at the right (finish), cells graze + sense. Two offset walls with gaps
+# make a simple zig-zag; the dead ends are short, so the diffused attractant still
+# routes cells to the exit (cf. Tweedy & Insall, Science 2020: easy mazes solved).
+# Score (driver): arrivals across the finish line and how fast.
+name: race_maze_easy
+seed: 0
+boundary: wall
+n_frames: 2400
+record_every: 8
+obstacles:
+  - [0.30, 0.00, 0.35, 0.65]     # wall 1, gap at the TOP (y > 0.65)
+  - [0.60, 0.35, 0.65, 1.00]     # wall 2, gap at the BOTTOM (y < 0.35)
+sets:
+  cell:
+    n: 120
+    start: [0.00, 0.00, 0.10, 1.00]
+    types: {A: {fraction: 0.5, youngs: 60}, B: {fraction: 0.5, youngs: 60}}
+  particle: {parent: cell, per_parent: 40, radius: 0.010, density: 1.0}
+fields:
+  attractant:
+    frame: grid
+    res: 128
+    diffusion: 1.0
+    decay: 0.0
+    couples_to: cell
+    init: 1.0
+    source: [0.90, 0.0, 1.0, 1.0]
+    source_rate: 0.6
+    navigation: dynamic
+operators:
+  - {op: motility, at: cell, speed: 16.0, rot: 0.20}
+  - {op: sense,  at: cell, from: attractant, gain: 300.0}
+  - {op: graze,  at: cell, from: attractant, rate: 1.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 800, drag: 2.0, vmax: 5.0}
+schedule: [aggregate, [motility, sense], graze, attractant.diffuse, mpm]

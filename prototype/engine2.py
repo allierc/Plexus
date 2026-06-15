@@ -62,15 +62,19 @@ def _geodesic_potential(walls_np, source_np):
     return pot
 
 
-def _raster(rects, res, device):
-    """Rasterize a list of [x0,y0,x1,y1] rectangles to a boolean [res,res] grid.
+def _raster(shapes, res, device):
+    """Rasterize a list of obstacles to a boolean [res,res] grid. Each obstacle is
+    either a rectangle [x0,y0,x1,y1] (len 4) or a circle [cx,cy,radius] (len 3).
     grid[i,j] center is at ((i+0.5)/res, (j+0.5)/res) -- matches GridField/MPM indexing."""
     c = (torch.arange(res, device=device).float() + 0.5) / res
     X = c[:, None].expand(res, res)
     Y = c[None, :].expand(res, res)
     m = torch.zeros(res, res, dtype=torch.bool, device=device)
-    for r in rects:
-        m |= (X >= r[0]) & (X <= r[2]) & (Y >= r[1]) & (Y <= r[3])
+    for r in shapes:
+        if len(r) == 3:                                   # circle: (cx, cy, radius)
+            m |= (X - r[0]) ** 2 + (Y - r[1]) ** 2 <= r[2] ** 2
+        else:                                             # rectangle: (x0, y0, x1, y1)
+            m |= (X >= r[0]) & (X <= r[2]) & (Y >= r[1]) & (Y <= r[3])
     return m
 
 
@@ -151,12 +155,23 @@ def build(sc, device="cpu"):
                         decay=f.get("decay", 0.0), dt=dt_f, device=device,
                         walls=walls, source=src, source_rate=f.get("source_rate", 0.0),
                         periodic=H.periodic)
-        if f.get("source"):  # static navigation potential = geodesic distance to source
+        # initial fill (declared): uniform value across the open domain
+        if f.get("init") is not None:
+            fld.grid = torch.full((res, res), float(f["init"]), device=device)
+            if walls is not None:
+                fld.grid = torch.where(walls, torch.zeros_like(fld.grid), fld.grid)
+        # navigation mode (declared, generic -- the engine does not branch on scenario name):
+        #   geodesic  -> precomputed distance-to-source potential (an EXTERNAL gradient)
+        #   dynamic   -> field evolves at run time (self-generated gradient: consume + diffuse)
+        # default: geodesic when a source is given (back-compat), else dynamic.
+        nav = f.get("navigation", "geodesic" if f.get("source") else "dynamic")
+        if nav == "geodesic" and src is not None:
             wnp = (walls.cpu().numpy() if walls is not None else np.zeros((res, res), bool))
             pot = _geodesic_potential(wnp, src.cpu().numpy())
             fld.grid = torch.from_numpy(pot).to(device)
         H.add_field(fld)
     H.cell_accel = torch.zeros(Nc, 2, device=device)
+    H.harvested = 0.0                                                     # graze objective
     H.rng = torch.Generator(device=device).manual_seed(sc.seed + 12345)   # for motility
     return H
 
@@ -243,6 +258,7 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
                particle_pos=ppos[:rec], parent=part.parent.cpu().numpy(),
                loaded=loaded[:rec], field=fhist[:rec], type_names=cell.type_names,
                food_delivered=int(getattr(H, "food_delivered", 0)),
+               harvested=float(getattr(H, "harvested", 0.0)),
                delivered_t=delivered_t[:rec],
                walls=(_raster(getattr(sc, "obstacles", []), H.fields[fld_name].res, device).cpu().numpy()
                       if getattr(sc, "obstacles", []) else None))

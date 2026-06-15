@@ -63,18 +63,18 @@
     "text": "Once the vocabulary existed, qualitatively different behaviours were just different specs over the same code — breadth comes from the intermediate representation, not from new code. Each simulation is 100–600 cells of ~100 MLS-MPM particles (the two cell types in two colours over the shaded chemical field). All simulations below use a periodic (toroidal) domain."
   },
   {
-    "objectID": "experiment.html#ten-simulations-from-one-registry",
-    "href": "experiment.html#ten-simulations-from-one-registry",
+    "objectID": "experiment.html#five-simulations-from-one-registry",
+    "href": "experiment.html#five-simulations-from-one-registry",
     "title": "A spread of simulations",
-    "section": "Ten simulations from one registry",
-    "text": "Ten simulations from one registry\nAcross all of them, only the operator choices and their parameters differ; the engine, the operators, and the schedule grammar are identical."
+    "section": "Five simulations from one registry",
+    "text": "Five simulations from one registry\nAcross all of them, only the operator choices and their parameters differ; the engine, the operators, and the schedule grammar are identical."
   },
   {
     "objectID": "experiment.html#emergent-ant-trails",
     "href": "experiment.html#emergent-ant-trails",
     "title": "A spread of simulations",
     "section": "Emergent ant trails",
-    "text": "Emergent ant trails\nAdding the trail operator (a Physarum/Jones three-sensor rule: each ant samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest, while motility drives it forward and secrete lays pheromone) yields self-reinforcing trails that grow, are followed, and coarsen over long runs — classic stigmergy.\n\nThe full simulation:\nname: ant\nseed: 0\nn_frames: 1500\nsets:\n  cell:\n    n: 150\n    types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}\n  particle: {parent: cell, per_parent: 60, radius: 0.012}\nfields:\n  pheromone: {frame: grid, res: 160, diffusion: 0.02, decay: 0.04, couples_to: cell}\noperators:\n  - {op: motility, at: cell, speed: 300.0, rot: 0.06}            # persistent forward motion\n  - {op: trail,  at: \"cell[type=soft]\", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}\n  - {op: secrete, at: \"cell[type=soft]\", to: pheromone, rate: 2.0}\n  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}\nschedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]\n\nTen variants, same code\nEach variant is the same trail + motility + secrete code with a few parameters changed (turn rate, sensor reach/angle, pheromone diffusion/decay, deposit rate, rotational noise). The parameter axes span the trail-formation regime — from loose wandering to tight reinforced networks."
+    "text": "Emergent ant trails\nAdding the trail operator (a Physarum/Jones three-sensor rule: each ant samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest, while motility drives it forward and secrete lays pheromone) yields self-reinforcing trails that grow, are followed, and coarsen over long runs — classic stigmergy.\n\nThe full simulation:\nname: ant\nseed: 0\nn_frames: 1500\nsets:\n  cell:\n    n: 150\n    types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}\n  particle: {parent: cell, per_parent: 60, radius: 0.012}\nfields:\n  pheromone: {frame: grid, res: 160, diffusion: 0.02, decay: 0.04, couples_to: cell}\noperators:\n  - {op: motility, at: cell, speed: 300.0, rot: 0.06}            # persistent forward motion\n  - {op: trail,  at: \"cell[type=soft]\", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}\n  - {op: secrete, at: \"cell[type=soft]\", to: pheromone, rate: 2.0}\n  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}\nschedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]\n\nFive variants, same code\nEach variant is the same trail + motility + secrete code with a few parameters changed (turn rate, sensor reach/angle, pheromone diffusion/decay, deposit rate, rotational noise). The parameter axes span the trail-formation regime — from loose wandering to tight reinforced networks."
   },
   {
     "objectID": "experiment.html#cells-in-a-maze-foraging-and-optimization",

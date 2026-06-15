@@ -1,0 +1,34 @@
+# Demo 2 -- Sustainable grazing (resource consumption + regeneration).
+# A resource field starts full everywhere and slowly regenerates (source over the
+# whole domain). Cells graze it (capped at local stock) and sense up-gradient, so
+# they migrate toward un-grazed patches, leaving depletion trails. Total harvested
+# is the objective: too-aggressive grazing crashes the field (tragedy of the
+# commons), so sustained yield peaks at intermediate pressure.
+# Intent check (driver): H.harvested > 0 and the field is visibly depleted.
+name: demo_graze
+seed: 0
+boundary: periodic
+n_frames: 700
+record_every: 3
+sets:
+  cell:
+    n: 90
+    types: {grazer: {fraction: 1.0, youngs: 60}}
+  particle: {parent: cell, per_parent: 50, radius: 0.014, density: 1.0}
+fields:
+  food:
+    frame: grid
+    res: 120
+    diffusion: 0.06
+    couples_to: cell
+    init: 1.0                       # field starts full
+    decay: 0.08                     # with regen, equilibrium c* = source_rate/decay = 0.5
+    source: [0.0, 0.0, 1.0, 1.0]    # regenerates everywhere ...
+    source_rate: 0.04               # ... slowly (grazing pushes the field below c*)
+    navigation: dynamic             # self-generated, NOT a precomputed potential
+operators:
+  - {op: motility, at: cell, speed: 14.0, rot: 0.45}
+  - {op: sense,  at: cell, from: food, gain: 90.0}     # climb toward richer (un-grazed) patches
+  - {op: graze,  at: cell, from: food, rate: 2.0}      # eat the resource (tracked in H.harvested)
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 4, vmax: 6.0}
+schedule: [aggregate, [motility, sense], graze, food.diffuse, mpm]
