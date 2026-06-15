@@ -13,9 +13,13 @@ from matplotlib.patches import Rectangle
 from matplotlib.colors import PowerNorm
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from viz_components import run_winner2, FOOD, HOME
+from viz_components import run_design, FOOD, HOME
 
 FPS = 20
+# winner_5 (best so far, food 525) from WINNERS.md
+WINNER5 = dict(speed=20.57, gain=341.41, drag=2.99, rot=0.40, youngs=23.87,
+               a_max=1632.80, radius=0.01, n=120)
+PREFIX = "scent_w5_"
 # (name, cmap, vmax_fraction, gamma)  -- gamma<1 boosts faint trails (more glow)
 VARIANTS = [
     ("inferno",  "inferno",       0.50, 1.0),
@@ -32,7 +36,7 @@ VARIANTS = [
 
 
 def main():
-    a = run_winner2()
+    a = run_design(WINNER5)
     scent, cp, obs = a["field"], a["cell_pos"], a["obstacles"]
     T = scent.shape[0]
     smax = max(scent.max(), 1e-6)
@@ -48,13 +52,13 @@ def main():
         ax.add_patch(Rectangle((FOOD[0], FOOD[1]), FOOD[2]-FOOD[0], FOOD[3]-FOOD[1], fill=False, edgecolor="#fa4", lw=1.0, zorder=2))
         s = ax.scatter(cp[0][:, 0], cp[0][:, 1], s=2.5, c="white", lw=0, alpha=0.8, zorder=3)
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
-        tt = ax.set_title(f"scent_{i} · {name}  (vmax {vfrac}, gamma {gamma})", color="#ccc", fontsize=7, loc="left")
+        tt = ax.set_title(f"{PREFIX}{i} · {name}  (vmax {vfrac}, gamma {gamma})", color="#ccc", fontsize=7, loc="left")
 
         def upd(f, im=im, s=s):
             im.set_data(scent[f].T); s.set_offsets(cp[f]); return im, s
 
-        FuncAnimation(fig, upd, frames=T, blit=False).save(f"scent_{i}.gif", writer=PillowWriter(fps=FPS))
-        plt.close(fig); print(f"scent_{i}.gif = {name}", flush=True)
+        FuncAnimation(fig, upd, frames=T, blit=False).save(f"{PREFIX}{i}.gif", writer=PillowWriter(fps=FPS))
+        plt.close(fig); print(f"{PREFIX}{i}.gif = {name}", flush=True)
     print("ALL DONE", flush=True)
 
 

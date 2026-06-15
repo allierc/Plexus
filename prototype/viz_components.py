@@ -62,22 +62,26 @@ def save(anim, path):
     anim.save(path, writer=PillowWriter(fps=FPS)); print(path, flush=True)
 
 
-def run_winner2():
-    p = dict(speed=106.32, gain=253.27, drag=1.25, rot=0.31, youngs=36.43,
-             a_max=598.85, radius=0.01, n=88)
-    sc = load("scenarios/forage_maze.yaml"); sc.n_frames = 1500; sc.record_every = 10
+def run_design(p, n_frames=1500, record_every=10):
+    """Run a forage design (8-param dict) and return trajectory + nav fields."""
+    sc = load("scenarios/forage_maze.yaml"); sc.n_frames = n_frames; sc.record_every = record_every
     for o in sc.operators:
         if o.op == "motility": o.params["speed"] = p["speed"]; o.params["rot"] = p["rot"]
         if o.op == "sense": o.params["gain"] = p["gain"]
         if o.op == "mpm": o.params["drag"] = p["drag"]; o.params["a_max"] = p["a_max"]
     for t in sc.sets["cell"]["types"].values(): t["youngs"] = p["youngs"]
-    sc.sets["particle"]["radius"] = p["radius"]; sc.sets["cell"]["n"] = p["n"]
+    sc.sets["particle"]["radius"] = p["radius"]; sc.sets["cell"]["n"] = int(round(p["n"]))
     _, a = engine2.run(sc, None, device="cuda")
     H = engine2.build(sc, device="cuda")       # static nav fields (geodesic)
     a["food_field"] = H.fields["food_signal"].grid.cpu().numpy()
     a["home_field"] = H.fields["home_signal"].grid.cpu().numpy()
     a["obstacles"] = getattr(sc, "obstacles", [])
     return a
+
+
+def run_winner2():
+    return run_design(dict(speed=106.32, gain=253.27, drag=1.25, rot=0.31, youngs=36.43,
+                           a_max=598.85, radius=0.01, n=88))
 
 
 def main():
