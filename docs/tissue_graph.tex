@@ -246,8 +246,12 @@ the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\
 
 The prototype's purpose was not the tissue physics but figuring out \emph{how an
 LLM should drive a registry of low-level operators}. The answer is a strict
-two-layer split that meet only at a declarative, validated file --- the
-\textbf{simulation} specification.
+two-layer split that meets only at one declarative, validated file --- the
+\textbf{simulation spec}. In effect this is a small domain-specific language: the
+spec is the \emph{source}, the registered operators are the \emph{primitives}, and
+the engine is the \emph{interpreter}. The \code{simulation.yaml} is therefore not a
+simulation but a \emph{specification} of one; the simulation is the run the engine
+produces from it.
 
 \begin{center}
 \renewcommand{\arraystretch}{1.25}
@@ -255,7 +259,7 @@ two-layer split that meet only at a declarative, validated file --- the
 \toprule
 \textbf{INTENT} & natural language (``2000 cells, two mechanical types, a chemical that guides only one'')\\
 \quad$\downarrow$ \emph{LLM compiles} & bounded, schema-checked generation\\
-\textbf{SIMULATION} & \code{simulation.yaml} --- sets $\cdot$ fields $\cdot$ operators($+$selectors) $\cdot$ schedule\\
+\textbf{SPEC} & \code{simulation.yaml} --- sets $\cdot$ fields $\cdot$ operators($+$selectors) $\cdot$ schedule\\
 \quad$\downarrow$ \emph{engine resolves} & names looked up in the registry\\
 \textbf{REGISTRY} & \code{@register\_operator} / \code{@register\_field} --- the only place code lives\\
 \quad$\downarrow$ & \\
@@ -264,11 +268,10 @@ two-layer split that meet only at a declarative, validated file --- the
 \end{tabular}
 \end{center}
 
-The \textbf{simulation file is the contract}. The LLM owns everything above it
-(intent $\to$ simulation); the code owns everything below (operators). They never
-touch directly. This makes the system both LLM-drivable and human-auditable: the
-simulation is small, typed, and reviewable, unlike the 500-line flat
-\code{config.py} it replaces. Three properties make the contract enforceable, and
+The \textbf{spec is the contract}. The LLM owns everything above it (intent $\to$
+spec); the code owns everything below (operators). They never touch directly. This
+makes the system both LLM-drivable and human-auditable: the spec is small, typed,
+and reviewable, unlike the 500-line flat \code{config.py} it replaces. Three properties make the contract enforceable, and
 they answer the three questions this experiment was built around
 (Table~\ref{tab:modes}).
 
