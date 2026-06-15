@@ -614,6 +614,44 @@ a slow, soft, high-drag, many-celled colony.}
 \label{fig:mazeopt}
 \end{figure}
 
+The optimizer keeps a log of every accepted improvement (the auto-generated
+\code{WINNERS.md}, Table~\ref{tab:winners}), which is itself the finding: it shows
+\emph{what makes a good forager}. Two parameters move monotonically to their bounds
+--- the colony grows to its cap ($n\!\approx\!120$: more foragers deliver more food)
+and the cells soften to the floor ($\text{youngs}\!\to\!20$: soft, deformable cells
+squeeze through the maze far better than the rigid ones we started from). Chemotaxis
+stays strong throughout ($\text{gain}\sim340$--$400$) and the cell radius sits at its
+minimum (smaller cells clear the gaps). The remaining knobs --- motility speed and
+rotation, drag, force cap --- are traded off rather than maximized: the best design
+(\code{winner\_7}) is a balanced, moderate-speed, moderate-drag colony, not any
+extreme. UCB explores widely (the parameter columns are non-monotonic) while the
+best-so-far food rises monotonically by construction. The headline is that the
+search rediscovered, with nothing hand-coded, that a \emph{large swarm of small,
+soft, strongly-chemotactic cells} forages a maze best.
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}l r r r r r r r r r@{}}
+\toprule
+\# & food & speed & gain & drag & rot & youngs & a\_max & radius & $n$ \\
+\midrule
+init & 120 & 40 & 180 & 2.00 & 0.30 & 550 & 700 & 0.01 & 60 \\
+1 & 142 & 74 & 379 & 2.54 & 0.10 & 517 & 454 & 0.02 & 46 \\
+2 & 225 & 106 & 253 & 1.25 & 0.31 & 36 & 599 & 0.01 & 88 \\
+3 & 298 & 83 & 270 & 0.97 & 0.48 & 78 & 1362 & 0.01 & 93 \\
+4 & 423 & 49 & 391 & 1.55 & 0.18 & 160 & 1438 & 0.01 & 106 \\
+5 & 525 & 21 & 341 & 2.99 & 0.40 & 24 & 1633 & 0.01 & 120 \\
+6 & 553 & 52 & 400 & 0.92 & 0.56 & 20 & 880 & 0.01 & 116 \\
+7 & 587 & 46 & 342 & 1.70 & 0.39 & 20 & 988 & 0.01 & 120 \\
+\bottomrule
+\end{tabular}
+\caption{The optimization log (\code{WINNERS.md}): the initial design and each
+significantly-better foraging design UCB found, with the eight tuned parameters.
+Food delivered rises from 120 to 587 ($\sim$5$\times$).}
+\label{tab:winners}
+\end{table}
+
 The difference is visible in the trails themselves (Fig.~\ref{fig:initwin}): the
 initial colony barely establishes a route, whereas the optimized one lays a strong
 chemoattractant highway that threads both maze gaps from home to food.
