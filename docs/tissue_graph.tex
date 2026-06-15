@@ -60,19 +60,20 @@ lessons that follow for how to construct the repository.
 
 The container is built from two kinds of object: \textbf{sets} and \textbf{fields}.
 A \textbf{set} $S_k$ is a discrete collection of like entities at scale $k$ ---
-molecules, particles, cells, populations, organisms (Fig.~\ref{fig:hier}).
+metabolites, particles, cells, populations, organisms (Fig.~\ref{fig:hier}).
 Adjacent scales are linked by \textbf{parent maps}
 \[
   \pi_k : S_k \longrightarrow S_{k+1},
 \]
-where $\pi_k(x)$ is the higher-level object that contains $x$. For a particle $p$
-and a cell $c$, $\pi_0(p)=c$ reads ``particle $p$ belongs to cell $c$''. Going the
-other way, the particles that make up a given cell $c$ are its \emph{fibre} --- the
-set of everything that maps to $c$,
+where $\pi_k(x)$ is the higher-level object that contains $x$. A cell is built from
+two kinds of $S_0$ entity --- its \textbf{particles} (mechanics) and its
+\textbf{metabolites} (chemistry) --- and $\pi_0$ sends each of them to the cell it
+belongs to, so $\pi_0(x)=c$ reads ``$x$ belongs to cell $c$''. The constituents of a
+given cell $c$ are its \emph{fibre}, the set of everything that maps to $c$,
 \[
-  \pi_0^{-1}(c)=\{\,p\in S_0 : \pi_0(p)=c\,\},
+  \pi_0^{-1}(c)=\{\,x\in S_0 : \pi_0(x)=c\,\},
 \]
-so a cell simply \emph{is} the collection of its constituent particles.
+so a cell simply \emph{is} the collection of its particles and metabolites.
 A \textbf{field} $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its
 own grid --- morphogen concentration, pressure, substrate stiffness, and so on.
 Fields are \emph{not} part of the containment hierarchy: they neither contain nor
@@ -89,20 +90,20 @@ Section~\ref{sec:operators}.
   leaf/.style={draw=cset,rounded corners,fill=cset!4,minimum width=26mm,minimum height=8mm},
   cont/.style={-{Stealth[length=2.6mm]},cset,thick},
 ]
-\node[set] (org)  at (0,7.5) {organism $S_3$};
-\node[set] (pop)  at (0,5.0) {population $S_2$};
-\node[set] (cell) at (0,2.5) {cell $S_1$};
+\node[set] (org)  at (0,6.0) {organism $S_3$};
+\node[set] (pop)  at (0,4.0) {population $S_2$};
+\node[set] (cell) at (0,2.0) {cell $S_1$};
 \node[leaf] (part) at (0,0.0) {particle $S_0$};
-\node[leaf] (mol)  at (-3.6,0.0) {molecule $S_0$};
-\draw[cont] (part) -- node[right,font=\scriptsize,pos=0.5]{$\pi_0$} (cell);
+\node[leaf] (mol)  at (-3.4,0.0) {metabolite $S_0$};
+\draw[cont] (part) -- (cell);
 \draw[cont] (mol.north) -- (cell.south west);
+\node[cset,font=\scriptsize] at (-1.25,0.85) {$\pi_0$};   % maps both leaves into the cell
 \draw[cont] (cell) -- node[right,font=\scriptsize,pos=0.5]{$\pi_1$} (pop);
 \draw[cont] (pop)  -- node[right,font=\scriptsize,pos=0.5]{$\pi_2$} (org);
 \end{tikzpicture}
-\caption{The containment hierarchy. Each scale $S_k$ is a set of entities; the
-parent map $\pi_k$ sends every entity to the higher-level object that contains it
-(particles and molecules into cells, cells into populations, populations into the
-organism). A cell is the fibre $\pi_0^{-1}(c)$ --- the set of its particles.}
+\caption{The containment hierarchy: the parent map $\pi_k$ sends each entity to the
+object that contains it. A cell is the fibre $\pi_0^{-1}(c)$ --- its particles and
+metabolites.}
 \label{fig:hier}
 \end{figure}
 
@@ -202,9 +203,14 @@ A simulation is a multi-rate composition of operators, declared as a
 $\Phi=\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1$, and the dynamics is its
 iteration $x_{t+1}=\Phi(x_t)$ --- a discrete flow (with ``multi-rate'' meaning
 some operators fire only on every $k$-th tick). The \code{Schedule} is just the
-code-level encoding of that composition. Operators are pure (they return deltas);
-the schedule sums them per set and integrates, so rollout stays differentiable and
-any number of operators may write the same set in one tick. The LLM searches over
+code-level encoding of that composition. Each operator is \emph{pure}: instead of
+editing the state in place, it only \emph{returns its contribution} --- a delta
+$\Delta_i$ (a time-derivative term) for the sets it touches. The schedule sums the
+deltas acting on each set and integrates once per tick,
+$x_{t+1}=x_t+\Delta t\sum_i\Delta_i$. Two consequences follow: several operators may
+act on the same set in one tick (their deltas simply add --- none overwrites
+another), and because nothing is mutated in place, gradients flow through the sums
+and the integrator, so the whole rollout stays differentiable. The LLM searches over
 schedules and operator parameterizations --- one well-defined action space instead
 of per-domain code.
 
