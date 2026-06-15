@@ -197,12 +197,16 @@ and the metabolite--reaction graph are both Exchange.}
 \section{Dynamics: a schedule}
 \label{sec:schedule}
 
-A simulation is a multi-rate composition of operators,
-$\;\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1$, declared as a \code{Schedule}.
-Operators are pure (they return deltas); the schedule sums them per set and
-integrates, so rollout stays differentiable and any number of operators may write
-the same set in one tick. The LLM searches over schedules and operator
-parameterizations --- one well-defined action space instead of per-domain code.
+A simulation is a multi-rate composition of operators, declared as a
+\code{Schedule}. In math terms, one tick is the composition
+$\Phi=\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1$, and the dynamics is its
+iteration $x_{t+1}=\Phi(x_t)$ --- a discrete flow (with ``multi-rate'' meaning
+some operators fire only on every $k$-th tick). The \code{Schedule} is just the
+code-level encoding of that composition. Operators are pure (they return deltas);
+the schedule sums them per set and integrates, so rollout stays differentiable and
+any number of operators may write the same set in one tick. The LLM searches over
+schedules and operator parameterizations --- one well-defined action space instead
+of per-domain code.
 
 \section{Glossary}
 
