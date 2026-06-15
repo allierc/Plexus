@@ -271,25 +271,31 @@ language: the spec is the \emph{source}, the registered operators are the
 The \textbf{spec is the contract}. The LLM owns everything above it (intent $\to$
 spec); the code owns everything below (operators). They never touch directly. This
 makes the system both LLM-drivable and human-auditable: the spec is small, typed,
-and reviewable, unlike the 500-line flat \code{config.py} it replaces. Three properties make the contract enforceable, and
-they answer the three questions this experiment was built around
-(Table~\ref{tab:modes}).
+and reviewable, unlike the 500-line flat \code{config.py} it replaces.
 
-\begin{table}[h]
-\centering
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{@{}p{3.6cm}p{6.6cm}p{4.2cm}@{}}
-\toprule
-\textbf{Question} & \textbf{Mechanism} & \textbf{Where} \\
-\midrule
-archive simulations & spec $+$ seed $+$ metrics $+$ thumbnail, name-keyed & \code{archive.py}, \code{GALLERY.md} \\
-missing model & registry lookup errors with the available set; add one \code{Operator} & \code{registry.get\_operator} \\
-missing property & operators \emph{declare} what they require; validator checks & \code{Operator.REQUIRES\_*} \\
-\bottomrule
-\end{tabular}
-\caption{The three operational modes.}
-\label{tab:modes}
-\end{table}
+Being a small, typed, declarative file gives the contract the properties one wants
+of an interface between an unreliable generator and exacting code:
+\begin{itemize}\itemsep2pt
+\item \textbf{Verifiable.} The spec is validated against the schema \emph{before}
+anything runs: an unregistered operator, a missing required property, or a
+malformed selector is rejected up front, so a spec that loads is guaranteed
+runnable (the missing-operator and missing-property cases below). Beyond
+well-formedness, each simulation also ships an \emph{intent} check that measures
+whether the requested behaviour actually occurred --- ``it ran'' is not ``it worked''.
+\item \textbf{Reproducible.} A run is bit-deterministic given $(\text{spec},
+\text{seed})$ --- the engine forces deterministic kernels --- so the same spec
+yields the same trajectory, and a fresh seed draws a new realization of the same
+dynamics.
+\item \textbf{Saveable.} The spec is $\sim$20 lines, so it version-controls, diffs,
+and archives trivially; together with the seed it \emph{is} the complete record. We
+archive the recipe, not the dish: store spec\,$+$\,seed (plus metrics and a
+thumbnail) and regenerate the trajectory on demand (\code{archive.py},
+\code{GALLERY.md}).
+\item \textbf{Composable.} A variant is a base spec plus a handful of overrides,
+which makes ablations and the optimizer's parameter sweeps cheap.
+\item \textbf{Extensible.} New behaviour is one new registered operator; the
+operator vocabulary grows monotonically, and every earlier spec keeps working.
+\end{itemize}
 
 \section{The simulation language}
 
