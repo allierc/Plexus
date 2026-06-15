@@ -495,22 +495,29 @@ into a one-line message up front.
 
 \section{A spread of simulations from one registry}
 
-Once the vocabulary existed, ten qualitatively different behaviours were
-\emph{just different YAML} over the same code (Fig.~\ref{fig:sims}). Breadth comes
-from the intermediate representation, not from new code. Each is 600 cells or 100
-cells of $\sim$100 MLS-MPM particles; soft cells are red, stiff blue, the chemical
-field green.
+Once the vocabulary existed, qualitatively different behaviours were \emph{just
+different specs} over the same code --- breadth comes from the intermediate
+representation, not from new code. Each simulation is 100--600 cells of $\sim$100
+MLS-MPM particles (soft cells red, stiff blue, the chemical field green); eight are
+shown in Fig.~\ref{fig:sims}:
+\begin{itemize}\itemsep1pt
+\item \textbf{aggregate} --- soft cells secrete a chemical and climb it, clumping together;
+\item \textbf{disperse} --- soft cells flee their own chemical (negative gain), spreading apart;
+\item \textbf{swarm} --- strong boids make the cells flock and move as one;
+\item \textbf{wander} --- active motility alone: a diffusive gas of cells;
+\item \textbf{sort} --- type-specific adhesion segregates the two populations;
+\item \textbf{chase} --- a fast-decaying field makes moving hotspots the cells chase;
+\item \textbf{crystal} --- pure repulsion spaces the cells into a lattice;
+\item \textbf{collapse} --- low diffusion with strong chemotaxis pulls soft cells into one tight cluster.
+\end{itemize}
+Across all eight, only the operator choices and their parameters differ; the engine,
+the operators, and the schedule grammar are identical.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_sims.png}
-\caption{End states of eight simulations, all generated from the same operator
-registry by changing only the simulation file. \emph{aggregate}: soft cells
-cluster on self-secreted chemical; \emph{disperse}: soft flee their own chemical;
-\emph{swarm}: boids flock; \emph{wander}: active gas; \emph{sort}: type-specific
-adhesion segregates the populations; \emph{chase}: a fast-decaying field makes
-moving hotspots; \emph{crystal}: pure repulsion spaces cells evenly;
-\emph{collapse}: low diffusion $+$ strong chemotaxis $\to$ one tight cluster.}
+\caption{End states of the eight simulations described above, all generated from
+the same operator registry by changing only the spec.}
 \label{fig:sims}
 \end{figure}
 
