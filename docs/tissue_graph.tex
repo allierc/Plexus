@@ -110,8 +110,8 @@ organism). A cell is the fibre $\pi_0^{-1}(c)$ --- the set of its particles.}
 \label{sec:operators}
 
 A GNN is an \textbf{operator} $\mathcal{O}$ returning a time-derivative
-contribution, dispatched by the relation it acts on. There are exactly four kinds
-(Fig.~\ref{fig:ops}):
+contribution, dispatched by the relation it acts on. We use four kinds, one per
+relation the container admits (Fig.~\ref{fig:ops}):
 \begin{align*}
 \textbf{Lateral}\quad   & \mathcal{O}_E,\ E\subseteq S_k\times S_k
   &&\text{(ODE interaction $+$ graph Laplacian)}\\
@@ -193,11 +193,6 @@ and \emph{Broadcast} move across containment $\pi$; \emph{Exchange} scatters
 and the metabolite--reaction graph are both Exchange.}
 \label{fig:ops}
 \end{figure}
-
-\paragraph{Composition.} ``MPM moves the cell'' $=$ Lateral@particle then
-Aggregate$\uparrow$. ``Signalling moves the cell'' $=$ Lateral@cell then
-Broadcast$\downarrow$. ``Object changes field, field moves object'' $=$
-$\mathcal{S}$ then $\mathcal{G}$.
 
 \section{Dynamics: a schedule}
 \label{sec:schedule}
