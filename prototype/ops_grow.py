@@ -102,6 +102,30 @@ class Duplicate(Operator):
         return {}
 
 
+@register_operator("tissue", level="cell", kind="lateral")
+class Tissue(Lateral):
+    """Inter-cell adhesion: each active cell is pulled toward the centroids of its
+    active neighbours within `radius`. This is the attraction that holds the colony
+    together as a tissue; MPM incompressibility + per-cell `cohere` fight it, so the
+    cells pack instead of either dispersing or collapsing. Cell-level accel ->
+    broadcast to the cell's particles by `mpm`."""
+    REQUIRES_PARAMS = ["strength", "radius"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.s = float(params["strength"]); self.r = float(params["radius"])
+
+    def forward(self, H, mask=None):
+        cell = H.level("cell"); pos = cell.state[:, :2]
+        act = H.c_active.float()
+        diff = pos[None, :, :] - pos[:, None, :]              # j - i  -> toward neighbour
+        d = torch.sqrt((diff * diff).sum(2) + 1e-9)
+        W = ((d < self.r) & (d > 1e-5)).float() * act[None, :] * act[:, None]
+        cnt = W.sum(1).clamp(min=1.0)[:, None]
+        accel = self.s * (W[..., None] * diff).sum(1) / cnt
+        return {"cell": accel * act[:, None]}
+
+
 @register_operator("divide", level="cell", kind="structural")
 class Divide(Operator):
     """Split any active cell whose mass has reached `ratio`x its birth mass, along

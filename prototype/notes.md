@@ -166,3 +166,20 @@ same way. Learnings:
 Both engines (`grow_engine`, `grow_engine_mpm`) duplicate most of build/run — they
 should fold into one generic engine that integrates deltas AND hosts MPM AND
 supports cardinality change.
+
+### Tissue adhesion (the missing force)
+
+With only `cohere` + MPM, after the `divide` push there is nothing holding
+daughters together, so the colony **disperses**. Added a `tissue` operator
+(cell-level lateral): each active cell is pulled toward its active neighbours
+within a radius. Now three forces balance into a packed tissue:
+
+- **`tissue`** (inter-cell attraction) pulls cells together;
+- **MPM** incompressibility + **`cohere`** (per-cell binding) resist overlap;
+- net result: cells pack as a cohesive cluster instead of dispersing or merging.
+
+Note `tissue` must respect `H.c_active` — inactive (dormant) cell slots have a
+centroid of (0,0), so a naive all-cells adhesion would pull the colony toward the
+origin. (The stock `adhesion` op isn't occupancy-aware, hence a new operator.)
+This is the general lesson: **once sets have occupancy, every set-level operator
+must mask on the active set.**
