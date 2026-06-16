@@ -76,7 +76,7 @@ class Simulation:
 
 
 _RESERVED = {"op", "at", "to", "from"}
-_BUILTIN_STEPS = {"integrate", "aggregate"}         # plus '<field>.diffuse'
+_BUILTIN_STEPS = {"aggregate"}                      # plus '<field>.diffuse'; integration is implicit (end of tick)
 
 
 def load(path: str) -> Simulation:

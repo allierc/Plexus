@@ -37,7 +37,7 @@ operators:
   - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
   - {op: boids,        at: particle}
 
-schedule: [radius_graph, boids, integrate]
+schedule: [radius_graph, boids]
 
 plotting:
   background: black

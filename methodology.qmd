@@ -61,7 +61,13 @@ the `Hierarchy` and iterates the schedule, $x_{t+1}=\Phi(x_t)$).
 Structurally this is an **entity–component–system** (ECS) architecture: sets are
 entities, their state buffers are components, operators are systems, and the
 schedule is the ECS system pipeline. We adopt that framing deliberately — it is
-the cleanest mental model and matches the engine one-to-one.
+the cleanest mental model and matches the engine one-to-one. Each entity kind
+declares its component layout once in the registry (`@register_entity`): a typed
+*state schema* naming which state columns are position, velocity, and so on, plus
+*render* hints (what to colour by, whether to draw orientation). The engine, the
+operators, and the visualizer all read column semantics from this one declaration
+rather than hard-coding offsets like `state[:, :2]`, so a new entity is drawn and
+integrated correctly for free.
 
 | Construct | Semantics | Example |
 |---|---|---|

@@ -22,7 +22,7 @@ operators:
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
 
-schedule: [radius_graph, attraction_repulsion, integrate]
+schedule: [radius_graph, attraction_repulsion]
 
 plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
   background: black

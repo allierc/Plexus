@@ -34,10 +34,10 @@ Operators
       def __init__(self, params: dict, device="cpu"): ...
       def forward(self, H: Hierarchy, mask=None) -> dict[str, Tensor]: ...
 
-  It returns a dict `{level_name: delta}` of *time-derivative contributions*
-  (accelerations / forces). The engine sums same-level deltas into that level's
-  accumulator; a downstream consumer (the `mpm` substep, the `integrate`
-  builtin, or `<field>.diffuse`) turns accumulated accel into new state. An
+  It returns a dict `{level_name: delta}` of *time-derivative contributions*. The
+  engine sums same-level deltas into that level's accumulator and integrates each
+  set once at the end of the tick (the order -- 1st-derivative velocity vs
+  2nd-derivative acceleration -- comes from the operator's `PREDICTION`). An
   operator that changes *membership* or *relations* (structural / rewire) or that
   writes a field (exchange) mutates `H` in place and returns `{}` -- uniform with
   every other operator, so the engine never special-cases a kind.
@@ -80,10 +80,11 @@ import torch
 import torch.nn as nn
 
 
-# The recognised operator kinds (dispatch tags). `structural` and `rewire` are
-# the two the prototype added beyond the paper's four; the validator/engine treat
-# them uniformly (they mutate H and return no delta), but naming them lets the
-# registry and the LLM enumerate "what can change the set / the relation".
+# The recognised operator kinds (dispatch tags), in two families: four *dynamics*
+# kinds (lateral / aggregate / broadcast / exchange) return a state delta, and two
+# *structure* kinds (`structural` changes the node set |S|, `rewire` rebuilds the
+# relation E) mutate H and return no delta. Naming them lets the registry and the
+# LLM enumerate "what can change the set / the relation".
 KINDS = ("lateral", "aggregate", "broadcast", "exchange", "structural", "rewire")
 
 
@@ -248,23 +249,23 @@ class Hierarchy(nn.Module):
     """Ordered Levels (bottom-up) + a flat set of Fields, plus run-time scratch.
 
     The engine attaches per-run state as plain attributes (an `nn.Module` allows
-    it): `config` (the validated Scenario), `rng` (a seeded generator for
-    determinism), world geometry (`world_width`, `periodic`, `walls_mpm`), and
-    the per-level **accel accumulators** that realise the integration model.
+    it): `config` (the validated Simulation), `rng` (a seeded generator for
+    determinism), world geometry (`world_width`, `periodic`), and the per-level
+    **delta accumulators** that realise the integration model.
 
     Integration model (the contract every operator/engine honours): operators are
-    pure and return per-level deltas; the engine accumulates same-level deltas
-    here, and a consumer (`mpm`, the `integrate` builtin, `<field>.diffuse`)
-    applies them to produce next state. Use `zero_accel`/`add_accel`/`accel` so
-    operators and the engine share one convention instead of hard-coding
-    `H.cell_accel` / `H.part_accel`.
+    pure and return per-level deltas `Δ`; the engine sums same-level deltas here
+    and integrates each set once at the end of the tick. Use
+    `zero_delta`/`add_delta`/`delta` so operators and the engine share one
+    convention. The delta is a velocity or an acceleration depending on the
+    operator's `PREDICTION`; it is not necessarily an acceleration, hence `delta`.
     """
 
     def __init__(self):
         super().__init__()
         self.levels = nn.ModuleDict()         # name -> Level (insertion order = bottom-up)
         self.fields = nn.ModuleDict()         # name -> Field
-        self._accel: dict[str, torch.Tensor] = {}
+        self._delta: dict[str, torch.Tensor] = {}
 
     # --- structure -------------------------------------------------------- #
     def add_level(self, lvl: Level) -> Level:
@@ -281,26 +282,26 @@ class Hierarchy(nn.Module):
     def field(self, name: str) -> Field:
         return self.fields[name]
 
-    # --- per-level accel accumulators (the integration scratch) ----------- #
-    def zero_accel(self, dim: int = 2) -> None:
-        """Reset every level's accel accumulator to zeros (called once per tick)."""
+    # --- per-level delta accumulators (the integration scratch) ----------- #
+    def zero_delta(self, dim: int = 2) -> None:
+        """Reset every level's delta accumulator to zeros (called once per tick)."""
         dev = next(iter(self.levels.values())).state.device
-        self._accel = {name: torch.zeros(l.n, dim, device=dev)
+        self._delta = {name: torch.zeros(l.n, dim, device=dev)
                        for name, l in self.levels.items()}
 
-    def add_accel(self, level_name: str, delta: torch.Tensor) -> None:
+    def add_delta(self, level_name: str, delta: torch.Tensor) -> None:
         """Add an operator's returned delta into its level's accumulator."""
-        if level_name not in self._accel:
-            self._accel[level_name] = delta.clone()
+        if level_name not in self._delta:
+            self._delta[level_name] = delta.clone()
         else:
-            self._accel[level_name] = self._accel[level_name] + delta
+            self._delta[level_name] = self._delta[level_name] + delta
 
-    def accel(self, level_name: str) -> torch.Tensor:
-        """The accumulated accel for a level (zeros if nothing wrote it)."""
-        if level_name not in self._accel:
+    def delta(self, level_name: str) -> torch.Tensor:
+        """The accumulated delta for a level (zeros if nothing wrote it)."""
+        if level_name not in self._delta:
             lvl = self.levels[level_name]
-            self._accel[level_name] = torch.zeros(lvl.n, 2, device=lvl.state.device)
-        return self._accel[level_name]
+            self._delta[level_name] = torch.zeros(lvl.n, 2, device=lvl.state.device)
+        return self._delta[level_name]
 
 
 # --------------------------------------------------------------------------- #

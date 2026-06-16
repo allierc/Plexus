@@ -124,18 +124,19 @@ def _mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
 
 
 # --------------------------------------------------------------------------- #
-#  integrate builtin: accumulated accel -> next state (per top-level set)
+#  integration: accumulated delta -> next state, run ONCE per tick (implicit)
 # --------------------------------------------------------------------------- #
 def _integrate(H: Hierarchy, dt: float) -> None:
-    """Accumulated per-level output -> next state. The integration order is the one
-    resolved from the set's operators (H.predict): first_derivative reads the
-    output as a velocity (x += dt·dpos); second_derivative reads it as an
-    acceleration (v += dt·acc; x += dt·v). Friction is the `drag` operator, not a
-    knob here; no velocity cap (numerical guards belong to a numerics layer)."""
+    """Turn each set's accumulated delta into its next state, once per tick. The
+    integration order is resolved from the set's operators (H.predict):
+    first_derivative reads the delta as a velocity (x += dt·dpos); second_derivative
+    reads it as an acceleration (v += dt·acc; x += dt·v). Only sets that have
+    force-emitting operators (a prediction) are integrated; others hold still.
+    Friction is the `drag` operator, not a knob here."""
     W = H.world_width
-    for name, lvl in H.levels.items():
-        out = H.accel(name)
-        pred = H.predict.get(name, "first_derivative")
+    for name, pred in H.predict.items():
+        lvl = H.levels[name]
+        out = H.delta(name)
         px0, px1 = lvl.state_schema["pos"]; vx0, vx1 = lvl.state_schema["vel"]
         x, v = lvl.state[:, px0:px1], lvl.state[:, vx0:vx1]
         v = out if pred == "first_derivative" else v + dt * out
@@ -167,12 +168,10 @@ def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tu
 
     with torch.no_grad():
         for frame in range(sim.n_frames + 1):
-            H.zero_accel()
-            for step in sim.schedule:
+            H.zero_delta()
+            for step in sim.schedule:                # operators accumulate per-set deltas
                 for tok in (step if isinstance(step, list) else [step]):
-                    if tok == "integrate":
-                        _integrate(H, sim.dt)
-                    elif tok == "aggregate":
+                    if tok == "aggregate":
                         raise NotImplementedError("`aggregate` lands with containment (next scale-up step)")
                     elif tok.endswith(".diffuse"):
                         raise NotImplementedError("fields land with the Exchange operators (next scale-up step)")
@@ -181,7 +180,8 @@ def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tu
                             if nm != tok:
                                 continue
                             for lvlname, d in ob(H, _mask(H, sel)).items():
-                                H.add_accel(lvlname, d)
+                                H.add_delta(lvlname, d)
+            _integrate(H, sim.dt)                    # integrate each set once, at end of tick
             for name, lvl in H.levels.items():
                 rec_sets[name][frame] = lvl.get("pos").cpu().numpy()
                 occ_sets[name][frame] = lvl.active.cpu().numpy()

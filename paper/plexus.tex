@@ -289,8 +289,19 @@ that evolve on different time scales. The \code{Schedule} is just the code-level
 encoding of that composition. Each operator is \emph{pure}: instead of
 editing the state in place, it only \emph{returns its contribution} --- a delta
 $\Delta_i$ (a time-derivative term) for the sets it touches. The schedule sums the
-deltas acting on each set and integrates once per tick,
-$x_{t+1}=x_t+\Delta t\sum_i\Delta_i$. Two consequences follow: several operators may
+deltas acting on each set and integrates once per tick.
+
+An operator declares the \emph{order} of its delta, since a time-derivative can be
+of position or of velocity. A \emph{first-order} (overdamped) operator returns a
+velocity and integrates as $x_{t+1}=x_t+\Delta t\sum_i\Delta_i$; a
+\emph{second-order} (inertial) operator returns an acceleration and integrates as
+$v_{t+1}=v_t+\Delta t\sum_i\Delta_i,\ x_{t+1}=x_t+\Delta t\,v_{t+1}$. The order is
+a fixed property of each operator (\code{PREDICTION}): attraction--repulsion is
+first order, boids flocking is second; all operators acting on one set must agree,
+so the set integrates as a single order. Friction in the inertial case is itself an
+operator (a \code{drag} delta $-\kappa v$), not a special term in the integrator.
+
+Two consequences follow: several operators may
 act on the same set in one tick (their deltas simply add --- none overwrites
 another), and because nothing is mutated in place, gradients flow through the sums
 and the integrator, so the whole rollout stays differentiable. The LLM searches over
@@ -450,7 +461,13 @@ where it may appear), and semantics, with examples drawn from Listing~\ref{lst:a
 Structurally this is an \textbf{entity--component--system} (ECS) architecture: sets
 are entities, their state buffers are components, operators are systems, and the
 schedule is the ECS system pipeline. We adopt that framing deliberately --- it is
-the cleanest mental model and matches the engine one-to-one.
+the cleanest mental model and matches the engine one-to-one. Each entity kind
+declares its component layout once in the registry (\code{@register\_entity}): a
+typed \emph{state schema} naming which state columns are position, velocity, and
+so on, plus \emph{render} hints (what to colour by, whether to draw orientation).
+The engine, the operators, and the visualizer all read column semantics from this
+one declaration rather than hard-coding offsets like \code{state[:, :2]} ---
+so a new entity is drawn and integrated correctly for free.
 
 Most of the spec is plain typed key--value; the only genuine sub-grammars are the
 last two blocks of Table~\ref{tab:lang} --- \emph{selectors} and the

@@ -155,9 +155,17 @@ that evolve on different time scales. Each operator
 is **pure**: instead of editing the state in place, it only *returns its
 contribution* — a delta $\Delta_i$ (a time-derivative term) for the sets it
 touches. The schedule sums the deltas acting on each set and integrates once per
-tick,
+tick.
 
-$$x_{t+1}=x_t+\Delta t\textstyle\sum_i\Delta_i.$$
+An operator declares the **order** of its delta, since a time-derivative can be of
+position or of velocity. A *first-order* (overdamped) operator returns a velocity,
+integrated $x_{t+1}=x_t+\Delta t\sum_i\Delta_i$; a *second-order* (inertial)
+operator returns an acceleration, integrated
+$v_{t+1}=v_t+\Delta t\sum_i\Delta_i,\ x_{t+1}=x_t+\Delta t\,v_{t+1}$. The order is a
+fixed property of each operator (`PREDICTION`): attraction–repulsion is first
+order, boids flocking is second; all operators on one set must agree, so the set
+integrates as a single order. Friction in the inertial case is itself an operator
+(a `drag` delta $-\kappa v$), not a special term in the integrator.
 
 Two consequences follow: several operators may act on the same set in one tick
 (their deltas simply add — none overwrites another), and because nothing is
