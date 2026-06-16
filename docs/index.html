@@ -20,6 +20,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -76,6 +111,35 @@ ul.task-list li input[type="checkbox"] {
 }</script>
 <style>html{ scroll-behavior: smooth; }</style>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -297,6 +361,7 @@ ul.task-list li input[type="checkbox"] {
    
   <ul>
   <li><a href="#a-language-not-a-world-model" id="toc-a-language-not-a-world-model" class="nav-link active" data-scroll-target="#a-language-not-a-world-model">A language, not a world model</a></li>
+  <li><a href="#a-language-and-a-calculus-two-layers-that-never-touch" id="toc-a-language-and-a-calculus-two-layers-that-never-touch" class="nav-link" data-scroll-target="#a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</a></li>
   <li><a href="#re-converging-four-frameworks" id="toc-re-converging-four-frameworks" class="nav-link" data-scroll-target="#re-converging-four-frameworks">Re-converging four frameworks</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
   <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
@@ -342,6 +407,32 @@ ul.task-list li input[type="checkbox"] {
 <p>Plexus takes the opposite approach. Its primitives are <strong>explicit</strong>: sets, fields, containment relations, and operators. A cell, a morphogen gradient, a mechanical substrate, and a neural circuit are all represented within the same formal framework. Dynamics arise from compositions of interpretable operators rather than opaque latent transitions.</p>
 <p>The question is therefore not <em>“Can we predict the next state?”</em> but <em>“What are the primitive concepts required to describe a living system?”</em> In this view the simulator is secondary — it is merely the <strong>interpreter</strong> of the language. The central object is the representation itself. Once a living system is expressed in the language of Plexus, it becomes possible to compose mechanisms across scales, perform inverse inference, optimize biological designs, and generate new models automatically.</p>
 <p>Plexus proposes that hierarchical sets, fields, and <strong>four classes of operators</strong> are sufficient to express a broad range of biological phenomena within a common <strong>differentiable</strong> framework.</p>
+</section>
+<section id="a-language-and-a-calculus-two-layers-that-never-touch" class="level2">
+<h2 class="anchored" data-anchor-id="a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</h2>
+<p>Plexus is two things at once, kept strictly apart:</p>
+<ul>
+<li>a <strong>language</strong> — a small, declarative <em>specification</em> (<code>spec.yaml</code>) that names the sets, fields, operators, and schedule of a system. This is <em>what</em> a living system is.</li>
+<li>a <strong>calculus</strong> — the registered operators and the engine that composes and integrates them, <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>, keeping the whole rollout differentiable. This is <em>how</em> it evolves.</li>
+</ul>
+<p>The two meet at exactly one place — the validated spec — and <strong>never touch directly</strong>. The LLM owns everything <em>above</em> the spec (intent → specification); the code owns everything <em>below</em> it (the operators). The LLM never writes engine code; the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.</p>
+<p>The practical payoff: a new behaviour is a new sentence in the language, not a new program. A short prompt becomes a running, differentiable simulation <strong>with no code written</strong> —</p>
+<blockquote class="blockquote">
+<p><strong>Prompt</strong> — <em>“100 cells; the soft ones secrete a chemical and climb it, so they clump together; the stiff ones ignore it.”</em></p>
+</blockquote>
+<p>the LLM compiles it to a specification:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> aggregate</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">12</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}}</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">radius</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="kw">}</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">fields</span><span class="kw">:</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">chemical</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">frame</span><span class="kw">:</span><span class="at"> grid</span><span class="kw">,</span><span class="at"> </span><span class="fu">res</span><span class="kw">:</span><span class="at"> </span><span class="dv">96</span><span class="kw">,</span><span class="at"> </span><span class="fu">diffusion</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.1</span><span class="kw">,</span><span class="at"> </span><span class="fu">decay</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span><span class="kw">,</span><span class="at"> </span><span class="fu">couples_to</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span><span class="kw">}</span><span class="co">    # only soft cells make it</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at">   </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">gain</span><span class="kw">:</span><span class="at"> </span><span class="dv">150</span><span class="kw">}</span><span class="co">  # only soft cells follow it</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at">     </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>and the engine resolves each <code>op</code> against the registry and runs it — producing the <em>aggregate</em> result shown below. No operator was written; the selector <code>cell[type=soft]</code> did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
 </section>
 <section id="re-converging-four-frameworks" class="level2">
 <h2 class="anchored" data-anchor-id="re-converging-four-frameworks">Re-converging four frameworks</h2>

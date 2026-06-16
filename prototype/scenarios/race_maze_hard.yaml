@@ -1,21 +1,18 @@
-# Scenario 2b -- Race through a HARD maze (long dead end).
-# Identical cells and self-generated-gradient navigation as the easy maze, but a
-# long dead-end pocket (the horizontal stub) holds enough attractant to look like a
-# through-route, so cells are tempted in and waste time -- the Tweedy & Insall
-# failure mode (hard mazes with long dead ends fool the self-generated gradient).
-# The honest finding is the easy-vs-hard CONTRAST under the same parameters.
-# Score (driver): arrivals/speed; expect markedly fewer/slower than the easy maze.
+# Scenario 2b -- Race through a HARD maze (forage-style), rendered longitudinally.
+# Identical mechanism to the easy maze (hidden geodesic nav + shown scent trail +
+# finish/freeze/counter), but NARROWER gaps and a long dead-end FINGER make the
+# route longer (BFS path ~195 vs easy ~143), so fewer cells arrive and later --
+# the easy-vs-hard CONTRAST under identical parameters.
 name: race_maze_hard
 seed: 0
 boundary: wall
 n_frames: 2400
 record_every: 8
-obstacles:                       # BFS-verified solvable (path len ~162 vs easy ~shorter)
-  - [0.30, 0.00, 0.35, 0.65]     # wall A, gap TOP (y > 0.65)
-  - [0.60, 0.35, 0.65, 1.00]     # wall B, gap BOTTOM (y < 0.35)
-  - [0.44, 0.18, 0.49, 1.00]     # long finger from the top -> a deep dead-end pocket on its left;
-                                 # cells entering A's top gap are tempted UP into the pocket and must
-                                 # instead descend the whole left wall to round the finger (the detour)
+obstacles:                       # BFS-verified passable (path ~195)
+  - [0.25, 0.00, 0.29, 0.66]     # wall A, narrow gap TOP (y > 0.66)
+  - [0.47, 0.34, 0.51, 1.00]     # wall B, narrow gap BOTTOM (y < 0.34)
+  - [0.69, 0.00, 0.73, 0.66]     # wall C, narrow gap TOP
+  - [0.34, 0.30, 0.38, 1.00]     # long finger from the top -> dead-end pocket; forces a long descent
 sets:
   cell:
     n: 120
@@ -23,19 +20,13 @@ sets:
     types: {A: {fraction: 0.5, youngs: 60}, B: {fraction: 0.5, youngs: 60}}
   particle: {parent: cell, per_parent: 40, radius: 0.010, density: 1.0}
 fields:
-  attractant:
-    frame: grid
-    res: 128
-    diffusion: 1.0
-    decay: 0.0
-    couples_to: cell
-    init: 1.0
-    source: [0.90, 0.0, 1.0, 1.0]
-    source_rate: 0.6
-    navigation: dynamic
+  scent: {frame: grid, res: 128, diffusion: 0.04, decay: 0.02, couples_to: cell}
+  nav:   {frame: grid, res: 128, diffusion: 1.0, source: [0.90, 0.0, 1.0, 1.0], navigation: geodesic, couples_to: cell}
 operators:
-  - {op: motility, at: cell, speed: 16.0, rot: 0.20}
-  - {op: sense,  at: cell, from: attractant, gain: 300.0}
-  - {op: graze,  at: cell, from: attractant, rate: 1.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 800, drag: 2.0, vmax: 5.0}
-schedule: [aggregate, [motility, sense], graze, attractant.diffuse, mpm]
+  - {op: finish, at: cell, x: 0.88}
+  - {op: motility, at: "cell[done=0]", speed: 40.0, rot: 0.30}
+  - {op: random_walk, at: "cell[done=0]", strength: 25.0}
+  - {op: sense,  at: "cell[done=0]", from: nav, gain: 180.0}
+  - {op: secrete, at: "cell[done=0]", to: scent, rate: 1.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 700, drag: 2.0, vmax: 5.0}
+schedule: [aggregate, finish, [motility, random_walk, sense], secrete, scent.diffuse, mpm]

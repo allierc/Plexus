@@ -186,6 +186,11 @@ def _mask(H, sel):
         return lvl.node_type == lvl.type_names.index(sel.val)
     if sel.attr == "loaded":
         return lvl.loaded == bool(int(sel.val))
+    if sel.attr == "done":
+        done = getattr(lvl, "done", None)
+        if done is None:
+            done = torch.zeros(lvl.n, dtype=torch.bool, device=lvl.state.device)
+        return done == bool(int(sel.val))
     raise ValueError(f"unknown selector attribute {sel.attr!r}")
 
 
@@ -228,8 +233,10 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
     cen = np.zeros((n_rec, cell.n, 2), np.float32)
     ppos = np.zeros((n_rec, part.n, 2), np.float32)
     loaded = np.zeros((n_rec, cell.n), bool)
+    done = np.zeros((n_rec, cell.n), bool)
     fhist = np.zeros((n_rec, H.fields[fld_name].res, H.fields[fld_name].res), np.float32)
     delivered_t = np.zeros(n_rec, np.int32)
+    finished_t = np.zeros(n_rec, np.int32)
 
     rec = 0
     for frame in range(sc.n_frames + 1):
@@ -250,16 +257,20 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
             cen[rec] = cell.state[:, :2].cpu().numpy()
             ppos[rec] = part.state[:, :2].cpu().numpy()
             loaded[rec] = cell.loaded.cpu().numpy()
+            done[rec] = (cell.done.cpu().numpy() if hasattr(cell, "done")
+                         else np.zeros(cell.n, bool))
             fhist[rec] = H.fields[fld_name].grid.cpu().numpy()
             delivered_t[rec] = getattr(H, "food_delivered", 0)
+            finished_t[rec] = getattr(H, "finished", 0)
             rec += 1
 
     out = dict(cell_pos=cen[:rec], cell_type=cell.node_type.cpu().numpy(),
                particle_pos=ppos[:rec], parent=part.parent.cpu().numpy(),
-               loaded=loaded[:rec], field=fhist[:rec], type_names=cell.type_names,
+               loaded=loaded[:rec], done=done[:rec], field=fhist[:rec], type_names=cell.type_names,
                food_delivered=int(getattr(H, "food_delivered", 0)),
                harvested=float(getattr(H, "harvested", 0.0)),
-               delivered_t=delivered_t[:rec],
+               finished=int(getattr(H, "finished", 0)),
+               delivered_t=delivered_t[:rec], finished_t=finished_t[:rec],
                walls=(_raster(getattr(sc, "obstacles", []), H.fields[fld_name].res, device).cpu().numpy()
                       if getattr(sc, "obstacles", []) else None))
     if out_path is not None:

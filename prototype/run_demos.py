@@ -73,29 +73,33 @@ def intent_graze(a):
 
 def intent_race(x_finish):
     def f(a):
-        x = a["cell_pos"][..., 0]                       # [T, Ncell]
-        crossed = x > x_finish                           # [T, Ncell]
-        ever = crossed.any(0)
-        arrived = int(ever.sum()); n = x.shape[1]
-        T = x.shape[0]
-        first = np.where(ever, crossed.argmax(0), T)      # first crossing frame (T if never)
-        speed_bonus = float(np.clip(1 - first[ever] / T, 0, 1).sum()) if arrived else 0.0
+        n = a["cell_pos"].shape[1]
+        ft = a["finished_t"]                              # cumulative finished per frame (engine counter)
+        arrived = int(a["finished"]); T = len(ft)
+        # time-to-finish bonus: earlier arrivals score more
+        frac_curve = ft / max(n, 1)
+        speed_bonus = float(frac_curve.sum() / T)         # area under the arrivals curve in [0,1]
         score = arrived + speed_bonus
         ok = arrived > 0
-        return ok, f"{arrived}/{n} crossed finish (x>{x_finish}); race score={score:.1f}"
+        return ok, f"{arrived}/{n} reached finish (x>{x_finish}); race score={score:.2f}"
     return f
 
 
 # --------------------------------------------------------------------------- #
 #  render (shared graphic design, matching the previous gallery gifs)
 # --------------------------------------------------------------------------- #
-def render(a, sc, path, fps=20, x_finish=None, start_box=None):
+def render(a, sc, path, fps=20, x_finish=None, start_box=None, wide=False):
     pp, par = a["particle_pos"], a["parent"]
-    pt = a["cell_type"][par]; ld = a["loaded"]
+    pt = a["cell_type"][par]
+    green_flag = a.get("done") if a.get("done") is not None else a.get("loaded")   # frozen/loaded -> green
+    ft = a.get("finished_t"); ncell = a["cell_pos"].shape[1]
     walls, fld, T = a["walls"], a["field"], a["particle_pos"].shape[0]
     base = PAL[pt]                                              # [Np,4]
     vmax = max(float(fld.max()) * 0.5, 1e-6)
-    fig, ax = plt.subplots(figsize=(5.5, 5.5)); fig.patch.set_facecolor("black"); ax.set_facecolor("black")
+    figsize = (11.0, 4.6) if wide else (5.5, 5.5)              # races render longitudinally
+    fig, ax = plt.subplots(figsize=figsize); fig.patch.set_facecolor("black"); ax.set_facecolor("black")
+    if wide:
+        ax.set_aspect("auto")
     imF = ax.imshow(fld[0].T, origin="lower", extent=[0, 1, 0, 1], cmap="inferno", vmin=0, vmax=vmax)
     if walls is not None:
         ax.imshow(np.where(walls.T, 1.0, np.nan), origin="lower", extent=[0, 1, 0, 1],
@@ -112,11 +116,14 @@ def render(a, sc, path, fps=20, x_finish=None, start_box=None):
     def upd(fr):
         sct.set_offsets(pp[fr])
         col = base.copy()
-        if ld is not None and ld.shape[0] > fr:
-            col[ld[fr][par]] = GREEN
+        if green_flag is not None and green_flag.shape[0] > fr:
+            col[green_flag[fr][par]] = GREEN
         sct.set_color(col)
         imF.set_data(fld[fr].T)
-        tt.set_text(f"{sc.name}  frame {fr}/{T-1}")
+        if x_finish is not None and ft is not None:
+            tt.set_text(f"{sc.name}   frame {fr}/{T-1}   |   finished {int(ft[fr])}/{ncell}")
+        else:
+            tt.set_text(f"{sc.name}  frame {fr}/{T-1}")
         return [sct, imF, tt]
 
     FuncAnimation(fig, upd, frames=T, blit=False).save(path, writer=PillowWriter(fps=fps))
@@ -131,11 +138,11 @@ DEMOS = {
     "demo_graze":     dict(gif="demo2_graze.gif",      intent=intent_graze),
     "demo_aggregate": dict(gif="demo3_aggregate.gif",  intent=intent_aggregate),
     "race_pillars":   dict(gif="race1_pillars.gif",    intent=intent_race(0.86),
-                           x_finish=0.86, start_box=[0.0, 0.0, 0.12, 1.0]),
+                           x_finish=0.86, start_box=[0.0, 0.0, 0.12, 1.0], wide=True),
     "race_maze_easy": dict(gif="race2_maze_easy.gif",  intent=intent_race(0.88),
-                           x_finish=0.88, start_box=[0.0, 0.0, 0.10, 1.0]),
+                           x_finish=0.88, start_box=[0.0, 0.0, 0.10, 1.0], wide=True),
     "race_maze_hard": dict(gif="race3_maze_hard.gif",  intent=intent_race(0.88),
-                           x_finish=0.88, start_box=[0.0, 0.0, 0.10, 1.0]),
+                           x_finish=0.88, start_box=[0.0, 0.0, 0.10, 1.0], wide=True),
 }
 
 
@@ -148,7 +155,8 @@ def main():
         t = time.time()
         sc = load(f"scenarios/{nm}.yaml")
         _, a = engine2.run(sc, None, device=DEVICE)
-        render(a, sc, cfg["gif"], x_finish=cfg.get("x_finish"), start_box=cfg.get("start_box"))
+        render(a, sc, cfg["gif"], x_finish=cfg.get("x_finish"),
+               start_box=cfg.get("start_box"), wide=cfg.get("wide", False))
         ok, msg = cfg["intent"](a)
         dt = time.time() - t
         flag = "OK " if ok else "!! "

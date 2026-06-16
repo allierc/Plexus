@@ -57,6 +57,52 @@ Plexus proposes that hierarchical sets, fields, and **four classes of operators*
 are sufficient to express a broad range of biological phenomena within a common
 **differentiable** framework.
 
+## A language *and* a calculus — two layers that never touch
+
+Plexus is two things at once, kept strictly apart:
+
+- a **language** — a small, declarative *specification* (`spec.yaml`) that names
+  the sets, fields, operators, and schedule of a system. This is *what* a living
+  system is.
+- a **calculus** — the registered operators and the engine that composes and
+  integrates them, $x_{t+1}=\Phi(x_t)$, keeping the whole rollout differentiable.
+  This is *how* it evolves.
+
+The two meet at exactly one place — the validated spec — and **never touch
+directly**. The LLM owns everything *above* the spec (intent → specification);
+the code owns everything *below* it (the operators). The LLM never writes engine
+code; the engine never sees natural language. The spec is the contract between
+them: small, typed, and human-auditable.
+
+The practical payoff: a new behaviour is a new sentence in the language, not a
+new program. A short prompt becomes a running, differentiable simulation **with
+no code written** —
+
+> **Prompt** — *"100 cells; the soft ones secrete a chemical and climb it, so
+> they clump together; the stiff ones ignore it."*
+
+the LLM compiles it to a specification:
+
+```yaml
+name: aggregate
+sets:
+  cell: {n: 100, types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}}
+  particle: {parent: cell, per_parent: 100, radius: 0.02}
+fields:
+  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+operators:
+  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}    # only soft cells make it
+  - {op: sense,   at: "cell[type=soft]", from: chemical, gain: 150}  # only soft cells follow it
+  - {op: mpm,     at: particle, n_grid: 128, a_max: 800, drag: 4}
+schedule: [aggregate, secrete, chemical.diffuse, sense, mpm]
+```
+
+and the engine resolves each `op` against the registry and runs it — producing
+the *aggregate* result shown below. No operator was written; the selector
+`cell[type=soft]` did the work of "only the soft ones". The full grammar, the
+compilation rules, and how the contract fails loudly on a bad spec are on the
+**[LLM ↔ registry](methodology.qmd)** page.
+
 ## Re-converging four frameworks
 
 Plexus re-converges four sibling frameworks that all forked from

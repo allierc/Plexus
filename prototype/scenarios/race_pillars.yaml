@@ -1,33 +1,48 @@
-# Scenario 1 -- Race through pillars (porous medium).
-# 120 soft cells start at the LEFT and must reach the FINISH line at the right.
-# Navigation is a SELF-GENERATED gradient (Tweedy/Insall), NOT a precomputed
-# potential: the attractant starts full everywhere, a reservoir at the right edge
-# keeps it high there, cells graze (deplete) it and sense up-gradient. Pillars are
-# obstacles: one mask is no-flux for the field (attractant routes around them) and
-# zero-velocity for MPM (cells must squeeze through the gaps).
+# Scenario 1 -- Race through pillars (porous medium), rendered longitudinally.
+# 120 soft cells start at the LEFT and must reach the FINISH at the right. Many
+# ROUND pillars of varied radius form a porous gauntlet (circular obstacles, one
+# mask: no-flux for the field, zero-velocity for MPM). Navigation is a SELF-
+# GENERATED gradient (Tweedy/Insall): attractant full at t=0, a reservoir at the
+# right keeps it high there, cells graze (deplete) it and sense up-gradient.
 # Score (driver): how many of the 120 cross the finish line, and how fast.
 name: race_pillars
 seed: 0
 boundary: wall
-n_frames: 1200
-record_every: 4
-obstacles:                       # staggered pillar array [x0,y0,x1,y1]; start (x<0.14) & finish (x>0.86) clear
-  - [0.28, 0.18, 0.34, 0.24]
-  - [0.28, 0.40, 0.34, 0.46]
-  - [0.28, 0.62, 0.34, 0.68]
-  - [0.28, 0.84, 0.34, 0.90]
-  - [0.43, 0.08, 0.49, 0.14]
-  - [0.43, 0.30, 0.49, 0.36]
-  - [0.43, 0.52, 0.49, 0.58]
-  - [0.43, 0.74, 0.49, 0.80]
-  - [0.43, 0.92, 0.49, 0.98]
-  - [0.58, 0.18, 0.64, 0.24]
-  - [0.58, 0.40, 0.64, 0.46]
-  - [0.58, 0.62, 0.64, 0.68]
-  - [0.58, 0.84, 0.64, 0.90]
-  - [0.73, 0.30, 0.79, 0.36]
-  - [0.73, 0.52, 0.79, 0.58]
-  - [0.73, 0.74, 0.79, 0.80]
+n_frames: 1400
+record_every: 5
+obstacles:                       # circles [cx,cy,radius]; start (x<0.15) & finish (x>0.85) clear; BFS-passable
+  - [0.235, 0.268, 0.048]
+  - [0.553, 0.143, 0.034]
+  - [0.253, 0.404, 0.037]
+  - [0.456, 0.576, 0.045]
+  - [0.792, 0.310, 0.042]
+  - [0.626, 0.318, 0.018]
+  - [0.751, 0.575, 0.035]
+  - [0.675, 0.087, 0.044]
+  - [0.420, 0.140, 0.042]
+  - [0.371, 0.713, 0.045]
+  - [0.617, 0.782, 0.034]
+  - [0.543, 0.871, 0.026]
+  - [0.317, 0.816, 0.023]
+  - [0.798, 0.683, 0.026]
+  - [0.529, 0.681, 0.020]
+  - [0.675, 0.406, 0.019]
+  - [0.429, 0.395, 0.052]
+  - [0.786, 0.801, 0.046]
+  - [0.820, 0.186, 0.038]
+  - [0.446, 0.806, 0.027]
+  - [0.619, 0.554, 0.043]
+  - [0.188, 0.774, 0.034]
+  - [0.689, 0.904, 0.037]
+  - [0.529, 0.262, 0.025]
+  - [0.311, 0.530, 0.051]
+  - [0.234, 0.126, 0.040]
+  - [0.222, 0.939, 0.025]
+  - [0.393, 0.932, 0.045]
+  - [0.809, 0.063, 0.022]
+  - [0.260, 0.664, 0.020]
+  - [0.770, 0.463, 0.025]
+  - [0.565, 0.426, 0.033]
 sets:
   cell:
     n: 120
