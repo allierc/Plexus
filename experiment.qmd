@@ -131,3 +131,35 @@ highway that threads both maze gaps from home to food.
 
 {{< video prototype/winner_7.mp4 title="best found by UCB (winner 7)" >}}
 :::
+
+## Racing through pillars and a maze
+
+Two harder navigation tasks reuse the same machinery and the same UCB optimizer.
+In both, a colony must reach an exit line on the right; the score is how many
+cells escape, and how fast. The behavioural levers — now including the three
+`boids` weights (cohesion / align / separate) for collision avoidance — are tuned
+exactly as the forager was, from a hand-set **initial** run to the best
+**optimized** design found.
+
+### Pillars (porous medium)
+
+200 cells squeeze through a dense field of obstacles toward the exit, pulled by a
+self-generated attractant gradient (cells consume it as they pass, sharpening the
+gradient behind them). The optimizer learns the body-and-behaviour that threads
+the gaps without jamming.
+
+{{< video prototype/race1_pillars.mp4 title="pillars — initial design" >}}
+
+{{< video prototype/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escaped)" >}}
+
+### Maze (self-generated gradient)
+
+A walled labyrinth solved by the Tweedy *self-generated-gradient* mechanism:
+cells consume a diffusing attractant, so dead ends deplete and cannot refill
+while through-routes stay replenished — the colony effectively "sees around
+corners". The optimizer drives the consumption rate, diffusion, and motility into
+the band where this works.
+
+{{< video prototype/race2_maze.mp4 title="maze — initial design" >}}
+
+{{< video prototype/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solved)" >}}

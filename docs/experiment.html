@@ -370,6 +370,11 @@ window.Quarto = {
   <li><a href="#optimizing-the-colony" id="toc-optimizing-the-colony" class="nav-link" data-scroll-target="#optimizing-the-colony">Optimizing the colony</a></li>
   <li><a href="#initial-vs.-optimized" id="toc-initial-vs.-optimized" class="nav-link" data-scroll-target="#initial-vs.-optimized">Initial vs.&nbsp;optimized</a></li>
   </ul></li>
+  <li><a href="#racing-through-pillars-and-a-maze" id="toc-racing-through-pillars-and-a-maze" class="nav-link" data-scroll-target="#racing-through-pillars-and-a-maze">Racing through pillars and a maze</a>
+  <ul class="collapse">
+  <li><a href="#pillars-porous-medium" id="toc-pillars-porous-medium" class="nav-link" data-scroll-target="#pillars-porous-medium">Pillars (porous medium)</a></li>
+  <li><a href="#maze-self-generated-gradient" id="toc-maze-self-generated-gradient" class="nav-link" data-scroll-target="#maze-self-generated-gradient">Maze (self-generated gradient)</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -592,6 +597,22 @@ window.Quarto = {
 </div>
 </div>
 </div>
+</section>
+</section>
+<section id="racing-through-pillars-and-a-maze" class="level2">
+<h2 class="anchored" data-anchor-id="racing-through-pillars-and-a-maze">Racing through pillars and a maze</h2>
+<p>Two harder navigation tasks reuse the same machinery and the same UCB optimizer. In both, a colony must reach an exit line on the right; the score is how many cells escape, and how fast. The behavioural levers — now including the three <code>boids</code> weights (cohesion / align / separate) for collision avoidance — are tuned exactly as the forager was, from a hand-set <strong>initial</strong> run to the best <strong>optimized</strong> design found.</p>
+<section id="pillars-porous-medium" class="level3">
+<h3 class="anchored" data-anchor-id="pillars-porous-medium">Pillars (porous medium)</h3>
+<p>200 cells squeeze through a dense field of obstacles toward the exit, pulled by a self-generated attractant gradient (cells consume it as they pass, sharpening the gradient behind them). The optimizer learns the body-and-behaviour that threads the gaps without jamming.</p>
+<div class="quarto-video"><video id="video_shortcode_videojs_video8" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — initial design"><source src="prototype/race1_pillars.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video9" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — optimized (136/154 escaped)"><source src="prototype/race_pillars_winner_8.mp4"></video></div>
+</section>
+<section id="maze-self-generated-gradient" class="level3">
+<h3 class="anchored" data-anchor-id="maze-self-generated-gradient">Maze (self-generated gradient)</h3>
+<p>A walled labyrinth solved by the Tweedy <em>self-generated-gradient</em> mechanism: cells consume a diffusing attractant, so dead ends deplete and cannot refill while through-routes stay replenished — the colony effectively “sees around corners”. The optimizer drives the consumption rate, diffusion, and motility into the band where this works.</p>
+<div class="quarto-video"><video id="video_shortcode_videojs_video10" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — initial design"><source src="prototype/race2_maze.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video11" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — optimized (150/160 solved)"><source src="prototype/race_maze_hard_winner_5.mp4"></video></div>
 
 
 </section>
@@ -1032,6 +1053,10 @@ window.Quarto = {
 <script>videojs(video_shortcode_videojs_video5);</script>
 <script>videojs(video_shortcode_videojs_video6);</script>
 <script>videojs(video_shortcode_videojs_video7);</script>
+<script>videojs(video_shortcode_videojs_video8);</script>
+<script>videojs(video_shortcode_videojs_video9);</script>
+<script>videojs(video_shortcode_videojs_video10);</script>
+<script>videojs(video_shortcode_videojs_video11);</script>
 
 
 
