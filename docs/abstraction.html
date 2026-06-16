@@ -324,7 +324,10 @@ window.Quarto = {
    
   <ul>
   <li><a href="#two-entities-sets-and-fields" id="toc-two-entities-sets-and-fields" class="nav-link active" data-scroll-target="#two-entities-sets-and-fields">Two entities: sets and fields</a></li>
-  <li><a href="#four-operators" id="toc-four-operators" class="nav-link" data-scroll-target="#four-operators">Four operators</a></li>
+  <li><a href="#operators" id="toc-operators" class="nav-link" data-scroll-target="#operators">Operators</a>
+  <ul class="collapse">
+  <li><a href="#differentiating-division-and-death" id="toc-differentiating-division-and-death" class="nav-link" data-scroll-target="#differentiating-division-and-death">Differentiating division and death</a></li>
+  </ul></li>
   <li><a href="#dynamics-a-schedule" id="toc-dynamics-a-schedule" class="nav-link" data-scroll-target="#dynamics-a-schedule">Dynamics: a schedule</a></li>
   <li><a href="#glossary" id="toc-glossary" class="nav-link" data-scroll-target="#glossary">Glossary</a></li>
   </ul>
@@ -370,9 +373,9 @@ window.Quarto = {
 </div>
 <p>A <strong>field</strong> <span class="math inline">\(f:\Omega\to\mathbb{R}^q\)</span> is a continuous quantity defined on its own grid — morphogen concentration, pressure, substrate stiffness. Fields are <em>not</em> part of the containment hierarchy: they neither contain nor are contained by cells. Instead, each field is bound to exactly one set level through an <strong>exchange</strong> relation (particle–grid transfer, cell sampling, or population-level secretion and sensing); these couplings are the operators below.</p>
 </section>
-<section id="four-operators" class="level2">
-<h2 class="anchored" data-anchor-id="four-operators">Four operators</h2>
-<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> returning a time-derivative contribution, dispatched by the relation it acts on. We use four kinds, one per relation the container admits:</p>
+<section id="operators" class="level2">
+<h2 class="anchored" data-anchor-id="operators">Operators</h2>
+<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> returning a time-derivative contribution, dispatched by the relation it acts on. Four operators move <em>state</em> along a fixed structure, one per relation the container admits, and two <em>structural</em> operators change a set’s membership. The four state operators:</p>
 <p><span class="math display">\[
 \begin{aligned}
 \textbf{Lateral}\quad   &amp; \mathcal{O}_E,\ E\subseteq S_k\times S_k
@@ -390,13 +393,25 @@ window.Quarto = {
 <p><strong>Aggregate <span class="math inline">\(\textstyle\sum_\pi\)</span> (up).</strong> Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.</p>
 <p><strong>Broadcast <span class="math inline">\(\pi^{*}\)</span> (down).</strong> The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map <span class="math inline">\(\pi\)</span>.</p>
 <p><strong>Exchange <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span>.</strong> Couples a set to a field: scatter <span class="math inline">\(\mathcal{S}\)</span> deposits/secretes object state into the field, gather <span class="math inline">\(\mathcal{G}\)</span> samples/senses the field back onto the objects. The relation is bipartite (objects <span class="math inline">\(\leftrightarrow\)</span> grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.</p>
+<p><strong>Two structural operators: Divide and Die.</strong> The four above move <em>state</em> while the sets, edges, and maps stay fixed. Living matter also rewrites its own structure: cells divide and die, so the cardinality <span class="math inline">\(|S_k|\)</span> itself grows and shrinks. Two operators do exactly this — <strong>Divide</strong> <span class="math inline">\(\mathcal{B}: x \mapsto
+\{x',x''\}\)</span> (proliferation) and <strong>Die</strong> <span class="math inline">\(\mathcal{D}: x \mapsto \varnothing\)</span> (apoptosis / efflux) — the only operators that change a set’s cardinality. For a <em>living</em> system they are as primordial as the other four; everything else assumes the cells it acts on already exist.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption>The four operators. <em>Lateral</em> acts within a set; <em>Aggregate</em> and <em>Broadcast</em> move across containment <span class="math inline">\(\pi\)</span>; <em>Exchange</em> scatters (<span class="math inline">\(\mathcal{S}\)</span>) to and gathers (<span class="math inline">\(\mathcal{G}\)</span>) from a field. P2G/G2P (mechanics) and the metabolite–reaction graph are both Exchange.</figcaption>
+<figcaption>The six operators. The first four move state along a fixed structure; <em>Divide</em> and <em>Die</em> are structural — they change a set’s membership (cell division and death), carried on a fixed buffer by a per-element occupancy mass <span class="math inline">\(w\)</span>.</figcaption>
 </figure>
 </div>
-<p>Sets, fields, and these four operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to signalling is some composition of Lateral, Aggregate, Broadcast, and Exchange over a hierarchy of sets and fields.</p>
+<section id="differentiating-division-and-death" class="level3">
+<h3 class="anchored" data-anchor-id="differentiating-division-and-death">Differentiating division and death</h3>
+<p>Changing <span class="math inline">\(|S_k|\)</span> is the one move that resists automatic differentiation: it alters a tensor’s shape, and <em>“does this cell divide?”</em> is a discrete event with no useful gradient. Plexus keeps differentiable with a <strong>continuous-occupancy</strong> formulation. Rather than resize, hold a fixed buffer of <span class="math inline">\(N_{\max}\)</span> slots and give every element a <strong>mass</strong> <span class="math inline">\(w_i\in[0,1]\)</span>:</p>
+<ul>
+<li><strong>Die</strong> decays <span class="math inline">\(w_i\to 0\)</span> — the slot goes dormant, not deleted.</li>
+<li><strong>Divide</strong> activates a dormant slot, copies the mother’s state with a small perturbation, and splits the mass <span class="math inline">\(w\to(\tfrac{w}{2},\tfrac{w}{2})\)</span>.</li>
+</ul>
+<p><em>Every operator then honours <span class="math inline">\(w\)</span></em>: Aggregate becomes a <strong>mass-weighted</strong> reduction <span class="math inline">\(\left(\sum_i w_i x_i\right)/\sum_i w_i\)</span>, Lateral weights each message by <span class="math inline">\(w_j\)</span>, and so on — so the boolean selector mask is just the <span class="math inline">\(\{0,1\}\)</span> special case of <span class="math inline">\(w\)</span>. The trajectory between events is now smooth in <span class="math inline">\(w\)</span>, so gradients flow on a fixed-shape tensor (and <code>torch.compile</code> still applies).</p>
+<p>The one genuinely non-differentiable part — the integer decision of <em>when</em> to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division <em>policy</em>; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death <em>rates</em>; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the <em>use both</em> recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.</p>
+<p>Sets, fields, and these six operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields.</p>
+</section>
 </section>
 <section id="dynamics-a-schedule" class="level2">
 <h2 class="anchored" data-anchor-id="dynamics-a-schedule">Dynamics: a schedule</h2>
@@ -491,12 +506,30 @@ window.Quarto = {
 <td><code>Exchange</code></td>
 </tr>
 <tr class="even">
+<td>make an element</td>
+<td>structural: division</td>
+<td><span class="math inline">\(\mathcal{B}:x\!\mapsto\!\{x',x''\}\)</span></td>
+<td><code>Divide</code></td>
+</tr>
+<tr class="odd">
+<td>remove an element</td>
+<td>structural: death</td>
+<td><span class="math inline">\(\mathcal{D}:x\!\mapsto\!\varnothing\)</span></td>
+<td><code>Die</code></td>
+</tr>
+<tr class="even">
+<td>per-element occupancy</td>
+<td>mass</td>
+<td><span class="math inline">\(w_i\in[0,1]\)</span></td>
+<td><code>Level.mass</code></td>
+</tr>
+<tr class="odd">
 <td>the container</td>
 <td>hierarchy</td>
 <td><span class="math inline">\((S_\bullet,F_\bullet,\pi_\bullet)\)</span></td>
 <td><code>Hierarchy</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the model</td>
 <td>composition of ops</td>
 <td><span class="math inline">\(\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1\)</span></td>

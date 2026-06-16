@@ -39,5 +39,17 @@
   \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{$\mathcal{G}$}(o2);
 \end{scope}
 \node[below=1mm of E,align=center]{\textbf{Exchange}\\$\mathcal{S},\mathcal{G}$};
+\begin{scope}[shift={(128mm,0)},local bounding box=DV]
+  \node[n] (m){};
+  \node[n,below=6mm of m,xshift=-5.5mm](g3){}; \node[n,below=6mm of m,xshift=5.5mm](g4){};
+  \draw[a] (m)--(g3); \draw[a] (m)--(g4);
+\end{scope}
+\node[below=1mm of DV,align=center]{\textbf{Divide}\\$w\!\to\!\tfrac{w}{2},\tfrac{w}{2}$};
+\begin{scope}[shift={(158mm,0)},local bounding box=DE]
+  \node[n,densely dashed,fill=cset!3] (z){};
+  \node[right=8mm of z] (nul) {$\varnothing$};
+  \draw[a] (z)--(nul);
+\end{scope}
+\node[below=1mm of DE,align=center]{\textbf{Die}\\$w\!\to\!0$};
 \end{tikzpicture}
 \end{document}

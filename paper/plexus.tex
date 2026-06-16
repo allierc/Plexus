@@ -108,12 +108,14 @@ metabolites.}
 \label{fig:hier}
 \end{figure}
 
-\section{Four operators}
+\section{Operators}
 \label{sec:operators}
 
 A GNN is an \textbf{operator} $\mathcal{O}$ returning a time-derivative
-contribution, dispatched by the relation it acts on. We use four kinds, one per
-relation the container admits (Fig.~\ref{fig:ops}):
+contribution, dispatched by the relation it acts on. Four operators move
+\emph{state} along a fixed structure, one per relation the container admits, and
+two \emph{structural} operators change a set's membership (Fig.~\ref{fig:ops}).
+The four state operators:
 \begin{align*}
 \textbf{Lateral}\quad   & \mathcal{O}_E,\ E\subseteq S_k\times S_k
   &&\text{(ODE interaction $+$ graph Laplacian)}\\
@@ -155,6 +157,16 @@ samples/senses the field back onto the objects. The relation is bipartite
 (objects~$\leftrightarrow$~grid); it is exactly the MPM particle--grid transfer
 (P2G/G2P) and chemotactic secretion/sensing.
 
+\paragraph{Two structural operators: Divide and Die.} The four above move
+\emph{state} while the sets, edges, and maps stay fixed. Living matter also
+rewrites its own structure: cells divide and die, so the cardinality $|S_k|$
+itself grows and shrinks. We add two operators for exactly this ---
+\textbf{Divide} $\mathcal{B}: x \mapsto \{x',x''\}$ (proliferation) and
+\textbf{Die} $\mathcal{D}: x \mapsto \varnothing$ (apoptosis / efflux) --- the
+only operators that change a set's cardinality. For a \emph{living} system they
+are as primordial as the other four; everything else assumes the cells it acts
+on already exist.
+
 \begin{figure}[h]
 \centering
 \begin{tikzpicture}[
@@ -188,13 +200,51 @@ samples/senses the field back onto the objects. The relation is bipartite
   \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{$\mathcal{G}$}(o2);
 \end{scope}
 \node[below=1mm of E,align=center]{\textbf{Exchange}\\$\mathcal{S},\mathcal{G}$};
+\begin{scope}[shift={(128mm,0)},local bounding box=DV]
+  \node[n] (m){};
+  \node[n,below=6mm of m,xshift=-5.5mm](g3){}; \node[n,below=6mm of m,xshift=5.5mm](g4){};
+  \draw[a] (m)--(g3); \draw[a] (m)--(g4);
+\end{scope}
+\node[below=1mm of DV,align=center]{\textbf{Divide}\\$w\!\to\!\tfrac{w}{2},\tfrac{w}{2}$};
+\begin{scope}[shift={(158mm,0)},local bounding box=DE]
+  \node[n,densely dashed,fill=cset!3] (z){};
+  \node[right=8mm of z] (nul) {$\varnothing$};
+  \draw[a] (z)--(nul);
+\end{scope}
+\node[below=1mm of DE,align=center]{\textbf{Die}\\$w\!\to\!0$};
 \end{tikzpicture}
-\caption{The four operators. \emph{Lateral} acts within a set; \emph{Aggregate}
-and \emph{Broadcast} move across containment $\pi$; \emph{Exchange} scatters
-($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field. P2G/G2P (mechanics)
-and the metabolite--reaction graph are both Exchange.}
+\caption{The six operators. The first four move state along a fixed structure:
+\emph{Lateral} acts within a set; \emph{Aggregate} and \emph{Broadcast} move
+across containment $\pi$; \emph{Exchange} scatters ($\mathcal{S}$) to and gathers
+($\mathcal{G}$) from a field (P2G/G2P and the metabolite--reaction graph are both
+Exchange). \emph{Divide} and \emph{Die} are \emph{structural}: they change a
+set's membership --- cell division and death --- carried on a fixed buffer by a
+per-element occupancy mass $w$.}
 \label{fig:ops}
 \end{figure}
+
+\paragraph{Differentiating division and death.} Changing $|S_k|$ is the one move
+that resists automatic differentiation: it alters a tensor's shape, and ``does
+this cell divide?'' is a discrete event with no useful gradient. We keep the
+framework differentiable with a \textbf{continuous-occupancy} formulation. Rather
+than resize, we hold a fixed buffer of $N_{\max}$ slots and give every element a
+\emph{mass} $w_i\in[0,1]$: \code{Die} decays $w_i\!\to\!0$ (the slot goes
+dormant, not deleted); \code{Divide} activates a dormant slot, copies the
+mother's state with a small perturbation, and splits the mass
+$w\!\to\!(\tfrac{w}{2},\tfrac{w}{2})$. \emph{Every operator then honours $w$}:
+Aggregate becomes a \emph{mass-weighted} reduction
+$\big(\sum_i w_i x_i\big)/\sum_i w_i$, Lateral weights each message by $w_j$, and
+so on --- so the boolean selector mask of Section~\ref{sec:language} is just the
+$\{0,1\}$ special case of $w$. The trajectory between events is now smooth in
+$w$, so gradients flow on a fixed-shape tensor (and \code{torch.compile} still
+applies). The one genuinely non-differentiable part --- the integer decision of
+\emph{when} to divide or die --- is handled separately: a straight-through or
+Gumbel estimator to learn a division \emph{policy}, a score-function (REINFORCE)
+gradient for an expected objective with respect to division/death \emph{rates},
+or black-box search (UCB/CEM) when the objective is itself discrete (final count,
+fraction escaped). This is the \emph{use both} recipe of Part~III applied to
+structure: gradients for the continuous interior, black-box for the discrete
+choices.
 
 \section{Dynamics: a schedule}
 \label{sec:schedule}
@@ -237,6 +287,9 @@ within-set op            & lateral              & $\mathcal{O}_E$             & 
 up op                    & reduction over fibres& $\sum_\pi$                  & \code{Aggregate} \\
 down op                  & lift                 & $\pi^{*}$                   & \code{Broadcast} \\
 set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \code{Exchange} \\
+make an element          & structural: division & $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ & \code{Divide} \\
+remove an element        & structural: death    & $\mathcal{D}:x\!\mapsto\!\varnothing$ & \code{Die} \\
+per-element occupancy     & mass                 & $w_i\in[0,1]$               & \code{Level.mass} \\
 the container            & hierarchy            & $(S_\bullet,F_\bullet,\pi_\bullet)$ & \code{Hierarchy} \\
 the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ & \code{Schedule} \\
 \bottomrule
@@ -440,6 +493,8 @@ simulation keeps working. The prototype catalog:
 \code{graze}    & exchange  & cell$\leftarrow$field & consume a field (capped at stock); harvest objective \\
 \code{trail}    & exchange  & cell        & Physarum 3-sensor pheromone steering (ants) \\
 \code{finish}   & lateral   & cell        & freeze \& count cells past an exit line \code{x} \\
+\code{divide}   & structural& cell        & cell division: split occupancy mass $w$ into a new slot \\
+\code{die}      & structural& cell        & cell death: occupancy mass $w\!\to\!0$ (apoptosis) \\
 \code{death}    & lateral   & cell        & remove \& count cells past an exit line (efflux sink) \\
 \code{aggregate}& builtin   & ---         & cell pos/vel $=$ mean of its particles ($\uparrow$) \\
 \code{<field>.diffuse} & builtin & ---    & field self-update (Laplacian $+$ decay) \\

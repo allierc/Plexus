@@ -35,11 +35,12 @@ cells. Instead, each field is bound to exactly one set level through an
 **exchange** relation (particle–grid transfer, cell sampling, or population-level
 secretion and sensing); these couplings are the operators below.
 
-## Four operators
+## Operators
 
 A GNN is an **operator** $\mathcal{O}$ returning a time-derivative contribution,
-dispatched by the relation it acts on. We use four kinds, one per relation the
-container admits:
+dispatched by the relation it acts on. Four operators move *state* along a fixed
+structure, one per relation the container admits, and two *structural* operators
+change a set's membership. The four state operators:
 
 $$
 \begin{aligned}
@@ -84,12 +85,47 @@ samples/senses the field back onto the objects. The relation is bipartite
 (objects $\leftrightarrow$ grid); it is exactly the MPM particle–grid transfer
 (P2G/G2P) and chemotactic secretion/sensing.
 
-![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* scatters ($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field. P2G/G2P (mechanics) and the metabolite–reaction graph are both Exchange.](figures/fig_ops.png){width=100%}
+**Two structural operators: Divide and Die.** The four above move *state* while
+the sets, edges, and maps stay fixed. Living matter also rewrites its own
+structure: cells divide and die, so the cardinality $|S_k|$ itself grows and
+shrinks. Two operators do exactly this — **Divide** $\mathcal{B}: x \mapsto
+\{x',x''\}$ (proliferation) and **Die** $\mathcal{D}: x \mapsto \varnothing$
+(apoptosis / efflux) — the only operators that change a set's cardinality. For a
+*living* system they are as primordial as the other four; everything else
+assumes the cells it acts on already exist.
 
-Sets, fields, and these four operators are the entire vocabulary. The wager of
+![The six operators. The first four move state along a fixed structure; *Divide* and *Die* are structural — they change a set's membership (cell division and death), carried on a fixed buffer by a per-element occupancy mass $w$.](figures/fig_ops.png){width=100%}
+
+### Differentiating division and death
+
+Changing $|S_k|$ is the one move that resists automatic differentiation: it
+alters a tensor's shape, and *"does this cell divide?"* is a discrete event with
+no useful gradient. Plexus keeps differentiable with a
+**continuous-occupancy** formulation. Rather than resize, hold a fixed buffer of
+$N_{\max}$ slots and give every element a **mass** $w_i\in[0,1]$:
+
+- **Die** decays $w_i\to 0$ — the slot goes dormant, not deleted.
+- **Divide** activates a dormant slot, copies the mother's state with a small
+  perturbation, and splits the mass $w\to(\tfrac{w}{2},\tfrac{w}{2})$.
+
+*Every operator then honours $w$*: Aggregate becomes a **mass-weighted** reduction
+$\left(\sum_i w_i x_i\right)/\sum_i w_i$, Lateral weights each message by $w_j$,
+and so on — so the boolean selector mask is just the $\{0,1\}$ special case of
+$w$. The trajectory between events is now smooth in $w$, so gradients flow on a
+fixed-shape tensor (and `torch.compile` still applies).
+
+The one genuinely non-differentiable part — the integer decision of *when* to
+divide or die — is handled separately: a straight-through or Gumbel estimator to
+learn a division *policy*; a score-function (REINFORCE) gradient for an expected
+objective w.r.t. division/death *rates*; or black-box search (UCB/CEM) when the
+objective is itself discrete (final count, fraction escaped). This is the *use
+both* recipe applied to structure: gradients for the continuous interior,
+black-box for the discrete choices.
+
+Sets, fields, and these six operators are the entire vocabulary. The wager of
 Plexus is that this is enough **to describe a complex living system** — that
-everything from mechanics to morphogenesis to signalling is some composition of
-Lateral, Aggregate, Broadcast, and Exchange over a hierarchy of sets and fields.
+everything from mechanics to morphogenesis to division and death is some
+composition of them over a hierarchy of sets and fields.
 
 ## Dynamics: a schedule
 
@@ -132,5 +168,8 @@ code.
 | up op | reduction over fibres | $\sum_\pi$ | `Aggregate` |
 | down op | lift | $\pi^{*}$ | `Broadcast` |
 | set $\leftrightarrow$ field op | transfer | $\mathcal{S},\mathcal{G}$ | `Exchange` |
+| make an element | structural: division | $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ | `Divide` |
+| remove an element | structural: death | $\mathcal{D}:x\!\mapsto\!\varnothing$ | `Die` |
+| per-element occupancy | mass | $w_i\in[0,1]$ | `Level.mass` |
 | the container | hierarchy | $(S_\bullet,F_\bullet,\pi_\bullet)$ | `Hierarchy` |
 | the model | composition of ops | $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ | `Schedule` |
