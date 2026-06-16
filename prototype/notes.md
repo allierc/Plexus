@@ -269,6 +269,31 @@ General principle reinforced: **name operators after the relation/dynamics
 (cohere, spring, rewire), never after the biological entity (nucleus, cortex).**
 Entities are sets/roles + containment; operators are the generic dynamics on them.
 
+### v9–v10: grounding division in real mitosis
+
+- **v9** = the winners combined on the **droplet** mechanic (cleanest of all
+  versions): cytoplasm + rigid nucleus role + a **membrane made of particles**
+  (`ring` rewire + `spring` lateral) + gradual `mitosis`. Validated by montage to
+  beat the MPM line (v1/v2/v8, which facet/scatter/blow-out) and match/exceed
+  v6/v7 while using a *genuine* particle membrane.
+- **v10** = v9 with the missing biology. Real animal-cell division is: mitotic
+  rounding → **nucleus splits to two poles (anaphase)** → an **equatorial
+  cleavage furrow** (contractile ring perpendicular to the spindle) pinches the
+  cell in two → two daughters. My `mitosis` had elongation + furrow but **no
+  nuclear separation**; added a `pole` term that drives nucleus-role particles to
+  the two poles during the division phase. Result (frame ~19): the single cell
+  shows two dark nuclei at opposite poles with the membrane ring pinching into a
+  figure-8 between them — textbook anaphase/cytokinesis.
+
+References used to ground the sequence:
+[Phases of mitosis (Khan Academy)](https://www.khanacademy.org/science/ap-biology/cell-communication-and-cell-cycle/cell-cycle/a/phases-of-mitosis),
+[Cleavage furrow formation & ingression (J Cell Sci)](https://journals.biologists.com/jcs/article/118/8/1549/28714/Cleavage-furrow-formation-and-ingression-during).
+
+Framework note: all of this stayed pure spec + registered operators. `mitosis`
+is now a faithful staged process (elongate + nuclear poles + furrow) yet still a
+single registered structural operator that emits per-particle deltas and only
+relabels membership at completion.
+
 `cohere` now takes an optional `role` (cohere to the sub-set centroid); `ring`
 (rewire) + `spring` (lateral) added; `nucleus` operator removed. MPM build assigns
 roles by radius (nucleus innermost, membrane outermost). v8 is rough (MPM edge
