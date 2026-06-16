@@ -1,0 +1,30 @@
+# B / v24: crisp single 3-layer MPM cell. v22 + a light whole-cell `cohere`
+# (surface containment) so the membrane edge stays tight instead of spreading.
+# This is the MPM showcase: rigid nucleus core, soft cytoplasm, stiff membrane.
+name: divide_mpm_v24
+seed: 0
+n_frames: 500
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 2
+    types: {soft: {fraction: 1.0, youngs: 40}}
+  particle:
+    parent: cell
+    per_parent: 1200
+    buffer: 5200
+    radius: 0.10
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.22, youngs: 320}
+      cyto:     {fraction: 0.53, youngs: 25}
+      membrane: {fraction: 0.25, youngs: 900}
+fields: {}
+operators:
+  - {op: skin, at: particle, nucleus: 0.22, membrane: 0.25}
+  - {op: cohere, at: particle, k: 22.0}          # light whole-cell containment -> tight surface
+  - {op: duplicate, at: particle, rate: 6, r0: 0.012}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 1.8, vmax: 5.0}
+schedule: [aggregate, skin, cohere, duplicate, mpm]

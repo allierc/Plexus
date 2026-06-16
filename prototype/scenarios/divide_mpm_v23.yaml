@@ -1,0 +1,30 @@
+# B / v23: a single 3-layer MPM cell dividing into TWO, with a strong mitosis push
+# so the daughters separate far enough to NOT re-fuse on the grid (the failure mode
+# of the morula attempts). cell buffer 2 = at most one division.
+name: divide_mpm_v23
+seed: 0
+n_frames: 560
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 2
+    types: {soft: {fraction: 1.0, youngs: 40}}
+  particle:
+    parent: cell
+    per_parent: 1400
+    buffer: 4200
+    radius: 0.10
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.22, youngs: 300}
+      cyto:     {fraction: 0.53, youngs: 25}
+      membrane: {fraction: 0.25, youngs: 800}
+fields: {}
+operators:
+  - {op: skin, at: particle, nucleus: 0.22, membrane: 0.25}
+  - {op: mitosis, at: cell, ratio: 1.6, frames: 40, elong: 1.2, furrow: 8.0, furrow_w: 0.02, pole: 2.0, round_frames: 8, round_k: 6.0}
+  - {op: duplicate, at: particle, rate: 6, r0: 0.012}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 300, drag: 1.5, vmax: 6.0}
+schedule: [aggregate, skin, mitosis, duplicate, mpm]

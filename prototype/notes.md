@@ -294,6 +294,34 @@ is now a faithful staged process (elongate + nuclear poles + furrow) yet still a
 single registered structural operator that emits per-particle deltas and only
 relabels membership at completion.
 
+### v11–v25: render cleanup, 3-layer cells, and the MPM-vs-droplet split
+
+Render: removed the drawn membrane circle; dots auto-shrink with density. New
+generic operators (all named after dynamics, not entities): `shell` (radial
+confinement), `skin` (rewire: re-tag inner=nucleus / outer=membrane by radius
+each tick → **uniform membrane + nucleus by construction**, and re-applies
+per-layer stiffness for MPM), `tissue` (inter-cell adhesion, weak), plus
+`mitosis` gained mitotic **rounding** + anaphase **nuclear poles**.
+
+Two regimes, each pushed to its best:
+
+- **Track A — droplet (cohere + repulse) → division works.** `v18` = the polished
+  result: a packed **morula** of 8 distinct 3-layer cells (rigid nucleus core,
+  cytoplasm, uniform membrane skin via `skin`), weak `tissue` packing, mitotic
+  rounding. Crisp; daughters stay distinct.
+- **Track B — MPM unified body → single cell shines, division fuses.** `v21/v22/v24`
+  = a single 3-layer MPM cell from the **layer-ball recipe** (elastic core, soft
+  cytoplasm, stiff membrane skin): a superb dense **rigid nucleus core**, but the
+  membrane edge stays diffuse (a growing MPM body has no surface tension) and any
+  division (`v15`, `v23`) **re-fuses the daughters on the shared grid** even with
+  a strong push.
+
+**Validated conclusion (montages each step):** for *division*, the droplet is the
+only mechanic that keeps cells distinct (A/`v18`); MPM is the right model for a
+*single* cell's mechanics (B/`v24`, and the bounce/layer balls) but single-material
+MPM cannot separate dividing daughters. Best dividing cell = `divide_cell_v18`;
+best single-cell mechanics = `divide_mpm_v24`.
+
 `cohere` now takes an optional `role` (cohere to the sub-set centroid); `ring`
 (rewire) + `spring` (lateral) added; `nucleus` operator removed. MPM build assigns
 roles by radius (nucleus innermost, membrane outermost). v8 is rough (MPM edge
