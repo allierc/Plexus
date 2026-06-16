@@ -117,14 +117,15 @@ def run(sc, device=DEV):
 
 
 if __name__ == "__main__":
-    import warnings; warnings.filterwarnings("ignore")
+    import sys, warnings; warnings.filterwarnings("ignore")
     from divide_cell import render             # reuse the follow-cam + membrane render
 
-    sc = load(os.path.join(HERE, "scenarios", "divide_cell.yaml"))
+    spec = sys.argv[1] if len(sys.argv) > 1 else "divide_cell"
+    sc = load(os.path.join(HERE, "scenarios", spec + ".yaml"))
     print(f"[1/2] running spec '{sc.name}' through the framework engine ...", flush=True)
     H, hist = run(sc)
     last = hist[-1]
     print(f"      final: {len(last[0])} particles, {last[3]} cells over {len(hist)} frames", flush=True)
-    out = os.path.join(HERE, "divide_cell_framework.gif")
-    render(hist, out)
+    out = os.path.join(HERE, sc.name + ".gif")
+    render(hist, out, title=sc.name)
     print(f"[2/2] wrote {out}", flush=True)

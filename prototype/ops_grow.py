@@ -102,6 +102,32 @@ class Duplicate(Operator):
         return {}
 
 
+@register_operator("tension", level="particle", kind="lateral")
+class Tension(Lateral):
+    """Cortical surface tension: a particle on the cell BOUNDARY (few same-cell
+    neighbours) is pulled inward toward the cell centroid; interior particles
+    (full neighbourhood) feel nothing. Minimising the exposed surface rounds the
+    cell -- the real force that makes a soft cell spherical, here fighting MPM's
+    elastic shape-memory so divided daughters round up instead of staying wedges."""
+    REQUIRES_PARAMS = ["strength", "radius"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.s = float(params["strength"]); self.r = float(params["radius"])
+        self.nfull = float(params.get("nfull", 12.0))
+
+    def forward(self, H, mask=None):
+        part = H.level("particle"); cell = H.level("cell"); w = H.p_w
+        pos = part.state[:, :2]
+        diff = pos[:, None, :] - pos[None, :, :]
+        d = torch.sqrt((diff * diff).sum(2) + 1e-9)
+        same = (part.parent[:, None] == part.parent[None, :]).float()
+        n = (((d < self.r) & (d > 1e-5)).float() * same * w[None, :]).sum(1)
+        bw = (1.0 - n / self.nfull).clamp(0.0, 1.0)              # boundary weight
+        cen = cell.state[:, :2][part.parent]
+        return {"particle": self.s * bw[:, None] * (cen - pos) * w[:, None]}
+
+
 @register_operator("tissue", level="cell", kind="lateral")
 class Tissue(Lateral):
     """Inter-cell adhesion: each active cell is pulled toward the centroids of its
@@ -124,6 +150,65 @@ class Tissue(Lateral):
         cnt = W.sum(1).clamp(min=1.0)[:, None]
         accel = self.s * (W[..., None] * diff).sum(1) / cnt
         return {"cell": accel * act[:, None]}
+
+
+@register_operator("mitosis", level="cell", kind="structural")
+class Mitosis(Operator):
+    """Gradual, realistic division. When a cell's mass doubles it enters mitosis:
+    over `frames` ticks it (i) ELONGATES along its principal axis (the two halves
+    drift apart) and (ii) forms a CLEAVAGE FURROW (particles near the equator are
+    pulled in perpendicular to the axis, pinching the waist); at the end the two
+    halves become separate cells. Returns a per-particle accel (integrated by the
+    engine) and relabels membership on completion."""
+    REQUIRES_PARAMS = ["ratio", "frames"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.ratio = float(params["ratio"]); self.frames = int(params["frames"])
+        self.elong = float(params.get("elong", 0.15))
+        self.furrow = float(params.get("furrow", 3.0))
+        self.furrow_w = float(params.get("furrow_w", 0.018))
+
+    def forward(self, H, mask=None):
+        part = H.level("particle"); cell = H.level("cell")
+        w = H.p_w; par = part.parent; dev = w.device
+        if not hasattr(H, "cell_phase"):
+            H.cell_phase = torch.zeros(cell.n, device=dev)
+            H.cell_axis = torch.zeros(cell.n, 2, device=dev)
+        accel = torch.zeros(part.n, 2, device=dev)
+        for c in [c for c in range(cell.n) if H.c_active[c]]:
+            mem = (par == c) & (w > EPS)
+            mc = float(w[mem].sum())
+            ph = float(H.cell_phase[c])
+            if ph == 0.0 and mc >= self.ratio * H.cell_birth[c]:
+                idx = mem.nonzero(as_tuple=True)[0]
+                p = part.state[idx, :2]; cen = p.mean(0)
+                cov = ((p - cen).t() @ (p - cen)) / p.shape[0]
+                H.cell_axis[c] = torch.linalg.eigh(cov)[1][:, -1]
+                H.cell_phase[c] = 1.0; ph = 1.0
+            if ph > 0.0:
+                idx = mem.nonzero(as_tuple=True)[0]
+                axis = H.cell_axis[c]
+                p = part.state[idx, :2]; cen = p.mean(0)
+                rel = p - cen
+                proj = rel @ axis                                   # along the spindle
+                perp = rel - proj[:, None] * axis                   # equatorial offset
+                s = torch.sign(proj)
+                a = self.elong * s[:, None] * axis[None, :]         # elongate: halves apart
+                eq = proj.abs() < self.furrow_w                     # cleavage furrow at the waist
+                a = a - self.furrow * eq[:, None].float() * perp    # pinch inward
+                accel[idx] += a
+                H.cell_phase[c] = ph + 1.0
+                if ph + 1.0 >= self.frames:                         # complete the split
+                    if H.c_active.sum() < cell.n:
+                        newid = int((~H.c_active).nonzero(as_tuple=True)[0][0])
+                        side = proj > 0
+                        par[idx[side]] = newid; H.c_active[newid] = True
+                        m_side = float(w[idx[side]].sum())
+                        H.cell_birth[c] = mc - m_side; H.cell_birth[newid] = m_side
+                        H.cell_phase[newid] = 0.0
+                    H.cell_phase[c] = 0.0
+        return {"particle": accel}
 
 
 @register_operator("divide", level="cell", kind="structural")

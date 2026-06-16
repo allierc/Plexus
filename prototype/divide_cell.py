@@ -156,7 +156,7 @@ def run(N0, N_max, rate, ticks, record_every, k_coh, grad=False):
 # --------------------------------------------------------------------------- #
 #  render
 # --------------------------------------------------------------------------- #
-def render(hist, path, fps=20):
+def render(hist, path, fps=20, title="divide_cell"):
     import numpy as np
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -196,7 +196,7 @@ def render(hist, path, fps=20):
         sc.set_sizes(7 * ww + 1)
         cx, cy = centers[i]; s = spans[i]
         ax.set_xlim(cx - s, cx + s); ax.set_ylim(cy - s, cy + s)
-        tt.set_text(f"divide_cell   frame {i}/{len(hist)-1}   |   {len(p)} particles, {len(ids)} cells")
+        tt.set_text(f"{title}   frame {i}/{len(hist)-1}   |   {len(p)} particles, {len(ids)} cells")
         return [sc, tt] + membranes
 
     FuncAnimation(fig, upd, frames=len(hist), blit=False).save(

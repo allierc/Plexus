@@ -183,3 +183,37 @@ centroid of (0,0), so a naive all-cells adhesion would pull the colony toward th
 origin. (The stock `adhesion` op isn't occupancy-aware, hence a new operator.)
 This is the general lesson: **once sets have occupancy, every set-level operator
 must mask on the active set.**
+
+## Iterating toward realistic division (indexed specs_X + _X.gif)
+
+Goal: round, realistic dividing cells, **only** via the framework (spec + registered
+ops + engine). Each attempt is a named spec → same-named gif.
+
+| # | spec | mechanics | result |
+|---|------|-----------|--------|
+| v1 | `divide_mpm_v1` | MPM elastic + cohere + tissue | **wedge/triangular** cells |
+| v2 | `divide_mpm_v2` | + `tension` (surface tension), softer MPM | rounder but **loose/scattered**, still faceted |
+| v3 | `divide_droplet_v3` | droplet: cohere + repulse (no MPM) | **clean round** uniform cells |
+| v4 | `divide_droplet_v4` | droplet + `mitosis` (gradual) | **round + realistic division** ✅ |
+
+**The core finding.** Elastic MPM is the *wrong* mechanic for round cells: its
+fixed-corotated stress has **shape-memory**, so the flat cut left by a division
+freezes into a wedge, and no rounding force fully overcomes it (v1, v2). A
+**surface-tension droplet** — `cohere` (pull to centroid) balanced by `repulse`
+(incompressibility) — has no shape memory and relaxes to a circle every time (v3).
+A real cell is closer to a tense fluid droplet than an elastic solid, so this is
+also the physically right call.
+
+**Two operators added, both rational:**
+- `tension` (cortical surface tension: boundary particles pulled inward → minimise
+  perimeter → round). Tried on MPM (v2); the droplet's `cohere`+`repulse` already
+  achieves the same more cleanly, so v3/v4 don't need it.
+- `mitosis` (gradual division): on doubling, the cell **elongates** along its
+  principal axis and forms a **cleavage furrow** (equatorial particles pulled in
+  perpendicular) over `frames` ticks, then splits — replacing the instant `divide`
+  relabel with visible, realistic mitosis. **v4 is the deliverable.**
+
+Lesson for the taxonomy: a structural operator can be **gradual** — it carries a
+per-cell phase and emits ordinary per-particle deltas during the transition, only
+changing membership at completion. So "structural" and "returns a delta" aren't
+exclusive; Divide/Die can have dynamics.
