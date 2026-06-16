@@ -105,9 +105,17 @@ def render(a, sc, path, fps=20, x_finish=None, start_box=None, wide=False):
     ax.set_aspect("equal")                                    # undistorted: circles stay round
     imF = ax.imshow(fld[0].T, origin="lower", extent=[0, W, 0, 1], cmap="inferno",
                     vmin=0, vmax=vmax, interpolation="bilinear", alpha=0.85)
-    if walls is not None:
-        wall_rgba = np.zeros((*walls.T.shape, 4)); wall_rgba[walls.T] = (0.42, 0.45, 0.50, 1.0)  # neat slate walls
-        ax.imshow(wall_rgba, origin="lower", extent=[0, W, 0, 1], interpolation="nearest")
+    # draw walls/pillars as crisp VECTOR patches from the spec (no pixelated mask)
+    from matplotlib.patches import FancyBboxPatch, Circle
+    SLATE = "#6b7280"
+    for r in getattr(sc, "obstacles", []):
+        if len(r) == 3:                                       # circle pillar (cx,cy,radius)
+            ax.add_patch(Circle((r[0], r[1]), r[2], facecolor=SLATE, edgecolor="none"))
+        else:                                                 # rectangle wall, lightly rounded corners
+            x0, y0, x1, y1 = r; pad = min(0.006, (x1 - x0) / 2, (y1 - y0) / 2)
+            ax.add_patch(FancyBboxPatch((x0 + pad, y0 + pad), (x1 - x0) - 2 * pad, (y1 - y0) - 2 * pad,
+                                        boxstyle=f"round,pad={pad},rounding_size={pad}",
+                                        facecolor=SLATE, edgecolor="none", mutation_aspect=1.0))
     if is_race:
         ax.axvline(x_finish, color="#33dd55", ls=(0, (4, 4)), lw=1.0, alpha=0.7)
     sct = ax.scatter(pp[0][:, 0], pp[0][:, 1], s=2.6, c=base, edgecolors="none")

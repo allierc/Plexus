@@ -98,7 +98,7 @@ Qualitatively different collective behaviours, all produced from the *same code*
 by changing only a ~20-line specification — no new software per phenomenon.
 
 ::: {layout-ncol=2}
-{{< video prototype/sim_5.mp4 title="squish — soft cells deform under crowding and confinement" >}}
+{{< video prototype/sim_2.mp4 title="disperse — soft cells flee their own chemical, spreading apart" >}}
 
 {{< video prototype/sim_3.mp4 title="swarm — strong boids make the cells flock and move as one" >}}
 
