@@ -61,20 +61,21 @@ def build(sc, device=DEV):
     part.register_buffer("parent", parent)
     H.add_level(part); H.p_w = w
 
-    # optional particle roles (e.g. cytoplasm / nucleus). The nucleus is the
-    # innermost `fraction` of each cell's particles (radially), so it starts central.
-    H.nuc_id = None
+    # optional particle roles by radius: innermost -> nucleus, outermost -> membrane.
+    H.nuc_id = H.mem_id = None
     ptypes = ps.get("types")
     node_type = torch.zeros(Np_max, dtype=torch.long, device=device)
     if ptypes:
         names = list(ptypes.keys()); part.type_names = names
+        rr = (part.state[:n0, :2] - centre).norm(dim=1); order = rr.argsort()
         if "nucleus" in names:
             H.nuc_id = names.index("nucleus")
-            fr = float(ptypes["nucleus"]["fraction"])
-            rr = (part.state[:n0, :2] - centre).norm(dim=1)
-            k = int(fr * n0)
-            inner = rr.argsort()[:k]                            # innermost -> nucleus
-            node_type[inner] = H.nuc_id
+            kn = int(float(ptypes["nucleus"]["fraction"]) * n0)
+            node_type[order[:kn]] = H.nuc_id                   # innermost
+        if "membrane" in names:
+            H.mem_id = names.index("membrane")
+            km = int(float(ptypes["membrane"]["fraction"]) * n0)
+            node_type[order[n0 - km:]] = H.mem_id              # outermost
     part.register_buffer("node_type", node_type)
 
     H.cell_birth = [0.0] * Nc_max; H.cell_birth[0] = float(ppc)
@@ -151,5 +152,6 @@ if __name__ == "__main__":
     last = hist[-1]
     print(f"      final: {len(last[0])} particles, {last[3]} cells over {len(hist)} frames", flush=True)
     out = os.path.join(HERE, sc.name + ".gif")
-    render(hist, out, title=sc.name, nuc_id=getattr(H, "nuc_id", None))
+    render(hist, out, title=sc.name, nuc_id=getattr(H, "nuc_id", None),
+           mem_id=getattr(H, "mem_id", None))
     print(f"[2/2] wrote {out}", flush=True)
