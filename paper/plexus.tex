@@ -320,7 +320,8 @@ construct in it appears in the example of Listing~\ref{lst:agg}.
 \code{name}        & run identifier                                  & \code{name: aggregate}\\
 \code{seed}        & RNG seed --- fixes determinism                  & \code{seed: 0}\\
 \code{n\_frames}   & number of ticks to run                          & \code{n\_frames: 250}\\
-\code{obstacles}   & static walls; a boundary condition for both the MPM grid and field diffusion & \code{[[.3,0,.36,.7]]}\\
+\code{obstacles}   & static walls (rectangles or \code{[cx,cy,r]} circles); BC for both the MPM grid and field diffusion & \code{[[.3,0,.36,.7]]}\\
+\code{world}       & domain width $W$; world is $[0,W]\!\times\![0,1]$ (longitudinal if $W{>}1$) & \code{world: 4.0}\\
 \code{sets/fields/operators/schedule} & the four parts, detailed below       & ---\\
 \midrule
 \multicolumn{3}{@{}l}{\emph{Set} ($S_k$ --- an entity level / ECS entity)}\\
@@ -335,6 +336,8 @@ construct in it appears in the example of Listing~\ref{lst:agg}.
 \code{diffusion}, \code{decay} & PDE coefficients                    & \code{diffusion: 0.1}\\
 \code{couples\_to} & the one set this field exchanges with           & \code{couples\_to: cell}\\
 \code{source}      & fixed source region (imposes a gradient)        & \code{source: [.82,.82,1,1]}\\
+\code{init}        & uniform initial fill (self-generated runs)      & \code{init: 1.0}\\
+\code{navigation}  & \code{geodesic} (precomputed external gradient) or \code{dynamic} (self-generated) & \code{navigation: geodesic}\\
 \midrule
 \multicolumn{3}{@{}l}{\emph{Operator} (a system; one per list entry)}\\
 \code{op}          & which registered operator to run                & \code{op: sense}\\
@@ -427,11 +430,14 @@ simulation keeps working. The prototype catalog:
 \midrule
 \code{boids}    & lateral   & cell        & collective motion (cohesion/align/separate) \\
 \code{motility} & lateral   & cell        & active self-propulsion (wandering heading) \\
-\code{adhesion} & lateral   & cell        & type-specific cohesion $\to$ sorting \\
+\code{adhesion} & lateral   & cell        & type-specific cohesion ($+$ \code{cross}$<$0 repels $\to$ sorting) \\
 \code{mpm}      & exchange  & particle    & MLS-MPM mechanics; soft/stiff via \code{youngs} \\
-\code{secrete}  & exchange  & cell$\to$field & deposit into a field \\
+\code{secrete}  & exchange  & cell$\to$field & deposit into a field (or consume, rate$<$0) \\
 \code{sense}    & exchange  & cell$\leftarrow$field & chemotactic accel up-gradient \\
+\code{graze}    & exchange  & cell$\leftarrow$field & consume a field (capped at stock); harvest objective \\
 \code{trail}    & exchange  & cell        & Physarum 3-sensor pheromone steering (ants) \\
+\code{finish}   & lateral   & cell        & freeze \& count cells past an exit line \code{x} \\
+\code{death}    & lateral   & cell        & remove \& count cells past an exit line (efflux sink) \\
 \code{aggregate}& builtin   & ---         & cell pos/vel $=$ mean of its particles ($\uparrow$) \\
 \code{<field>.diffuse} & builtin & ---    & field self-update (Laplacian $+$ decay) \\
 \bottomrule
@@ -664,6 +670,37 @@ each a single run shown as five frames from early to late. The optimized colony 
 a far more complete and persistent foraging trail.}
 \label{fig:initwin}
 \end{figure}
+
+\section{Races: a longitudinal world, an exit boundary, and more levers}
+
+The foraging maze generalizes into a family of \emph{races}: a population starts at
+the left and must reach an exit at the right as fast as possible. Three additions to
+the language carry them, none touching the engine's generic core.
+
+\paragraph{A longitudinal world.} A declarative \code{world: W} makes the domain the
+rectangle $[0,W]\times[0,1]$ on a grid of \emph{square} cells ($n_x=\mathrm{round}(W\,n_y)$);
+$W{=}4$ gives a long left-to-right track. Obstacles may now be \textbf{circles}
+(\code{[cx,cy,r]}) as well as rectangles, so a porous field of $\sim$hundreds of round
+pillars and a real recursive-backtracker maze (genuine corridors and dead ends) are
+both just obstacle lists, reused as the one MPM/field mask as before.
+
+\paragraph{An exit (efflux) boundary.} A cell crossing the finish is handled by an
+operator: \code{finish} \emph{freezes} it at the line, while \code{death}
+\emph{removes} it (zeroing its particles' mass and parking them off-domain) so it
+disappears instead of piling up. Both count the crossing in \code{H.finished} (the race
+objective) and set a sticky \code{done} flag; driving operators select
+\code{cell[done=0]}, so an exited cell stops being driven or drawn. \code{death} is the
+discrete-set counterpart of a field \code{source}: an open sink, run last in the
+schedule. Navigation reuses the proven hidden \emph{geodesic} field (no source bands),
+while only the faint deposited \code{scent} trail is shown.
+
+\paragraph{More levers, including \code{boids}.} The optimizer (\code{race\_opt.py},
+same kNN-UCB as foraging, a winner gif saved whenever the escaped count rises by ten)
+sweeps the foraging levers \emph{plus the three boids weights} and its radius ---
+\code{boids.cohesion/align/separate/radius} --- twelve in all. This is the point of the
+operator-parameter view: the search tunes the collective-motion rule (how strongly cells
+flock and avoid jamming in a tight maze) jointly with body and fleet, not just scalar
+gains.
 
 \section{What the process taught us}
 

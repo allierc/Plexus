@@ -24,6 +24,12 @@ import sys
 import time
 import numpy as np
 
+# --- self-bootstrap: run from anywhere (no PYTHONPATH / cwd needed) ---
+_HERE = os.path.dirname(os.path.abspath(__file__))          # .../prototype
+sys.path.insert(0, _HERE)                                   # prototype modules
+sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "src"))  # the `plexus` package
+os.chdir(_HERE)                                             # so 'scenarios/...' resolves
+
 from scenario_schema import load
 import engine2
 from run_demos import render          # reuse the exact race render (wide, death, counter)
@@ -99,9 +105,10 @@ def write_index(scenario, winners):
     open(f"WINNERS_{scenario}.md", "w").write("\n".join(lines) + "\n")
 
 
-def main():
-    scenario = sys.argv[1] if len(sys.argv) > 1 else "race_maze_easy"
-    budget = float(sys.argv[2]) if len(sys.argv) > 2 else float("inf")   # seconds; default: no limit
+def main(scenario=None, budget=None):
+    scenario = scenario or (sys.argv[1] if len(sys.argv) > 1 else "race_maze_hard")
+    if budget is None:
+        budget = float(sys.argv[2]) if len(sys.argv) > 2 else float("inf")   # seconds; default: no limit
     rng = np.random.default_rng(0)
     t0 = time.time()
     print(f"[start] {scenario}: {D} levers {PARAMS}", flush=True)
@@ -124,7 +131,9 @@ def main():
               + ", ".join(f"{k}={v:.3f}" for k, v in zip(PARAMS, p)), flush=True)
 
     for _ in range(5):                                       # random exploration seed
-        u = rng.random(D); f = evaluate(u, scenario); X.append(u); Y.append(f); maybe_winner(u, f)
+        u = rng.random(D); f = evaluate(u, scenario); X.append(u); Y.append(f)
+        print(f"  eval {len(Y):3d} (seed): escaped={f:.0f}  best={max(Y):.0f}  ({time.time()-t0:.0f}s)", flush=True)
+        maybe_winner(u, f)
     print(f"[seed] best={max(Y):.0f} ({len(Y)} evals, {time.time()-t0:.0f}s)", flush=True)
 
     while time.time() - t0 < budget:
@@ -140,9 +149,8 @@ def main():
         scale = (Ya.max() - Ya.min()) or 1.0
         u = cand[(mean + 0.6 * scale * unc).argmax()]         # UCB acquisition
         f = evaluate(u, scenario); X.append(u); Y.append(f)
+        print(f"  eval {len(Y):3d}: escaped={f:.0f}  best={max(Y):.0f}  ({time.time()-t0:.0f}s)", flush=True)
         maybe_winner(u, f)
-        if len(Y) % 10 == 0:
-            print(f"  {len(Y)} evals, best={max(Y):.0f}, {time.time()-t0:.0f}s", flush=True)
 
     print(f"[DONE] {len(Y)} evals, {winners} winners, best escaped={max(Y):.0f}", flush=True)
 

@@ -22,6 +22,12 @@ import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
+# --- self-bootstrap: run from anywhere (no PYTHONPATH / cwd needed) ---
+_HERE = os.path.dirname(os.path.abspath(__file__))          # .../prototype
+sys.path.insert(0, _HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "src"))  # the `plexus` package
+os.chdir(_HERE)                                             # so 'scenarios/...' resolves
+
 from scenario_schema import load
 import engine2
 
@@ -149,8 +155,7 @@ DEMOS = {
     "demo_graze":     dict(gif="demo2_graze.gif",      intent=intent_graze),
     "demo_aggregate": dict(gif="demo3_aggregate.gif",  intent=intent_aggregate),
     "race_pillars":   dict(gif="race1_pillars.gif",    intent=intent_race(3.92), x_finish=3.92),
-    "race_maze_easy": dict(gif="race2_maze_easy.gif",  intent=intent_race(3.92), x_finish=3.92),
-    "race_maze_hard": dict(gif="race3_maze_hard.gif",  intent=intent_race(3.92), x_finish=3.92),
+    "race_maze_hard": dict(gif="race2_maze.gif",       intent=intent_race(3.92), x_finish=3.92),
 }
 
 

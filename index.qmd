@@ -5,11 +5,18 @@ subtitle: "Toward a language and calculus of living systems"
 
 Biology is not a single graph.
 
-Living systems combine cells, molecules, tissues, populations, and continuous
-fields across multiple spatial and temporal scales. Existing simulators
-typically focus on one layer of this hierarchy at a time: particle mechanics,
-cellular interactions, neural dynamics, reaction networks, or continuum fields.
-As a result, models become difficult to combine, extend, and reason about.
+A graph fixes *one* kind of node and *one* kind of edge — particles bonded by
+forces, cells linked by signals, neurons wired by synapses, species joined by
+reactions. Each existing framework commits to one such graph and models that
+layer alone. But a living system is several of these at once, nested inside one
+another and coupled to continuous fields: particles make up cells, cells make up
+tissues and populations, and every level exchanges with morphogen, pressure, and
+chemical fields. Choose any single graph and you capture one slice — the
+couplings *between* slices, where much of the biology lives, fall outside it.
+
+That is why models built one-layer-at-a-time are so hard to combine, extend, and
+reason about: there is no shared representation in which a particle, a cell, a
+population, and a field are the same kind of thing.
 
 Plexus starts from a different question:
 
