@@ -460,12 +460,6 @@ window.Quarto = {
 <h3 class="anchored" data-anchor-id="optimizing-the-colony">Optimizing the colony</h3>
 <p>Because the whole simulation is differentiable and the spec is tiny, the colony can be <em>optimized</em>: search the behavioural parameters to deliver food as fast as possible. The objective — units delivered — comes from a discrete pick-up/drop-off and is therefore non-differentiable, so we use a black-box <strong>UCB</strong> search over eight levers (motility speed and rotation, sense gain, MPM drag and force cap, cell stiffness and size, colony size). Over a few dozen simulations it improves delivery roughly five-fold.</p>
 <p>This echoes the differentiable-simulator design literature, where a <em>smooth</em> objective is optimized by gradients through the rollout; the general recipe is <strong>both</strong> — UCB or CEM for the discrete and structural choices, and gradient-through-rollout on a smooth surrogate for the continuous interior.</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/fig_maze_opt.png" class="img-fluid figure-img" style="width:72.0%"></p>
-<figcaption>Optimizing the colony. Best food delivered as UCB searches the eight-parameter design space, from the initial hand-set design to the best found — a slow, soft, high-drag, many-celled colony.</figcaption>
-</figure>
-</div>
 <p>The optimizer keeps a log of every accepted improvement, which is itself the finding — it shows <em>what makes a good forager</em>:</p>
 <table class="caption-top table">
 <caption>The optimization log: the initial design and each significantly-better foraging design UCB found, with the eight tuned parameters. Food delivered rises from 120 to 587 (~5×).</caption>

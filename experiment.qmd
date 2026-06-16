@@ -91,8 +91,6 @@ objective is optimized by gradients through the rollout; the general recipe is
 **both** — UCB or CEM for the discrete and structural choices, and
 gradient-through-rollout on a smooth surrogate for the continuous interior.
 
-![Optimizing the colony. Best food delivered as UCB searches the eight-parameter design space, from the initial hand-set design to the best found — a slow, soft, high-drag, many-celled colony.](figures/fig_maze_opt.png){width=72%}
-
 The optimizer keeps a log of every accepted improvement, which is itself the
 finding — it shows *what makes a good forager*:
 

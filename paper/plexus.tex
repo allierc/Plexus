@@ -645,17 +645,7 @@ by machinery already present. The same mask (i) zeroes the MPM grid velocity ins
 walls, so rigid cells cannot enter, and (ii) imposes no-flux on field diffusion, so
 a chemical \emph{routes around} the walls. Two such fields --- one sourced at food,
 one at home --- become navigation gradients that solve the maze; unloaded and loaded
-cells climb opposite ones (Fig.~\ref{fig:maze}).
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_maze.png}
-\caption{Maze foraging (three frames, early to late). A colony leaves home
-(lower-left box), threads the walls up the food gradient to the source (upper-right
-box), picks up food, and carries it home along the home gradient to drop it off;
-shading is the deposited chemoattractant.}
-\label{fig:maze}
-\end{figure}
+cells climb opposite ones.
 
 Because the whole simulation is differentiable and the spec is tiny, the colony can
 be \emph{optimized}: search the behavioural parameters to deliver food as fast as
@@ -663,20 +653,11 @@ possible. The objective --- units delivered --- comes from a discrete
 pick-up/drop-off and is therefore non-differentiable, so we use a black-box
 \textbf{UCB} search over eight levers (motility speed and rotation, sense gain, MPM
 drag and force cap, cell stiffness and size, colony size). Over a few dozen
-simulations it improves delivery roughly five-fold (Fig.~\ref{fig:mazeopt}). This
+simulations it improves delivery roughly five-fold. This
 echoes the differentiable-simulator design literature, where a \emph{smooth}
 objective is optimized by gradients through the rollout; the general recipe is
 \textbf{both} --- UCB or CEM for the discrete and structural choices, and
 gradient-through-rollout on a smooth surrogate for the continuous interior.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.72\textwidth]{figures/fig_maze_opt.png}
-\caption{Optimizing the colony. Best food delivered as UCB searches the
-eight-parameter design space, from the initial hand-set design to the best found ---
-a slow, soft, high-drag, many-celled colony.}
-\label{fig:mazeopt}
-\end{figure}
 
 The optimizer keeps a log of every accepted improvement (the auto-generated
 \code{WINNERS.md}, Table~\ref{tab:winners}), which is itself the finding: it shows

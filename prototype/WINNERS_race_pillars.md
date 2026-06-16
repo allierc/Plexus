@@ -9,3 +9,4 @@ Each row is a design whose escaped count beat the previous best by >= 10.
 | 3 | 31 | 48.113 | 0.435 | 357.798 | 1.939 | 750.532 | 36.294 | 0.008 | 48.048 | 0.138 | 0.211 | 0.285 | 0.031 | [race_pillars_winner_3.gif](race_pillars_winner_3.gif) |
 | 4 | 52 | 32.387 | 0.344 | 183.868 | 2.304 | 488.717 | 111.567 | 0.006 | 134.141 | 0.189 | 0.199 | 0.179 | 0.032 | [race_pillars_winner_4.gif](race_pillars_winner_4.gif) |
 | 5 | 90 | 20.248 | 0.112 | 290.757 | 2.882 | 463.323 | 175.425 | 0.007 | 144.079 | 0.124 | 0.181 | 0.088 | 0.059 | [race_pillars_winner_5.gif](race_pillars_winner_5.gif) |
+| 6 | 101 | 36.742 | 0.189 | 370.981 | 0.561 | 757.730 | 246.394 | 0.007 | 159.205 | 0.056 | 0.063 | 0.101 | 0.048 | [race_pillars_winner_6.gif](race_pillars_winner_6.gif) |
