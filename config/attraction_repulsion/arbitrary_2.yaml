@@ -1,0 +1,24 @@
+# Two-type attraction-repulsion, matching ParticleGraph arbitrary_3_1's regime
+# (sigma=0.005, max_radius=0.075, periodic, first_derivative, dt=0.1) with the
+# first two param rows of that config. Dense O(N^2) op -> N kept GPU-feasible.
+name: arbitrary_2
+seed: 0
+n_frames: 250
+dt: 0.1
+record_every: 2
+boundary: periodic
+
+sets:
+  particle:
+    n: 6000
+    types:
+      t0: {fraction: 0.5, p: [1.6233, 1.0413, 1.6012, 1.5615]}
+      t1: {fraction: 0.5, p: [1.7667, 1.8308, 1.0855, 1.9055]}
+
+fields: {}
+
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}   # rebuild neighbour graph
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}    # message pass over it
+
+schedule: [radius_graph, attraction_repulsion, integrate]

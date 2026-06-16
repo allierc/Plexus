@@ -1,20 +1,26 @@
-# The simplest Plexus simulation: one set of points, attraction + repulsion.
-# Balanced, the two forces settle the points at a characteristic spacing.
+# Analytic attraction-repulsion with per-type interaction parameters.
+# Each type carries p = [p1, p2, p3, p4]: the difference-of-Gaussians force law
+#   f(r) = p1*exp(-r^(2 p2)/2sigma^2) - p3*exp(-r^(2 p4)/2sigma^2)
+# summed over neighbours within `radius`. First-derivative law (returns velocity).
 name: attraction_repulsion
 seed: 0
-n_frames: 300
+n_frames: 250
 dt: 0.05
 record_every: 2
+boundary: periodic           # torus: minimum-image displacement in the force
 
 sets:
   particle:
-    n: 200
-    damping: 1.0          # overdamped: velocity saturates at accel/damping
+    n: 1200
+    types:                            # three populations, each its own force law
+      t0: {fraction: 0.34, p: [1.3453, 1.5175, 1.1073, 1.0233]}
+      t1: {fraction: 0.33, p: [1.9893, 1.2029, 1.7467, 1.2261]}
+      t2: {fraction: 0.33, p: [1.7790, 1.7066, 1.7218, 1.0976]}
 
-fields: {}                # none yet (fields land with the Exchange operators)
+fields: {}
 
 operators:
-  - {op: repulse, at: particle, radius: 0.05, k: 30.0}   # short-range push
-  - {op: attract, at: particle, radius: 0.20, k: 4.0}    # longer-range pull
+  - {op: radius_graph,         at: particle, radius: 0.075}   # rebuild neighbour graph
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}    # message pass over it
 
-schedule: [repulse, attract, integrate]
+schedule: [radius_graph, attraction_repulsion, integrate]

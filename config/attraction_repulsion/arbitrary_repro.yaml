@@ -1,0 +1,30 @@
+# Exact reproduction of the ParticleGraph reference dataset
+# graphs_data/arbitrary/arbitrary: 4800 particles, 3 types (1600 each), 1000
+# frames, sigma=0.005, max_radius=0.075, dt=0.025, periodic, first_derivative,
+# mean aggregation. With identical initial conditions the trajectory should match.
+name: arbitrary_repro
+seed: 0
+n_frames: 1000
+dt: 0.025
+record_every: 1
+boundary: periodic
+
+sets:
+  particle:
+    n: 4800
+    types:
+      t0: {fraction: 0.3333333, p: [1.6233, 1.0413, 1.6012, 1.5615]}
+      t1: {fraction: 0.3333333, p: [1.7667, 1.8308, 1.0855, 1.9055]}
+      t2: {fraction: 0.3333334, p: [1.7226, 1.7850, 1.0584, 1.8579]}
+
+fields: {}
+
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005, aggr: mean}
+
+schedule: [radius_graph, attraction_repulsion, integrate]
+
+plotting:
+  colormap: tab10
+  point_size: 4.0

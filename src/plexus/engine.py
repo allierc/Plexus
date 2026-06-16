@@ -22,9 +22,43 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 torch.use_deterministic_algorithms(True, warn_only=True)
 
 from plexus.models.base import Hierarchy, Level
-from plexus.models.registry import get_operator
-import plexus.operators  # noqa: F401  self-registers the operator library
+from plexus.models.registry import get_operator, get_entity
+import plexus.operators        # noqa: F401  self-registers the operator library
+import plexus.models.entities  # noqa: F401  self-registers entity state-schemas
+from plexus.models.entities import DEFAULT_STATE_SCHEMA, DEFAULT_RENDER
 from plexus.simulation import Simulation, Selector
+
+
+def _entity_meta(sname: str) -> tuple[dict, dict, int]:
+    """(state_schema, render, level) for a set name, from the entity registry,
+    falling back to the position+velocity default for unregistered names."""
+    try:
+        ent = get_entity(sname)
+        schema = getattr(ent, "STATE_SCHEMA", None) or DEFAULT_STATE_SCHEMA
+        render = getattr(ent, "RENDER", None) or DEFAULT_RENDER
+        level = getattr(ent, "LEVEL", None)
+        level = level if level is not None else 0
+    except KeyError:
+        schema, render, level = DEFAULT_STATE_SCHEMA, DEFAULT_RENDER, 0
+    return schema, render, level
+
+
+def _resolve_prediction(sim: Simulation) -> dict:
+    """set -> integration order, read from the PREDICTION of the force-emitting
+    operators acting on it. All such operators on one set must agree (a set
+    integrates as a single order); a conflict is a modelling error, raised here."""
+    modes: dict[str, str] = {}
+    for o in sim.operators:
+        pred = getattr(get_operator(o.op), "PREDICTION", None)
+        if pred is None:
+            continue                                   # rewire / structural / field-write: emits no force
+        s = o.on.set
+        if s in modes and modes[s] != pred:
+            raise ValueError(
+                f"set {s!r} has operators with conflicting prediction "
+                f"({modes[s]} vs {pred} from {o.op!r}); a set integrates as one order.")
+        modes[s] = pred
+    return modes
 
 
 # --------------------------------------------------------------------------- #
@@ -42,13 +76,19 @@ def build(sim: Simulation, device: str = "cpu") -> Hierarchy:
             continue                                   # contained (leaf) set: lands with containment
         n = int(s["n"])
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
-        # state = [x, y, vx, vy]; positions seeded uniformly in [0,W]x[0,1]
-        state = torch.zeros(buffer, 4, device=device)
-        pos = torch.rand(n, 2, generator=H.rng, device=device)
+        schema, render, level = _entity_meta(sname)    # state-column semantics from the registry
+        dim = max(b for _, b in schema.values())
+        state = torch.zeros(buffer, dim, device=device)
+        px0, px1 = schema["pos"]; pos = torch.rand(n, 2, generator=H.rng, device=device)
         pos[:, 0] *= H.world_width
-        state[:n, :2] = pos
+        state[:n, px0:px1] = pos
+        vinit = float(s.get("vel_init", 0.0))               # random initial speed (e.g. boids start moving)
+        if vinit > 0 and "vel" in schema:
+            vx0, vx1 = schema["vel"]
+            state[:n, vx0:vx1] = (torch.rand(n, 2, generator=H.rng, device=device) - 0.5) * (2 * vinit)
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
-        lvl = Level(sname, level=1, state=state, occ=occ)
+        lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
+        lvl.render = render
 
         types = s.get("types")
         if types:                                      # assign node_type by fraction (deterministic)
@@ -60,6 +100,12 @@ def build(sim: Simulation, device: str = "cpu") -> Hierarchy:
                 k = int(round(t["fraction"] * n))
                 node_type[perm[start:start + k]] = tid; start += k
             lvl.register_buffer("node_type", node_type)
+            # per-type parameter table (the inverse-problem target), built from the
+            # spec types' `p` vectors -> the operator indexes it by node_type
+            if all("p" in t for t in types.values()):
+                P = torch.tensor([list(t["p"]) for t in types.values()],
+                                 dtype=torch.float32, device=device)
+                lvl.register_buffer("type_params", P)
         H.add_level(lvl)
 
     return H
@@ -81,22 +127,26 @@ def _mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
 #  integrate builtin: accumulated accel -> next state (per top-level set)
 # --------------------------------------------------------------------------- #
 def _integrate(H: Hierarchy, dt: float) -> None:
+    """Accumulated per-level output -> next state. The integration order is the one
+    resolved from the set's operators (H.predict): first_derivative reads the
+    output as a velocity (x += dt·dpos); second_derivative reads it as an
+    acceleration (v += dt·acc; x += dt·v). Friction is the `drag` operator, not a
+    knob here; no velocity cap (numerical guards belong to a numerics layer)."""
     W = H.world_width
     for name, lvl in H.levels.items():
-        a = H.accel(name)
-        s = H.config.sets[name]
-        damping = float(s.get("damping", 0.0))
-        vmax = float(s.get("vmax", 0.2))               # speed cap: max step = dt*vmax (robust to bad params)
-        x, v = lvl.state[:, :2], lvl.state[:, 2:4]
-        v = v + dt * (a - damping * v)
-        sp = v.norm(dim=1, keepdim=True).clamp(min=1e-9)
-        v = v * (sp.clamp(max=vmax) / sp)              # never move more than dt*vmax per frame
+        out = H.accel(name)
+        pred = H.predict.get(name, "first_derivative")
+        px0, px1 = lvl.state_schema["pos"]; vx0, vx1 = lvl.state_schema["vel"]
+        x, v = lvl.state[:, px0:px1], lvl.state[:, vx0:vx1]
+        v = out if pred == "first_derivative" else v + dt * out
         x = x + dt * v
         if H.periodic:
             x = torch.stack([torch.remainder(x[:, 0], W), torch.remainder(x[:, 1], 1.0)], 1)
         else:
             x = torch.stack([x[:, 0].clamp(0.0, W), x[:, 1].clamp(0.0, 1.0)], 1)
-        lvl.state = torch.cat([x, v], dim=1)
+        new = lvl.state.clone()
+        new[:, px0:px1] = x; new[:, vx0:vx1] = v
+        lvl.state = new
 
 
 # --------------------------------------------------------------------------- #
@@ -104,6 +154,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
 # --------------------------------------------------------------------------- #
 def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tuple[Hierarchy, dict]:
     H = build(sim, device)
+    H.predict = _resolve_prediction(sim)         # set -> integration order (from the operators)
     # (op_name, instance, selector); params carry the field refs + the set name (_at)
     inst = [(o.op,
              get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
@@ -135,7 +186,7 @@ def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tu
                                 H.add_accel(lvlname, d)
             if frame % re == 0:
                 for name, lvl in H.levels.items():
-                    rec_sets[name][rec] = lvl.state[:, :2].cpu().numpy()
+                    rec_sets[name][rec] = lvl.get("pos").cpu().numpy()
                     occ_sets[name][rec] = lvl.active.cpu().numpy()
                 rec += 1
 

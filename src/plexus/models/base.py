@@ -110,10 +110,12 @@ class Level(nn.Module):
         parent: Optional[torch.Tensor] = None,      # [N]      index into level+1 (partition pi_k)
         edge_index: Optional[torch.Tensor] = None,  # [2, E]   lateral relation
         occ: Optional[torch.Tensor] = None,         # [N]      occupancy in [0,1] (default ones)
+        state_schema: Optional[dict] = None,        # {block: (c0,c1)} column semantics (from the entity registry)
     ):
         super().__init__()
         self.name = name
         self.level = level
+        self.state_schema = state_schema or {"pos": (0, 2), "vel": (2, 4)}
         N = state.shape[0]
         self.register_buffer("state", state)
         self.embedding = nn.Parameter(embedding) if embedding is not None else None
@@ -140,6 +142,11 @@ class Level(nn.Module):
     def n(self) -> int:
         """Buffer size (allocated slots, live or dormant)."""
         return self.state.shape[0]
+
+    def get(self, block: str) -> torch.Tensor:
+        """A view of a named state block (e.g. 'pos', 'vel') per the schema."""
+        a, b = self.state_schema[block]
+        return self.state[:, a:b]
 
     @property
     def active(self) -> torch.Tensor:
@@ -316,6 +323,11 @@ class Operator(nn.Module):
 
     KIND: Optional[str] = None
     LEVEL: Optional[str] = None
+    # What this operator's returned delta IS, so the engine knows how to integrate
+    # it: "first_derivative" (the delta is a velocity -> x += dt*delta) or
+    # "second_derivative" (an acceleration -> v += dt*delta; x += dt*v). None for
+    # operators that emit no force (rewire/structural/exchange-into-field).
+    PREDICTION: Optional[str] = None
     REQUIRES_PARAMS: list = []          # param keys this operator must be given
     REQUIRES_TYPE_PROPS: list = []      # per-type node properties it reads (e.g. "youngs")
 

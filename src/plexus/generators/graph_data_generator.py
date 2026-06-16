@@ -26,12 +26,16 @@ def data_generate(
     sim: Simulation,
     pre_folder: str,
     device: str = "cpu",
-    visualize: bool = True,
     erase: bool = False,
     save: bool = True,
 ) -> tuple[str, dict]:
     """Forward-simulate `sim` and write its trajectory under
-    graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out)."""
+    graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out).
+
+    Generation writes DATA ONLY -- the trajectory + metadata. Visualization is a
+    separate, external concern (plexus.plot, run as `Plexus_Main -o plot`); the
+    generator never imports matplotlib, so adding simulations never grows a plot
+    switch in here (the ParticleGraph anti-pattern)."""
     folder = pre_folder.rstrip("/")
     data_dir = graphs_data_path(folder, sim.name)
     if erase and os.path.isdir(data_dir):
@@ -55,34 +59,6 @@ def data_generate(
                 flat[f"{sname}__node_type"] = d["node_type"]
         np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"], **flat)
 
-    if visualize:
-        _preview(out, data_dir, sim.name)
-
     nrec = next(iter(out["sets"].values()))["pos"].shape[0]
     print(f"[generate] done: {nrec} recorded frames -> {data_dir}", flush=True)
     return data_dir, out
-
-
-def _preview(out: dict, data_dir: str, name: str) -> None:
-    """A 4-frame montage of the first set's trajectory (cheap, no animation deps)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    sname = next(iter(out["sets"]))
-    pos = out["sets"][sname]["pos"]
-    occ = out["sets"][sname]["occ"]
-    W = out["world"]
-    T = pos.shape[0]
-    idx = [0, T // 4, T // 2, T - 1]
-    fig, axes = plt.subplots(1, 4, figsize=(4 * W * 3.4, 3.4))
-    for ax, i in zip(np.atleast_1d(axes), idx):
-        live = occ[i]
-        ax.scatter(pos[i, live, 0], pos[i, live, 1], s=10, c="#1f77b4")
-        ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal")
-        ax.set_title(f"frame {i}", fontsize=9); ax.axis("off")
-    fig.suptitle(name, fontsize=11)
-    plt.tight_layout()
-    out_png = os.path.join(data_dir, "preview.png")
-    plt.savefig(out_png, dpi=90); plt.close(fig)
-    print(f"[generate] preview -> {out_png}", flush=True)

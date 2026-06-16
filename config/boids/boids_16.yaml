@@ -1,0 +1,44 @@
+# Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
+# 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
+# max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
+# Per-type p = [cohesion, alignment, separation].
+name: boids_16
+seed: 0
+n_frames: 4000
+dt: 0.5
+record_every: 4
+boundary: periodic
+
+sets:
+  particle:
+    n: 1792
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.0625, p: [27.600000381469727, 92.5, 48.20000076293945]}
+      t01: {fraction: 0.0625, p: [32.0, 51.79999923706055, 29.799999237060547]}
+      t02: {fraction: 0.0625, p: [23.600000381469727, 35.0, 13.5]}
+      t03: {fraction: 0.0625, p: [3.299999952316284, 76.4000015258789, 13.0]}
+      t04: {fraction: 0.0625, p: [94.0, 78.69999694824219, 30.799999237060547]}
+      t05: {fraction: 0.0625, p: [81.4000015258789, 34.599998474121094, 2.200000047683716]}
+      t06: {fraction: 0.0625, p: [3.0999999046325684, 40.5, 17.0]}
+      t07: {fraction: 0.0625, p: [88.80000305175781, 7.199999809265137, 29.799999237060547]}
+      t08: {fraction: 0.0625, p: [32.70000076293945, 76.80000305175781, 26.100000381469727]}
+      t09: {fraction: 0.0625, p: [14.5, 56.79999923706055, 27.600000381469727]}
+      t10: {fraction: 0.0625, p: [63.29999923706055, 99.9000015258789, 13.899999618530273]}
+      t11: {fraction: 0.0625, p: [32.5, 25.200000762939453, 24.399999618530273]}
+      t12: {fraction: 0.0625, p: [97.5999984741211, 56.5, 12.100000381469727]}
+      t13: {fraction: 0.0625, p: [62.20000076293945, 9.100000381469727, 28.299999237060547]}
+      t14: {fraction: 0.0625, p: [76.4000015258789, 52.900001525878906, 32.0]}
+      t15: {fraction: 0.0625, p: [48.099998474121094, 54.400001525878906, 30.700000762939453]}
+
+fields: {}
+
+operators:
+  - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
+  - {op: boids,        at: particle}
+
+schedule: [radius_graph, boids, integrate]
+
+plotting:
+  colormap: tab20
+  point_size: 6.0

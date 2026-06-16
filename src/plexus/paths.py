@@ -61,7 +61,7 @@ def config_path(*parts: str) -> str:
 # Ordered (folder, trigger-substrings). First folder whose any trigger appears
 # in the config name wins. Grow this as new simulation types are added.
 _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
-    ("interaction", ("interaction", "attract", "repuls")),
+    ("attraction_repulsion", ("attraction_repulsion", "attract", "repuls", "arbitrary")),
     ("boids",       ("boids", "flock", "swarm")),
     ("mpm",         ("mpm", "tissue", "elastic", "soft")),
     ("divide",      ("divide", "grow", "mitosis", "morula")),

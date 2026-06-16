@@ -73,6 +73,7 @@ class Simulation:
     obstacles: list = field(default_factory=list)   # wall rectangles [x0,y0,x1,y1] or discs [cx,cy,r]
     boundary: str = "wall"                           # 'wall' (clamp) or 'periodic' (torus)
     world: float = 1.0                               # domain width; world is [0,world]x[0,1]
+    plotting: dict = field(default_factory=dict)     # render STYLE (colormap, point_size, ...) — read by plexus.plot
 
 
 _RESERVED = {"op", "at", "to", "from"}
@@ -199,4 +200,5 @@ def load(path: str) -> Simulation:
         obstacles=raw.get("obstacles", []),
         boundary=raw.get("boundary", "wall"),
         world=float(raw.get("world", 1.0)),
+        plotting=raw.get("plotting", {}),
     )

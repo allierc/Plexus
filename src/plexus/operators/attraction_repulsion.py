@@ -1,19 +1,20 @@
-"""Attraction / repulsion -- the simplest Lateral operators (one set, pairwise).
+"""Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.
 
-Two composable forces on a single set of points, the canonical starting point
-(ParticleGraph's interacting particles). Each is a `Lateral` operator: it reads
-the set named by its `at:` selector, computes a pairwise force over the live
-(`occ > 0`) nodes within a cutoff `radius`, and returns `{set: accel}`. The engine
-sums the two into the set's accel accumulator and the `integrate` builtin steps it.
+A Lateral operator over a neighbour graph. For a receiver particle i of type t,
+summed over its neighbours j (the edges left by a `rewire` operator such as
+`radius_graph`):
 
-  repulse : soft short-range push  (incompressibility -> points keep a spacing)
-  attract : pull toward neighbours within a larger radius (cohesion -> a cluster)
+    f(r) = p1 * exp(-r^(2 p2) / 2σ²)  -  p3 * exp(-r^(2 p4) / 2σ²)      (a length)
+    dpos_i = Σ_j  f(r_ij) * (pos_j - pos_i)                            (a velocity)
 
-Balanced, the two settle the points at a characteristic spacing -- a crystal /
-blob. O(N^2) dense pairwise (fine at the small N we start with).
+with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
+Gaussian is the long-range pull, the second the short-range push; their balance
+gives type-specific phases (clusters, networks, lattices). First-derivative law:
+returns a velocity (set `prediction: first_derivative`).
 
-The operator learns which set it acts on from `_at` (the selector's set name,
-injected by the engine), so it is not hard-wired to a level name.
+This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
+a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
+(each type carries `p`), assembled by the engine into `Level.type_params`.
 """
 from __future__ import annotations
 
@@ -21,58 +22,46 @@ import torch
 
 from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
+from plexus.geometry import minimum_image
 
-EPS = 1e-6
 
-
-@register_operator("repulse", level="particle", kind="lateral")
-class Repulse(Lateral):
-    """Soft short-range repulsion: within `radius`, a linear push that is `k` at
-    contact and fades to 0 at the cutoff. Pushes overlapping points apart."""
-    REQUIRES_PARAMS = ["radius", "k"]
+@register_operator("attraction_repulsion", level="particle", kind="lateral")
+class AttractionRepulsion(Lateral):
+    PREDICTION = "first_derivative"             # emits a velocity (overdamped law)
+    REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
+    REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.r = float(params["radius"])
-        self.k = float(params["k"])
+        self.sigma = float(params["sigma"])
+        self.aggr = params.get("aggr", "mean")               # mean (default, matches the reference) or sum
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        pos = lvl.state[:, :2]
+        pos = lvl.get("pos")
         occ = lvl.occ
-        diff = pos[:, None, :] - pos[None, :, :]                  # i <- j  (point away from j)
-        d = torch.sqrt((diff * diff).sum(2) + 1e-9)
-        within = (d < self.r) & (d > EPS)
-        mag = (self.k * (1.0 - d / self.r)).clamp_min(0.0) * within.float() * occ[None, :]
-        f = (mag[:, :, None] * diff / d[:, :, None]).sum(1)
+        N = pos.shape[0]
+        ei = lvl.edge_index                                  # [2, E]: row0 = receiver i, row1 = neighbour j
+        if ei.numel() == 0:
+            return {self.at: torch.zeros(N, 2, device=pos.device)}
+        i, j = ei[0], ei[1]
+
+        d = minimum_image(pos[j] - pos[i], getattr(H, "periodic", False),
+                          getattr(H, "world_width", 1.0))    # j - i  [E, 2]
+        r2 = (d * d).sum(-1)                                  # [E]
+        p = lvl.type_params[lvl.node_type[i]]                # receiver-type params [E, 4]
+        s2 = 2.0 * self.sigma ** 2
+        f = (p[:, 0] * torch.exp(-(r2 ** p[:, 1]) / s2)
+             - p[:, 2] * torch.exp(-(r2 ** p[:, 3]) / s2))   # [E]
+        f = f * occ[j]                                       # ignore dormant neighbours
+
+        dpos = torch.zeros(N, 2, device=pos.device)
+        dpos.index_add_(0, i, f[:, None] * d)                # aggregate at the receiver
+        if self.aggr == "mean":                              # average over neighbours (density-independent)
+            deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
+            dpos = dpos / deg.clamp(min=1.0)[:, None]
+        dpos = dpos * occ[:, None]
         if mask is not None:
-            f = f * mask[:, None].float()
-        return {self.at: f * occ[:, None]}
-
-
-@register_operator("attract", level="particle", kind="lateral")
-class Attract(Lateral):
-    """Cohesion: pull each point toward the mean direction of its neighbours
-    within `radius`, strength `k`. Normalised by neighbour count so it does not
-    blow up with density -- a steady pull to the local centroid."""
-    REQUIRES_PARAMS = ["radius", "k"]
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.r = float(params["radius"])
-        self.k = float(params["k"])
-        self.at = params.get("_at", "particle")
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at)
-        pos = lvl.state[:, :2]
-        occ = lvl.occ
-        diff = pos[None, :, :] - pos[:, None, :]                  # i -> j  (toward neighbour)
-        d = torch.sqrt((diff * diff).sum(2) + 1e-9)
-        within = ((d < self.r) & (d > EPS)).float() * occ[None, :]
-        cnt = within.sum(1).clamp(min=1.0)[:, None]
-        f = self.k * (within[:, :, None] * diff).sum(1) / cnt
-        if mask is not None:
-            f = f * mask[:, None].float()
-        return {self.at: f * occ[:, None]}
+            dpos = dpos * mask[:, None].float()
+        return {self.at: dpos}

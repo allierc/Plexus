@@ -42,6 +42,8 @@ def main():
     parser.add_argument("--device", default="cpu", help="cpu or cuda:N")
     parser.add_argument("--force", action="store_true",
                         help="erase + regenerate data even if it already exists")
+    parser.add_argument("--movie", action="store_true",
+                        help="on -o plot, also render a gif movie per set")
     args = parser.parse_args()
 
     if args.output_root:
@@ -69,14 +71,18 @@ def main():
 
     if "generate" in task:
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
-                                    visualize=True, erase=args.force, save=True)
+                                    erase=args.force, save=True)
         _mark(run_log_dir, "_completed_generate", data_dir)
 
-    for stage in ("train", "test", "plot"):
+    if "plot" in task:
+        from plexus.plot import plot_dataset
+        data_dir = plot_dataset(sim, pre_folder, movie=args.movie)
+        _mark(run_log_dir, "_completed_plot", data_dir)
+
+    for stage in ("train", "test"):
         if stage in task:
             raise NotImplementedError(
-                f"task stage {stage!r} is not built yet (inverse-problem stage). "
-                f"Only 'generate' is implemented.")
+                f"task stage {stage!r} is not built yet (inverse-problem stage).")
 
     _mark(run_log_dir, "_complete", " ".join(sys.argv))
 
