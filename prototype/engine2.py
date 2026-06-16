@@ -176,7 +176,7 @@ def build(sc, device="cpu"):
         # default: geodesic when a source is given (back-compat), else dynamic.
         nav = f.get("navigation", "geodesic" if f.get("source") else "dynamic")
         if nav == "geodesic" and src is not None:
-            wnp = (walls.cpu().numpy() if walls is not None else np.zeros((res, res), bool))
+            wnp = (walls.cpu().numpy() if walls is not None else np.zeros((nx, res), bool))
             pot = _geodesic_potential(wnp, src.cpu().numpy())
             fld.grid = torch.from_numpy(pot).to(device)
         H.add_field(fld)
@@ -281,7 +281,8 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
                harvested=float(getattr(H, "harvested", 0.0)),
                finished=int(getattr(H, "finished", 0)),
                delivered_t=delivered_t[:rec], finished_t=finished_t[:rec],
-               walls=(_raster(getattr(sc, "obstacles", []), H.fields[fld_name].res, device).cpu().numpy()
+               walls=(_raster(getattr(sc, "obstacles", []), H.fields[fld_name].res,
+                              getattr(H, "world_width", 1.0), device).cpu().numpy()
                       if getattr(sc, "obstacles", []) else None))
     if out_path is not None:
         root = zarr.open_group(out_path, mode="w")

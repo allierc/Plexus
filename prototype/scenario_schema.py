@@ -56,6 +56,7 @@ class Scenario:
     schedule: list
     obstacles: list = field(default_factory=list)   # wall rectangles [x0,y0,x1,y1]
     boundary: str = "wall"                           # 'wall' (clamp) or 'periodic' (torus)
+    world: float = 1.0                               # domain width; world is [0,world]x[0,1]
 
 
 _RESERVED = {"op", "at", "to", "from"}
@@ -168,4 +169,5 @@ def load(path: str) -> Scenario:
         schedule=raw["schedule"],
         obstacles=raw.get("obstacles", []),
         boundary=raw.get("boundary", "wall"),
+        world=float(raw.get("world", 1.0)),
     )
