@@ -361,6 +361,28 @@ membrane = solid elastic; `skin` updates the liquid mask by radius each tick.
 Ranking now: `divide_cell_v18` (droplet) crispest overall; `divide_mpm_v32` best
 MPM (and the most biologically structured: liquid cytoplasm in an elastic cell).
 
+### v33–v41: up to 16 cells, fixed division size, CSF surface tension
+
+- **Cell-count ceiling fixed.** Cells kept stalling at 8 because they grow during
+  the 36-frame mitosis, so `birth_mass` (set at completion) inflated each round →
+  thresholds ballooned. Added a **fixed `size`** threshold to `mitosis` (every
+  cell divides at the same absolute mass). With buffer ≈ 8×size the colony grows
+  to ~16 cells. `v35`/`v40` = 15-cell liquid-cyto MPM morula (~300 frames).
+- **CSF surface tension** (the grid-based Continuum Surface Force in `mpm.py`:
+  liquid colour field → normal → curvature κ → force $\sigma\kappa\nabla c$) is
+  what `surface_tension` now drives. The water sims calibrate σ≈18–40; cells used
+  55–90. Key subtlety: **CSF acts on the *liquid* (cytoplasm) surface**, so it
+  rounds the cyto, but the *membrane* (elastic, outermost) sits outside that and
+  is what looks fuzzy. Making the cell mostly-liquid (v41) puts the CSF interface
+  at the cell boundary but doesn't fully crisp it either.
+- **Crispness plateau (validated v36–v41).** Tried higher/lower σ, stiffer
+  membrane, mostly-liquid, low `vmax`, `cohere` straggler-gather, gentle
+  `separate`: all give *distinct nucleated cells with soft edges*. The residual
+  fuzz is intrinsic to many small **growing** MPM cells + the `separate` halo +
+  noisier MPM packing than the droplet's uniform `repulse`. So: **MPM divides to
+  ~16 cells now (the goal)**; the droplet (`v18`) remains crisper. Best MPM
+  morula = `divide_mpm_v40`.
+
 `cohere` now takes an optional `role` (cohere to the sub-set centroid); `ring`
 (rewire) + `spring` (lateral) added; `nucleus` operator removed. MPM build assigns
 roles by radius (nucleus innermost, membrane outermost). v8 is rough (MPM edge

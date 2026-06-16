@@ -1,0 +1,26 @@
+name: divide_mpm_v41
+seed: 0
+n_frames: 700
+dt: 0.02
+record_every: 4
+sets:
+  cell: {n: 1, buffer: 14, types: {soft: {fraction: 1.0, youngs: 40}}}
+  particle:
+    parent: cell
+    per_parent: 520
+    buffer: 4400
+    radius: 0.08
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.12, youngs: 140}   # small elastic core
+      cyto:     {fraction: 0.80, youngs: 6}      # MOSTLY liquid -> CSF beads the cell surface
+      membrane: {fraction: 0.08, youngs: 350}    # thin elastic skin riding the liquid surface
+fields: {}
+operators:
+  - {op: skin,    at: particle, nucleus: 0.12, membrane: 0.08}
+  - {op: separate, at: particle, r0: 0.014, k: 0.4}
+  - {op: tissue,  at: cell, strength: 35.0, radius: 0.18}
+  - {op: mitosis, at: cell, ratio: 2.0, size: 900.0, frames: 34, elong: 0.45, furrow: 6.0, furrow_w: 0.016, pole: 1.3, round_frames: 8, round_k: 6.0}
+  - {op: duplicate, at: particle, rate: 16, r0: 0.009}
+  - {op: mpm, at: particle, n_grid: 160, substeps: 14, dt_sub: 2.0e-4, a_max: 300, drag: 0.8, vmax: 6.0, surface_tension: 40.0}
+schedule: [aggregate, skin, separate, tissue, mitosis, duplicate, mpm]
