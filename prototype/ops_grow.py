@@ -334,6 +334,7 @@ class Mitosis(Operator):
         self.pole = float(params.get("pole", 0.0))      # anaphase: pull nucleus to the two poles
         self.round_frames = int(params.get("round_frames", 0))  # mitotic rounding before the furrow
         self.round_k = float(params.get("round_k", 6.0))
+        self.size = float(params.get("size", 0.0))      # absolute divide threshold (overrides ratio*birth)
 
     def forward(self, H, mask=None):
         part = H.level("particle"); cell = H.level("cell")
@@ -346,7 +347,8 @@ class Mitosis(Operator):
             mem = (par == c) & (w > EPS)
             mc = float(w[mem].sum())
             ph = float(H.cell_phase[c])
-            if ph == 0.0 and mc >= self.ratio * H.cell_birth[c]:
+            thresh = self.size if self.size > 0 else self.ratio * H.cell_birth[c]
+            if ph == 0.0 and mc >= thresh:
                 idx = mem.nonzero(as_tuple=True)[0]
                 p = part.state[idx, :2]; cen = p.mean(0)
                 cov = ((p - cen).t() @ (p - cen)) / p.shape[0]

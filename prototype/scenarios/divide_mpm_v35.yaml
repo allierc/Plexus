@@ -1,0 +1,29 @@
+# v35: up to 16 cells. FIXED division size (mitosis `size`) so every cell splits
+# at the same mass (no birth inflation) and the buffer caps growth at ~16 cells.
+# Liquid cytoplasm + soft-elastic membrane/nucleus (v32 recipe).
+name: divide_mpm_v35
+seed: 0
+n_frames: 1300
+dt: 0.02
+record_every: 5
+sets:
+  cell: {n: 1, buffer: 24, types: {soft: {fraction: 1.0, youngs: 40}}}
+  particle:
+    parent: cell
+    per_parent: 480
+    buffer: 8000
+    radius: 0.07
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.16, youngs: 120}
+      cyto:     {fraction: 0.68, youngs: 8}
+      membrane: {fraction: 0.16, youngs: 280}
+fields: {}
+operators:
+  - {op: skin,    at: particle, nucleus: 0.16, membrane: 0.16}
+  - {op: separate, at: particle, r0: 0.016, k: 0.6}
+  - {op: tissue,  at: cell, strength: 45.0, radius: 0.18}
+  - {op: mitosis, at: cell, ratio: 2.0, size: 900.0, frames: 34, elong: 0.45, furrow: 6.0, furrow_w: 0.016, pole: 1.3, round_frames: 8, round_k: 6.0}
+  - {op: duplicate, at: particle, rate: 20, r0: 0.009}
+  - {op: mpm, at: particle, n_grid: 160, substeps: 12, dt_sub: 2.0e-4, a_max: 400, drag: 1.8, vmax: 6.0, surface_tension: 55.0}
+schedule: [aggregate, skin, separate, tissue, mitosis, duplicate, mpm]
