@@ -1,0 +1,30 @@
+# layer_ball_10: a SEALED WATER BALLOON. Same 3-layer geometry as layer_ball_9 (elastic
+# core, WATER middle, elastic membrane) but now with (a) a stiffer membrane (600->800) and
+# (b) surface_tension on the water so it stays a cohesive blob instead of leaking/puddling.
+# Goal: the membrane mechanically contains the water while surface tension keeps it together,
+# so the ball bounces and WOBBLES (water sloshing inside) without bursting. Compare to
+# layer_ball_9 (no surface tension) where the water flowed out and puddled.
+name: layer_ball_10
+seed: 0
+n_frames: 600
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.82, 0.5, 0.82]
+    types:
+      ball:
+        fraction: 1.0
+        youngs: 25
+        layers:
+          - {frac: 0.28, youngs: 300}                      # core: small elastic
+          - {frac: 0.74, youngs: 60, material: liquid}     # middle: WATER
+          - {frac: 1.00, youngs: 800}                      # membrane: stiff, seals the water in
+  particle: {parent: cell, per_parent: 3000, radius: 0.12, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.12, wall_damp: 0.9, surface_tension: 3000.0}
+schedule: [aggregate, gravity, mpm]

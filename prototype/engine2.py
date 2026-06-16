@@ -336,6 +336,7 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
                is_core=part.is_core.cpu().numpy() if hasattr(part, "is_core") else None,
                layer_id=part.layer_id.cpu().numpy() if hasattr(part, "layer_id") else None,
                is_liquid=part.is_liquid.cpu().numpy() if hasattr(part, "is_liquid") else None,
+               is_snow=part.is_snow.cpu().numpy() if hasattr(part, "is_snow") else None,
                loaded=loaded[:rec], done=done[:rec], field=fhist[:rec], type_names=cell.type_names,
                food_delivered=int(getattr(H, "food_delivered", 0)),
                harvested=float(getattr(H, "harvested", 0.0)),

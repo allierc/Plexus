@@ -44,8 +44,14 @@ def render(name, fps=30):
     imS = ax.imshow(scent[0].T, origin="lower", extent=[0, 1, 0, 1], cmap="inferno", vmin=0, vmax=smax)
     if walls is not None:
         ax.imshow(np.where(walls.T, 1.0, np.nan), origin="lower", extent=[0, 1, 0, 1], cmap="gray", vmin=0, vmax=2.2)
-    ax.add_patch(plt.Rectangle((0, 0), 0.18, 0.18, fill=False, edgecolor="#5599ff", lw=1.5))
-    ax.add_patch(plt.Rectangle((0.82, 0.82), 0.18, 0.18, fill=False, edgecolor="#ffaa33", lw=1.5))
+    # outlined regions: GREEN = food, BLUE = home (read from the forage operator so they match)
+    fo = next((o for o in sc.operators if o.op == "forage"), None)
+    food_r = fo.params.get("food", [0.82, 0.82, 1.0, 1.0]) if fo else [0.82, 0.82, 1.0, 1.0]
+    home_r = fo.params.get("home", [0.0, 0.0, 0.18, 0.18]) if fo else [0.0, 0.0, 0.18, 0.18]
+    ax.add_patch(plt.Rectangle((home_r[0], home_r[1]), home_r[2] - home_r[0], home_r[3] - home_r[1],
+                               fill=False, edgecolor="#3a86ff", lw=1.8))   # home = blue
+    ax.add_patch(plt.Rectangle((food_r[0], food_r[1]), food_r[2] - food_r[0], food_r[3] - food_r[1],
+                               fill=False, edgecolor="#28d65a", lw=1.8))   # food = green
     sc_pts = ax.scatter(pp[0][:, 0], pp[0][:, 1], s=1.3, c=base)
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
     tt = ax.set_title("", fontsize=8, color="white")
