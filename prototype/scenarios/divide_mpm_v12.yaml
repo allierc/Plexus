@@ -1,0 +1,33 @@
+# v12: unified MPM body (bounce-ball style) + just enough cohesion to keep the
+# cell a tight, distinct body so the membrane shell is uniform and daughters
+# don't re-fuse. cytoplasm coheres to the cell centre, nucleus to its own (rigid
+# core); the membrane is the outer role (MPM surface), drawn bright. Fewer cells,
+# stronger mitosis push so the two halves fully separate.
+name: divide_mpm_v12
+seed: 0
+n_frames: 560
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 8
+    types: {soft: {fraction: 1.0, youngs: 40}}
+  particle:
+    parent: cell
+    per_parent: 800
+    buffer: 5200
+    radius: 0.08
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.18, youngs: 220}
+      cyto:     {fraction: 0.64, youngs: 22}
+      membrane: {fraction: 0.18, youngs: 120}
+fields: {}
+operators:
+  - {op: cohere, at: particle, k: 35.0, role: cyto}      # tighten body -> distinct, round, uniform shell
+  - {op: cohere, at: particle, k: 70.0, role: nucleus}   # rigid nuclear core
+  - {op: mitosis, at: cell, ratio: 2.0, frames: 30, elong: 0.9, furrow: 7.0, furrow_w: 0.02, pole: 2.2}
+  - {op: duplicate, at: particle, rate: 8, r0: 0.010}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 10, dt_sub: 2.0e-4, a_max: 400, drag: 2.0, vmax: 5.0}
+schedule: [aggregate, cohere, mitosis, duplicate, mpm]

@@ -1,0 +1,33 @@
+# v15: dividing cell from the 3-layer BALL recipe (layer_ball_*). A unified MPM
+# body with concentric layers -- elastic nucleus core, soft cytoplasm cushion,
+# STIFF membrane skin (the skin that held the bouncing ball together). `skin`
+# re-tags + re-stiffens the layers by radius each tick so they track growth and
+# division; grows by duplicate, divides by mitosis. No cohere/spring -- MPM + the
+# stiff skin do it, exactly like the ball.
+name: divide_mpm_v15
+seed: 0
+n_frames: 600
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 8
+    types: {soft: {fraction: 1.0, youngs: 40}}
+  particle:
+    parent: cell
+    per_parent: 1000
+    buffer: 6000
+    radius: 0.09
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.20, youngs: 300}    # elastic core
+      cyto:     {fraction: 0.55, youngs: 25}     # soft cushion
+      membrane: {fraction: 0.25, youngs: 800}    # stiff skin (holds the cell together)
+fields: {}
+operators:
+  - {op: skin,   at: particle, nucleus: 0.20, membrane: 0.25}   # re-tag + re-stiffen layers by radius
+  - {op: mitosis, at: cell, ratio: 2.0, frames: 30, elong: 0.6, furrow: 6.0, furrow_w: 0.02, pole: 1.5}
+  - {op: duplicate, at: particle, rate: 8, r0: 0.011}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.6, vmax: 5.0}
+schedule: [aggregate, skin, mitosis, duplicate, mpm]

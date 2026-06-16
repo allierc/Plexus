@@ -1,0 +1,32 @@
+# v11: the dividing cell as a UNIFIED MPM body (inspired by bounce_ball).
+# No cohere/ring/spring -- MPM elasticity holds the cell together; structure is
+# just per-role STIFFNESS: a rigid nucleus core, soft cytoplasm, a stiff membrane
+# cortex (outer shell). Grows by `duplicate`, divides by `mitosis` (elongate +
+# furrow + nuclear poles). Render: small dots, membrane bright, nucleus dark, no
+# drawn circle.
+name: divide_mpm_v11
+seed: 0
+n_frames: 600
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 12
+    types: {soft: {fraction: 1.0, youngs: 40}}     # build fallback
+  particle:
+    parent: cell
+    per_parent: 700
+    buffer: 6000
+    radius: 0.08
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.20, youngs: 260}       # rigid core
+      cyto:     {fraction: 0.60, youngs: 22}        # soft bulk
+      membrane: {fraction: 0.20, youngs: 130}       # stiff cortex (outer shell)
+fields: {}
+operators:
+  - {op: mitosis,   at: cell, ratio: 2.0, frames: 30, elong: 0.5, furrow: 6.0, furrow_w: 0.02, pole: 1.5}
+  - {op: duplicate, at: particle, rate: 8, r0: 0.010}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 10, dt_sub: 2.0e-4, a_max: 300, drag: 1.5, vmax: 5.0}
+schedule: [aggregate, mitosis, duplicate, mpm]

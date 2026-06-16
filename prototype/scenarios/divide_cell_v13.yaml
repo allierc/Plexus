@@ -1,0 +1,25 @@
+# v13: droplet cells with a UNIFORM particle membrane via `shell` (radial
+# confinement to the surface radius + repulse for even spacing) -- replaces the
+# uneven ring+spring. Rigid nucleus role; gradual mitosis with nuclear poles.
+name: divide_cell_v13
+seed: 0
+n_frames: 600
+dt: 0.02
+record_every: 4
+sets:
+  cell:     {n: 1, buffer: 16}
+  particle:
+    parent: cell
+    per_parent: 360
+    buffer: 4800
+    radius: 0.06
+    types: {nucleus: {fraction: 0.18}, cyto: {fraction: 0.60}, membrane: {fraction: 0.22}}
+fields: {}
+operators:
+  - {op: cohere, at: particle, k: 0.35, role: cyto}     # cytoplasm fills the cell
+  - {op: cohere, at: particle, k: 5.0,  role: nucleus}  # rigid nuclear core
+  - {op: repulse, at: particle, r0: 0.013, k: 0.6}      # incompressibility + even membrane spacing
+  - {op: shell,  at: particle, k: 2.5, role: membrane, factor: 1.18}  # uniform membrane shell
+  - {op: duplicate, at: particle, rate: 6, r0: 0.013}
+  - {op: mitosis,   at: cell, ratio: 2.0, frames: 30, elong: 0.20, furrow: 3.5, furrow_w: 0.016, pole: 0.6}
+schedule: [aggregate, cohere, repulse, shell, mitosis, integrate, duplicate]

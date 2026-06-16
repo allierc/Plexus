@@ -115,6 +115,75 @@ class Duplicate(Operator):
         return {}
 
 
+@register_operator("skin", level="particle", kind="rewire")
+class Skin(Operator):
+    """Rewire roles by radius each tick: per cell, the innermost `nucleus`
+    fraction becomes the nucleus, the outermost `membrane` fraction becomes the
+    membrane, the rest cytoplasm. So the membrane is *always* the current surface
+    layer (uniform thickness by construction) and the nucleus the current core --
+    no shell/spring needed to hold them in place."""
+    REQUIRES_PARAMS = ["nucleus", "membrane"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.nf = float(params["nucleus"]); self.mf = float(params["membrane"])
+
+    def forward(self, H, mask=None):
+        part, cell = H.level("particle"), H.level("cell")
+        w = H.p_w; pos = part.state[:, :2]
+        names = part.type_names
+        nuc, mem, cyt = names.index("nucleus"), names.index("membrane"), names.index("cyto")
+        nt = part.node_type
+        for c in [c for c in range(cell.n) if H.c_active[c]]:
+            ii = ((part.parent == c) & (w > EPS)).nonzero(as_tuple=True)[0]
+            n = ii.numel()
+            if n < 6:
+                continue
+            r = (pos[ii] - pos[ii].mean(0)).norm(dim=1)
+            order = ii[r.argsort()]
+            nt[order] = cyt
+            nt[order[:int(self.nf * n)]] = nuc                 # innermost -> nucleus
+            nt[order[n - int(self.mf * n):]] = mem             # outermost -> membrane
+        # if MPM + per-role stiffness: re-apply stiffness by current role (stiff
+        # membrane skin tracks the surface) -- the 3-layer ball recipe, made dynamic
+        yr = getattr(H, "role_youngs", None)
+        if yr is not None and hasattr(part, "mu"):
+            E = yr[nt]; nu = 0.2
+            part.mu.copy_(E / (2 * (1 + nu)))
+            part.la.copy_(E * nu / ((1 + nu) * (1 - 2 * nu)))
+        return {}
+
+
+@register_operator("shell", level="particle", kind="broadcast")
+class Shell(Broadcast):
+    """Confine a role's particles to a uniform SHELL at the cell surface: a radial
+    spring pulls each `role` particle to target radius R from the cell centroid,
+    where R = factor x the mean radius of the cell's non-`role` (body) particles.
+    Even angular spacing comes from `repulse`. Gives an even-thickness membrane
+    without the loops/spirals the ring+spring produced."""
+    REQUIRES_PARAMS = ["k", "role"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.k = float(params["k"]); self.role = params["role"]
+        self.factor = float(params.get("factor", 1.25))
+
+    def forward(self, H, mask=None):
+        part, cell = H.level("particle"), H.level("cell")
+        w = H.p_w; pos = part.state[:, :2]; dev = w.device; Nc = cell.n
+        rid = part.type_names.index(self.role)
+        ism = (part.node_type == rid) & (w > EPS)
+        cen = cell.state[:, :2][part.parent]
+        rvec = pos - cen; dist = rvec.norm(dim=1, keepdim=True).clamp_min(1e-6)
+        body = (~ism) & (w > EPS)                              # cytoplasm + nucleus = the body
+        bd = (pos - cen).norm(dim=1) * body.float()
+        cnt = torch.zeros(Nc, device=dev).index_add(0, part.parent, body.float())
+        sd = torch.zeros(Nc, device=dev).index_add(0, part.parent, bd)
+        rmean = sd / cnt.clamp_min(1.0)
+        Rt = (rmean * self.factor)[part.parent][:, None]       # surface radius, per cell
+        return {"particle": -self.k * (dist - Rt) / dist * rvec * ism.float()[:, None]}
+
+
 @register_operator("ring", level="particle", kind="rewire")
 class Ring(Operator):
     """REWIRE operator: (re)build the membrane relation. For each cell, the

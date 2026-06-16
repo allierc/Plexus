@@ -97,6 +97,16 @@ def build(sc, device=DEV):
             node_type[order[n0 - km:]] = H.mem_id             # outermost
     part.register_buffer("node_type", node_type)
 
+    # per-role stiffness -> one unified MPM body whose structure (rigid nucleus,
+    # soft cytoplasm, stiff membrane cortex) is just spatially-varying youngs.
+    H.role_youngs = None
+    if ptypes and all("youngs" in t for t in ptypes.values()):
+        yr = torch.tensor([float(ptypes[n]["youngs"]) for n in names], device=device)
+        H.role_youngs = yr                                # skin re-applies this each tick
+        yp = yr[node_type]
+        mu_p, la_p = _lame(yp)
+        part.mu.copy_(mu_p); part.la.copy_(la_p)
+
     H.cell_birth = [0.0] * Nc_max; H.cell_birth[0] = float(ppc)
     return H
 

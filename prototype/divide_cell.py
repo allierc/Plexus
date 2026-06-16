@@ -170,17 +170,12 @@ def render(hist, path, fps=20, title="divide_cell", nuc_id=None, mem_id=None):
     for h in hist:
         p = h[0]; c = p.mean(0); e = float(np.abs(p - c).max())
         run = max(run, e); centers.append(c); spans.append(run * 1.25 + 0.02)
-    from matplotlib.patches import Circle
     fig, ax = plt.subplots(figsize=(5.5, 5.5)); fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
     palette = cm.get_cmap("tab20")
     has_role = (nuc_id is not None or mem_id is not None) and len(hist[0]) > 4
     maxN = max(len(h[0]) for h in hist)                        # auto dot size: denser -> smaller
-    dot = float(np.clip((1800.0 / max(maxN, 1)) ** 0.5, 0.28, 1.0))
-    MAXC = 40                                                   # membrane ring per cell
-    membranes = [Circle((0, 0), 0.0) for _ in range(MAXC)]
-    for m in membranes:
-        m.set_visible(False); ax.add_patch(m)
+    dot = float(np.clip((1500.0 / max(maxN, 1)) ** 0.5, 0.22, 0.9))
     sc = ax.scatter([], [], s=6)
     tt = ax.set_title("", color="white", fontsize=8)
     ax.set_xticks([]); ax.set_yticks([])
@@ -190,33 +185,22 @@ def render(hist, path, fps=20, title="divide_cell", nuc_id=None, mem_id=None):
         p, ww, cc, C = item[:4]
         role = item[4] if has_role else None
         ids = sorted(set(cc.tolist()))
-        for j, m in enumerate(membranes):
-            if j < len(ids):
-                pc = p[cc == ids[j]]; cen = pc.mean(0)
-                r = 1.6 * float(np.sqrt(((pc - cen) ** 2).sum(1).mean()))
-                col = palette(ids[j] % 20)
-                m.set_center((cen[0], cen[1])); m.set_radius(r)
-                m.set_facecolor((*col[:3], 0.12))               # faint cytosol fill
-                m.set_edgecolor((*col[:3], 0.9)); m.set_linewidth(1.6)   # membrane ring
-                m.set_visible(True)
-            else:
-                m.set_visible(False)
         cols = np.array([to_rgba(palette(int(c) % 20)) for c in cc])
-        sizes = (6 * ww + 1) * dot
+        sizes = (4.0 * ww + 0.5) * dot                          # smaller dots, no drawn circle
         if role is not None:
-            if nuc_id is not None:                              # nucleus: dark + a touch bigger
+            if nuc_id is not None:                              # nucleus: dark
                 isn = role == nuc_id
                 cols[isn, :3] *= 0.30
-                sizes = np.where(isn, sizes + 3 * dot, sizes)
-            if mem_id is not None:                              # membrane: bright shell
+                sizes = np.where(isn, sizes + 1.5 * dot, sizes)
+            if mem_id is not None:                              # membrane: bright shell of particles
                 ism = role == mem_id
                 cols[ism, :3] = 0.5 + 0.5 * cols[ism, :3]
-                sizes = np.where(ism, sizes + 2 * dot, sizes)
+                sizes = np.where(ism, sizes + 1.0 * dot, sizes)
         sc.set_offsets(p); sc.set_color(cols); sc.set_sizes(sizes); sc.set_alpha(0.95)
         cx, cy = centers[i]; s = spans[i]
         ax.set_xlim(cx - s, cx + s); ax.set_ylim(cy - s, cy + s)
         tt.set_text(f"{title}   frame {i}/{len(hist)-1}   |   {len(p)} particles, {len(ids)} cells")
-        return [sc, tt] + membranes
+        return [sc, tt]
 
     FuncAnimation(fig, upd, frames=len(hist), blit=False).save(
         path, writer=PillowWriter(fps=fps)); plt.close(fig)
