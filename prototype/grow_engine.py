@@ -61,7 +61,22 @@ def build(sc, device=DEV):
     part.register_buffer("parent", parent)
     H.add_level(part); H.p_w = w
 
-    # per-cell birth mass (for the doubling rule); cell 0 starts with ppc particles
+    # optional particle roles (e.g. cytoplasm / nucleus). The nucleus is the
+    # innermost `fraction` of each cell's particles (radially), so it starts central.
+    H.nuc_id = None
+    ptypes = ps.get("types")
+    node_type = torch.zeros(Np_max, dtype=torch.long, device=device)
+    if ptypes:
+        names = list(ptypes.keys()); part.type_names = names
+        if "nucleus" in names:
+            H.nuc_id = names.index("nucleus")
+            fr = float(ptypes["nucleus"]["fraction"])
+            rr = (part.state[:n0, :2] - centre).norm(dim=1)
+            k = int(fr * n0)
+            inner = rr.argsort()[:k]                            # innermost -> nucleus
+            node_type[inner] = H.nuc_id
+    part.register_buffer("node_type", node_type)
+
     H.cell_birth = [0.0] * Nc_max; H.cell_birth[0] = float(ppc)
     return H
 
@@ -76,8 +91,15 @@ def _aggregate(H):
 
 
 def _integrate(H, accel, dt):
-    """overdamped move: pos += dt * clamp(accel); only the particle level here."""
-    part = H.level("particle"); a = accel.get("particle")
+    """overdamped move: pos += dt * clamp(accel). Particle-level deltas apply
+    directly; cell-level deltas (e.g. inter-cell `tissue` adhesion) are broadcast
+    down to each cell's particles."""
+    part = H.level("particle")
+    a = accel.get("particle")
+    ac = accel.get("cell")
+    if ac is not None:
+        b = ac[part.parent]
+        a = b if a is None else a + b
     if a is None:
         return
     fn = a.norm(dim=1, keepdim=True).clamp_min(EPS)
@@ -109,10 +131,12 @@ def run(sc, device=DEV):
                                 accel[lvl] = accel.get(lvl, 0) + d
             if frame % re == 0:
                 a = (H.p_w > EPS).cpu().numpy()
+                role = (part.node_type.cpu().numpy()[a]
+                        if hasattr(part, "node_type") else None)
                 hist.append((part.state[:, :2].cpu().numpy()[a],
                              H.p_w.cpu().numpy()[a],
                              part.parent.cpu().numpy()[a],
-                             int(H.c_active.sum())))
+                             int(H.c_active.sum()), role))
     return H, hist
 
 
@@ -127,5 +151,5 @@ if __name__ == "__main__":
     last = hist[-1]
     print(f"      final: {len(last[0])} particles, {last[3]} cells over {len(hist)} frames", flush=True)
     out = os.path.join(HERE, sc.name + ".gif")
-    render(hist, out, title=sc.name)
+    render(hist, out, title=sc.name, nuc_id=getattr(H, "nuc_id", None))
     print(f"[2/2] wrote {out}", flush=True)

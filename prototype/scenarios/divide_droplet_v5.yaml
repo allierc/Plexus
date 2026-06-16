@@ -1,0 +1,19 @@
+# v5: v4 + crisper round membranes (`tension`) + a compact embryo that holds
+# together (`tissue` inter-cell adhesion) + a longer run (more cells).
+name: divide_droplet_v5
+seed: 0
+n_frames: 760
+dt: 0.02
+record_every: 4
+sets:
+  cell:     {n: 1, buffer: 24}
+  particle: {parent: cell, per_parent: 200, buffer: 3600, radius: 0.06}
+fields: {}
+operators:
+  - {op: cohere,    at: particle, k: 0.9}                 # pull to centroid
+  - {op: repulse,   at: particle, r0: 0.013, k: 0.6}      # incompressibility
+  - {op: tension,   at: particle, strength: 4.0, radius: 0.026, nfull: 12}  # crisp round boundary
+  - {op: tissue,    at: cell, strength: 1.5, radius: 0.22} # gentle adhesion -> compact embryo
+  - {op: duplicate, at: particle, rate: 5, r0: 0.013}     # grow
+  - {op: mitosis,   at: cell, ratio: 2.0, frames: 24, elong: 0.18, furrow: 3.5, furrow_w: 0.018}
+schedule: [aggregate, cohere, repulse, tension, tissue, mitosis, integrate, duplicate]

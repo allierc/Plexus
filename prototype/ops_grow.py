@@ -91,6 +91,8 @@ class Duplicate(Operator):
         part.state[new, 2:] = 0.0
         part.parent[new] = part.parent[par]
         w[new] = 1.0
+        if hasattr(part, "node_type"):                  # daughter inherits role (cyto/nucleus)
+            part.node_type[new] = part.node_type[par]
         # if the particle level carries MPM state, initialise the new slots too
         if hasattr(part, "mass"):
             part.mass[new] = H.p_mass0
@@ -100,6 +102,32 @@ class Duplicate(Operator):
         if hasattr(part, "mu"):
             part.mu[new] = part.mu[par]; part.la[new] = part.la[par]
         return {}
+
+
+@register_operator("nucleus", level="particle", kind="broadcast")
+class Nucleus(Broadcast):
+    """A rigid nucleus: particles tagged `nucleus` are pulled strongly toward
+    their cell's nucleus centroid, so they clump into a stiff compact core at the
+    cell centre (and split with the cell at division). `k` large => rigid."""
+    REQUIRES_PARAMS = ["k"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.k = float(params["k"])
+
+    def forward(self, H, mask=None):
+        nuc_id = getattr(H, "nuc_id", None)
+        if nuc_id is None:
+            return {}
+        part, cell = H.level("particle"), H.level("cell")
+        w = H.p_w; pos = part.state[:, :2]; dev = w.device
+        isn = ((part.node_type == nuc_id) & (w > EPS)).float()
+        wn = w * isn
+        Nc = cell.n
+        m = torch.zeros(Nc, device=dev).index_add(0, part.parent, wn)
+        sp = torch.zeros(Nc, 2, device=dev).index_add(0, part.parent, wn[:, None] * pos)
+        ncen = sp / m.clamp_min(EPS)[:, None]                    # per-cell nucleus centroid
+        return {"particle": -self.k * (pos - ncen[part.parent]) * isn[:, None]}
 
 
 @register_operator("tension", level="particle", kind="lateral")

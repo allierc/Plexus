@@ -217,3 +217,26 @@ Lesson for the taxonomy: a structural operator can be **gradual** — it carries
 per-cell phase and emits ordinary per-particle deltas during the transition, only
 changing membership at completion. So "structural" and "returns a delta" aren't
 exclusive; Divide/Die can have dynamics.
+
+### v5–v6: tissue, then internal structure (nucleus + membrane)
+
+| # | spec | change | result |
+|---|------|--------|--------|
+| v5 | `divide_droplet_v5` | + `tissue` adhesion (strength 1.5) | **regression**: tissue ≫ cohere, all cells merge into one mixed ball |
+| v6 | `divide_droplet_v6` | particle roles + `nucleus` + membrane render | **nucleated cells with membranes** ✅ |
+
+- **v5 lesson:** inter-cell `tissue` adhesion must be **≪** the per-cell binding
+  (`cohere`), or cells lose identity and fuse. Dropped it; the morula already
+  packs from global `repulse`.
+- **v6 (better):** cells gain *internal structure*.
+  - **Particle roles**: the `particle` set now has `types: {cyto, nucleus}` — the
+    engine assigns the innermost fraction of each cell to `nucleus` (so it starts
+    central), `duplicate` propagates the role to daughters, and `mitosis` splits
+    the nucleus with the cell.
+  - **`nucleus` operator** (broadcast): nuclear particles are pulled hard to their
+    cell's nuclear centroid → a stiff compact core. `k` large ⇒ rigid.
+  - **Membrane**: `tension` already defines the boundary; the render now draws it
+    as a **ring** (edge) and the nucleus particles **dark** — each cell reads as a
+    membrane-bounded cell with a nucleus, not a dot cloud.
+  - General engine lesson: a set can carry **roles (sub-types) on a leaf level**,
+    and every per-particle structural op (`duplicate`) must propagate them.

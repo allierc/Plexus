@@ -156,11 +156,14 @@ def run(N0, N_max, rate, ticks, record_every, k_coh, grad=False):
 # --------------------------------------------------------------------------- #
 #  render
 # --------------------------------------------------------------------------- #
-def render(hist, path, fps=20, title="divide_cell"):
+def render(hist, path, fps=20, title="divide_cell", nuc_id=None):
+    """hist items are (pos, w, cell_id, C) or (..., role). If `role` + `nuc_id`
+    are given, nucleus particles are drawn dark and the membrane as a ring."""
     import numpy as np
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation, PillowWriter
+    from matplotlib.colors import to_rgba
     import matplotlib.cm as cm
     # follow-cam: centre on the colony each frame; zoom out monotonically as it grows
     centers, spans, run = [], [], 0.0
@@ -171,8 +174,9 @@ def render(hist, path, fps=20, title="divide_cell"):
     fig, ax = plt.subplots(figsize=(5.5, 5.5)); fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
     palette = cm.get_cmap("tab20")
-    MAXC = 32                                                   # soft "membrane" per cell
-    membranes = [Circle((0, 0), 0.0, lw=0) for _ in range(MAXC)]
+    has_role = nuc_id is not None and len(hist[0]) > 4
+    MAXC = 40                                                   # membrane ring per cell
+    membranes = [Circle((0, 0), 0.0) for _ in range(MAXC)]
     for m in membranes:
         m.set_visible(False); ax.add_patch(m)
     sc = ax.scatter([], [], s=6)
@@ -180,20 +184,28 @@ def render(hist, path, fps=20, title="divide_cell"):
     ax.set_xticks([]); ax.set_yticks([])
 
     def upd(i):
-        p, ww, cc, C = hist[i]
+        item = hist[i]
+        p, ww, cc, C = item[:4]
+        role = item[4] if has_role else None
         ids = sorted(set(cc.tolist()))
         for j, m in enumerate(membranes):
             if j < len(ids):
                 pc = p[cc == ids[j]]; cen = pc.mean(0)
-                r = 1.7 * float(np.sqrt(((pc - cen) ** 2).sum(1).mean()))   # ~ enclosing radius
+                r = 1.6 * float(np.sqrt(((pc - cen) ** 2).sum(1).mean()))
+                col = palette(ids[j] % 20)
                 m.set_center((cen[0], cen[1])); m.set_radius(r)
-                m.set_facecolor(palette(ids[j] % 20)); m.set_alpha(0.16); m.set_visible(True)
+                m.set_facecolor((*col[:3], 0.12))               # faint cytosol fill
+                m.set_edgecolor((*col[:3], 0.9)); m.set_linewidth(1.6)   # membrane ring
+                m.set_visible(True)
             else:
                 m.set_visible(False)
-        sc.set_offsets(p)
-        sc.set_color(palette(cc % 20))
-        sc.set_alpha(0.95)
-        sc.set_sizes(7 * ww + 1)
+        cols = np.array([to_rgba(palette(int(c) % 20)) for c in cc])
+        sizes = 7 * ww + 1
+        if role is not None:                                    # nucleus: dark + bigger
+            isn = role == nuc_id
+            cols[isn, :3] *= 0.30
+            sizes = np.where(isn, sizes + 4, sizes)
+        sc.set_offsets(p); sc.set_color(cols); sc.set_sizes(sizes); sc.set_alpha(0.95)
         cx, cy = centers[i]; s = spans[i]
         ax.set_xlim(cx - s, cx + s); ax.set_ylim(cy - s, cy + s)
         tt.set_text(f"{title}   frame {i}/{len(hist)-1}   |   {len(p)} particles, {len(ids)} cells")
