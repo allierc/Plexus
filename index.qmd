@@ -113,7 +113,7 @@ by changing only a ~20-line specification — no new software per phenomenon.
 :::
 
 And because every simulation is differentiable, biological designs can be
-*optimized*. Below, a foraging colony in a maze is tuned by black-box search —
+*optimized*. Below, a foraging colony in a maze is tuned by a UCB algorithm —
 from a hand-set design (left) to the best found (right), which delivers food
 roughly five-fold faster.
 
