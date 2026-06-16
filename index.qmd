@@ -15,18 +15,15 @@ pressure field, a chemical signal — that the discrete entities both shape and
 read. Choose any single graph and you capture one slice — the couplings
 *between* slices, where much of the biology lives, fall outside it.
 
-Plexus starts from a different question:
-
-> What is the minimal language needed to describe a living system?
-
 Rather than building another domain-specific simulator, Plexus introduces a
 common representation based on **hierarchical sets**, **continuous fields**, and
 a small collection of **operators** acting between them. Cells contain particles
-and metabolites. Populations contain cells. Fields exchange information with
-discrete entities. State moves through just four operators — **lateral** (within
-a set), **aggregate** (up the containment hierarchy), **broadcast** (down it),
-and **exchange** (between sets and fields). Complex simulations emerge from
-composing a few primitive operations.
+and metabolites. State moves through just four operators — **lateral** (within a
+set), **aggregate** (upward), **broadcast** (downward), and **exchange** (between
+sets and fields). Complex simulations emerge from composing a few primitive
+operations.
+
+![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* scatters ($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field.](figures/fig_ops.png){width=100%}
 
 The goal is not merely to mimic biology, but to provide a *language* in
 which biological systems can be expressed, modified, optimized, and understood —
