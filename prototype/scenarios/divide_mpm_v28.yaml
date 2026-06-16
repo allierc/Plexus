@@ -1,0 +1,27 @@
+name: divide_mpm_v28
+seed: 0
+n_frames: 620
+dt: 0.02
+record_every: 4
+sets:
+  cell: {n: 1, buffer: 8, types: {soft: {fraction: 1.0, youngs: 40}}}
+  particle:
+    parent: cell
+    per_parent: 1000
+    buffer: 8000
+    radius: 0.09
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.14, youngs: 320}
+      cyto:     {fraction: 0.72, youngs: 25}
+      membrane: {fraction: 0.14, youngs: 800}
+fields: {}
+operators:
+  - {op: skin,    at: particle, nucleus: 0.14, membrane: 0.14}
+  - {op: cohere,  at: particle, k: 70.0}                   # strong within-cell containment
+  - {op: separate, at: particle, r0: 0.020, k: 0.7}        # gentle anti-fusion gap
+  - {op: tissue,  at: cell, strength: 90.0, radius: 0.22}
+  - {op: mitosis, at: cell, ratio: 2.0, frames: 36, elong: 0.8, furrow: 7.0, furrow_w: 0.02, pole: 1.5, round_frames: 8, round_k: 6.0}
+  - {op: duplicate, at: particle, rate: 9, r0: 0.011}
+  - {op: mpm, at: particle, n_grid: 160, substeps: 12, dt_sub: 2.0e-4, a_max: 500, drag: 2.4, vmax: 6.0}
+schedule: [aggregate, skin, cohere, separate, tissue, mitosis, duplicate, mpm]

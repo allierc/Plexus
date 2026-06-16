@@ -1,0 +1,33 @@
+# v26: MPM dividing cell with v18-style dynamics. MPM gives the unified bouncy
+# mechanics; `separate` (cross-cell repulsion) holds a gap so daughters DON'T fuse;
+# `tissue` packs them back together; `mitosis` does the elongate+furrow+poles split.
+# Smaller nucleus & thinner membrane (per feedback that v18's were too big/thick).
+name: divide_mpm_v26
+seed: 0
+n_frames: 620
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 8
+    types: {soft: {fraction: 1.0, youngs: 40}}
+  particle:
+    parent: cell
+    per_parent: 700
+    buffer: 6000
+    radius: 0.09
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.14, youngs: 320}
+      cyto:     {fraction: 0.72, youngs: 25}
+      membrane: {fraction: 0.14, youngs: 800}
+fields: {}
+operators:
+  - {op: skin,    at: particle, nucleus: 0.14, membrane: 0.14}
+  - {op: separate, at: particle, r0: 0.024, k: 1.6}        # anti-fusion gap between cells
+  - {op: tissue,  at: cell, strength: 100.0, radius: 0.22} # pack daughters back (cell adhesion)
+  - {op: mitosis, at: cell, ratio: 2.0, frames: 36, elong: 0.8, furrow: 7.0, furrow_w: 0.02, pole: 1.5, round_frames: 8, round_k: 6.0}
+  - {op: duplicate, at: particle, rate: 7, r0: 0.012}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 400, drag: 1.2, vmax: 6.0}
+schedule: [aggregate, skin, separate, tissue, mitosis, duplicate, mpm]

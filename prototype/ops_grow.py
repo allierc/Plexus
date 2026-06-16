@@ -265,6 +265,30 @@ class Tension(Lateral):
         return {"particle": self.s * bw[:, None] * (cen - pos) * w[:, None]}
 
 
+@register_operator("separate", level="particle", kind="lateral")
+class Separate(Lateral):
+    """Cross-cell repulsion: a particle is pushed away from nearby particles of
+    OTHER cells, holding a gap so single-material MPM bodies do NOT fuse on the
+    shared grid (the failure mode of every MPM division attempt). Within-cell
+    pairs are ignored -- MPM handles those. r0 should be a few grid cells so the
+    gap exceeds the P2G/G2P stencil reach."""
+    REQUIRES_PARAMS = ["r0", "k"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.r0 = float(params["r0"]); self.k = float(params["k"])
+
+    def forward(self, H, mask=None):
+        part = H.level("particle"); w = H.p_w
+        pos = part.state[:, :2]; N = pos.shape[0]
+        diff = pos[:, None, :] - pos[None, :, :]
+        d = torch.sqrt((diff * diff).sum(2) + 1e-9)
+        cross = (part.parent[:, None] != part.parent[None, :])
+        mag = (self.k * (1.0 - d / self.r0)).clamp_min(0.0) * cross.float() * w[None, :]
+        f = (mag[:, :, None] * diff / d[:, :, None]).sum(1)
+        return {"particle": f * w[:, None]}
+
+
 @register_operator("tissue", level="cell", kind="lateral")
 class Tissue(Lateral):
     """Inter-cell adhesion: each active cell is pulled toward the centroids of its
