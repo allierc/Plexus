@@ -1,6 +1,6 @@
 ---
 title: "The abstraction"
-subtitle: "Hierarchical sets, fields, and four operators"
+subtitle: "Hierarchical sets, fields, and operators"
 ---
 
 The container is built from two kinds of object — **sets** and **fields** — and
@@ -38,9 +38,12 @@ secretion and sensing); these couplings are the operators below.
 ## Operators
 
 A GNN is an **operator** $\mathcal{O}$ returning a time-derivative contribution,
-dispatched by the relation it acts on. Four operators move *state* along a fixed
-structure, one per relation the container admits, and two *structural* operators
-change a set's membership. The four state operators:
+dispatched by the relation it acts on. The operators fall into two families.
+**Four dynamics operators** move *state* along a fixed structure, one per relation
+the container admits. **Structure operators** instead reshape that structure
+itself and emit no state delta: *Rewire* rebuilds the relation $E$ (which nodes
+interact), while *Divide* and *Die* change the node set $|S_k|$ (birth and death).
+The four dynamics operators:
 
 $$
 \begin{aligned}
@@ -85,16 +88,26 @@ samples/senses the field back onto the objects. The relation is bipartite
 (objects $\leftrightarrow$ grid); it is exactly the MPM particle–grid transfer
 (P2G/G2P) and chemotactic secretion/sensing.
 
-**Two structural operators: Divide and Die.** The four above move *state* while
-the sets, edges, and maps stay fixed. Living matter also rewrites its own
-structure: cells divide and die, so the cardinality $|S_k|$ itself grows and
-shrinks. Two operators do exactly this — **Divide** $\mathcal{B}: x \mapsto
+**Rewire $\mathcal{R}$ (structure).** The first structure operator rebuilds the
+relation $E\subseteq S_k\times S_k$ on which the lateral operators act — *which*
+nodes are neighbours — and returns no state delta. A *geometric* relation is
+rebuilt every tick from the live configuration (a **radius graph**: all pairs
+within a cutoff; or a $k$-nearest-neighbour or Delaunay graph), so the
+interaction graph tracks motion, growth, and division; a *fixed* relation (a
+connectome) is built once and never rewired. Separating *who* interacts (Rewire)
+from *how* they interact (Lateral) is what turns a dense $O(N^2)$ force law into
+$O(|E|)$ message passing and lets several lateral operators share one graph.
+
+**Divide and Die (structure).** Rewire reshapes the edges; these two reshape the
+nodes. The dynamics operators move *state* while the node set stays fixed, but
+living matter also rewrites its own membership: cells divide and die, so the
+cardinality $|S_k|$ itself grows and shrinks — **Divide** $\mathcal{B}: x \mapsto
 \{x',x''\}$ (proliferation) and **Die** $\mathcal{D}: x \mapsto \varnothing$
-(apoptosis / efflux) — the only operators that change a set's cardinality. For a
+(apoptosis / efflux) are the only operators that change a set's cardinality. For a
 *living* system they are as primordial as the other four; everything else
 assumes the cells it acts on already exist.
 
-![The six operators. The first four move state along a fixed structure; *Divide* and *Die* are structural — they change a set's membership (cell division and death), carried on a fixed buffer by a per-element occupancy mass $w$.](figures/fig_ops.png){width=100%}
+![The operators, in two families. The first four are *dynamics* — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment $\pi$; Exchange to/from a field). The last three are *structure* operators that emit no state delta: *Rewire* rebuilds the relation $E$ — which nodes interact (a radius graph rebuilt each tick, dashed cutoff) — while *Divide* and *Die* change the node set $|S_k|$, carried on a fixed buffer by a per-element occupancy mass $w$.](figures/fig_ops.png){width=100%}
 
 ### Differentiating division and death
 
@@ -122,7 +135,7 @@ objective is itself discrete (final count, fraction escaped). This is the *use
 both* recipe applied to structure: gradients for the continuous interior,
 black-box for the discrete choices.
 
-Sets, fields, and these six operators are the entire vocabulary. The wager of
+Sets, fields, and these operators are the entire vocabulary. The wager of
 Plexus is that this is enough **to describe a complex living system** — that
 everything from mechanics to morphogenesis to division and death is some
 composition of them over a hierarchy of sets and fields.
@@ -168,8 +181,9 @@ code.
 | up op | reduction over fibres | $\sum_\pi$ | `Aggregate` |
 | down op | lift | $\pi^{*}$ | `Broadcast` |
 | set $\leftrightarrow$ field op | transfer | $\mathcal{S},\mathcal{G}$ | `Exchange` |
-| make an element | structural: division | $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ | `Divide` |
-| remove an element | structural: death | $\mathcal{D}:x\!\mapsto\!\varnothing$ | `Die` |
+| rebuild the relation | structure: rewire | $\mathcal{R}\!:\,\to\!E$ | `Rewire` |
+| make an element | structure: division | $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ | `Divide` |
+| remove an element | structure: death | $\mathcal{D}:x\!\mapsto\!\varnothing$ | `Die` |
 | per-element occupancy | mass | $w_i\in[0,1]$ | `Level.mass` |
 | the container | hierarchy | $(S_\bullet,F_\bullet,\pi_\bullet)$ | `Hierarchy` |
 | the model | composition of ops | $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ | `Schedule` |

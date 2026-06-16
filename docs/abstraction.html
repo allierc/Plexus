@@ -340,7 +340,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">The abstraction</h1>
-<p class="subtitle lead">Hierarchical sets, fields, and four operators</p>
+<p class="subtitle lead">Hierarchical sets, fields, and operators</p>
 </div>
 
 
@@ -375,7 +375,7 @@ window.Quarto = {
 </section>
 <section id="operators" class="level2">
 <h2 class="anchored" data-anchor-id="operators">Operators</h2>
-<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> returning a time-derivative contribution, dispatched by the relation it acts on. Four operators move <em>state</em> along a fixed structure, one per relation the container admits, and two <em>structural</em> operators change a set’s membership. The four state operators:</p>
+<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> returning a time-derivative contribution, dispatched by the relation it acts on. The operators fall into two families. <strong>Four dynamics operators</strong> move <em>state</em> along a fixed structure, one per relation the container admits. <strong>Structure operators</strong> instead reshape that structure itself and emit no state delta: <em>Rewire</em> rebuilds the relation <span class="math inline">\(E\)</span> (which nodes interact), while <em>Divide</em> and <em>Die</em> change the node set <span class="math inline">\(|S_k|\)</span> (birth and death). The four dynamics operators:</p>
 <p><span class="math display">\[
 \begin{aligned}
 \textbf{Lateral}\quad   &amp; \mathcal{O}_E,\ E\subseteq S_k\times S_k
@@ -393,12 +393,13 @@ window.Quarto = {
 <p><strong>Aggregate <span class="math inline">\(\textstyle\sum_\pi\)</span> (up).</strong> Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.</p>
 <p><strong>Broadcast <span class="math inline">\(\pi^{*}\)</span> (down).</strong> The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map <span class="math inline">\(\pi\)</span>.</p>
 <p><strong>Exchange <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span>.</strong> Couples a set to a field: scatter <span class="math inline">\(\mathcal{S}\)</span> deposits/secretes object state into the field, gather <span class="math inline">\(\mathcal{G}\)</span> samples/senses the field back onto the objects. The relation is bipartite (objects <span class="math inline">\(\leftrightarrow\)</span> grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.</p>
-<p><strong>Two structural operators: Divide and Die.</strong> The four above move <em>state</em> while the sets, edges, and maps stay fixed. Living matter also rewrites its own structure: cells divide and die, so the cardinality <span class="math inline">\(|S_k|\)</span> itself grows and shrinks. Two operators do exactly this — <strong>Divide</strong> <span class="math inline">\(\mathcal{B}: x \mapsto
-\{x',x''\}\)</span> (proliferation) and <strong>Die</strong> <span class="math inline">\(\mathcal{D}: x \mapsto \varnothing\)</span> (apoptosis / efflux) — the only operators that change a set’s cardinality. For a <em>living</em> system they are as primordial as the other four; everything else assumes the cells it acts on already exist.</p>
+<p><strong>Rewire <span class="math inline">\(\mathcal{R}\)</span> (structure).</strong> The first structure operator rebuilds the relation <span class="math inline">\(E\subseteq S_k\times S_k\)</span> on which the lateral operators act — <em>which</em> nodes are neighbours — and returns no state delta. A <em>geometric</em> relation is rebuilt every tick from the live configuration (a <strong>radius graph</strong>: all pairs within a cutoff; or a <span class="math inline">\(k\)</span>-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a <em>fixed</em> relation (a connectome) is built once and never rewired. Separating <em>who</em> interacts (Rewire) from <em>how</em> they interact (Lateral) is what turns a dense <span class="math inline">\(O(N^2)\)</span> force law into <span class="math inline">\(O(|E|)\)</span> message passing and lets several lateral operators share one graph.</p>
+<p><strong>Divide and Die (structure).</strong> Rewire reshapes the edges; these two reshape the nodes. The dynamics operators move <em>state</em> while the node set stays fixed, but living matter also rewrites its own membership: cells divide and die, so the cardinality <span class="math inline">\(|S_k|\)</span> itself grows and shrinks — <strong>Divide</strong> <span class="math inline">\(\mathcal{B}: x \mapsto
+\{x',x''\}\)</span> (proliferation) and <strong>Die</strong> <span class="math inline">\(\mathcal{D}: x \mapsto \varnothing\)</span> (apoptosis / efflux) are the only operators that change a set’s cardinality. For a <em>living</em> system they are as primordial as the other four; everything else assumes the cells it acts on already exist.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption>The six operators. The first four move state along a fixed structure; <em>Divide</em> and <em>Die</em> are structural — they change a set’s membership (cell division and death), carried on a fixed buffer by a per-element occupancy mass <span class="math inline">\(w\)</span>.</figcaption>
+<figcaption>The operators, in two families. The first four are <em>dynamics</em> — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment <span class="math inline">\(\pi\)</span>; Exchange to/from a field). The last three are <em>structure</em> operators that emit no state delta: <em>Rewire</em> rebuilds the relation <span class="math inline">\(E\)</span> — which nodes interact (a radius graph rebuilt each tick, dashed cutoff) — while <em>Divide</em> and <em>Die</em> change the node set <span class="math inline">\(|S_k|\)</span>, carried on a fixed buffer by a per-element occupancy mass <span class="math inline">\(w\)</span>.</figcaption>
 </figure>
 </div>
 <section id="differentiating-division-and-death" class="level3">
@@ -410,7 +411,7 @@ window.Quarto = {
 </ul>
 <p><em>Every operator then honours <span class="math inline">\(w\)</span></em>: Aggregate becomes a <strong>mass-weighted</strong> reduction <span class="math inline">\(\left(\sum_i w_i x_i\right)/\sum_i w_i\)</span>, Lateral weights each message by <span class="math inline">\(w_j\)</span>, and so on — so the boolean selector mask is just the <span class="math inline">\(\{0,1\}\)</span> special case of <span class="math inline">\(w\)</span>. The trajectory between events is now smooth in <span class="math inline">\(w\)</span>, so gradients flow on a fixed-shape tensor (and <code>torch.compile</code> still applies).</p>
 <p>The one genuinely non-differentiable part — the integer decision of <em>when</em> to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division <em>policy</em>; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death <em>rates</em>; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the <em>use both</em> recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.</p>
-<p>Sets, fields, and these six operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields.</p>
+<p>Sets, fields, and these operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields.</p>
 </section>
 </section>
 <section id="dynamics-a-schedule" class="level2">
@@ -506,30 +507,36 @@ window.Quarto = {
 <td><code>Exchange</code></td>
 </tr>
 <tr class="even">
+<td>rebuild the relation</td>
+<td>structure: rewire</td>
+<td><span class="math inline">\(\mathcal{R}\!:\,\to\!E\)</span></td>
+<td><code>Rewire</code></td>
+</tr>
+<tr class="odd">
 <td>make an element</td>
-<td>structural: division</td>
+<td>structure: division</td>
 <td><span class="math inline">\(\mathcal{B}:x\!\mapsto\!\{x',x''\}\)</span></td>
 <td><code>Divide</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>remove an element</td>
-<td>structural: death</td>
+<td>structure: death</td>
 <td><span class="math inline">\(\mathcal{D}:x\!\mapsto\!\varnothing\)</span></td>
 <td><code>Die</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>per-element occupancy</td>
 <td>mass</td>
 <td><span class="math inline">\(w_i\in[0,1]\)</span></td>
 <td><code>Level.mass</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>the container</td>
 <td>hierarchy</td>
 <td><span class="math inline">\((S_\bullet,F_\bullet,\pi_\bullet)\)</span></td>
 <td><code>Hierarchy</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>the model</td>
 <td>composition of ops</td>
 <td><span class="math inline">\(\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1\)</span></td>
