@@ -240,3 +240,37 @@ exclusive; Divide/Die can have dynamics.
     membrane-bounded cell with a nucleus, not a dot cloud.
   - General engine lesson: a set can carry **roles (sub-types) on a leaf level**,
     and every per-particle structural op (`duplicate`) must propagate them.
+
+### v7–v8 + a structural correction (entities vs operators)
+
+| # | spec | change | result |
+|---|------|--------|--------|
+| v7 | `divide_cell_v7` | ~4× particles, dots auto-shrink with density | dense, finely-grained cells |
+| v8 | `divide_mpm_v8` | MPM back + membrane **made of particles** | structured cells (nucleus/cyto/membrane); rough at 8 |
+
+**Two corrections to keep the modelling framework-clean (prompted by good pushback):**
+
+1. **A nucleus is an *entity*, not an operator.** First version had a bespoke
+   `nucleus` operator — that conflates *what it is* (a contained sub-set) with *the
+   force* (cohesion). Fixed: `nucleus` is a **role** on the particle set (a
+   sub-set of the cell, à la Fig 1 "cell = particles AND metabolites"), and its
+   rigidity is the **generic `cohere` operator scoped to that role** (`role:
+   nucleus`, large `k`). Deleted the `nucleus` operator. Same lesson would apply
+   to any organelle.
+2. **A membrane is also an entity** — and tempting to name a force after the actin
+   *cortex*. Same trap. Modelled it generically: `membrane` is a **role**; its
+   particles are linked into a **ring** (`ring`, a **rewire** operator that
+   rebuilds the loop relation each tick as the cell grows/divides), and held taut
+   by **`spring`** (the canonical **Lateral** operator along `edge_index`). So the
+   membrane = entity (role) + relation (ring) + generic Lateral force — exercising
+   the taxonomy's **rewire** + **lateral** primitives, no "cortex" operator.
+
+General principle reinforced: **name operators after the relation/dynamics
+(cohere, spring, rewire), never after the biological entity (nucleus, cortex).**
+Entities are sets/roles + containment; operators are the generic dynamics on them.
+
+`cohere` now takes an optional `role` (cohere to the sub-set centroid); `ring`
+(rewire) + `spring` (lateral) added; `nucleus` operator removed. MPM build assigns
+roles by radius (nucleus innermost, membrane outermost). v8 is rough (MPM edge
+blow-out, cells overlap without containment) — needs tuning, but the structured,
+particle-membrane cell is proven inside the framework.

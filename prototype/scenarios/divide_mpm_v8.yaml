@@ -1,0 +1,34 @@
+# v8: MPM mechanics + cells with full structure -- a rigid NUCLEUS (core), a
+# CYTOPLASM bulk, and a MEMBRANE made of particles (an outer ring held by a
+# `spring` along a `ring` relation that a rewire rebuilds each tick). All three
+# are entities (roles); the dynamics are generic operators (cohere / spring / mpm).
+name: divide_mpm_v8
+seed: 0
+n_frames: 560
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 12
+    types: {soft: {fraction: 1.0, youngs: 13}}     # mpm reads youngs (build sets mu,la)
+  particle:
+    parent: cell
+    per_parent: 300
+    buffer: 3600
+    radius: 0.06
+    # roles carry youngs too (the capability check resolves it on the nearest typed set)
+    types:
+      nucleus:  {fraction: 0.22, youngs: 13}
+      cyto:     {fraction: 0.58, youngs: 13}
+      membrane: {fraction: 0.20, youngs: 13}
+fields: {}
+operators:
+  - {op: cohere, at: particle, k: 60.0,  role: cyto}     # cytoplasm rounds to cell centroid
+  - {op: cohere, at: particle, k: 140.0, role: nucleus}  # rigid nuclear core
+  - {op: ring,   at: particle, role: membrane}           # rewire: rebuild the membrane loop
+  - {op: spring, at: particle, k: 90.0, rest: 0.006}     # lateral: membrane tension (taut shell)
+  - {op: duplicate, at: particle, rate: 6, r0: 0.012}
+  - {op: mitosis,   at: cell, ratio: 2.0, frames: 24, elong: 0.18, furrow: 3.5, furrow_w: 0.014}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 800, drag: 2.0, vmax: 6.0}
+schedule: [aggregate, cohere, ring, spring, mitosis, duplicate, mpm]

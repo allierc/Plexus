@@ -1,7 +1,7 @@
 # A round soft cell of particles grows by duplication and divides when its mass
 # has DOUBLED; the daughters grow and divide again. Pure spec over registered
 # operators -- the engine never branches on this scenario's name.
-name: divide_droplet_v3
+name: divide_cell_v3
 seed: 0
 n_frames: 520
 dt: 0.02

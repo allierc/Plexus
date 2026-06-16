@@ -156,9 +156,9 @@ def run(N0, N_max, rate, ticks, record_every, k_coh, grad=False):
 # --------------------------------------------------------------------------- #
 #  render
 # --------------------------------------------------------------------------- #
-def render(hist, path, fps=20, title="divide_cell", nuc_id=None):
-    """hist items are (pos, w, cell_id, C) or (..., role). If `role` + `nuc_id`
-    are given, nucleus particles are drawn dark and the membrane as a ring."""
+def render(hist, path, fps=20, title="divide_cell", nuc_id=None, mem_id=None):
+    """hist items are (pos, w, cell_id, C) or (..., role). With roles, nucleus
+    particles are drawn dark and membrane particles bright."""
     import numpy as np
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -174,7 +174,9 @@ def render(hist, path, fps=20, title="divide_cell", nuc_id=None):
     fig, ax = plt.subplots(figsize=(5.5, 5.5)); fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
     palette = cm.get_cmap("tab20")
-    has_role = nuc_id is not None and len(hist[0]) > 4
+    has_role = (nuc_id is not None or mem_id is not None) and len(hist[0]) > 4
+    maxN = max(len(h[0]) for h in hist)                        # auto dot size: denser -> smaller
+    dot = float(np.clip((1800.0 / max(maxN, 1)) ** 0.5, 0.28, 1.0))
     MAXC = 40                                                   # membrane ring per cell
     membranes = [Circle((0, 0), 0.0) for _ in range(MAXC)]
     for m in membranes:
@@ -200,11 +202,16 @@ def render(hist, path, fps=20, title="divide_cell", nuc_id=None):
             else:
                 m.set_visible(False)
         cols = np.array([to_rgba(palette(int(c) % 20)) for c in cc])
-        sizes = 7 * ww + 1
-        if role is not None:                                    # nucleus: dark + bigger
-            isn = role == nuc_id
-            cols[isn, :3] *= 0.30
-            sizes = np.where(isn, sizes + 4, sizes)
+        sizes = (6 * ww + 1) * dot
+        if role is not None:
+            if nuc_id is not None:                              # nucleus: dark + a touch bigger
+                isn = role == nuc_id
+                cols[isn, :3] *= 0.30
+                sizes = np.where(isn, sizes + 3 * dot, sizes)
+            if mem_id is not None:                              # membrane: bright shell
+                ism = role == mem_id
+                cols[ism, :3] = 0.5 + 0.5 * cols[ism, :3]
+                sizes = np.where(ism, sizes + 2 * dot, sizes)
         sc.set_offsets(p); sc.set_color(cols); sc.set_sizes(sizes); sc.set_alpha(0.95)
         cx, cy = centers[i]; s = spans[i]
         ax.set_xlim(cx - s, cx + s); ax.set_ylim(cy - s, cy + s)

@@ -29,20 +29,31 @@ EPS = 1e-6
 
 @register_operator("cohere", level="particle", kind="broadcast")
 class Cohere(Broadcast):
-    """Broadcast the parent cell's centroid down to its particles and pull each
-    particle toward it (keeps the cell round and together)."""
+    """Pull each particle toward the centroid of its containing set, so that set
+    stays round and together. With no `role`, the set is the whole cell (cytosol
+    cohesion). With `role: <type>`, the set is the cell's sub-population of that
+    role (e.g. the NUCLEUS) and the particles cohere to *its* centroid -- a large
+    `k` makes a rigid organelle. The nucleus is thus an entity (a contained
+    sub-set), and its rigidity is just this generic operator scoped to it; there
+    is no special 'nucleus' operator."""
     REQUIRES_PARAMS = ["k"]
 
     def __init__(self, params, device="cpu"):
         super().__init__()
-        self.k = float(params["k"])
+        self.k = float(params["k"]); self.role = params.get("role")
 
     def forward(self, H, mask=None):
         part, cell = H.level("particle"), H.level("cell")
-        ppos = part.state[:, :2]
-        centroid = cell.state[:, :2][part.parent]          # parent's centroid (down-lift)
-        accel = -self.k * (ppos - centroid) * H.p_w[:, None]
-        return {"particle": accel}
+        w = H.p_w; pos = part.state[:, :2]
+        if self.role is None:                              # whole-cell centroid (already aggregated)
+            return {"particle": -self.k * (pos - cell.state[:, :2][part.parent]) * w[:, None]}
+        rid = part.type_names.index(self.role)             # sub-set (role) centroid, per cell
+        isr = ((part.node_type == rid) & (w > EPS)).float()
+        wr = w * isr; Nc = cell.n; dev = w.device
+        m = torch.zeros(Nc, device=dev).index_add(0, part.parent, wr)
+        sp = torch.zeros(Nc, 2, device=dev).index_add(0, part.parent, wr[:, None] * pos)
+        cen = sp / m.clamp_min(EPS)[:, None]
+        return {"particle": -self.k * (pos - cen[part.parent]) * isr[:, None]}
 
 
 @register_operator("repulse", level="particle", kind="lateral")
@@ -104,30 +115,59 @@ class Duplicate(Operator):
         return {}
 
 
-@register_operator("nucleus", level="particle", kind="broadcast")
-class Nucleus(Broadcast):
-    """A rigid nucleus: particles tagged `nucleus` are pulled strongly toward
-    their cell's nucleus centroid, so they clump into a stiff compact core at the
-    cell centre (and split with the cell at division). `k` large => rigid."""
-    REQUIRES_PARAMS = ["k"]
+@register_operator("ring", level="particle", kind="rewire")
+class Ring(Operator):
+    """REWIRE operator: (re)build the membrane relation. For each cell, the
+    `role` particles are ordered by angle around the cell centroid and linked into
+    a closed loop (edge_index). Rebuilt every tick, so it tracks growth and
+    division automatically -- the structural 'change the relation E' primitive.
+    Stores H.mem_edges; emits no force."""
+    REQUIRES_PARAMS = ["role"]
 
     def __init__(self, params, device="cpu"):
         super().__init__()
-        self.k = float(params["k"])
+        self.role = params["role"]
 
     def forward(self, H, mask=None):
-        nuc_id = getattr(H, "nuc_id", None)
-        if nuc_id is None:
-            return {}
         part, cell = H.level("particle"), H.level("cell")
         w = H.p_w; pos = part.state[:, :2]; dev = w.device
-        isn = ((part.node_type == nuc_id) & (w > EPS)).float()
-        wn = w * isn
-        Nc = cell.n
-        m = torch.zeros(Nc, device=dev).index_add(0, part.parent, wn)
-        sp = torch.zeros(Nc, 2, device=dev).index_add(0, part.parent, wn[:, None] * pos)
-        ncen = sp / m.clamp_min(EPS)[:, None]                    # per-cell nucleus centroid
-        return {"particle": -self.k * (pos - ncen[part.parent]) * isn[:, None]}
+        rid = part.type_names.index(self.role)
+        ism = (part.node_type == rid) & (w > EPS)
+        loops = []
+        for c in [c for c in range(cell.n) if H.c_active[c]]:
+            idx = (ism & (part.parent == c)).nonzero(as_tuple=True)[0]
+            if idx.numel() < 3:
+                continue
+            p = pos[idx]; cen = p.mean(0)
+            ang = torch.atan2(p[:, 1] - cen[1], p[:, 0] - cen[0])
+            loop = idx[ang.argsort()]
+            loops.append(torch.stack([loop, torch.roll(loop, -1)]))   # consecutive + wrap
+        H.mem_edges = (torch.cat(loops, 1) if loops
+                       else torch.empty(2, 0, dtype=torch.long, device=dev))
+        return {}
+
+
+@register_operator("spring", level="particle", kind="lateral")
+class Spring(Lateral):
+    """LATERAL operator: Hookean spring along `H.mem_edges` (the membrane ring).
+    Membrane tension -> a taut shell of particles at the cell surface."""
+    REQUIRES_PARAMS = ["k", "rest"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.k = float(params["k"]); self.rest = float(params["rest"])
+
+    def forward(self, H, mask=None):
+        e = getattr(H, "mem_edges", None)
+        part = H.level("particle")
+        if e is None or e.numel() == 0:
+            return {"particle": torch.zeros(part.n, 2, device=part.state.device)}
+        pos = part.state[:, :2]; i, j = e[0], e[1]
+        d = pos[j] - pos[i]; L = d.norm(dim=1, keepdim=True).clamp_min(1e-6)
+        f = self.k * (L - self.rest) * d / L                  # pull together if stretched
+        accel = torch.zeros(part.n, 2, device=pos.device)
+        accel.index_add_(0, i, f); accel.index_add_(0, j, -f)
+        return {"particle": accel}
 
 
 @register_operator("tension", level="particle", kind="lateral")

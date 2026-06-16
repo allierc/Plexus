@@ -2,7 +2,7 @@
 # particles carry a role (cytoplasm / nucleus); `nucleus` binds the nuclear
 # particles into a stiff central core; `tension` defines a crisp membrane that
 # the render draws as a ring. Round droplet mechanics + gradual mitosis as v4.
-name: divide_droplet_v6
+name: divide_cell_v6
 seed: 0
 n_frames: 600
 dt: 0.02
@@ -20,9 +20,9 @@ sets:
 fields: {}
 operators:
   - {op: cohere,    at: particle, k: 0.9}                 # cytosol cohesion -> round
+  - {op: cohere,    at: particle, k: 6.0, role: nucleus}  # rigid nucleus (cohere scoped to the sub-set)
   - {op: repulse,   at: particle, r0: 0.013, k: 0.6}      # incompressibility
   - {op: tension,   at: particle, strength: 4.0, radius: 0.026, nfull: 12}  # crisp membrane
-  - {op: nucleus,   at: particle, k: 6.0}                 # rigid nuclear core
   - {op: duplicate, at: particle, rate: 5, r0: 0.013}     # grow
   - {op: mitosis,   at: cell, ratio: 2.0, frames: 24, elong: 0.18, furrow: 3.5, furrow_w: 0.018}
-schedule: [aggregate, cohere, repulse, tension, nucleus, mitosis, integrate, duplicate]
+schedule: [aggregate, cohere, repulse, tension, mitosis, integrate, duplicate]

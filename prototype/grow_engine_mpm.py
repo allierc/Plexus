@@ -77,6 +77,26 @@ def build(sc, device=DEV):
                                              torch.zeros(Np_max, device=device)))
     part.p_vol = p_vol
     H.add_level(part); H.p_w = w
+
+    # particle roles by radius: innermost -> nucleus, outermost -> membrane, rest -> cyto
+    H.nuc_id = H.mem_id = None
+    ptypes = ps.get("types")
+    node_type = torch.zeros(Np_max, dtype=torch.long, device=device)
+    if ptypes:
+        names = list(ptypes.keys()); part.type_names = names
+        centre = torch.tensor([0.5, 0.5], device=device)
+        rr = (part.state[:n0, :2] - centre).norm(dim=1)
+        order = rr.argsort()
+        if "nucleus" in names:
+            H.nuc_id = names.index("nucleus")
+            kn = int(float(ptypes["nucleus"]["fraction"]) * n0)
+            node_type[order[:kn]] = H.nuc_id                  # innermost
+        if "membrane" in names:
+            H.mem_id = names.index("membrane")
+            km = int(float(ptypes["membrane"]["fraction"]) * n0)
+            node_type[order[n0 - km:]] = H.mem_id             # outermost
+    part.register_buffer("node_type", node_type)
+
     H.cell_birth = [0.0] * Nc_max; H.cell_birth[0] = float(ppc)
     return H
 
@@ -114,10 +134,12 @@ def run(sc, device=DEV):
                                     H.cell_accel = H.cell_accel + d
             if frame % re == 0:
                 a = (H.p_w > EPS).cpu().numpy()
+                role = (part.node_type.cpu().numpy()[a]
+                        if hasattr(part, "node_type") else None)
                 hist.append((part.state[:, :2].cpu().numpy()[a],
                              H.p_w.cpu().numpy()[a],
                              part.parent.cpu().numpy()[a],
-                             int(H.c_active.sum())))
+                             int(H.c_active.sum()), role))
     return H, hist
 
 
@@ -132,5 +154,6 @@ if __name__ == "__main__":
     last = hist[-1]
     print(f"      final: {len(last[0])} particles, {last[3]} cells over {len(hist)} frames", flush=True)
     out = os.path.join(HERE, sc.name + ".gif")
-    render(hist, out, title=sc.name)
+    render(hist, out, title=sc.name, nuc_id=getattr(H, "nuc_id", None),
+           mem_id=getattr(H, "mem_id", None))
     print(f"[2/2] wrote {out}", flush=True)

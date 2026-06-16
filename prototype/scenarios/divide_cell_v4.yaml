@@ -1,6 +1,6 @@
 # v4: round droplet cells + GRADUAL mitosis (elongate + cleavage furrow, then
 # split) for realistic division dynamics, instead of the instant `divide`.
-name: divide_droplet_v4
+name: divide_cell_v4
 seed: 0
 n_frames: 560
 dt: 0.02

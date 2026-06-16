@@ -1,0 +1,26 @@
+# v7: v6 with ~4x more particles per cell (denser, finer-grained cells); the
+# render auto-shrinks the dots as density rises.
+name: divide_cell_v7
+seed: 0
+n_frames: 620
+dt: 0.02
+record_every: 4
+sets:
+  cell:
+    n: 1
+    buffer: 16
+  particle:
+    parent: cell
+    per_parent: 960            # ~4x v6 (was 240)
+    buffer: 8400
+    radius: 0.06
+    types: {cyto: {fraction: 0.72}, nucleus: {fraction: 0.28}}
+fields: {}
+operators:
+  - {op: cohere,    at: particle, k: 0.9}                # cytosol cohesion (whole cell)
+  - {op: cohere,    at: particle, k: 6.0, role: nucleus} # rigid nucleus = cohere scoped to the nucleus sub-set
+  - {op: repulse,   at: particle, r0: 0.0065, k: 0.6}    # smaller spacing (denser packing)
+  - {op: tension,   at: particle, strength: 4.0, radius: 0.014, nfull: 14}
+  - {op: duplicate, at: particle, rate: 20, r0: 0.0065}  # ~4x growth rate
+  - {op: mitosis,   at: cell, ratio: 2.0, frames: 24, elong: 0.18, furrow: 3.5, furrow_w: 0.012}
+schedule: [aggregate, cohere, repulse, tension, mitosis, integrate, duplicate]

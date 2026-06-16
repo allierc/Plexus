@@ -1,6 +1,6 @@
 # v5: v4 + crisper round membranes (`tension`) + a compact embryo that holds
 # together (`tissue` inter-cell adhesion) + a longer run (more cells).
-name: divide_droplet_v5
+name: divide_cell_v5
 seed: 0
 n_frames: 760
 dt: 0.02

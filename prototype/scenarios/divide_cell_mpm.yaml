@@ -12,11 +12,11 @@ sets:
   cell:
     n: 1
     buffer: 12
-    types: {soft: {fraction: 1.0, youngs: 20}}   # mpm reads youngs -> mu, la
+    types: {soft: {fraction: 1.0, youngs: 13}}   # mpm reads youngs -> mu, la (soft: less shape-memory)
   particle: {parent: cell, per_parent: 200, buffer: 2200, radius: 0.06, density: 1.0}
 fields: {}
 operators:
-  - {op: cohere,    at: particle, k: 120.0}                       # per-particle accel -> cell identity
+  - {op: cohere,    at: particle, k: 320.0}                       # surface-tension-to-centroid -> round cells
   - {op: tissue,    at: cell, strength: 150.0, radius: 0.25}      # inter-cell adhesion -> holds tissue together
   - {op: duplicate, at: particle, rate: 4, r0: 0.013}            # cell grows
   - {op: divide,    at: cell, ratio: 2.0, push: 0.02}            # split once doubled
