@@ -14,10 +14,6 @@ tissues and populations, and every level exchanges with morphogen, pressure, and
 chemical fields. Choose any single graph and you capture one slice — the
 couplings *between* slices, where much of the biology lives, fall outside it.
 
-That is why models built one-layer-at-a-time are so hard to combine, extend, and
-reason about: there is no shared representation in which a particle, a cell, a
-population, and a field are the same kind of thing.
-
 Plexus starts from a different question:
 
 > What is the minimal language needed to describe a living system?
