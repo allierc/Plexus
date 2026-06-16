@@ -172,7 +172,7 @@
     "href": "index.html#what-it-looks-like",
     "title": "Plexus",
     "section": "What it looks like",
-    "text": "What it looks like\nQualitatively different collective behaviours, all produced from the same code by changing only a ~20-line specification — no new software per phenomenon.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nAnd because every simulation is differentiable, biological designs can be optimized. Below, a foraging colony in a maze is tuned by a UCB algorithm — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster."
+    "text": "What it looks like\nQualitatively different collective behaviours, all produced from the same code by changing only a ~20-line specification — no new software per phenomenon.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nAnd because every simulation is differentiable, biological designs can be optimized. Below, a foraging colony in a maze is tuned by a UCB algorithm — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.\n\n\n\n\n\n\n\n\n\n\nThe same recipe scales to harder navigation — a porous pillar field and a walled maze, each crossed by a self-generated attractant gradient and tuned by the same optimizer (see Simulations for the init-vs-winner runs):"
   },
   {
     "objectID": "index.html#read-the-blueprint",

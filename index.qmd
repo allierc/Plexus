@@ -118,6 +118,15 @@ roughly five-fold faster.
 {{< video prototype/winner_7.mp4 title="optimized colony (winner 7)" >}}
 :::
 
+The same recipe scales to harder navigation — a porous **pillar** field and a
+walled **maze**, each crossed by a self-generated attractant gradient and tuned
+by the same optimizer (see [Simulations](experiment.qmd) for the init-vs-winner
+runs):
+
+{{< video prototype/race_pillars_winner_8.mp4 title="pillars — optimized colony, 136/154 escape the porous field" >}}
+
+{{< video prototype/race_maze_hard_winner_5.mp4 title="maze — optimized colony, 150/160 solve the labyrinth" >}}
+
 ## Read the blueprint
 
 This site distils a working prototype into a single blueprint, in four parts:
