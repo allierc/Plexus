@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 
-<meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.38">
+<head>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta charset="utf-8" />
+<meta name="generator" content="quarto-1.9.38" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
 
 
-<title>Plexus</title>
+<title>The abstraction – Plexus</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -23,67 +25,9 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
-
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-0a6b7249c26820e032cb0bd839ff02b1.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-a44efdd6c2d0c2769921b501701ebde4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-316ae4571fe8960cd1803aa1556ed0cb.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-a44efdd6c2d0c2769921b501701ebde4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
-<script src="site_libs/quarto-contrib/videojs/video.min.js"></script>
-<link href="site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
+<!-- htmldependencies:E3FAD763 -->
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -145,7 +89,64 @@ window.Quarto = {
 
 </head>
 
-<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+<body>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="/index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
+  aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation"
+  onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="/index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="/abstraction.html"> 
+<span class="menu-text">The abstraction</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="/methodology.html"> 
+<span class="menu-text">LLM ↔ registry</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="/experiment.html"> 
+<span class="menu-text">Simulations</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="/building.html"> 
+<span class="menu-text">Building Plexus</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus"  title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <div id="quarto-toc-target"></div>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+<script id = "quarto-html-before-body" type="application/javascript">
     const toggleBodyColorMode = (bsSheetEl) => {
       const mode = bsSheetEl.getAttribute("data-mode");
       const bodyEl = window.document.querySelector("body");
@@ -309,74 +310,10 @@ window.Quarto = {
     }
   </script>
 
-<div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
-    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
-      <div class="navbar-container container-fluid">
-      <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
-    <span class="navbar-title">Plexus</span>
-    </a>
-  </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
-  <span class="navbar-toggler-icon"></span>
-</button>
-          <div class="collapse navbar-collapse" id="navbarCollapse">
-            <ul class="navbar-nav navbar-nav-scroll me-auto">
-  <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
-<span class="menu-text">Home</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./abstraction.html"> 
-<span class="menu-text">The abstraction</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./methodology.html"> 
-<span class="menu-text">LLM ↔︎ registry</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./experiment.html"> 
-<span class="menu-text">Simulations</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./building.html"> 
-<span class="menu-text">Building Plexus</span></a>
-  </li>  
-</ul>
-          </div> <!-- /navcollapse -->
-            <div class="quarto-navbar-tools">
-    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
-  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
-</div>
-      </div> <!-- /container-fluid -->
-    </nav>
-</header>
-<!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
-<!-- sidebar -->
-<!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
-   
-  <ul>
-  <li><a href="#a-language-and-a-calculus-two-layers-that-never-touch" id="toc-a-language-and-a-calculus-two-layers-that-never-touch" class="nav-link active" data-scroll-target="#a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</a></li>
-  <li><a href="#re-converging-four-frameworks" id="toc-re-converging-four-frameworks" class="nav-link" data-scroll-target="#re-converging-four-frameworks">Re-converging four frameworks</a></li>
-  <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
-  <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
-  </ul>
-</nav>
-    </div>
-<!-- main -->
-<main class="content" id="quarto-document-content">
-
-
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Plexus</h1>
-<p class="subtitle lead">Toward a language and calculus of living systems</p>
+<h1 class="title">The abstraction</h1>
+<p class="subtitle lead">Hierarchical sets, fields, and four operators</p>
 </div>
 
 
@@ -392,133 +329,179 @@ window.Quarto = {
 
 </header>
 
-
-<p>Biology is not a single graph.</p>
-<p>A graph fixes <em>one</em> kind of node and <em>one</em> kind of edge — particles and the forces between them, cells and their contacts, neurons and synapses, molecular species and reactions. Each existing framework commits to one such graph and models that layer alone. But a living system is several of these at once, nested inside one another: particles make up cells, and cells make up tissues and populations. And every level is coupled to continuous fields — a morphogen gradient, a pressure field, a chemical signal — that the discrete entities both shape and read. Choose any single graph and you capture one slice — the couplings <em>between</em> slices, where much of the biology lives, fall outside it.</p>
-<p>Rather than building another domain-specific simulator, Plexus introduces a common representation based on <strong>hierarchical sets</strong>, <strong>continuous fields</strong>, and a small collection of <strong>operators</strong> acting between them. Cells contain particles and metabolites. State moves through just four operators — <strong>lateral</strong> (within a set), <strong>aggregate</strong> (upward), <strong>broadcast</strong> (downward), and <strong>exchange</strong> (between sets and fields). Complex simulations emerge from composing a few primitive operations.</p>
+<nav id="TOC" role="doc-toc">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#two-entities-sets-and-fields" id="toc-two-entities-sets-and-fields">Two entities: sets and fields</a></li>
+  <li><a href="#four-operators" id="toc-four-operators">Four operators</a></li>
+  <li><a href="#dynamics-a-schedule" id="toc-dynamics-a-schedule">Dynamics: a schedule</a></li>
+  <li><a href="#glossary" id="toc-glossary">Glossary</a></li>
+  </ul>
+</nav>
+<p>The container is built from two kinds of object — <strong>sets</strong> and <strong>fields</strong> — and a small algebra of <strong>operators</strong> that move state between them. This is the missing primitive: the place where particle mechanics, cellular interaction, neural dynamics, and reaction networks all become the same kind of thing.</p>
+<section id="two-entities-sets-and-fields" class="level2">
+<h2>Two entities: sets and fields</h2>
+<p>A <strong>set</strong> <span class="math inline">\(S_k\)</span> is a discrete collection of like entities at scale <span class="math inline">\(k\)</span> — metabolites, particles, cells, populations, organisms. Adjacent scales are linked by <strong>parent maps</strong></p>
+<p><span class="math display">\[\pi_k : S_k \longrightarrow S_{k+1},\]</span></p>
+<p>where <span class="math inline">\(\pi_k(x)\)</span> is the higher-level object that contains <span class="math inline">\(x\)</span>. A cell is built from two kinds of <span class="math inline">\(S_0\)</span> entity — its <strong>particles</strong> (mechanics) and its <strong>metabolites</strong> (chemistry) — and <span class="math inline">\(\pi_0\)</span> sends each of them to the cell it belongs to, so <span class="math inline">\(\pi_0(x)=c\)</span> reads <em>“<span class="math inline">\(x\)</span> belongs to cell <span class="math inline">\(c\)</span>”</em>. The constituents of a given cell <span class="math inline">\(c\)</span> are its <strong>fibre</strong>, the set of everything that maps to <span class="math inline">\(c\)</span>,</p>
+<p><span class="math display">\[\pi_0^{-1}(c)=\{\,x\in S_0 : \pi_0(x)=c\,\},\]</span></p>
+<p>so a cell simply <em>is</em> the collection of its particles and metabolites.</p>
 <div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption>The four operators. <em>Lateral</em> acts within a set; <em>Aggregate</em> and <em>Broadcast</em> move across containment <span class="math inline">\(\pi\)</span>; <em>Exchange</em> scatters (<span class="math inline">\(\mathcal{S}\)</span>) to and gathers (<span class="math inline">\(\mathcal{G}\)</span>) from a field.</figcaption>
+<figure>
+<p><img src="figures/fig_hier.png" class="img-fluid" style="width:58.0%" /></p>
+<figcaption>The containment hierarchy: the parent map <span class="math inline">\(\pi_k\)</span> sends each entity to the object that contains it. A cell is the fibre <span class="math inline">\(\pi_0^{-1}(c)\)</span> — its particles and metabolites.</figcaption>
 </figure>
 </div>
-<p>The goal is not merely to mimic biology, but to provide a <em>language</em> in which biological systems can be expressed, modified, optimized, and understood — where testing a new hypothesis is a few edited lines of specification, not a new software project.</p>
-<section id="a-language-and-a-calculus-two-layers-that-never-touch" class="level2">
-<h2 class="anchored" data-anchor-id="a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</h2>
-<p>Plexus is two things at once, kept strictly apart:</p>
-<ul>
-<li>a <strong>language</strong> — a small, declarative <em>specification</em> (<code>spec.yaml</code>) that names the sets, fields, operators, and schedule of a system. This is <em>what</em> a living system is.</li>
-<li>a <strong>calculus</strong> — the registered operators and the engine that composes and integrates them. A simulation is a multi-rate composition of operators, declared as a <code>Schedule</code>; in math terms, one tick is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, iterated as <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span> and kept differentiable throughout. This is <em>how</em> it evolves.</li>
-</ul>
-<p>Both layers are built from <strong>explicit, named primitives</strong> — not the latent variables a world model learns for prediction. And because those primitives are explicit <em>and</em> differentiable, the same language serves prediction, inverse inference, and the optimization of biological designs alike.</p>
-<p>The two meet at exactly one place — the validated spec — and <strong>never touch directly</strong>. The LLM owns everything <em>above</em> the spec (intent → specification); the code owns everything <em>below</em> it (the operators). The LLM never writes engine code; the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.</p>
-<p>The practical payoff: a new behaviour is a new sentence in the language, not a new program. A short prompt becomes a running, differentiable simulation <strong>with no code written</strong> —</p>
-<blockquote class="blockquote">
-<p><strong>Prompt</strong> — <em>“100 cells; the soft ones secrete a chemical and climb it, so they clump together; the stiff ones ignore it.”</em></p>
-</blockquote>
-<p>the LLM compiles it to a specification:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> aggregate</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">12</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}}</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">radius</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="kw">}</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">fields</span><span class="kw">:</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">chemical</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">frame</span><span class="kw">:</span><span class="at"> grid</span><span class="kw">,</span><span class="at"> </span><span class="fu">res</span><span class="kw">:</span><span class="at"> </span><span class="dv">96</span><span class="kw">,</span><span class="at"> </span><span class="fu">diffusion</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.1</span><span class="kw">,</span><span class="at"> </span><span class="fu">decay</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span><span class="kw">,</span><span class="at"> </span><span class="fu">couples_to</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span><span class="kw">}</span><span class="co">    # only soft cells make it</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at">   </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">gain</span><span class="kw">:</span><span class="at"> </span><span class="dv">150</span><span class="kw">}</span><span class="co">  # only soft cells follow it</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at">     </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>and the engine resolves each <code>op</code> against the registry and runs it — producing the <em>aggregate</em> result shown below. No operator was written; the selector <code>cell[type=soft]</code> did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
+<p>A <strong>field</strong> <span class="math inline">\(f:\Omega\to\mathbb{R}^q\)</span> is a continuous quantity defined on its own grid — morphogen concentration, pressure, substrate stiffness. Fields are <em>not</em> part of the containment hierarchy: they neither contain nor are contained by cells. Instead, each field is bound to exactly one set level through an <strong>exchange</strong> relation (particle–grid transfer, cell sampling, or population-level secretion and sensing); these couplings are the operators below.</p>
 </section>
-<section id="re-converging-four-frameworks" class="level2">
-<h2 class="anchored" data-anchor-id="re-converging-four-frameworks">Re-converging four frameworks</h2>
-<p>Plexus re-converges four sibling frameworks that all forked from <a href="https://github.com/allierc/ParticleGraph"><code>ParticleGraph</code></a> and then drifted — each implements <em>one</em> graph type; a tissue needs them coexisting.</p>
-<table class="caption-top table">
+<section id="four-operators" class="level2">
+<h2>Four operators</h2>
+<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> returning a time-derivative contribution, dispatched by the relation it acts on. We use four kinds, one per relation the container admits:</p>
+<p><span class="math display">\[
+\begin{aligned}
+\textbf{Lateral}\quad   &amp; \mathcal{O}_E,\ E\subseteq S_k\times S_k
+  &amp;&amp; \text{(ODE interaction } + \text{ graph Laplacian)}\\
+\textbf{Aggregate}\ \uparrow\quad &amp; \textstyle\sum_{\pi}: S_k \to S_{k+1}
+  &amp;&amp; \text{(reduction over fibres of } \pi)\\
+\textbf{Broadcast}\ \downarrow\quad &amp; \pi^{*}: S_{k+1}\to S_k
+  &amp;&amp; \text{(lift along } \pi)\\
+\textbf{Exchange}\quad  &amp; \mathcal{S},\mathcal{G}: S_k \leftrightarrow F
+  &amp;&amp; \text{(scatter / gather; bipartite)}
+\end{aligned}
+\]</span></p>
+<p>Two pieces of notation: <span class="math inline">\(S_k\times S_k\)</span> is the set of all node <em>pairs</em>, so an edge set <span class="math inline">\(E\subseteq S_k\times S_k\)</span> is simply a graph on <span class="math inline">\(S_k\)</span> — which nodes interact (e.g. neighbours within a cutoff radius, or a fixed connectome). And <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span> are the two halves of a field coupling: <em>scatter</em> <span class="math inline">\(\mathcal{S}:S_k\to F\)</span> writes object state into the field, while <em>gather</em> <span class="math inline">\(\mathcal{G}:F\to S_k\)</span> reads it back.</p>
+<p><strong>Lateral <span class="math inline">\(\mathcal{O}_E\)</span>.</strong> Message passing <em>within</em> one scale along the edges <span class="math inline">\(E\)</span>. It carries the within-scale physics: pairwise interactions (forces, adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities over the edges. Examples: particle–particle elasticity, cell–cell flocking or adhesion, neuron–neuron signal propagation.</p>
+<p><strong>Aggregate <span class="math inline">\(\textstyle\sum_\pi\)</span> (up).</strong> Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.</p>
+<p><strong>Broadcast <span class="math inline">\(\pi^{*}\)</span> (down).</strong> The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map <span class="math inline">\(\pi\)</span>.</p>
+<p><strong>Exchange <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span>.</strong> Couples a set to a field: scatter <span class="math inline">\(\mathcal{S}\)</span> deposits/secretes object state into the field, gather <span class="math inline">\(\mathcal{G}\)</span> samples/senses the field back onto the objects. The relation is bipartite (objects <span class="math inline">\(\leftrightarrow\)</span> grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img src="figures/fig_ops.png" class="img-fluid" style="width:100.0%" /></p>
+<figcaption>The four operators. <em>Lateral</em> acts within a set; <em>Aggregate</em> and <em>Broadcast</em> move across containment <span class="math inline">\(\pi\)</span>; <em>Exchange</em> scatters (<span class="math inline">\(\mathcal{S}\)</span>) to and gathers (<span class="math inline">\(\mathcal{G}\)</span>) from a field. P2G/G2P (mechanics) and the metabolite–reaction graph are both Exchange.</figcaption>
+</figure>
+</div>
+<p>Sets, fields, and these four operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to signalling is some composition of Lateral, Aggregate, Broadcast, and Exchange over a hierarchy of sets and fields.</p>
+</section>
+<section id="dynamics-a-schedule" class="level2">
+<h2>Dynamics: a schedule</h2>
+<p>A simulation is a multi-rate composition of operators, declared as a <code>Schedule</code>. In math terms, one tick is the composition</p>
+<p><span class="math display">\[\Phi=\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1,\]</span></p>
+<p>and the dynamics is its iteration <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span> — a discrete flow (with “multi-rate” meaning some operators fire only on every <span class="math inline">\(k\)</span>-th tick). Each operator is <strong>pure</strong>: instead of editing the state in place, it only <em>returns its contribution</em> — a delta <span class="math inline">\(\Delta_i\)</span> (a time-derivative term) for the sets it touches. The schedule sums the deltas acting on each set and integrates once per tick,</p>
+<p><span class="math display">\[x_{t+1}=x_t+\Delta t\textstyle\sum_i\Delta_i.\]</span></p>
+<p>Two consequences follow: several operators may act on the same set in one tick (their deltas simply add — none overwrites another), and because nothing is mutated in place, gradients flow through the sums and the integrator, so the whole rollout stays <strong>differentiable</strong>. The LLM searches over schedules and operator parameterizations — one well-defined action space instead of per-domain code.</p>
+</section>
+<section id="glossary" class="level2">
+<h2>Glossary</h2>
+<table class="caption-top">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
 </colgroup>
 <thead>
 <tr class="header">
-<th>Framework</th>
-<th>Domain</th>
-<th>Becomes (in Plexus)</th>
+<th>Concept</th>
+<th>Set/operator term</th>
+<th>Symbol</th>
+<th>Code</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>CellGraph</strong></td>
-<td>collective cell interactions</td>
-<td><code>Lateral</code> operators @ cell level</td>
+<td>collection of like nodes</td>
+<td>set (level)</td>
+<td><span class="math inline">\(S_k\)</span></td>
+<td><code>Level</code></td>
 </tr>
 <tr class="even">
-<td><strong>NeuralGraph</strong></td>
-<td>neural / signalling networks</td>
-<td><code>Lateral</code> operators @ cell level</td>
+<td>a single node</td>
+<td>element</td>
+<td><span class="math inline">\(x\in S_k\)</span></td>
+<td>row of <code>Level.state</code></td>
 </tr>
 <tr class="odd">
-<td><strong>MPMGraph</strong></td>
-<td>tissue mechanics, deformable matter</td>
-<td><code>Exchange</code> (P2G/G2P) @ particle level</td>
+<td>learnable per-node code</td>
+<td>embedding</td>
+<td><span class="math inline">\(a_i\)</span></td>
+<td><code>Level.embedding</code></td>
 </tr>
 <tr class="even">
-<td><strong>MetabolismGraph</strong></td>
-<td>bipartite reaction networks</td>
-<td><code>Exchange</code> (stoichiometry) @ molecule level</td>
+<td>containment</td>
+<td>partition</td>
+<td><span class="math inline">\(\pi_k\!:\!S_k\!\to\!S_{k+1}\)</span></td>
+<td><code>Level.parent</code></td>
+</tr>
+<tr class="odd">
+<td>within-set links</td>
+<td>relation</td>
+<td><span class="math inline">\(E\subseteq S_k\times S_k\)</span></td>
+<td><code>Level.edge_index</code></td>
+</tr>
+<tr class="even">
+<td>continuum quantity</td>
+<td>field</td>
+<td><span class="math inline">\(f:\Omega\to\mathbb{R}^c\)</span></td>
+<td><code>Field</code></td>
+</tr>
+<tr class="odd">
+<td>dynamics (GNN)</td>
+<td>operator: ODE+Laplacian</td>
+<td><span class="math inline">\(\mathcal{O}\)</span></td>
+<td><code>Operator</code></td>
+</tr>
+<tr class="even">
+<td>within-set op</td>
+<td>lateral</td>
+<td><span class="math inline">\(\mathcal{O}_E\)</span></td>
+<td><code>Lateral</code></td>
+</tr>
+<tr class="odd">
+<td>up op</td>
+<td>reduction over fibres</td>
+<td><span class="math inline">\(\sum_\pi\)</span></td>
+<td><code>Aggregate</code></td>
+</tr>
+<tr class="even">
+<td>down op</td>
+<td>lift</td>
+<td><span class="math inline">\(\pi^{*}\)</span></td>
+<td><code>Broadcast</code></td>
+</tr>
+<tr class="odd">
+<td>set <span class="math inline">\(\leftrightarrow\)</span> field op</td>
+<td>transfer</td>
+<td><span class="math inline">\(\mathcal{S},\mathcal{G}\)</span></td>
+<td><code>Exchange</code></td>
+</tr>
+<tr class="even">
+<td>the container</td>
+<td>hierarchy</td>
+<td><span class="math inline">\((S_\bullet,F_\bullet,\pi_\bullet)\)</span></td>
+<td><code>Hierarchy</code></td>
+</tr>
+<tr class="odd">
+<td>the model</td>
+<td>composition of ops</td>
+<td><span class="math inline">\(\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1\)</span></td>
+<td><code>Schedule</code></td>
 </tr>
 </tbody>
 </table>
-</section>
-<section id="what-it-looks-like" class="level2">
-<h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>
-<p>Qualitatively different collective behaviours, all produced from the <em>same code</em> by changing only a ~20-line specification — no new software per phenomenon.</p>
-<div class="quarto-layout-panel" data-layout-ncol="2">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="disperse — soft cells flee their own chemical, spreading apart"><source src="prototype/sim_2.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="swarm — strong boids make the cells flock and move as one"><source src="prototype/sim_3.mp4"></video></div>
+<div id="quarto-navigation-envelope" class="hidden">
+<p><span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1zaWRlYmFyLXRpdGxl">Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXItdGl0bGU=">Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6SG9tZQ==">Home</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L2luZGV4Lmh0bWw=">/index.html</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6VGhlIGFic3RyYWN0aW9u">The abstraction</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L2Fic3RyYWN0aW9uLmh0bWw=">/abstraction.html</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6TExNIOKGlCByZWdpc3RyeQ==">LLM ↔︎ registry</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L21ldGhvZG9sb2d5Lmh0bWw=">/methodology.html</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6U2ltdWxhdGlvbnM=">Simulations</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L2V4cGVyaW1lbnQuaHRtbA==">/experiment.html</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6QnVpbGRpbmcgUGxleHVz">Building Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLWludC1uYXZiYXI6L2J1aWxkaW5nLmh0bWw=">/building.html</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW5hdmJhci10b29sczpodHRwczovL2dpdGh1Yi5jb20vYWxsaWVyYy9QbGV4dXM=">https://github.com/allierc/Plexus</span></p>
+<div class="hidden quarto-markdown-envelope-contents" data-render-id="Zm9vdGVyLWNlbnRlcg==">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
 </div>
 </div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="ant trails — stigmergic pheromone trails self-organize"><source src="prototype/ant_1.mp4"></video></div>
+<div id="quarto-meta-markdown" class="hidden">
+<p><span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW1ldGF0aXRsZQ==">The abstraction – Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLXR3aXR0ZXJjYXJkdGl0bGU=">The abstraction – Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW9nY2FyZHRpdGxl">The abstraction – Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW1ldGFzaXRlbmFtZQ==">Plexus</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLXR3aXR0ZXJjYXJkZGVzYw==">Hierarchical sets, fields, and four operators</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW9nY2FyZGRkZXNj">Hierarchical sets, fields, and four operators</span> <span class="hidden quarto-markdown-envelope-contents" data-render-id="cXVhcnRvLW1ldGFzaXRlZGVzYw==">A language and calculus of living systems.</span></p>
 </div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="ant trails — tighter, low-noise reinforced network"><source src="prototype/ant_4.mp4"></video></div>
-</div>
-</div>
-</div>
-<p>And because every simulation is differentiable, biological designs can be <em>optimized</em>. Below, a foraging colony in a maze is tuned by a UCB algorithm — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.</p>
-<div class="quarto-layout-panel" data-layout-ncol="2">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set colony"><source src="prototype/initial.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="optimized colony (winner 7)"><source src="prototype/winner_7.mp4"></video></div>
-</div>
-</div>
-</div>
-</section>
-<section id="read-the-blueprint" class="level2">
-<h2 class="anchored" data-anchor-id="read-the-blueprint">Read the blueprint</h2>
-<p>This site distils a working prototype into a single blueprint, in four parts:</p>
-<ul>
-<li><strong><a href="./abstraction.html">The abstraction</a></strong> — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.</li>
-<li><strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.</li>
-<li><strong><a href="./experiment.html">Simulations</a></strong> — ten distinct simulations, an emergent ant-trail model, and a maze-foraging colony optimized end-to-end.</li>
-<li><strong><a href="./building.html">Building Plexus</a></strong> — the proposed repository methodology and the invariants that hold the line.</li>
-</ul>
-<p>A static version with full schematics and glossary is in <a href="paper/plexus.pdf"><code>paper/plexus.pdf</code></a>.</p>
-
-
 </section>
 
 </main> <!-- /main -->
-<script id="quarto-html-after-body" type="application/javascript">
+<script id = "quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     // Ensure there is a toggle, if there isn't float one in the top right
     if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
@@ -938,22 +921,14 @@ window.Quarto = {
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p>Cedric Allier · Janelia Research Campus · 2026</p>
-</div>
+      <div class='footer-contents'>Cedric Allier · Janelia Research Campus · 2026</div>  
+    </div>
     <div class="nav-footer-right">
       &nbsp;
     </div>
   </div>
 </footer>
-<script>videojs(video_shortcode_videojs_video1);</script>
-<script>videojs(video_shortcode_videojs_video2);</script>
-<script>videojs(video_shortcode_videojs_video3);</script>
-<script>videojs(video_shortcode_videojs_video4);</script>
-<script>videojs(video_shortcode_videojs_video5);</script>
-<script>videojs(video_shortcode_videojs_video6);</script>
 
+</body>
 
-
-
-<script src="site_libs/quarto-html/zenscroll-min.js"></script>
-</body></html>
+</html>

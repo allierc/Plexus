@@ -98,8 +98,11 @@ A simulation is a multi-rate composition of operators, declared as a
 
 $$\Phi=\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1,$$
 
-and the dynamics is its iteration $x_{t+1}=\Phi(x_t)$ — a discrete flow (with
-"multi-rate" meaning some operators fire only on every $k$-th tick). Each operator
+and the dynamics is its iteration $x_{t+1}=\Phi(x_t)$ — a discrete flow.
+*Multi-rate* means the operators need not all fire on every tick: a slow process
+(diffusion, cell division) can be scheduled to act once every $k$ ticks, while a
+fast one (mechanics) runs every tick, so a single `Schedule` interleaves dynamics
+that evolve on different time scales. Each operator
 is **pure**: instead of editing the state in place, it only *returns its
 contribution* — a delta $\Delta_i$ (a time-derivative term) for the sets it
 touches. The schedule sums the deltas acting on each set and integrates once per

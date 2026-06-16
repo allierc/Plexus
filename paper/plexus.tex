@@ -202,9 +202,12 @@ and the metabolite--reaction graph are both Exchange.}
 A simulation is a multi-rate composition of operators, declared as a
 \code{Schedule}. In math terms, one tick is the composition
 $\Phi=\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1$, and the dynamics is its
-iteration $x_{t+1}=\Phi(x_t)$ --- a discrete flow (with ``multi-rate'' meaning
-some operators fire only on every $k$-th tick). The \code{Schedule} is just the
-code-level encoding of that composition. Each operator is \emph{pure}: instead of
+iteration $x_{t+1}=\Phi(x_t)$ --- a discrete flow. \emph{Multi-rate} means the
+operators need not all fire on every tick: a slow process (diffusion, cell
+division) can be scheduled to act once every $k$ ticks, while a fast one
+(mechanics) runs every tick, so a single \code{Schedule} interleaves dynamics
+that evolve on different time scales. The \code{Schedule} is just the code-level
+encoding of that composition. Each operator is \emph{pure}: instead of
 editing the state in place, it only \emph{returns its contribution} --- a delta
 $\Delta_i$ (a time-derivative term) for the sets it touches. The schedule sums the
 deltas acting on each set and integrates once per tick,
