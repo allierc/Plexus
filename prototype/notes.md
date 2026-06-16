@@ -340,6 +340,27 @@ surface `tension`, stiffer membrane (v29/v30) — improves density but the soft
 fuzz persists. So: **MPM division works now** (the goal); droplet is still
 crisper. `separate` is the key new primitive.
 
+### v31–v32: liquid cytoplasm + elastic membrane/nucleus (the best MPM)
+
+Idea (from feedback): make the *middle* layer flow like the droplet cell while
+the nucleus and membrane stay soft-elastic. MPM already has a per-particle
+`is_liquid` mask (liquid = drop shape memory, keep only volume) + `surface_tension`
+(liquid cohesion → local-COM pull). So: tag **cytoplasm = liquid**, nucleus +
+membrane = solid elastic; `skin` updates the liquid mask by radius each tick.
+
+- `v31` (surface_tension 9): too weak — the fluid **stretched into a stringy
+  merged mass** (liquid flows along the mitosis/tissue forces with nothing to
+  round it).
+- `v32` (surface_tension 55, gentler mitosis/tissue): **the best MPM cell.**
+  Strong liquid cohesion rounds each cell; nucleus + membrane (elastic) hold
+  structure; `separate` keeps daughters distinct; `tissue` packs them. Result: 4
+  round, distinct, nucleated MPM cells that **divide and pack** — rounder/cleaner
+  than the solid-cyto v28, and faithful to the biology (fluid cytosol, elastic
+  cortex + nucleus). **`divide_mpm_v32` = best MPM dividing cell.**
+
+Ranking now: `divide_cell_v18` (droplet) crispest overall; `divide_mpm_v32` best
+MPM (and the most biologically structured: liquid cytoplasm in an elastic cell).
+
 `cohere` now takes an optional `role` (cohere to the sub-set centroid); `ring`
 (rewire) + `spring` (lateral) added; `nucleus` operator removed. MPM build assigns
 roles by radius (nucleus innermost, membrane outermost). v8 is rough (MPM edge

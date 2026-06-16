@@ -1,0 +1,30 @@
+# v31: hybrid -- the MIDDLE layer (cytoplasm) is MPM LIQUID (flows/moves, with
+# surface-tension cohesion), the NUCLEUS and MEMBRANE are soft ELASTIC solids that
+# hold shape. A fluid-filled elastic cell. separate prevents fusion, tissue packs,
+# mitosis divides. skin keeps the layers (and which is liquid) by radius each tick.
+name: divide_mpm_v32
+seed: 0
+n_frames: 620
+dt: 0.02
+record_every: 4
+sets:
+  cell: {n: 1, buffer: 8, types: {soft: {fraction: 1.0, youngs: 40}}}
+  particle:
+    parent: cell
+    per_parent: 900
+    buffer: 7000
+    radius: 0.09
+    density: 1.0
+    types:
+      nucleus:  {fraction: 0.16, youngs: 120}   # soft elastic core
+      cyto:     {fraction: 0.68, youngs: 8}      # liquid (flows)
+      membrane: {fraction: 0.16, youngs: 280}    # soft elastic shell
+fields: {}
+operators:
+  - {op: skin,    at: particle, nucleus: 0.16, membrane: 0.16}
+  - {op: separate, at: particle, r0: 0.020, k: 0.6}        # anti-fusion gap
+  - {op: tissue,  at: cell, strength: 40.0, radius: 0.22}  # pack daughters
+  - {op: mitosis, at: cell, ratio: 2.0, frames: 38, elong: 0.45, furrow: 6.0, furrow_w: 0.02, pole: 1.4, round_frames: 8, round_k: 6.0}
+  - {op: duplicate, at: particle, rate: 7, r0: 0.011}
+  - {op: mpm, at: particle, n_grid: 160, substeps: 14, dt_sub: 2.0e-4, a_max: 400, drag: 1.8, vmax: 6.0, surface_tension: 55.0}
+schedule: [aggregate, skin, separate, tissue, mitosis, duplicate, mpm]

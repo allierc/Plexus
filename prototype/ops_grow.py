@@ -151,6 +151,8 @@ class Skin(Operator):
             E = yr[nt]; nu = 0.2
             part.mu.copy_(E / (2 * (1 + nu)))
             part.la.copy_(E * nu / ((1 + nu) * (1 - 2 * nu)))
+        if hasattr(part, "is_liquid"):                     # cytoplasm flows; nucleus+membrane elastic
+            part.is_liquid.copy_(nt == cyt)
         return {}
 
 

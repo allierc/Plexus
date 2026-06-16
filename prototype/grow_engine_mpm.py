@@ -97,6 +97,12 @@ def build(sc, device=DEV):
             node_type[order[n0 - km:]] = H.mem_id             # outermost
     part.register_buffer("node_type", node_type)
 
+    # cytoplasm flows (MPM liquid), nucleus + membrane stay soft-elastic (solid)
+    is_liquid = torch.zeros(Np_max, dtype=torch.bool, device=device)
+    if ptypes and "cyto" in names:
+        is_liquid = node_type == names.index("cyto")
+    part.register_buffer("is_liquid", is_liquid)
+
     # per-role stiffness -> one unified MPM body whose structure (rigid nucleus,
     # soft cytoplasm, stiff membrane cortex) is just spatially-varying youngs.
     H.role_youngs = None
