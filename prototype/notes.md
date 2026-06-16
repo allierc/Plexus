@@ -322,6 +322,24 @@ only mechanic that keeps cells distinct (A/`v18`); MPM is the right model for a
 MPM cannot separate dividing daughters. Best dividing cell = `divide_cell_v18`;
 best single-cell mechanics = `divide_mpm_v24`.
 
+### v26–v30: MPM division solved with a `separate` operator
+
+The MPM fusion was the whole blocker. Fix: a **`separate`** operator (cross-cell
+particle repulsion) that holds a gap > the P2G/G2P stencil reach between cells, so
+single-material MPM bodies can't merge on the shared grid. With
+`separate` (anti-fusion) + `tissue` (pack) + `mitosis` (split) + `cohere`
+(within-cell containment), **MPM cells now genuinely divide and pack** like v18:
+`v28` = 4 distinct nucleated MPM cells in a 2×2 morula (vs `v15` = one fused
+blob). The divide-then-pack dynamics are there (separate pushes daughters apart,
+tissue draws them back).
+
+Residual: a *growing* MPM body stays fuzzier at the edges than the droplet
+(particles injected by `duplicate` into a deforming body don't immediately
+conform; MPM has no strong surface tension). Tried slower growth, high drag,
+surface `tension`, stiffer membrane (v29/v30) — improves density but the soft
+fuzz persists. So: **MPM division works now** (the goal); droplet is still
+crisper. `separate` is the key new primitive.
+
 `cohere` now takes an optional `role` (cohere to the sub-set centroid); `ring`
 (rewire) + `spring` (lateral) added; `nucleus` operator removed. MPM build assigns
 roles by radius (nucleus innermost, membrane outermost). v8 is rough (MPM edge
