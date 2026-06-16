@@ -131,36 +131,3 @@ highway that threads both maze gaps from home to food.
 
 {{< video prototype/winner_7.mp4 title="best found by UCB (winner 7)" >}}
 :::
-
-## What the process taught us
-
-1. **The intermediate representation is the whole game.** Ten distinct
-   behaviours and an ant model were all different YAML over the same code.
-2. **Selectors are the highest-leverage primitive.** `cell[type=soft]` expresses
-   "only population 1 does X" and lets behaviours coexist; every operator must
-   honour the selector mask.
-3. **Verification must check *intent*, not just "it ran".** The hard bugs were
-   physical: unstable diffusion ($dt\cdot D>0.25$), wrong particle volume,
-   unclamped accelerations blowing up MPM, cell inversion at very low stiffness,
-   GPU non-determinism breaking reproducibility, and — subtlest — the *wrong
-   metric* (net displacement vs. nearest-neighbour clustering).
-4. **Honesty about regime.** Self-secreted chemotaxis aggregates only below a
-   density threshold (above it the field is spatially flat — correct physics);
-   the verify output should state the regime, not silently show the one setting
-   that worked.
-5. **Determinism is a feature you must force** (deterministic CUDA kernels), or
-   "reproduce with a new seed" is meaningless.
-6. **Obstacles are boundary conditions, not forces.** A wall is one static mask
-   reused by the MPM grid (interior zero-velocity) and the diffusing fields
-   (no-flux); maze navigation then falls out of the field's gradient, with no
-   special pathfinding code.
-7. **Cap speed below the CFL limit.** Strong gradients otherwise drive cells to
-   the grid's stability ceiling, where they move ballistically ("asteroids"); an
-   explicit max-speed clamp plus overdamped drag restores smooth, biological
-   motion.
-8. **Discrete objectives need black-box search, differentiable ones admit
-   gradients — use both.** Food count (discrete) optimizes well under UCB; a
-   smooth surrogate opens the gradient-through-rollout path, and the two compose.
-9. **Reproducibility needs full-precision provenance.** Archiving rounded
-   parameters made a winner re-simulate to a different score; the exact spec (and
-   seed) must be stored, or the run is not bit-reproducible.

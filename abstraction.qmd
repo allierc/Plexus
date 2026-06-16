@@ -26,13 +26,7 @@ $$\pi_0^{-1}(c)=\{\,x\in S_0 : \pi_0(x)=c\,\},$$
 
 so a cell simply *is* the collection of its particles and metabolites.
 
-```{mermaid}
-flowchart BT
-  mol["metabolite S₀"] --> cell["cell S₁"]
-  part["particle S₀"] --> cell
-  cell -->|π₁| pop["population S₂"]
-  pop -->|π₂| org["organism S₃"]
-```
+![The containment hierarchy: the parent map $\pi_k$ sends each entity to the object that contains it. A cell is the fibre $\pi_0^{-1}(c)$ — its particles and metabolites.](figures/fig_hier.png){width=58%}
 
 A **field** $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its own
 grid — morphogen concentration, pressure, substrate stiffness. Fields are *not*
@@ -89,6 +83,8 @@ $\mathcal{S}$ deposits/secretes object state into the field, gather $\mathcal{G}
 samples/senses the field back onto the objects. The relation is bipartite
 (objects $\leftrightarrow$ grid); it is exactly the MPM particle–grid transfer
 (P2G/G2P) and chemotactic secretion/sensing.
+
+![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* scatters ($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field. P2G/G2P (mechanics) and the metabolite–reaction graph are both Exchange.](figures/fig_ops.png){width=100%}
 
 ## Dynamics: a schedule
 

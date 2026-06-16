@@ -370,7 +370,6 @@ window.Quarto = {
   <li><a href="#optimizing-the-colony" id="toc-optimizing-the-colony" class="nav-link" data-scroll-target="#optimizing-the-colony">Optimizing the colony</a></li>
   <li><a href="#initial-vs.-optimized" id="toc-initial-vs.-optimized" class="nav-link" data-scroll-target="#initial-vs.-optimized">Initial vs.&nbsp;optimized</a></li>
   </ul></li>
-  <li><a href="#what-the-process-taught-us" id="toc-what-the-process-taught-us" class="nav-link" data-scroll-target="#what-the-process-taught-us">What the process taught us</a></li>
   </ul>
 </nav>
     </div>
@@ -593,23 +592,9 @@ window.Quarto = {
 </div>
 </div>
 </div>
-</section>
-</section>
-<section id="what-the-process-taught-us" class="level2">
-<h2 class="anchored" data-anchor-id="what-the-process-taught-us">What the process taught us</h2>
-<ol type="1">
-<li><strong>The intermediate representation is the whole game.</strong> Ten distinct behaviours and an ant model were all different YAML over the same code.</li>
-<li><strong>Selectors are the highest-leverage primitive.</strong> <code>cell[type=soft]</code> expresses “only population 1 does X” and lets behaviours coexist; every operator must honour the selector mask.</li>
-<li><strong>Verification must check <em>intent</em>, not just “it ran”.</strong> The hard bugs were physical: unstable diffusion (<span class="math inline">\(dt\cdot D&gt;0.25\)</span>), wrong particle volume, unclamped accelerations blowing up MPM, cell inversion at very low stiffness, GPU non-determinism breaking reproducibility, and — subtlest — the <em>wrong metric</em> (net displacement vs.&nbsp;nearest-neighbour clustering).</li>
-<li><strong>Honesty about regime.</strong> Self-secreted chemotaxis aggregates only below a density threshold (above it the field is spatially flat — correct physics); the verify output should state the regime, not silently show the one setting that worked.</li>
-<li><strong>Determinism is a feature you must force</strong> (deterministic CUDA kernels), or “reproduce with a new seed” is meaningless.</li>
-<li><strong>Obstacles are boundary conditions, not forces.</strong> A wall is one static mask reused by the MPM grid (interior zero-velocity) and the diffusing fields (no-flux); maze navigation then falls out of the field’s gradient, with no special pathfinding code.</li>
-<li><strong>Cap speed below the CFL limit.</strong> Strong gradients otherwise drive cells to the grid’s stability ceiling, where they move ballistically (“asteroids”); an explicit max-speed clamp plus overdamped drag restores smooth, biological motion.</li>
-<li><strong>Discrete objectives need black-box search, differentiable ones admit gradients — use both.</strong> Food count (discrete) optimizes well under UCB; a smooth surrogate opens the gradient-through-rollout path, and the two compose.</li>
-<li><strong>Reproducibility needs full-precision provenance.</strong> Archiving rounded parameters made a winner re-simulate to a different score; the exact spec (and seed) must be stored, or the run is not bit-reproducible.</li>
-</ol>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

@@ -1,0 +1,43 @@
+\documentclass[border=5pt]{standalone}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
+\definecolor{cset}{RGB}{31,119,180}
+\definecolor{cfield}{RGB}{44,160,44}
+\definecolor{cop}{RGB}{214,39,40}
+\definecolor{cgray}{RGB}{120,120,120}
+\begin{document}
+\begin{tikzpicture}[
+  font=\scriptsize,
+  n/.style={circle,draw=cset,fill=cset!10,minimum size=5mm,inner sep=0},
+  p/.style={rectangle,draw=cset,fill=cset!10,minimum width=14mm,minimum height=5mm},
+  g/.style={rectangle,draw=cfield,fill=cfield!12,minimum width=5mm,minimum height=5mm},
+  a/.style={-{Stealth[length=1.6mm]},cop,thick},
+]
+\begin{scope}[local bounding box=L]
+  \node[n] (a1){}; \node[n,right=6mm of a1](a2){}; \node[n,below=5mm of a1,xshift=3mm](a3){};
+  \draw[a] (a1)--(a2); \draw[a] (a1)--(a3); \draw[a] (a2)--(a3);
+\end{scope}
+\node[below=1mm of L,align=center]{\textbf{Lateral}\\$\mathcal{O}_E$};
+\begin{scope}[shift={(34mm,0)},local bounding box=A]
+  \node[p] (par){parent};
+  \node[n,below=6mm of par,xshift=-6mm](c1){}; \node[n,below=6mm of par,xshift=6mm](c2){};
+  \draw[a] (c1)--(par); \draw[a] (c2)--(par);
+\end{scope}
+\node[below=1mm of A,align=center]{\textbf{Aggregate}$\uparrow$\\$\sum_\pi$};
+\begin{scope}[shift={(64mm,0)},local bounding box=B]
+  \node[p] (par2){parent};
+  \node[n,below=6mm of par2,xshift=-6mm](d1){}; \node[n,below=6mm of par2,xshift=6mm](d2){};
+  \draw[a] (par2)--(d1); \draw[a] (par2)--(d2);
+\end{scope}
+\node[below=1mm of B,align=center]{\textbf{Broadcast}$\downarrow$\\$\pi^*$};
+\begin{scope}[shift={(96mm,0)},local bounding box=E]
+  \node[n] (o1){}; \node[n,below=5mm of o1](o2){};
+  \node[g,right=8mm of o1](g1){}; \node[g,below=0mm of g1](g2){};
+  \draw[a,transform canvas={yshift=0.6mm}] (o1)-- node[above,font=\tiny]{$\mathcal{S}$}(g1);
+  \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{$\mathcal{G}$}(o2);
+\end{scope}
+\node[below=1mm of E,align=center]{\textbf{Exchange}\\$\mathcal{S},\mathcal{G}$};
+\end{tikzpicture}
+\end{document}

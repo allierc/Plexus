@@ -1,0 +1,28 @@
+\documentclass[border=5pt]{standalone}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
+\definecolor{cset}{RGB}{31,119,180}
+\definecolor{cfield}{RGB}{44,160,44}
+\definecolor{cop}{RGB}{214,39,40}
+\definecolor{cgray}{RGB}{120,120,120}
+\begin{document}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  set/.style={draw=cset,thick,rounded corners,fill=cset!10,minimum width=30mm,minimum height=9mm},
+  leaf/.style={draw=cset,rounded corners,fill=cset!4,minimum width=26mm,minimum height=8mm},
+  cont/.style={-{Stealth[length=2.6mm]},cset,thick},
+]
+\node[set] (org)  at (0,6.0) {organism $S_3$};
+\node[set] (pop)  at (0,4.0) {population $S_2$};
+\node[set] (cell) at (0,2.0) {cell $S_1$};
+\node[leaf] (part) at (0,0.0) {particle $S_0$};
+\node[leaf] (mol)  at (-3.4,0.0) {metabolite $S_0$};
+\draw[cont] (part) -- (cell);
+\draw[cont] (mol.north) -- (cell.south west);
+\node[cset,font=\scriptsize] at (-1.25,0.85) {$\pi_0$};   % maps both leaves into the cell
+\draw[cont] (cell) -- node[right,font=\scriptsize,pos=0.5]{$\pi_1$} (pop);
+\draw[cont] (pop)  -- node[right,font=\scriptsize,pos=0.5]{$\pi_2$} (org);
+\end{tikzpicture}
+\end{document}

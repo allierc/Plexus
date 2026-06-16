@@ -73,9 +73,6 @@ ul.task-list li input[type="checkbox"] {
   }
 }</script>
 <style>html{ scroll-behavior: smooth; }</style>
-<script src="site_libs/quarto-diagram/mermaid.min.js"></script>
-<script src="site_libs/quarto-diagram/mermaid-init.js"></script>
-<link href="site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -365,21 +362,11 @@ window.Quarto = {
 <p>where <span class="math inline">\(\pi_k(x)\)</span> is the higher-level object that contains <span class="math inline">\(x\)</span>. A cell is built from two kinds of <span class="math inline">\(S_0\)</span> entity — its <strong>particles</strong> (mechanics) and its <strong>metabolites</strong> (chemistry) — and <span class="math inline">\(\pi_0\)</span> sends each of them to the cell it belongs to, so <span class="math inline">\(\pi_0(x)=c\)</span> reads <em>“<span class="math inline">\(x\)</span> belongs to cell <span class="math inline">\(c\)</span>”</em>. The constituents of a given cell <span class="math inline">\(c\)</span> are its <strong>fibre</strong>, the set of everything that maps to <span class="math inline">\(c\)</span>,</p>
 <p><span class="math display">\[\pi_0^{-1}(c)=\{\,x\in S_0 : \pi_0(x)=c\,\},\]</span></p>
 <p>so a cell simply <em>is</em> the collection of its particles and metabolites.</p>
-<div class="cell" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class="figure"><p></p>
-<div>
-<pre class="mermaid mermaid-js">flowchart BT
-  mol["metabolite S₀"] --&gt; cell["cell S₁"]
-  part["particle S₀"] --&gt; cell
-  cell --&gt;|π₁| pop["population S₂"]
-  pop --&gt;|π₂| org["organism S₃"]
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:58.0%"></p>
+<figcaption>The containment hierarchy: the parent map <span class="math inline">\(\pi_k\)</span> sends each entity to the object that contains it. A cell is the fibre <span class="math inline">\(\pi_0^{-1}(c)\)</span> — its particles and metabolites.</figcaption>
+</figure>
 </div>
 <p>A <strong>field</strong> <span class="math inline">\(f:\Omega\to\mathbb{R}^q\)</span> is a continuous quantity defined on its own grid — morphogen concentration, pressure, substrate stiffness. Fields are <em>not</em> part of the containment hierarchy: they neither contain nor are contained by cells. Instead, each field is bound to exactly one set level through an <strong>exchange</strong> relation (particle–grid transfer, cell sampling, or population-level secretion and sensing); these couplings are the operators below.</p>
 </section>
@@ -403,6 +390,12 @@ window.Quarto = {
 <p><strong>Aggregate <span class="math inline">\(\textstyle\sum_\pi\)</span> (up).</strong> Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.</p>
 <p><strong>Broadcast <span class="math inline">\(\pi^{*}\)</span> (down).</strong> The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map <span class="math inline">\(\pi\)</span>.</p>
 <p><strong>Exchange <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span>.</strong> Couples a set to a field: scatter <span class="math inline">\(\mathcal{S}\)</span> deposits/secretes object state into the field, gather <span class="math inline">\(\mathcal{G}\)</span> samples/senses the field back onto the objects. The relation is bipartite (objects <span class="math inline">\(\leftrightarrow\)</span> grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>The four operators. <em>Lateral</em> acts within a set; <em>Aggregate</em> and <em>Broadcast</em> move across containment <span class="math inline">\(\pi\)</span>; <em>Exchange</em> scatters (<span class="math inline">\(\mathcal{S}\)</span>) to and gathers (<span class="math inline">\(\mathcal{G}\)</span>) from a field. P2G/G2P (mechanics) and the metabolite–reaction graph are both Exchange.</figcaption>
+</figure>
+</div>
 </section>
 <section id="dynamics-a-schedule" class="level2">
 <h2 class="anchored" data-anchor-id="dynamics-a-schedule">Dynamics: a schedule</h2>
