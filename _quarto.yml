@@ -7,6 +7,7 @@ project:
 website:
   title: "Plexus"
   description: "A language and calculus of living systems."
+  site-url: https://allierc.github.io/Plexus/
   navbar:
     left:
       - href: index.qmd

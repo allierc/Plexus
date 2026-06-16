@@ -9,6 +9,7 @@ paper/*.out
 paper/*.fls
 paper/*.fdb_latexmk
 prototype/*.gif
+prototype/*.mp4
 prototype/*.png
 prototype/*.zarr
 
@@ -16,3 +17,4 @@ prototype/*.zarr
 **/*.quarto_ipynb
 paper/*.synctex.gz
 paper/*.toc
+papers/*.pdf
