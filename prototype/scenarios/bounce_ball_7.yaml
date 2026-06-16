@@ -1,0 +1,25 @@
+# v7 vs v6: fixes the "floating ball" artifact. In v6 motility.speed=60 was a
+# PERSISTENT propulsion force 6x stronger than gravity (g=10), so any ball whose
+# random heading pointed up was driven into the ceiling and hovered there forever
+# (rot=0.02 -> heading never rotated back down). That was a force-balance bug in the
+# spec, not the engine. Here motility.speed=8 << g=12, so the random heading only
+# gives a gentle initial scatter and GRAVITY DOMINATES: every ball falls and bounces,
+# none float. rot raised to 0.06 so headings drift instead of locking upward.
+name: bounce_ball_7
+seed: 0
+n_frames: 500
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 5
+    start: [0.30, 0.40, 0.70, 0.70]
+    types: {stiff: {fraction: 1.0, youngs: 600}}
+  particle: {parent: cell, per_parent: 600, radius: 0.035, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 8.0, rot: 0.06}    # gentle random drift, << gravity
+  - {op: gravity, at: cell, g: 12.0}                    # gravity dominates
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.1}
+schedule: [aggregate, motility, gravity, mpm]

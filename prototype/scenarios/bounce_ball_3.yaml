@@ -1,0 +1,20 @@
+# v3 vs v1: VERY SOFT ball (youngs 60 -> 8). Same gravity/drag as v1.
+# Hypothesis: a very soft ball has little elastic restoring stress, so it should
+# pancake/splat on the floor and barely rebound -- the soft limit of the bounce.
+name: bounce_ball_3
+seed: 0
+n_frames: 400
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.78, 0.5, 0.78]
+    types: {soft: {fraction: 1.0, youngs: 8}}
+  particle: {parent: cell, per_parent: 2000, radius: 0.12, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.4}
+schedule: [aggregate, gravity, mpm]

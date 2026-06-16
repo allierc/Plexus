@@ -306,6 +306,8 @@ class Mitosis(Operator):
         self.furrow = float(params.get("furrow", 3.0))
         self.furrow_w = float(params.get("furrow_w", 0.018))
         self.pole = float(params.get("pole", 0.0))      # anaphase: pull nucleus to the two poles
+        self.round_frames = int(params.get("round_frames", 0))  # mitotic rounding before the furrow
+        self.round_k = float(params.get("round_k", 6.0))
 
     def forward(self, H, mask=None):
         part = H.level("particle"); cell = H.level("cell")
@@ -332,13 +334,16 @@ class Mitosis(Operator):
                 proj = rel @ axis                                   # along the spindle
                 perp = rel - proj[:, None] * axis                   # equatorial offset
                 s = torch.sign(proj)
-                a = self.elong * s[:, None] * axis[None, :]         # elongate: halves apart
-                eq = proj.abs() < self.furrow_w                     # cleavage furrow at the waist
-                a = a - self.furrow * eq[:, None].float() * perp    # pinch inward
-                nuc_id = getattr(H, "nuc_id", None)                 # anaphase: nucleus -> two poles
-                if self.pole > 0 and nuc_id is not None:
-                    isn = (part.node_type[idx] == nuc_id).float()
-                    a = a + self.pole * isn[:, None] * s[:, None] * axis[None, :]
+                if ph <= self.round_frames:                        # prophase: mitotic rounding
+                    a = -self.round_k * rel                         # pull inward -> tight round cell
+                else:
+                    a = self.elong * s[:, None] * axis[None, :]     # elongate: halves apart
+                    eq = proj.abs() < self.furrow_w                 # cleavage furrow at the waist
+                    a = a - self.furrow * eq[:, None].float() * perp  # pinch inward
+                    nuc_id = getattr(H, "nuc_id", None)             # anaphase: nucleus -> two poles
+                    if self.pole > 0 and nuc_id is not None:
+                        isn = (part.node_type[idx] == nuc_id).float()
+                        a = a + self.pole * isn[:, None] * s[:, None] * axis[None, :]
                 accel[idx] += a
                 H.cell_phase[c] = ph + 1.0
                 if ph + 1.0 >= self.frames:                         # complete the split

@@ -1,0 +1,31 @@
+# 3-layer ball (membrane test 1/4). Inner->outer concentric materials:
+#   core    frac 0.30  youngs 300  -- small, MORE ELASTIC than its surrounding cushion
+#   middle  frac 0.72  youngs 25   -- soft cushion that absorbs the impact
+#   membrane frac 1.0  youngs 40  -- the variable skin; stiffer membrane should hold
+#                                      the ball together so it does NOT shed particles.
+# Dropped under gravity onto a (mildly inelastic) floor. Across layer_ball_1..4 only the
+# membrane youngs changes (40, 200, 600, 1000) to find the skin that keeps the ball intact.
+name: layer_ball_1
+seed: 0
+n_frames: 500
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.78, 0.5, 0.78]
+    types:
+      ball:
+        fraction: 1.0
+        youngs: 25                 # base (unused once layers cover the disc)
+        layers:
+          - {frac: 0.30, youngs: 300}   # core: small, elastic
+          - {frac: 0.72, youngs: 25}    # middle: soft cushion
+          - {frac: 1.00, youngs: 40}  # membrane: variable stiffness
+  particle: {parent: cell, per_parent: 2500, radius: 0.12, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.25, wall_damp: 0.85}
+schedule: [aggregate, gravity, mpm]

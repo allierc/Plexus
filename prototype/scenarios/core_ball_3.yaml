@@ -1,0 +1,28 @@
+# core_ball_3: the INVERTED material layout of _1 -- a STIFF shell around a SOFT core,
+# i.e. a rigid capsule holding a fluid-like centre. Implemented with the same `core`
+# knob but reversed stiffness: shell youngs 500 (rigid), core youngs 8 (very soft).
+# Hypothesis: the stiff shell keeps the overall ball round and bouncing, while the
+# soft red core sloshes inside it -- the opposite of _1, where the core was the rigid
+# part. Tests that the per-particle material assignment is truly general, not just
+# "core must be the stiff one".
+name: core_ball_3
+seed: 0
+n_frames: 500
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.80, 0.5, 0.80]
+    types:
+      layered:
+        fraction: 1.0
+        youngs: 500                      # stiff shell (the rigid capsule)
+        core: {youngs: 8, frac: 0.55}    # soft sloshing core
+  particle: {parent: cell, per_parent: 2500, radius: 0.13, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.2}
+schedule: [aggregate, gravity, mpm]

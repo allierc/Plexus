@@ -1,0 +1,31 @@
+# A multi-material ball: a SOFT shell wrapped around a SOLID (stiff) core, dropped
+# under gravity. Same cell = one ball, but its particles are no longer homogeneous:
+# the type carries an optional `core: {youngs, frac}` block, so particles within
+# frac*radius of the cell center take the stiff core youngs and the rest take the
+# soft shell youngs. Expectation on impact: the soft shell squashes/pancakes against
+# the floor while the rigid core stays round and barely deforms -- a soft ball with a
+# hard centre, like a gel capsule around a marble.
+name: core_ball
+seed: 0
+n_frames: 500
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.80, 0.5, 0.80]
+    types:
+      layered:
+        fraction: 1.0
+        youngs: 20                       # soft shell
+        # core 40x stiffer than the shell -> effectively rigid by contrast. NOT higher:
+        # at dt_sub=2e-4, dx=1/128, MPM is stable only up to youngs ~1500 (c=sqrt(E/rho),
+        # dt<dx/c); youngs=5000 went unstable -> velocities NaN'd to 0 -> ball froze.
+        core: {youngs: 800, frac: 0.45}  # stiff solid core, inner 45% of the radius
+  particle: {parent: cell, per_parent: 2500, radius: 0.13, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.2}
+schedule: [aggregate, gravity, mpm]

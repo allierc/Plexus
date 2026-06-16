@@ -95,13 +95,24 @@ def build(sc, device="cpu"):
     cell.type_names = list(types.keys())
     node_type = torch.zeros(Nc, dtype=torch.long, device=device)
     youngs = torch.zeros(Nc, device=device)
+    core_youngs = torch.zeros(Nc, device=device)        # 0 -> homogeneous (no core)
+    core_frac = torch.zeros(Nc, device=device)          # core radius as a fraction of the disc
     perm = torch.randperm(Nc, generator=g, device=device)
     start = 0
+    type_layers = {}                                    # tid -> [(outer_frac, youngs), ...] inner->outer
     for tid, (tname, t) in enumerate(types.items()):
         k = int(round(t["fraction"] * Nc))
         idx = perm[start:start + k]; start += k
         node_type[idx] = tid
         youngs[idx] = float(t["youngs"])
+        core = t.get("core")                            # optional {youngs, frac}: a stiffer inner core
+        if core is not None:
+            core_youngs[idx] = float(core["youngs"])
+            core_frac[idx] = float(core.get("frac", 0.5))
+        layers = t.get("layers")                        # optional N-layer ball (inner->outer concentric shells)
+        if layers is not None:                          # each layer: (outer_frac, youngs, material)
+            type_layers[tid] = [(float(L["frac"]), float(L["youngs"]), L.get("material", "elastic"))
+                                for L in layers]
     cell.register_buffer("node_type", node_type)
     cell.loaded = torch.zeros(Nc, dtype=torch.bool, device=device)   # forage state (unused otherwise)
     H.add_level(cell)
@@ -134,7 +145,44 @@ def build(sc, device="cpu"):
     part.register_buffer("parent", parent)
     part.register_buffer("C", torch.zeros(Np, 2, 2, device=device))
     part.register_buffer("F", torch.eye(2, device=device).expand(Np, 2, 2).contiguous())
-    mu, la = _lame(youngs[parent])
+    # per-particle stiffness. Two ways to make a multi-material ball:
+    #   core:   one stiffer inner disc (r < frac*rad)         -> is_core flag (legacy, 2 materials)
+    #   layers: N concentric shells inner->outer by frac      -> layer_id 0..N-1 (general)
+    # default: homogeneous (the cell's shell youngs).
+    is_core = (core_youngs[parent] > 0) & (r < core_frac[parent] * rad)
+    p_youngs = torch.where(is_core, core_youngs[parent], youngs[parent])
+    layer_id = torch.zeros(Np, dtype=torch.long, device=device)        # 0 if not layered
+    is_liquid = torch.zeros(Np, dtype=torch.bool, device=device)       # liquid material (mu=0, F reset)
+    is_snow = torch.zeros(Np, dtype=torch.bool, device=device)         # snow/plastic (SVD clamp + hardening)
+    if type_layers:
+        rnorm = r / max(rad, 1e-9)                                     # particle radius in [0,1]
+        ntype = node_type[parent]
+        for tid, lyrs in type_layers.items():
+            sel = ntype == tid
+            assigned = torch.zeros_like(sel)
+            for li, (frac, yng, mat) in enumerate(lyrs):              # inner -> outer; first band that contains it
+                band = sel & (~assigned) & (rnorm <= frac)
+                p_youngs = torch.where(band, torch.full_like(p_youngs, yng), p_youngs)
+                layer_id = torch.where(band, torch.full_like(layer_id, li), layer_id)
+                if mat == "liquid":
+                    is_liquid = is_liquid | band
+                elif mat == "snow":
+                    is_snow = is_snow | band
+                assigned = assigned | band
+            rem = sel & (~assigned)                                    # rounding slop -> outermost layer
+            p_youngs = torch.where(rem, torch.full_like(p_youngs, lyrs[-1][1]), p_youngs)
+            layer_id = torch.where(rem, torch.full_like(layer_id, len(lyrs) - 1), layer_id)
+            if lyrs[-1][2] == "liquid":
+                is_liquid = is_liquid | rem
+            elif lyrs[-1][2] == "snow":
+                is_snow = is_snow | rem
+    mu, la = _lame(p_youngs)
+    mu = torch.where(is_liquid, torch.zeros_like(mu), mu)              # liquid: no shear modulus -> pressure only
+    part.register_buffer("is_core", is_core)
+    part.register_buffer("layer_id", layer_id)
+    part.register_buffer("is_liquid", is_liquid)
+    part.register_buffer("is_snow", is_snow)
+    part.register_buffer("Jp", torch.ones(Np, device=device))         # plastic volume ratio (snow hardening)
     part.register_buffer("mu", mu)
     part.register_buffer("la", la)
     # per-particle volume = actual disc area / particles  (consistent with packing)
@@ -161,10 +209,11 @@ def build(sc, device="cpu"):
         nx = int(round(width * res))
         walls = _raster(obstacles, res, width, device) if obstacles else None
         src = _raster([f["source"]], res, width, device) if f.get("source") else None
+        snk = _raster([f["sink"]], res, width, device) if f.get("sink") else None
         fld = GridField(fname, f["couples_to"], res=res, diffusion=f["diffusion"],
                         decay=f.get("decay", 0.0), dt=dt_f, device=device,
                         walls=walls, source=src, source_rate=f.get("source_rate", 0.0),
-                        periodic=H.periodic, width=width)
+                        periodic=H.periodic, width=width, sink=snk)
         # initial fill (declared): uniform value across the open domain
         if f.get("init") is not None:
             fld.grid = torch.full((nx, res), float(f["init"]), device=device)
@@ -179,6 +228,13 @@ def build(sc, device="cpu"):
             wnp = (walls.cpu().numpy() if walls is not None else np.zeros((nx, res), bool))
             pot = _geodesic_potential(wnp, src.cpu().numpy())
             fld.grid = torch.from_numpy(pot).to(device)
+        # declarative pre-solve: run the field's own diffusion to (near) steady state
+        # before t=0, so a SELF-GENERATED (dynamic) gradient is already established at the
+        # start instead of taking thousands of ticks to crawl across the domain. Generic
+        # (any field may request it); not a geodesic -- it is the field's real PDE solution.
+        n_eq = int(f.get("equilibrate", 0))
+        if n_eq > 0:
+            fld.equilibrate(n_eq)
         H.add_field(fld)
     H.cell_accel = torch.zeros(Nc, 2, device=device)
     H.harvested = 0.0                                                     # graze objective
@@ -277,6 +333,9 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
 
     out = dict(cell_pos=cen[:rec], cell_type=cell.node_type.cpu().numpy(),
                particle_pos=ppos[:rec], parent=part.parent.cpu().numpy(),
+               is_core=part.is_core.cpu().numpy() if hasattr(part, "is_core") else None,
+               layer_id=part.layer_id.cpu().numpy() if hasattr(part, "layer_id") else None,
+               is_liquid=part.is_liquid.cpu().numpy() if hasattr(part, "is_liquid") else None,
                loaded=loaded[:rec], done=done[:rec], field=fhist[:rec], type_names=cell.type_names,
                food_delivered=int(getattr(H, "food_delivered", 0)),
                harvested=float(getattr(H, "harvested", 0.0)),

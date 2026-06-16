@@ -134,7 +134,7 @@ def load(path: str) -> Scenario:
     used_props = set()
     for o in raw["operators"]:
         used_props |= set(getattr(registry.get_operator(o["op"]), "REQUIRES_TYPE_PROPS", []))
-    _KNOWN_TYPE_KEYS = {"fraction"} | used_props
+    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers"} | used_props  # core/layers read by engine build (per-particle stiffness)
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:

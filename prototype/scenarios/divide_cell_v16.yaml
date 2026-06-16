@@ -1,0 +1,19 @@
+name: divide_cell_v16
+seed: 0
+n_frames: 600
+dt: 0.02
+record_every: 4
+sets:
+  cell: {n: 1, buffer: 16}
+  particle: {parent: cell, per_parent: 360, buffer: 4800, radius: 0.06,
+             types: {nucleus: {fraction: 0.18}, cyto: {fraction: 0.60}, membrane: {fraction: 0.22}}}
+fields: {}
+operators:
+  - {op: skin,   at: particle, nucleus: 0.18, membrane: 0.22}
+  - {op: cohere, at: particle, k: 0.35, role: cyto}
+  - {op: cohere, at: particle, k: 5.0,  role: nucleus}
+  - {op: repulse, at: particle, r0: 0.013, k: 0.6}
+  - {op: tissue, at: cell, strength: 0.5, radius: 0.18}
+  - {op: duplicate, at: particle, rate: 6, r0: 0.013}
+  - {op: mitosis, at: cell, ratio: 2.0, frames: 30, elong: 0.12, furrow: 3.5, furrow_w: 0.016, pole: 0.4}
+schedule: [aggregate, skin, cohere, repulse, tissue, mitosis, integrate, duplicate]

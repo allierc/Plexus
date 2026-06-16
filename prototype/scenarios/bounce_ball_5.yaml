@@ -1,0 +1,25 @@
+# v5: a "break" test of the MPM engine. Several STIFF balls start clustered in the
+# CENTRAL zone, each kicked off in its own RANDOM direction (motility = per-cell
+# random heading), then gravity pulls them down. Expectation: the balls fan out in
+# random directions, arc under gravity, bounce off the floor and side walls, and --
+# because they are stiff -- collide elastically and stay as distinct balls instead
+# of merging into one blob. If two stiff balls instead fused on contact, the engine
+# would be failing to resolve contact (the thing we are testing).
+name: bounce_ball_5
+seed: 0
+n_frames: 500
+record_every: 2
+boundary: wall                         # reflective domain walls -> they bounce, not escape
+sets:
+  cell:
+    n: 9
+    start: [0.40, 0.42, 0.60, 0.62]    # clustered in the central zone
+    types: {stiff: {fraction: 1.0, youngs: 600}}   # very stiff -> resist sticking/merging
+  particle: {parent: cell, per_parent: 800, radius: 0.05, density: 1.0}
+fields:                                # engine requires >=1 field; unused here
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 45.0, rot: 0.03}   # random heading per ball, ~persistent
+  - {op: gravity, at: cell, g: 10.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.1}
+schedule: [aggregate, motility, gravity, mpm]

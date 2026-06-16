@@ -1,0 +1,24 @@
+# A soft elastic ball of 2000 MPM particles dropped under gravity onto the floor.
+#   particle (L0) -- MLS-MPM mechanics; one soft material (youngs)
+#   cell     (L1) -- the ball; its center = Aggregate-up of its particles
+# gravity pulls the ball down (a uniform body force broadcast to every particle);
+# the floor is the reflective domain wall (grid velocity into it is clamped to 0).
+# The bounce is NOT a wall force -- it is the elastic restoring stress when the
+# ball compresses against the floor. youngs sets how lively; drag how fast it dies.
+name: bounce_ball
+seed: 0
+n_frames: 400
+record_every: 2
+boundary: wall                         # reflective domain walls (NOT periodic)
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.78, 0.5, 0.78]      # single ball, dropped from high up
+    types: {soft: {fraction: 1.0, youngs: 60}}
+  particle: {parent: cell, per_parent: 2000, radius: 0.12, density: 1.0}
+fields:                                # engine requires >=1 field; unused (no secrete/sense)
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.4}
+schedule: [aggregate, gravity, mpm]

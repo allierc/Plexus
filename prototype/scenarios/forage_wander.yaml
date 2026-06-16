@@ -1,0 +1,40 @@
+# Wandering forager -- a VARIANT of forage_maze.yaml. Same sets / fields / obstacles /
+# schedule and same operators; ONLY the spawn region + motility / random_walk / sense
+# parameters change. Intent of the variant: cells do NOT march straight up the food
+# gradient. Chemotaxis is turned down to a weak bias (gain 180 -> 30), the per-cell
+# self-propulsion is made stronger and noisier (speed 40 -> 75, rot 0.30 -> 0.75 -- each
+# cell's random initial heading x higher speed = more stochastic initial velocity), and
+# the Brownian jitter is amplified (random_walk strength 25 -> 80).
+#
+# No-bias check: cells spawn in the OPEN CENTRAL CORRIDOR of the maze (between the two
+# walls), not in the home corner -- in a corner, walls + domain edges block down/left, so
+# dispersal only LOOKS directional. From the middle they are free to scatter in every
+# direction, so the early frames show isotropic spread (the actual test that the wander
+# is unbiased). Cells stay very stiff (youngs 550) so they bounce apart on contact instead
+# of clumping into a sticky blob.
+name: forage_wander
+seed: 0
+n_frames: 3600
+record_every: 6
+obstacles:                       # [x0,y0,x1,y1] in [0,1]  -- identical to forage_maze
+  - [0.30, 0.00, 0.36, 0.70]     # wall with a gap at the top
+  - [0.62, 0.30, 0.68, 1.00]     # wall with a gap at the bottom
+sets:
+  cell:
+    n: 60
+    start: [0.42, 0.42, 0.58, 0.58]            # spawn in the OPEN MIDDLE of the maze (between the walls)
+    types: {A: {fraction: 0.5, youngs: 550}, B: {fraction: 0.5, youngs: 550}}  # both very rigid -> don't stick
+  particle: {parent: cell, per_parent: 50, radius: 0.012, density: 1.0}
+fields:
+  scent: {frame: grid, res: 96, diffusion: 0.04, decay: 0.02, couples_to: cell}   # deposited tracks
+  food_signal: {frame: grid, res: 96, diffusion: 1.0, source: [0.82, 0.82, 1.0, 1.0], couples_to: cell}
+  home_signal: {frame: grid, res: 96, diffusion: 1.0, source: [0.00, 0.00, 0.18, 0.18], couples_to: cell}
+operators:
+  - {op: motility, at: cell, speed: 75.0, rot: 0.75}                       # strong, noisy self-propulsion (was 40 / 0.30)
+  - {op: random_walk, at: cell, strength: 80.0}                            # large Brownian jitter (was 25)
+  - {op: forage, at: cell, food: [0.82, 0.82, 1.0, 1.0], home: [0.0, 0.0, 0.18, 0.18]}
+  - {op: sense, at: "cell[loaded=0]", from: food_signal, gain: 30.0}       # weak bias only (was 180)
+  - {op: sense, at: "cell[loaded=1]", from: home_signal, gain: 30.0}       # weak bias only (was 180)
+  - {op: secrete, at: cell, to: scent, rate: 1.0}                          # lay chemoattractant track
+  - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 700, drag: 2.0, vmax: 5.0}
+schedule: [aggregate, forage, [motility, random_walk, sense], secrete, scent.diffuse, mpm]

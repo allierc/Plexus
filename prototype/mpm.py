@@ -24,7 +24,8 @@ _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torc
 
 
 def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
-                   nx, ny, dx, inv_dx, dt, p_vol, drag, walls_flat, vmax_user, periodic, width):
+                   nx, ny, dx, inv_dx, dt, p_vol, drag, walls_flat, vmax_user, periodic, width,
+                   wall_damp, wall_contact, liquid_mask, snow_mask, Jp):
     """One MLS-MPM substep. All tensors batched over particles. Pure -> compilable.
     Grid is [nx, ny] of square cells (dx); the world is [0,width]x[0,1]."""
     N = X.shape[0]
@@ -38,6 +39,28 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     a, b, c, d = F[:, 0, 0], F[:, 0, 1], F[:, 1, 0], F[:, 1, 1]
     J = a * d - b * c                                   # det(F)
 
+    if liquid_mask is not None:                         # LIQUID: drop shape memory, keep only volume J.
+        Jl = torch.sqrt(J.clamp(min=1e-6))              # F := sqrt(J)*I  -> isotropic, no shear/rotation.
+        F = torch.where(liquid_mask[:, None, None], eye * Jl[:, None, None], F)
+        a, b, c, d = F[:, 0, 0], F[:, 0, 1], F[:, 1, 0], F[:, 1, 1]   # (mu=0 for liquid -> stress is pure pressure)
+
+    mu_e, la_e = mu, la
+    if snow_mask is not None:                           # SNOW: plastic flow -> clamp singular values of F,
+        sm = snow_mask                                  # accumulate plastic volume Jp, harden mu/la with Jp.
+        Fs = F[sm]
+        if Fs.shape[0] > 0:
+            U, sig, Vh = torch.linalg.svd(Fs)           # F = U diag(sig) Vh   (per snow particle)
+            sig_c = sig.clamp(1.0 - 2.5e-2, 1.0 + 7.5e-3)   # snow yield: theta_c compress, theta_s stretch
+            Fp = U @ torch.diag_embed(sig_c) @ Vh
+            F = F.clone(); F[sm] = Fp
+            ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)   # volume pushed into plastic part
+            Jp = Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
+            a, b, c, d = F[:, 0, 0], F[:, 0, 1], F[:, 1, 0], F[:, 1, 1]
+            J = a * d - b * c
+        h = torch.exp((10.0 * (1.0 - Jp)).clamp(-6.0, 6.0))   # Jp<1 (packed) -> harder; Jp>1 -> softer
+        mu_e = torch.where(sm, mu * h, mu)
+        la_e = torch.where(sm, la * h, la)
+
     # analytic 2x2 polar rotation R (closest rotation to F)
     cs, sn = (a + d), (c - b)
     r = torch.sqrt(cs * cs + sn * sn) + 1e-9
@@ -45,10 +68,10 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     R = torch.stack([torch.stack([cs, -sn], -1),
                      torch.stack([sn, cs], -1)], -2)    # [N,2,2]
 
-    # fixed-corotated stress -> affine momentum matrix
+    # fixed-corotated stress -> affine momentum matrix  (mu_e/la_e carry snow hardening)
     FmR = F - R
-    stress = 2 * mu[:, None, None] * (FmR @ F.transpose(-2, -1)) \
-        + eye * (la * J * (J - 1))[:, None, None]
+    stress = 2 * mu_e[:, None, None] * (FmR @ F.transpose(-2, -1)) \
+        + eye * (la_e * J * (J - 1))[:, None, None]
     stress = (-dt * p_vol * 4 * inv_dx * inv_dx) * stress
     affine = stress + mass[:, None, None] * C
 
@@ -96,6 +119,11 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     # robustness: bound velocity (CFL) and sanitize NaN/inf so a bad design can't
     # poison the CUDA context -- it just produces a poor (low-food) trajectory.
     new_V = torch.nan_to_num(new_V)
+    if wall_damp != 1.0 and not periodic:            # inelastic walls: bleed kinetic energy from
+        cb = wall_contact                            # the layer of material in contact with a wall
+        near = ((X[:, 0] < cb) | (X[:, 0] > width - cb)
+                | (X[:, 1] < cb) | (X[:, 1] > 1.0 - cb))
+        new_V = torch.where(near[:, None], new_V * wall_damp, new_V)
     sp = new_V.norm(dim=1, keepdim=True).clamp(min=1e-9)
     vmax = min(vmax_user, 0.4 * dx / dt)             # user cap, never above CFL
     new_V = new_V * (sp.clamp(max=vmax) / sp)
@@ -108,7 +136,7 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     else:
         X = torch.stack([X[:, 0].clamp(2 * dx, width - 2 * dx),
                          X[:, 1].clamp(2 * dx, 1 - 2 * dx)], dim=1)
-    return X, new_V, new_C, F
+    return X, new_V, new_C, F, Jp
 
 
 @register_operator("mpm", level="particle", kind="exchange")
@@ -122,6 +150,9 @@ class MPMOperator(Exchange):
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.a_max = float(params.get("a_max", 200.0))    # clamp broadcast accel
         self.drag = float(params.get("drag", 40.0))       # Stokes drag (overdamped)
+        self.wall_damp = float(params.get("wall_damp", 1.0))  # 1.0=elastic wall; <1 loses energy on bounce
+        self.wall_contact = float(params.get("wall_contact", 0.04))  # contact-layer thickness damped on bounce
+        self.surface_tension = float(params.get("surface_tension", 0.0))  # liquid cohesion (pull to local COM)
         self.vmax = float(params.get("vmax", 1e9))        # max cell speed (default: CFL only)
         self.dx = 1.0 / self.n_grid
         self.inv_dx = float(self.n_grid)
@@ -148,10 +179,31 @@ class MPMOperator(Exchange):
         fn = self.compiled or mlsmpm_substep
         X, V = p.state[:, :2], p.state[:, 2:4]
         C, F = p.C, p.F
+        liquid = getattr(p, "is_liquid", None)             # per-particle liquid material mask (or None)
+        if liquid is not None and not liquid.any():
+            liquid = None                                  # all-solid -> skip the liquid branch entirely
+        snow = getattr(p, "is_snow", None)                 # per-particle snow/plastic mask (or None)
+        if snow is not None and not snow.any():
+            snow = None                                    # no snow -> skip the SVD plasticity branch
+        Jp = getattr(p, "Jp", None)
+
+        if self.surface_tension > 0 and liquid is not None:   # SURFACE TENSION (cohesion) for liquid particles:
+            pos = p.state[:, :2]                              # pull each liquid particle toward its local
+            pl = pos[liquid]                                  # neighbourhood COM. Interior -> ~0; surface -> inward.
+            if pl.shape[0] > 1:
+                dmat = torch.cdist(pl, pl)
+                nb = (dmat < 3.0 * self.dx).float()           # neighbours within 3*dx (includes self)
+                com = (nb @ pl) / nb.sum(1, keepdim=True).clamp(min=1.0)
+                st = torch.zeros_like(pos)
+                st[liquid] = self.surface_tension * (com - pl)
+                a_ext = a_ext + st
         for _ in range(self.substeps):
-            X, V, C, F = fn(X, V, C, F, p.mass, p.mu, p.la, a_ext, offsets,
-                            nx, ny, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls,
-                            self.vmax, periodic, width)
+            X, V, C, F, Jp = fn(X, V, C, F, p.mass, p.mu, p.la, a_ext, offsets,
+                                nx, ny, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls,
+                                self.vmax, periodic, width, self.wall_damp, self.wall_contact,
+                                liquid, snow, Jp)
         p.state = torch.cat([X, V], dim=1)
         p.C, p.F = C, F
+        if Jp is not None:
+            p.Jp = Jp
         return {}

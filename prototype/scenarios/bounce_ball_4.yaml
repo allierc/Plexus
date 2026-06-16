@@ -1,0 +1,23 @@
+# v4: TWO balls dropped together in a wide world, differing only in stiffness
+# (soft youngs 30 vs stiff youngs 400) -- the contrast from v1/v2/v3 in one shot.
+# Hypothesis: the stiff ball bounces high and stays round; the soft one squashes
+# and barely rebounds. `types` carries the per-ball stiffness; selector not needed
+# (gravity + mpm act on all). world>1 gives the two balls horizontal room.
+name: bounce_ball_4
+seed: 1
+n_frames: 500
+record_every: 2
+boundary: wall
+world: 1.6
+sets:
+  cell:
+    n: 2
+    start: [0.35, 0.82, 1.25, 0.82]            # a wide horizontal band -> two columns
+    types: {soft: {fraction: 0.5, youngs: 30}, stiff: {fraction: 0.5, youngs: 400}}
+  particle: {parent: cell, per_parent: 2000, radius: 0.11, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.15}
+schedule: [aggregate, gravity, mpm]

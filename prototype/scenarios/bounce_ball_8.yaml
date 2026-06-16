@@ -1,0 +1,24 @@
+# v8: demonstrates the new wall_damp (restitution) knob. Same stiff, low-drag ball
+# as v2 -- which bounced many times with almost no decay (near-elastic walls) -- but
+# now wall_damp=0.7 bleeds 30% of the contact velocity each time the ball touches a
+# wall/floor. Global drag is kept tiny (0.04) so the energy loss is attributable to
+# the WALL, not air resistance. Expectation: a tall first bounce, then each rebound
+# noticeably lower than the last (a classic damped bouncing ball), settling on the
+# floor -- in contrast to v2, whose bounce height barely changed.
+name: bounce_ball_8
+seed: 0
+n_frames: 600
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.82, 0.5, 0.82]
+    types: {soft: {fraction: 1.0, youngs: 400}}   # stiff -> lively bounce to decay
+  particle: {parent: cell, per_parent: 2000, radius: 0.12, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.04, wall_damp: 0.7}
+schedule: [aggregate, gravity, mpm]

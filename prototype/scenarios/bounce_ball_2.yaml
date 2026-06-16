@@ -1,0 +1,20 @@
+# v2 vs v1: STIFFER ball (youngs 60 -> 400) + LESS drag (0.4 -> 0.08).
+# Hypothesis: a stiffer, less-damped ball should squash less on impact and rebound
+# higher, with many slowly-decaying bounces (closer to elastic restitution ~1).
+name: bounce_ball_2
+seed: 0
+n_frames: 500
+record_every: 2
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.82, 0.5, 0.82]
+    types: {soft: {fraction: 1.0, youngs: 400}}
+  particle: {parent: cell, per_parent: 2000, radius: 0.12, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.08}
+schedule: [aggregate, gravity, mpm]
