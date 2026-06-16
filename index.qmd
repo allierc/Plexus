@@ -6,13 +6,14 @@ subtitle: "Toward a language and calculus of living systems"
 Biology is not a single graph.
 
 A graph fixes *one* kind of node and *one* kind of edge — particles and the
-forces between them, cells and their interactions, neurons and synapses,
+forces between them, cells and their contacts, neurons and synapses,
 molecular species and reactions. Each existing framework commits to one such
 graph and models that layer alone. But a living system is several of these at once, nested inside one
-another and coupled to continuous fields: particles make up cells, cells make up
-tissues and populations, and every level exchanges with morphogen, pressure, and
-chemical fields. Choose any single graph and you capture one slice — the
-couplings *between* slices, where much of the biology lives, fall outside it.
+another: particles make up cells, and cells make up tissues and populations.
+And every level is coupled to continuous fields — a morphogen gradient, a
+pressure field, a chemical signal — that the discrete entities both shape and
+read. Choose any single graph and you capture one slice — the couplings
+*between* slices, where much of the biology lives, fall outside it.
 
 Plexus starts from a different question:
 
@@ -28,10 +29,9 @@ and **exchange** (between sets and fields). Complex simulations emerge from
 composing a few primitive operations.
 
 The goal is not merely to mimic biology, but to provide a *language* in
-which biological systems can be expressed, modified, optimized, and understood.
-A simulation becomes a program. A tissue becomes a composition of operators. A
-new biological hypothesis becomes a small change to a specification rather than a
-new software project.
+which biological systems can be expressed, modified, optimized, and understood —
+where testing a new hypothesis is a few edited lines of specification, not a new
+software project.
 
 ## A language *and* a calculus — two layers that never touch
 
