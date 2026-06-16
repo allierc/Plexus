@@ -161,12 +161,10 @@ def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tu
              o.on)
             for o in sim.operators]
 
-    re = sim.record_every
-    n_rec = sim.n_frames // re + 1
+    n_rec = sim.n_frames + 1
     rec_sets = {name: np.zeros((n_rec, lvl.n, 2), np.float32) for name, lvl in H.levels.items()}
     occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}
 
-    rec = 0
     with torch.no_grad():
         for frame in range(sim.n_frames + 1):
             H.zero_accel()
@@ -184,13 +182,11 @@ def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tu
                                 continue
                             for lvlname, d in ob(H, _mask(H, sel)).items():
                                 H.add_accel(lvlname, d)
-            if frame % re == 0:
-                for name, lvl in H.levels.items():
-                    rec_sets[name][rec] = lvl.get("pos").cpu().numpy()
-                    occ_sets[name][rec] = lvl.active.cpu().numpy()
-                rec += 1
+            for name, lvl in H.levels.items():
+                rec_sets[name][frame] = lvl.get("pos").cpu().numpy()
+                occ_sets[name][frame] = lvl.active.cpu().numpy()
 
-    out = {"sets": {name: {"pos": rec_sets[name][:rec], "occ": occ_sets[name][:rec],
+    out = {"sets": {name: {"pos": rec_sets[name], "occ": occ_sets[name],
                            "node_type": (H.level(name).node_type.cpu().numpy()
                                          if hasattr(H.level(name), "node_type") else None),
                            "type_names": getattr(H.level(name), "type_names", None)}
@@ -203,5 +199,5 @@ def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tu
             g = root.create_group(name)
             g.create_dataset("pos", data=out["sets"][name]["pos"])
             g.create_dataset("occ", data=out["sets"][name]["occ"])
-        root.attrs.update(name=sim.name, seed=sim.seed, world=H.world_width, record_every=re)
+        root.attrs.update(name=sim.name, seed=sim.seed, world=H.world_width)
     return H, out

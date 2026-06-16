@@ -60,6 +60,7 @@ def plot_dataset(sim: Simulation, pre_folder: str, movie: bool = False) -> str:
 
     style = sim.plotting or {}
     cmap = plt.get_cmap(style.get("colormap", "tab10"))
+    bg = style.get("background", "white")             # figure/axes background colour
     W = float(d["world"]) if "world" in d.files else sim.world
 
     for sname in _sets_in(d):
@@ -74,40 +75,52 @@ def plot_dataset(sim: Simulation, pre_folder: str, movie: bool = False) -> str:
         def _draw(ax, i):
             live = occ[i]
             c = (color[live] if color is not None else "#1f77b4")
+            ax.set_facecolor(bg)
             ax.scatter(pos[i, live, 0], pos[i, live, 1], s=s, c=c, linewidths=0)
             ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
 
         # evolution montage
         idx = [0, T // 5, 2 * T // 5, 3 * T // 5, T - 1]
         fig, axes = plt.subplots(1, len(idx), figsize=(len(idx) * W * 3.2, 3.4))
+        fig.patch.set_facecolor(bg)
         for ax, i in zip(np.atleast_1d(axes), idx):
-            _draw(ax, i); ax.set_title(f"frame {i * sim.record_every}", fontsize=9)
-        fig.suptitle(f"{folder}/{sim.name} — {sname}", fontsize=11)
+            _draw(ax, i)
         plt.tight_layout()
         evo = os.path.join(data_dir, f"fig_{sname}_evolution.png")
-        plt.savefig(evo, dpi=100); plt.close(fig)
+        plt.savefig(evo, dpi=100, facecolor=bg); plt.close(fig)
 
         # final frame
         fig, ax = plt.subplots(figsize=(6 * W, 6))
-        _draw(ax, T - 1); ax.set_title(f"{sim.name} — {sname} (final)", fontsize=11)
+        fig.patch.set_facecolor(bg)
+        _draw(ax, T - 1)
         plt.tight_layout()
         fin = os.path.join(data_dir, f"fig_{sname}_final.png")
-        plt.savefig(fin, dpi=110); plt.close(fig)
+        plt.savefig(fin, dpi=110, facecolor=bg); plt.close(fig)
         print(f"[plot] {sname}: {os.path.basename(evo)}, {os.path.basename(fin)}", flush=True)
 
         if movie:
-            _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}.gif"))
+            _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"), bg=bg)
 
     print(f"[plot] figures -> {data_dir}", flush=True)
     return data_dir
 
 
-def _movie(pos, occ, color, s, W, T, out_path, max_frames: int = 80) -> None:
-    from matplotlib.animation import FuncAnimation, PillowWriter
+def _ffmpeg() -> str | None:
+    """Locate ffmpeg: next to the running interpreter (conda env) or on PATH."""
+    import sys, shutil
+    cand = os.path.join(os.path.dirname(sys.executable), "ffmpeg")
+    return cand if os.path.exists(cand) else shutil.which("ffmpeg")
+
+
+def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white") -> None:
+    """Render a movie of a set's trajectory. Writes mp4 via ffmpeg when available,
+    else falls back to gif. `out_base` is the path without extension."""
+    from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
     fig, ax = plt.subplots(figsize=(5 * W, 5)); ax.set_xlim(0, W); ax.set_ylim(0, 1)
-    ax.set_aspect("equal"); ax.axis("off")
+    ax.set_aspect("equal"); ax.axis("off"); ax.set_facecolor(bg); fig.patch.set_facecolor(bg)
+    fig.tight_layout(pad=0)
     sc = ax.scatter(pos[0, :, 0], pos[0, :, 1], s=s, linewidths=0,
                     c=(color if color is not None else "#1f77b4"))
 
@@ -118,6 +131,14 @@ def _movie(pos, occ, color, s, W, T, out_path, max_frames: int = 80) -> None:
             sc.set_color(color[live])
         return sc,
 
-    FuncAnimation(fig, upd, frames=frames, interval=50).save(out_path, writer=PillowWriter(fps=20))
+    anim = FuncAnimation(fig, upd, frames=frames, interval=50)
+    ff = _ffmpeg()
+    if ff:
+        matplotlib.rcParams["animation.ffmpeg_path"] = ff
+        out = out_base + ".mp4"
+        anim.save(out, writer=FFMpegWriter(fps=25, bitrate=4000), savefig_kwargs={"facecolor": bg})
+    else:
+        out = out_base + ".gif"
+        anim.save(out, writer=PillowWriter(fps=20), savefig_kwargs={"facecolor": bg})
     plt.close(fig)
-    print(f"[plot] movie -> {os.path.basename(out_path)}", flush=True)
+    print(f"[plot] movie -> {os.path.basename(out)}", flush=True)

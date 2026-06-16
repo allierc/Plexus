@@ -2,12 +2,12 @@
 # graphs_data/arbitrary/arbitrary: 4800 particles, 3 types (1600 each), 1000
 # frames, sigma=0.005, max_radius=0.075, dt=0.025, periodic, first_derivative,
 # mean aggregation. With identical initial conditions the trajectory should match.
-name: arbitrary_repro
-seed: 0
-n_frames: 1000
-dt: 0.025
-record_every: 1
-boundary: periodic
+general:
+  name: arbitrary_repro
+  seed: 0
+  n_frames: 1000
+  dt: 0.025
+  boundary: periodic
 
 sets:
   particle:
@@ -26,5 +26,6 @@ operators:
 schedule: [radius_graph, attraction_repulsion, integrate]
 
 plotting:
+  background: black
   colormap: tab10
   point_size: 4.0

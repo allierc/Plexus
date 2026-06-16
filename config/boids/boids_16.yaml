@@ -2,12 +2,12 @@
 # 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
 # max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
 # Per-type p = [cohesion, alignment, separation].
-name: boids_16
-seed: 0
-n_frames: 4000
-dt: 0.5
-record_every: 4
-boundary: periodic
+general:
+  name: boids_16
+  seed: 0
+  n_frames: 4000
+  dt: 0.5
+  boundary: periodic
 
 sets:
   particle:
@@ -40,5 +40,6 @@ operators:
 schedule: [radius_graph, boids, integrate]
 
 plotting:
+  background: black
   colormap: tab20
   point_size: 6.0

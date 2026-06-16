@@ -1,12 +1,12 @@
 # Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
 # max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
 # because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
-name: arbitrary_3
-seed: 0
-n_frames: 250
-dt: 0.1
-record_every: 2
-boundary: periodic
+general:
+  name: arbitrary_3
+  seed: 0
+  n_frames: 250
+  dt: 0.1
+  boundary: periodic
 
 sets:
   particle:
@@ -25,5 +25,6 @@ operators:
 schedule: [radius_graph, attraction_repulsion, integrate]
 
 plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
+  background: black
   colormap: tab10
   point_size: 2.0

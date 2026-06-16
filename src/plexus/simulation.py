@@ -65,7 +65,6 @@ class Simulation:
     seed: int
     n_frames: int
     dt: float
-    record_every: int
     sets: dict
     fields: dict
     operators: list[OpSpec]
@@ -84,9 +83,17 @@ def load(path: str) -> Simulation:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
-    for key in ("name", "sets", "fields", "operators", "schedule"):
+    # run/world scalars live under `general:` (name, seed, n_frames, dt, boundary,
+    # world, obstacles); fall back to the top level for back-compat.
+    g = raw.get("general", {})
+    def gv(key, default=None):
+        return g.get(key, raw.get(key, default))
+
+    for key in ("sets", "fields", "operators", "schedule"):
         if key not in raw:
             raise ValueError(f"simulation missing required key: {key!r}")
+    if gv("name") is None:
+        raise ValueError("simulation missing required key: 'name' (under general:)")
 
     # --- sets: type fractions sum to 1; buffer (if given) >= n -------------- #
     for sname, s in raw["sets"].items():
@@ -188,17 +195,16 @@ def load(path: str) -> Simulation:
                 raise ValueError(f"schedule step {tok!r} is not a declared operator or builtin")
 
     return Simulation(
-        name=raw["name"],
-        seed=int(raw.get("seed", 0)),
-        n_frames=int(raw.get("n_frames", 200)),
-        dt=float(raw.get("dt", 0.05)),
-        record_every=int(raw.get("record_every", 2)),
+        name=gv("name"),
+        seed=int(gv("seed", 0)),
+        n_frames=int(gv("n_frames", 200)),
+        dt=float(gv("dt", 0.05)),
         sets=raw["sets"],
         fields=raw["fields"],
         operators=ops,
         schedule=raw["schedule"],
-        obstacles=raw.get("obstacles", []),
-        boundary=raw.get("boundary", "wall"),
-        world=float(raw.get("world", 1.0)),
+        obstacles=gv("obstacles", []),
+        boundary=gv("boundary", "wall"),
+        world=float(gv("world", 1.0)),
         plotting=raw.get("plotting", {}),
     )

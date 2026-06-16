@@ -2,12 +2,12 @@
 # Each type carries p = [p1, p2, p3, p4]: the difference-of-Gaussians force law
 #   f(r) = p1*exp(-r^(2 p2)/2sigma^2) - p3*exp(-r^(2 p4)/2sigma^2)
 # summed over neighbours within `radius`. First-derivative law (returns velocity).
-name: attraction_repulsion
-seed: 0
-n_frames: 250
-dt: 0.05
-record_every: 2
-boundary: periodic           # torus: minimum-image displacement in the force
+general:
+  name: attraction_repulsion
+  seed: 0
+  n_frames: 250
+  dt: 0.05
+  boundary: periodic           # torus: minimum-image displacement in the force
 
 sets:
   particle:
@@ -24,3 +24,6 @@ operators:
   - {op: attraction_repulsion, at: particle, sigma: 0.005}    # message pass over it
 
 schedule: [radius_graph, attraction_repulsion, integrate]
+
+plotting:
+  background: black
