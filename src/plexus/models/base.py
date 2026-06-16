@@ -1,89 +1,236 @@
-"""The hierarchical graph container: sets + fields + operators.
+"""The hierarchical graph container: sets + fields + operators (the contract layer).
 
-Design summary (see docs/plexus.pdf):
+This module defines the *vocabulary* every Plexus simulation is built from. It is
+deliberately small and engine-agnostic: it says what a set, a field, and an
+operator ARE, not how a run is stepped (that is `engine.py`). The shapes here are
+exactly the ones the prototype validated across ~30 scenarios, promoted into the
+package with the gaps `prototype/notes.md` surfaced closed.
 
-  * A **Level** is a *set* S_k of like nodes at one scale, stored as batched
-    tensors (state + learnable embedding) plus a `parent` map (the partition
-    into the level above) and an optional `edge_index` (a lateral relation).
-  * A **Field** is a continuum f: Omega -> R^c on its own discretization frame,
-    bound to exactly one level via `couples_to`.
-  * A **Hierarchy** holds the ordered levels and the set of fields.
-  * An **Operator** is a GNN that returns a *time-derivative contribution*
-    (ODE vector field + Laplacian) for one relation. Four kinds:
-        Lateral    : within a set            (uses Level.edge_index)
-        Aggregate  : children -> parent  (up)   (uses Level.parent)
-        Broadcast  : parent -> children  (down) (uses Level.parent)
-        Exchange   : set <-> field/other set    (scatter / gather, bipartite)
-  * A **Schedule** is an ordered, multi-rate list of operators. It *integrates*
-    the accumulated derivatives (operators stay pure -> composable rollouts).
+Entities
+--------
+* **Level** -- a *set* `S_k` of like nodes at one scale (molecule / particle /
+  cell / population / organism). Stored as flat batched tensors (a `state`
+  matrix, an optional learnable `embedding`), never one object per node. The
+  containment tree is `parent` (the partition `pi_k : S_k -> S_{k+1}`); an
+  optional `edge_index` is a lateral relation. A Level is allocated at a fixed
+  **buffer** size and a per-node **occupancy** `occ in [0,1]` marks the live
+  subset -- this is what lets a *cardinality-changing* operator (divide / die)
+  live inside a constant-shape contract.
+* **Field** -- a continuum `f: Omega -> R^c` on its own discretization frame,
+  bound to exactly one Level via `couples_to`. Fields do not nest. Subclasses
+  supply the frame and the transfer kernels (`scatter`/`gather`/`step`).
 
-Operators return deltas; the Schedule sums and integrates them. This keeps
-multiple operators writing the same level safe and keeps rollout differentiable.
+Container
+---------
+* **Hierarchy** -- the ordered Levels + the flat set of Fields, plus the run-time
+  scratch the engine attaches (config, rng, per-level accel accumulators, world
+  geometry). It is an `nn.Module`, so operators and fields register as submodules
+  and `.to(device)` moves the whole thing.
+
+Operators
+---------
+* **Operator** -- a unit of dynamics. Proven contract::
+
+      def __init__(self, params: dict, device="cpu"): ...
+      def forward(self, H: Hierarchy, mask=None) -> dict[str, Tensor]: ...
+
+  It returns a dict `{level_name: delta}` of *time-derivative contributions*
+  (accelerations / forces). The engine sums same-level deltas into that level's
+  accumulator; a downstream consumer (the `mpm` substep, the `integrate`
+  builtin, or `<field>.diffuse`) turns accumulated accel into new state. An
+  operator that changes *membership* or *relations* (structural / rewire) or that
+  writes a field (exchange) mutates `H` in place and returns `{}` -- uniform with
+  every other operator, so the engine never special-cases a kind.
+
+  Six kinds, dispatched by the relation an operator acts on:
+
+  | kind        | relation              | examples                              |
+  |-------------|-----------------------|---------------------------------------|
+  | `lateral`   | within a set          | signalling, boids, MPM particle forces|
+  | `aggregate` | children -> parent    | particles -> cell centroid            |
+  | `broadcast` | parent -> children    | cell decision -> particle force       |
+  | `exchange`  | set <-> field / set   | P2G/G2P, secrete/sense, reaction      |
+  | `structural`| changes |S_k| / membership | divide, duplicate, die           |
+  | `rewire`    | rebuilds E (edge_index)   | membrane ring, neighbour graph    |
+
+  `params` is the operator's spec line merged with its field refs (`to`/`from`);
+  operators read their tunables from it in `__init__`. The `mask` is the live
+  boolean selection of the operator's `at:` selector, recomputed every tick by
+  the engine (so state-dependent selectors like `cell[done=0]` track the run).
+
+Capability contract
+-------------------
+Operators declare what they need so the validator fails *before* a run, not deep
+in a substep:
+
+* `REQUIRES_PARAMS`      -- param keys the spec line must provide.
+* `REQUIRES_TYPE_PROPS`  -- per-type node properties (resolved along the
+  containment chain, e.g. `mpm` acts on particles but reads `youngs` off the
+  parent cell's types).
+
+`KIND` and `LEVEL` are stamped onto each class by the `@register_operator`
+decorator; do not set them by hand.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
 from typing import Optional
 
 import torch
 import torch.nn as nn
-from torch_geometric.nn import MessagePassing
+
+
+# The recognised operator kinds (dispatch tags). `structural` and `rewire` are
+# the two the prototype added beyond the paper's four; the validator/engine treat
+# them uniformly (they mutate H and return no delta), but naming them lets the
+# registry and the LLM enumerate "what can change the set / the relation".
+KINDS = ("lateral", "aggregate", "broadcast", "exchange", "structural", "rewire")
 
 
 # --------------------------------------------------------------------------- #
 #  Entities: Level (a set) and Field (a continuum)
 # --------------------------------------------------------------------------- #
 class Level(nn.Module):
-    """A set S_k of like nodes at one scale (cells, particles, molecules...).
+    """A set `S_k` of like nodes at one scale, stored as flat batched tensors.
 
-    Storage is flat/batched (PyG `batch`-vector style), never one module per
-    node. The containment tree lives in `parent`.
+    Allocated at a fixed **buffer** size; `occ` (occupancy in [0,1], default all
+    ones) marks the live subset so a cardinality-changing operator can wake or
+    retire slots without resizing. `active` is the boolean live mask. Domain
+    operators register their own per-node buffers on the Level (e.g. MPM's
+    `mass`/`F`/`C`, a `node_type` for roles) -- the contract only mandates
+    `state`, `occ`, and (for a contained set) `parent`.
     """
 
     def __init__(
         self,
         name: str,
         level: int,
-        state: torch.Tensor,                  # [N, d]  dynamic state
-        embedding: Optional[torch.Tensor] = None,   # [N, e]  learnable a_i
-        parent: Optional[torch.Tensor] = None,      # [N]     index into level+1
-        edge_index: Optional[torch.Tensor] = None,  # [2, E]  lateral relation
+        state: torch.Tensor,                        # [N, d]   dynamic state
+        embedding: Optional[torch.Tensor] = None,   # [N, e]   learnable a_i
+        parent: Optional[torch.Tensor] = None,      # [N]      index into level+1 (partition pi_k)
+        edge_index: Optional[torch.Tensor] = None,  # [2, E]   lateral relation
+        occ: Optional[torch.Tensor] = None,         # [N]      occupancy in [0,1] (default ones)
     ):
         super().__init__()
         self.name = name
         self.level = level
+        N = state.shape[0]
         self.register_buffer("state", state)
         self.embedding = nn.Parameter(embedding) if embedding is not None else None
-        self.register_buffer("parent", parent if parent is not None else torch.empty(0, dtype=torch.long))
-        self.register_buffer("edge_index", edge_index if edge_index is not None else torch.empty(2, 0, dtype=torch.long))
+        self.register_buffer(
+            "parent",
+            parent if parent is not None else torch.empty(0, dtype=torch.long, device=state.device),
+        )
+        self.register_buffer(
+            "edge_index",
+            edge_index if edge_index is not None else torch.empty(2, 0, dtype=torch.long, device=state.device),
+        )
+        self.register_buffer(
+            "occ",
+            occ if occ is not None else torch.ones(N, device=state.device),
+        )
+        # lineage bookkeeping for cardinality-changing (structural) operators:
+        #   birth   -- the occupancy baseline a node was born with (drives the
+        #              "mass has doubled -> divide" trigger; caller sets/splits it).
+        #   lineage -- the slot this node split/spawned from (-1 = founder).
+        self.register_buffer("birth", self.occ.clone())
+        self.register_buffer("lineage", torch.full((N,), -1, dtype=torch.long, device=state.device))
 
     @property
     def n(self) -> int:
+        """Buffer size (allocated slots, live or dormant)."""
         return self.state.shape[0]
 
+    @property
+    def active(self) -> torch.Tensor:
+        """Boolean mask of live nodes (`occ > 0`)."""
+        return self.occ > 0
+
+    @property
+    def n_active(self) -> int:
+        return int(self.active.sum())
+
     def __repr__(self):
-        return f"Level({self.name!r}, level={self.level}, n={self.n}, d={self.state.shape[-1]})"
+        return (f"Level({self.name!r}, level={self.level}, n={self.n}, "
+                f"active={self.n_active}, d={self.state.shape[-1]})")
+
+    # --- cardinality primitives (the engine-level structural machinery) ----- #
+    # A `structural` operator (divide / duplicate / die) orchestrates these
+    # instead of hand-scanning occupancy and hand-initialising buffers. They keep
+    # tensor shapes constant (a fixed buffer); `occ` marks the live subset.
+    def per_node_buffers(self):
+        """Yield (name, tensor) for every registered buffer indexed by node, so a
+        structural op touches them all uniformly. Excludes the relation
+        `edge_index` (shaped [2, E], not per-node) and the immutable `birth` /
+        `lineage` / `occ` which `spawn`/`kill` manage explicitly."""
+        for name, b in self.named_buffers(recurse=False):
+            if name in ("edge_index", "occ", "birth", "lineage"):
+                continue
+            if b.dim() >= 1 and b.shape[0] == self.n:
+                yield name, b
+
+    def free_slots(self, k: int) -> torch.Tensor:
+        """Up to `k` dormant slot indices (`occ == 0`), fewer if the buffer is
+        nearly full. An empty result means the buffer is exhausted -- the op
+        should stop dividing rather than error (the proven 'buffer full' guard)."""
+        dormant = (self.occ == 0).nonzero(as_tuple=True)[0]
+        return dormant[:k]
+
+    def spawn(self, src_idx: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Wake free slots as clones of `src_idx`: copy EVERY per-node buffer
+        (state, parent, node_type, and any domain buffer like MPM mass/F/C/mu/la)
+        from the source nodes, set `occ = 1`, and record lineage. This is the
+        init-safe fix for the trap in notes.md -- a structural op no longer has to
+        remember to initialise each operator's per-node state by hand; it inherits
+        the parent's. The caller then overrides only what must differ (e.g. nudge
+        position, zero velocity, reset deformation F). Returns (new_idx, src_used)
+        truncated to the number of free slots actually available."""
+        dst = self.free_slots(int(src_idx.numel()))
+        src = src_idx[: dst.numel()]
+        for _, b in self.per_node_buffers():
+            b[dst] = b[src]
+        self.occ[dst] = 1.0
+        self.birth[dst] = self.birth[src]          # default: inherit baseline (divide overrides per-daughter)
+        self.lineage[dst] = src
+        return dst, src
+
+    def kill(self, idx: torch.Tensor, park: Optional[torch.Tensor] = None) -> None:
+        """Retire live slots (the efflux/death boundary): `occ = 0`, drop physical
+        `mass` to 0 if present so the node stops contributing to MPM scatter /
+        mass-weighted aggregation, and optionally park its position off-domain at
+        `park` so it is neither drawn nor sensed."""
+        self.occ[idx] = 0.0
+        if "mass" in dict(self.named_buffers(recurse=False)):
+            self.get_buffer("mass")[idx] = 0.0
+        if park is not None:
+            self.state[idx, : park.numel()] = park
 
 
 class Field(nn.Module):
-    """A continuum f: Omega -> R^c on its own frame, bound to one Level.
+    """A continuum `f: Omega -> R^c` on its own frame, bound to one Level.
 
-    Subclasses (registered via @register_field) supply the discretization and
-    the transfer kernels. `scatter` writes object state into the field;
-    `gather` reads the field back onto objects. P2G/G2P, secrete/sense and
-    morphogen sampling are all (scatter, gather) pairs.
+    Subclasses (registered via `@register_field`) supply the discretization and
+    the transfer kernels. `scatter` writes object state into the field; `gather`
+    reads the field back onto objects (a delta); `step` advances the field's own
+    PDE one tick (Laplacian diffusion + decay). P2G/G2P, secrete/sense and
+    morphogen sampling are all (scatter, gather) pairs over a Field.
     """
+
+    COUPLES_TO: Optional[str] = None    # stamped by @register_field
+    FRAME: Optional[str] = None
 
     def __init__(self, name: str, couples_to: str):
         super().__init__()
         self.name = name
-        self.couples_to = couples_to        # the Level this field exchanges with
+        self.couples_to = couples_to          # the Level this field exchanges with
 
-    def scatter(self, level: Level) -> None:        # object -> field
+    def scatter(self, level: "Level") -> None:          # object -> field
         raise NotImplementedError
 
-    def gather(self, level: Level) -> torch.Tensor:  # field -> object (delta)
+    def gather(self, level: "Level") -> torch.Tensor:   # field -> object (delta)
+        raise NotImplementedError
+
+    def step(self) -> None:                             # advance the field's own PDE
         raise NotImplementedError
 
 
@@ -91,14 +238,28 @@ class Field(nn.Module):
 #  Container: Hierarchy
 # --------------------------------------------------------------------------- #
 class Hierarchy(nn.Module):
-    """Ordered levels (bottom-up) + a flat set of fields. The thing everything
-    is built upon."""
+    """Ordered Levels (bottom-up) + a flat set of Fields, plus run-time scratch.
+
+    The engine attaches per-run state as plain attributes (an `nn.Module` allows
+    it): `config` (the validated Scenario), `rng` (a seeded generator for
+    determinism), world geometry (`world_width`, `periodic`, `walls_mpm`), and
+    the per-level **accel accumulators** that realise the integration model.
+
+    Integration model (the contract every operator/engine honours): operators are
+    pure and return per-level deltas; the engine accumulates same-level deltas
+    here, and a consumer (`mpm`, the `integrate` builtin, `<field>.diffuse`)
+    applies them to produce next state. Use `zero_accel`/`add_accel`/`accel` so
+    operators and the engine share one convention instead of hard-coding
+    `H.cell_accel` / `H.part_accel`.
+    """
 
     def __init__(self):
         super().__init__()
-        self.levels = nn.ModuleDict()       # name -> Level
-        self.fields = nn.ModuleDict()       # name -> Field
+        self.levels = nn.ModuleDict()         # name -> Level (insertion order = bottom-up)
+        self.fields = nn.ModuleDict()         # name -> Field
+        self._accel: dict[str, torch.Tensor] = {}
 
+    # --- structure -------------------------------------------------------- #
     def add_level(self, lvl: Level) -> Level:
         self.levels[lvl.name] = lvl
         return lvl
@@ -110,45 +271,70 @@ class Hierarchy(nn.Module):
     def level(self, name: str) -> Level:
         return self.levels[name]
 
+    def field(self, name: str) -> Field:
+        return self.fields[name]
+
+    # --- per-level accel accumulators (the integration scratch) ----------- #
+    def zero_accel(self, dim: int = 2) -> None:
+        """Reset every level's accel accumulator to zeros (called once per tick)."""
+        dev = next(iter(self.levels.values())).state.device
+        self._accel = {name: torch.zeros(l.n, dim, device=dev)
+                       for name, l in self.levels.items()}
+
+    def add_accel(self, level_name: str, delta: torch.Tensor) -> None:
+        """Add an operator's returned delta into its level's accumulator."""
+        if level_name not in self._accel:
+            self._accel[level_name] = delta.clone()
+        else:
+            self._accel[level_name] = self._accel[level_name] + delta
+
+    def accel(self, level_name: str) -> torch.Tensor:
+        """The accumulated accel for a level (zeros if nothing wrote it)."""
+        if level_name not in self._accel:
+            lvl = self.levels[level_name]
+            self._accel[level_name] = torch.zeros(lvl.n, 2, device=lvl.state.device)
+        return self._accel[level_name]
+
 
 # --------------------------------------------------------------------------- #
-#  Operators: GNN = ODE vector field + Laplacian, dispatched by relation
+#  Operators: a unit of dynamics, dispatched by relation
 # --------------------------------------------------------------------------- #
-@dataclass
-class Relation:
-    """Names the operands an operator acts on within a Hierarchy."""
-    src: str                       # source level name
-    dst: Optional[str] = None      # target level/field (None -> same as src)
+class Operator(nn.Module):
+    """Base operator. Proven contract: `__init__(params, device)` reads tunables
+    from the spec line; `forward(H, mask) -> {level_name: delta}` returns
+    per-level time-derivative contributions (or `{}` if it mutates `H`).
 
+    `KIND` and `LEVEL` are stamped by `@register_operator`. `REQUIRES_PARAMS` /
+    `REQUIRES_TYPE_PROPS` are the capability contract the validator checks.
 
-class Operator(MessagePassing):
-    """Base operator. `forward` returns a delta dict {target_name: dstate}.
-
-    KIND and LEVEL are stamped by the registry decorator.
+    Subclasses below are thin semantic tags (one per kind); an operator inherits
+    the one matching the relation it acts on so its kind reads from the class.
+    Plain torch is the norm (index_add / pairwise); an operator that wants
+    message-passing machinery can mix in a PyG `MessagePassing` when those ports
+    land (signalling, interaction) -- the contract does not require it.
     """
 
-    KIND: str = None
-    LEVEL: str = None
-    # capability contract (checked by the scenario validator before running):
-    REQUIRES_PARAMS: list = []        # param keys this operator must be given
-    REQUIRES_TYPE_PROPS: list = []    # per-type node properties it reads (e.g. "youngs")
+    KIND: Optional[str] = None
+    LEVEL: Optional[str] = None
+    REQUIRES_PARAMS: list = []          # param keys this operator must be given
+    REQUIRES_TYPE_PROPS: list = []      # per-type node properties it reads (e.g. "youngs")
 
-    def __init__(self, config=None, device=None, aggr: str = "add"):
-        super().__init__(aggr=aggr)
-        self.config = config
+    def __init__(self, params: Optional[dict] = None, device: str = "cpu"):
+        super().__init__()
+        self.params = params or {}
         self.device = device
 
-    def forward(self, H: Hierarchy, rel: Relation) -> dict[str, torch.Tensor]:
+    def forward(self, H: Hierarchy, mask: Optional[torch.Tensor] = None) -> dict[str, torch.Tensor]:
         raise NotImplementedError
 
 
 class Lateral(Operator):
-    """Within-set message passing (ODE interaction + discrete Laplacian)."""
+    """Within-set dynamics on `E subset S_k x S_k` (interaction + discrete Laplacian)."""
     KIND = "lateral"
 
 
 class Aggregate(Operator):
-    """children -> parent reduction over the partition `Level.parent`."""
+    """children -> parent reduction over the partition `Level.parent` (occupancy-weighted)."""
     KIND = "aggregate"
 
 
@@ -158,42 +344,20 @@ class Broadcast(Operator):
 
 
 class Exchange(Operator):
-    """set <-> field (or set <-> set) scatter/gather. The bipartite operator;
-    unifies P2G/G2P, secrete/sense, and reaction stoichiometry."""
+    """set <-> field (or set <-> set) scatter/gather. Unifies P2G/G2P, secrete/sense,
+    and reaction stoichiometry. Mutates a Field (or state) in place; returns `{}`."""
     KIND = "exchange"
 
 
-# --------------------------------------------------------------------------- #
-#  Dynamics: Schedule (multi-rate, integrates accumulated deltas)
-# --------------------------------------------------------------------------- #
-@dataclass
-class Step:
-    op: str                        # operator name (registry key)
-    rel: Relation
-    rate: int = 1                  # run every `rate`-th outer tick (timescale)
+class Structural(Operator):
+    """Changes cardinality / membership (divide, duplicate, die) on a fixed buffer
+    via occupancy. May emit per-node deltas during a gradual transition (e.g.
+    mitosis) and only relabel membership at completion; returns `{}` otherwise."""
+    KIND = "structural"
 
 
-class Schedule(nn.Module):
-    """A model = an ordered, multi-rate list of operator steps. Pure operators
-    return deltas; the Schedule sums per level and integrates (Euler by
-    default)."""
-
-    def __init__(self, steps: list[Step], dt: float = 1.0):
-        super().__init__()
-        self.steps = steps
-        self.dt = dt
-
-    def forward(self, H: Hierarchy, tick: int = 0) -> Hierarchy:
-        from plexus.models.registry import get_operator
-
-        deltas: dict[str, torch.Tensor] = {}
-        for s in self.steps:
-            if tick % s.rate != 0:
-                continue
-            op = get_operator(s.op)(config=getattr(H, "config", None))
-            for tgt, d in op(H, s.rel).items():
-                deltas[tgt] = deltas.get(tgt, 0) + d
-        for name, d in deltas.items():           # integrate
-            lvl = H.levels[name]
-            lvl.state = lvl.state + self.dt * d
-        return H
+class Rewire(Operator):
+    """Rebuilds a relation `E` (`edge_index`) -- e.g. the membrane ring or a
+    neighbour graph -- each tick, so the relation tracks growth/division. Stores
+    the new edges on `H`; emits no delta."""
+    KIND = "rewire"

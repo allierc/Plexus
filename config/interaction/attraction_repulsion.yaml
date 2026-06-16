@@ -1,0 +1,20 @@
+# The simplest Plexus simulation: one set of points, attraction + repulsion.
+# Balanced, the two forces settle the points at a characteristic spacing.
+name: attraction_repulsion
+seed: 0
+n_frames: 300
+dt: 0.05
+record_every: 2
+
+sets:
+  particle:
+    n: 200
+    damping: 1.0          # overdamped: velocity saturates at accel/damping
+
+fields: {}                # none yet (fields land with the Exchange operators)
+
+operators:
+  - {op: repulse, at: particle, radius: 0.05, k: 30.0}   # short-range push
+  - {op: attract, at: particle, radius: 0.20, k: 4.0}    # longer-range pull
+
+schedule: [repulse, attract, integrate]
