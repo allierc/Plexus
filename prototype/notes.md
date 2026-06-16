@@ -138,3 +138,31 @@ to <1%** straight through a division. Caveats learned:
 - the only non-differentiable residue is the **discrete which-daughter split**
   at the principal-axis plane (a side-assignment flip under perturbation) — the
   ~0.4% FD mismatch, exactly the discrete part the taxonomy flags.
+
+## MPM version (`divide_cell_mpm.yaml` + `grow_engine_mpm.py`)
+
+Second version where the soft cell is a disc of **MLS-MPM** particles (the
+registered `mpm` Exchange operator does the elastic mechanics), grown + split the
+same way. Learnings:
+
+1. **MPM has no per-cell cohesion** — single-material MPM merges touching blobs
+   on the shared grid, so 8 dividing cells would fuse into one body. Fix: keep a
+   light **`cohere`** (per-particle pull to the cell centroid) for *identity*, and
+   let MPM do the *mechanics*. Cohesion = who-belongs-to-whom; MPM = how it deforms.
+2. **MPM only accepted a per-CELL `a_ext`** (`cell_accel[parent]`, uniform per
+   cell). Cohesion is per-particle, so I added a tiny backward-compatible hook:
+   `mpm` now also adds `H.part_accel` (per-particle) if present. One line; existing
+   scenarios unchanged (defaults to 0).
+3. **Dormant particles must carry `mass = 0`** so they don't scatter to the grid;
+   then the full-buffer `mpm` op runs unchanged and dormant slots are inert. On
+   `duplicate`, new slots get `mass = p_vol·ρ`, `F = I`, `C = 0`, `mu/la` from the
+   parent — i.e. the structural op must initialise the *operator's* per-node state,
+   not just position. (Suggests: operators should be able to declare how a new
+   node of their level is initialised.)
+4. Look: MPM cells are looser / jigglier than the cohesion-repulsion version
+   (real elastic deformation vs. uniform packing). Tightening wants higher `cohere
+   k`, more `substeps`, or lower `drag`.
+
+Both engines (`grow_engine`, `grow_engine_mpm`) duplicate most of build/run — they
+should fold into one generic engine that integrates deltas AND hosts MPM AND
+supports cardinality change.

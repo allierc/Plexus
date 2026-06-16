@@ -134,6 +134,9 @@ class MPMOperator(Exchange):
         cell_accel = torch.nan_to_num(cell_accel, posinf=self.a_max, neginf=-self.a_max)
         cell_accel = cell_accel.clamp(-self.a_max, self.a_max)
         a_ext = cell_accel[p.parent]                       # broadcast down  [Np,2]
+        part_accel = getattr(H, "part_accel", None)        # optional per-particle external accel
+        if part_accel is not None:
+            a_ext = a_ext + part_accel                     # (e.g. per-cell cohesion for identity)
         offsets = _OFFSETS.to(p.state.device)
         width = float(getattr(H, "world_width", 1.0))      # rectangular world [0,width]x[0,1]
         ny = self.n_grid; nx = int(round(width * ny))      # square cells dx = 1/ny

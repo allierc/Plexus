@@ -91,6 +91,14 @@ class Duplicate(Operator):
         part.state[new, 2:] = 0.0
         part.parent[new] = part.parent[par]
         w[new] = 1.0
+        # if the particle level carries MPM state, initialise the new slots too
+        if hasattr(part, "mass"):
+            part.mass[new] = H.p_mass0
+        if hasattr(part, "F"):
+            part.F[new] = torch.eye(2, device=w.device)
+            part.C[new] = 0.0
+        if hasattr(part, "mu"):
+            part.mu[new] = part.mu[par]; part.la[new] = part.la[par]
         return {}
 
 
