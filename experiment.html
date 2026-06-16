@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Plexus</title>
+<title>A spread of simulations – Plexus</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -325,7 +325,7 @@ window.Quarto = {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
@@ -337,7 +337,7 @@ window.Quarto = {
 <span class="menu-text">LLM ↔︎ registry</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./experiment.html"> 
+    <a class="nav-link active" href="./experiment.html" aria-current="page"> 
 <span class="menu-text">Simulations</span></a>
   </li>  
   <li class="nav-item">
@@ -362,11 +362,17 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#a-language-not-a-world-model" id="toc-a-language-not-a-world-model" class="nav-link active" data-scroll-target="#a-language-not-a-world-model">A language, not a world model</a></li>
-  <li><a href="#a-language-and-a-calculus-two-layers-that-never-touch" id="toc-a-language-and-a-calculus-two-layers-that-never-touch" class="nav-link" data-scroll-target="#a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</a></li>
-  <li><a href="#re-converging-four-frameworks" id="toc-re-converging-four-frameworks" class="nav-link" data-scroll-target="#re-converging-four-frameworks">Re-converging four frameworks</a></li>
-  <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
-  <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
+  <li><a href="#two-simulations-from-one-registry" id="toc-two-simulations-from-one-registry" class="nav-link active" data-scroll-target="#two-simulations-from-one-registry">Two simulations from one registry</a></li>
+  <li><a href="#emergent-ant-trails" id="toc-emergent-ant-trails" class="nav-link" data-scroll-target="#emergent-ant-trails">Emergent ant trails</a>
+  <ul class="collapse">
+  <li><a href="#two-variants-same-code" id="toc-two-variants-same-code" class="nav-link" data-scroll-target="#two-variants-same-code">Two variants, same code</a></li>
+  </ul></li>
+  <li><a href="#cells-in-a-maze-foraging-and-optimization" id="toc-cells-in-a-maze-foraging-and-optimization" class="nav-link" data-scroll-target="#cells-in-a-maze-foraging-and-optimization">Cells in a maze: foraging and optimization</a>
+  <ul class="collapse">
+  <li><a href="#optimizing-the-colony" id="toc-optimizing-the-colony" class="nav-link" data-scroll-target="#optimizing-the-colony">Optimizing the colony</a></li>
+  <li><a href="#initial-vs.-optimized" id="toc-initial-vs.-optimized" class="nav-link" data-scroll-target="#initial-vs.-optimized">Initial vs.&nbsp;optimized</a></li>
+  </ul></li>
+  <li><a href="#what-the-process-taught-us" id="toc-what-the-process-taught-us" class="nav-link" data-scroll-target="#what-the-process-taught-us">What the process taught us</a></li>
   </ul>
 </nav>
     </div>
@@ -376,8 +382,8 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Plexus</h1>
-<p class="subtitle lead">Toward a language and calculus of living systems</p>
+<h1 class="title">A spread of simulations</h1>
+<p class="subtitle lead">Ten behaviours, emergent ant trails, and an optimized maze forager</p>
 </div>
 
 
@@ -394,131 +400,216 @@ window.Quarto = {
 </header>
 
 
-<p>Biology is not a single graph.</p>
-<p>Living systems combine cells, molecules, tissues, populations, and continuous fields across multiple spatial and temporal scales. Existing simulators typically focus on one layer of this hierarchy at a time: particle mechanics, cellular interactions, neural dynamics, reaction networks, or continuum fields. As a result, models become difficult to combine, extend, and reason about.</p>
-<p>Plexus starts from a different question:</p>
-<blockquote class="blockquote">
-<p>What is the minimal language needed to describe a living system?</p>
-</blockquote>
-<p>Rather than building another domain-specific simulator, Plexus introduces a common representation based on <strong>hierarchical sets</strong>, <strong>continuous fields</strong>, and a small collection of <strong>operators</strong> acting between them. Cells contain particles and metabolites. Populations contain cells. Fields exchange information with discrete entities. Complex simulations emerge from composing a few primitive operations.</p>
-<p>The goal is not merely to predict trajectories, but to provide a <em>language</em> in which biological systems can be expressed, modified, optimized, and understood. A simulation becomes a program. A tissue becomes a composition of operators. A new biological hypothesis becomes a small change to a specification rather than a new software project.</p>
-<section id="a-language-not-a-world-model" class="level2">
-<h2 class="anchored" data-anchor-id="a-language-not-a-world-model">A language, not a world model</h2>
-<p>The goal of Plexus is not to learn a world model of biology. The goal is to define a language in which biological worlds can be <em>written</em>.</p>
-<p>Modern world models learn compressed latent representations whose internal structure is optimized for prediction. Such representations can be powerful, but their primitives are learned from data: they do not provide a natural language for expressing biological hypotheses, composing mechanisms across scales, or introducing new physical laws.</p>
-<p>Plexus takes the opposite approach. Its primitives are <strong>explicit</strong>: sets, fields, containment relations, and operators. A cell, a morphogen gradient, a mechanical substrate, and a neural circuit are all represented within the same formal framework. Dynamics arise from compositions of interpretable operators rather than opaque latent transitions.</p>
-<p>The question is therefore not <em>“Can we predict the next state?”</em> but <em>“What are the primitive concepts required to describe a living system?”</em> In this view the simulator is secondary — it is merely the <strong>interpreter</strong> of the language. The central object is the representation itself. Once a living system is expressed in the language of Plexus, it becomes possible to compose mechanisms across scales, perform inverse inference, optimize biological designs, and generate new models automatically.</p>
-<p>Plexus proposes that hierarchical sets, fields, and <strong>four classes of operators</strong> are sufficient to express a broad range of biological phenomena within a common <strong>differentiable</strong> framework.</p>
+<p>Once the vocabulary existed, qualitatively different behaviours were <em>just different specs</em> over the same code — breadth comes from the intermediate representation, not from new code. Each simulation is 100–600 cells of ~100 MLS-MPM particles (the two cell types in two colours over the shaded chemical field). All simulations below use a <strong>periodic</strong> (toroidal) domain.</p>
+<section id="two-simulations-from-one-registry" class="level2">
+<h2 class="anchored" data-anchor-id="two-simulations-from-one-registry">Two simulations from one registry</h2>
+<p>Only the operator choices and their parameters differ; the engine, the operators, and the schedule grammar are identical.</p>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="aggregate — soft cells secrete a chemical and climb it, clumping together"><source src="prototype/sim_1.mp4"></video></div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="sort — type-specific adhesion segregates the two populations"><source src="prototype/sim_6.mp4"></video></div>
+</div>
+</div>
+</div>
 </section>
-<section id="a-language-and-a-calculus-two-layers-that-never-touch" class="level2">
-<h2 class="anchored" data-anchor-id="a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</h2>
-<p>Plexus is two things at once, kept strictly apart:</p>
-<ul>
-<li>a <strong>language</strong> — a small, declarative <em>specification</em> (<code>spec.yaml</code>) that names the sets, fields, operators, and schedule of a system. This is <em>what</em> a living system is.</li>
-<li>a <strong>calculus</strong> — the registered operators and the engine that composes and integrates them, <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>, keeping the whole rollout differentiable. This is <em>how</em> it evolves.</li>
-</ul>
-<p>The two meet at exactly one place — the validated spec — and <strong>never touch directly</strong>. The LLM owns everything <em>above</em> the spec (intent → specification); the code owns everything <em>below</em> it (the operators). The LLM never writes engine code; the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.</p>
-<p>The practical payoff: a new behaviour is a new sentence in the language, not a new program. A short prompt becomes a running, differentiable simulation <strong>with no code written</strong> —</p>
-<blockquote class="blockquote">
-<p><strong>Prompt</strong> — <em>“100 cells; the soft ones secrete a chemical and climb it, so they clump together; the stiff ones ignore it.”</em></p>
-</blockquote>
-<p>the LLM compiles it to a specification:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> aggregate</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">12</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}}</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">radius</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="kw">}</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">fields</span><span class="kw">:</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">chemical</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">frame</span><span class="kw">:</span><span class="at"> grid</span><span class="kw">,</span><span class="at"> </span><span class="fu">res</span><span class="kw">:</span><span class="at"> </span><span class="dv">96</span><span class="kw">,</span><span class="at"> </span><span class="fu">diffusion</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.1</span><span class="kw">,</span><span class="at"> </span><span class="fu">decay</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span><span class="kw">,</span><span class="at"> </span><span class="fu">couples_to</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span><span class="kw">}</span><span class="co">    # only soft cells make it</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at">   </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">gain</span><span class="kw">:</span><span class="at"> </span><span class="dv">150</span><span class="kw">}</span><span class="co">  # only soft cells follow it</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at">     </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>and the engine resolves each <code>op</code> against the registry and runs it — producing the <em>aggregate</em> result shown below. No operator was written; the selector <code>cell[type=soft]</code> did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
+<section id="emergent-ant-trails" class="level2">
+<h2 class="anchored" data-anchor-id="emergent-ant-trails">Emergent ant trails</h2>
+<p>Adding the <code>trail</code> operator (a Physarum/Jones three-sensor rule: each ant samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest, while <code>motility</code> drives it forward and <code>secrete</code> lays pheromone) yields self-reinforcing trails that grow, are followed, and coarsen over long runs — classic stigmergy.</p>
+<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="ant trail-following: a diffuse pheromone network forms, reinforces, and coarsens into a few dominant trails"><source src="prototype/ant_1.mp4"></video></div>
+<p>The full simulation:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> ant</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">seed</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">n_frames</span><span class="kw">:</span><span class="at"> </span><span class="dv">1500</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">150</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.6</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">60</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.4</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">60</span><span class="kw">,</span><span class="at"> </span><span class="fu">radius</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.012</span><span class="kw">}</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">fields</span><span class="kw">:</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pheromone</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">frame</span><span class="kw">:</span><span class="at"> grid</span><span class="kw">,</span><span class="at"> </span><span class="fu">res</span><span class="kw">:</span><span class="at"> </span><span class="dv">160</span><span class="kw">,</span><span class="at"> </span><span class="fu">diffusion</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="kw">,</span><span class="at"> </span><span class="fu">decay</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.04</span><span class="kw">,</span><span class="at"> </span><span class="fu">couples_to</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> motility</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">speed</span><span class="kw">:</span><span class="at"> </span><span class="fl">300.0</span><span class="kw">,</span><span class="at"> </span><span class="fu">rot</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.06</span><span class="kw">}</span><span class="co">            # persistent forward motion</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> trail</span><span class="kw">,</span><span class="at">  </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> pheromone</span><span class="kw">,</span><span class="at"> </span><span class="fu">turn</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.4</span><span class="kw">,</span><span class="at"> </span><span class="fu">sensor_dist</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.04</span><span class="kw">,</span><span class="at"> </span><span class="fu">sensor_angle</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">}</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> pheromone</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">2.0</span><span class="kw">}</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">substeps</span><span class="kw">:</span><span class="at"> </span><span class="dv">8</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">1200</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.6</span><span class="kw">}</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> trail</span><span class="kw">,</span><span class="at"> motility</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> pheromone.diffuse</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="two-variants-same-code" class="level3">
+<h3 class="anchored" data-anchor-id="two-variants-same-code">Two variants, same code</h3>
+<p>Each variant is the same <code>trail</code> + <code>motility</code> + <code>secrete</code> code with a few parameters changed (turn rate, sensor reach/angle, pheromone diffusion/decay, deposit rate, rotational noise).</p>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="baseline"><source src="prototype/ant_1.mp4"></video></div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="tight trails — low noise, strong turning"><source src="prototype/ant_4.mp4"></video></div>
+</div>
+</div>
+</div>
 </section>
-<section id="re-converging-four-frameworks" class="level2">
-<h2 class="anchored" data-anchor-id="re-converging-four-frameworks">Re-converging four frameworks</h2>
-<p>Plexus re-converges four sibling frameworks that all forked from <a href="https://github.com/allierc/ParticleGraph"><code>ParticleGraph</code></a> and then drifted — each implements <em>one</em> graph type; a tissue needs them coexisting.</p>
+</section>
+<section id="cells-in-a-maze-foraging-and-optimization" class="level2">
+<h2 class="anchored" data-anchor-id="cells-in-a-maze-foraging-and-optimization">Cells in a maze: foraging and optimization</h2>
+<p>A harder simulation exercises more of the language: two rigid cell populations start at <em>home</em> (bottom-left), navigate a walled <em>maze</em> to <em>food</em> (top-right), pick food up, and carry it back. It adds three constructs — <code>obstacles</code>, a per-cell <code>loaded</code> state, and state-gated selectors (<code>cell[loaded=0]</code> seeks food, <code>cell[loaded=1]</code> returns home) — and answers the design question <em>how does one model an obstacle</em>: a wall is not a pairwise force but a <strong>static occupancy mask reused as a boundary condition</strong> by machinery already present. The same mask (i) zeroes the MPM grid velocity inside walls, so rigid cells cannot enter, and (ii) imposes no-flux on field diffusion, so a chemical <em>routes around</em> the walls. Two such fields — one sourced at food, one at home — become navigation gradients that solve the maze; unloaded and loaded cells climb opposite ones.</p>
+<section id="optimizing-the-colony" class="level3">
+<h3 class="anchored" data-anchor-id="optimizing-the-colony">Optimizing the colony</h3>
+<p>Because the whole simulation is differentiable and the spec is tiny, the colony can be <em>optimized</em>: search the behavioural parameters to deliver food as fast as possible. The objective — units delivered — comes from a discrete pick-up/drop-off and is therefore non-differentiable, so we use a black-box <strong>UCB</strong> search over eight levers (motility speed and rotation, sense gain, MPM drag and force cap, cell stiffness and size, colony size). Over a few dozen simulations it improves delivery roughly five-fold.</p>
+<p>This echoes the differentiable-simulator design literature, where a <em>smooth</em> objective is optimized by gradients through the rollout; the general recipe is <strong>both</strong> — UCB or CEM for the discrete and structural choices, and gradient-through-rollout on a smooth surrogate for the continuous interior.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/fig_maze_opt.png" class="img-fluid figure-img" style="width:72.0%"></p>
+<figcaption>Optimizing the colony. Best food delivered as UCB searches the eight-parameter design space, from the initial hand-set design to the best found — a slow, soft, high-drag, many-celled colony.</figcaption>
+</figure>
+</div>
+<p>The optimizer keeps a log of every accepted improvement, which is itself the finding — it shows <em>what makes a good forager</em>:</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
+<caption>The optimization log: the initial design and each significantly-better foraging design UCB found, with the eight tuned parameters. Food delivered rises from 120 to 587 (~5×).</caption>
 <thead>
 <tr class="header">
-<th>Framework</th>
-<th>Domain</th>
-<th>Becomes (in Plexus)</th>
+<th>#</th>
+<th>food</th>
+<th>speed</th>
+<th>gain</th>
+<th>drag</th>
+<th>rot</th>
+<th>youngs</th>
+<th>a_max</th>
+<th>radius</th>
+<th><span class="math inline">\(n\)</span></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>CellGraph</strong></td>
-<td>collective cell interactions</td>
-<td><code>Lateral</code> operators @ cell level</td>
+<td>init</td>
+<td>120</td>
+<td>40</td>
+<td>180</td>
+<td>2.00</td>
+<td>0.30</td>
+<td>550</td>
+<td>700</td>
+<td>0.01</td>
+<td>60</td>
 </tr>
 <tr class="even">
-<td><strong>NeuralGraph</strong></td>
-<td>neural / signalling networks</td>
-<td><code>Lateral</code> operators @ cell level</td>
+<td>1</td>
+<td>142</td>
+<td>74</td>
+<td>379</td>
+<td>2.54</td>
+<td>0.10</td>
+<td>517</td>
+<td>454</td>
+<td>0.02</td>
+<td>46</td>
 </tr>
 <tr class="odd">
-<td><strong>MPMGraph</strong></td>
-<td>tissue mechanics, deformable matter</td>
-<td><code>Exchange</code> (P2G/G2P) @ particle level</td>
+<td>2</td>
+<td>225</td>
+<td>106</td>
+<td>253</td>
+<td>1.25</td>
+<td>0.31</td>
+<td>36</td>
+<td>599</td>
+<td>0.01</td>
+<td>88</td>
 </tr>
 <tr class="even">
-<td><strong>MetabolismGraph</strong></td>
-<td>bipartite reaction networks</td>
-<td><code>Exchange</code> (stoichiometry) @ molecule level</td>
+<td>3</td>
+<td>298</td>
+<td>83</td>
+<td>270</td>
+<td>0.97</td>
+<td>0.48</td>
+<td>78</td>
+<td>1362</td>
+<td>0.01</td>
+<td>93</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>423</td>
+<td>49</td>
+<td>391</td>
+<td>1.55</td>
+<td>0.18</td>
+<td>160</td>
+<td>1438</td>
+<td>0.01</td>
+<td>106</td>
+</tr>
+<tr class="even">
+<td>5</td>
+<td>525</td>
+<td>21</td>
+<td>341</td>
+<td>2.99</td>
+<td>0.40</td>
+<td>24</td>
+<td>1633</td>
+<td>0.01</td>
+<td>120</td>
+</tr>
+<tr class="odd">
+<td>6</td>
+<td>553</td>
+<td>52</td>
+<td>400</td>
+<td>0.92</td>
+<td>0.56</td>
+<td>20</td>
+<td>880</td>
+<td>0.01</td>
+<td>116</td>
+</tr>
+<tr class="even">
+<td>7</td>
+<td>587</td>
+<td>46</td>
+<td>342</td>
+<td>1.70</td>
+<td>0.39</td>
+<td>20</td>
+<td>988</td>
+<td>0.01</td>
+<td>120</td>
 </tr>
 </tbody>
 </table>
+<p>Two parameters move monotonically to their bounds — the colony grows to its cap (<span class="math inline">\(n\approx120\)</span>: more foragers deliver more food) and the cells soften to the floor (<span class="math inline">\(\text{youngs}\to20\)</span>: soft, deformable cells squeeze through the maze far better than the rigid ones we started from). Chemotaxis stays strong throughout (<span class="math inline">\(\text{gain}\sim340\)</span>–<span class="math inline">\(400\)</span>) and the cell radius sits at its minimum (smaller cells clear the gaps). The remaining knobs are traded off rather than maximized: the best design (<code>winner_7</code>) is a balanced, moderate-speed, moderate-drag colony, not any extreme. The headline is that the search rediscovered, with nothing hand-coded, that a <em>large swarm of small, soft, strongly-chemotactic cells</em> forages a maze best.</p>
 </section>
-<section id="what-it-looks-like" class="level2">
-<h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>
-<p>Qualitatively different collective behaviours, all produced from the <em>same code</em> by changing only a ~20-line specification — no new software per phenomenon.</p>
+<section id="initial-vs.-optimized" class="level3">
+<h3 class="anchored" data-anchor-id="initial-vs.-optimized">Initial vs.&nbsp;optimized</h3>
+<p>The difference is visible in the trails themselves: the initial colony barely establishes a route, whereas the optimized one lays a strong chemoattractant highway that threads both maze gaps from home to food.</p>
 <div class="quarto-layout-panel" data-layout-ncol="2">
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="aggregate — soft cells secrete a chemical and climb it"><source src="prototype/sim_1.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set design"><source src="prototype/initial.mp4"></video></div>
 </div>
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="swarm — strong boids make the cells flock and move as one"><source src="prototype/sim_3.mp4"></video></div>
-</div>
-</div>
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="sort — type-specific adhesion segregates two populations"><source src="prototype/sim_6.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="ant trails — stigmergic pheromone trails self-organize"><source src="prototype/ant_1.mp4"></video></div>
-</div>
-</div>
-</div>
-<p>And because every simulation is differentiable, biological designs can be <em>optimized</em>. Below, a foraging colony in a maze is tuned by black-box search — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.</p>
-<div class="quarto-layout-panel" data-layout-ncol="2">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set colony"><source src="prototype/initial.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="optimized colony (winner 7)"><source src="prototype/winner_7.mp4"></video></div>
+<div class="quarto-video"><video id="video_shortcode_videojs_video7" class="video-js vjs-default-skin vjs-big-play-centered vjs-fluid" controls="" preload="auto" data-setup="{}" title="best found by UCB (winner 7)"><source src="prototype/winner_7.mp4"></video></div>
 </div>
 </div>
 </div>
 </section>
-<section id="read-the-blueprint" class="level2">
-<h2 class="anchored" data-anchor-id="read-the-blueprint">Read the blueprint</h2>
-<p>This site distils a working prototype into a single blueprint, in four parts:</p>
-<ul>
-<li><strong><a href="./abstraction.html">The abstraction</a></strong> — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.</li>
-<li><strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.</li>
-<li><strong><a href="./experiment.html">Simulations</a></strong> — ten distinct simulations, an emergent ant-trail model, and a maze-foraging colony optimized end-to-end.</li>
-<li><strong><a href="./building.html">Building Plexus</a></strong> — the proposed repository methodology and the invariants that hold the line.</li>
-</ul>
-<p>A static version with full schematics and glossary is in <a href="paper/plexus.pdf"><code>paper/plexus.pdf</code></a>.</p>
+</section>
+<section id="what-the-process-taught-us" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-process-taught-us">What the process taught us</h2>
+<ol type="1">
+<li><strong>The intermediate representation is the whole game.</strong> Ten distinct behaviours and an ant model were all different YAML over the same code.</li>
+<li><strong>Selectors are the highest-leverage primitive.</strong> <code>cell[type=soft]</code> expresses “only population 1 does X” and lets behaviours coexist; every operator must honour the selector mask.</li>
+<li><strong>Verification must check <em>intent</em>, not just “it ran”.</strong> The hard bugs were physical: unstable diffusion (<span class="math inline">\(dt\cdot D&gt;0.25\)</span>), wrong particle volume, unclamped accelerations blowing up MPM, cell inversion at very low stiffness, GPU non-determinism breaking reproducibility, and — subtlest — the <em>wrong metric</em> (net displacement vs.&nbsp;nearest-neighbour clustering).</li>
+<li><strong>Honesty about regime.</strong> Self-secreted chemotaxis aggregates only below a density threshold (above it the field is spatially flat — correct physics); the verify output should state the regime, not silently show the one setting that worked.</li>
+<li><strong>Determinism is a feature you must force</strong> (deterministic CUDA kernels), or “reproduce with a new seed” is meaningless.</li>
+<li><strong>Obstacles are boundary conditions, not forces.</strong> A wall is one static mask reused by the MPM grid (interior zero-velocity) and the diffusing fields (no-flux); maze navigation then falls out of the field’s gradient, with no special pathfinding code.</li>
+<li><strong>Cap speed below the CFL limit.</strong> Strong gradients otherwise drive cells to the grid’s stability ceiling, where they move ballistically (“asteroids”); an explicit max-speed clamp plus overdamped drag restores smooth, biological motion.</li>
+<li><strong>Discrete objectives need black-box search, differentiable ones admit gradients — use both.</strong> Food count (discrete) optimizes well under UCB; a smooth surrogate opens the gradient-through-rollout path, and the two compose.</li>
+<li><strong>Reproducibility needs full-precision provenance.</strong> Archiving rounded parameters made a winner re-simulate to a different score; the exact spec (and seed) must be stored, or the run is not bit-reproducible.</li>
+</ol>
 
 
 </section>
@@ -957,6 +1048,7 @@ window.Quarto = {
 <script>videojs(video_shortcode_videojs_video4);</script>
 <script>videojs(video_shortcode_videojs_video5);</script>
 <script>videojs(video_shortcode_videojs_video6);</script>
+<script>videojs(video_shortcode_videojs_video7);</script>
 
 
 

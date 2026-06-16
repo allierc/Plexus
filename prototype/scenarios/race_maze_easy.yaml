@@ -1,32 +1,45 @@
-# Scenario 2a -- Race through an EASY maze (forage-style), rendered longitudinally.
-# Built exactly like the food-gathering winner: a HIDDEN geodesic navigation field
-# (source at the finish, routes around walls) pulls cells through; the only field
-# SHOWN is the faint cell-deposited scent trail (same look as winner.gif -- no
-# bright reservoir/source bands). Cells freeze when they cross the finish line and
-# a live counter tracks arrivals. Longitudinal serpentine with GENEROUS gaps.
+# Scenario 2a -- EASY maze (8x4 perfect maze): real corridors + dead ends, longitudinal. Hidden geodesic nav, shown scent trail, freeze+counter at the finish.
 name: race_maze_easy
 seed: 0
 boundary: wall
-n_frames: 2400
+n_frames: 2600
 record_every: 8
-obstacles:                       # BFS-verified passable (path ~143)
-  - [0.25, 0.00, 0.29, 0.58]     # wall 1, wide gap TOP (y > 0.58)
-  - [0.47, 0.42, 0.51, 1.00]     # wall 2, wide gap BOTTOM (y < 0.42)
-  - [0.69, 0.00, 0.73, 0.58]     # wall 3, wide gap TOP
+obstacles:                       # real perfect maze (recursive backtracker, maze_gen.py); inset into x>0.14, BFS-verified
+  - [0.2375, 0.5, 0.2575, 0.75]
+  - [0.345, 0.0, 0.365, 0.25]
+  - [0.345, 0.25, 0.365, 0.5]
+  - [0.4525, 0.0, 0.4725, 0.25]
+  - [0.4525, 0.25, 0.4725, 0.5]
+  - [0.56, 0.25, 0.58, 0.5]
+  - [0.56, 0.5, 0.58, 0.75]
+  - [0.6675, 0.5, 0.6875, 0.75]
+  - [0.6675, 0.75, 0.6875, 1.0]
+  - [0.8825, 0.5, 0.9025, 0.75]
+  - [0.14, 0.24, 0.2475, 0.26]
+  - [0.2475, 0.49, 0.355, 0.51]
+  - [0.2475, 0.74, 0.355, 0.76]
+  - [0.355, 0.74, 0.4625, 0.76]
+  - [0.4625, 0.74, 0.57, 0.76]
+  - [0.57, 0.24, 0.6775, 0.26]
+  - [0.6775, 0.24, 0.785, 0.26]
+  - [0.6775, 0.49, 0.785, 0.51]
+  - [0.785, 0.24, 0.8925, 0.26]
+  - [0.785, 0.49, 0.8925, 0.51]
+  - [0.785, 0.74, 0.8925, 0.76]
 sets:
   cell:
-    n: 120
-    start: [0.00, 0.00, 0.10, 1.00]
+    n: 100
+    start: [0.00, 0.00, 0.11, 1.00]            # open entry corridor (x < 0.14), clear of walls
     types: {A: {fraction: 0.5, youngs: 60}, B: {fraction: 0.5, youngs: 60}}
-  particle: {parent: cell, per_parent: 40, radius: 0.010, density: 1.0}
+  particle: {parent: cell, per_parent: 30, radius: 0.008, density: 1.0}
 fields:
-  scent: {frame: grid, res: 128, diffusion: 0.04, decay: 0.02, couples_to: cell}     # SHOWN: deposited trail
-  nav:   {frame: grid, res: 128, diffusion: 1.0, source: [0.90, 0.0, 1.0, 1.0], navigation: geodesic, couples_to: cell}  # HIDDEN: navigation
+  scent: {frame: grid, res: 160, diffusion: 0.04, decay: 0.02, couples_to: cell}                                          # SHOWN: deposited trail
+  nav:   {frame: grid, res: 160, diffusion: 1.0, source: [0.92, 0.0, 1.0, 1.0], navigation: geodesic, couples_to: cell}   # HIDDEN: navigation
 operators:
-  - {op: finish, at: cell, x: 0.88}                              # freeze + count at the line
+  - {op: finish, at: cell, x: 0.93}                              # freeze + count at the line
   - {op: motility, at: "cell[done=0]", speed: 40.0, rot: 0.30}
   - {op: random_walk, at: "cell[done=0]", strength: 25.0}
   - {op: sense,  at: "cell[done=0]", from: nav, gain: 180.0}     # navigate the maze to the finish
   - {op: secrete, at: "cell[done=0]", to: scent, rate: 1.0}      # lay the visible trail
-  - {op: mpm, at: particle, n_grid: 128, substeps: 6, dt_sub: 2.0e-4, a_max: 700, drag: 2.0, vmax: 5.0}
+  - {op: mpm, at: particle, n_grid: 160, substeps: 6, dt_sub: 2.0e-4, a_max: 700, drag: 2.0, vmax: 5.0}
 schedule: [aggregate, finish, [motility, random_walk, sense], secrete, scent.diffuse, mpm]

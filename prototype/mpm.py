@@ -24,8 +24,9 @@ _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torc
 
 
 def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
-                   n_grid, dx, inv_dx, dt, p_vol, drag, walls_flat, vmax_user, periodic):
-    """One MLS-MPM substep. All tensors batched over particles. Pure -> compilable."""
+                   nx, ny, dx, inv_dx, dt, p_vol, drag, walls_flat, vmax_user, periodic, width):
+    """One MLS-MPM substep. All tensors batched over particles. Pure -> compilable.
+    Grid is [nx, ny] of square cells (dx); the world is [0,width]x[0,1]."""
     N = X.shape[0]
     eye = torch.eye(2, device=X.device).expand(N, 2, 2)
 
@@ -60,26 +61,30 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     oi = offsets[:, 0].long(); oj = offsets[:, 1].long()             # [9]
     weight = w[:, oi, 0] * w[:, oj, 1]                               # [N,9]
     gpos = base[:, None, :] + offsets.long()[None]                  # [N,9,2]
-    gpos = torch.remainder(gpos, n_grid) if periodic else gpos.clamp(0, n_grid - 1)
+    if periodic:
+        gpos = torch.stack([gpos[..., 0] % nx, gpos[..., 1] % ny], dim=-1)
+    else:
+        gpos = torch.stack([gpos[..., 0].clamp(0, nx - 1), gpos[..., 1].clamp(0, ny - 1)], dim=-1)
     dpos_phys = (offsets[None] - fx[:, None, :]) * dx               # [N,9,2]
 
     mom = mass[:, None, None] * V[:, None, :] \
         + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)      # [N,9,2]
-    flat = (gpos[..., 0] * n_grid + gpos[..., 1]).reshape(-1)       # [N*9]
-    grid_m = torch.zeros(n_grid * n_grid, device=X.device)
-    grid_mv = torch.zeros(n_grid * n_grid, 2, device=X.device)
+    flat = (gpos[..., 0] * ny + gpos[..., 1]).reshape(-1)          # [N*9]  (row-major nx x ny)
+    grid_m = torch.zeros(nx * ny, device=X.device)
+    grid_mv = torch.zeros(nx * ny, 2, device=X.device)
     grid_m.index_add_(0, flat, (weight * mass[:, None]).reshape(-1))
     grid_mv.index_add_(0, flat, (weight[..., None] * mom).reshape(-1, 2))
 
     # grid velocity
     gv = grid_mv / grid_m.clamp(min=1e-10)[:, None]
     if not periodic:                                  # reflective domain walls (toroidal otherwise)
-        gv = gv.view(n_grid, n_grid, 2)
-        idx = torch.arange(n_grid, device=X.device); bnd = 3
-        lo, hi = idx < bnd, idx > n_grid - bnd
-        gv[lo, :, 0] = gv[lo, :, 0].clamp(min=0); gv[hi, :, 0] = gv[hi, :, 0].clamp(max=0)
-        gv[:, lo, 1] = gv[:, lo, 1].clamp(min=0); gv[:, hi, 1] = gv[:, hi, 1].clamp(max=0)
-        gv = gv.view(n_grid * n_grid, 2)
+        gv = gv.view(nx, ny, 2)
+        ix = torch.arange(nx, device=X.device); iy = torch.arange(ny, device=X.device); bnd = 3
+        lox, hix = ix < bnd, ix > nx - bnd
+        loy, hiy = iy < bnd, iy > ny - bnd
+        gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
+        gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
+        gv = gv.view(nx * ny, 2)
     gv = torch.where(walls_flat[:, None], torch.zeros_like(gv), gv)   # interior wall BC
 
     # --- G2P ---
@@ -98,9 +103,11 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     F = torch.nan_to_num(F, nan=1.0)
     X = torch.nan_to_num(X + dt * new_V, nan=0.5)
     if periodic:
-        X = torch.remainder(X, 1.0)                  # bc_pos: wrap onto the torus
+        X = torch.stack([torch.remainder(X[:, 0], width),            # bc_pos: wrap onto the torus
+                         torch.remainder(X[:, 1], 1.0)], dim=1)
     else:
-        X = X.clamp(2 * dx, 1 - 2 * dx)
+        X = torch.stack([X[:, 0].clamp(2 * dx, width - 2 * dx),
+                         X[:, 1].clamp(2 * dx, 1 - 2 * dx)], dim=1)
     return X, new_V, new_C, F
 
 
@@ -128,9 +135,11 @@ class MPMOperator(Exchange):
         cell_accel = cell_accel.clamp(-self.a_max, self.a_max)
         a_ext = cell_accel[p.parent]                       # broadcast down  [Np,2]
         offsets = _OFFSETS.to(p.state.device)
+        width = float(getattr(H, "world_width", 1.0))      # rectangular world [0,width]x[0,1]
+        ny = self.n_grid; nx = int(round(width * ny))      # square cells dx = 1/ny
         walls = getattr(H, "walls_mpm", None)              # interior obstacles (optional)
         if walls is None:
-            walls = torch.zeros(self.n_grid * self.n_grid, dtype=torch.bool, device=p.state.device)
+            walls = torch.zeros(nx * ny, dtype=torch.bool, device=p.state.device)
         periodic = bool(getattr(H, "periodic", False))
 
         fn = self.compiled or mlsmpm_substep
@@ -138,8 +147,8 @@ class MPMOperator(Exchange):
         C, F = p.C, p.F
         for _ in range(self.substeps):
             X, V, C, F = fn(X, V, C, F, p.mass, p.mu, p.la, a_ext, offsets,
-                            self.n_grid, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls,
-                            self.vmax, periodic)
+                            nx, ny, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls,
+                            self.vmax, periodic, width)
         p.state = torch.cat([X, V], dim=1)
         p.C, p.F = C, F
         return {}

@@ -28,35 +28,6 @@ A simulation becomes a program. A tissue becomes a composition of operators. A
 new biological hypothesis becomes a small change to a specification rather than a
 new software project.
 
-## A language, not a world model
-
-The goal of Plexus is not to learn a world model of biology. The goal is to
-define a language in which biological worlds can be *written*.
-
-Modern world models learn compressed latent representations whose internal
-structure is optimized for prediction. Such representations can be powerful, but
-their primitives are learned from data: they do not provide a natural language
-for expressing biological hypotheses, composing mechanisms across scales, or
-introducing new physical laws.
-
-Plexus takes the opposite approach. Its primitives are **explicit**: sets,
-fields, containment relations, and operators. A cell, a morphogen gradient, a
-mechanical substrate, and a neural circuit are all represented within the same
-formal framework. Dynamics arise from compositions of interpretable operators
-rather than opaque latent transitions.
-
-The question is therefore not *"Can we predict the next state?"* but *"What are
-the primitive concepts required to describe a living system?"* In this view the
-simulator is secondary — it is merely the **interpreter** of the language. The
-central object is the representation itself. Once a living system is expressed in
-the language of Plexus, it becomes possible to compose mechanisms across scales,
-perform inverse inference, optimize biological designs, and generate new models
-automatically.
-
-Plexus proposes that hierarchical sets, fields, and **four classes of operators**
-are sufficient to express a broad range of biological phenomena within a common
-**differentiable** framework.
-
 ## A language *and* a calculus — two layers that never touch
 
 Plexus is two things at once, kept strictly apart:
@@ -67,6 +38,11 @@ Plexus is two things at once, kept strictly apart:
 - a **calculus** — the registered operators and the engine that composes and
   integrates them, $x_{t+1}=\Phi(x_t)$, keeping the whole rollout differentiable.
   This is *how* it evolves.
+
+Both layers are built from **explicit, named primitives** — not the latent
+variables a world model learns for prediction. And because those primitives are
+explicit *and* differentiable, the same language serves prediction, inverse
+inference, and the optimization of biological designs alike.
 
 The two meet at exactly one place — the validated spec — and **never touch
 directly**. The LLM owns everything *above* the spec (intent → specification);

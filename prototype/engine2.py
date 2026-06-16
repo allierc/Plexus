@@ -62,14 +62,18 @@ def _geodesic_potential(walls_np, source_np):
     return pot
 
 
-def _raster(shapes, res, device):
-    """Rasterize a list of obstacles to a boolean [res,res] grid. Each obstacle is
-    either a rectangle [x0,y0,x1,y1] (len 4) or a circle [cx,cy,radius] (len 3).
-    grid[i,j] center is at ((i+0.5)/res, (j+0.5)/res) -- matches GridField/MPM indexing."""
-    c = (torch.arange(res, device=device).float() + 0.5) / res
-    X = c[:, None].expand(res, res)
-    Y = c[None, :].expand(res, res)
-    m = torch.zeros(res, res, dtype=torch.bool, device=device)
+def _raster(shapes, ny, width, device):
+    """Rasterize a list of obstacles to a boolean [nx,ny] grid over the world
+    [0,width]x[0,1] with square cells dx=1/ny (nx=round(width*ny)). Each obstacle is
+    a rectangle [x0,y0,x1,y1] (len 4) or a circle [cx,cy,radius] (len 3). Cell [i,j]
+    center is at ((i+0.5)*dx, (j+0.5)*dx) -- matches GridField/MPM indexing."""
+    dx = 1.0 / ny
+    nx = int(round(width * ny))
+    cx = (torch.arange(nx, device=device).float() + 0.5) * dx
+    cy = (torch.arange(ny, device=device).float() + 0.5) * dx
+    X = cx[:, None].expand(nx, ny)
+    Y = cy[None, :].expand(nx, ny)
+    m = torch.zeros(nx, ny, dtype=torch.bool, device=device)
     for r in shapes:
         if len(r) == 3:                                   # circle: (cx, cy, radius)
             m |= (X - r[0]) ** 2 + (Y - r[1]) ** 2 <= r[2] ** 2
@@ -139,25 +143,31 @@ def build(sc, device="cpu"):
     part.register_buffer("mass", torch.full((Np,), p_vol * rho, device=device))
     H.add_level(part)
 
+    # --- world: rectangle [0,width]x[0,1] (width>1 -> longitudinal); square grid cells ---
+    width = float(getattr(sc, "world", 1.0))
+    H.world_width = width
+
     # --- obstacles (maze): one mask, reused as BC by both fields and MPM ---
     obstacles = getattr(sc, "obstacles", [])
     n_grid = next((int(o.params.get("n_grid", 128)) for o in sc.operators if o.op == "mpm"), 128)
-    H.walls_mpm = (_raster(obstacles, n_grid, device).view(-1) if obstacles
-                   else torch.zeros(n_grid * n_grid, dtype=torch.bool, device=device))
+    nx_mpm = int(round(width * n_grid))
+    H.walls_mpm = (_raster(obstacles, n_grid, width, device).view(-1) if obstacles
+                   else torch.zeros(nx_mpm * n_grid, dtype=torch.bool, device=device))
 
     H.periodic = (getattr(sc, "boundary", "wall") == "periodic")
     for fname, f in sc.fields.items():
         dt_f = min(0.2 / max(f["diffusion"], 1e-6), 0.2)
         res = int(f["res"])
-        walls = _raster(obstacles, res, device) if obstacles else None
-        src = _raster([f["source"]], res, device) if f.get("source") else None
+        nx = int(round(width * res))
+        walls = _raster(obstacles, res, width, device) if obstacles else None
+        src = _raster([f["source"]], res, width, device) if f.get("source") else None
         fld = GridField(fname, f["couples_to"], res=res, diffusion=f["diffusion"],
                         decay=f.get("decay", 0.0), dt=dt_f, device=device,
                         walls=walls, source=src, source_rate=f.get("source_rate", 0.0),
-                        periodic=H.periodic)
+                        periodic=H.periodic, width=width)
         # initial fill (declared): uniform value across the open domain
         if f.get("init") is not None:
-            fld.grid = torch.full((res, res), float(f["init"]), device=device)
+            fld.grid = torch.full((nx, res), float(f["init"]), device=device)
             if walls is not None:
                 fld.grid = torch.where(walls, torch.zeros_like(fld.grid), fld.grid)
         # navigation mode (declared, generic -- the engine does not branch on scenario name):
