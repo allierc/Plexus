@@ -406,7 +406,7 @@ window.Quarto = {
 <p>Plexus is two things at once, kept strictly apart:</p>
 <ul>
 <li>a <strong>language</strong> — a small, declarative <em>specification</em> (<code>spec.yaml</code>) that names the sets, fields, operators, and schedule of a system. This is <em>what</em> a living system is.</li>
-<li>a <strong>calculus</strong> — the registered operators and the engine that composes and integrates them, <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>, keeping the whole rollout differentiable. This is <em>how</em> it evolves.</li>
+<li>a <strong>calculus</strong> — the registered operators and the engine that composes and integrates them. A simulation is a multi-rate composition of operators, declared as a <code>Schedule</code>; in math terms, one tick is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, iterated as <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span> and kept differentiable throughout. This is <em>how</em> it evolves.</li>
 </ul>
 <p>Both layers are built from <strong>explicit, named primitives</strong> — not the latent variables a world model learns for prediction. And because those primitives are explicit <em>and</em> differentiable, the same language serves prediction, inverse inference, and the optimization of biological designs alike.</p>
 <p>The two meet at exactly one place — the validated spec — and <strong>never touch directly</strong>. The LLM owns everything <em>above</em> the spec (intent → specification); the code owns everything <em>below</em> it (the operators). The LLM never writes engine code; the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.</p>

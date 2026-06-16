@@ -38,8 +38,11 @@ Plexus is two things at once, kept strictly apart:
   the sets, fields, operators, and schedule of a system. This is *what* a living
   system is.
 - a **calculus** — the registered operators and the engine that composes and
-  integrates them, $x_{t+1}=\Phi(x_t)$, keeping the whole rollout differentiable.
-  This is *how* it evolves.
+  integrates them. A simulation is a multi-rate composition of operators,
+  declared as a `Schedule`; in math terms, one tick is the composition
+  $\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$, iterated as
+  $x_{t+1}=\Phi(x_t)$ and kept differentiable throughout. This is *how* it
+  evolves.
 
 Both layers are built from **explicit, named primitives** — not the latent
 variables a world model learns for prediction. And because those primitives are
