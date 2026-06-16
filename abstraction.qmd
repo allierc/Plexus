@@ -86,6 +86,11 @@ samples/senses the field back onto the objects. The relation is bipartite
 
 ![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* scatters ($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field. P2G/G2P (mechanics) and the metabolite–reaction graph are both Exchange.](figures/fig_ops.png){width=100%}
 
+Sets, fields, and these four operators are the entire vocabulary. The wager of
+Plexus is that this is enough **to describe a complex living system** — that
+everything from mechanics to morphogenesis to signalling is some composition of
+Lateral, Aggregate, Broadcast, and Exchange over a hierarchy of sets and fields.
+
 ## Dynamics: a schedule
 
 A simulation is a multi-rate composition of operators, declared as a

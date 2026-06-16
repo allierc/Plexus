@@ -6,3 +6,4 @@ Each row is a design whose escaped count beat the previous best by >= 10.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 0 | 58.218 | 0.235 | 93.112 | 0.541 | 1294.597 | 549.398 | 0.012 | 127.540 | 0.109 | 0.281 | 0.816 | 0.030 | [race_maze_hard_winner_1.gif](race_maze_hard_winner_1.gif) |
 | 2 | 23 | 71.444 | 0.117 | 313.490 | 0.939 | 1349.497 | 334.048 | 0.009 | 90.722 | 0.006 | 0.037 | 0.671 | 0.075 | [race_maze_hard_winner_2.gif](race_maze_hard_winner_2.gif) |
+| 3 | 33 | 49.150 | 0.545 | 378.894 | 1.394 | 1028.683 | 206.684 | 0.012 | 80.549 | 0.078 | 0.267 | 0.227 | 0.074 | [race_maze_hard_winner_3.gif](race_maze_hard_winner_3.gif) |
