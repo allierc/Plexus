@@ -5,10 +5,10 @@ subtitle: "Toward a language and calculus of living systems"
 
 Biology is not a single graph.
 
-A graph fixes *one* kind of node and *one* kind of edge — particles bonded by
-forces, cells linked by signals, neurons wired by synapses, species joined by
-reactions. Each existing framework commits to one such graph and models that
-layer alone. But a living system is several of these at once, nested inside one
+A graph fixes *one* kind of node and *one* kind of edge — particles and the
+forces between them, cells and their interactions, neurons and synapses,
+molecular species and reactions. Each existing framework commits to one such
+graph and models that layer alone. But a living system is several of these at once, nested inside one
 another and coupled to continuous fields: particles make up cells, cells make up
 tissues and populations, and every level exchanges with morphogen, pressure, and
 chemical fields. Choose any single graph and you capture one slice — the
