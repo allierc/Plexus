@@ -98,9 +98,9 @@ Qualitatively different collective behaviours, all produced from the *same code*
 by changing only a ~20-line specification — no new software per phenomenon.
 
 ::: {layout-ncol=2}
-{{< video prototype/sim_1.mp4 title="aggregate — soft cells secrete a chemical and climb it" >}}
+{{< video prototype/sim_5.mp4 title="squish — soft cells deform under crowding and confinement" >}}
 
-{{< video prototype/sim_6.mp4 title="sort — type-specific adhesion segregates two populations" >}}
+{{< video prototype/sim_3.mp4 title="swarm — strong boids make the cells flock and move as one" >}}
 
 {{< video prototype/ant_1.mp4 title="ant trails — stigmergic pheromone trails self-organize" >}}
 
