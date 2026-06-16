@@ -27,7 +27,7 @@ a set), **aggregate** (up the containment hierarchy), **broadcast** (down it),
 and **exchange** (between sets and fields). Complex simulations emerge from
 composing a few primitive operations.
 
-The goal is not merely to predict trajectories, but to provide a *language* in
+The goal is not merely to mimic biology, but to provide a *language* in
 which biological systems can be expressed, modified, optimized, and understood.
 A simulation becomes a program. A tissue becomes a composition of operators. A
 new biological hypothesis becomes a small change to a specification rather than a
