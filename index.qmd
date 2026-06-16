@@ -100,11 +100,11 @@ by changing only a ~20-line specification — no new software per phenomenon.
 ::: {layout-ncol=2}
 {{< video prototype/sim_1.mp4 title="aggregate — soft cells secrete a chemical and climb it" >}}
 
-{{< video prototype/sim_3.mp4 title="swarm — strong boids make the cells flock and move as one" >}}
-
 {{< video prototype/sim_6.mp4 title="sort — type-specific adhesion segregates two populations" >}}
 
 {{< video prototype/ant_1.mp4 title="ant trails — stigmergic pheromone trails self-organize" >}}
+
+{{< video prototype/ant_4.mp4 title="ant trails — tighter, low-noise reinforced network" >}}
 :::
 
 And because every simulation is differentiable, biological designs can be

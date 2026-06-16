@@ -91,27 +91,30 @@ def intent_race(x_finish):
 def render(a, sc, path, fps=20, x_finish=None, start_box=None, wide=False):
     pp, par = a["particle_pos"], a["parent"]
     pt = a["cell_type"][par]
-    green_flag = a.get("done") if a.get("done") is not None else a.get("loaded")   # frozen/loaded -> green
+    is_race = x_finish is not None
+    green_flag = None if is_race else a.get("loaded")          # demos: loaded -> green; races: cells just vanish
     ft = a.get("finished_t"); ncell = a["cell_pos"].shape[1]
     walls, fld, T = a["walls"], a["field"], a["particle_pos"].shape[0]
-    base = PAL[pt]                                              # [Np,4]
-    vmax = max(float(fld.max()) * 0.5, 1e-6)
-    figsize = (11.0, 4.6) if wide else (5.5, 5.5)              # races render longitudinally
+    W = float(getattr(sc, "world", 1.0))                       # world = [0,W]x[0,1]
+    base = PAL[pt]                                             # [Np,4]
+    # dim the field so only real trails show (avoid a saturated haze near the start)
+    vmax = max(float(np.percentile(fld, 99.8)) * 1.6, 1e-6)
+    figsize = (min(20.0, 3.7 * W + 0.6), 3.9) if W > 1.4 else (5.5, 5.5)
     fig, ax = plt.subplots(figsize=figsize); fig.patch.set_facecolor("black"); ax.set_facecolor("black")
-    if wide:
-        ax.set_aspect("auto")
-    imF = ax.imshow(fld[0].T, origin="lower", extent=[0, 1, 0, 1], cmap="inferno", vmin=0, vmax=vmax)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.93, bottom=0.02)
+    ax.set_aspect("equal")                                    # undistorted: circles stay round
+    imF = ax.imshow(fld[0].T, origin="lower", extent=[0, W, 0, 1], cmap="inferno",
+                    vmin=0, vmax=vmax, interpolation="bilinear", alpha=0.85)
     if walls is not None:
-        ax.imshow(np.where(walls.T, 1.0, np.nan), origin="lower", extent=[0, 1, 0, 1],
-                  cmap="gray", vmin=0, vmax=2.2)
-    if start_box is not None:
-        x0, y0, x1, y1 = start_box
-        ax.add_patch(plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, edgecolor="#5599ff", lw=1.2))
-    if x_finish is not None:
-        ax.axvline(x_finish, color="#33dd55", ls="--", lw=1.5)
-    sct = ax.scatter(pp[0][:, 0], pp[0][:, 1], s=1.3, c=base)
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
-    tt = ax.set_title("", fontsize=8, color="white")
+        wall_rgba = np.zeros((*walls.T.shape, 4)); wall_rgba[walls.T] = (0.42, 0.45, 0.50, 1.0)  # neat slate walls
+        ax.imshow(wall_rgba, origin="lower", extent=[0, W, 0, 1], interpolation="nearest")
+    if is_race:
+        ax.axvline(x_finish, color="#33dd55", ls=(0, (4, 4)), lw=1.0, alpha=0.7)
+    sct = ax.scatter(pp[0][:, 0], pp[0][:, 1], s=2.6, c=base, edgecolors="none")
+    ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_xticks([]); ax.set_yticks([])
+    for s in ax.spines.values():
+        s.set_visible(False)
+    tt = ax.set_title("", fontsize=9, color="0.85")
 
     def upd(fr):
         sct.set_offsets(pp[fr])
@@ -120,8 +123,8 @@ def render(a, sc, path, fps=20, x_finish=None, start_box=None, wide=False):
             col[green_flag[fr][par]] = GREEN
         sct.set_color(col)
         imF.set_data(fld[fr].T)
-        if x_finish is not None and ft is not None:
-            tt.set_text(f"{sc.name}   frame {fr}/{T-1}   |   finished {int(ft[fr])}/{ncell}")
+        if is_race and ft is not None:
+            tt.set_text(f"{sc.name}   frame {fr}/{T-1}   |   escaped {int(ft[fr])}/{ncell}")
         else:
             tt.set_text(f"{sc.name}  frame {fr}/{T-1}")
         return [sct, imF, tt]
@@ -137,12 +140,9 @@ DEMOS = {
     "demo_sort":      dict(gif="demo1_sort.gif",       intent=intent_sort),
     "demo_graze":     dict(gif="demo2_graze.gif",      intent=intent_graze),
     "demo_aggregate": dict(gif="demo3_aggregate.gif",  intent=intent_aggregate),
-    "race_pillars":   dict(gif="race1_pillars.gif",    intent=intent_race(0.86),
-                           x_finish=0.86, start_box=[0.0, 0.0, 0.12, 1.0], wide=True),
-    "race_maze_easy": dict(gif="race2_maze_easy.gif",  intent=intent_race(0.88),
-                           x_finish=0.88, start_box=[0.0, 0.0, 0.10, 1.0], wide=True),
-    "race_maze_hard": dict(gif="race3_maze_hard.gif",  intent=intent_race(0.88),
-                           x_finish=0.88, start_box=[0.0, 0.0, 0.10, 1.0], wide=True),
+    "race_pillars":   dict(gif="race1_pillars.gif",    intent=intent_race(3.92), x_finish=3.92),
+    "race_maze_easy": dict(gif="race2_maze_easy.gif",  intent=intent_race(3.92), x_finish=3.92),
+    "race_maze_hard": dict(gif="race3_maze_hard.gif",  intent=intent_race(3.92), x_finish=3.92),
 }
 
 

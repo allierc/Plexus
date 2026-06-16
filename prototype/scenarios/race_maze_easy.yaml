@@ -1,45 +1,68 @@
-# Scenario 2a -- EASY maze (8x4 perfect maze): real corridors + dead ends, longitudinal. Hidden geodesic nav, shown scent trail, freeze+counter at the finish.
+# Scenario 2a -- EASY maze (15x4 perfect maze) in a 4x-wide world. Hidden geodesic nav, shown scent trail; cells DIE (disappear) at the exit with a counter.
 name: race_maze_easy
 seed: 0
 boundary: wall
-n_frames: 2600
-record_every: 8
-obstacles:                       # real perfect maze (recursive backtracker, maze_gen.py); inset into x>0.14, BFS-verified
-  - [0.2375, 0.5, 0.2575, 0.75]
-  - [0.345, 0.0, 0.365, 0.25]
-  - [0.345, 0.25, 0.365, 0.5]
-  - [0.4525, 0.0, 0.4725, 0.25]
-  - [0.4525, 0.25, 0.4725, 0.5]
-  - [0.56, 0.25, 0.58, 0.5]
-  - [0.56, 0.5, 0.58, 0.75]
-  - [0.6675, 0.5, 0.6875, 0.75]
-  - [0.6675, 0.75, 0.6875, 1.0]
-  - [0.8825, 0.5, 0.9025, 0.75]
-  - [0.14, 0.24, 0.2475, 0.26]
-  - [0.2475, 0.49, 0.355, 0.51]
-  - [0.2475, 0.74, 0.355, 0.76]
-  - [0.355, 0.74, 0.4625, 0.76]
-  - [0.4625, 0.74, 0.57, 0.76]
-  - [0.57, 0.24, 0.6775, 0.26]
-  - [0.6775, 0.24, 0.785, 0.26]
-  - [0.6775, 0.49, 0.785, 0.51]
-  - [0.785, 0.24, 0.8925, 0.26]
-  - [0.785, 0.49, 0.8925, 0.51]
-  - [0.785, 0.74, 0.8925, 0.76]
+world: 4.0                        # longitudinal world [0,4]x[0,1] (4x wider than tall)
+n_frames: 4000
+record_every: 12
+obstacles:                       # real perfect maze (maze_gen.py), square rooms, inset into x>0.30; BFS-verified
+  - [0.5347, 0.5, 0.5587, 0.75]
+  - [0.7813, 0.0, 0.8053, 0.25]
+  - [0.7813, 0.25, 0.8053, 0.5]
+  - [1.028, 0.25, 1.052, 0.5]
+  - [1.2747, 0.25, 1.2987, 0.5]
+  - [1.2747, 0.5, 1.2987, 0.75]
+  - [1.5213, 0.5, 1.5453, 0.75]
+  - [1.5213, 0.75, 1.5453, 1.0]
+  - [1.768, 0.75, 1.792, 1.0]
+  - [2.0147, 0.5, 2.0387, 0.75]
+  - [2.2613, 0.25, 2.2853, 0.5]
+  - [2.2613, 0.5, 2.2853, 0.75]
+  - [2.508, 0.75, 2.532, 1.0]
+  - [3.0013, 0.25, 3.0253, 0.5]
+  - [3.0013, 0.5, 3.0253, 0.75]
+  - [3.248, 0.0, 3.272, 0.25]
+  - [3.248, 0.25, 3.272, 0.5]
+  - [3.248, 0.5, 3.272, 0.75]
+  - [3.4947, 0.0, 3.5187, 0.25]
+  - [3.7413, 0.25, 3.7653, 0.5]
+  - [3.7413, 0.5, 3.7653, 0.75]
+  - [0.3, 0.238, 0.5467, 0.262]
+  - [0.5467, 0.488, 0.7933, 0.512]
+  - [0.5467, 0.738, 0.7933, 0.762]
+  - [0.7933, 0.738, 1.04, 0.762]
+  - [1.04, 0.238, 1.2867, 0.262]
+  - [1.04, 0.738, 1.2867, 0.762]
+  - [1.2867, 0.238, 1.5333, 0.262]
+  - [1.5333, 0.238, 1.78, 0.262]
+  - [1.5333, 0.488, 1.78, 0.512]
+  - [1.78, 0.238, 2.0267, 0.262]
+  - [1.78, 0.488, 2.0267, 0.512]
+  - [2.0267, 0.238, 2.2733, 0.262]
+  - [2.2733, 0.488, 2.52, 0.512]
+  - [2.52, 0.238, 2.7667, 0.262]
+  - [2.52, 0.488, 2.7667, 0.512]
+  - [2.52, 0.738, 2.7667, 0.762]
+  - [2.7667, 0.238, 3.0133, 0.262]
+  - [2.7667, 0.738, 3.0133, 0.762]
+  - [3.26, 0.738, 3.5067, 0.762]
+  - [3.5067, 0.488, 3.7533, 0.512]
+  - [3.5067, 0.738, 3.7533, 0.762]
 sets:
   cell:
     n: 100
-    start: [0.00, 0.00, 0.11, 1.00]            # open entry corridor (x < 0.14), clear of walls
+    start: [0.00, 0.00, 0.26, 1.00]            # open entry corridor (x < 0.30), clear of walls
     types: {A: {fraction: 0.5, youngs: 60}, B: {fraction: 0.5, youngs: 60}}
   particle: {parent: cell, per_parent: 30, radius: 0.008, density: 1.0}
 fields:
-  scent: {frame: grid, res: 160, diffusion: 0.04, decay: 0.02, couples_to: cell}                                          # SHOWN: deposited trail
-  nav:   {frame: grid, res: 160, diffusion: 1.0, source: [0.92, 0.0, 1.0, 1.0], navigation: geodesic, couples_to: cell}   # HIDDEN: navigation
+  scent: {frame: grid, res: 160, diffusion: 0.05, decay: 0.05, couples_to: cell}                                          # SHOWN: faint deposited trail
+  nav:   {frame: grid, res: 160, diffusion: 1.0, source: [3.78, 0.0, 4.0, 1.0], navigation: geodesic, couples_to: cell}   # HIDDEN: navigation to the exit
 operators:
-  - {op: finish, at: cell, x: 0.93}                              # freeze + count at the line
-  - {op: motility, at: "cell[done=0]", speed: 40.0, rot: 0.30}
+  - {op: motility, at: "cell[done=0]", speed: 45.0, rot: 0.30}
   - {op: random_walk, at: "cell[done=0]", strength: 25.0}
-  - {op: sense,  at: "cell[done=0]", from: nav, gain: 180.0}     # navigate the maze to the finish
-  - {op: secrete, at: "cell[done=0]", to: scent, rate: 1.0}      # lay the visible trail
-  - {op: mpm, at: particle, n_grid: 160, substeps: 6, dt_sub: 2.0e-4, a_max: 700, drag: 2.0, vmax: 5.0}
-schedule: [aggregate, finish, [motility, random_walk, sense], secrete, scent.diffuse, mpm]
+  - {op: sense,  at: "cell[done=0]", from: nav, gain: 220.0}     # navigate the maze to the exit
+  - {op: boids,  at: "cell[done=0]", radius: 0.05, cohesion: 0.02, align: 0.05, separate: 0.6}  # flock + anti-jam
+  - {op: secrete, at: "cell[done=0]", to: scent, rate: 0.5}      # lay a faint visible trail
+  - {op: mpm, at: particle, n_grid: 160, substeps: 6, dt_sub: 2.0e-4, a_max: 800, drag: 2.0, vmax: 8.0}
+  - {op: death, at: cell, x: 3.92}                               # exit: cells disappear at the line (sink) + counter
+schedule: [aggregate, [motility, random_walk, sense, boids], secrete, scent.diffuse, mpm, death]

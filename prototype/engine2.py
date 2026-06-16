@@ -40,9 +40,9 @@ def _geodesic_potential(walls_np, source_np):
     This is the steady state of source-diffusion-with-walls; gradient ascent on it
     routes around obstacles. Unreachable/wall cells are 0."""
     from collections import deque
-    res = walls_np.shape[0]
+    nx, ny = walls_np.shape
     INF = 1 << 30
-    dist = np.full((res, res), INF, np.int64)
+    dist = np.full((nx, ny), INF, np.int64)
     dq = deque()
     src = np.argwhere(source_np & ~walls_np)
     for i, j in src:
@@ -51,10 +51,10 @@ def _geodesic_potential(walls_np, source_np):
         i, j = dq.popleft()
         for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             a, b = i + di, j + dj
-            if 0 <= a < res and 0 <= b < res and not walls_np[a, b] and dist[a, b] == INF:
+            if 0 <= a < nx and 0 <= b < ny and not walls_np[a, b] and dist[a, b] == INF:
                 dist[a, b] = dist[i, j] + 1; dq.append((a, b))
     reach = dist < INF
-    pot = np.zeros((res, res), np.float32)
+    pot = np.zeros((nx, ny), np.float32)
     if reach.any():
         dmax = dist[reach].max()
         pot[reach] = (dmax - dist[reach]).astype(np.float32) / max(dmax, 1)
@@ -244,7 +244,8 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
     ppos = np.zeros((n_rec, part.n, 2), np.float32)
     loaded = np.zeros((n_rec, cell.n), bool)
     done = np.zeros((n_rec, cell.n), bool)
-    fhist = np.zeros((n_rec, H.fields[fld_name].res, H.fields[fld_name].res), np.float32)
+    _fg = H.fields[fld_name].grid
+    fhist = np.zeros((n_rec, _fg.shape[0], _fg.shape[1]), np.float32)
     delivered_t = np.zeros(n_rec, np.int32)
     finished_t = np.zeros(n_rec, np.int32)
 
