@@ -79,3 +79,62 @@ branching) and all new behaviour is a registered operator or a declarative spec 
 - Noted the `world` width (longitudinal domain), the `navigation` field mode
   (geodesic vs self-generated), `init`, and circle obstacles in the language table.
 - Added the pillars + maze **race** scenarios and the `race_opt` optimizer (boids levers).
+
+---
+
+# Dividing cell — porting the standalone prototype into the framework
+
+`divide_cell.py` was first written **standalone** (bespoke torch, no registry, no
+spec, no engine) to validate that a *cardinality-changing* operator can be made
+differentiable. This section logs bringing it inside the contract.
+
+## Why `engine2` could not host it (the core finding)
+
+`engine2` allocates `Nc`, `Np`, `parent` once in `build()` and never changes
+them; the schedule accumulates into a fixed `H.cell_accel` and MPM moves a fixed
+particle array. Nothing can change `|S_k|`. **Cell division and particle
+duplication are cardinality-changing operators**, so they can't be a spec over
+`engine2` as-is — the concrete reason the prototype lived outside the framework.
+
+## The faithful port (what made it fit the contract)
+
+- **Occupancy mass on a fixed buffer.** Allocate `buffer` slots per level; a
+  per-node mass `w ∈ {0,1}` (0 = dormant) marks the active set. Duplication /
+  division flip dormant↔active instead of resizing → constant tensor shape (and
+  the same trick that keeps it differentiable; here `w` is boolean, the
+  continuous-occupancy version of `divide_cell.py` uses `w ∈ [0,1]`).
+- **Four registered operators**, real `@register_operator` on `base.py` classes,
+  `forward(self, H, mask) -> {level: delta}`:
+  - `cohere` (broadcast) — particle pulled toward its parent-cell centroid.
+  - `repulse` (lateral) — soft short-range particle–particle repulsion.
+  - `duplicate` (**structural**, new kind tag) — wake dormant particle slots.
+  - `divide` (**structural**) — split a cell once its mass has doubled.
+- **`integrate` builtin**: the schedule grammar already reserves it; `engine2`
+  never implemented it. The growth engine implements it as overdamped
+  `pos += dt·accel`. So the schedule reads
+  `[aggregate, cohere, repulse, integrate, duplicate, divide]` — pure spec.
+- Structural ops mutate `H` and return `{}` (no delta) — uniform with every other
+  op, so the engine loop doesn't special-case them.
+
+## What the framework still needs (gaps surfaced)
+
+1. **`Level` needs first-class occupancy** (`Level.mass`) + a `buffer` field in
+   the set spec, so cardinality change is engine-level, not per-op bookkeeping.
+2. **`aggregate` must be mass-weighted** once `w` exists (centroid = Σwx/Σw).
+3. **A `structural` operator kind** (changes membership, returns no delta) should
+   be a recognised category alongside lateral/aggregate/broadcast/exchange — i.e.
+   the Divide/Die row of the taxonomy, wired into the engine + validator.
+4. **`engine2` and the growth engine should merge**: one generic engine that
+   integrates deltas AND supports cardinality change, so MPM soft-cells can also
+   divide.
+
+## Differentiability (kept for the next step)
+
+The continuous-occupancy `divide_cell.py` confirmed it: backprop of an outcome
+(colony spread) to a physical parameter (cohesion) **matches finite differences
+to <1%** straight through a division. Caveats learned:
+- float32 **overflows** the gradient of a long stiff rollout (≈2.4×/tick) → use
+  float64 for the sensitivity check, or a short horizon.
+- the only non-differentiable residue is the **discrete which-daughter split**
+  at the principal-axis plane (a side-assignment flip under perturbation) — the
+  ~0.4% FD mismatch, exactly the discrete part the taxonomy flags.

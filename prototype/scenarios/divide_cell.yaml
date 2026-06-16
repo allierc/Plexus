@@ -1,0 +1,18 @@
+# A round soft cell of particles grows by duplication and divides when its mass
+# has DOUBLED; the daughters grow and divide again. Pure spec over registered
+# operators -- the engine never branches on this scenario's name.
+name: divide_cell
+seed: 0
+n_frames: 520
+dt: 0.02
+record_every: 4
+sets:
+  cell:     {n: 1,   buffer: 12}                 # 1 active cell now, room for 12 after divisions
+  particle: {parent: cell, per_parent: 200, buffer: 2200, radius: 0.06}
+fields: {}                                       # no continuum field in this demo
+operators:
+  - {op: cohere,    at: particle, k: 0.9}        # broadcast: pull to parent-cell centroid
+  - {op: repulse,   at: particle, r0: 0.013, k: 0.6}   # lateral: soft incompressibility
+  - {op: duplicate, at: particle, rate: 4, r0: 0.013}  # structural: cell grows
+  - {op: divide,    at: cell, ratio: 2.0, push: 0.012} # structural: split once doubled
+schedule: [aggregate, cohere, repulse, integrate, duplicate, divide]
