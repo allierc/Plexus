@@ -37,25 +37,51 @@ secretion and sensing); these couplings are the operators below.
 
 ## A typed containment graph
 
-The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition, but read literally it
-over-constrains: it assumes each scale has *one* child type. A real cell does not —
-it is a container of many sets at once: a membrane, a cytoplasm, a nucleus,
-organelles, molecules, each with its own state, operators, and parent map. So we
-lift the chain to a graph. Containment is a parent map between *any* two sets,
-declared by naming the parent,
+The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition — and the place to start —
+but read literally it over-constrains in two ways: it assumes each scale has *one*
+child type, and it treats every entity as an element of one big set, told apart
+only by a label. A real cell is neither: it is a container of many *different
+kinds* of set at once — a membrane, a cytoplasm, a nucleus, organelles, molecules —
+each with its own state space and operators. So we make two moves: from one set to
+a *family* of typed sets, and from a chain to a graph.
 
-$$\pi_{A\to B} : S_A \longrightarrow S_B,$$
+**A family of typed sets.** Rather than one set $S_0$ with a type function
+$\tau:S_0\to\{\text{membrane},\dots\}$, we take a family
+$S=\{S_\alpha\}_{\alpha\in A}$, one set per *sort*, each with its own state schema,
+operators, and fields. The two are equivalent as sets (the fibres
+$\tau^{-1}(\alpha)$ *are* the $S_\alpha$), but the family is the honest one: a
+single set with a type label forces every operator to branch on $\tau$ at run time
+(the spaghetti), whereas a family lets each operator declare *one* sort statically
+(`at: nucleus`) and never branch. This is many-sorted set theory — the typed
+discipline an ECS or a database already uses.
 
-so a cell is not one fibre but a **bundle of fibres**,
-$\mathrm{Cell}(c)=\{\,\pi_{A\to\mathrm{cell}}^{-1}(c) : A\in\mathrm{children}(\mathrm{cell})\,\}$.
+**Joined by containment maps.** The sorts are joined by parent maps
+$\pi_{\alpha\to\beta}: S_\alpha \to S_\beta$, so a cell is not one fibre but a
+**bundle of fibres**,
+$\mathrm{Cell}(c)=\{\,\pi_{\alpha\to\mathrm{cell}}^{-1}(c) : \alpha\in\mathrm{children}(\mathrm{cell})\,\}$.
 The container is a *typed containment graph* — a **DAG** (directed acyclic graph:
-the sets are nodes, the parent maps are directed edges, and containment never
-cycles) — not a fixed scale ladder. The shift from "*level $k$ contains level $k{-}1$*" to "*set $A$
-is contained by set $B$*" keeps the code clean — the engine needs only
-`Level.parent` and `Level.parent_name` — and keeps operators *typed*
-(`membrane_tension` on `membrane_particle`, `metabolism` on `metabolite`), instead
-of one mega-operator branching on a `role` flag. New biological structure is a new
-set and a parent map, never an engine change:
+sorts are nodes, parent maps directed edges, no cycles) — not a fixed scale ladder.
+Categorically it is a diagram of sets (a functor from the containment graph into
+$\mathbf{Set}$); the old $S_0\to S_1\to S_2$ was just the chain-shaped case. Nothing
+leaves set theory; the *shape* generalizes from a ladder to a graph. The engine
+needs only `Level.parent` and `Level.parent_name`; new structure is a new set and a
+parent map, never an engine change.
+
+**A new set, or a new type?** The type function $\tau$ does not disappear — it is
+demoted: it no longer distinguishes *kinds*, it parameterizes a *subpopulation of
+one kind*. Two groups that differ in state space or operators are different *sorts*
+(separate sets); two that share both and differ only in parameters are *types
+within one set* (the $\tau$ colouring — the `types:` block).
+
+| | **Different sorts** ($S_\alpha$) | **Types within one sort** ($\tau$) |
+|---|---|---|
+| example | membrane vs nucleus vs metabolite | soft cell vs stiff cell |
+| differ in | state space + operators | only parameter values |
+| in the spec | separate `sets:` with `parent:` | a `types:` block inside one set |
+| dispatch | by name (`at: nucleus`) | per-row lookup $p[\tau(i)]$ |
+
+A new *kind* is a new set; a parametric *variant* is a new type — keeping operators
+typed, never one mega-operator branching on a role flag:
 
 ``` yaml
 sets:

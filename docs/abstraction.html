@@ -411,9 +411,47 @@ window.Quarto = {
 </section>
 <section id="a-typed-containment-graph" class="level2">
 <h2 class="anchored" data-anchor-id="a-typed-containment-graph">A typed containment graph</h2>
-<p>The chain <span class="math inline">\(\pi_k:S_k\to S_{k+1}\)</span> is the right intuition, but read literally it over-constrains: it assumes each scale has <em>one</em> child type. A real cell does not — it is a container of many sets at once: a membrane, a cytoplasm, a nucleus, organelles, molecules, each with its own state, operators, and parent map. So we lift the chain to a graph. Containment is a parent map between <em>any</em> two sets, declared by naming the parent,</p>
-<p><span class="math display">\[\pi_{A\to B} : S_A \longrightarrow S_B,\]</span></p>
-<p>so a cell is not one fibre but a <strong>bundle of fibres</strong>, <span class="math inline">\(\mathrm{Cell}(c)=\{\,\pi_{A\to\mathrm{cell}}^{-1}(c) : A\in\mathrm{children}(\mathrm{cell})\,\}\)</span>. The container is a <em>typed containment graph</em> — a <strong>DAG</strong> (directed acyclic graph: the sets are nodes, the parent maps are directed edges, and containment never cycles) — not a fixed scale ladder. The shift from “<em>level <span class="math inline">\(k\)</span> contains level <span class="math inline">\(k{-}1\)</span></em>” to “<em>set <span class="math inline">\(A\)</span> is contained by set <span class="math inline">\(B\)</span></em>” keeps the code clean — the engine needs only <code>Level.parent</code> and <code>Level.parent_name</code> — and keeps operators <em>typed</em> (<code>membrane_tension</code> on <code>membrane_particle</code>, <code>metabolism</code> on <code>metabolite</code>), instead of one mega-operator branching on a <code>role</code> flag. New biological structure is a new set and a parent map, never an engine change:</p>
+<p>The chain <span class="math inline">\(\pi_k:S_k\to S_{k+1}\)</span> is the right intuition — and the place to start — but read literally it over-constrains in two ways: it assumes each scale has <em>one</em> child type, and it treats every entity as an element of one big set, told apart only by a label. A real cell is neither: it is a container of many <em>different kinds</em> of set at once — a membrane, a cytoplasm, a nucleus, organelles, molecules — each with its own state space and operators. So we make two moves: from one set to a <em>family</em> of typed sets, and from a chain to a graph.</p>
+<p><strong>A family of typed sets.</strong> Rather than one set <span class="math inline">\(S_0\)</span> with a type function <span class="math inline">\(\tau:S_0\to\{\text{membrane},\dots\}\)</span>, we take a family <span class="math inline">\(S=\{S_\alpha\}_{\alpha\in A}\)</span>, one set per <em>sort</em>, each with its own state schema, operators, and fields. The two are equivalent as sets (the fibres <span class="math inline">\(\tau^{-1}(\alpha)\)</span> <em>are</em> the <span class="math inline">\(S_\alpha\)</span>), but the family is the honest one: a single set with a type label forces every operator to branch on <span class="math inline">\(\tau\)</span> at run time (the spaghetti), whereas a family lets each operator declare <em>one</em> sort statically (<code>at: nucleus</code>) and never branch. This is many-sorted set theory — the typed discipline an ECS or a database already uses.</p>
+<p><strong>Joined by containment maps.</strong> The sorts are joined by parent maps <span class="math inline">\(\pi_{\alpha\to\beta}: S_\alpha \to S_\beta\)</span>, so a cell is not one fibre but a <strong>bundle of fibres</strong>, <span class="math inline">\(\mathrm{Cell}(c)=\{\,\pi_{\alpha\to\mathrm{cell}}^{-1}(c) : \alpha\in\mathrm{children}(\mathrm{cell})\,\}\)</span>. The container is a <em>typed containment graph</em> — a <strong>DAG</strong> (directed acyclic graph: sorts are nodes, parent maps directed edges, no cycles) — not a fixed scale ladder. Categorically it is a diagram of sets (a functor from the containment graph into <span class="math inline">\(\mathbf{Set}\)</span>); the old <span class="math inline">\(S_0\to S_1\to S_2\)</span> was just the chain-shaped case. Nothing leaves set theory; the <em>shape</em> generalizes from a ladder to a graph. The engine needs only <code>Level.parent</code> and <code>Level.parent_name</code>; new structure is a new set and a parent map, never an engine change.</p>
+<p><strong>A new set, or a new type?</strong> The type function <span class="math inline">\(\tau\)</span> does not disappear — it is demoted: it no longer distinguishes <em>kinds</em>, it parameterizes a <em>subpopulation of one kind</em>. Two groups that differ in state space or operators are different <em>sorts</em> (separate sets); two that share both and differ only in parameters are <em>types within one set</em> (the <span class="math inline">\(\tau\)</span> colouring — the <code>types:</code> block).</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Different sorts</strong> (<span class="math inline">\(S_\alpha\)</span>)</th>
+<th><strong>Types within one sort</strong> (<span class="math inline">\(\tau\)</span>)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>example</td>
+<td>membrane vs nucleus vs metabolite</td>
+<td>soft cell vs stiff cell</td>
+</tr>
+<tr class="even">
+<td>differ in</td>
+<td>state space + operators</td>
+<td>only parameter values</td>
+</tr>
+<tr class="odd">
+<td>in the spec</td>
+<td>separate <code>sets:</code> with <code>parent:</code></td>
+<td>a <code>types:</code> block inside one set</td>
+</tr>
+<tr class="even">
+<td>dispatch</td>
+<td>by name (<code>at: nucleus</code>)</td>
+<td>per-row lookup <span class="math inline">\(p[\tau(i)]\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>A new <em>kind</em> is a new set; a parametric <em>variant</em> is a new type — keeping operators typed, never one mega-operator branching on a role flag:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at">               </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">}</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">membrane_particle</span><span class="kw">:</span><span class="at">  </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">64</span><span class="kw">,</span><span class="at">  </span><span class="fu">role</span><span class="kw">:</span><span class="at"> membrane</span><span class="kw">}</span></span>

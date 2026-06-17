@@ -112,39 +112,84 @@ metabolites.}
 \section{A typed containment graph}
 \label{sec:graph}
 
-The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition, but read literally it
-over-constrains: it assumes each scale has \emph{one} child type. A real cell does
-not --- it is a container of many sets at once: a membrane, a cytoplasm, a nucleus,
-organelles, receptors, molecules, each with its own state, operators, and parent
-map. So we lift the chain to a graph.
+The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition --- and the place to start
+--- but read literally it over-constrains in two ways: it assumes each scale has
+\emph{one} child type, and it treats every entity as an element of one big set,
+told apart only by a label. A real cell is neither: it is a container of many
+\emph{different kinds} of set at once --- a membrane, a cytoplasm, a nucleus,
+organelles, molecules --- each with its own state space and its own operators. So
+we make two moves: from one set to a \emph{family} of typed sets, and from a chain
+to a graph.
 
-Containment is a parent map between \emph{any} two sets, declared by naming the
-parent:
+\paragraph{A family of typed sets.} Rather than one set $S_0$ with a type function
+$\tau:S_0\to\{\text{membrane},\text{nucleus},\dots\}$, we take a family
 \[
-  \pi_{A\to B} : S_A \longrightarrow S_B,
+  S=\{\,S_\alpha\,\}_{\alpha\in A},
 \]
-assigning every entity of type $A$ to a parent of type $B$. A parent set may have
-many children, so a cell is not one fibre but a \textbf{bundle of fibres},
+one set per \emph{sort}, each carrying its own state schema, operators, and fields.
+The two are equivalent as sets --- the fibres $\tau^{-1}(\alpha)$ \emph{are} the
+$S_\alpha$ --- but the family is the computationally honest presentation: a single
+set with a type label forces every operator to branch on $\tau$ at run time (the
+spaghetti), whereas a family lets each operator declare \emph{one} sort statically
+(\code{at: nucleus}) and never branch. This is many-sorted set theory, the typed
+discipline an ECS or a relational database already uses.
+
+\paragraph{Joined by containment maps.} The sorts are joined by parent maps,
+declared by naming the parent,
 \[
-  \mathrm{Cell}(c)=\Big\{\, \pi_{A\to\mathrm{cell}}^{-1}(c) \;:\; A\in\mathrm{children}(\mathrm{cell}) \,\Big\}.
+  \pi_{\alpha\to\beta} : S_\alpha \longrightarrow S_\beta,
+\]
+assigning every entity of sort $\alpha$ to a parent of sort $\beta$. A parent may
+have many children, so a cell is not one fibre but a \textbf{bundle of fibres},
+\[
+  \mathrm{Cell}(c)=\Big\{\, \pi_{\alpha\to\mathrm{cell}}^{-1}(c) \;:\; \alpha\in\mathrm{children}(\mathrm{cell}) \,\Big\}.
 \]
 The container is therefore a \emph{typed containment graph} --- a \textbf{DAG}
-(directed acyclic graph: the sets are nodes, the parent maps are directed edges,
-and containment never cycles), shown in Fig.~\ref{fig:graph} --- not a fixed scale
-ladder. A DAG rather than a tree because a parent has \emph{many} children. The
-shift is from
-``\emph{level $k$ contains level $k{-}1$}'' to ``\emph{set $A$ is contained by set
-$B$}'', and it is what keeps the code clean: the engine needs only
-\code{Level.parent} (the index map) and \code{Level.parent\_name} (the edge); new
-biological structure is a \emph{new set and a parent map}, never an engine change.
+(directed acyclic graph: the sorts are nodes, the parent maps are directed edges,
+and containment never cycles), shown in Fig.~\ref{fig:graph}; a DAG rather than a
+tree because a parent has \emph{many} children. Categorically it is a diagram of
+sets --- a functor from the containment graph (the shape) into $\mathbf{Set}$ ---
+and the old $S_0\to S_1\to S_2$ was just the chain-shaped case. Nothing leaves set
+theory; the \emph{shape} generalizes from a ladder to a graph. The shift from
+``level $k$ contains level $k{-}1$'' to ``sort $A$ is contained by sort $B$'' is
+what keeps the code clean: the engine needs only \code{Level.parent} (the index
+map) and \code{Level.parent\_name} (the edge); new biological structure is a new
+set and a parent map, never an engine change.
 
-This also keeps operators \emph{typed}: \code{membrane\_tension} acts on
+\paragraph{A new set, or a new type?} The type function $\tau$ does not disappear;
+it is demoted. It no longer distinguishes \emph{kinds} --- it parameterizes a
+\emph{subpopulation of one kind}. Two groups that differ in state space or
+operators are different \emph{sorts} (separate sets); two groups that share both
+and differ only in parameter values are \emph{types within one set} (the $\tau$
+colouring, our \code{types:} block). Table~\ref{tab:sorts} is the rule, and it is
+the structural form of the category discipline of Section~\ref{sec:category}: a new
+\emph{kind} is a new set, a parametric \emph{variant} is a new type.
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}l p{5.1cm} p{5.1cm}@{}}
+\toprule
+ & \textbf{Different sorts} (typed sets $S_\alpha$) & \textbf{Types within one sort} (the $\tau$ colouring) \\
+\midrule
+example     & membrane vs.\ nucleus vs.\ metabolite      & soft cell vs.\ stiff cell \\
+differ in   & state space $+$ operators                  & only parameter values \\
+in the spec & separate \code{sets:} with \code{parent:}   & a \code{types:} block inside one set \\
+dispatch    & by name (\code{at: nucleus})               & per-row param lookup $p[\tau(i)]$ \\
+\bottomrule
+\end{tabular}
+\caption{When to declare a new set versus a new type: a different \emph{kind}
+(state space or dynamics) $\Rightarrow$ a new sort; a parametric \emph{variant}
+$\Rightarrow$ a type within a set.}
+\label{tab:sorts}
+\end{table}
+
+Keeping operators typed is the payoff: \code{membrane\_tension} acts on
 \code{membrane\_particle}, \code{metabolism} on \code{metabolite},
 \code{gene\_regulation} on \code{nucleus}, and Exchange operators connect
 compartments explicitly (nucleus\,$\leftrightarrow$\,cytoplasm,
-membrane\,$\leftrightarrow$\,extracellular field). The alternative --- one set of
-generic particles carrying a \code{role} flag, driven by one mega-operator that
-branches on the role --- is precisely the spaghetti a typed graph avoids.
+membrane\,$\leftrightarrow$\,extracellular field) --- never one mega-operator
+branching on a role flag.
 
 \begin{figure}[h]
 \centering
@@ -386,7 +431,7 @@ of per-domain code.
 \toprule
 \textbf{Concept} & \textbf{Set/operator term} & \textbf{Symbol} & \textbf{Code} \\
 \midrule
-collection of like nodes & set (level)          & $S_k$                       & \code{Level} \\
+collection of like nodes & set (a sort)         & $S_\alpha$                  & \code{Level} \\
 a single node            & element              & $x\in S_k$                  & row of \code{Level.state} \\
 learnable per-node code  & embedding            & $a_i$                       & \code{Level.embedding} \\
 containment              & parent map (by name) & $\pi_{A\to B}\!:\!S_A\!\to\!S_B$& \code{.parent}, \code{.parent\_name} \\
