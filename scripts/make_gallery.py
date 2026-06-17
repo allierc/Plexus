@@ -85,14 +85,23 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
 }
 
 
-def transcode(src: str, dst: str) -> bool:
-    """GIF/mp4 -> small looping mp4 (≤460px wide, 20 fps, H.264)."""
+# clips whose motion reads too fast -> stretch playback time by this factor
+SLOW: dict[str, float] = {
+    "ns_rayleigh_benard": 2.0,
+    "ns_rayleigh_taylor": 2.0,
+}
+
+
+def transcode(src: str, dst: str, slow: float = 1.0) -> bool:
+    """GIF/mp4 -> small looping mp4 (≤460px wide, 20 fps, H.264). `slow`>1 stretches
+    playback time (2.0 = half speed) via setpts before the fps resample."""
     if not os.path.exists(src):
         print(f"  skip (missing): {src}")
         return False
+    vf = (f"setpts={slow}*PTS," if slow != 1.0 else "") + "fps=20,scale='min(460,iw)':-2:flags=lanczos"
     cmd = [FFMPEG, "-y", "-loglevel", "error", "-i", src, "-an",
            "-movflags", "+faststart", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "30",
-           "-vf", "fps=20,scale='min(460,iw)':-2:flags=lanczos", dst]
+           "-vf", vf, dst]
     subprocess.run(cmd, check=True)
     return True
 
@@ -152,7 +161,7 @@ def main():
         cards = []
         for name, src, spec, cap in sims:
             dst = f"{OUT}/{name}.mp4"
-            if transcode(src, dst):
+            if transcode(src, dst, SLOW.get(name, 1.0)):
                 cards.append(card(name, dst, spec, cap))
                 print(f"  ok: {name}  ({os.path.getsize(dst)//1024} KB)")
         if cards:
