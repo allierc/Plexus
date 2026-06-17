@@ -8,42 +8,36 @@ a small algebra of **operators** that move state between them. This is the
 missing primitive: the place where particle mechanics, cellular interaction,
 neural dynamics, and reaction networks all become the same kind of thing.
 
-## Two entities: sets and fields
+## Two entities: typed sets and fields
 
-A **set** $S_k$ is a discrete collection of like entities at scale $k$ —
-metabolites, particles, cells, populations, organisms. Adjacent scales are linked
-by **parent maps**
+A **typed set** $S_\alpha$ is a discrete collection of entities of one biological
+*sort*: membrane particles, cytoplasmic particles, nuclei, metabolites, cells,
+populations, or organisms. Each sort has its own state schema and its own
+admissible operators. Typed sets are connected by **parent maps**
 
-$$\pi_k : S_k \longrightarrow S_{k+1},$$
+$$\pi_{\alpha\to\beta} : S_\alpha \longrightarrow S_\beta,$$
 
-where $\pi_k(x)$ is the higher-level object that contains $x$. A cell is built
-from two kinds of $S_0$ entity — its **particles** (mechanics) and its
-**metabolites** (chemistry) — and $\pi_0$ sends each of them to the cell it
-belongs to, so $\pi_0(x)=c$ reads *"$x$ belongs to cell $c$"*. The constituents
-of a given cell $c$ are its **fibre**, the set of everything that maps to $c$,
+which assign each entity of sort $\alpha$ to the entity of sort $\beta$ that
+contains it. Thus a cell is not a single fibre of one lower-level set, but a
+*bundle of fibres*: membrane particles, cytoplasmic particles, nuclei,
+metabolites, and other child sets that all map to the same parent cell. The next
+section makes this containment graph precise.
 
-$$\pi_0^{-1}(c)=\{\,x\in S_0 : \pi_0(x)=c\,\},$$
-
-so a cell simply *is* the collection of its particles and metabolites.
-
-![The containment hierarchy: the parent map $\pi_k$ sends each entity to the object that contains it. A cell is the fibre $\pi_0^{-1}(c)$ — its particles and metabolites.](figures/fig_hier.png){width=58%}
+![Containment across scales: each parent map $\pi$ sends an entity to the one that contains it. A cell is a *bundle* of fibres — here its particles and metabolites; in general also its membrane, nucleus, and other child sets.](figures/fig_hier.png){width=58%}
 
 A **field** $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its own
-grid — morphogen concentration, pressure, substrate stiffness. Fields are *not*
-part of the containment hierarchy: they neither contain nor are contained by
-cells. Instead, each field is bound to exactly one set level through an
-**exchange** relation (particle–grid transfer, cell sampling, or population-level
-secretion and sensing); these couplings are the operators below.
+grid — morphogen concentration, pressure, substrate stiffness, or extracellular
+chemical concentration. Fields are *not* part of the containment graph: they do not
+contain cells, and cells do not contain fields. Instead, each field is coupled to
+one or more typed sets through **exchange** operators — secretion, sensing,
+particle–grid transfer, or field sampling.
 
 ## A typed containment graph
 
-The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition — and the place to start —
-but read literally it over-constrains in two ways: it assumes each scale has *one*
-child type, and it treats every entity as an element of one big set, told apart
-only by a label. A real cell is neither: it is a container of many *different
-kinds* of set at once — a membrane, a cytoplasm, a nucleus, organelles, molecules —
-each with its own state space and operators. So we make two moves: from one set to
-a *family* of typed sets, and from a chain to a graph.
+Above we named entities by their sort and joined them with parent maps; here is the
+formalism. Two ideas make it precise, and they are what keep the code free of
+branching: the sets form a *family* indexed by sort, and the parent maps form a
+*graph* rather than a chain.
 
 **A family of typed sets.** Rather than one set $S_0$ with a type function
 $\tau:S_0\to\{\text{membrane},\dots\}$, we take a family

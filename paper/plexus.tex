@@ -58,31 +58,32 @@ lessons that follow for how to construct the repository.
 \part*{Part I --- The abstraction}
 \addcontentsline{toc}{section}{Part I --- The abstraction}
 
-\section{Two entities: sets and fields}
+\section{Two entities: typed sets and fields}
+\label{sec:entities}
 
-The container is built from two kinds of object: \textbf{sets} and \textbf{fields}.
-A \textbf{set} $S_k$ is a discrete collection of like entities at scale $k$ ---
-metabolites, particles, cells, populations, organisms (Fig.~\ref{fig:hier}).
-Adjacent scales are linked by \textbf{parent maps}
+The container is built from two kinds of object: \textbf{typed sets} and
+\textbf{fields}. A typed set $S_\alpha$ is a discrete collection of entities of one
+biological \emph{sort}: membrane particles, cytoplasmic particles, nuclei,
+metabolites, cells, populations, or organisms (Fig.~\ref{fig:hier}). Each sort has
+its own state schema and its own admissible operators.
+
+Typed sets are connected by \textbf{parent maps}
 \[
-  \pi_k : S_k \longrightarrow S_{k+1},
+  \pi_{\alpha\to\beta}: S_\alpha \longrightarrow S_\beta,
 \]
-where $\pi_k(x)$ is the higher-level object that contains $x$. A cell is built from
-two kinds of $S_0$ entity --- its \textbf{particles} (mechanics) and its
-\textbf{metabolites} (chemistry) --- and $\pi_0$ sends each of them to the cell it
-belongs to, so $\pi_0(x)=c$ reads ``$x$ belongs to cell $c$''. The constituents of a
-given cell $c$ are its \emph{fibre}, the set of everything that maps to $c$,
-\[
-  \pi_0^{-1}(c)=\{\,x\in S_0 : \pi_0(x)=c\,\},
-\]
-so a cell simply \emph{is} the collection of its particles and metabolites.
+which assign each entity of sort $\alpha$ to the entity of sort $\beta$ that
+contains it. Thus a cell is not a single fibre of one lower-level set, but a
+\emph{bundle of fibres}: membrane particles, cytoplasmic particles, nuclei,
+metabolites, and other child sets that all map to the same parent cell. The next
+section makes this containment graph precise.
+
 A \textbf{field} $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its
-own grid --- morphogen concentration, pressure, substrate stiffness, and so on.
-Fields are \emph{not} part of the containment hierarchy: they neither contain nor
-are contained by cells. Instead, each field is bound to exactly one set level
-through an \emph{exchange} relation (particle--grid transfer, cell sampling, or
-population-level secretion and sensing); these couplings are the operators of
-Section~\ref{sec:operators}.
+own grid --- morphogen concentration, pressure, substrate stiffness, or
+extracellular chemical concentration. Fields are \emph{not} part of the containment
+graph: they do not contain cells, and cells do not contain fields. Instead, each
+field is coupled to one or more typed sets through \emph{exchange} operators ---
+secretion, sensing, particle--grid transfer, or field sampling
+(Section~\ref{sec:operators}).
 
 \begin{figure}[h]
 \centering
@@ -103,23 +104,20 @@ Section~\ref{sec:operators}.
 \draw[cont] (cell) -- node[right,font=\scriptsize,pos=0.5]{$\pi_1$} (pop);
 \draw[cont] (pop)  -- node[right,font=\scriptsize,pos=0.5]{$\pi_2$} (org);
 \end{tikzpicture}
-\caption{The containment hierarchy: the parent map $\pi_k$ sends each entity to the
-object that contains it. A cell is the fibre $\pi_0^{-1}(c)$ --- its particles and
-metabolites.}
+\caption{Containment across scales: each parent map $\pi$ sends an entity to the one
+that contains it. A cell is a \emph{bundle} of fibres --- here its particles and
+metabolites; in general also its membrane, nucleus, and other child sets
+(Section~\ref{sec:graph}).}
 \label{fig:hier}
 \end{figure}
 
 \section{A typed containment graph}
 \label{sec:graph}
 
-The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition --- and the place to start
---- but read literally it over-constrains in two ways: it assumes each scale has
-\emph{one} child type, and it treats every entity as an element of one big set,
-told apart only by a label. A real cell is neither: it is a container of many
-\emph{different kinds} of set at once --- a membrane, a cytoplasm, a nucleus,
-organelles, molecules --- each with its own state space and its own operators. So
-we make two moves: from one set to a \emph{family} of typed sets, and from a chain
-to a graph.
+Section~\ref{sec:entities} named entities by their sort and joined them with parent
+maps. Two ideas make that precise, and they are what keep the code free of
+branching: the sets form a \emph{family} indexed by sort, and the parent maps form
+a \emph{graph} rather than a chain.
 
 \paragraph{A family of typed sets.} Rather than one set $S_0$ with a type function
 $\tau:S_0\to\{\text{membrane},\text{nucleus},\dots\}$, we take a family
