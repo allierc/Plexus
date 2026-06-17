@@ -1,0 +1,16 @@
+# Vicsek self-propelled particles -- the microscopic model behind the_well/active_matter
+# (whose stored continuum coarse-grains exactly this). SET half of Plexus: a particle
+# Level + a rewired radius graph (Rewire) + an alignment Lateral operator, the SAME
+# machinery the water particles used. Only the spec changes between regimes.
+# moderate noise -> swirling mesoscale flow (active turbulence)
+name: am_swirl
+seed: 3
+n_frames: 600
+record_every: 3
+world: 1.0
+sets:
+  active: {n: 4000}
+operators:
+  - {op: radius_graph, at: active, radius: 0.05}
+  - {op: active_matter, at: active, v0: 0.014, noise: 0.10}
+schedule: [radius_graph, active_matter]

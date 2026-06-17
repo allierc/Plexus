@@ -1,0 +1,16 @@
+# Acoustic focusing: a single slow (high-rho) disc acts as a converging lens for a
+# plane-ish pulse. Heterogeneous-medium wave propagation (the_well acoustic family).
+name: wave_lens
+seed: 3
+n_frames: 520
+record_every: 4
+world: 1.0
+fields:
+  acoustic: {frame: grid, res: 256, channels: 3, bc_x: wall, bc_y: open}
+init:
+  acoustic:
+    rho: {kind: lens, cx: 0.5, cy: 0.62, r: 0.16, rho: 7.0}
+    p: {seed: rings, n: 1}
+operators:
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 6, sponge: 0.12}
+schedule: [wave_acoustic]

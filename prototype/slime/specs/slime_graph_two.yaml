@@ -1,0 +1,20 @@
+# slime_graph_two -- two repelling species, with a PER-SPECIES trail_graph: one
+# coloured node+edge graph per channel, overlaid on the two-colour trail.
+general: {name: slime_graph_two, seed: 0, n_frames: 420, record_every: 6, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      a: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.5, decay: 0.03, diffuse: 0.28, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+- {op: trail_graph, at: cell, from: trail, n_nodes: 700, radius: 0.025, thresh: 0.06, edge_min: 0.015, per_species: true}
+schedule: [slime, trail.diffuse, trail_graph]
+plotting:
+  colors: {a: [0.20, 0.95, 0.65], b: [1.00, 0.35, 0.45]}
+  background: black
+  gamma: 0.7

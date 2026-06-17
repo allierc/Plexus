@@ -1,0 +1,29 @@
+# MIX: four-species SLIME (Physarum) + ACTIVE-MATTER alignment, PAIRED trail affinity.
+# Four particle types, each laying its own trail channel. The affinity matrix W[s,:]
+# sets which trails a species follows: pairs (0,1) and (2,3) share trails, the two
+# pairs repel -> four types running two coupled transport NETWORKS.
+#   trail_diffuse -> 4-channel pheromone field self-update (diffuse + evaporate)   FIELD
+#   radius_graph  -> neighbour relation for the alignment term                     REWIRE
+#   slime         -> sense weighted trail (3 sensors) + Vicsek alignment + move +  EXCHANGE
+#                    deposit. The Jones/Lague steer builds networks; the alignment
+#                    term IS the active-matter half, fused on the shared heading.
+name: mix_slime4
+seed: 0
+n_frames: 560
+record_every: 3
+world: 1.0
+fields:
+  trail: {frame: grid, res: 200, channels: 4, bc: periodic}
+sets:
+  active: {n: 8000, species: 4}
+operators:
+  - {op: trail_diffuse, at: trail, D: 0.13, decay: 0.04, substeps: 1}
+  - {op: radius_graph, at: active, radius: 0.02}
+  - {op: slime, at: active, from_field: trail, to_field: trail, v0: 0.004,
+     turn: 0.5, sensor_angle: 24, sensor_dist: 0.022, align: 0.10, noise: 0.06,
+     amount: 0.05, cap: 1.0,
+     affinity: [[1.0, 0.9, -0.5, -0.5],
+                [0.9, 1.0, -0.5, -0.5],
+                [-0.5, -0.5, 1.0, 0.9],
+                [-0.5, -0.5, 0.9, 1.0]]}
+schedule: [trail_diffuse, radius_graph, slime]

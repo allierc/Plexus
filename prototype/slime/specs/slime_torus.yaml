@@ -1,0 +1,19 @@
+# slime_torus -- periodic (wrap-around) boundary: an endless, seamless network with
+# no walls to reflect off. Tests the engine's periodic boundary path.
+general: {name: slime_torus, seed: 0, n_frames: 400, record_every: 4, boundary: periodic}
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.9, decay: 0.012, diffuse: 0.35, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

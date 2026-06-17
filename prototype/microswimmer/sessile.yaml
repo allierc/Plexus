@@ -1,0 +1,25 @@
+# A sessile (attached) ciliate: anchored sphere whose cilia drive a feeding current
+# over a 50%-coverage mouth cap. Reproduces the sessile column of the paper's
+# flow + concentration figures (Liu, Costello & Kanso, Nat Commun 2025).
+name: sessile
+seed: 0
+n_frames: 120
+record_every: 2
+dt: 1.0
+world: 1.0
+sets:
+  organism:
+    n: 1
+    radius: 0.14
+    n_mode: 40
+    types:
+      sessile: {fraction: 1.0, lifestyle: sessile, feeding_area: 0.2}
+  surface_node: {parent: organism, per_parent: 240, role: membrane}
+fields:
+  flow:     {kind: flow, res: 160, couples_to: organism}
+  chemical: {kind: chemical, res: 160, couples_to: surface_node, diffusion: 0.06, peclet: 100.0, c_inf: 1.0}
+operators:
+  - {op: squirmer_flow, at: organism, to: flow, frame: body}
+  - {op: slip,    at: surface_node}
+  - {op: absorb,  at: "surface_node[type=mouth]", from: chemical, rate: 1.0}
+schedule: [squirmer_flow, slip, absorb, chemical.diffuse]

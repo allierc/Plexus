@@ -1,0 +1,18 @@
+# Gray-Scott reaction-diffusion -- worms regime.
+# the_well/gray_scott_reaction_diffusion (Ohana et al., NeurIPS 2024). One FIELD
+# self-update operator; only (f,k) and the initial condition change vs the others.
+# Worms: elongating, branching filaments.
+name: rd_worms
+seed: 0
+n_frames: 7000
+record_every: 70
+world: 1.0
+fields:
+  chem: {frame: grid, res: 128, channels: 2, bc: periodic}
+init:
+  chem:
+    A: 1.0
+    B: {seed: clusters, n: 30, radius: 2.0, value: 1.0}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, Da: 0.16, Db: 0.08, substeps: 12}
+schedule: [reaction_diffusion]

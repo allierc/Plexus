@@ -1,0 +1,19 @@
+# slime_coarse -- long sensor reach -> few large transport cells (coarse network).
+general: {name: slime_coarse, seed: 0, n_frames: 400, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a: {fraction: 1.0, move_speed: 0.008, turn_speed: 0.4, sensor_angle: 22, sensor_dist: 0.05, sensor_size: 2}
+fields:
+  trail: {frame: trail, res: 200, deposit: 0.9, decay: 0.008, diffuse: 0.4, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

@@ -21,7 +21,7 @@ from plexus.models.registry import register_field
 class GridField(Field):
     def __init__(self, name, couples_to, res=96, diffusion=0.1, decay=0.0,
                  dt=0.05, device="cpu", walls=None, source=None, source_rate=0.0,
-                 periodic=False, width=1.0, sink=None):
+                 periodic=False, width=1.0):
         super().__init__(name, couples_to)
         self.width = float(width)
         self.ny = int(res)
@@ -38,11 +38,6 @@ class GridField(Field):
         self.register_buffer("walls", walls if walls is not None
                              else torch.zeros(self.nx, self.ny, dtype=torch.bool, device=device))
         self.register_buffer("source", source if source is not None
-                             else torch.zeros(self.nx, self.ny, dtype=torch.bool, device=device))
-        # absorbing region (Dirichlet c=0): mirror of `source`. With a source at one pole
-        # and a sink at another, the steady field is a harmonic source->sink potential,
-        # monotone along the corridor between them (clean navigation, routes around walls).
-        self.register_buffer("sink", sink if sink is not None
                              else torch.zeros(self.nx, self.ny, dtype=torch.bool, device=device))
 
     def equilibrate(self, n):                              # pre-solve a steady gradient
@@ -109,5 +104,4 @@ class GridField(Field):
         if self.source_rate > 0:
             g = g + self.dt * self.source_rate * self.source.float()
         g = torch.where(w, torch.zeros_like(g), g)          # walls hold no chemical
-        g = torch.where(self.sink, torch.zeros_like(g), g)  # absorbing sink (Dirichlet c=0)
         self.grid = g

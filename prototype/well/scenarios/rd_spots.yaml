@@ -1,0 +1,17 @@
+# Gray-Scott reaction-diffusion -- "spots" regime.
+# the_well/gray_scott_reaction_diffusion (Ohana et al., NeurIPS 2024).
+# A single FIELD self-update operator (reaction_diffusion) on a 2-channel grid.
+name: rd_spots
+seed: 0
+n_frames: 4000
+record_every: 40
+world: 1.0
+fields:
+  chem: {frame: grid, res: 128, channels: 2, bc: periodic}
+init:
+  chem:
+    A: 1.0
+    B: {seed: clusters, n: 30, radius: 2.0, value: 1.0}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.030, k: 0.062, Da: 0.16, Db: 0.08, substeps: 12}
+schedule: [reaction_diffusion]

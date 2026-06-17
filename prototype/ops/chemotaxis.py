@@ -25,12 +25,19 @@ class SecreteOperator(Exchange):
         super().__init__()
         self.rate = float(params.get("rate", 1.0))
         self.field_name = params.get("to")
+        # optional recency-discounted deposit (ant recruitment): if runout>0, a cell's deposit
+        # fades linearly to 0 over `runout` ticks since it last left a goal (read from the
+        # clock the `forage` operator maintains as cell.t_since_goal). Default 0 -> constant rate.
+        self.runout = float(params.get("runout", 0.0))
 
     def forward(self, H, mask=None):
         cell = H.level("cell")
         pos = cell.state[:, :2]
         fld = H.fields[self.field_name]
         amount = torch.full((pos.shape[0],), self.rate * fld.dt, device=pos.device)
+        if self.runout > 0 and hasattr(cell, "t_since_goal"):
+            recency = (1.0 - cell.t_since_goal / self.runout).clamp(min=0.0, max=1.0)
+            amount = amount * recency
         if mask is not None:
             amount = amount * mask.float()
         fld.scatter(pos, amount)                  # side effect on the field

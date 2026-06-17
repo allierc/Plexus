@@ -1,0 +1,17 @@
+# Acoustic scattering across a single DISCONTINUOUS interface (two half-spaces of
+# different density). the_well/acoustic_scattering_discontinuous. A pressure pulse
+# launched in the light half partially reflects / refracts at the jump.
+name: wave_split
+seed: 2
+n_frames: 600
+record_every: 4
+world: 1.0
+fields:
+  acoustic: {frame: grid, res: 256, channels: 3, bc_x: wall, bc_y: open}
+init:
+  acoustic:
+    rho: {kind: split, lo: 1.0, hi: 6.0}
+    p: {seed: rings, n: 2}
+operators:
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 6, sponge: 0.12}
+schedule: [wave_acoustic]

@@ -1,0 +1,22 @@
+# slime_two_attract -- TWO species, cross=+1: each is attracted to BOTH channels, so
+# the two slimes co-align and share one network (contrast with two_repel: only the
+# `cross` sign differs). Shows the inter-type coupling sign is a single lever.
+general: {name: slime_two_attract, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      a: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.5, decay: 0.03, diffuse: 0.28, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: 1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7

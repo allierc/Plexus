@@ -25,7 +25,7 @@ _OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torc
 
 def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
                    nx, ny, dx, inv_dx, dt, p_vol, drag, walls_flat, vmax_user, periodic, width,
-                   wall_damp, wall_contact, liquid_mask, snow_mask, Jp):
+                   wall_damp, wall_contact, liquid_mask, snow_mask, Jp, surf):
     """One MLS-MPM substep. All tensors batched over particles. Pure -> compilable.
     Grid is [nx, ny] of square cells (dx); the world is [0,width]x[0,1]."""
     N = X.shape[0]
@@ -72,7 +72,8 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     FmR = F - R
     stress = 2 * mu_e[:, None, None] * (FmR @ F.transpose(-2, -1)) \
         + eye * (la_e * J * (J - 1))[:, None, None]
-    stress = (-dt * p_vol * 4 * inv_dx * inv_dx) * stress
+    pv = p_vol[:, None, None] if torch.is_tensor(p_vol) else p_vol
+    stress = (-dt * 4 * inv_dx * inv_dx) * pv * stress
     affine = stress + mass[:, None, None] * C
 
     # --- P2G ---
@@ -100,6 +101,28 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
 
     # grid velocity
     gv = grid_mv / grid_m.clamp(min=1e-10)[:, None]
+
+    if surf > 0.0 and liquid_mask is not None:        # SURFACE TENSION as a CSF (continuum surface force):
+        # 1) liquid colour field c on the grid (scatter liquid mass via the same P2G weights)
+        lw = (weight * (mass * liquid_mask.to(mass.dtype))[:, None]).reshape(-1)
+        c = torch.zeros(nx * ny, device=X.device).index_add_(0, flat, lw).view(nx, ny)
+        # 2) normal n = grad(c)/|grad(c)|  (central differences in physical units)
+        cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
+        cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
+        gmag = torch.sqrt(cx * cx + cy * cy)
+        eps = 1e-6
+        nxg, nyg = cx / (gmag + eps), cy / (gmag + eps)
+        # 3) curvature kappa = -div(n)
+        kappa = -((torch.roll(nxg, -1, 0) - torch.roll(nxg, 1, 0)) * (0.5 * inv_dx)
+                  + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
+        # 4) surface force density f = surf * kappa * grad(c)  (acts only where |grad c|>0: the interface)
+        fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+        stfx = (surf * kappa * cx * fmask).view(-1)        # surface-tension force, x (not the P2G fx!)
+        stfy = (surf * kappa * cy * fmask).view(-1)
+        # 5) apply as grid acceleration a = f * cell_area / grid_mass, carried to particles by G2P
+        inv_m = (dx * dx) / grid_m.clamp(min=1e-8)
+        gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
+
     if not periodic:                                  # reflective domain walls (toroidal otherwise)
         gv = gv.view(nx, ny, 2)
         ix = torch.arange(nx, device=X.device); iy = torch.arange(ny, device=X.device); bnd = 3
@@ -107,7 +130,21 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
         loy, hiy = iy < bnd, iy > ny - bnd
         gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
         gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
+        if wall_damp != 1.0:                          # tangential wall FRICTION (kills wall jets), but
+            # at SIDE walls damp only UPWARD flow -> jets die yet gravity still drains stuck droplets down
+            gl = gv[lox, :, 1]; gv[lox, :, 1] = torch.where(gl > 0, gl * wall_damp, gl)
+            gh = gv[hix, :, 1]; gv[hix, :, 1] = torch.where(gh > 0, gh * wall_damp, gh)
+            gv[:, loy, 0] = gv[:, loy, 0] * wall_damp   # floor/ceiling: horizontal tangential (symmetric ok)
+            gv[:, hiy, 0] = gv[:, hiy, 0] * wall_damp
         gv = gv.view(nx * ny, 2)
+    if wall_damp != 1.0 and walls_flat.any():     # friction in the fluid cells touching any INTERIOR
+        w2 = walls_flat.view(nx, ny)              # obstacle wall (general: works for any obstacle shape)
+        near = (torch.roll(w2, 1, 0) | torch.roll(w2, -1, 0)
+                | torch.roll(w2, 1, 1) | torch.roll(w2, -1, 1)) & ~w2
+        gvv = gv.view(nx, ny, 2); gx = gvv[..., 0]; gy = gvv[..., 1]
+        gvv[..., 0] = torch.where(near, gx * wall_damp, gx)              # horizontal: full friction
+        gvv[..., 1] = torch.where(near & (gy > 0), gy * wall_damp, gy)   # vertical: damp only upward -> gravity drains
+        gv = gvv.view(nx * ny, 2)
     gv = torch.where(walls_flat[:, None], torch.zeros_like(gv), gv)   # interior wall BC
 
     # --- G2P ---
@@ -119,10 +156,12 @@ def mlsmpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
     # robustness: bound velocity (CFL) and sanitize NaN/inf so a bad design can't
     # poison the CUDA context -- it just produces a poor (low-food) trajectory.
     new_V = torch.nan_to_num(new_V)
-    if wall_damp != 1.0 and not periodic:            # inelastic walls: bleed kinetic energy from
-        cb = wall_contact                            # the layer of material in contact with a wall
+    if wall_damp != 1.0 and not periodic:            # inelastic walls: bleed kinetic energy from the
+        cb = wall_contact                            # SOLID layer in contact with a wall (bounce restitution)
         near = ((X[:, 0] < cb) | (X[:, 0] > width - cb)
                 | (X[:, 1] < cb) | (X[:, 1] > 1.0 - cb))
+        if liquid_mask is not None:                  # liquids are handled by the asymmetric grid wall
+            near = near & ~liquid_mask               # friction -> don't pin them here (else they can't drain)
         new_V = torch.where(near[:, None], new_V * wall_damp, new_V)
     sp = new_V.norm(dim=1, keepdim=True).clamp(min=1e-9)
     vmax = min(vmax_user, 0.4 * dx / dt)             # user cap, never above CFL
@@ -187,21 +226,14 @@ class MPMOperator(Exchange):
             snow = None                                    # no snow -> skip the SVD plasticity branch
         Jp = getattr(p, "Jp", None)
 
-        if self.surface_tension > 0 and liquid is not None:   # SURFACE TENSION (cohesion) for liquid particles:
-            pos = p.state[:, :2]                              # pull each liquid particle toward its local
-            pl = pos[liquid]                                  # neighbourhood COM. Interior -> ~0; surface -> inward.
-            if pl.shape[0] > 1:
-                dmat = torch.cdist(pl, pl)
-                nb = (dmat < 3.0 * self.dx).float()           # neighbours within 3*dx (includes self)
-                com = (nb @ pl) / nb.sum(1, keepdim=True).clamp(min=1.0)
-                st = torch.zeros_like(pos)
-                st[liquid] = self.surface_tension * (com - pl)
-                a_ext = a_ext + st
+        # surface tension is injected as a proper CSF (continuum surface force) on the grid
+        # inside the substep (see mlsmpm_substep); pass the coefficient through.
+        surf = self.surface_tension if (self.surface_tension > 0 and liquid is not None) else 0.0
         for _ in range(self.substeps):
             X, V, C, F, Jp = fn(X, V, C, F, p.mass, p.mu, p.la, a_ext, offsets,
                                 nx, ny, self.dx, self.inv_dx, self.dt_sub, p.p_vol, self.drag, walls,
                                 self.vmax, periodic, width, self.wall_damp, self.wall_contact,
-                                liquid, snow, Jp)
+                                liquid, snow, Jp, surf)
         p.state = torch.cat([X, V], dim=1)
         p.C, p.F = C, F
         if Jp is not None:

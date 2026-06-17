@@ -1,0 +1,17 @@
+# MIX (2 families): same worms morphogen, but NEGATIVE chemotaxis gain -> particles
+# FLEE the ridges and pack into the valleys (one sign flip in the spec, opposite behaviour).
+name: mix_avoid
+seed: 1
+n_frames: 600
+record_every: 3
+world: 1.0
+fields: {chem: {frame: grid, res: 128, channels: 2, bc: periodic}}
+sets: {active: {n: 3000}}
+init:
+  chem: {A: 1.0, B: {seed: clusters, n: 18, radius: 2.0, value: 1.0}}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, substeps: 12}
+  - {op: radius_graph, at: active, radius: 0.05}
+  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
+  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: -0.0022}
+schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]

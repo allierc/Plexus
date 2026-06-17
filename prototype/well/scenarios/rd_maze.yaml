@@ -1,0 +1,18 @@
+# Gray-Scott reaction-diffusion -- maze regime.
+# the_well/gray_scott_reaction_diffusion (Ohana et al., NeurIPS 2024). One FIELD
+# self-update operator; only (f,k) and the initial condition change vs the others.
+# Maze: labyrinthine stripes (Turing).
+name: rd_maze
+seed: 0
+n_frames: 9000
+record_every: 90
+world: 1.0
+fields:
+  chem: {frame: grid, res: 128, channels: 2, bc: periodic}
+init:
+  chem:
+    A: 1.0
+    B: {seed: fourier, kmax: 8, thresh: 0.55, value: 1.0}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.029, k: 0.057, Da: 0.16, Db: 0.08, substeps: 12}
+schedule: [reaction_diffusion]

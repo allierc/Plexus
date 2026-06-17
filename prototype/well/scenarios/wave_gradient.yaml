@@ -1,0 +1,16 @@
+# Acoustic refraction in a smooth vertical density gradient -- ray bending, like
+# sound in a thermocline. Heterogeneous-medium wave (the_well acoustic family).
+name: wave_gradient
+seed: 4
+n_frames: 600
+record_every: 4
+world: 1.0
+fields:
+  acoustic: {frame: grid, res: 256, channels: 3, bc_x: wall, bc_y: open}
+init:
+  acoustic:
+    rho: {kind: gradient, lo: 1.0, hi: 8.0}
+    p: {seed: rings, n: 2}
+operators:
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 6, sponge: 0.12}
+schedule: [wave_acoustic]

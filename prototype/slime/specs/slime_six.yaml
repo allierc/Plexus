@@ -1,0 +1,30 @@
+# slime_six -- SIX mutually-repelling species (cross=-1): six colour territories.
+# More channels overlap (and additive-blend toward white) faster, so deposit drops
+# and decay rises vs four to keep the field below saturation and the colours distinct.
+general: {name: slime_six, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      e: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      f: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.38, decay: 0.042, diffuse: 0.25, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.20, 0.95, 0.65]
+    b: [1.00, 0.35, 0.45]
+    c: [0.40, 0.65, 1.00]
+    d: [1.00, 0.85, 0.30]
+    e: [0.95, 0.40, 0.95]
+    f: [1.00, 0.60, 0.20]
+  background: black
+  gamma: 0.7

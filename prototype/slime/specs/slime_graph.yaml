@@ -1,0 +1,21 @@
+# slime_graph -- the canonical single-species network, with a `trail_graph` STRUCTURE
+# operator (Rewire) that extracts a node+edge graph approximating the slime network
+# each tick (no state delta -- it builds a scaffold). Rendered overlaid on the trail.
+general: {name: slime_graph, seed: 0, n_frames: 400, record_every: 6, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.30
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.012, diffuse: 0.35, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+- {op: trail_graph, at: cell, from: trail, n_nodes: 1400, radius: 0.02, thresh: 0.08, edge_min: 0.03, edge_k: 6}
+schedule: [slime, trail.diffuse, trail_graph]
+plotting:
+  colors: {a: [0.20, 0.95, 0.65]}
+  background: black
+  gamma: 0.7

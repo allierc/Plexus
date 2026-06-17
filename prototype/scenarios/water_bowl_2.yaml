@@ -1,0 +1,27 @@
+name: water_bowl_2
+seed: 0
+n_frames: 1300
+record_every: 5
+boundary: wall
+obstacles:
+  - [0.00, 0.0, 0.12, 0.50]
+  - [0.12, 0.0, 0.24, 0.38]
+  - [0.24, 0.0, 0.36, 0.27]
+  - [0.36, 0.0, 0.44, 0.18]
+  - [0.56, 0.0, 0.64, 0.18]
+  - [0.64, 0.0, 0.76, 0.27]
+  - [0.76, 0.0, 0.88, 0.38]
+  - [0.88, 0.0, 1.00, 0.50]
+sets:
+  cell:
+    n: 1
+    start: [0.50, 0.56, 0.50, 0.56]
+    types:
+      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 7000, radius: 0.22, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.35, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 16.0}
+schedule: [aggregate, gravity, mpm]

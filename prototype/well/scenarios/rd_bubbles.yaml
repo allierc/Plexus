@@ -1,0 +1,18 @@
+# Gray-Scott reaction-diffusion -- bubbles regime.
+# the_well/gray_scott_reaction_diffusion (Ohana et al., NeurIPS 2024). One FIELD
+# self-update operator; only (f,k) and the initial condition change vs the others.
+# Bubbles: coarsening cellular foam.
+name: rd_bubbles
+seed: 0
+n_frames: 4000
+record_every: 40
+world: 1.0
+fields:
+  chem: {frame: grid, res: 128, channels: 2, bc: periodic}
+init:
+  chem:
+    A: 1.0
+    B: {seed: clusters, n: 40, radius: 2.0, value: 1.0}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.098, k: 0.057, Da: 0.16, Db: 0.08, substeps: 12}
+schedule: [reaction_diffusion]

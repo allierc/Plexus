@@ -1,0 +1,19 @@
+# slime_fine -- short sensor reach + low diffusion -> a fine, dense capillary mesh.
+general: {name: slime_fine, seed: 0, n_frames: 400, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 16000
+    spawn: disc
+    spawn_radius: 0.32
+    types:
+      a: {fraction: 1.0, move_speed: 0.004, turn_speed: 0.5, sensor_angle: 26, sensor_dist: 0.012, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 260, deposit: 0.9, decay: 0.018, diffuse: 0.15, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

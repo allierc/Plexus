@@ -1,0 +1,14 @@
+=== flow ===
+  flow_sessile       max|u|=1.219
+  flow_motile_body   max|u|=1.278
+  flow_motile_lab    max|u|=0.991
+=== pe ===
+  flow_motile_body   max|u|=1.278
+  flow_motile_lab    max|u|=0.991
+  pe_000  Sh=1.000  rate= 139.18  c_min=0.388
+  pe_010  Sh=1.027  rate= 142.90  c_min=0.418
+  pe_030  Sh=1.095  rate= 152.42  c_min=0.472
+  pe_060  Sh=1.173  rate= 163.19  c_min=0.530
+  pe_120  Sh=1.268  rate= 176.54  c_min=0.605
+  pe_200  Sh=1.337  rate= 186.04  c_min=0.661
+=== cover ===

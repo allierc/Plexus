@@ -1,0 +1,19 @@
+# slime_dense -- low decay + strong deposit -> a thick, persistent, space-filling web.
+general: {name: slime_dense, seed: 0, n_frames: 400, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 16000
+    spawn: disc
+    spawn_radius: 0.34
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 30, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 220, deposit: 1.2, decay: 0.005, diffuse: 0.5, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

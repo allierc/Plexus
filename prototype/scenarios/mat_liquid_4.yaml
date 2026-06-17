@@ -1,0 +1,18 @@
+name: mat_liquid_4
+seed: 0
+n_frames: 700
+record_every: 3
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.42, 0.5, 0.42]
+    types:
+      water: {fraction: 1.0, youngs: 140, layers: [{frac: 1.0, youngs: 140, material: liquid}]}
+  particle: {parent: cell, per_parent: 6000, radius: 0.20, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 16, dt_sub: 2.0e-4, a_max: 200, drag: 0.30, wall_damp: 0.45, wall_contact: 0.06, surface_tension: 800.0}
+schedule: [aggregate, gravity, mpm]

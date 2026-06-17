@@ -1,0 +1,19 @@
+# Acoustic scattering through random density inclusions.
+# the_well/acoustic_scattering_inclusions (Ohana et al., NeurIPS 2024).
+# One FIELD self-update operator (wave_acoustic) on a 3-channel grid [p,u,v];
+# rho(x,y) = smooth background + ellipsoidal inclusions (carried as a static coeff
+# map). Reflecting x-walls, open (absorbing) y-boundary -- exactly the_well's BC.
+name: wave_inclusions
+seed: 1
+n_frames: 600
+record_every: 4
+world: 1.0
+fields:
+  acoustic: {frame: grid, res: 256, channels: 3, bc_x: wall, bc_y: open}
+init:
+  acoustic:
+    rho: {kind: inclusions, n: 10, base: 1.0}
+    p: {seed: rings, n: 3}
+operators:
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 6, sponge: 0.12}
+schedule: [wave_acoustic]

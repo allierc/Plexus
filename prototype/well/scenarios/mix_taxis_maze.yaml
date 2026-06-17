@@ -1,0 +1,16 @@
+# MIX (2 families): Gray-Scott MAZE morphogen + particles tracing its corridors.
+name: mix_taxis_maze
+seed: 3
+n_frames: 700
+record_every: 3
+world: 1.0
+fields: {chem: {frame: grid, res: 128, channels: 2, bc: periodic}}
+sets: {active: {n: 3500}}
+init:
+  chem: {A: 1.0, B: {seed: fourier, kmax: 8, thresh: 0.55, value: 1.0}}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.029, k: 0.057, substeps: 12}
+  - {op: radius_graph, at: active, radius: 0.05}
+  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
+  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: 0.0022}
+schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]

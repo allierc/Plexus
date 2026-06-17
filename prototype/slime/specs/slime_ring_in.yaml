@@ -1,0 +1,20 @@
+# slime_ring_in -- agents start on a ring pointing inward (Lague's signature spawn):
+# they rush to the centre and burst back out into a radial network.
+general: {name: slime_ring_in, seed: 0, n_frames: 450, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 15000
+    spawn: ring_in
+    spawn_radius: 0.43
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.4, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.012, diffuse: 0.35, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

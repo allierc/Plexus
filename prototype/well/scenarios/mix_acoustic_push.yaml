@@ -1,0 +1,18 @@
+# MIX (2 families): an ACOUSTIC wave + particles pushed by its pressure gradient.
+# wave_acoustic(field) + active_matter(set) coupled by the SAME chemotaxis op, just
+# pointed at the pressure channel -> expanding wavefronts herd the swarm.
+name: mix_acoustic_push
+seed: 0
+n_frames: 600
+record_every: 3
+world: 1.0
+fields: {acoustic: {frame: grid, res: 128, channels: 3, bc: periodic}}
+sets: {active: {n: 3000}}
+init:
+  acoustic: {rho: {kind: uniform, value: 1.0}, p: {seed: rings, n: 3}}
+operators:
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 4, sponge: 0.0}
+  - {op: radius_graph, at: active, radius: 0.05}
+  - {op: active_matter, at: active, v0: 0.003, noise: 0.10}
+  - {op: chemotaxis, at: active, from_field: acoustic, channel: 0, gain: -0.0010}
+schedule: [wave_acoustic, radius_graph, active_matter, chemotaxis]

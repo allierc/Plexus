@@ -1,0 +1,18 @@
+name: ph_slosh
+seed: 0
+n_frames: 1000
+record_every: 5
+boundary: wall
+sets:
+  cell:
+    n: 1
+    start: [0.5,0.2,0.5,0.2]
+    types:
+      water: {fraction: 1.0, youngs: 300, block: [0.05,0.04,0.95,0.30], layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 9000, radius: 0.30, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0, gx: 6.0, gy: -10.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.15, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 10}
+schedule: [aggregate, gravity, mpm]

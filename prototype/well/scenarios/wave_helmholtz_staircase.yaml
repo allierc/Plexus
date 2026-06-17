@@ -1,0 +1,29 @@
+# Wave scattering off a periodic STAIRCASE -> the_well/helmholtz_staircase. Reuses
+# the SAME wave_acoustic operator; only the obstacle geometry changes (spec-is-API).
+name: wave_helmholtz_staircase
+seed: 0
+n_frames: 640
+record_every: 4
+world: 1.0
+fields:
+  acoustic:
+    frame: grid
+    res: 256
+    channels: 3
+    bc_x: wall
+    bc_y: open
+    obstacles:
+    - [0.0, 0.0, 0.14285714285714285, 0.12857142857142856]
+    - [0.14285714285714285, 0.0, 0.2857142857142857, 0.2571428571428571]
+    - [0.2857142857142857, 0.0, 0.42857142857142855, 0.3857142857142857]
+    - [0.42857142857142855, 0.0, 0.5714285714285714, 0.5142857142857142]
+    - [0.5714285714285714, 0.0, 0.7142857142857143, 0.6428571428571429]
+    - [0.7142857142857143, 0.0, 0.8571428571428571, 0.7714285714285714]
+    - [0.8571428571428571, 0.0, 1.0, 0.9]
+init:
+  acoustic:
+    rho: {kind: uniform, value: 1.0}
+    p: {seed: point, cx: 0.45, cy: 0.82, r: 0.018, inten: 2.5}
+operators:
+- {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.3, substeps: 6, sponge: 0.12}
+schedule: [wave_acoustic]

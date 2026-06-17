@@ -1,0 +1,24 @@
+# Two circular water droplets placed EXACTLY TANGENT (touching at one point), in ZERO
+# GRAVITY. With surface tension ON they should fuse into a single round droplet (minimise
+# surface); the st variant uses surface_tension: 25.0. The nost control (=0) is the
+# A/B comparison: no cohesion -> they stay as two touching blobs (a dumbbell), never round.
+# Droplet centres set explicitly via start: [[x,y],...]; distance 0.22 = 2*radius -> tangent.
+name: ph_two_drops_st
+seed: 0
+n_frames: 600
+record_every: 3
+boundary: wall
+sets:
+  cell:
+    n: 2
+    start: [[0.39, 0.5], [0.61, 0.5]]
+    types:
+      a: {fraction: 0.5, youngs: 200, layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      b: {fraction: 0.5, youngs: 200, layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+  particle: {parent: cell, per_parent: 3000, radius: 0.11, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 0.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 14, dt_sub: 2.0e-4, a_max: 200, drag: 0.10, wall_damp: 1.0, surface_tension: 120.0}
+schedule: [aggregate, gravity, mpm]

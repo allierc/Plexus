@@ -1,0 +1,27 @@
+# A motile (swimming) ciliate: the sphere self-propels at U = (2/3) B_1 along its
+# axis, sweeping through the nutrient bath and leaving a depleted wake (lab frame).
+# Same registry as sessile.yaml -- only the type (lifestyle) + the swim op differ.
+name: motile
+seed: 0
+n_frames: 200
+record_every: 2
+dt: 1.0
+world: 1.6
+sets:
+  organism:
+    n: 1
+    radius: 0.12
+    n_mode: 40
+    axis: 0.0
+    types:
+      motile: {fraction: 1.0, lifestyle: motile, feeding_area: 0.5}
+  surface_node: {parent: organism, per_parent: 240, role: membrane}
+fields:
+  flow:     {kind: flow, res: 192, couples_to: organism}
+  chemical: {kind: chemical, res: 192, couples_to: surface_node, diffusion: 0.05, peclet: 120.0, c_inf: 1.0}
+operators:
+  - {op: squirmer_flow, at: organism, to: flow, frame: lab}
+  - {op: slip,   at: surface_node}
+  - {op: swim,   at: "organism[type=motile]", gain: 0.012}
+  - {op: absorb, at: "surface_node[type=mouth]", from: chemical, rate: 1.0}
+schedule: [squirmer_flow, slip, swim, absorb, chemical.diffuse]

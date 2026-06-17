@@ -1,0 +1,24 @@
+# water_vessel_2 vs _1: get rid of the water stuck on the walls. Those were cohesion-less
+# splash droplets. Fixes: (a) surface_tension=1500 so droplets are pulled back into the
+# bulk, (b) more viscosity drag 0.18->0.30 so fewer droplets are thrown, (c) stronger wall
+# friction wall_damp 0.5->0.4. Still E=300 (incompressible) so it flows and levels.
+name: water_vessel_2
+seed: 0
+n_frames: 1000
+record_every: 4
+boundary: wall
+obstacles:
+  - [0.58, 0.15, 0.64, 1.00]
+sets:
+  cell:
+    n: 1
+    start: [0.28, 0.66, 0.28, 0.66]
+    types:
+      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 6000, radius: 0.22, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.30, wall_damp: 0.4, wall_contact: 0.06, surface_tension: 1500.0}
+schedule: [aggregate, gravity, mpm]

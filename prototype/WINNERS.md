@@ -1,14 +1,10 @@
-# Foraging optimization winners (auto-indexed by forage_loop.py)
+# No-geodesic maze forager optimization winners (auto-indexed by forage_loop.py)
 
-Each row is a significantly-better design found by UCB search; the gif shows it at 40 fps with loaded cells in green.
+Objective = food brought BACK home (round-trip delivery) + speed bonus. Each row is a significantly-better design found by UCB; the gif shows it with food-carrying cells in green.
 
-| # | food delivered | motility.speed | sense.gain | mpm.drag | motility.rot | cell.youngs | mpm.a_max | particle.radius | cell.n | gif |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 120 | 40.00 | 180.00 | 2.00 | 0.30 | 550.00 | 700.00 | 0.01 | 60.00 | [initial.gif](initial.gif) |
-| 1 | 142 | 74.36 | 379.22 | 2.54 | 0.10 | 517.29 | 453.74 | 0.02 | 45.81 | [winner_1.gif](winner_1.gif) |
-| 2 | 225 | 106.32 | 253.27 | 1.25 | 0.31 | 36.43 | 598.85 | 0.01 | 88.25 | [winner_2.gif](winner_2.gif) |
-| 3 | 298 | 83.08 | 269.96 | 0.97 | 0.48 | 77.96 | 1362.49 | 0.01 | 93.24 | [winner_3.gif](winner_3.gif) |
-| 4 | 423 | 49.44 | 391.35 | 1.55 | 0.18 | 159.83 | 1437.55 | 0.01 | 105.90 | [winner_4.gif](winner_4.gif) |
-| 5 | 525 | 20.57 | 341.41 | 2.99 | 0.40 | 23.87 | 1632.80 | 0.01 | 119.58 | [winner_5.gif](winner_5.gif) |
-| 6 | 553 | 52.36 | 400.00 | 0.92 | 0.56 | 20.00 | 879.56 | 0.01 | 116.48 | [winner_6.gif](winner_6.gif) |
-| 7 | 587 | 46.50 | 341.65 | 1.70 | 0.39 | 20.00 | 988.27 | 0.01 | 120.00 | [winner_7.gif](winner_7.gif) |
+| # | food delivered | motility.speed | motility.rot | random_walk.strength | trail.turn | trail.sensor_dist | mpm.drag | cell.youngs | particle.radius | cell.n | gif |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 3.02 | 90.000 | 0.400 | 110.000 | 0.500 | 0.050 | 2.000 | 60.000 | 0.012 | 60.000 | [initial.gif](initial.gif) |
+| 1 | 8.07 | 76.511 | 0.717 | 171.896 | 0.287 | 0.059 | 1.854 | 22.132 | 0.013 | 51.662 | [winner_1.gif](winner_1.gif) |
+| 2 | 14.13 | 94.567 | 0.740 | 178.897 | 0.200 | 0.069 | 1.997 | 130.632 | 0.013 | 50.447 | [winner_2.gif](winner_2.gif) |
+| 3 | 31.37 | 140.533 | 0.501 | 47.937 | 0.267 | 0.026 | 0.333 | 30.677 | 0.012 | 59.164 | [winner_3.gif](winner_3.gif) |

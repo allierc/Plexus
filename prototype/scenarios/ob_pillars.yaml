@@ -1,0 +1,24 @@
+name: ob_pillars
+seed: 0
+n_frames: 900
+record_every: 5
+boundary: wall
+obstacles:
+  - [0.20,0.0,0.28,0.30]
+  - [0.46,0.0,0.54,0.30]
+  - [0.72,0.0,0.80,0.30]
+  - [0.33,0.0,0.41,0.16]
+  - [0.59,0.0,0.67,0.16]
+sets:
+  cell:
+    n: 1
+    start: [0.5,0.82,0.5,0.82]
+    types:
+      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 7000, radius: 0.20, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.25, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 12}
+schedule: [aggregate, gravity, mpm]

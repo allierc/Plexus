@@ -120,7 +120,11 @@ def build(sc, device="cpu"):
     ps = sc.sets["particle"]
     ppc = int(ps["per_parent"]); rad = float(ps["radius"]); rho = float(ps.get("density", 1.0))
     start_rect = cs.get("start")
-    if start_rect is not None:
+    if start_rect is not None and len(start_rect) and isinstance(start_rect[0], (list, tuple)):
+        # explicit per-cell centers: start: [[x,y], ...] (deterministic placement, tiled if fewer than Nc)
+        pts = torch.tensor([[float(p[0]), float(p[1])] for p in start_rect], device=device)
+        centers = pts[torch.arange(Nc, device=device) % pts.shape[0]]
+    elif start_rect is not None:
         # scatter cell centers uniformly in a start region (e.g. home)
         x0, y0, x1, y1 = start_rect
         centers = torch.rand(Nc, 2, generator=g, device=device)
@@ -140,6 +144,15 @@ def build(sc, device="cpu"):
     r = torch.sqrt(torch.rand(Np, generator=g, device=device)) * rad
     th = torch.rand(Np, generator=g, device=device) * 2 * math.pi
     ppos = centers[parent] + torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
+    # a type may instead FILL a rectangle (a block/pool of material, e.g. a cube of water)
+    for tid, (tname, t) in enumerate(types.items()):
+        blk = t.get("block")
+        if blk is not None:
+            bm = node_type[parent] == tid
+            nb = int(bm.sum())
+            x0, y0, x1, y1 = blk
+            u = torch.rand(nb, 2, generator=g, device=device)
+            ppos[bm] = torch.stack([x0 + u[:, 0] * (x1 - x0), y0 + u[:, 1] * (y1 - y0)], 1)
     part = Level("particle", level=0,
                  state=torch.cat([ppos, torch.zeros(Np, 2, device=device)], 1))
     part.register_buffer("parent", parent)
@@ -185,10 +198,19 @@ def build(sc, device="cpu"):
     part.register_buffer("Jp", torch.ones(Np, device=device))         # plastic volume ratio (snow hardening)
     part.register_buffer("mu", mu)
     part.register_buffer("la", la)
-    # per-particle volume = actual disc area / particles  (consistent with packing)
-    p_vol = math.pi * rad * rad / ppc
+    # per-particle volume = cell footprint area / particles. Disc cells: pi*rad^2/ppc;
+    # block cells (a pool/cube): block rectangle area / ppc -> correct density for a mix
+    # of a big water block and a small dropped ball in one scene.
+    p_vol = torch.full((Np,), math.pi * rad * rad / ppc, device=device)
+    for tid, (tname, t) in enumerate(types.items()):
+        blk = t.get("block")
+        if blk is not None:
+            x0, y0, x1, y1 = blk
+            area = abs((x1 - x0) * (y1 - y0))
+            p_vol = torch.where(node_type[parent] == tid,
+                                torch.full_like(p_vol, area / ppc), p_vol)
     part.p_vol = p_vol
-    part.register_buffer("mass", torch.full((Np,), p_vol * rho, device=device))
+    part.register_buffer("mass", p_vol * rho)
     H.add_level(part)
 
     # --- world: rectangle [0,width]x[0,1] (width>1 -> longitudinal); square grid cells ---
@@ -209,11 +231,10 @@ def build(sc, device="cpu"):
         nx = int(round(width * res))
         walls = _raster(obstacles, res, width, device) if obstacles else None
         src = _raster([f["source"]], res, width, device) if f.get("source") else None
-        snk = _raster([f["sink"]], res, width, device) if f.get("sink") else None
         fld = GridField(fname, f["couples_to"], res=res, diffusion=f["diffusion"],
                         decay=f.get("decay", 0.0), dt=dt_f, device=device,
                         walls=walls, source=src, source_rate=f.get("source_rate", 0.0),
-                        periodic=H.periodic, width=width, sink=snk)
+                        periodic=H.periodic, width=width)
         # initial fill (declared): uniform value across the open domain
         if f.get("init") is not None:
             fld.grid = torch.full((nx, res), float(f["init"]), device=device)
@@ -228,13 +249,6 @@ def build(sc, device="cpu"):
             wnp = (walls.cpu().numpy() if walls is not None else np.zeros((nx, res), bool))
             pot = _geodesic_potential(wnp, src.cpu().numpy())
             fld.grid = torch.from_numpy(pot).to(device)
-        # declarative pre-solve: run the field's own diffusion to (near) steady state
-        # before t=0, so a SELF-GENERATED (dynamic) gradient is already established at the
-        # start instead of taking thousands of ticks to crawl across the domain. Generic
-        # (any field may request it); not a geodesic -- it is the field's real PDE solution.
-        n_eq = int(f.get("equilibrate", 0))
-        if n_eq > 0:
-            fld.equilibrate(n_eq)
         H.add_field(fld)
     H.cell_accel = torch.zeros(Nc, 2, device=device)
     H.harvested = 0.0                                                     # graze objective
@@ -302,6 +316,9 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
     done = np.zeros((n_rec, cell.n), bool)
     _fg = H.fields[fld_name].grid
     fhist = np.zeros((n_rec, _fg.shape[0], _fg.shape[1]), np.float32)
+    # record EVERY field too (generic; multi-field sims like the ant colony need all of them)
+    fhist_all = {nm: np.zeros((n_rec, fl.grid.shape[0], fl.grid.shape[1]), np.float32)
+                 for nm, fl in H.fields.items()}
     delivered_t = np.zeros(n_rec, np.int32)
     finished_t = np.zeros(n_rec, np.int32)
 
@@ -327,6 +344,8 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
             done[rec] = (cell.done.cpu().numpy() if hasattr(cell, "done")
                          else np.zeros(cell.n, bool))
             fhist[rec] = H.fields[fld_name].grid.cpu().numpy()
+            for nm, fl in H.fields.items():
+                fhist_all[nm][rec] = fl.grid.cpu().numpy()
             delivered_t[rec] = getattr(H, "food_delivered", 0)
             finished_t[rec] = getattr(H, "finished", 0)
             rec += 1
@@ -337,7 +356,8 @@ def run(sc, out_path=None, device="cpu", compile_mpm=False):
                layer_id=part.layer_id.cpu().numpy() if hasattr(part, "layer_id") else None,
                is_liquid=part.is_liquid.cpu().numpy() if hasattr(part, "is_liquid") else None,
                is_snow=part.is_snow.cpu().numpy() if hasattr(part, "is_snow") else None,
-               loaded=loaded[:rec], done=done[:rec], field=fhist[:rec], type_names=cell.type_names,
+               loaded=loaded[:rec], done=done[:rec], field=fhist[:rec],
+               fields={nm: h[:rec] for nm, h in fhist_all.items()}, type_names=cell.type_names,
                food_delivered=int(getattr(H, "food_delivered", 0)),
                harvested=float(getattr(H, "harvested", 0.0)),
                finished=int(getattr(H, "finished", 0)),

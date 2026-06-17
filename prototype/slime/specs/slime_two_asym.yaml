@@ -1,0 +1,22 @@
+# slime_two_asym -- TWO species with DIFFERENT per-species settings (Unity's
+# SpeciesSettings array): green is fast + narrow-cone + low-turn (straight highways),
+# red is slow + wide-cone + high-turn (curly mats). cross=-1 keeps them apart.
+general: {name: slime_two_asym, seed: 0, n_frames: 440, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      fast: {fraction: 0.5, move_speed: 0.009, turn_speed: 0.2, sensor_angle: 16, sensor_dist: 0.04, sensor_size: 1}
+      curly: {fraction: 0.5, move_speed: 0.004, turn_speed: 0.85, sensor_angle: 42, sensor_dist: 0.022, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.5, decay: 0.03, diffuse: 0.28, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    fast: [0.2, 0.95, 0.65]
+    curly: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7
