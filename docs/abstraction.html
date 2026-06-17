@@ -20,6 +20,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -324,6 +359,7 @@ window.Quarto = {
    
   <ul>
   <li><a href="#two-entities-sets-and-fields" id="toc-two-entities-sets-and-fields" class="nav-link active" data-scroll-target="#two-entities-sets-and-fields">Two entities: sets and fields</a></li>
+  <li><a href="#a-typed-containment-graph" id="toc-a-typed-containment-graph" class="nav-link" data-scroll-target="#a-typed-containment-graph">A typed containment graph</a></li>
   <li><a href="#operators" id="toc-operators" class="nav-link" data-scroll-target="#operators">Operators</a>
   <ul class="collapse">
   <li><a href="#differentiating-division-and-death" id="toc-differentiating-division-and-death" class="nav-link" data-scroll-target="#differentiating-division-and-death">Differentiating division and death</a></li>
@@ -373,9 +409,21 @@ window.Quarto = {
 </div>
 <p>A <strong>field</strong> <span class="math inline">\(f:\Omega\to\mathbb{R}^q\)</span> is a continuous quantity defined on its own grid — morphogen concentration, pressure, substrate stiffness. Fields are <em>not</em> part of the containment hierarchy: they neither contain nor are contained by cells. Instead, each field is bound to exactly one set level through an <strong>exchange</strong> relation (particle–grid transfer, cell sampling, or population-level secretion and sensing); these couplings are the operators below.</p>
 </section>
+<section id="a-typed-containment-graph" class="level2">
+<h2 class="anchored" data-anchor-id="a-typed-containment-graph">A typed containment graph</h2>
+<p>The chain <span class="math inline">\(\pi_k:S_k\to S_{k+1}\)</span> is the right intuition, but read literally it over-constrains: it assumes each scale has <em>one</em> child type. A real cell does not — it is a container of many sets at once: a membrane, a cytoplasm, a nucleus, organelles, molecules, each with its own state, operators, and parent map. So we lift the chain to a graph. Containment is a parent map between <em>any</em> two sets, declared by naming the parent,</p>
+<p><span class="math display">\[\pi_{A\to B} : S_A \longrightarrow S_B,\]</span></p>
+<p>so a cell is not one fibre but a <strong>bundle of fibres</strong>, <span class="math inline">\(\mathrm{Cell}(c)=\{\,\pi_{A\to\mathrm{cell}}^{-1}(c) : A\in\mathrm{children}(\mathrm{cell})\,\}\)</span>. The container is a <em>typed containment graph</em> (a DAG of sets and parent maps), not a fixed scale ladder. The shift from “<em>level <span class="math inline">\(k\)</span> contains level <span class="math inline">\(k{-}1\)</span></em>” to “<em>set <span class="math inline">\(A\)</span> is contained by set <span class="math inline">\(B\)</span></em>” keeps the code clean — the engine needs only <code>Level.parent</code> and <code>Level.parent_name</code> — and keeps operators <em>typed</em> (<code>membrane_tension</code> on <code>membrane_particle</code>, <code>metabolism</code> on <code>metabolite</code>), instead of one mega-operator branching on a <code>role</code> flag. New biological structure is a new set and a parent map, never an engine change:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at">               </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">}</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">membrane_particle</span><span class="kw">:</span><span class="at">  </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">64</span><span class="kw">,</span><span class="at">  </span><span class="fu">role</span><span class="kw">:</span><span class="at"> membrane</span><span class="kw">}</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cytoplasm_particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">200</span><span class="kw">,</span><span class="at"> </span><span class="fu">role</span><span class="kw">:</span><span class="at"> cytoplasm</span><span class="kw">}</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">nucleus</span><span class="kw">:</span><span class="at">            </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span><span class="kw">,</span><span class="at">   </span><span class="fu">role</span><span class="kw">:</span><span class="at"> nucleus</span><span class="kw">}</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">metabolite</span><span class="kw">:</span><span class="at">         </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">50</span><span class="kw">,</span><span class="at">  </span><span class="fu">role</span><span class="kw">:</span><span class="at"> metabolite</span><span class="kw">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
 <section id="operators" class="level2">
 <h2 class="anchored" data-anchor-id="operators">Operators</h2>
-<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> returning a time-derivative contribution, dispatched by the relation it acts on. The operators fall into two families. <strong>Four dynamics operators</strong> move <em>state</em> along a fixed structure, one per relation the container admits. <strong>Structure operators</strong> instead reshape that structure itself and emit no state delta: <em>Rewire</em> rebuilds the relation <span class="math inline">\(E\)</span> (which nodes interact), while <em>Divide</em> and <em>Die</em> change the node set <span class="math inline">\(|S_k|\)</span> (birth and death). The four dynamics operators:</p>
+<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> dispatched by the relation it acts on. An operator changes exactly one of the three things the container holds: the <strong>state</strong> on the nodes, the <strong>relations</strong> between them, or the <strong>entities</strong> themselves. <strong>Four dynamics operators</strong> move <em>state</em> along a fixed structure, one per relation the container admits. <strong>Rewire</strong> changes the <em>relations</em> — the edge set <span class="math inline">\(E\)</span>, which nodes interact. <strong>Divide</strong> and <strong>Die</strong> change the <em>entities</em> — the node set <span class="math inline">\(|S_k|\)</span>, which nodes exist. Those last three return no state delta. The four dynamics operators:</p>
 <p><span class="math display">\[
 \begin{aligned}
 \textbf{Lateral}\quad   &amp; \mathcal{O}_E,\ E\subseteq S_k\times S_k
@@ -393,13 +441,12 @@ window.Quarto = {
 <p><strong>Aggregate <span class="math inline">\(\textstyle\sum_\pi\)</span> (up).</strong> Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.</p>
 <p><strong>Broadcast <span class="math inline">\(\pi^{*}\)</span> (down).</strong> The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map <span class="math inline">\(\pi\)</span>.</p>
 <p><strong>Exchange <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span>.</strong> Couples a set to a field: scatter <span class="math inline">\(\mathcal{S}\)</span> deposits/secretes object state into the field, gather <span class="math inline">\(\mathcal{G}\)</span> samples/senses the field back onto the objects. The relation is bipartite (objects <span class="math inline">\(\leftrightarrow\)</span> grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.</p>
-<p><strong>Rewire <span class="math inline">\(\mathcal{R}\)</span> (structure).</strong> The first structure operator rebuilds the relation <span class="math inline">\(E\subseteq S_k\times S_k\)</span> on which the lateral operators act — <em>which</em> nodes are neighbours — and returns no state delta. A <em>geometric</em> relation is rebuilt every tick from the live configuration (a <strong>radius graph</strong>: all pairs within a cutoff; or a <span class="math inline">\(k\)</span>-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a <em>fixed</em> relation (a connectome) is built once and never rewired. Separating <em>who</em> interacts (Rewire) from <em>how</em> they interact (Lateral) is what turns a dense <span class="math inline">\(O(N^2)\)</span> force law into <span class="math inline">\(O(|E|)\)</span> message passing and lets several lateral operators share one graph.</p>
-<p><strong>Divide and Die (structure).</strong> Rewire reshapes the edges; these two reshape the nodes. The dynamics operators move <em>state</em> while the node set stays fixed, but living matter also rewrites its own membership: cells divide and die, so the cardinality <span class="math inline">\(|S_k|\)</span> itself grows and shrinks — <strong>Divide</strong> <span class="math inline">\(\mathcal{B}: x \mapsto
-\{x',x''\}\)</span> (proliferation) and <strong>Die</strong> <span class="math inline">\(\mathcal{D}: x \mapsto \varnothing\)</span> (apoptosis / efflux) are the only operators that change a set’s cardinality. For a <em>living</em> system they are as primordial as the other four; everything else assumes the cells it acts on already exist.</p>
+<p><strong>Rewire <span class="math inline">\(\mathcal{R}\)</span> (relations).</strong> Rewire changes the <em>relation</em> <span class="math inline">\(E\subseteq S_k\times S_k\)</span> on which the lateral operators act — <em>which</em> nodes are neighbours — and returns no state delta. A <em>geometric</em> relation is rebuilt every tick from the live configuration (a <strong>radius graph</strong>: all pairs within a cutoff; or a <span class="math inline">\(k\)</span>-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a <em>fixed</em> relation (a connectome) is built once and never rewired. Rewire is of a different nature from the other five: it neither moves state nor changes who exists — it maintains the <em>scaffold</em> the dynamics run on. Separating <em>who</em> interacts (Rewire) from <em>how</em> they interact (Lateral) also turns a dense <span class="math inline">\(O(N^2)\)</span> force law into <span class="math inline">\(O(|E|)\)</span> message passing.</p>
+<p><strong>Divide and Die (entities).</strong> The dynamics operators move <em>state</em> and Rewire moves <em>relations</em>, both while the node set stays fixed; living matter also rewrites its own membership. <strong>Divide</strong> <span class="math inline">\(\mathcal{B}: x \mapsto \{x',x''\}\)</span> (proliferation) and <strong>Die</strong> <span class="math inline">\(\mathcal{D}: x \mapsto \varnothing\)</span> (apoptosis / efflux) are the only operators that change the <em>entities</em> themselves — the cardinality <span class="math inline">\(|S_k|\)</span>. For a <em>living</em> system they are as primordial as the four dynamics operators: a tissue is defined as much by the cells it makes and loses as by how they move. Everything else assumes the cells it acts on already exist.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption>The operators, in two families. The first four are <em>dynamics</em> — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment <span class="math inline">\(\pi\)</span>; Exchange to/from a field). The last three are <em>structure</em> operators that emit no state delta: <em>Rewire</em> rebuilds the relation <span class="math inline">\(E\)</span> — which nodes interact (a radius graph rebuilt each tick, dashed cutoff) — while <em>Divide</em> and <em>Die</em> change the node set <span class="math inline">\(|S_k|\)</span>, carried on a fixed buffer by a per-element occupancy mass <span class="math inline">\(w\)</span>.</figcaption>
+<figcaption>The operators, grouped by what they change. The first four are <em>dynamics</em> — they move <em>state</em> along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment <span class="math inline">\(\pi\)</span>; Exchange to/from a field). The last three return no state delta: <em>Rewire</em> changes the <em>relations</em> — the edge set <span class="math inline">\(E\)</span>, which nodes interact (a radius graph rebuilt each tick, dashed cutoff); <em>Divide</em> and <em>Die</em> change the <em>entities</em> — the node set <span class="math inline">\(|S_k|\)</span>, on a fixed buffer with per-element occupancy <span class="math inline">\(w\)</span>.</figcaption>
 </figure>
 </div>
 <section id="differentiating-division-and-death" class="level3">
@@ -508,27 +555,27 @@ window.Quarto = {
 </tr>
 <tr class="even">
 <td>rebuild the relation</td>
-<td>structure: rewire</td>
+<td>relations: rewire</td>
 <td><span class="math inline">\(\mathcal{R}\!:\,\to\!E\)</span></td>
 <td><code>Rewire</code></td>
 </tr>
 <tr class="odd">
 <td>make an element</td>
-<td>structure: division</td>
+<td>entities: division</td>
 <td><span class="math inline">\(\mathcal{B}:x\!\mapsto\!\{x',x''\}\)</span></td>
 <td><code>Divide</code></td>
 </tr>
 <tr class="even">
 <td>remove an element</td>
-<td>structure: death</td>
+<td>entities: death</td>
 <td><span class="math inline">\(\mathcal{D}:x\!\mapsto\!\varnothing\)</span></td>
 <td><code>Die</code></td>
 </tr>
 <tr class="odd">
 <td>per-element occupancy</td>
-<td>mass</td>
+<td>occupancy</td>
 <td><span class="math inline">\(w_i\in[0,1]\)</span></td>
-<td><code>Level.mass</code></td>
+<td><code>Level.occ</code></td>
 </tr>
 <tr class="even">
 <td>the container</td>

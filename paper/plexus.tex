@@ -31,7 +31,7 @@
 
 \title{\textbf{Plexus}\\[3pt]
 \large A blueprint for differentiable tissue: hierarchical sets, operators,\\
-and an LLM-driven simulation layer}
+and a formal simulation language}
 \author{Janelia Research Campus}
 \date{\today}
 
@@ -46,9 +46,10 @@ force, and collective dynamics across scales. The frameworks built so far
 them coexisting. This document is a single blueprint, distilled from a working
 prototype, for building one repository that unifies them. It has three parts:
 (i) the missing primitive --- a \textbf{hierarchical graph container} stated in
-the language of \textbf{sets} and \textbf{operators}; (ii) the \textbf{contract}
-that lets a large language model (LLM) drive a registry of low-level operators
-through a declarative \emph{simulation} specification; and (iii) the
+the language of \textbf{sets} and \textbf{operators}; (ii) a \textbf{formal
+intermediate representation} --- a typed, declarative spec language compiled to a
+calculus of registered operators --- that turns intent into a runnable simulation
+and that a person or a language model can drive; and (iii) the
 \textbf{experiment} --- ten distinct simulations and an emergent ant-trail model,
 all produced from the same code by changing only the simulation file --- with the
 lessons that follow for how to construct the repository.
@@ -108,17 +109,84 @@ metabolites.}
 \label{fig:hier}
 \end{figure}
 
+\section{A typed containment graph}
+\label{sec:graph}
+
+The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition, but read literally it
+over-constrains: it assumes each scale has \emph{one} child type. A real cell does
+not --- it is a container of many sets at once: a membrane, a cytoplasm, a nucleus,
+organelles, receptors, molecules, each with its own state, operators, and parent
+map. So we lift the chain to a graph.
+
+Containment is a parent map between \emph{any} two sets, declared by naming the
+parent:
+\[
+  \pi_{A\to B} : S_A \longrightarrow S_B,
+\]
+assigning every entity of type $A$ to a parent of type $B$. A parent set may have
+many children, so a cell is not one fibre but a \textbf{bundle of fibres},
+\[
+  \mathrm{Cell}(c)=\Big\{\, \pi_{A\to\mathrm{cell}}^{-1}(c) \;:\; A\in\mathrm{children}(\mathrm{cell}) \,\Big\}.
+\]
+The container is therefore a \emph{typed containment graph} --- a DAG of sets and
+parent maps (Fig.~\ref{fig:graph}) --- not a fixed scale ladder. The shift is from
+``\emph{level $k$ contains level $k{-}1$}'' to ``\emph{set $A$ is contained by set
+$B$}'', and it is what keeps the code clean: the engine needs only
+\code{Level.parent} (the index map) and \code{Level.parent\_name} (the edge); new
+biological structure is a \emph{new set and a parent map}, never an engine change.
+
+This also keeps operators \emph{typed}: \code{membrane\_tension} acts on
+\code{membrane\_particle}, \code{metabolism} on \code{metabolite},
+\code{gene\_regulation} on \code{nucleus}, and Exchange operators connect
+compartments explicitly (nucleus\,$\leftrightarrow$\,cytoplasm,
+membrane\,$\leftrightarrow$\,extracellular field). The alternative --- one set of
+generic particles carrying a \code{role} flag, driven by one mega-operator that
+branches on the role --- is precisely the spaghetti a typed graph avoids.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[font=\footnotesize,
+  set/.style={draw=cset,thick,rounded corners,fill=cset!10,minimum width=22mm,minimum height=8mm},
+  leaf/.style={draw=cset,rounded corners,fill=cset!4,minimum width=24mm,minimum height=7mm},
+  cont/.style={-{Stealth[length=2.4mm]},cset,thick},
+]
+\node[set] (cell) at (0,0) {cell};
+\node[leaf] (mem) at (-5.7,-2.0) {membrane particle};
+\node[leaf] (cyt) at (-1.9,-2.0) {cytoplasm particle};
+\node[leaf] (nuc) at (1.9,-2.0) {nucleus};
+\node[leaf] (met) at (5.7,-2.0) {metabolite};
+\draw[cont] (mem) -- (cell); \draw[cont] (cyt) -- (cell);
+\draw[cont] (nuc) -- (cell); \draw[cont] (met) -- (cell);
+\node[cset,font=\scriptsize] at (-2.5,-1.05) {$\pi_{A\to\mathrm{cell}}$};
+\end{tikzpicture}
+\caption{A typed containment graph: one parent set (\code{cell}) with several child
+sets, each its own type with its own parent map $\pi_{A\to\mathrm{cell}}$. The cell
+entity is the bundle of these fibres --- not a bag of one kind of particle. A new
+compartment is a new row in the spec (Listing~\ref{lst:cell}), not an engine edit.}
+\label{fig:graph}
+\end{figure}
+
+\begin{lstlisting}[style=yaml,caption={A cell as a bundle of child sets: each compartment is its own typed set with a parent map.},label=lst:cell]
+sets:
+  cell:               {n: 100}
+  membrane_particle:  {parent: cell, per_parent: 64,  role: membrane}
+  cytoplasm_particle: {parent: cell, per_parent: 200, role: cytoplasm}
+  nucleus:            {parent: cell, per_parent: 1,   role: nucleus}
+  metabolite:         {parent: cell, per_parent: 50,  role: metabolite}
+\end{lstlisting}
+
 \section{Operators}
 \label{sec:operators}
 
-A GNN is an \textbf{operator} $\mathcal{O}$ returning a time-derivative
-contribution, dispatched by the relation it acts on. The operators fall into two
-families (Fig.~\ref{fig:ops}). \textbf{Four dynamics operators} move \emph{state}
-along a fixed structure, one per relation the container admits. \textbf{Structure
-operators} instead reshape that structure itself and emit no state delta:
-\emph{Rewire} rebuilds the relation $E$ (which nodes interact), while
-\emph{Divide} and \emph{Die} change the node set $|S_k|$ (birth and death). The
-four dynamics operators:
+A GNN is an \textbf{operator} $\mathcal{O}$ dispatched by the relation it acts on.
+An operator changes exactly one of the three things the container holds
+(Fig.~\ref{fig:ops}): the \textbf{state} on the nodes, the \textbf{relations}
+between them, or the \textbf{entities} themselves. \textbf{Four dynamics operators}
+move \emph{state} along a fixed structure, one per relation the container admits,
+each returning a time-derivative contribution. \textbf{Rewire} changes the
+\emph{relations} --- the edge set $E$, which nodes interact. \textbf{Divide} and
+\textbf{Die} change the \emph{entities} --- the node set $|S_k|$, which nodes
+exist. Those last three return no state delta. The four dynamics operators:
 \begin{align*}
 \textbf{Lateral}\quad   & \mathcal{O}_E,\ E\subseteq S_k\times S_k
   &&\text{(ODE interaction $+$ graph Laplacian)}\\
@@ -160,27 +228,27 @@ samples/senses the field back onto the objects. The relation is bipartite
 (objects~$\leftrightarrow$~grid); it is exactly the MPM particle--grid transfer
 (P2G/G2P) and chemotactic secretion/sensing.
 
-\paragraph{Rewire $\mathcal{R}$ (structure).} The first structure operator
-rebuilds the relation $E\subseteq S_k\times S_k$ on which the lateral operators
-act --- \emph{which} nodes are neighbours --- and returns no state delta. A
-\emph{geometric} relation is rebuilt every tick from the live configuration (a
-\textbf{radius graph}: all pairs within a cutoff; or a $k$-nearest-neighbour or
-Delaunay graph), so the interaction graph tracks motion, growth, and division; a
-\emph{fixed} relation (a connectome) is built once and never rewired. Separating
-\emph{who} interacts (Rewire) from \emph{how} they interact (Lateral) is what
-turns a dense $O(N^2)$ force law into $O(|E|)$ message passing and lets several
-lateral operators share one graph.
+\paragraph{Rewire $\mathcal{R}$ (relations).} Rewire changes the \emph{relation}
+$E\subseteq S_k\times S_k$ on which the lateral operators act --- \emph{which}
+nodes are neighbours --- and returns no state delta. A \emph{geometric} relation is
+rebuilt every tick from the live configuration (a \textbf{radius graph}: all pairs
+within a cutoff; or a $k$-nearest-neighbour or Delaunay graph), so the interaction
+graph tracks motion, growth, and division; a \emph{fixed} relation (a connectome)
+is built once and never rewired. Rewire is of a different nature from the other
+five: it neither moves state nor changes who exists --- it maintains the
+\emph{scaffold} the dynamics run on. Separating \emph{who} interacts (Rewire) from
+\emph{how} they interact (Lateral) is also what turns a dense $O(N^2)$ force law
+into $O(|E|)$ message passing and lets several lateral operators share one graph.
 
-\paragraph{Divide and Die (structure).} Rewire reshapes the edges; these two
-reshape the nodes. The dynamics operators move \emph{state} while the node set
-stays fixed, but living matter also rewrites its own membership: cells divide and
-die, so the cardinality $|S_k|$ itself grows and shrinks. We add two operators for
-exactly this ---
-\textbf{Divide} $\mathcal{B}: x \mapsto \{x',x''\}$ (proliferation) and
-\textbf{Die} $\mathcal{D}: x \mapsto \varnothing$ (apoptosis / efflux) --- the
-only operators that change a set's cardinality. For a \emph{living} system they
-are as primordial as the other four; everything else assumes the cells it acts
-on already exist.
+\paragraph{Divide and Die (entities).} The dynamics operators move \emph{state}
+and Rewire moves \emph{relations}, both while the node set stays fixed; living
+matter also rewrites its own membership. \textbf{Divide}
+$\mathcal{B}: x \mapsto \{x',x''\}$ (proliferation) and \textbf{Die}
+$\mathcal{D}: x \mapsto \varnothing$ (apoptosis / efflux) are the only operators
+that change the \emph{entities} themselves --- the cardinality $|S_k|$. For a
+\emph{living} system they are as primordial as the four dynamics operators: a
+tissue is defined as much by the cells it makes and loses as by how they move.
+Everything else assumes the cells it acts on already exist.
 
 \begin{figure}[h]
 \centering
@@ -239,16 +307,15 @@ on already exist.
 \end{scope}
 \node[below=1mm of DE,align=center]{\textbf{Die}\\$w\!\to\!0$};
 \end{tikzpicture}}
-\caption{The operators, in two families. The first four are \emph{dynamics}: they
-move state along a fixed structure --- \emph{Lateral} acts within a set;
-\emph{Aggregate} and \emph{Broadcast} move across containment $\pi$;
-\emph{Exchange} scatters ($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a
-field (P2G/G2P and the metabolite--reaction graph are both Exchange). The last
-three are \emph{structure} operators (they emit no state delta):
-\emph{Rewire} rebuilds the relation $E$ --- which nodes interact (a radius graph
-rebuilt each tick, dashed cutoff) --- while \emph{Divide} and \emph{Die} change
-the node set $|S_k|$, cell division and death carried on a fixed buffer by a
-per-element occupancy mass $w$.}
+\caption{The operators, grouped by what they change. The first four are
+\emph{dynamics}: they move \emph{state} along a fixed structure --- \emph{Lateral}
+within a set; \emph{Aggregate}/\emph{Broadcast} across containment $\pi$;
+\emph{Exchange} to/from a field (P2G/G2P and the metabolite--reaction graph are
+both Exchange). The last three return no state delta: \emph{Rewire} changes the
+\emph{relations} --- the edge set $E$, which nodes interact (a radius graph rebuilt
+each tick, dashed cutoff); \emph{Divide} and \emph{Die} change the \emph{entities}
+--- the node set $|S_k|$, cell division and death on a fixed buffer with
+per-element occupancy $w$.}
 \label{fig:ops}
 \end{figure}
 
@@ -319,7 +386,7 @@ of per-domain code.
 collection of like nodes & set (level)          & $S_k$                       & \code{Level} \\
 a single node            & element              & $x\in S_k$                  & row of \code{Level.state} \\
 learnable per-node code  & embedding            & $a_i$                       & \code{Level.embedding} \\
-containment              & partition            & $\pi_k\!:\!S_k\!\to\!S_{k+1}$& \code{Level.parent} \\
+containment              & parent map (by name) & $\pi_{A\to B}\!:\!S_A\!\to\!S_B$& \code{.parent}, \code{.parent\_name} \\
 within-set links         & relation             & $E\subseteq S_k\times S_k$  & \code{Level.edge\_index} \\
 continuum quantity       & field                & $f:\Omega\to\mathbb{R}^c$   & \code{Field} \\
 dynamics (GNN)           & operator: ODE+Laplacian & $\mathcal{O}$            & \code{Operator} \\
@@ -327,27 +394,37 @@ within-set op            & lateral              & $\mathcal{O}_E$             & 
 up op                    & reduction over fibres& $\sum_\pi$                  & \code{Aggregate} \\
 down op                  & lift                 & $\pi^{*}$                   & \code{Broadcast} \\
 set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \code{Exchange} \\
-rebuild the relation     & structure: rewire    & $\mathcal{R}\!:\,\to\!E$     & \code{Rewire} \\
-make an element          & structure: division  & $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ & \code{Divide} \\
-remove an element        & structure: death     & $\mathcal{D}:x\!\mapsto\!\varnothing$ & \code{Die} \\
-per-element occupancy     & mass                 & $w_i\in[0,1]$               & \code{Level.mass} \\
+rebuild the relation     & relations: rewire    & $\mathcal{R}\!:\,\to\!E$     & \code{Rewire} \\
+make an element          & entities: division   & $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ & \code{Divide} \\
+remove an element        & entities: death      & $\mathcal{D}:x\!\mapsto\!\varnothing$ & \code{Die} \\
+per-element occupancy     & occupancy            & $w_i\in[0,1]$               & \code{Level.occ} \\
 the container            & hierarchy            & $(S_\bullet,F_\bullet,\pi_\bullet)$ & \code{Hierarchy} \\
 the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ & \code{Schedule} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\part*{Part II --- The LLM\,$\leftrightarrow$\,registry methodology}
-\addcontentsline{toc}{section}{Part II --- The LLM/registry methodology}
+\part*{Part II --- A formal intermediate representation}
+\addcontentsline{toc}{section}{Part II --- A formal intermediate representation}
 
 \section{Two layers and the contract between them}
 
-The prototype's purpose was not the tissue physics but figuring out \emph{how an
-LLM should drive a registry of low-level operators}. The answer is a strict
-two-layer split that meets only at one declarative, validated file --- the
-\textbf{spec} (\code{spec.yaml}). In effect this is a small domain-specific
-language: the spec is the \emph{source}, the registered operators are the
-\emph{primitives}, and the engine is the \emph{interpreter}.
+The contribution of this part is not that a language model can drive the
+framework --- it is that there is a \textbf{formal intermediate representation}
+for anything to drive at all. Between a person's \emph{intent} and a running
+\emph{simulation} we interpose one typed, declarative artifact, the \textbf{spec},
+and the system becomes a compiler stack:
+\[
+\text{Intent}\ \longrightarrow\ \text{Language}\ \longrightarrow\ \text{Calculus}\ \longrightarrow\ \text{Simulation}.
+\]
+Intent compiles to the \textbf{language} (the spec, \code{spec.yaml}); the spec
+names primitives in a \textbf{calculus} of operators (the registry); the engine
+\textbf{interprets} that calculus into a simulation. In one line: the spec is the
+\emph{source}, the registered operators are the \emph{primitives}, and the engine
+is the \emph{interpreter}. A language model is one front end on the first arrow ---
+useful, but replaceable; the durable object is the representation in the middle.
+Every property claimed below is a property of \emph{it}, not of the model that
+writes it.
 
 \begin{center}
 \begin{tikzpicture}[font=\footnotesize,
@@ -413,18 +490,19 @@ construct in it appears in the example of Listing~\ref{lst:agg}.
 \toprule
 \textbf{Construct} & \textbf{Semantics} & \textbf{Example} \\
 \midrule
-\multicolumn{3}{@{}l}{\emph{Top level}}\\
+\multicolumn{3}{@{}l}{\code{general:} --- the run and the world (the space + the clock)}\\
 \code{name}        & run identifier                                  & \code{name: aggregate}\\
 \code{seed}        & RNG seed --- fixes determinism                  & \code{seed: 0}\\
-\code{n\_frames}   & number of ticks to run                          & \code{n\_frames: 250}\\
-\code{obstacles}   & static walls (rectangles or \code{[cx,cy,r]} circles); BC for both the MPM grid and field diffusion & \code{[[.3,0,.36,.7]]}\\
-\code{world}       & domain width $W$; world is $[0,W]\!\times\![0,1]$ (longitudinal if $W{>}1$) & \code{world: 4.0}\\
-\code{sets/fields/operators/schedule} & the four parts, detailed below       & ---\\
+\code{n\_frames}, \code{dt} & ticks to run; the time step             & \code{n\_frames: 250}\\
+\code{boundary}    & the space: \code{periodic} (torus) or \code{wall} (clamp) & \code{boundary: periodic}\\
+\code{world}       & domain width $W$; world is $[0,W]\!\times\![0,1]$ ($W{>}1$ longitudinal) & \code{world: 4.0}\\
+\code{obstacles}   & static walls (rects or \code{[cx,cy,r]} circles); a BC for the MPM grid $+$ field diffusion & \code{[[.3,0,.36,.7]]}\\
 \midrule
 \multicolumn{3}{@{}l}{\emph{Set} ($S_k$ --- an entity level / ECS entity)}\\
 \code{n}           & size of a top-level set                         & \code{n: 100}\\
-\code{parent}      & containment target of a leaf set (the map $\pi_k$) & \code{parent: cell}\\
+\code{parent}      & the set that contains this one --- a containment edge $\pi_{A\to B}$ (many sets may share a parent) & \code{parent: cell}\\
 \code{per\_parent} & children per parent                             & \code{per\_parent: 100}\\
+\code{role}        & this set's role inside its parent (membrane / cytoplasm / nucleus...) & \code{role: membrane}\\
 \code{types}       & named sub-populations: fraction $+$ per-type properties & \code{\{soft: \{fraction: .5, youngs: 12\}\}}\\
 \midrule
 \multicolumn{3}{@{}l}{\emph{Field} (a continuum)}\\
@@ -451,10 +529,16 @@ operator name         & run that operator this tick                  & \code{sen
 \code{[a, b]}         & a group run in the same stage                & \code{[motility, sense]}\\
 \code{aggregate}      & builtin: Aggregate$\uparrow$ (parent $=$ mean of children) & \code{aggregate}\\
 \code{name.diffuse}   & builtin: advance that field one step         & \code{chemical.diffuse}\\
+\midrule
+\multicolumn{3}{@{}l}{\code{plotting:} (render style only --- never affects dynamics)}\\
+\code{colormap}, \code{point\_size}, \code{background} & how the sets are drawn & \code{background: black}\\
 \bottomrule
 \end{tabular}
-\caption{The simulation language --- vocabulary, grammar (each construct's block is
-where it may appear), and semantics, with examples drawn from Listing~\ref{lst:agg}.}
+\caption{The simulation language. Each block is a category with its own home in
+the spec (Section~\ref{sec:category}): \code{general:} is the world and clock,
+\code{sets:} are the entities, \code{operators:} the dynamics, \code{schedule:}
+the composition, \code{plotting:} the style. Integration is implicit (each set is
+integrated once at the end of a tick), so there is no \code{integrate} token.}
 \label{tab:lang}
 \end{table}
 
@@ -485,20 +569,15 @@ Prior art worth borrowing: ECS engines (the scheduling model), SBML/Antimony
 (reaction--species vocabulary), NeuroML and MorpheusML/PhysiCell (multicellular
 specs), UFL (PDE operators), and NetLogo/Mesa (agent rules).
 
-\section{The simulation specification}
-
-Using the language of Section~\ref{sec:language} (full vocabulary in
-Table~\ref{tab:lang}), a complete simulation is a single \code{spec.yaml}.
-Listing~\ref{lst:agg} shows one: two cell \code{types}, \code{particle}s contained
-in each \code{cell}, one chemical \code{field}, and a four-step \code{schedule}.
-Soft cells \code{secrete} the chemical and \code{sense} (climb) it, so they
-self-aggregate, while stiff cells --- selected out by \code{cell[type=soft]} ---
-do not.
+A complete spec is a single \code{spec.yaml}. Listing~\ref{lst:agg} assembles the
+vocabulary of Table~\ref{tab:lang} into one: two cell \code{types},
+\code{particle}s contained in each \code{cell}, one chemical \code{field}, and a
+\code{schedule}. Soft cells \code{secrete} the chemical and \code{sense} (climb)
+it, so they self-aggregate, while stiff cells --- selected out by
+\code{cell[type=soft]} --- do not.
 
 \begin{lstlisting}[style=yaml,caption={A complete simulation: soft cells secrete and follow a chemical and self-aggregate.},label=lst:agg]
-name: aggregate
-seed: 0
-n_frames: 250
+general: {name: aggregate, seed: 0, n_frames: 250, dt: 0.05, boundary: periodic}
 sets:
   cell:
     n: 100
@@ -520,10 +599,102 @@ references a declared set/field; type \code{fraction}s sum to one; every schedul
 token resolves. (One trap: never use a YAML~1.1 boolean key such as
 \code{on}/\code{off} --- we use \code{at}.)
 
+\section{Categorical discipline: what belongs where}
+\label{sec:category}
+
+The same structure that makes the spec powerful makes it fragile: it has a few
+\emph{orthogonal categories}, and every key belongs to exactly one. The schema
+catches a malformed spec, but it cannot catch a \emph{well-formed} spec that files
+a quantity under the wrong category --- a force constant placed on a set, a domain
+property placed on an operator, an integration knob placed on a particle. These are
+\textbf{category errors}, and for anything editing the representation --- a language
+model most of all --- they are the dominant failure mode. The type system cannot
+state this discipline, so we state it here, as a rule.
+
+\paragraph{The categories.} Every part of a spec answers exactly one question, and
+that question fixes its home (Table~\ref{tab:cat}).
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}l p{6.2cm} l@{}}
+\toprule
+\textbf{Category} & \textbf{Owns --- the question it answers} & \textbf{Home} \\
+\midrule
+World        & the space: boundary, domain size, obstacles --- \emph{``what space do nodes live in?''} & \code{general:} \\
+Set (entity) & what a node \emph{is}: count, composition (types $+$ per-type properties), initial state --- \emph{``what is a node, and how many?''} & \code{sets:} ($+$ \code{@register\_entity}) \\
+Operator     & the dynamics: an interaction law, its parameters, and what its output \emph{means} (\code{PREDICTION}, \code{KIND}) --- \emph{``how does state change?''} & \code{operators:} ($+$ the registry class) \\
+Schedule     & the composition: time step, order, rates --- \emph{``when, in what order?''} & \code{schedule:}, \code{dt} \\
+Style        & rendering only --- \emph{``how is it drawn?''} & \code{plotting:} \\
+\bottomrule
+\end{tabular}
+\caption{The categories of the spec. They are orthogonal; a quantity belongs to the
+one whose question it answers, never to two.}
+\label{tab:cat}
+\end{table}
+
+\paragraph{The litmus test.} When unsure where a quantity goes, ask whether it is a
+property of the \emph{thing} or of the \emph{process} acting on it. A property of
+the thing --- its identity, count, composition, the meaning of its state columns,
+its initial value --- belongs to the set/entity. A property of the process --- a
+rate, a coefficient, a force law, the order of the time-derivative it produces ---
+belongs to the operator. A property of the shared space belongs to the world; a
+property of timing, to the schedule. \emph{Thing $\to$ set; process $\to$ operator.}
+
+\paragraph{Worked category errors.} The tempting move is almost always to attach a
+\emph{process} parameter to the \emph{thing} it acts on. Table~\ref{tab:caterr}
+collects the ones we actually hit while building the framework.
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{2.4cm} p{2.6cm} p{2.9cm} p{4.4cm}@{}}
+\toprule
+\textbf{Quantity} & \textbf{Tempting (wrong)} & \textbf{Correct} & \textbf{Why} \\
+\midrule
+integration order (1st/2nd derivative) & a field on the particle set & an intrinsic operator property (\code{PREDICTION}) & it is what the operator's output \emph{means} (velocity vs.\ acceleration), not what a particle is \\
+friction / damping & an integrator knob or a set field & a \code{drag} operator ($-\kappa v$) & friction is a force; forces are operators \\
+velocity cap & a particle field & a numerical guard in the integrator & it is about stepping, not the entity \\
+boundary (periodic/wall) & a per-operator flag & the world (\code{general:}) & the space is shared; all spatial operators must agree \\
+interaction radius, $\sigma$, $k$ & the set & the operator that uses them & they parameterize the law, not the node \\
+per-type law params $p$ & the operator's own table & the set's \code{types:}, \emph{read} by the operator & they are per-\emph{type} (a property of the node's kind) and the inverse-problem target; the type owns, the operator consumes \\
+which column is position / velocity & hard-coded in the operator & the entity state schema (\code{@register\_entity}) & column meaning is a property of the entity kind \\
+\bottomrule
+\end{tabular}
+\caption{Category errors and their corrections. The pattern is constant: a process
+parameter wrongly attached to the thing it acts on.}
+\label{tab:caterr}
+\end{table}
+
+\paragraph{Invariants (hold the line).}
+\begin{itemize}\itemsep2pt
+\item An operator never declares what a node \emph{is} (count, type, composition,
+initial state); it only \emph{reads} those.
+\item A set never declares how state \emph{changes} --- no rates, force constants,
+or integration order on a set; those are operators or the schedule.
+\item The world appears once, never per-operator: every spatial operator reads one
+boundary and one domain.
+\item Integration is the schedule's job, not an operator's; the only thing an
+operator says about integration is the \emph{order} of its delta (\code{PREDICTION}).
+\item A per-type property is owned by the type (\code{types:}) and read by whatever
+operator needs it (declared in \code{REQUIRES\_TYPE\_PROPS}), resolved along the
+containment chain.
+\item Style never changes dynamics: \code{plotting:} is read only by the visualizer.
+\end{itemize}
+
+\paragraph{The discard rule.} When a quantity does not obviously fit, do \emph{not}
+invent a new top-level key. Place it in the category whose question it answers; and
+if no operator or entity reads it, the validator's \emph{``read by no operator''}
+warning (Section~\ref{sec:gaps}) is the tripwire that catches the misfiling. New
+\emph{behaviour} is a new operator, never a set field; a new \emph{kind of node} is
+a new entity, never an operator parameter. Hold this line and the action space
+stays the single, well-defined one a search --- or a language model --- can explore.
+
 \section{Operator catalog}
 
-Operators are the system's vocabulary; it grows monotonically and every past
-simulation keeps working. The prototype catalog:
+Operators are the system's vocabulary; it grows monotonically and every past spec
+keeps working. The catalog, grouped by what each operator changes (Section~\ref{sec:operators});
+\emph{1st}/\emph{2nd} marks the integration order of the dynamics operators:
 
 \begin{center}
 \renewcommand{\arraystretch}{1.15}
@@ -531,7 +702,10 @@ simulation keeps working. The prototype catalog:
 \toprule
 \textbf{op} & \textbf{kind} & \textbf{acts on} & \textbf{behaviour} \\
 \midrule
-\code{boids}    & lateral   & cell        & collective motion (cohesion/align/separate) \\
+\multicolumn{4}{@{}l}{\emph{Dynamics --- move state}}\\
+\code{attraction\_repulsion} & lateral \emph{1st} & particle & per-type difference-of-Gaussians interaction law \\
+\code{boids}    & lateral \emph{2nd} & particle/cell & flocking (cohesion/align/separate) \\
+\code{drag}     & lateral \emph{2nd} & any         & viscous friction $-\kappa v$ \\
 \code{motility} & lateral   & cell        & active self-propulsion (wandering heading) \\
 \code{adhesion} & lateral   & cell        & type-specific cohesion ($+$ \code{cross}$<$0 repels $\to$ sorting) \\
 \code{mpm}      & exchange  & particle    & MLS-MPM mechanics; soft/stiff via \code{youngs} \\
@@ -539,13 +713,17 @@ simulation keeps working. The prototype catalog:
 \code{sense}    & exchange  & cell$\leftarrow$field & chemotactic accel up-gradient \\
 \code{graze}    & exchange  & cell$\leftarrow$field & consume a field (capped at stock); harvest objective \\
 \code{trail}    & exchange  & cell        & Physarum 3-sensor pheromone steering (ants) \\
-\code{finish}   & lateral   & cell        & freeze \& count cells past an exit line \code{x} \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Relations --- change the edge set $E$}}\\
 \code{radius\_graph} & rewire & particle & neighbour graph: pairs within a cutoff, rebuilt each tick \\
 \code{ring}     & rewire    & particle    & closed loop over a role's particles (a membrane) \\
-\code{divide}   & structural& cell        & cell division: split occupancy mass $w$ into a new slot \\
-\code{die}      & structural& cell        & cell death: occupancy mass $w\!\to\!0$ (apoptosis) \\
-\code{death}    & lateral   & cell        & remove \& count cells past an exit line (efflux sink) \\
-\code{aggregate}& builtin   & ---         & cell pos/vel $=$ mean of its particles ($\uparrow$) \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Entities --- change the node set $|S|$}}\\
+\code{divide}   & structural& cell        & cell division: split occupancy $w$ into a new slot \\
+\code{die}      & structural& cell        & cell death/efflux: occupancy $w\!\to\!0$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Builtins}}\\
+\code{aggregate}& builtin   & ---         & parent state $=$ (mass-weighted) mean of children ($\uparrow$) \\
 \code{<field>.diffuse} & builtin & ---    & field self-update (Laplacian $+$ decay) \\
 \bottomrule
 \end{tabular}
@@ -564,44 +742,54 @@ structure), it follows fixed rules; the most useful:
 \item ``moves by boids / flock'' $\to$ \code{boids}; ``wanders / motile'' $\to$ \code{motility}.
 \item ``creates/secretes a chemical'' $\to$ a \code{field} $+$ \code{secrete};
       ``follows / chemotaxis'' $\to$ \code{sense}; ``ant trails'' $\to$ \code{trail}.
+\item ``particles attract/repel, interact by type'' $\to$ a \code{radius\_graph}
+      (the relation) followed by a lateral interaction op (e.g.\
+      \code{attraction\_repulsion}); the per-type law parameters go in
+      \code{types:}, read by the operator.
 \item \textbf{``only population X does Y''} $\to$ the selector \code{at: cell[type=X]}.
       This is the highest-leverage primitive: it scopes behaviour to a
       subpopulation and lets two behaviours coexist.
 \end{enumerate}
 
-\section{When the present code is not enough (a missing model)}
+Throughout, the mapping respects the categories of Section~\ref{sec:category}: a
+\emph{behaviour} becomes an operator, a \emph{kind of node} a type, the
+\emph{space} the \code{general:} block --- never the reverse.
 
-The pipeline fails loudly and points at the gap, e.g.\ for a request needing
-field advection or reaction--diffusion:
+\section{When the present code is not enough}
+\label{sec:gaps}\label{sec:prop}
+
+The gatekeeper fails loudly and points at the gap --- never with a crash deep in a
+substep --- in two forms.
+
+\paragraph{A missing operator.} A request needing a behaviour no operator provides
+(say reaction--diffusion) is rejected at load:
 \begin{lstlisting}[style=yaml]
 operator 'reaction_diffusion' not in registry.
-Available: ['adhesion','boids','mechanics','motility','mpm','secrete','sense','trail']
+Available: ['attraction_repulsion','boids','drag','radius_graph','divide','die', ...]
 \end{lstlisting}
 The fix is \textbf{one new \code{Operator} subclass} --- never an engine change:
-write \code{forward(self, H, mask) -> {set: accel}} (or mutate a field, return
-\code{\{\}}); decorate \code{@register\_operator}; declare its needs; reference it
-in the simulation. We exercised this live twice during the experiment: adding
-\code{adhesion} unlocked cell \emph{sorting}, and adding \code{trail} unlocked
-ant \emph{trail-following} --- each $\sim$20 lines, with the engine and all other
-simulations untouched.
+write \code{forward(self, H, mask) -> {set: delta}} (or mutate a field/relation and
+return \code{\{\}}); decorate \code{@register\_operator}; declare its needs;
+reference it in the spec. We exercised this live during the experiment: adding
+\code{adhesion} unlocked cell \emph{sorting} and \code{trail} unlocked ant
+\emph{trail-following} --- each $\sim$20 lines, the engine and every other spec
+untouched.
 
-\section{When a cell/particle property does not exist}
-\label{sec:prop}
-
-Operators \emph{declare} what they need (\code{REQUIRES\_PARAMS},
-\code{REQUIRES\_TYPE\_PROPS}); the validator checks before running, resolving a
-property along the containment chain (\code{mpm} acts on particles but
-\code{youngs} lives on the parent cell's types):
+\paragraph{A missing property.} Operators \emph{declare} what they need
+(\code{REQUIRES\_PARAMS}, \code{REQUIRES\_TYPE\_PROPS}); the validator checks before
+running, resolving a property along the containment chain (\code{mpm} acts on
+particles but \code{youngs} lives on the parent cell's types):
 \begin{lstlisting}[style=yaml]
 # missing required property -> hard error, before any computation:
 operator 'mpm' requires property 'youngs' on every type of 'cell'; missing on type 'soft'.
-# property no operator reads -> warning (typo guard), run proceeds:
+# property no operator reads -> warning (typo guard + category-error tripwire):
 [warn] property 'viscosity' on cell.soft is read by no operator (known: ['fraction','youngs'])
 \end{lstlisting}
 \textbf{Design rule: capabilities are declared, not discovered at a crash.} The
 operator that consumes a property is the single place that declares the
 requirement, turning a would-be \code{AttributeError} thousands of substeps deep
-into a one-line message up front.
+into a one-line message up front --- and that ``read by no operator'' warning is
+exactly the tripwire for the category errors of Section~\ref{sec:category}.
 
 \part*{Part III --- The experiment}
 \addcontentsline{toc}{section}{Part III --- The experiment}

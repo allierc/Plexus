@@ -8,14 +8,18 @@ package with the gaps `prototype/notes.md` surfaced closed.
 
 Entities
 --------
-* **Level** -- a *set* `S_k` of like nodes at one scale (molecule / particle /
-  cell / population / organism). Stored as flat batched tensors (a `state`
-  matrix, an optional learnable `embedding`), never one object per node. The
-  containment tree is `parent` (the partition `pi_k : S_k -> S_{k+1}`); an
-  optional `edge_index` is a lateral relation. A Level is allocated at a fixed
-  **buffer** size and a per-node **occupancy** `occ in [0,1]` marks the live
-  subset -- this is what lets a *cardinality-changing* operator (divide / die)
-  live inside a constant-shape contract.
+* **Level** -- a *set* of like nodes of one type (membrane particle / cytoplasm
+  particle / nucleus / molecule / cell / population). Stored as flat batched
+  tensors (a `state` matrix, an optional learnable `embedding`), never one object
+  per node. Containment is a **parent map to another set**: `parent` (indices)
+  `+ parent_name` (the containing set), the map `pi_{this -> parent}`. MANY sets
+  may share one parent -- a cell contains membrane, cytoplasm, nucleus and
+  molecule sets at once -- so the container is a *typed containment graph*, not a
+  linear scale ladder, and a parent entity is a bundle of fibres (one per child
+  set). An optional `edge_index` is a lateral relation. A Level is allocated at a
+  fixed **buffer** size and a per-node **occupancy** `occ in [0,1]` marks the live
+  subset, so a *cardinality-changing* operator (divide / die) lives inside a
+  constant-shape contract.
 * **Field** -- a continuum `f: Omega -> R^c` on its own discretization frame,
   bound to exactly one Level via `couples_to`. Fields do not nest. Subclasses
   supply the frame and the transfer kernels (`scatter`/`gather`/`step`).
@@ -80,11 +84,12 @@ import torch
 import torch.nn as nn
 
 
-# The recognised operator kinds (dispatch tags), in two families: four *dynamics*
-# kinds (lateral / aggregate / broadcast / exchange) return a state delta, and two
-# *structure* kinds (`structural` changes the node set |S|, `rewire` rebuilds the
-# relation E) mutate H and return no delta. Naming them lets the registry and the
-# LLM enumerate "what can change the set / the relation".
+# The recognised operator kinds (dispatch tags), grouped by what they change:
+# four *dynamics* kinds (lateral / aggregate / broadcast / exchange) move STATE and
+# return a delta; `rewire` changes the RELATIONS (the edge set E); `structural`
+# changes the ENTITIES (the node set |S|). The last two mutate H and return no
+# delta. Naming them lets the registry enumerate "what can change the state, the
+# relation, or the set".
 KINDS = ("lateral", "aggregate", "broadcast", "exchange", "structural", "rewire")
 
 
@@ -108,14 +113,18 @@ class Level(nn.Module):
         level: int,
         state: torch.Tensor,                        # [N, d]   dynamic state
         embedding: Optional[torch.Tensor] = None,   # [N, e]   learnable a_i
-        parent: Optional[torch.Tensor] = None,      # [N]      index into level+1 (partition pi_k)
+        parent: Optional[torch.Tensor] = None,      # [N]      index into the PARENT SET (the map pi_{this->parent})
         edge_index: Optional[torch.Tensor] = None,  # [2, E]   lateral relation
         occ: Optional[torch.Tensor] = None,         # [N]      occupancy in [0,1] (default ones)
         state_schema: Optional[dict] = None,        # {block: (c0,c1)} column semantics (from the entity registry)
+        parent_name: Optional[str] = None,          # name of the set that contains this one (a containment EDGE)
+        role: Optional[str] = None,                 # this set's role inside its parent (membrane / cytoplasm / nucleus...)
     ):
         super().__init__()
         self.name = name
-        self.level = level
+        self.level = level                          # a depth hint only; containment is by `parent_name`, not by integer
+        self.parent_name = parent_name              # which set contains this one (None for a top-level set)
+        self.role = role
         self.state_schema = state_schema or {"pos": (0, 2), "vel": (2, 4)}
         N = state.shape[0]
         self.register_buffer("state", state)
@@ -281,6 +290,17 @@ class Hierarchy(nn.Module):
 
     def field(self, name: str) -> Field:
         return self.fields[name]
+
+    # --- the typed containment graph (parent maps by name, not a linear ladder) -- #
+    def children(self, parent_name: str) -> list[str]:
+        """The child sets contained by `parent_name`. A parent may have MANY
+        children of different roles (membrane / cytoplasm / nucleus / molecule),
+        so a parent entity is a *bundle of fibres*, one per child set."""
+        return [n for n, l in self.levels.items() if getattr(l, "parent_name", None) == parent_name]
+
+    def parent_of(self, name: str) -> Optional[str]:
+        """The set that contains `name` (None for a top-level set)."""
+        return getattr(self.levels[name], "parent_name", None)
 
     # --- per-level delta accumulators (the integration scratch) ----------- #
     def zero_delta(self, dim: int = 2) -> None:

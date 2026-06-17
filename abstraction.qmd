@@ -35,14 +35,45 @@ cells. Instead, each field is bound to exactly one set level through an
 **exchange** relation (particle–grid transfer, cell sampling, or population-level
 secretion and sensing); these couplings are the operators below.
 
+## A typed containment graph
+
+The chain $\pi_k:S_k\to S_{k+1}$ is the right intuition, but read literally it
+over-constrains: it assumes each scale has *one* child type. A real cell does not —
+it is a container of many sets at once: a membrane, a cytoplasm, a nucleus,
+organelles, molecules, each with its own state, operators, and parent map. So we
+lift the chain to a graph. Containment is a parent map between *any* two sets,
+declared by naming the parent,
+
+$$\pi_{A\to B} : S_A \longrightarrow S_B,$$
+
+so a cell is not one fibre but a **bundle of fibres**,
+$\mathrm{Cell}(c)=\{\,\pi_{A\to\mathrm{cell}}^{-1}(c) : A\in\mathrm{children}(\mathrm{cell})\,\}$.
+The container is a *typed containment graph* (a DAG of sets and parent maps), not a
+fixed scale ladder. The shift from "*level $k$ contains level $k{-}1$*" to "*set $A$
+is contained by set $B$*" keeps the code clean — the engine needs only
+`Level.parent` and `Level.parent_name` — and keeps operators *typed*
+(`membrane_tension` on `membrane_particle`, `metabolism` on `metabolite`), instead
+of one mega-operator branching on a `role` flag. New biological structure is a new
+set and a parent map, never an engine change:
+
+``` yaml
+sets:
+  cell:               {n: 100}
+  membrane_particle:  {parent: cell, per_parent: 64,  role: membrane}
+  cytoplasm_particle: {parent: cell, per_parent: 200, role: cytoplasm}
+  nucleus:            {parent: cell, per_parent: 1,   role: nucleus}
+  metabolite:         {parent: cell, per_parent: 50,  role: metabolite}
+```
+
 ## Operators
 
-A GNN is an **operator** $\mathcal{O}$ returning a time-derivative contribution,
-dispatched by the relation it acts on. The operators fall into two families.
-**Four dynamics operators** move *state* along a fixed structure, one per relation
-the container admits. **Structure operators** instead reshape that structure
-itself and emit no state delta: *Rewire* rebuilds the relation $E$ (which nodes
-interact), while *Divide* and *Die* change the node set $|S_k|$ (birth and death).
+A GNN is an **operator** $\mathcal{O}$ dispatched by the relation it acts on. An
+operator changes exactly one of the three things the container holds: the
+**state** on the nodes, the **relations** between them, or the **entities**
+themselves. **Four dynamics operators** move *state* along a fixed structure, one
+per relation the container admits. **Rewire** changes the *relations* — the edge
+set $E$, which nodes interact. **Divide** and **Die** change the *entities* — the
+node set $|S_k|$, which nodes exist. Those last three return no state delta.
 The four dynamics operators:
 
 $$
@@ -88,26 +119,27 @@ samples/senses the field back onto the objects. The relation is bipartite
 (objects $\leftrightarrow$ grid); it is exactly the MPM particle–grid transfer
 (P2G/G2P) and chemotactic secretion/sensing.
 
-**Rewire $\mathcal{R}$ (structure).** The first structure operator rebuilds the
-relation $E\subseteq S_k\times S_k$ on which the lateral operators act — *which*
-nodes are neighbours — and returns no state delta. A *geometric* relation is
-rebuilt every tick from the live configuration (a **radius graph**: all pairs
-within a cutoff; or a $k$-nearest-neighbour or Delaunay graph), so the
-interaction graph tracks motion, growth, and division; a *fixed* relation (a
-connectome) is built once and never rewired. Separating *who* interacts (Rewire)
-from *how* they interact (Lateral) is what turns a dense $O(N^2)$ force law into
-$O(|E|)$ message passing and lets several lateral operators share one graph.
+**Rewire $\mathcal{R}$ (relations).** Rewire changes the *relation*
+$E\subseteq S_k\times S_k$ on which the lateral operators act — *which* nodes are
+neighbours — and returns no state delta. A *geometric* relation is rebuilt every
+tick from the live configuration (a **radius graph**: all pairs within a cutoff;
+or a $k$-nearest-neighbour or Delaunay graph), so the interaction graph tracks
+motion, growth, and division; a *fixed* relation (a connectome) is built once and
+never rewired. Rewire is of a different nature from the other five: it neither
+moves state nor changes who exists — it maintains the *scaffold* the dynamics run
+on. Separating *who* interacts (Rewire) from *how* they interact (Lateral) also
+turns a dense $O(N^2)$ force law into $O(|E|)$ message passing.
 
-**Divide and Die (structure).** Rewire reshapes the edges; these two reshape the
-nodes. The dynamics operators move *state* while the node set stays fixed, but
-living matter also rewrites its own membership: cells divide and die, so the
-cardinality $|S_k|$ itself grows and shrinks — **Divide** $\mathcal{B}: x \mapsto
-\{x',x''\}$ (proliferation) and **Die** $\mathcal{D}: x \mapsto \varnothing$
-(apoptosis / efflux) are the only operators that change a set's cardinality. For a
-*living* system they are as primordial as the other four; everything else
-assumes the cells it acts on already exist.
+**Divide and Die (entities).** The dynamics operators move *state* and Rewire
+moves *relations*, both while the node set stays fixed; living matter also rewrites
+its own membership. **Divide** $\mathcal{B}: x \mapsto \{x',x''\}$ (proliferation)
+and **Die** $\mathcal{D}: x \mapsto \varnothing$ (apoptosis / efflux) are the only
+operators that change the *entities* themselves — the cardinality $|S_k|$. For a
+*living* system they are as primordial as the four dynamics operators: a tissue is
+defined as much by the cells it makes and loses as by how they move. Everything
+else assumes the cells it acts on already exist.
 
-![The operators, in two families. The first four are *dynamics* — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment $\pi$; Exchange to/from a field). The last three are *structure* operators that emit no state delta: *Rewire* rebuilds the relation $E$ — which nodes interact (a radius graph rebuilt each tick, dashed cutoff) — while *Divide* and *Die* change the node set $|S_k|$, carried on a fixed buffer by a per-element occupancy mass $w$.](figures/fig_ops.png){width=100%}
+![The operators, grouped by what they change. The first four are *dynamics* — they move *state* along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment $\pi$; Exchange to/from a field). The last three return no state delta: *Rewire* changes the *relations* — the edge set $E$, which nodes interact (a radius graph rebuilt each tick, dashed cutoff); *Divide* and *Die* change the *entities* — the node set $|S_k|$, on a fixed buffer with per-element occupancy $w$.](figures/fig_ops.png){width=100%}
 
 ### Differentiating division and death
 
@@ -189,9 +221,9 @@ code.
 | up op | reduction over fibres | $\sum_\pi$ | `Aggregate` |
 | down op | lift | $\pi^{*}$ | `Broadcast` |
 | set $\leftrightarrow$ field op | transfer | $\mathcal{S},\mathcal{G}$ | `Exchange` |
-| rebuild the relation | structure: rewire | $\mathcal{R}\!:\,\to\!E$ | `Rewire` |
-| make an element | structure: division | $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ | `Divide` |
-| remove an element | structure: death | $\mathcal{D}:x\!\mapsto\!\varnothing$ | `Die` |
-| per-element occupancy | mass | $w_i\in[0,1]$ | `Level.mass` |
+| rebuild the relation | relations: rewire | $\mathcal{R}\!:\,\to\!E$ | `Rewire` |
+| make an element | entities: division | $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ | `Divide` |
+| remove an element | entities: death | $\mathcal{D}:x\!\mapsto\!\varnothing$ | `Die` |
+| per-element occupancy | occupancy | $w_i\in[0,1]$ | `Level.occ` |
 | the container | hierarchy | $(S_\bullet,F_\bullet,\pi_\bullet)$ | `Hierarchy` |
 | the model | composition of ops | $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ | `Schedule` |

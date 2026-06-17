@@ -15,6 +15,7 @@ up -- the loop shape stays the same.
 from __future__ import annotations
 
 import os
+import math
 import numpy as np
 import torch
 
@@ -65,6 +66,25 @@ def _resolve_prediction(sim: Spec) -> dict:
 # --------------------------------------------------------------------------- #
 #  build: spec -> Hierarchy
 # --------------------------------------------------------------------------- #
+def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
+    """Assign node_type by per-type fraction over the buffer, and build the per-type
+    parameter table the operator indexes (the inverse-problem target)."""
+    types = s.get("types")
+    if not types:
+        return
+    lvl.type_names = list(types.keys())
+    node_type = torch.zeros(lvl.n, dtype=torch.long, device=device)
+    perm = torch.randperm(lvl.n, generator=H.rng, device=device)
+    start = 0
+    for tid, t in enumerate(types.values()):
+        k = int(round(t["fraction"] * lvl.n))
+        node_type[perm[start:start + k]] = tid; start += k
+    lvl.register_buffer("node_type", node_type)
+    if all("p" in t for t in types.values()):
+        P = torch.tensor([list(t["p"]) for t in types.values()], dtype=torch.float32, device=device)
+        lvl.register_buffer("type_params", P)
+
+
 def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H = Hierarchy()
     H.config = sim
@@ -72,9 +92,10 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H.world_width = float(sim.world)
     H.periodic = (sim.boundary == "periodic")
 
+    # pass 1: top-level sets (no parent) -- positions seeded across the domain.
     for sname, s in sim.sets.items():
         if "parent" in s:
-            continue                                   # contained (leaf) set: lands with containment
+            continue
         n = int(s["n"])
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
         schema, render, level = _entity_meta(sname)    # state-column semantics from the registry
@@ -90,23 +111,36 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
+        _assign_types(lvl, s, H, device)
+        H.add_level(lvl)
 
-        types = s.get("types")
-        if types:                                      # assign node_type by fraction (deterministic)
-            lvl.type_names = list(types.keys())
-            node_type = torch.zeros(buffer, dtype=torch.long, device=device)
-            perm = torch.randperm(n, generator=H.rng, device=device)
-            start = 0
-            for tid, t in enumerate(types.values()):
-                k = int(round(t["fraction"] * n))
-                node_type[perm[start:start + k]] = tid; start += k
-            lvl.register_buffer("node_type", node_type)
-            # per-type parameter table (the inverse-problem target), built from the
-            # spec types' `p` vectors -> the operator indexes it by node_type
-            if all("p" in t for t in types.values()):
-                P = torch.tensor([list(t["p"]) for t in types.values()],
-                                 dtype=torch.float32, device=device)
-                lvl.register_buffer("type_params", P)
+    # pass 2: contained sets -- the typed containment graph. Each child set is
+    # mapped to its parent (`parent` index + `parent_name`) and scattered within
+    # it; a parent may have MANY child sets of different roles (membrane,
+    # cytoplasm, nucleus, molecule), so a parent entity is a bundle of fibres.
+    for sname, s in sim.sets.items():
+        if "parent" not in s:
+            continue
+        pname = s["parent"]
+        if pname not in H.levels:
+            raise ValueError(f"set {sname!r} has parent {pname!r}, which is not a declared set")
+        parent = H.level(pname)
+        per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
+        schema, render, level = _entity_meta(sname)
+        dim = max(b for _, b in schema.values())
+        Np = parent.n * per                                       # one block of `per` children per parent slot
+        parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per)
+        ppos = parent.get("pos")[parent_idx]                      # each child's parent position
+        r = torch.sqrt(torch.rand(Np, generator=H.rng, device=device)) * radius
+        th = torch.rand(Np, generator=H.rng, device=device) * 2 * math.pi
+        state = torch.zeros(Np, dim, device=device)
+        px0, px1 = schema["pos"]
+        state[:, px0:px1] = ppos + torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
+        occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
+        lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
+                    parent=parent_idx, parent_name=pname, role=s.get("role"))
+        lvl.render = render
+        _assign_types(lvl, s, H, device)
         H.add_level(lvl)
 
     return H
