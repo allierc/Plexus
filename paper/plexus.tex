@@ -1100,4 +1100,117 @@ This is the contract that lets the LLM operate at the top (intent $\to$ simulati
 plus occasional single-operator authoring) while the low-level code stays a clean,
 growing, verifiable registry underneath.
 
+\appendix
+\part*{Appendix}
+\addcontentsline{toc}{section}{Appendix --- Plexus and Lean}
+
+\section{Plexus and Lean: a structural correspondence}
+\label{sec:lean}
+
+Plexus and a proof assistant such as \textsc{Lean} do not look alike --- one rolls
+out tissue dynamics, the other checks mathematics --- yet they attack the same
+meta-problem: \emph{how do you build complex objects from a small set of primitive
+constructions while preserving correctness?} The resemblance is sharpest at the
+\emph{architecture}, looser at the \emph{semantics}, and points at an even closer
+relative. It is worth spelling out, because it explains \emph{why} the parts of
+Plexus that feel most principled are exactly the parts it shares with a theorem
+prover.
+
+\paragraph{The shared architecture: an LCF kernel.} Both are instances of Milner's
+\textbf{LCF design} (the lineage \textsc{Lean}, \textsc{HOL}, and \textsc{Isabelle}
+all inherit): a \emph{small trusted kernel}, an \emph{abstract type of ``theorems''}
+constructible only by kernel-sanctioned steps, and an \emph{untrusted tactic layer}
+that searches for those steps. Plexus is recognizably the same pattern --- the
+\textbf{validated \code{Spec}} is the abstract type of theorems (you obtain one only
+by passing the validator); the \textbf{engine} is the kernel (small, generic, never
+branching on a simulation's name); the \textbf{LLM} is the tactic layer (powerful,
+heuristic, untrusted, replaceable). This is the thesis of Part~II in borrowed
+vocabulary: \emph{trust the kernel-checked artifact, not the generator that proposed
+it.}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}\footnotesize
+\begin{tabular}{@{}ll p{5.9cm}@{}}
+\toprule
+\textbf{Lean} & \textbf{Plexus} & \textbf{The correspondence} \\
+\midrule
+type                    & typed set $S_\alpha$            & an identity: Plexus is many-sorted \\
+term $x\!:\!T$          & entity $x\in S_\alpha$          & an identity \\
+function $A\!\to\!B$    & containment map $\pi_{\alpha\to\beta}$ & literal; \emph{operators} are transition rules, not functions \\
+kernel                  & engine                          & strong: a small generic trusted core \\
+type checker            & schema validator                & strong: rejects ill-formed input before it runs \\
+tactic                  & LLM compiler                    & strong: an untrusted elaborator emitting a checkable artifact \\
+mathematical library    & operator registry               & strong: a monotone, reusable library \\
+proof term              & the spec (schedule $+$ operators) & good: the constructed program \\
+reduction / elaboration & running the engine              & partial: a dynamical \emph{flow}, not normalization \\
+theorem (the goal)      & the intent                      & weak: the proposition lives \emph{outside} the type system \\
+proof checking          & the intent (``verify'') check   & weak: empirical, not deductive \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Two refinements.} The top rows are tighter than a loose analogy: after
+Section~\ref{sec:graph}, \emph{sorts are types} and \emph{entities are terms}
+outright. But ``function'' splits in two --- the \emph{containment maps}
+$\pi_{\alpha\to\beta}:S_\alpha\to S_\beta$ are the literal functions between sorts,
+whereas \emph{operators} are transition rules (they transform state; they are not
+maps of terms). And ``theorem'' belongs not on the simulation but on the
+\emph{intent}: the intent is the goal, the spec is the proof term, running the
+engine is elaboration, the trajectory is the \emph{witness}, and the intent check
+asks whether the witness meets the goal.
+
+\paragraph{Where the analogy breaks --- and what that teaches.}
+\begin{itemize}\itemsep2pt
+\item \textbf{Soundness vs.\ well-formedness.} Lean's kernel certifies \emph{truth};
+Plexus's validator certifies only \emph{runnability}. A spec that type-checks can
+still produce nonsense --- precisely ``it ran $\neq$ it worked''
+(Section~\ref{sec:gaps}). The only thing playing the role of soundness is the
+empirical intent check: a measured threshold, not a derivation. Plexus's gate is a
+\emph{type} gate, not a \emph{truth} gate.
+\item \textbf{No Curry--Howard.} In Lean a proposition \emph{is} a type and a proof
+\emph{is} a term. In Plexus the proposition --- the desired behaviour --- lives
+outside the type system and is checked by measurement. And Plexus is
+\emph{many-sorted, not dependent}: nearer a typed first-order signature (the sorts
+of SMT, or algebraic specification) than dependent type theory.
+\item \textbf{Reduction vs.\ dynamics, and differentiability.} The kernel
+\emph{normalizes} (terminating, exact); the engine \emph{integrates a flow}
+$x_{t+1}=\Phi(x_t)$ that is often chaotic (boids trajectories diverge at
+floating-point precision). And Plexus operators are \emph{differentiable} ---
+gradients flow through the rollout --- which has no analogue in proof checking. Here
+Plexus is richer in an orthogonal direction: at once a checked compositional system
+and a smooth, optimizable program.
+\end{itemize}
+
+\paragraph{The closer cousin: rewriting logic.} For the tightest structural match,
+look not to Lean but to \textbf{Maude} / rewriting logic, which \emph{is} typed
+compositional state-transition with a strategy for applying rules:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}\footnotesize
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Rewriting logic (Maude)} & \textbf{Plexus} \\
+\midrule
+sorts                        & typed sets $S_\alpha$ \\
+operators (\code{op})        & operators \\
+rewrite rules                & the dynamics of one tick \\
+the strategy language        & the schedule \\
+membership equational logic  & the schema and \code{REQUIRES\_*} contracts \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Lean and Plexus share a \emph{trust architecture}; Maude and Plexus share
+a \emph{semantics}. A theorem prover is about static deduction; rewriting logic is
+about typed dynamics --- and Plexus is dynamics.
+
+\paragraph{Summary.} Plexus is, in one line, an \textbf{LCF-style proof assistant
+whose proofs are simulations}. It inherits the kernel\,/\,validator\,/\,library\,/\,tactic
+architecture and the many-sorted typing, but not the soundness guarantee: its
+theorems are \emph{empirical witnesses}, not deductive certainties. That is both its
+limitation --- no proof that a spec ``works'', only a measurement that it did --- and
+its distinctive richness: unlike a proof term, a Plexus spec is a differentiable,
+dynamical object one can optimize. The mathematics it most wants to \emph{be} is not
+type theory but rewriting logic.
+
 \end{document}
