@@ -699,6 +699,92 @@ schedule: [wave_acoustic]</pre></span></span>
       <span class="sim-cap">field: acoustic waves focused by a lens</span>
     </figcaption>
   </figure>
+  <figure class="sim-card">
+    <video src="gallery/ns_rayleigh_benard.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">ns_rayleigh_benard<span class="sim-spec"><pre># Rayleigh-Benard convection -&gt; the_well/rayleigh_benard. Hot (buoyant) fluid under
+# cold; body_force(buoyancy) drives rolls. Schedule = buoyancy + advect + diffuse +
+# project + advect(T). This is what advect+poisson_solve unlock together.
+name: ns_rayleigh_benard
+seed: 2
+n_frames: 700
+record_every: 4
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: rayleigh_benard, seed: 0.03, width: 0.05}}
+operators:
+  - {op: body_force, at: fluid, scalar: 2, g: 28.0, ref: 0.5, dt_sub: 0.006}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.012}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [2], D: 0.00002, dt_sub: 0.012}
+schedule: [body_force, advect, diffuse, poisson_solve, advect, diffuse]</pre></span></span>
+      <span class="sim-cap">field: Rayleigh–Bénard convection rolls (Navier–Stokes)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/ns_vortices.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">ns_vortices<span class="sim-spec"><pre># Decaying 2D turbulence: six random vortices merge and form coherent structures
+# (the inverse cascade). advect + project only.
+name: ns_vortices
+seed: 4
+n_frames: 520
+record_every: 3
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: vortices, n: 8, bands: 8}}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,2,3], dt_sub: 0.005, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00002, dt_sub: 0.01}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+schedule: [advect, diffuse, poisson_solve]</pre></span></span>
+      <span class="sim-cap">field: decaying 2-D turbulence, vortices merge (Navier–Stokes)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/ns_taylor_green.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">ns_taylor_green<span class="sim-spec"><pre># Taylor-Green vortex decay -- the canonical incompressible-NS test (vortex lattice
+# that cascades to small scales). Pure advect + project, viscous decay.
+name: ns_taylor_green
+seed: 0
+n_frames: 420
+record_every: 3
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: taylor_green, U: 0.8}}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,2,3], dt_sub: 0.004, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.008}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+schedule: [advect, diffuse, poisson_solve]</pre></span></span>
+      <span class="sim-cap">field: Taylor–Green vortex decay (Navier–Stokes)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/ns_rayleigh_taylor.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">ns_rayleigh_taylor<span class="sim-spec"><pre># Rayleigh-Taylor instability -&gt; the_well/rayleigh_taylor_instability. Heavy fluid
+# above light; body_force with g&lt;0 makes it sink into fingers/mushrooms.
+name: ns_rayleigh_taylor
+seed: 3
+n_frames: 700
+record_every: 4
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: rayleigh_taylor, amp: 0.012, k: 3}}
+operators:
+  - {op: body_force, at: fluid, scalar: 2, g: -26.0, ref: 0.5, dt_sub: 0.006}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00003, dt_sub: 0.012}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
+schedule: [body_force, advect, diffuse, poisson_solve, advect]</pre></span></span>
+      <span class="sim-cap">field: Rayleigh–Taylor fingering instability (Navier–Stokes)</span>
+    </figcaption>
+  </figure>
 </div>
 
 <h2>Mixtures — several mechanisms in one world</h2>
@@ -812,6 +898,67 @@ operators:
   - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: 0.0020}
 schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]</pre></span></span>
       <span class="sim-cap">a Vicsek flock climbs a morphogen gradient</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mix_acoustic_push.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">mix_acoustic_push<span class="sim-spec"><pre># MIX (2 families): an ACOUSTIC wave + particles pushed by its pressure gradient.
+# wave_acoustic(field) + active_matter(set) coupled by the SAME chemotaxis op, just
+# pointed at the pressure channel -&gt; expanding wavefronts herd the swarm.
+name: mix_acoustic_push
+seed: 0
+n_frames: 600
+record_every: 3
+world: 1.0
+fields: {acoustic: {frame: grid, res: 128, channels: 3, bc: periodic}}
+sets: {active: {n: 3000}}
+init:
+  acoustic: {rho: {kind: uniform, value: 1.0}, p: {seed: rings, n: 3}}
+operators:
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 4, sponge: 0.0}
+  - {op: radius_graph, at: active, radius: 0.05}
+  - {op: active_matter, at: active, v0: 0.003, noise: 0.10}
+  - {op: chemotaxis, at: active, from_field: acoustic, channel: 0, gain: -0.0010}
+schedule: [wave_acoustic, radius_graph, active_matter, chemotaxis]</pre></span></span>
+      <span class="sim-cap">expanding acoustic wavefronts herd a swarm</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/mix_world.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">mix_world<span class="sim-spec"><pre># MIX: all three operator families in ONE schedule, one world.
+#   reaction_diffusion -&gt; a Gray-Scott morphogen pattern (FIELD)
+#   wave_acoustic      -&gt; an acoustic ripple in the same domain (FIELD)
+#   active_matter      -&gt; Vicsek particles that flock (SET)         + radius_graph (Rewire)
+#   chemotaxis         -&gt; particles climb the morphogen&#x27;s B channel (EXCHANGE set&lt;-&gt;field)
+# Flocking and chemotaxis deltas simply SUM on the particle set (the framework&#x27;s
+# &#x27;several operators on one set, deltas add&#x27; rule). Mixing is just a longer schedule.
+name: mix_world
+seed: 1
+n_frames: 600
+record_every: 3
+world: 1.0
+fields:
+  chem:     {frame: grid, res: 128, channels: 2, bc: periodic}
+  acoustic: {frame: grid, res: 128, channels: 3, bc: periodic}
+sets:
+  active: {n: 3000}
+init:
+  chem:
+    A: 1.0
+    B: {seed: clusters, n: 18, radius: 2.0, value: 1.0}
+  acoustic:
+    rho: {kind: uniform, value: 1.0}
+    p: {seed: rings, n: 3}
+operators:
+  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, substeps: 12}
+  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 4, sponge: 0.0}
+  - {op: radius_graph, at: active, radius: 0.05}
+  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
+  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: 0.0006}
+schedule: [reaction_diffusion, wave_acoustic, radius_graph, active_matter, chemotaxis]</pre></span></span>
+      <span class="sim-cap">all three operator families coupled in one world</span>
     </figcaption>
   </figure>
 </div>

@@ -59,12 +59,18 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("wave_double_slit", "prototype/well/wave_double_slit.gif", "prototype/well/scenarios/wave_double_slit.yaml", "field: acoustic double-slit diffraction"),
         ("wave_helmholtz_staircase", "prototype/well/wave_helmholtz_staircase.gif", "prototype/well/scenarios/wave_helmholtz_staircase.yaml", "field: waves scattering off a periodic staircase"),
         ("wave_lens", "prototype/well/wave_lens.gif", "prototype/well/scenarios/wave_lens.yaml", "field: acoustic waves focused by a lens"),
+        ("ns_rayleigh_benard", "prototype/well/ns_rayleigh_benard.gif", "prototype/well/scenarios/ns_rayleigh_benard.yaml", "field: Rayleigh–Bénard convection rolls (Navier–Stokes)"),
+        ("ns_vortices", "prototype/well/ns_vortices.gif", "prototype/well/scenarios/ns_vortices.yaml", "field: decaying 2-D turbulence, vortices merge (Navier–Stokes)"),
+        ("ns_taylor_green", "prototype/well/ns_taylor_green.gif", "prototype/well/scenarios/ns_taylor_green.yaml", "field: Taylor–Green vortex decay (Navier–Stokes)"),
+        ("ns_rayleigh_taylor", "prototype/well/ns_rayleigh_taylor.gif", "prototype/well/scenarios/ns_rayleigh_taylor.yaml", "field: Rayleigh–Taylor fingering instability (Navier–Stokes)"),
     ],
     "Mixtures — several mechanisms in one world": [
         ("mix_avoid", "prototype/well/mix_avoid.gif", "prototype/well/scenarios/mix_avoid.yaml", "particles flee a reaction–diffusion ridge field"),
         ("mix_slime4", "prototype/well/mix_slime4.gif", "prototype/well/scenarios/mix_slime4.yaml", "four slime species run two coupled networks"),
         ("mix_taxis_maze_A", "prototype/well/mix_taxis_maze_A.gif", "prototype/well/scenarios/mix_taxis_maze.yaml", "particles trace a Gray–Scott maze morphogen"),
         ("mix_chemotaxis", "prototype/well/mix_chemotaxis.gif", "prototype/well/scenarios/mix_chemotaxis.yaml", "a Vicsek flock climbs a morphogen gradient"),
+        ("mix_acoustic_push", "prototype/well/mix_acoustic_push.gif", "prototype/well/scenarios/mix_acoustic_push.yaml", "expanding acoustic wavefronts herd a swarm"),
+        ("mix_world", "prototype/well/mix_world.gif", "prototype/well/scenarios/mix_world.yaml", "all three operator families coupled in one world"),
     ],
     "Microswimmers": [
         ("motile", "prototype/microswimmer/motile.gif", "prototype/microswimmer/motile.yaml", "active self-propelled swimmers"),
