@@ -1,0 +1,142 @@
+#!/usr/bin/env python
+"""Generate the Simulations gallery page (experiment.qmd) for the Quarto minisite.
+
+For each curated simulation it (1) transcodes the prototype render (a large GIF, or
+an mp4 from graphs_data) into a small, web-friendly looping mp4 under gallery/, and
+(2) reads the simulation's spec.yaml. It then emits experiment.qmd as a grid of
+cards: each card autoplays its clip, and hovering (or focusing) the title reveals
+the full spec.yaml in a popover.
+
+Run:  python scripts/make_gallery.py     (from the repo root)
+
+The gallery/ mp4s live outside prototype/ (which is gitignored for media), so they
+ship with the site; Quarto copies them into docs/gallery/ on render.
+"""
+from __future__ import annotations
+import html
+import os
+import subprocess
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
+FFMPEG = "/workspace/.conda_envs/neural-graph-linux/bin/ffmpeg"
+GD = "/groups/saalfeld/home/allierc/GraphData/graphs_data"
+OUT = "gallery"
+
+# family -> [(name, source video (gif/mp4), spec.yaml, caption)]
+CURATED: dict[str, list[tuple[str, str, str, str]]] = {
+    "Attraction–repulsion & boids — validated against ParticleGraph": [
+        ("arbitrary_3", f"{GD}/attraction_repulsion/arbitrary_3/movie_particle.mp4",
+         "config/attraction_repulsion/arbitrary_3.yaml",
+         "3 types, 30k particles; per-type difference-of-Gaussians law (reproduces PDE_A)"),
+        ("boids_16", f"{GD}/boids/boids_16/movie_particle.mp4",
+         "config/boids/boids_16.yaml",
+         "16 types of boid; cohesion/alignment/separation (reproduces PDE_B)"),
+    ],
+    "Ant colony — foraging & stigmergy": [
+        ("ant_colony", "prototype/ant/ant_colony.gif", "prototype/ant/specs/ant_colony.yaml", "a colony forages and lays trails"),
+        ("ant_highway", "prototype/ant/ant_highway.gif", "prototype/ant/specs/ant_highway.yaml", "trails coarsen into a dominant highway"),
+        ("ant_islands", "prototype/ant/ant_islands.gif", "prototype/ant/specs/ant_islands.yaml", "food on separate islands"),
+        ("ant_many_food", "prototype/ant/ant_many_food.gif", "prototype/ant/specs/ant_many_food.yaml", "many food sources, competing trails"),
+    ],
+    "Slime mould — Physarum networks": [
+        ("slime_default", "prototype/slime/slime_default.gif", "prototype/slime/specs/slime_default.yaml", "self-reinforcing transport network"),
+        ("slime_curly", "prototype/slime/slime_curly.gif", "prototype/slime/specs/slime_curly.yaml", "high turning rate, curly filaments"),
+        ("slime_filaments", "prototype/slime/slime_filaments.gif", "prototype/slime/specs/slime_filaments.yaml", "fine filamentary structure"),
+        ("slime_eight", "prototype/slime/slime_eight.gif", "prototype/slime/specs/slime_eight.yaml", "eight sources"),
+    ],
+    "MPM fluids & materials": [
+        ("mat_liquid", "prototype/water/mat_liquid.gif", "prototype/scenarios/mat_liquid.yaml", "liquid material (no shear memory)"),
+        ("mat_elastic", "prototype/water/mat_elastic.gif", "prototype/scenarios/mat_elastic.yaml", "elastic material (shape memory)"),
+        ("ph_crown_splash", "prototype/water/ph_crown_splash.gif", "prototype/scenarios/ph_crown_splash.yaml", "a drop hits a pool: crown splash"),
+        ("ph_slosh", "prototype/water/ph_slosh.gif", "prototype/scenarios/ph_slosh.yaml", "sloshing in a vessel"),
+    ],
+    "Microswimmers": [
+        ("motile", "prototype/microswimmer/motile.gif", "prototype/microswimmer/motile.yaml", "active self-propelled swimmers"),
+        ("feeding", "prototype/microswimmer/feeding.gif", "prototype/microswimmer/feeding.yaml", "feeding on a resource field"),
+        ("sessile", "prototype/microswimmer/sessile.gif", "prototype/microswimmer/sessile.yaml", "attached, beating cilia"),
+    ],
+    "Dictyostelium — aggregation": [
+        ("dicty_aggregate", "prototype/dicty/dicty_aggregate.gif", "prototype/dicty/specs/dicty_aggregate.yaml", "chemotactic aggregation to a mound"),
+        ("dicty_winner", "prototype/dicty/dicty_opt_winner_1.gif", "prototype/dicty/specs/dicty_opt_winner_1.yaml", "an optimized aggregation design"),
+    ],
+}
+
+
+def transcode(src: str, dst: str) -> bool:
+    """GIF/mp4 -> small looping mp4 (≤460px wide, 20 fps, H.264)."""
+    if not os.path.exists(src):
+        print(f"  skip (missing): {src}")
+        return False
+    cmd = [FFMPEG, "-y", "-loglevel", "error", "-i", src, "-an",
+           "-movflags", "+faststart", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "30",
+           "-vf", "fps=20,scale='min(460,iw)':-2:flags=lanczos", dst]
+    subprocess.run(cmd, check=True)
+    return True
+
+
+def card(name: str, mp4: str, spec_path: str, caption: str) -> str:
+    spec = html.escape(open(spec_path).read().rstrip()) if os.path.exists(spec_path) else "(spec not found)"
+    return f"""  <figure class="sim-card">
+    <video src="{mp4}" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">{name}<span class="sim-spec"><pre>{spec}</pre></span></span>
+      <span class="sim-cap">{html.escape(caption)}</span>
+    </figcaption>
+  </figure>"""
+
+
+STYLE = """<style>
+.sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.1rem;margin:1rem 0 2rem}
+.sim-card{margin:0}
+.sim-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
+.sim-card figcaption{margin-top:.35rem;line-height:1.25}
+.sim-name{font-weight:600;cursor:help;position:relative;border-bottom:1px dotted #999}
+.sim-cap{display:block;font-size:.84em;color:#777;margin-top:.1rem}
+.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(300px,108%);max-height:360px;overflow:auto;
+  background:#1e1e1e;border-radius:7px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:.5rem .7rem;text-align:left;cursor:auto}
+.sim-name:hover .sim-spec,.sim-name:focus .sim-spec{display:block}
+.sim-spec pre{margin:0;font-size:.72em;line-height:1.3;white-space:pre;color:#e9e9e9;background:none;border:none;padding:0}
+</style>"""
+
+HEADER = """---
+title: "A spread of simulations"
+subtitle: "One engine, many living systems — hover a title to read its spec"
+resources:
+  - gallery/
+---
+
+The same engine and registry produce qualitatively different living systems by
+changing only the declarative spec. Each clip below is one `spec.yaml` over the
+identical operators and schedule grammar; **hover (or tab to) a simulation's title
+to read the exact spec that generated it.** The first two are validated to
+floating-point precision against [ParticleGraph](https://github.com/allierc/ParticleGraph).
+
+::: {.callout-note collapse="true"}
+## How a clip is made
+`Plexus_Main.py -o generate_plot <config>` runs the forward simulation, writes the
+trajectory, and renders the movie — no per-simulation code, only the spec differs.
+:::
+"""
+
+
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    blocks = [STYLE]
+    for family, sims in CURATED.items():
+        cards = []
+        for name, src, spec, cap in sims:
+            dst = f"{OUT}/{name}.mp4"
+            if transcode(src, dst):
+                cards.append(card(name, dst, spec, cap))
+                print(f"  ok: {name}  ({os.path.getsize(dst)//1024} KB)")
+        if cards:
+            blocks.append(f"<h2>{html.escape(family)}</h2>\n<div class=\"sim-gallery\">\n" +
+                          "\n".join(cards) + "\n</div>")
+    body = HEADER + "\n```{=html}\n" + "\n\n".join(blocks) + "\n```\n"
+    open("experiment.qmd", "w").write(body)
+    print(f"wrote experiment.qmd and {len(os.listdir(OUT))} clips in {OUT}/")
+
+
+if __name__ == "__main__":
+    main()
