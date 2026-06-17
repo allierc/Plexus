@@ -33,12 +33,6 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
          "config/boids/boids_16.yaml",
          "16 types of boid; cohesion/alignment/separation (reproduces PDE_B)"),
     ],
-    "Ant colony — foraging & stigmergy": [
-        ("ant_colony", "prototype/ant/ant_colony.gif", "prototype/ant/specs/ant_colony.yaml", "a colony forages and lays trails"),
-        ("ant_highway", "prototype/ant/ant_highway.gif", "prototype/ant/specs/ant_highway.yaml", "trails coarsen into a dominant highway"),
-        ("ant_islands", "prototype/ant/ant_islands.gif", "prototype/ant/specs/ant_islands.yaml", "food on separate islands"),
-        ("ant_many_food", "prototype/ant/ant_many_food.gif", "prototype/ant/specs/ant_many_food.yaml", "many food sources, competing trails"),
-    ],
     "Slime mould — Physarum networks": [
         ("slime_default", "prototype/slime/slime_default.gif", "prototype/slime/specs/slime_default.yaml", "self-reinforcing transport network"),
         ("slime_curly", "prototype/slime/slime_curly.gif", "prototype/slime/specs/slime_curly.yaml", "high turning rate, curly filaments"),
@@ -48,19 +42,38 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
     "MPM fluids & materials": [
         ("mat_liquid", "prototype/water/mat_liquid.gif", "prototype/scenarios/mat_liquid.yaml", "liquid material (no shear memory)"),
         ("mat_elastic", "prototype/water/mat_elastic.gif", "prototype/scenarios/mat_elastic.yaml", "elastic material (shape memory)"),
+        ("mat_snow", "prototype/water/mat_snow.gif", "prototype/scenarios/mat_snow.yaml", "snow / granular material"),
         ("ph_crown_splash", "prototype/water/ph_crown_splash.gif", "prototype/scenarios/ph_crown_splash.yaml", "a drop hits a pool: crown splash"),
+        ("ph_coalesce", "prototype/water/ph_coalesce.gif", "prototype/scenarios/ph_coalesce.yaml", "two drops coalesce under surface tension"),
         ("ph_slosh", "prototype/water/ph_slosh.gif", "prototype/scenarios/ph_slosh.yaml", "sloshing in a vessel"),
+        ("ob_dam_break", "prototype/water/ob_dam_break.gif", "prototype/scenarios/ob_dam_break.yaml", "dam break against an obstacle"),
+        ("ob_funnel", "prototype/water/ob_funnel.gif", "prototype/scenarios/ob_funnel.yaml", "draining through a funnel"),
+        ("water_bowl_1", "prototype/water/water_bowl_1.gif", "prototype/scenarios/water_bowl_1.yaml", "pouring water into a bowl"),
+    ],
+    "The Well — single mechanisms vs. mixtures": [
+        ("rd_worms", "prototype/well/rd_worms.gif", "prototype/well/scenarios/rd_worms.yaml", "single field: Gray–Scott reaction–diffusion"),
+        ("wave_lens", "prototype/well/wave_lens.gif", "prototype/well/scenarios/wave_lens.yaml", "single field: acoustic waves through a lens"),
+        ("am_swirl", "prototype/well/am_swirl.gif", "prototype/well/scenarios/am_swirl.yaml", "single set: Vicsek active matter, a swirl"),
+        ("mix_world", "prototype/well/mix_world.gif", "prototype/well/scenarios/mix_world.yaml", "a mixture: field + active set in one world"),
+        ("mix_taxis_spots", "prototype/well/mix_taxis_spots.gif", "prototype/well/scenarios/mix_taxis_spots.yaml", "a mixture: chemotaxis toward emergent spots"),
     ],
     "Microswimmers": [
         ("motile", "prototype/microswimmer/motile.gif", "prototype/microswimmer/motile.yaml", "active self-propelled swimmers"),
+        ("slipwave_motile", "prototype/microswimmer/slipwave_motile.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — slip-wave field overlay"),
+        ("vorticity_motile", "prototype/microswimmer/vorticity_motile.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — vorticity field overlay"),
         ("feeding", "prototype/microswimmer/feeding.gif", "prototype/microswimmer/feeding.yaml", "feeding on a resource field"),
         ("sessile", "prototype/microswimmer/sessile.gif", "prototype/microswimmer/sessile.yaml", "attached, beating cilia"),
     ],
-    "Dictyostelium — aggregation": [
-        ("dicty_aggregate", "prototype/dicty/dicty_aggregate.gif", "prototype/dicty/specs/dicty_aggregate.yaml", "chemotactic aggregation to a mound"),
-        ("dicty_winner", "prototype/dicty/dicty_opt_winner_1.gif", "prototype/dicty/specs/dicty_opt_winner_1.yaml", "an optimized aggregation design"),
-    ],
 }
+
+# Four representatives for the "What it looks like" hero strip: maximally different
+# collective behaviours, each a different operator family. (name, hero caption)
+HERO: list[tuple[str, str]] = [
+    ("boids_16", "flocking — collective motion from local rules"),
+    ("slime_filaments", "a self-organizing Physarum transport network"),
+    ("ph_crown_splash", "an MPM fluid: a drop crowns on impact"),
+    ("rd_worms", "a Gray–Scott reaction–diffusion field"),
+]
 
 
 def transcode(src: str, dst: str) -> bool:
@@ -88,6 +101,7 @@ def card(name: str, mp4: str, spec_path: str, caption: str) -> str:
 
 STYLE = """<style>
 .sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.1rem;margin:1rem 0 2rem}
+.sim-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.3rem;margin:1.2rem 0 2.5rem}
 .sim-card{margin:0}
 .sim-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
 .sim-card figcaption{margin-top:.35rem;line-height:1.25}
@@ -106,11 +120,19 @@ resources:
   - gallery/
 ---
 
-The same engine and registry produce qualitatively different living systems by
-changing only the declarative spec. Each clip below is one `spec.yaml` over the
-identical operators and schedule grammar; **hover (or tab to) a simulation's title
-to read the exact spec that generated it.** The first two are validated to
-floating-point precision against [ParticleGraph](https://github.com/allierc/ParticleGraph).
+## What it looks like
+
+Qualitatively different collective behaviours, all produced from the same code by
+changing only a ~20-line specification — no new software per phenomenon.
+"""
+
+INTRO = """
+## Browse the families
+
+Each clip below is one `spec.yaml` over the identical operators and schedule grammar;
+**hover (or tab to) a simulation's title to read the exact spec that generated it.**
+The first two are validated to floating-point precision against
+[ParticleGraph](https://github.com/allierc/ParticleGraph).
 
 ::: {.callout-note collapse="true"}
 ## How a clip is made
@@ -122,6 +144,13 @@ trajectory, and renders the movie — no per-simulation code, only the spec diff
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    for f in os.listdir(OUT):                       # clean slate: drop clips of de-curated sims
+        if f.endswith(".mp4"):
+            os.remove(os.path.join(OUT, f))
+
+    # one lookup of spec paths so the hero can reuse already-transcoded clips
+    spec_of = {name: spec for sims in CURATED.values() for name, _, spec, _ in sims}
+
     blocks = [STYLE]
     for family, sims in CURATED.items():
         cards = []
@@ -133,7 +162,13 @@ def main():
         if cards:
             blocks.append(f"<h2>{html.escape(family)}</h2>\n<div class=\"sim-gallery\">\n" +
                           "\n".join(cards) + "\n</div>")
-    body = HEADER + "\n```{=html}\n" + "\n\n".join(blocks) + "\n```\n"
+
+    # hero strip of four representatives (clips already transcoded above)
+    hero_cards = [card(name, f"{OUT}/{name}.mp4", spec_of[name], cap) for name, cap in HERO]
+    hero = "<div class=\"sim-hero\">\n" + "\n".join(hero_cards) + "\n</div>"
+
+    body = (HEADER + "\n```{=html}\n" + STYLE + "\n" + hero + "\n```\n" +
+            INTRO + "\n```{=html}\n" + "\n\n".join(blocks[1:]) + "\n```\n")
     open("experiment.qmd", "w").write(body)
     print(f"wrote experiment.qmd and {len(os.listdir(OUT))} clips in {OUT}/")
 
