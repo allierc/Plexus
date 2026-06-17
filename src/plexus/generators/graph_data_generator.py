@@ -1,7 +1,7 @@
 """Ground-truth data generation: run a spec's forward simulation, save it.
 
 This is the Plexus analogue of connectome-gnn's `data_generate`: given a validated
-`Simulation`, it builds the Hierarchy, rolls the schedule forward through the
+`Spec`, it builds the Hierarchy, rolls the schedule forward through the
 engine, and writes the trajectory dataset (+ a preview) under
 
     {data_root}/graphs_data/<pre_folder>/<name>/
@@ -17,13 +17,13 @@ import shutil
 
 import numpy as np
 
-from plexus.simulation import Simulation
+from plexus.schema import Spec
 from plexus.engine import run
 from plexus.paths import graphs_data_path
 
 
 def data_generate(
-    sim: Simulation,
+    sim: Spec,
     pre_folder: str,
     device: str = "cpu",
     erase: bool = False,

@@ -1,23 +1,19 @@
-"""The simulation spec: load + VALIDATE -- the contract gatekeeper.
+"""The spec schema: load + VALIDATE -- the contract gatekeeper.
 
-A complete Plexus run is a single declarative `spec.yaml`: `sets`, `fields`,
-`operators` (+ selectors), and a `schedule`. This module parses it into typed
-objects and fails loudly with a precise message if anything is off -- an
-unregistered operator, an unknown set/field reference, a malformed selector, type
-fractions that do not sum to one, a required property missing along the
-containment chain, or a schedule token that does not resolve. The guarantee:
+A complete Plexus run is a single declarative `spec.yaml` (`general`, `sets`,
+`fields`, `operators` (+ selectors), `schedule`, `plotting`). This module is the
+schema: it parses the file into typed objects (`Spec`, `OpSpec`, `Selector`) and
+fails loudly with a precise message if anything is off -- an unregistered
+operator, an unknown set/field reference, a malformed selector, type fractions
+that do not sum to one, a required property missing along the containment chain,
+or a schedule token that does not resolve. The guarantee:
 
     a spec that loads here is runnable by the engine.
 
-It imports the registry (to resolve operator names + their capability contracts)
-but NEVER the engine -- pure validation, no execution. The operator modules must
+It defines and validates the spec; the engine *runs* a `Spec`. This module
+imports the registry (to resolve operator names + their capability contracts) but
+NEVER the engine -- pure validation, no execution. The operator modules must
 already be imported by the caller so the registry is populated.
-
-(Promoted from the prototype's `scenario_schema.py`; renamed `Scenario` ->
-`Simulation` to match the build plan, which uses "simulation" throughout. Two
-additions over the prototype: the `buffer` set-spec field -- the occupancy
-allocation a cardinality-changing run needs -- and a defensive check that every
-operator carries a recognised `KIND`.)
 """
 
 from __future__ import annotations
@@ -60,7 +56,7 @@ class OpSpec:
 
 
 @dataclass
-class Simulation:
+class Spec:
     name: str
     seed: int
     n_frames: int
@@ -79,7 +75,7 @@ _RESERVED = {"op", "at", "to", "from"}
 _BUILTIN_STEPS = {"aggregate"}                      # plus '<field>.diffuse'; integration is implicit (end of tick)
 
 
-def load(path: str) -> Simulation:
+def load(path: str) -> Spec:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
@@ -194,7 +190,7 @@ def load(path: str) -> Simulation:
             if tok not in op_names:
                 raise ValueError(f"schedule step {tok!r} is not a declared operator or builtin")
 
-    return Simulation(
+    return Spec(
         name=gv("name"),
         seed=int(gv("seed", 0)),
         n_frames=int(gv("n_frames", 200)),

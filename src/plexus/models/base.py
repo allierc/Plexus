@@ -249,7 +249,7 @@ class Hierarchy(nn.Module):
     """Ordered Levels (bottom-up) + a flat set of Fields, plus run-time scratch.
 
     The engine attaches per-run state as plain attributes (an `nn.Module` allows
-    it): `config` (the validated Simulation), `rng` (a seeded generator for
+    it): `config` (the validated Spec), `rng` (a seeded generator for
     determinism), world geometry (`world_width`, `periodic`), and the per-level
     **delta accumulators** that realise the integration model.
 

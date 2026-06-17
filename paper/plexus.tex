@@ -835,7 +835,7 @@ must be stored, or the run is not bit-reproducible.
 \item \code{models/base.py} --- entities, operator base, the capability-contract fields.
 \item \code{models/registry.py} --- the only name$\to$code map (entity / operator / field).
 \item \code{models/<domain>/*.py} --- operators, one concern per file, each declaring \code{REQUIRES\_*}.
-\item \code{simulation.py} --- the schema $+$ validator (the contract gatekeeper).
+\item \code{schema.py} --- the schema $+$ validator (the contract gatekeeper).
 \item \code{engine.py} --- generic; contains \textbf{no} simulation-specific logic.
 \item \code{viz.py} --- generic over the \code{Hierarchy}/\code{zarr}; swappable backends (2-D now, 3-D later).
 \item \code{archive.py} $+$ \code{simulations/} --- the growing, reproducible gallery.

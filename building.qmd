@@ -11,7 +11,7 @@ the LLM and the code co-evolve, and a short list of invariants that hold the lin
 - `models/base.py` — entities, operator base, the capability-contract fields.
 - `models/registry.py` — the only name→code map (entity / operator / field).
 - `models/<domain>/*.py` — operators, one concern per file, each declaring `REQUIRES_*`.
-- `simulation.py` — the schema + validator (the contract gatekeeper).
+- `schema.py` — the schema + validator (the contract gatekeeper).
 - `engine.py` — generic; contains **no** simulation-specific logic.
 - `viz.py` — generic over the `Hierarchy`/`zarr`; swappable backends (2-D now, 3-D later).
 - `archive.py` + `simulations/` — the growing, reproducible gallery.

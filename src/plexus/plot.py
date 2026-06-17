@@ -22,7 +22,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from plexus.simulation import Simulation
+from plexus.schema import Spec
 from plexus.paths import graphs_data_path
 from plexus.models.registry import get_entity
 import plexus.models.entities  # noqa: F401  register entity render hints
@@ -48,7 +48,7 @@ def _point_size(style: dict, n: int) -> float:
     return 8.0 if n <= 4000 else (4.0 if n <= 12000 else 2.0)
 
 
-def plot_dataset(sim: Simulation, pre_folder: str, movie: bool = False) -> str:
+def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     """Render a generated simulation's trajectory into its dataset directory.
     Returns the directory written to."""
     folder = pre_folder.rstrip("/")

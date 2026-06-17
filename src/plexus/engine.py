@@ -1,15 +1,16 @@
 """The generic engine: build a Hierarchy from a validated spec, run the schedule.
 
-This is the *interpreter* of the simulation language. It contains NO
-simulation-specific logic: it builds the sets the spec declares, instantiates the
-registered operators it names, and iterates the schedule. Operators are pure
-(return per-level deltas); the engine accumulates same-level deltas and the
-`integrate` builtin turns accumulated accel into next state.
+This is the *interpreter* of the spec language. It contains NO spec-specific
+logic: it builds the sets the spec declares, instantiates the registered
+operators it names, and iterates the schedule. Operators are pure (return
+per-level deltas); the engine sums same-level deltas during the tick and
+integrates each set once at the end (implicitly; the order -- 1st vs 2nd
+derivative -- comes from each operator's `PREDICTION`).
 
-Starting small (attraction/repulsion): a single top-level set, Newtonian update
-with damping, wall/periodic boundary. Containment (`aggregate`), fields
-(`<f>.diffuse`), MPM and cardinality change are stubbed with clear errors and get
-filled as we scale up -- the loop shape stays the same.
+Starting small (attraction/repulsion, boids): single top-level sets on a
+wall/periodic boundary. Containment (`aggregate`), fields (`<f>.diffuse`), MPM
+and cardinality change are stubbed with clear errors and get filled as we scale
+up -- the loop shape stays the same.
 """
 from __future__ import annotations
 
@@ -26,7 +27,7 @@ from plexus.models.registry import get_operator, get_entity
 import plexus.operators        # noqa: F401  self-registers the operator library
 import plexus.models.entities  # noqa: F401  self-registers entity state-schemas
 from plexus.models.entities import DEFAULT_STATE_SCHEMA, DEFAULT_RENDER
-from plexus.simulation import Simulation, Selector
+from plexus.schema import Spec, Selector
 
 
 def _entity_meta(sname: str) -> tuple[dict, dict, int]:
@@ -43,7 +44,7 @@ def _entity_meta(sname: str) -> tuple[dict, dict, int]:
     return schema, render, level
 
 
-def _resolve_prediction(sim: Simulation) -> dict:
+def _resolve_prediction(sim: Spec) -> dict:
     """set -> integration order, read from the PREDICTION of the force-emitting
     operators acting on it. All such operators on one set must agree (a set
     integrates as a single order); a conflict is a modelling error, raised here."""
@@ -64,7 +65,7 @@ def _resolve_prediction(sim: Simulation) -> dict:
 # --------------------------------------------------------------------------- #
 #  build: spec -> Hierarchy
 # --------------------------------------------------------------------------- #
-def build(sim: Simulation, device: str = "cpu") -> Hierarchy:
+def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H = Hierarchy()
     H.config = sim
     H.rng = torch.Generator(device=device).manual_seed(sim.seed)
@@ -153,7 +154,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
 # --------------------------------------------------------------------------- #
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
-def run(sim: Simulation, out_path: str | None = None, device: str = "cpu") -> tuple[Hierarchy, dict]:
+def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hierarchy, dict]:
     H = build(sim, device)
     H.predict = _resolve_prediction(sim)         # set -> integration order (from the operators)
     # (op_name, instance, selector); params carry the field refs + the set name (_at)

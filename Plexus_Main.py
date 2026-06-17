@@ -28,7 +28,7 @@ import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
 import plexus.operators  # noqa: F401  self-register the operator library
-from plexus.simulation import load
+from plexus.schema import load
 from plexus.paths import resolve_config, validate_pre_folder, set_data_root, log_path
 from plexus.generators.graph_data_generator import data_generate
 

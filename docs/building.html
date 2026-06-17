@@ -334,7 +334,7 @@ ul.task-list li input[type="checkbox"] {
 <li><code>models/base.py</code> — entities, operator base, the capability-contract fields.</li>
 <li><code>models/registry.py</code> — the only name→code map (entity / operator / field).</li>
 <li><code>models/&lt;domain&gt;/*.py</code> — operators, one concern per file, each declaring <code>REQUIRES_*</code>.</li>
-<li><code>simulation.py</code> — the schema + validator (the contract gatekeeper).</li>
+<li><code>schema.py</code> — the schema + validator (the contract gatekeeper).</li>
 <li><code>engine.py</code> — generic; contains <strong>no</strong> simulation-specific logic.</li>
 <li><code>viz.py</code> — generic over the <code>Hierarchy</code>/<code>zarr</code>; swappable backends (2-D now, 3-D later).</li>
 <li><code>archive.py</code> + <code>simulations/</code> — the growing, reproducible gallery.</li>
