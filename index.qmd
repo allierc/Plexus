@@ -108,8 +108,10 @@ each implements *one* graph type; a tissue needs them coexisting.
 
 ## What it looks like
 
-Qualitatively different collective behaviours, all produced from the *same code*
-by changing only a ~20-line specification — no new software per phenomenon.
+Qualitatively different dynamical systems expressed within the same language. Each
+simulation is constructed from the same primitives—sets, fields, operators, and
+schedules—yet gives rise to distinct collective behaviours spanning flocking,
+morphogenesis, fluid mechanics, reaction–diffusion, and active matter.
 
 ```{=html}
 <style>
