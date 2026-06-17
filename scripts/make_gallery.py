@@ -45,14 +45,15 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("slime_torus", "prototype/slime/slime_torus.gif", "prototype/slime/specs/slime_torus.yaml", "periodic (toroidal) domain"),
     ],
     "MPM fluids & materials": [
-        ("mat_liquid", "prototype/water/mat_liquid.gif", "prototype/scenarios/mat_liquid.yaml", "liquid material (no shear memory)"),
+        ("mat_liquid_1", "prototype/water/mat_liquid_1.gif", "prototype/scenarios/mat_liquid_1.yaml", "a big water ball drops, splashes, and settles into a pool"),
         ("mat_elastic", "prototype/water/mat_elastic.gif", "prototype/scenarios/mat_elastic.yaml", "elastic material (shape memory)"),
         ("mat_snow", "prototype/water/mat_snow.gif", "prototype/scenarios/mat_snow.yaml", "snow / granular material"),
         ("ph_crown_splash", "prototype/water/ph_crown_splash.gif", "prototype/scenarios/ph_crown_splash.yaml", "a drop hits a pool: crown splash"),
-        ("ph_coalesce", "prototype/water/ph_coalesce.gif", "prototype/scenarios/ph_coalesce.yaml", "two drops coalesce under surface tension"),
+        ("ob_zigzag", "prototype/water/ob_zigzag.gif", "prototype/scenarios/ob_zigzag.yaml", "water cascades down a zig-zag channel"),
         ("ph_slosh", "prototype/water/ph_slosh.gif", "prototype/scenarios/ph_slosh.yaml", "sloshing in a vessel"),
         ("ob_dam_break", "prototype/water/ob_dam_break.gif", "prototype/scenarios/ob_dam_break.yaml", "dam break against an obstacle"),
         ("ob_funnel", "prototype/water/ob_funnel.gif", "prototype/scenarios/ob_funnel.yaml", "draining through a funnel"),
+        ("ob_wedge", "prototype/water/ob_wedge.gif", "prototype/scenarios/ob_wedge.yaml", "a falling stream splits around a wedge"),
     ],
     "The Well — fields & active matter": [
         ("am_flock", "prototype/well/am_flock.gif", "prototype/well/scenarios/am_flock.yaml", "active matter: a coherent polar flock (Vicsek)"),

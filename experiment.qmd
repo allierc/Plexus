@@ -388,27 +388,31 @@ plotting:
 <h2>MPM fluids &amp; materials</h2>
 <div class="sim-gallery">
   <figure class="sim-card">
-    <video src="gallery/mat_liquid.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/mat_liquid_1.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">mat_liquid<span class="sim-spec"><pre>name: mat_liquid
+      <span class="sim-name" tabindex="0">mat_liquid_1<span class="sim-spec"><pre># mat_liquid_1: a BIG ball of water dropped into the box [0,1]^2 to check it fills the
+# container properly (should fall, splash, and settle into a flat-topped pool). Stiffer
+# than mat_liquid (E 80-&gt;300, less compressible) and NO surface tension so it spreads and
+# fills instead of balling up. More substeps (15) for liquid stability; low drag so it flows.
+name: mat_liquid_1
 seed: 0
-n_frames: 500
-record_every: 2
+n_frames: 700
+record_every: 3
 boundary: wall
 sets:
   cell:
     n: 1
-    start: [0.5, 0.80, 0.5, 0.80]
+    start: [0.5, 0.62, 0.5, 0.62]
     types:
-      ball: {fraction: 1.0, youngs: 200, layers: [{frac: 1.0, youngs: 80, material: liquid}]}
-  particle: {parent: cell, per_parent: 2200, radius: 0.11, density: 1.0}
+      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 4500, radius: 0.20, density: 1.0}
 fields:
   chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
 operators:
   - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.1, wall_damp: 0.9, surface_tension: 4000.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 15, dt_sub: 2.0e-4, a_max: 200, drag: 0.05, wall_damp: 1.0}
 schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">liquid material (no shear memory)</span>
+      <span class="sim-cap">a big water ball drops, splashes, and settles into a pool</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -485,28 +489,31 @@ schedule: [aggregate, gravity, mpm]</pre></span></span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/ph_coalesce.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/ob_zigzag.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">ph_coalesce<span class="sim-spec"><pre>name: ph_coalesce
+      <span class="sim-name" tabindex="0">ob_zigzag<span class="sim-spec"><pre>name: ob_zigzag
 seed: 0
-n_frames: 500
+n_frames: 1100
 record_every: 5
 boundary: wall
+obstacles:
+  - [0.0,0.66,0.66,0.72]
+  - [0.34,0.40,1.0,0.46]
+  - [0.0,0.16,0.66,0.22]
 sets:
   cell:
-    n: 2
-    start: [0.5,0.54,0.5,0.54]
+    n: 1
+    start: [0.18,0.82,0.18,0.82]
     types:
-      a: {fraction: 0.5, youngs: 200, block: [0.30,0.44,0.50,0.64], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-      b: {fraction: 0.5, youngs: 200, block: [0.50,0.44,0.70,0.64], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-  particle: {parent: cell, per_parent: 3500, radius: 0.24, density: 1.0}
+      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 7000, radius: 0.18, density: 1.0}
 fields:
   chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
 operators:
-  - {op: gravity, at: cell, g: 0.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.12, wall_damp: 1.0, wall_contact: 0.06, surface_tension: 30}
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.25, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 12}
 schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">two drops coalesce under surface tension</span>
+      <span class="sim-cap">water cascades down a zig-zag channel</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -588,6 +595,36 @@ operators:
   - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.3, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 14}
 schedule: [aggregate, gravity, mpm]</pre></span></span>
       <span class="sim-cap">draining through a funnel</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/ob_wedge.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">ob_wedge<span class="sim-spec"><pre>name: ob_wedge
+seed: 0
+n_frames: 1100
+record_every: 5
+boundary: wall
+obstacles:
+  - [0.00,0.0,0.20,0.45]
+  - [0.20,0.0,0.40,0.35]
+  - [0.40,0.0,0.60,0.25]
+  - [0.60,0.0,0.80,0.15]
+  - [0.80,0.0,1.00,0.06]
+sets:
+  cell:
+    n: 1
+    start: [0.2,0.7,0.2,0.7]
+    types:
+      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
+  particle: {parent: cell, per_parent: 7000, radius: 0.20, density: 1.0}
+fields:
+  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
+operators:
+  - {op: gravity, at: cell, g: 12.0}
+  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.3, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 12}
+schedule: [aggregate, gravity, mpm]</pre></span></span>
+      <span class="sim-cap">a falling stream splits around a wedge</span>
     </figcaption>
   </figure>
 </div>
