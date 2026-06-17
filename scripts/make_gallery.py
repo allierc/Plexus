@@ -70,9 +70,9 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("mix_avoid", "prototype/well/mix_avoid.gif", "prototype/well/scenarios/mix_avoid.yaml", "particles flee a reaction–diffusion ridge field"),
         ("mix_slime4", "prototype/well/mix_slime4.gif", "prototype/well/scenarios/mix_slime4.yaml", "four slime species run two coupled networks"),
         ("mix_taxis_maze_A", "prototype/well/mix_taxis_maze_A.gif", "prototype/well/scenarios/mix_taxis_maze.yaml", "particles trace a Gray–Scott maze morphogen"),
-        ("mix_chemotaxis", "prototype/well/mix_chemotaxis.gif", "prototype/well/scenarios/mix_chemotaxis.yaml", "a Vicsek flock climbs a morphogen gradient"),
+        ("mix_swarm_flow", "prototype/well/mix_swarm_flow.gif", "prototype/well/scenarios/mix_swarm_flow.yaml", "a Vicsek swarm swept by a turbulent flow"),
+        ("mix_rd_flow", "prototype/well/mix_rd_flow.gif", "prototype/well/scenarios/mix_rd_flow.yaml", "a reaction–diffusion pattern stirred by turbulence"),
         ("mix_acoustic_push", "prototype/well/mix_acoustic_push.gif", "prototype/well/scenarios/mix_acoustic_push.yaml", "expanding acoustic wavefronts herd a swarm"),
-        ("mix_world", "prototype/well/mix_world.gif", "prototype/well/scenarios/mix_world.yaml", "all three operator families coupled in one world"),
     ],
     "Microswimmers": [
         ("motile", "prototype/microswimmer/motile.gif", "prototype/microswimmer/motile.yaml", "active self-propelled swimmers"),

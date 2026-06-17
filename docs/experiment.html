@@ -1253,34 +1253,60 @@ schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]</pre></s
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/mix_chemotaxis.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/mix_swarm_flow.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">mix_chemotaxis<span class="sim-spec"><pre># MIX of TWO families: a FIELD PDE and a SET model, coupled.
-#   reaction_diffusion -&gt; a Gray-Scott "worms" morphogen pattern (FIELD self-update)
-#   active_matter      -&gt; Vicsek particles that flock                (SET) + radius_graph
-#   chemotaxis         -&gt; particles climb the morphogen's B channel  (EXCHANGE set&lt;-field)
-# On the particle set the flocking and chemotaxis deltas simply SUM -- the framework's
-# "several operators on one set, deltas add" rule. Mixing = a longer schedule, nothing else.
-name: mix_chemotaxis
-seed: 1
-n_frames: 600
+      <span class="sim-name" tabindex="0">mix_swarm_flow<span class="sim-spec"><pre># MIX: ACTIVE MATTER in a TURBULENT FLOW. A Vicsek swarm (SET) is simultaneously
+# self-propelled/aligning AND swept by a decaying-turbulence velocity field (FIELD).
+#   advect + poisson_solve  -&gt; evolve the carrier flow (2D turbulence)
+#   radius_graph + active_matter -&gt; flocking
+#   advect_particles        -&gt; the flow carries the swarm (set&lt;-&gt;field gather)
+# active_matter and advect_particles deltas SUM on the swarm -&gt; flock riding vortices.
+name: mix_swarm_flow
+seed: 4
+n_frames: 520
 record_every: 3
 world: 1.0
 fields:
-  chem: {frame: grid, res: 128, channels: 2, bc: periodic}
+  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
 sets:
-  active: {n: 3000}
+  active: {n: 4000}
 init:
-  chem:
-    A: 1.0
-    B: {seed: clusters, n: 18, radius: 2.0, value: 1.0}
+  fluid: {preset: vortices, n: 8, bands: 8}
 operators:
-  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, substeps: 12}
-  - {op: radius_graph, at: active, radius: 0.05}
-  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
-  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: 0.0020}
-schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]</pre></span></span>
-      <span class="sim-cap">a Vicsek flock climbs a morphogen gradient</span>
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,3], dt_sub: 0.005, substeps: 2}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: radius_graph, at: active, radius: 0.04}
+  - {op: active_matter, at: active, v0: 0.002, noise: 0.10}
+  - {op: advect_particles, at: active, from_field: fluid, vel: [0,1], speed: 0.9}
+schedule: [advect, poisson_solve, radius_graph, active_matter, advect_particles]</pre></span></span>
+      <span class="sim-cap">a Vicsek swarm swept by a turbulent flow</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/mix_rd_flow.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">mix_rd_flow<span class="sim-spec"><pre># MIX: reaction-ADVECTION-diffusion. A Gray-Scott "worms" pattern (channels A,B = 2,3)
+# is stirred by a decaying-turbulence velocity field (channels vx,vy = 0,1). Three
+# fluid/Well operators compose on ONE field:
+#   advect (carry A,B by the velocity) -&gt; reaction_diffusion (grow the pattern) -&gt;
+#   advect+poisson_solve (evolve the carrier flow). The pattern is smeared along the
+#   streamlines -&gt; Turing patterns wrapped onto vortices.
+name: mix_rd_flow
+seed: 3
+n_frames: 900
+record_every: 5
+world: 1.0
+fields:
+  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
+init:
+  fluid: {preset: stir_rd, n: 8, seeds: 30}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.004, substeps: 1}
+  - {op: reaction_diffusion, at: fluid, f: 0.058, k: 0.065, channels: [2,3], substeps: 8}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.004, substeps: 1}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+schedule: [advect, reaction_diffusion, advect, poisson_solve]</pre></span></span>
+      <span class="sim-cap">a reaction–diffusion pattern stirred by turbulence</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -1305,43 +1331,6 @@ operators:
   - {op: chemotaxis, at: active, from_field: acoustic, channel: 0, gain: -0.0010}
 schedule: [wave_acoustic, radius_graph, active_matter, chemotaxis]</pre></span></span>
       <span class="sim-cap">expanding acoustic wavefronts herd a swarm</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/mix_world.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mix_world<span class="sim-spec"><pre># MIX: all three operator families in ONE schedule, one world.
-#   reaction_diffusion -&gt; a Gray-Scott morphogen pattern (FIELD)
-#   wave_acoustic      -&gt; an acoustic ripple in the same domain (FIELD)
-#   active_matter      -&gt; Vicsek particles that flock (SET)         + radius_graph (Rewire)
-#   chemotaxis         -&gt; particles climb the morphogen's B channel (EXCHANGE set&lt;-&gt;field)
-# Flocking and chemotaxis deltas simply SUM on the particle set (the framework's
-# 'several operators on one set, deltas add' rule). Mixing is just a longer schedule.
-name: mix_world
-seed: 1
-n_frames: 600
-record_every: 3
-world: 1.0
-fields:
-  chem:     {frame: grid, res: 128, channels: 2, bc: periodic}
-  acoustic: {frame: grid, res: 128, channels: 3, bc: periodic}
-sets:
-  active: {n: 3000}
-init:
-  chem:
-    A: 1.0
-    B: {seed: clusters, n: 18, radius: 2.0, value: 1.0}
-  acoustic:
-    rho: {kind: uniform, value: 1.0}
-    p: {seed: rings, n: 3}
-operators:
-  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, substeps: 12}
-  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 4, sponge: 0.0}
-  - {op: radius_graph, at: active, radius: 0.05}
-  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
-  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: 0.0006}
-schedule: [reaction_diffusion, wave_acoustic, radius_graph, active_matter, chemotaxis]</pre></span></span>
-      <span class="sim-cap">all three operator families coupled in one world</span>
     </figcaption>
   </figure>
 </div>
