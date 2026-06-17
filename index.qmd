@@ -1,6 +1,8 @@
 ---
 title: "Plexus"
 subtitle: "Toward a language and calculus of living systems"
+resources:
+  - gallery/
 ---
 
 Biology is not a single graph.
@@ -97,15 +99,21 @@ each implements *one* graph type; a tissue needs them coexisting.
 Qualitatively different collective behaviours, all produced from the *same code*
 by changing only a ~20-line specification — no new software per phenomenon.
 
-::: {layout-ncol=2}
-{{< video prototype/sim_2.mp4 title="disperse — soft cells flee their own chemical, spreading apart" >}}
-
-{{< video prototype/sim_3.mp4 title="swarm — strong boids make the cells flock and move as one" >}}
-
-{{< video prototype/ant_1.mp4 title="ant trails — stigmergic pheromone trails self-organize" >}}
-
-{{< video prototype/ant_4.mp4 title="ant trails — tighter, low-noise reinforced network" >}}
-:::
+```{=html}
+<style>
+.home-2x2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;max-width:660px;margin:1.3rem auto .5rem}
+.home-2x2 figure{margin:0}
+.home-2x2 video{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;background:#000;display:block}
+.home-2x2 figcaption{margin-top:.4rem;font-size:.85em;color:#666;line-height:1.3}
+.home-2x2 figcaption b{color:#333}
+</style>
+<div class="home-2x2">
+  <figure><video src="gallery/boids_16.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
+  <figure><video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
+  <figure><video src="gallery/ph_crown_splash.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>fluids</b> — an MPM drop crowns on impact</figcaption></figure>
+  <figure><video src="gallery/rd_worms.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>fields</b> — a Gray–Scott reaction–diffusion pattern</figcaption></figure>
+</div>
+```
 
 And because every simulation is differentiable, biological designs can be
 *optimized*. Below, a foraging colony in a maze is tuned by a UCB algorithm —
