@@ -48,8 +48,9 @@ $$\pi_{A\to B} : S_A \longrightarrow S_B,$$
 
 so a cell is not one fibre but a **bundle of fibres**,
 $\mathrm{Cell}(c)=\{\,\pi_{A\to\mathrm{cell}}^{-1}(c) : A\in\mathrm{children}(\mathrm{cell})\,\}$.
-The container is a *typed containment graph* (a DAG of sets and parent maps), not a
-fixed scale ladder. The shift from "*level $k$ contains level $k{-}1$*" to "*set $A$
+The container is a *typed containment graph* — a **DAG** (directed acyclic graph:
+the sets are nodes, the parent maps are directed edges, and containment never
+cycles) — not a fixed scale ladder. The shift from "*level $k$ contains level $k{-}1$*" to "*set $A$
 is contained by set $B$*" keeps the code clean — the engine needs only
 `Level.parent` and `Level.parent_name` — and keeps operators *typed*
 (`membrane_tension` on `membrane_particle`, `metabolism` on `metabolite`), instead

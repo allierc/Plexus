@@ -128,8 +128,11 @@ many children, so a cell is not one fibre but a \textbf{bundle of fibres},
 \[
   \mathrm{Cell}(c)=\Big\{\, \pi_{A\to\mathrm{cell}}^{-1}(c) \;:\; A\in\mathrm{children}(\mathrm{cell}) \,\Big\}.
 \]
-The container is therefore a \emph{typed containment graph} --- a DAG of sets and
-parent maps (Fig.~\ref{fig:graph}) --- not a fixed scale ladder. The shift is from
+The container is therefore a \emph{typed containment graph} --- a \textbf{DAG}
+(directed acyclic graph: the sets are nodes, the parent maps are directed edges,
+and containment never cycles), shown in Fig.~\ref{fig:graph} --- not a fixed scale
+ladder. A DAG rather than a tree because a parent has \emph{many} children. The
+shift is from
 ``\emph{level $k$ contains level $k{-}1$}'' to ``\emph{set $A$ is contained by set
 $B$}'', and it is what keeps the code clean: the engine needs only
 \code{Level.parent} (the index map) and \code{Level.parent\_name} (the edge); new
