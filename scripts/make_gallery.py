@@ -37,7 +37,11 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("slime_default", "prototype/slime/slime_default.gif", "prototype/slime/specs/slime_default.yaml", "self-reinforcing transport network"),
         ("slime_curly", "prototype/slime/slime_curly.gif", "prototype/slime/specs/slime_curly.yaml", "high turning rate, curly filaments"),
         ("slime_filaments", "prototype/slime/slime_filaments.gif", "prototype/slime/specs/slime_filaments.yaml", "fine filamentary structure"),
+        ("slime_coarse_stream", "prototype/slime/slime_coarse_stream.gif", "prototype/slime/specs/slime_coarse.yaml", "coarse network, streamline view"),
+        ("slime_fine_graph", "prototype/slime/slime_fine_graph.gif", "prototype/slime/specs/slime_fine.yaml", "fine network, extracted as a graph"),
+        ("slime_six", "prototype/slime/slime_six.gif", "prototype/slime/specs/slime_six.yaml", "six sources"),
         ("slime_eight", "prototype/slime/slime_eight.gif", "prototype/slime/specs/slime_eight.yaml", "eight sources"),
+        ("slime_torus", "prototype/slime/slime_torus.gif", "prototype/slime/specs/slime_torus.yaml", "periodic (toroidal) domain"),
     ],
     "MPM fluids & materials": [
         ("mat_liquid", "prototype/water/mat_liquid.gif", "prototype/scenarios/mat_liquid.yaml", "liquid material (no shear memory)"),
@@ -48,32 +52,29 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("ph_slosh", "prototype/water/ph_slosh.gif", "prototype/scenarios/ph_slosh.yaml", "sloshing in a vessel"),
         ("ob_dam_break", "prototype/water/ob_dam_break.gif", "prototype/scenarios/ob_dam_break.yaml", "dam break against an obstacle"),
         ("ob_funnel", "prototype/water/ob_funnel.gif", "prototype/scenarios/ob_funnel.yaml", "draining through a funnel"),
-        ("water_bowl_1", "prototype/water/water_bowl_1.gif", "prototype/scenarios/water_bowl_1.yaml", "pouring water into a bowl"),
     ],
-    "The Well — single mechanisms vs. mixtures": [
-        ("rd_worms", "prototype/well/rd_worms.gif", "prototype/well/scenarios/rd_worms.yaml", "single field: Gray–Scott reaction–diffusion"),
-        ("wave_lens", "prototype/well/wave_lens.gif", "prototype/well/scenarios/wave_lens.yaml", "single field: acoustic waves through a lens"),
-        ("am_swirl", "prototype/well/am_swirl.gif", "prototype/well/scenarios/am_swirl.yaml", "single set: Vicsek active matter, a swirl"),
-        ("mix_world", "prototype/well/mix_world.gif", "prototype/well/scenarios/mix_world.yaml", "a mixture: field + active set in one world"),
-        ("mix_taxis_spots", "prototype/well/mix_taxis_spots.gif", "prototype/well/scenarios/mix_taxis_spots.yaml", "a mixture: chemotaxis toward emergent spots"),
+    "The Well — fields & active matter": [
+        ("am_flock", "prototype/well/am_flock.gif", "prototype/well/scenarios/am_flock.yaml", "active matter: a coherent polar flock (Vicsek)"),
+        ("rd_worms", "prototype/well/rd_worms.gif", "prototype/well/scenarios/rd_worms.yaml", "field: Gray–Scott reaction–diffusion, worms"),
+        ("wave_double_slit", "prototype/well/wave_double_slit.gif", "prototype/well/scenarios/wave_double_slit.yaml", "field: acoustic double-slit diffraction"),
+        ("wave_helmholtz_staircase", "prototype/well/wave_helmholtz_staircase.gif", "prototype/well/scenarios/wave_helmholtz_staircase.yaml", "field: waves scattering off a periodic staircase"),
+        ("wave_lens", "prototype/well/wave_lens.gif", "prototype/well/scenarios/wave_lens.yaml", "field: acoustic waves focused by a lens"),
+    ],
+    "Mixtures — several mechanisms in one world": [
+        ("mix_avoid", "prototype/well/mix_avoid.gif", "prototype/well/scenarios/mix_avoid.yaml", "particles flee a reaction–diffusion ridge field"),
+        ("mix_slime4", "prototype/well/mix_slime4.gif", "prototype/well/scenarios/mix_slime4.yaml", "four slime species run two coupled networks"),
+        ("mix_taxis_maze_A", "prototype/well/mix_taxis_maze_A.gif", "prototype/well/scenarios/mix_taxis_maze.yaml", "particles trace a Gray–Scott maze morphogen"),
+        ("mix_chemotaxis", "prototype/well/mix_chemotaxis.gif", "prototype/well/scenarios/mix_chemotaxis.yaml", "a Vicsek flock climbs a morphogen gradient"),
     ],
     "Microswimmers": [
         ("motile", "prototype/microswimmer/motile.gif", "prototype/microswimmer/motile.yaml", "active self-propelled swimmers"),
         ("slipwave_motile", "prototype/microswimmer/slipwave_motile.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — slip-wave field overlay"),
         ("vorticity_motile", "prototype/microswimmer/vorticity_motile.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — vorticity field overlay"),
+        ("vortzoom_fast", "prototype/microswimmer/vortzoom_fast.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — vorticity close-up"),
         ("feeding", "prototype/microswimmer/feeding.gif", "prototype/microswimmer/feeding.yaml", "feeding on a resource field"),
         ("sessile", "prototype/microswimmer/sessile.gif", "prototype/microswimmer/sessile.yaml", "attached, beating cilia"),
     ],
 }
-
-# Four representatives for the "What it looks like" hero strip: maximally different
-# collective behaviours, each a different operator family. (name, hero caption)
-HERO: list[tuple[str, str]] = [
-    ("boids_16", "flocking — collective motion from local rules"),
-    ("slime_filaments", "a self-organizing Physarum transport network"),
-    ("ph_crown_splash", "an MPM fluid: a drop crowns on impact"),
-    ("rd_worms", "a Gray–Scott reaction–diffusion field"),
-]
 
 
 def transcode(src: str, dst: str) -> bool:
@@ -101,7 +102,6 @@ def card(name: str, mp4: str, spec_path: str, caption: str) -> str:
 
 STYLE = """<style>
 .sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.1rem;margin:1rem 0 2rem}
-.sim-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.3rem;margin:1.2rem 0 2.5rem}
 .sim-card{margin:0}
 .sim-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
 .sim-card figcaption{margin-top:.35rem;line-height:1.25}
@@ -119,15 +119,6 @@ subtitle: "One engine, many living systems — hover a title to read its spec"
 resources:
   - gallery/
 ---
-
-## What it looks like
-
-Qualitatively different collective behaviours, all produced from the same code by
-changing only a ~20-line specification — no new software per phenomenon.
-"""
-
-INTRO = """
-## Browse the families
 
 Each clip below is one `spec.yaml` over the identical operators and schedule grammar;
 **hover (or tab to) a simulation's title to read the exact spec that generated it.**
@@ -148,10 +139,7 @@ def main():
         if f.endswith(".mp4"):
             os.remove(os.path.join(OUT, f))
 
-    # one lookup of spec paths so the hero can reuse already-transcoded clips
-    spec_of = {name: spec for sims in CURATED.values() for name, _, spec, _ in sims}
-
-    blocks = [STYLE]
+    blocks = []
     for family, sims in CURATED.items():
         cards = []
         for name, src, spec, cap in sims:
@@ -163,12 +151,7 @@ def main():
             blocks.append(f"<h2>{html.escape(family)}</h2>\n<div class=\"sim-gallery\">\n" +
                           "\n".join(cards) + "\n</div>")
 
-    # hero strip of four representatives (clips already transcoded above)
-    hero_cards = [card(name, f"{OUT}/{name}.mp4", spec_of[name], cap) for name, cap in HERO]
-    hero = "<div class=\"sim-hero\">\n" + "\n".join(hero_cards) + "\n</div>"
-
-    body = (HEADER + "\n```{=html}\n" + STYLE + "\n" + hero + "\n```\n" +
-            INTRO + "\n```{=html}\n" + "\n\n".join(blocks[1:]) + "\n```\n")
+    body = HEADER + "\n```{=html}\n" + STYLE + "\n" + "\n\n".join(blocks) + "\n```\n"
     open("experiment.qmd", "w").write(body)
     print(f"wrote experiment.qmd and {len(os.listdir(OUT))} clips in {OUT}/")
 
