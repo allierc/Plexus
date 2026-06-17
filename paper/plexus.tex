@@ -72,10 +72,16 @@ Typed sets are connected by \textbf{parent maps}
   \pi_{\alpha\to\beta}: S_\alpha \longrightarrow S_\beta,
 \]
 which assign each entity of sort $\alpha$ to the entity of sort $\beta$ that
-contains it. Thus a cell is not a single fibre of one lower-level set, but a
+contains it. The \emph{fibre} of such a map over an entity $b\in S_\beta$ is its
+preimage --- everything that maps to $b$:
+\[
+  \pi_{\alpha\to\beta}^{-1}(b)=\{\,x\in S_\alpha : \pi_{\alpha\to\beta}(x)=b\,\}.
+\]
+The fibre of $\pi_{\text{particle}\to\text{cell}}$ over a cell $c$ is thus the set
+of particles inside $c$. A cell is not a single such fibre, however, but a
 \emph{bundle of fibres}: membrane particles, cytoplasmic particles, nuclei,
-metabolites, and other child sets that all map to the same parent cell. The next
-section makes this containment graph precise.
+metabolites, and other child sets all map to the same parent cell, and the cell is
+the union of those fibres. The next section makes this containment graph precise.
 
 A \textbf{field} $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its
 own grid --- morphogen concentration, pressure, substrate stiffness, or
@@ -1104,113 +1110,173 @@ growing, verifiable registry underneath.
 \part*{Appendix}
 \addcontentsline{toc}{section}{Appendix --- Plexus and Lean}
 
-\section{Plexus and Lean: a structural correspondence}
+\section{Plexus and Lean}
 \label{sec:lean}
 
-Plexus and a proof assistant such as \textsc{Lean} do not look alike --- one rolls
-out tissue dynamics, the other checks mathematics --- yet they attack the same
-meta-problem: \emph{how do you build complex objects from a small set of primitive
-constructions while preserving correctness?} The resemblance is sharpest at the
-\emph{architecture}, looser at the \emph{semantics}, and points at an even closer
-relative. It is worth spelling out, because it explains \emph{why} the parts of
-Plexus that feel most principled are exactly the parts it shares with a theorem
-prover.
+At first glance Plexus and a proof assistant such as \textsc{Lean} appear unrelated.
+One simulates living systems; the other verifies mathematics. Yet they share a
+surprisingly similar architecture. Both seek to construct complex objects from a
+small set of primitive building blocks while preserving correctness. Understanding
+this correspondence helps clarify what Plexus actually is: not merely a simulator,
+but a formal system for describing biological models.
 
-\paragraph{The shared architecture: an LCF kernel.} Both are instances of Milner's
-\textbf{LCF design} (the lineage \textsc{Lean}, \textsc{HOL}, and \textsc{Isabelle}
-all inherit): a \emph{small trusted kernel}, an \emph{abstract type of ``theorems''}
-constructible only by kernel-sanctioned steps, and an \emph{untrusted tactic layer}
-that searches for those steps. Plexus is recognizably the same pattern --- the
-\textbf{validated \code{Spec}} is the abstract type of theorems (you obtain one only
-by passing the validator); the \textbf{engine} is the kernel (small, generic, never
-branching on a simulation's name); the \textbf{LLM} is the tactic layer (powerful,
-heuristic, untrusted, replaceable). This is the thesis of Part~II in borrowed
-vocabulary: \emph{trust the kernel-checked artifact, not the generator that proposed
-it.}
+\subsection{A brief introduction to Lean}
+
+Lean is an interactive theorem prover developed to formalize mathematics. A user
+states a theorem and constructs a proof. Unlike a traditional mathematical proof
+written for humans, a Lean proof must be expressed in a precise formal language that
+the Lean kernel can verify mechanically.
+
+For example, the mathematical statement
+\[
+a+b=b+a
+\]
+can be expressed as a theorem in Lean:
+
+\begin{verbatim}
+theorem add_comm (a b : Nat) : a + b = b + a := ...
+\end{verbatim}
+
+The dots represent a proof. Once supplied, Lean checks every step and certifies
+that the conclusion follows from the rules of the system.
+
+Lean is built around several layers.
+
+\begin{enumerate}
+\item \textbf{Types}. Every object belongs to a type: natural numbers, real
+numbers, sets, functions, and so on.
+
+\item \textbf{Terms}. Concrete objects inhabit types. The number $3$ is a term of
+type \texttt{Nat}. A function is a term of a function type.
+
+\item \textbf{Theorems}. A theorem is a proposition that one wishes to prove.
+
+\item \textbf{Proof terms}. A proof is itself an object. Under the
+Curry--Howard correspondence, propositions behave like types and proofs behave like
+terms inhabiting those types.
+
+\item \textbf{The kernel}. A small trusted program checks that a proof is valid.
+
+\item \textbf{Tactics}. Convenient automation that helps construct proofs. Tactics
+can be sophisticated and even unreliable internally because the kernel checks the
+result afterward.
+
+\item \textbf{Mathlib}. A large library of previously formalized mathematics.
+\end{enumerate}
+
+The key idea is separation of concerns. The user writes proofs, tactics help
+construct them, and the kernel verifies them. Trust resides in the kernel rather
+than in the process that produced the proof.
+
+\subsection{The structural correspondence}
+
+Plexus exhibits a remarkably similar decomposition. The correspondence is not
+perfect, but it is useful.
 
 \begin{center}
-\renewcommand{\arraystretch}{1.2}\footnotesize
-\begin{tabular}{@{}ll p{5.9cm}@{}}
+\renewcommand{\arraystretch}{1.2}
+\footnotesize
+\begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Lean} & \textbf{Plexus} & \textbf{The correspondence} \\
+\textbf{Lean} & \textbf{Plexus} & \textbf{Role} \\
 \midrule
-type                    & typed set $S_\alpha$            & an identity: Plexus is many-sorted \\
-term $x\!:\!T$          & entity $x\in S_\alpha$          & an identity \\
-function $A\!\to\!B$    & containment map $\pi_{\alpha\to\beta}$ & literal; \emph{operators} are transition rules, not functions \\
-kernel                  & engine                          & strong: a small generic trusted core \\
-type checker            & schema validator                & strong: rejects ill-formed input before it runs \\
-tactic                  & LLM compiler                    & strong: an untrusted elaborator emitting a checkable artifact \\
-mathematical library    & operator registry               & strong: a monotone, reusable library \\
-proof term              & the spec (schedule $+$ operators) & good: the constructed program \\
-reduction / elaboration & running the engine              & partial: a dynamical \emph{flow}, not normalization \\
-theorem (the goal)      & the intent                      & weak: the proposition lives \emph{outside} the type system \\
-proof checking          & the intent (``verify'') check   & weak: empirical, not deductive \\
+Types & Sets $S_\alpha$ and Fields $F$ & primitive objects \\
+Terms & Entities (cells, particles, metabolites) & instances of those objects \\
+Functions & Operators & transformations \\
+Proof composition & Schedule & composition of transformations \\
+Type checker & Schema validator & correctness gate \\
+Tactics & LLM compiler & search / generation layer \\
+Theorem & Intent & desired outcome \\
+Proof term & Simulation specification & executable description \\
+Kernel & Engine & trusted interpreter \\
+Mathlib & Operator registry & reusable library of primitives \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\paragraph{Two refinements.} The top rows are tighter than a loose analogy: after
-Section~\ref{sec:graph}, \emph{sorts are types} and \emph{entities are terms}
-outright. But ``function'' splits in two --- the \emph{containment maps}
-$\pi_{\alpha\to\beta}:S_\alpha\to S_\beta$ are the literal functions between sorts,
-whereas \emph{operators} are transition rules (they transform state; they are not
-maps of terms). And ``theorem'' belongs not on the simulation but on the
-\emph{intent}: the intent is the goal, the spec is the proof term, running the
-engine is elaboration, the trajectory is the \emph{witness}, and the intent check
-asks whether the witness meets the goal.
+Several rows deserve explanation.
 
-\paragraph{Where the analogy breaks --- and what that teaches.}
-\begin{itemize}\itemsep2pt
-\item \textbf{Soundness vs.\ well-formedness.} Lean's kernel certifies \emph{truth};
-Plexus's validator certifies only \emph{runnability}. A spec that type-checks can
-still produce nonsense --- precisely ``it ran $\neq$ it worked''
-(Section~\ref{sec:gaps}). The only thing playing the role of soundness is the
-empirical intent check: a measured threshold, not a derivation. Plexus's gate is a
-\emph{type} gate, not a \emph{truth} gate.
-\item \textbf{No Curry--Howard.} In Lean a proposition \emph{is} a type and a proof
-\emph{is} a term. In Plexus the proposition --- the desired behaviour --- lives
-outside the type system and is checked by measurement. And Plexus is
-\emph{many-sorted, not dependent}: nearer a typed first-order signature (the sorts
-of SMT, or algebraic specification) than dependent type theory.
-\item \textbf{Reduction vs.\ dynamics, and differentiability.} The kernel
-\emph{normalizes} (terminating, exact); the engine \emph{integrates a flow}
-$x_{t+1}=\Phi(x_t)$ that is often chaotic (boids trajectories diverge at
-floating-point precision). And Plexus operators are \emph{differentiable} ---
-gradients flow through the rollout --- which has no analogue in proof checking. Here
-Plexus is richer in an orthogonal direction: at once a checked compositional system
-and a smooth, optimizable program.
-\end{itemize}
+A typed set in Plexus plays a role similar to a type in Lean. Just as Lean
+distinguishes natural numbers from matrices or groups, Plexus distinguishes cells,
+particles, metabolites, nuclei, and fields. Operators declare which kinds of
+objects they act upon, exactly as functions declare their input types.
 
-\paragraph{The closer cousin: rewriting logic.} For the tightest structural match,
-look not to Lean but to \textbf{Maude} / rewriting logic, which \emph{is} typed
-compositional state-transition with a strategy for applying rules:
+Entities are analogous to terms. A particular cell is an element of the set
+\texttt{cell}, just as the number $3$ is an element of the type \texttt{Nat}.
 
-\begin{center}
-\renewcommand{\arraystretch}{1.2}\footnotesize
-\begin{tabular}{@{}ll@{}}
-\toprule
-\textbf{Rewriting logic (Maude)} & \textbf{Plexus} \\
-\midrule
-sorts                        & typed sets $S_\alpha$ \\
-operators (\code{op})        & operators \\
-rewrite rules                & the dynamics of one tick \\
-the strategy language        & the schedule \\
-membership equational logic  & the schema and \code{REQUIRES\_*} contracts \\
-\bottomrule
-\end{tabular}
-\end{center}
+The operator registry resembles a mathematical library. New functionality is added
+by registering a new operator rather than modifying the engine itself. Existing
+simulations continue to work because the vocabulary only grows.
 
-\noindent Lean and Plexus share a \emph{trust architecture}; Maude and Plexus share
-a \emph{semantics}. A theorem prover is about static deduction; rewriting logic is
-about typed dynamics --- and Plexus is dynamics.
+The strongest correspondence is architectural. The simulation specification
+(\code{spec.yaml}) is generated by a human or by an LLM. It is not trusted. The
+schema validator checks that the specification is well formed before execution.
+Only after passing validation is it handed to the engine. This mirrors the
+relationship between tactics and the Lean kernel.
 
-\paragraph{Summary.} Plexus is, in one line, an \textbf{LCF-style proof assistant
-whose proofs are simulations}. It inherits the kernel\,/\,validator\,/\,library\,/\,tactic
-architecture and the many-sorted typing, but not the soundness guarantee: its
-theorems are \emph{empirical witnesses}, not deductive certainties. That is both its
-limitation --- no proof that a spec ``works'', only a measurement that it did --- and
-its distinctive richness: unlike a proof term, a Plexus spec is a differentiable,
-dynamical object one can optimize. The mathematics it most wants to \emph{be} is not
-type theory but rewriting logic.
+\subsection{Why the analogy is imperfect}
+
+Despite these similarities, Plexus is not a theorem prover.
+
+Lean is fundamentally concerned with \emph{truth}. Given a proposition $P$, Lean
+determines whether a proof exists. If the kernel accepts the proof, the theorem is
+established with mathematical certainty.
+
+Plexus is concerned with \emph{dynamics}. Given an initial state and a collection
+of operators, Plexus computes
+\[
+x_{t+1}=\Phi(x_t).
+\]
+The result is not a proof but a trajectory.
+
+This difference has important consequences.
+
+First, the Plexus validator checks only \emph{well-formedness}, not correctness. A
+specification that passes validation may still represent a poor biological model.
+The analogue of theorem proving in Plexus is not validation but experimental
+verification.
+
+Second, Lean computations terminate. A proof either checks or it does not. Plexus
+simulations may be unstable, chaotic, or sensitive to parameters. The engine
+integrates a dynamical system rather than reducing an expression to normal form.
+
+Third, Plexus is differentiable. Gradients flow through operators, schedules, and
+rollouts. This allows optimization of model parameters and even biological designs.
+There is no direct analogue of differentiation in theorem proving.
+
+\subsection{What Plexus borrows from theorem provers}
+
+The value of the comparison is therefore not that Plexus proves theorems. Rather,
+it inherits a design philosophy from systems such as Lean.
+
+The first lesson is to separate a symbolic description from its execution. A
+simulation should be represented explicitly rather than being scattered across code.
+
+The second lesson is to separate a trusted kernel from untrusted generation. The
+LLM may produce a simulation specification, but correctness of the specification is
+established by the validator and the engine, not by the model that wrote it.
+
+The third lesson is that a small set of primitives can support a large space of
+constructions. Lean builds mathematics from types, functions, and proof rules.
+Plexus builds biological models from sets, fields, operators, and schedules.
+
+\subsection{A language and calculus of living systems}
+
+Seen from this perspective, Plexus is best understood as a formal language and
+calculus for living systems.
+
+The language is the simulation specification. It provides a symbolic vocabulary for
+describing entities, fields, relations, and schedules.
+
+The calculus is the collection of operators acting on those objects. Lateral,
+Aggregate, Broadcast, Exchange, Rewire, Divide, and Die are the primitive
+transformations from which larger biological mechanisms are assembled.
+
+The engine plays the role of an interpreter, turning symbolic descriptions into
+dynamical trajectories.
+
+This is ultimately the deepest connection to Lean. Both systems seek a compact set
+of primitives from which a much larger space of structures can be constructed.
+Lean does this for mathematics. Plexus attempts to do it for biological systems.
 
 \end{document}
