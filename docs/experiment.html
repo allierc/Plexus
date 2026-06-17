@@ -567,6 +567,36 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
+    <video src="gallery/slime_two_repel.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">slime_two_repel<span class="sim-spec"><pre># slime_two_repel -- TWO species, identical rules, cross=-1 (attract own channel,
+# repel the other). Categorical separation: same operator, two `types`, two field
+# channels -&gt; the two slimes carve out separate territories with a sharp interface.
+# Density kept BELOW field saturation (lower deposit, higher decay) so a gradient
+# survives -- saturated trails are flat and the repulsion would have nothing to climb.
+general: {name: slime_two_repel, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      a: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.5, decay: 0.03, diffuse: 0.28, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7</pre></span></span>
+      <span class="sim-cap">two species repel: separate territories, sharp interface</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
     <video src="gallery/slime_six.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">slime_six<span class="sim-spec"><pre># slime_six -- SIX mutually-repelling species (cross=-1): six colour territories.

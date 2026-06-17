@@ -39,6 +39,7 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("slime_filaments", "prototype/slime/slime_filaments.gif", "prototype/slime/specs/slime_filaments.yaml", "fine filamentary structure"),
         ("slime_coarse_stream", "prototype/slime/slime_coarse_stream.gif", "prototype/slime/specs/slime_coarse.yaml", "coarse network, streamline view"),
         ("slime_fine_graph", "prototype/slime/slime_fine_graph.gif", "prototype/slime/specs/slime_fine.yaml", "fine network, extracted as a graph"),
+        ("slime_two_repel", "prototype/slime/slime_two_repel.gif", "prototype/slime/specs/slime_two_repel.yaml", "two species repel: separate territories, sharp interface"),
         ("slime_six", "prototype/slime/slime_six.gif", "prototype/slime/specs/slime_six.yaml", "six sources"),
         ("slime_eight", "prototype/slime/slime_eight.gif", "prototype/slime/specs/slime_eight.yaml", "eight sources"),
         ("slime_torus", "prototype/slime/slime_torus.gif", "prototype/slime/specs/slime_torus.yaml", "periodic (toroidal) domain"),
