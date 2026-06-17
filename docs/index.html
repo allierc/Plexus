@@ -391,6 +391,16 @@ window.Quarto = {
 </header>
 
 
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>Operators adapted from prior work.</strong> Plexus re-implements published simulation code as registered operators: attraction–repulsion and boids from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a>; the slime-mould (Physarum) agent from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>; the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from <a href="https://github.com/PolymathicAI/the_well"><em>The Well</em></a> (Ohana et al., NeurIPS 2024); and the ciliate microswimmer from <a href="https://github.com/jingyiliu1900/Flow-Physics-drives-functional-design-of-microswimmers">Liu, Costello &amp; Kanso</a> (<em>Nat. Commun.</em> 2025).</p>
+</div>
+</div>
+</div>
 <p>Biology is not a single graph.</p>
 <p>A graph fixes <em>one</em> kind of node and <em>one</em> kind of edge — particles and the forces between them, cells and their contacts, neurons and synapses, molecular species and reactions. Each existing framework commits to one such graph and models that layer alone. But a living system is several of these at once, nested inside one another: particles make up cells, and cells make up tissues and populations. And every level is coupled to continuous fields — a morphogen gradient, a pressure field, a chemical signal — that the discrete entities both shape and read. Choose any single graph and you capture one slice — the couplings <em>between</em> slices, where much of the biology lives, fall outside it.</p>
 <p>Rather than building another domain-specific simulator, Plexus introduces a common representation based on <strong>hierarchical sets</strong>, <strong>continuous fields</strong>, and a small collection of <strong>operators</strong> acting between them. Cells contain particles and metabolites. State moves through just four operators — <strong>lateral</strong> (within a set), <strong>aggregate</strong> (upward), <strong>broadcast</strong> (downward), and <strong>exchange</strong> (between sets and fields). Complex simulations emerge from composing a few primitive operations.</p>

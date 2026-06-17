@@ -5,6 +5,18 @@ resources:
   - gallery/
 ---
 
+::: {.callout-note appearance="simple"}
+**Operators adapted from prior work.** Plexus re-implements published simulation code
+as registered operators: attraction–repulsion and boids from
+[ParticleGraph](https://github.com/allierc/ParticleGraph); the slime-mould (Physarum)
+agent from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation);
+the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from
+[*The Well*](https://github.com/PolymathicAI/the_well) (Ohana et al., NeurIPS 2024); and
+the ciliate microswimmer from
+[Liu, Costello & Kanso](https://github.com/jingyiliu1900/Flow-Physics-drives-functional-design-of-microswimmers)
+(*Nat. Commun.* 2025).
+:::
+
 Biology is not a single graph.
 
 A graph fixes *one* kind of node and *one* kind of edge — particles and the
