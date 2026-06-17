@@ -59,7 +59,7 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("am_flock", "prototype/well/am_flock.gif", "prototype/well/scenarios/am_flock.yaml", "active matter: a coherent polar flock (Vicsek)"),
         ("rd_worms", "prototype/well/rd_worms.gif", "prototype/well/scenarios/rd_worms.yaml", "field: Gray–Scott reaction–diffusion, worms"),
         ("wave_double_slit", "prototype/well/wave_double_slit.gif", "prototype/well/scenarios/wave_double_slit.yaml", "field: acoustic double-slit diffraction"),
-        ("wave_helmholtz_staircase", "prototype/well/wave_helmholtz_staircase.gif", "prototype/well/scenarios/wave_helmholtz_staircase.yaml", "field: waves scattering off a periodic staircase"),
+        ("wave_maze", "prototype/well/wave_maze.gif", "prototype/well/scenarios/wave_maze.yaml", "field: acoustic propagation through a maze of sound-hard corridors"),
         ("wave_lens", "prototype/well/wave_lens.gif", "prototype/well/scenarios/wave_lens.yaml", "field: acoustic waves focused by a lens"),
         ("ns_rayleigh_benard", "prototype/well/ns_rayleigh_benard.gif", "prototype/well/scenarios/ns_rayleigh_benard.yaml", "field: Rayleigh–Bénard convection rolls (Navier–Stokes)"),
         ("ns_vortices", "prototype/well/ns_vortices.gif", "prototype/well/scenarios/ns_vortices.yaml", "field: decaying 2-D turbulence, vortices merge (Navier–Stokes)"),
