@@ -276,6 +276,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
              get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on)
             for o in sim.operators]
+    # integration invariant: no operator may write pos/vel directly (only _integrate
+    # does). Checked once on frame 0 -- a violator does it every tick, so one frame
+    # catches it for ~free. Skipped when a structural op is present (divide/die
+    # legitimately rewrite a set's state buffer when cardinality changes).
+    guard_state = not any(getattr(get_operator(o.op), "KIND", None) == "structural"
+                          for o in sim.operators)
 
     n_rec = sim.n_frames + 1
     rec_sets = {name: np.zeros((n_rec, lvl.n, 2), np.float32) for name, lvl in H.levels.items()}
@@ -288,6 +294,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
     with torch.no_grad():
         for frame in range(sim.n_frames + 1):
             H.zero_delta()
+            snap0 = ({name: lvl.state.clone() for name, lvl in H.levels.items()}
+                     if frame == 0 and guard_state else None)
             for step in sim.schedule:                # operators accumulate per-set deltas
                 for tok in (step if isinstance(step, list) else [step]):
                     if tok == "aggregate":
@@ -302,6 +310,14 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
                                 continue
                             for lvlname, d in ob(H, _mask(H, sel)).items():
                                 H.add_delta(lvlname, d)
+            if snap0 is not None:                    # enforce the integration invariant
+                for name, before in snap0.items():
+                    if not torch.equal(before, H.levels[name].state):
+                        raise RuntimeError(
+                            f"an operator wrote the integrated state of set {name!r} directly during "
+                            f"the schedule. Dynamics operators must RETURN a delta (the engine "
+                            f"integrates it); only relations/entities/fields/aux state may be mutated "
+                            f"in place. (Plexus integration invariant; see models/base.Operator.)")
             _integrate(H, sim.dt)                    # integrate each set once, at end of tick
             for name, lvl in H.levels.items():
                 rec_sets[name][frame] = lvl.get("pos").cpu().numpy()

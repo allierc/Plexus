@@ -46,6 +46,15 @@ Operators
   writes a field (exchange) mutates `H` in place and returns `{}` -- uniform with
   every other operator, so the engine never special-cases a kind.
 
+  **The integration invariant.** An operator NEVER writes the engine-integrated
+  state (`pos`/`vel`) directly -- a change to position/velocity must flow through
+  the returned delta, which the engine integrates. Everything *else* is mutated in
+  place and returns `{}`: relations `E` (`edge_index`), entities `|S|`
+  (`occ`/buffers, structural only), fields `F` (`grid`), and auxiliary per-node
+  control buffers (e.g. a slime agent's `heading`, which is not integrated state).
+  So a dynamics operator that self-Euler-steps `pos` is a category error; the
+  engine guards against it on the first frame.
+
   Six kinds, dispatched by the relation an operator acts on:
 
   | kind        | relation              | examples                              |
