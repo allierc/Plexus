@@ -1520,4 +1520,64 @@ predicts which explanations are worth testing.
 In this view, Plexus is neither a simulator nor a world model alone. It is a
 language in which candidate worlds can be written, searched, and falsified.
 
+\addcontentsline{toc}{section}{Appendix --- Rules for a well-formed operator}
+
+\section{Rules for a well-formed operator}
+\label{sec:operator-rules}
+
+An operator is the only place new dynamics enter Plexus, so a few simple rules keep
+the calculus sound and the engine generic. They are enforced --- by the schema
+validator before a run, and by the engine on the first frame --- so a violation
+fails loudly rather than silently corrupting a trajectory.
+
+\paragraph{1. The integration invariant.}
+No operator writes the engine-integrated state ($\mathrm{pos}/\mathrm{vel}$)
+directly. A change to position or velocity must flow through the operator's
+\emph{returned delta}, which the engine integrates once per tick. Everything else
+is mutated in place and the operator returns \code{\{\}}: the relations $E$
+(\code{edge\_index}), the entities $|S|$ (\code{occ} and per-node buffers,
+structural operators only), the fields $F$ (\code{grid}), and auxiliary per-node
+control buffers (e.g.\ a slime agent's \code{heading}, which is not integrated
+state). A dynamics operator that Euler-steps \code{pos} itself is a category
+error --- exactly the bug an early \code{advance} contained, fixed by returning a
+velocity $v_i = s_i(\cos h_i,\sin h_i)$ and letting the engine do
+$x \leftarrow x + \Delta t\, v$.
+
+\paragraph{2. One operator, one category.}
+The operator's \code{KIND} must match what it changes:
+\code{lateral}/\code{aggregate}/\code{broadcast}/\code{exchange} move \emph{state}
+(return a delta); \code{rewire} changes the \emph{relations} $E$; \code{structural}
+changes the \emph{entities} $|S|$. An operator never does two of these at once.
+
+\paragraph{3. \code{at:} names the locality; \code{to:}/\code{from:} the field.}
+\code{at:} is the set an operator acts on, or --- for a field-internal operator
+such as \code{diffuse}/\code{decay} --- the field it reads and writes. A coupling
+operator names its field in \code{to:} (scatter, set$\to$field) or \code{from:}
+(gather, field$\to$set). So \code{diffuse} reads \code{at: chemical}, never the
+placeholder \code{at: cell}.
+
+\paragraph{4. \code{PREDICTION} matches the derivative order.}
+A force-emitting operator declares whether its delta is a velocity
+(\code{first\_derivative}, overdamped) or an acceleration
+(\code{second\_derivative}, inertial); all operators acting on one set must agree,
+since a set integrates as a single order. Operators that emit no force (\code{rewire},
+\code{structural}, field writes) set \code{PREDICTION\,=\,None}.
+
+\paragraph{5. Style stays in \code{plotting:}.}
+Colours, colormap, point size, gamma, and background are render \emph{style}; they
+live in the spec's \code{plotting:} block, read only by the plotter. They are never
+properties of a set or an operator (which carry only what the dynamics read).
+
+\paragraph{6. Dispatch tags are class attributes; values are spec.}
+\code{KIND}, \code{LEVEL}, and \code{PREDICTION} are fixed dispatch tags stamped on
+the class. Tunable numbers (rates, gains, coefficients, per-type parameters) come
+from the spec at run time --- never hoisted onto the class --- so one operator
+serves every parameterization.
+
+\paragraph{7. Declare the capability contract.}
+An operator lists the spec keys it needs (\code{REQUIRES\_PARAMS}) and the per-type
+node properties it reads (\code{REQUIRES\_TYPE\_PROPS}, resolved along the containment
+chain). The validator checks these \emph{before} the run, so a missing parameter is a
+clear message, not a crash deep in a substep.
+
 \end{document}
