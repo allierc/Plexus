@@ -1,0 +1,17 @@
+grid: 256
+species: 3
+a: 0.6
+D: 0.5
+dt: 0.3
+bc: periodic
+steps: 4200
+record_every: 30
+init: random
+seed: 0
+flow: none
+flow_strength: 0.0
+particles: 1400
+particle:
+  channel: 0
+  chemotaxis: 14.0
+  follow_flow: 0.0

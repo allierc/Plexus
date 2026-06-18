@@ -1,0 +1,15 @@
+grid: 256
+species: 3
+a: 0.6
+D: 0.5
+dt: 0.3
+bc: periodic
+steps: 4200
+record_every: 30
+init: random
+seed: 0
+flow: turbulent
+flow_strength: 6.0
+particles: 1600
+particle:
+  follow_flow: 1.0
