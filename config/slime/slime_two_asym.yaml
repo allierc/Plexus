@@ -1,0 +1,49 @@
+# slime_two_asym -- ported from prototype/slime to the decomposed src operators:
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
+general: {name: slime_two_asym, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      fast: {fraction: 0.5, move_speed: 0.009, turn_speed: 0.2, sensor_angle: 16, sensor_dist: 0.04, sensor_size: 1}
+      curly: {fraction: 0.5, move_speed: 0.004, turn_speed: 0.85, sensor_angle: 42, sensor_dist: 0.022, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.5}
+- {op: diffuse, at: chemical, rate: 0.28}
+- {op: decay,   at: chemical, rate: 0.03}
+- {op: sense,   at: cell, from: chemical, cross: -1.0}
+- {op: bounce,  at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    fast: [0.2, 0.95, 0.65]
+    curly: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a complex network of orange and blue filaments evolving in a 2D
+      space. Over time, the filaments appear to shift and reorganize their positions while maintaining
+      their interconnected, thread-like structures. The density of the filaments remains relatively constant
+      as they weave through the black background. There is a subtle fluid-like motion as the paths of
+      the particles slightly deform and flow.
+    objects: 'The scene contains two primary sets of objects: orange filaments and blue filaments. Both
+      sets are composed of small, discrete particles that form continuous, winding, and interconnected
+      paths. The orange filaments are generally thicker and more prominent, while the blue filaments are
+      thinner and more delicate. All filaments are distributed uniformly across the black background,
+      creating a dense, web-like topology.'
+  movie_chemical:
+    description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
+      these particles organize into distinct, interconnected filamentary structures. The filaments expand
+      and weave together to form a complex, web-like network. By the final frame, the network is fully
+      established, showing a stable, interconnected topology.
+    objects: The scene contains two primary sets of filaments, one colored in cyan and the other in magenta.
+      These filaments are thin, elongated structures that branch and intersect throughout the space. They
+      are arranged in a dense, interconnected network that covers the entire field of view. The filaments
+      appear to have a consistent thickness and are distributed uniformly across the black background.

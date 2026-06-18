@@ -1,0 +1,48 @@
+# slime_random_full -- ported from prototype/slime to the decomposed src operators:
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
+general: {name: slime_random_full, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.9}
+- {op: diffuse, at: chemical, rate: 0.35}
+- {op: decay,   at: chemical, rate: 0.012}
+- {op: sense,   at: cell, from: chemical, cross: -1.0}
+- {op: bounce,  at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a network of blue particles forming a complex, interconnected web-like
+      structure. Over time, the particles appear to shift and reorganize slightly while maintaining the
+      overall topology of the network. The density of the connections remains relatively constant throughout
+      the sequence. The movement is subtle, suggesting a steady-state or slowly evolving dynamic system.
+    objects: The scene consists of numerous small, bright blue particles distributed against a black background.
+      These particles are arranged into thin, filamentary lines that form a porous, cellular network.
+      The topology is characterized by interconnected loops and nodes, resembling a biological tissue
+      or a physical foam. Each individual particle is tiny, but their collective arrangement creates large-scale
+      structural patterns.
+  movie_chemical:
+    description: The simulation shows a network of interconnected filaments that gradually become more
+      defined and distinct. Over time, the dark voids between the filaments appear to shrink as the teal
+      structure expands and thickens. The overall pattern transitions from a blurry, diffuse state to
+      a sharp, high-contrast web-like structure. By the final frame, the network has reached a stable,
+      intricate configuration of interconnected nodes and paths.
+    objects: The scene contains a network of teal-colored filaments that form a continuous, interconnected
+      web. These filaments are arranged in a stochastic, porous topology with irregular dark voids between
+      them. The size of the individual filaments varies, creating a complex, multi-scale mesh across the
+      entire field. The color is a consistent cyan-teal, which contrasts sharply against the black background
+      of the voids.

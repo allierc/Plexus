@@ -1,0 +1,63 @@
+# slime_eight -- ported from prototype/slime to the decomposed src operators:
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
+general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 24000
+    spawn: random
+    types:
+      a: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      b: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      c: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      d: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      e: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      f: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      g: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      h: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 256, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.33}
+- {op: diffuse, at: chemical, rate: 0.24}
+- {op: decay,   at: chemical, rate: 0.05}
+- {op: sense,   at: cell, from: chemical, cross: -1.0}
+- {op: bounce,  at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+    e: [0.95, 0.4, 0.95]
+    f: [1.0, 0.6, 0.2]
+    g: [0.2, 0.85, 0.85]
+    h: [0.65, 0.5, 1.0]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
+      across a black background. Over time, these particles begin to organize into distinct, flowing filaments
+      and swirling patterns. The motion evolves from random noise into complex, interconnected structures
+      that resemble turbulent fluid dynamics. By the final frame, the particles have formed well-defined,
+      curved trajectories and nested loops.
+    objects: The scene contains thousands of tiny, point-like particles in various colors including red,
+      green, blue, and yellow. These particles are initially arranged in a stochastic, high-entropy distribution
+      with no clear spatial correlation. As the simulation progresses, they form elongated, thread-like
+      filaments that curve and intertwine with one another. The final structures exhibit a complex topology
+      of nested loops and turbulent eddies, maintaining a consistent small size throughout the evolution.
+  movie_chemical:
+    description: The simulation begins with a dense, chaotic field of small particles and short, disconnected
+      filaments. Over time, these elements begin to organize into distinct, elongated structures that
+      follow curved paths. The filaments grow longer and more coherent, eventually forming a complex network
+      of intertwined strands. By the final frame, the system has transitioned from a disordered state
+      to a highly structured flow of continuous, sweeping lines.
+    objects: The scene contains numerous thin, thread-like filaments that vary in length and curvature.
+      These filaments are colored in a palette of cyan, magenta, yellow, and blue, often appearing in
+      clusters. They are arranged in a tangled, overlapping topology that suggests a fluid-like flow or
+      a complex network. Small, bright white and grey speckles are interspersed throughout the background,
+      providing a textured, granular appearance to the field.

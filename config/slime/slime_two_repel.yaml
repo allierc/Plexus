@@ -1,7 +1,5 @@
-# slime_two_repel -- TWO species, identical rules, cross=-1 (attract own channel,
-# repel the other). Categorical separation: one `types:` change + a 2-channel field
-# (one per species) -> the two slimes carve out separate territories with a sharp
-# interface. No new code.
+# slime_two_repel -- ported from prototype/slime to the decomposed src operators:
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
 general: {name: slime_two_repel, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
 sets:
   cell:
@@ -13,41 +11,40 @@ sets:
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
 operators:
-# lower deposit + higher decay keep the trail BELOW saturation, so a gradient
-# survives for the cross=-1 repulsion to climb (else the field is flat and the
-# two species intermix instead of segregating).
 - {op: deposit, at: cell, to: chemical, amount: 0.5}
-- {op: diffuse, at: chemical,            rate: 0.28}
-- {op: decay,   at: chemical,            rate: 0.03}
+- {op: diffuse, at: chemical, rate: 0.28}
+- {op: decay,   at: chemical, rate: 0.03}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, advance]
 plotting:
-  colors: {a: [0.2, 0.95, 0.65], b: [1.0, 0.35, 0.45]}
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
   background: black
   gamma: 0.7
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a dense field of orange and blue particles moving in complex, winding
-      paths. Over time, the particles form distinct, interconnected filamentary structures that resemble
-      neural networks or fluid flow patterns. The paths of the particles shift and evolve, maintaining
-      a consistent density while changing their specific geometric configurations. The overall motion
-      appears fluid and continuous, with the two colors weaving through one another across the entire
-      frame.
-    objects: The scene contains two primary sets of particles, one colored bright orange and the other
-      a deep blue. These particles are arranged into long, continuous, and winding filaments that curve
-      and loop throughout the space. Each filament is composed of many small, individual points that are
-      closely packed to form a coherent line. The filaments are interconnected at various points, creating
-      a complex, web-like topology against a solid black background.
+    description: The simulation shows a dynamic system of particles forming complex, undulating patterns.
+      Over time, the orange and blue paths shift and morph, creating a fluid-like motion across the frame.
+      The structures appear to flow and weave around one another, maintaining a consistent density. The
+      overall movement suggests a continuous evolution of a field or a collective behavior of agents.
+    objects: The scene contains two primary sets of particles, one colored orange and the other blue.
+      These particles are arranged into elongated, curvilinear strands that resemble topographic contour
+      lines or streamlines. The strands are interconnected and intertwined, forming a dense, web-like
+      topology across the black background. Each individual particle is small and point-like, but they
+      collectively form large, continuous structures.
   movie_chemical:
     description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
-      these particles organize into distinct, winding filaments of red and cyan. The filaments grow and
-      intertwine, forming a complex, interconnected network across the frame. By the final frame, the
-      structure stabilizes into a dense, labyrinthine web of continuous lines.
-    objects: 'The scene contains two primary sets of objects: red and cyan filaments. These filaments
-      are long, continuous, and thread-like in shape. They are arranged in a highly interconnected topology,
-      frequently branching and crossing one another. The filaments vary slightly in thickness but maintain
-      a consistent, organic scale throughout the simulation.'
+      these particles organize into distinct, winding filaments that move and shift across the frame.
+      The filaments continuously evolve, changing their curvature and connectivity while maintaining a
+      fluid, organic motion. By the final frame, the system has settled into a complex, interconnected
+      network of undulating lines.
+    objects: The scene contains two primary sets of filaments, one colored in vibrant pink and the other
+      in bright cyan. These filaments are arranged in a dense, intertwined topology, forming a labyrinthine
+      network of loops and branches. Each filament is relatively thin and uniform in width, though they
+      vary in length and curvature. The objects are set against a solid black background, which highlights
+      their high-contrast colors and intricate spatial arrangement.

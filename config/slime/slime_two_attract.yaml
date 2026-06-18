@@ -1,0 +1,50 @@
+# slime_two_attract -- ported from prototype/slime to the decomposed src operators:
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
+general: {name: slime_two_attract, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      a: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.5}
+- {op: diffuse, at: chemical, rate: 0.28}
+- {op: decay,   at: chemical, rate: 0.03}
+- {op: sense,   at: cell, from: chemical, cross: 1.0}
+- {op: bounce,  at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a network of particles forming interconnected, loop-like structures
+      against a black background. Over time, the particles appear to shift and flow along these established
+      paths, maintaining the overall web-like topology. The density of the particles remains relatively
+      constant as they move through the network. There is no significant change in the global structure,
+      suggesting a steady-state flow or a stable equilibrium in the system.
+    objects: The scene contains thousands of small, individual particles that are primarily orange and
+      blue in color. These particles are organized into thin, curvilinear filaments that intersect to
+      form a complex, porous network. The filaments vary in length and curvature, creating a series of
+      irregular polygonal voids. Each particle is uniform in size, appearing as a single pixel or a small
+      cluster of pixels.
+  movie_chemical:
+    description: The simulation begins with a dense field of scattered, multicolored particles. Over time,
+      these particles rapidly aggregate and organize into a complex, interconnected network of white filaments.
+      The network expands and stabilizes into a web-like structure with distinct polygonal cells. The
+      final frames show a steady state where the filaments maintain their structural integrity against
+      a black background.
+    objects: The primary objects are white filaments that form a continuous, interconnected mesh. These
+      filaments vary in thickness but generally maintain a consistent width across the frame. Small, multicolored
+      specks in shades of cyan and magenta are visible both within the filaments and in the background.
+      The overall topology is a Voronoi-like tessellation of irregular polygons bounded by the white lines.

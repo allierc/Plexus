@@ -158,10 +158,30 @@ def _ffmpeg() -> str | None:
     return cand if os.path.exists(cand) else shutil.which("ffmpeg")
 
 
+def _save_anim(anim, out_base: str, bg: str, fps: int = 25, dpi: int = 150) -> str:
+    """Save an animation as high-quality H.264 (constant-quality CRF, not a fixed
+    bitrate). Thin bright structure on a dark background -- slime trails, particle
+    fields -- otherwise picks up mosquito/blocking noise at a fixed bitrate. Falls
+    back to gif when ffmpeg is absent. Returns the output path."""
+    from matplotlib.animation import FFMpegWriter, PillowWriter
+    ff = _ffmpeg()
+    if ff:
+        matplotlib.rcParams["animation.ffmpeg_path"] = ff
+        out = out_base + ".mp4"
+        anim.save(out, dpi=dpi, savefig_kwargs={"facecolor": bg},
+                  writer=FFMpegWriter(fps=fps, codec="libx264",
+                                      extra_args=["-crf", "16", "-preset", "slow",
+                                                  "-pix_fmt", "yuv420p"]))
+    else:
+        out = out_base + ".gif"
+        anim.save(out, writer=PillowWriter(fps=20), savefig_kwargs={"facecolor": bg})
+    return out
+
+
 def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white") -> None:
     """Render a movie of a set's trajectory. Writes mp4 via ffmpeg when available,
     else falls back to gif. `out_base` is the path without extension."""
-    from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+    from matplotlib.animation import FuncAnimation
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
     fig, ax = plt.subplots(figsize=(5 * W, 5)); ax.set_xlim(0, W); ax.set_ylim(0, 1)
@@ -178,21 +198,14 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
         return sc,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
-    ff = _ffmpeg()
-    if ff:
-        matplotlib.rcParams["animation.ffmpeg_path"] = ff
-        out = out_base + ".mp4"
-        anim.save(out, writer=FFMpegWriter(fps=25, bitrate=4000), savefig_kwargs={"facecolor": bg})
-    else:
-        out = out_base + ".gif"
-        anim.save(out, writer=PillowWriter(fps=20), savefig_kwargs={"facecolor": bg})
+    out = _save_anim(anim, out_base, bg)
     plt.close(fig)
     print(f"[plot] movie -> {os.path.basename(out)}", flush=True)
 
 
 def _field_movie(grid, colors, W, out_base, gamma, bg, max_frames: int = 150) -> None:
     """Render a field's composited heatmap over time (mp4 via ffmpeg, else gif)."""
-    from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+    from matplotlib.animation import FuncAnimation
     T = grid.shape[0]
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
@@ -207,13 +220,6 @@ def _field_movie(grid, colors, W, out_base, gamma, bg, max_frames: int = 150) ->
         return im,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
-    ff = _ffmpeg()
-    if ff:
-        matplotlib.rcParams["animation.ffmpeg_path"] = ff
-        out = out_base + ".mp4"
-        anim.save(out, writer=FFMpegWriter(fps=25, bitrate=4000), savefig_kwargs={"facecolor": bg})
-    else:
-        out = out_base + ".gif"
-        anim.save(out, writer=PillowWriter(fps=20), savefig_kwargs={"facecolor": bg})
+    out = _save_anim(anim, out_base, bg)
     plt.close(fig)
     print(f"[plot] field movie -> {os.path.basename(out)}", flush=True)

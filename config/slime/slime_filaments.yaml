@@ -1,0 +1,48 @@
+# slime_filaments -- ported from prototype/slime to the decomposed src operators:
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
+general: {name: slime_filaments, seed: 0, n_frames: 450, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 13000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.9}
+- {op: diffuse, at: chemical, rate: 0.3}
+- {op: decay,   at: chemical, rate: 0.01}
+- {op: sense,   at: cell, from: chemical, cross: -1.0}
+- {op: bounce,  at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large cluster of blue particles initially forms a dense, roughly circular shape against
+      a black background. As time progresses, the cluster begins to expand and fragment into a complex
+      network of interconnected filaments. These filaments stretch outward and weave into a web-like structure
+      that fills the frame. By the final frames, the original circular form has completely dissolved into
+      a chaotic, sprawling lattice of thin lines.
+    objects: The primary objects are small, luminous blue particles that aggregate to form larger structures.
+      These particles are arranged in a dense, circular cluster at the beginning of the sequence. Over
+      time, they organize into a network of thin, curved filaments that intersect and overlap. The final
+      topology is a complex, web-like lattice of interconnected lines spanning the entire field of view.
+  movie_chemical:
+    description: A dense collection of cyan particles initially forms a spherical cluster against a black
+      background. As time progresses, the sphere expands and transforms into a complex, interconnected
+      network of filaments. These filaments weave together to form a dense, web-like structure that fills
+      the entire frame. The final frames show a highly intricate, overlapping mesh of cyan lines with
+      small bright spots scattered throughout.
+    objects: The primary objects are cyan-colored particles and filaments. Initially, the particles are
+      arranged in a large, roughly spherical cluster. Over time, they organize into a network of thin,
+      curved filaments that intersect and overlap. The final structure is a dense, web-like topology of
+      varying filament thicknesses and small, bright point-like features.

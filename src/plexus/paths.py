@@ -90,9 +90,15 @@ def add_pre_folder(config_name: str) -> tuple[str, str]:
         head = config_name.split("/", 1)[0]
         return config_name, head + "/"
     low = config_name.lower()
+    # leftmost trigger wins: the type keyword leads the name, so `slime_two_attract`
+    # routes to slime (`slime` at pos 0), not attraction_repulsion (`attract` at pos 10).
+    best = None                                    # (position, folder)
     for folder, triggers in _PRE_FOLDER_RULES:
-        if any(t in low for t in triggers):
-            return os.path.join(folder, config_name), folder + "/"
+        hits = [low.find(t) for t in triggers if t in low]
+        if hits and (best is None or min(hits) < best[0]):
+            best = (min(hits), folder)
+    if best is not None:
+        return os.path.join(best[1], config_name), best[1] + "/"
     raise ValueError(
         f"cannot infer a simulation type (pre-folder) from config name {config_name!r}; "
         f"known types: {', '.join(sorted(_VALID_PRE_FOLDERS))}. "
