@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from . import graph                 # noqa: F401  registers radius_graph (rewire)
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
-from . import boids                 # noqa: F401  registers boids (lateral, 2nd-derivative)
+from . import boids                 # noqa: F401  registers boids (lateral, 2nd-derivative; monolith)
+from . import flocking              # noqa: F401  registers cohesion/alignment/separation (boids, decomposed)
 from . import drag                  # noqa: F401  registers drag (lateral, 2nd-derivative)
 # field-coupled primitives (the slime/Physarum decomposition: 1 set + 1 scalar field)
 from . import scalar_field          # noqa: F401  registers the `grid` scalar field
@@ -21,5 +22,5 @@ from . import sense                 # noqa: F401  field -> set (turn heading)
 from . import advance               # noqa: F401  set -> self-propelled move
 from . import bounce                # noqa: F401  set -> wall/obstacle reflection (re-head)
 
-__all__ = ["graph", "attraction_repulsion", "boids", "drag",
+__all__ = ["graph", "attraction_repulsion", "boids", "flocking", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce"]
