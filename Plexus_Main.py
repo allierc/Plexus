@@ -44,6 +44,10 @@ def main():
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
                         help="on -o plot, also render a gif movie per set")
+    parser.add_argument("--no-describe", action="store_true",
+                        help="skip the automatic VLM video description that -o generate runs by default")
+    parser.add_argument("--describe-out", default=None,
+                        help="aggregate description file (default: graphs_data/video_descriptions.txt)")
     args = parser.parse_args()
 
     if args.output_root:
@@ -69,15 +73,26 @@ def main():
     os.makedirs(run_log_dir, exist_ok=True)
     shutil.copy2(yaml_file, os.path.join(run_log_dir, "config.yaml"))
 
+    describe = not args.no_describe
+    data_dir = None
+
     if "generate" in task:
         data_dir, _ = data_generate(sim, pre_folder, device=args.device,
                                     erase=args.force, save=True)
+        shutil.copy2(yaml_file, os.path.join(data_dir, "spec.yaml"))   # co-locate the spec with its data
         _mark(run_log_dir, "_completed_generate", data_dir)
 
-    if "plot" in task:
+    # render movies if plotting was asked OR describing (the captioner needs the mp4s)
+    if "plot" in task or (describe and "generate" in task):
         from plexus.plot import plot_dataset
-        data_dir = plot_dataset(sim, pre_folder, movie=args.movie)
-        _mark(run_log_dir, "_completed_plot", data_dir)
+        data_dir = plot_dataset(sim, pre_folder, movie=(args.movie or describe))
+        if "plot" in task:
+            _mark(run_log_dir, "_completed_plot", data_dir)
+
+    # caption the freshly rendered movies (default on for -o generate; --no-describe to skip)
+    if describe and "generate" in task and data_dir:
+        _describe(data_dir, args.describe_out)
+        _mark(run_log_dir, "_completed_describe", args.describe_out or "graphs_data/video_descriptions.txt")
 
     for stage in ("train", "test"):
         if stage in task:
@@ -85,6 +100,29 @@ def main():
                 f"task stage {stage!r} is not built yet (inverse-problem stage).")
 
     _mark(run_log_dir, "_complete", " ".join(sys.argv))
+
+
+def _describe(data_dir: str, out_file: str | None) -> None:
+    """Caption this run's movies with the local VLM, appending to the aggregate file.
+    Runs describe_video.py as a subprocess so a missing/broken VLM never breaks a run."""
+    import glob
+    import subprocess
+    from plexus.paths import graphs_data_path
+    repo = os.path.dirname(os.path.abspath(__file__))
+    gemma = os.environ.get("GEMMA_DIR", os.path.join(repo, "VLLM", "gemma-4-12B-it"))
+    if not os.path.isdir(gemma):
+        print(f"[describe] skip: no VLM weights at {gemma} (pass --no-describe to silence)", flush=True)
+        return
+    movies = sorted(glob.glob(os.path.join(data_dir, "movie_*.mp4")))
+    if not movies:
+        print("[describe] no movies found to describe", flush=True)
+        return
+    gd = graphs_data_path()
+    out_file = out_file or os.path.join(gd, "video_descriptions.txt")
+    script = os.path.join(repo, "VLLM", "describe_video.py")
+    print(f"[describe] captioning {len(movies)} movie(s) -> {out_file}", flush=True)
+    subprocess.run([sys.executable, script, *movies, "--root", gd,
+                    "--out", out_file, "--append"], check=False)
 
 
 def _mark(run_log_dir: str, marker: str, info: str) -> None:

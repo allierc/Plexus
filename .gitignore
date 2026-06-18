@@ -25,3 +25,7 @@ prototype/**/*.mp4
 prototype/**/*.png
 prototype/**/*.log
 papers/
+
+# local VLM weights (24GB) and logs -- never commit
+VLLM/gemma-4-12B-it/
+VLLM/*.log
