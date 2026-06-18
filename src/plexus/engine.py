@@ -144,6 +144,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H.rng = torch.Generator(device=device).manual_seed(sim.seed)
     H.world_width = float(sim.world)
     H.periodic = (sim.boundary == "periodic")
+    H.obstacles = list(getattr(sim, "obstacles", []) or [])   # wall rects/discs for the `bounce` op
 
     # pass 1: top-level sets (no parent) -- positions seeded across the domain.
     for sname, s in sim.sets.items():
