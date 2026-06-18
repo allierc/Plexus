@@ -124,8 +124,10 @@ def load(path: str) -> Spec:
             raise ValueError(
                 f"operator {name!r} has unrecognised kind {kind!r}; expected one of {KINDS}.")
         sel = Selector.parse(o["at"])
-        if sel.set not in raw["sets"]:
-            raise ValueError(f"operator {name!r} acts on unknown set {sel.set!r}")
+        # `at:` names a SET (set/exchange operators) or a FIELD (field-internal
+        # operators like diffuse/decay, which read & write the field at `at:`).
+        if sel.set not in raw["sets"] and sel.set not in raw["fields"]:
+            raise ValueError(f"operator {name!r} acts on unknown set or field {sel.set!r}")
         for fref in (o.get("to"), o.get("from")):
             if fref is not None and fref not in raw["fields"]:
                 raise ValueError(f"operator {name!r} references unknown field {fref!r}")

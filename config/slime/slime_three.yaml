@@ -15,8 +15,8 @@ operators:
 # below-saturation density (low deposit, higher decay) so the cross=-1 gradient
 # survives and the three species carve out distinct territories.
 - {op: deposit, at: cell, to: chemical, amount: 0.5}
-- {op: diffuse, at: cell, to: chemical, rate: 0.28}
-- {op: decay,   at: cell, to: chemical, rate: 0.03}
+- {op: diffuse, at: chemical,            rate: 0.28}
+- {op: decay,   at: chemical,            rate: 0.03}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: advance, at: cell}
 schedule: [deposit, diffuse, decay, sense, advance]

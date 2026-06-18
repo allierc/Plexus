@@ -227,6 +227,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 #  selectors: resolve to a live boolean mask, every tick
 # --------------------------------------------------------------------------- #
 def _mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
+    if sel.set not in H.levels:                        # a field-internal operator (at: <field>)
+        return None                                    # has no per-node mask
     lvl = H.level(sel.set)
     if sel.attr is None:
         return lvl.active                              # all live nodes

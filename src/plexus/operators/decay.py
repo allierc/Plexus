@@ -10,13 +10,13 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("decay", level="cell", kind="exchange")
+@register_operator("decay", level="field", kind="exchange")
 class Decay(Exchange):
-    REQUIRES_PARAMS = ["to"]
+    """field -> field: acts on the field named by `at:` (no set involved)."""
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        self.field_name = params.get("to")
+        self.field_name = params.get("_at") or params.get("to")   # the field at `at:`
         self.rate = float(params.get("rate", 0.012))    # evaporation per unit time
 
     def forward(self, H, mask=None):
