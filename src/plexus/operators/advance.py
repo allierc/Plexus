@@ -1,13 +1,17 @@
 """advance -- set (lateral). Self-propulsion: move along the heading at speed.
 
-Each agent steps forward `dt * move_speed` along its current heading (the heading
-that `sense` set). On a wall it picks a fresh random heading (Lague's bounce); on a
-periodic domain it wraps. A first-class self-propelled mover: it integrates its own
-position and returns {} (sanctioned by the operator contract -- like the other
-self-moving/exchange ops), so the set needs no separate integration order.
+A first-derivative dynamics operator: it returns a velocity delta
+`v_i = move_speed_i * (cos h_i, sin h_i)` and lets the ENGINE integrate the
+position (`pos += dt * v`), exactly like attraction_repulsion returns a dpos.
+It does NOT touch `pos` itself -- the integrator is the engine's job.
 
-Renamed from the prototype `motility` (it is the slime "move" step); the active-
-Brownian rotational-diffusion variant can layer on top as a separate operator.
+The heading is auxiliary control state (set by `sense`, not integrated by the
+engine). On a wall, advance re-heads *proactively*: if a step along the current
+heading would leave the domain, it picks a fresh random heading this tick (so the
+emitted velocity already points back inward) -- Lague's bounce, without the
+operator ever writing a position.
+
+Renamed from the prototype `motility` (it is the slime "move" step).
 """
 from __future__ import annotations
 
@@ -20,6 +24,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("advance", level="cell", kind="lateral")
 class Advance(Lateral):
+    PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates pos
     REQUIRES_TYPE_PROPS = ["move_speed"]
 
     def __init__(self, params, device="cpu"):
@@ -30,30 +35,24 @@ class Advance(Lateral):
         lvl = H.level(self.at)
         dev = lvl.state.device
         N = lvl.n
-        pos = lvl.state[:, :2]
+        pos = lvl.get("pos")
         h = lvl.heading
         spd = lvl.move_speed
-        dt = float(getattr(H.config, "dt", 1.0))
-        W = float(getattr(H, "world_width", 1.0))
-
-        step = dt * spd
-        nx = pos[:, 0] + torch.cos(h) * step
-        ny = pos[:, 1] + torch.sin(h) * step
-
-        if getattr(H, "periodic", False):
-            nx = torch.remainder(nx, W)
-            ny = torch.remainder(ny, 1.0)
-            new_h = h
-        else:
-            out = (nx < 0) | (nx >= W) | (ny < 0) | (ny >= 1)         # hit a wall
-            rand = torch.rand(N, generator=H.rng, device=dev) * 2 * math.pi
-            new_h = torch.where(out, rand, h)                         # pick a fresh direction
-            nx = nx.clamp(0, W - 1e-6)
-            ny = ny.clamp(0, 1 - 1e-6)
-
-        new_pos = torch.stack([nx, ny], dim=1)
-        m = (mask.float() if mask is not None else torch.ones(N, device=dev))
+        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
         keep = m > 0
-        lvl.heading = torch.where(keep, new_h, h)
-        lvl.state[:, :2] = torch.where(keep[:, None], new_pos, pos)
-        return {}
+
+        if not getattr(H, "periodic", False):
+            # proactive wall bounce: if a dt-step along the heading would leave the
+            # domain, re-head NOW (heading is auxiliary control state, not the
+            # integrated pos), so the velocity we emit already points back inward.
+            dt = float(getattr(H.config, "dt", 1.0))
+            W = float(getattr(H, "world_width", 1.0))
+            nx = pos[:, 0] + dt * spd * torch.cos(h)
+            ny = pos[:, 1] + dt * spd * torch.sin(h)
+            out = (nx < 0) | (nx >= W) | (ny < 0) | (ny >= 1)
+            rand = torch.rand(N, generator=H.rng, device=dev) * 2 * math.pi
+            h = torch.where(out & keep, rand, h)
+            lvl.heading = torch.where(keep, h, lvl.heading)
+
+        vel = spd[:, None] * torch.stack([torch.cos(h), torch.sin(h)], dim=1)
+        return {self.at: vel * m[:, None]}
