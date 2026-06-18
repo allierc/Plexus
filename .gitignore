@@ -22,4 +22,6 @@ papers/*.pdf
 # prototype renders (recursive: also ant/, water/, slime/, ... subdirs)
 prototype/**/*.gif
 prototype/**/*.mp4
+prototype/**/*.png
+prototype/**/*.log
 papers/

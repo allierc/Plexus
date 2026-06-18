@@ -1,0 +1,10 @@
+grid: 384
+species: 3
+a: 0.9
+D: 0.18
+dt: 0.3
+bc: periodic
+steps: 6000
+record_every: 40
+init: random
+seed: 0

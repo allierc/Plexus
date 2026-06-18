@@ -7,8 +7,9 @@ resources:
 
 ::: {.callout-note appearance="simple"}
 **Operators adapted from prior work.** Plexus re-implements published simulation code
-as registered operators: attraction–repulsion and boids from
-[ParticleGraph](https://github.com/allierc/ParticleGraph); the slime-mould (Physarum)
+as registered operators: attraction–repulsion, boids, and rock–paper–scissors
+reaction–diffusion from [ParticleGraph](https://github.com/allierc/ParticleGraph);
+the slime-mould (Physarum)
 agent from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation);
 the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from
 [*The Well*](https://github.com/PolymathicAI/the_well) (Ohana et al., NeurIPS 2024); and
@@ -124,7 +125,7 @@ morphogenesis, fluid mechanics, reaction–diffusion, and active matter.
 <div class="home-2x2">
   <figure><video src="gallery/boids_16.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
   <figure><video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
-  <figure><video src="gallery/ph_crown_splash.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>fluids</b> — an MPM drop crowns on impact</figcaption></figure>
+  <figure><video src="gallery/rps_species_6.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>competition</b> — six-species rock–paper–scissors spirals</figcaption></figure>
   <figure><video src="gallery/rd_worms.mp4" autoplay loop muted playsinline preload="metadata"></video><figcaption><b>fields</b> — a Gray–Scott reaction–diffusion pattern</figcaption></figure>
 </div>
 ```

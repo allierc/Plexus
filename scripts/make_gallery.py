@@ -66,6 +66,12 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("ns_taylor_green", "prototype/well/ns_taylor_green.gif", "prototype/well/scenarios/ns_taylor_green.yaml", "field: Taylor–Green vortex decay (Navier–Stokes)"),
         ("ns_rayleigh_taylor", "prototype/well/ns_rayleigh_taylor.gif", "prototype/well/scenarios/ns_rayleigh_taylor.yaml", "field: Rayleigh–Taylor fingering instability (Navier–Stokes)"),
     ],
+    "Reaction–diffusion — cyclic competition (rock–paper–scissors)": [
+        ("rps_random", "prototype/rps/rps_random.gif", "prototype/rps/scenarios/rps_random.yaml", "3 species quenched from disorder → spiral turbulence"),
+        ("rps_species_3", "prototype/rps/rps_species_3.gif", "prototype/rps/scenarios/rps_species_3.yaml", "3 species seeded as a pinwheel → one spiral core"),
+        ("rps_species_4", "prototype/rps/rps_species_4.gif", "prototype/rps/scenarios/rps_species_4.yaml", "4-species cyclic competition"),
+        ("rps_species_6", "prototype/rps/rps_species_6.gif", "prototype/rps/scenarios/rps_species_6.yaml", "6-species cyclic competition (validated vs ParticleGraph RD_RPS)"),
+    ],
     "Mixtures — several mechanisms in one world": [
         ("mix_avoid", "prototype/well/mix_avoid.gif", "prototype/well/scenarios/mix_avoid.yaml", "particles flee a reaction–diffusion ridge field"),
         ("mix_slime4", "prototype/well/mix_slime4.gif", "prototype/well/scenarios/mix_slime4.yaml", "four slime species run two coupled networks"),
@@ -139,8 +145,9 @@ resources:
 
 ::: {.callout-note appearance="simple"}
 **Operators adapted from prior work.** Plexus re-implements published simulation code
-as registered operators: attraction–repulsion and boids from
-[ParticleGraph](https://github.com/allierc/ParticleGraph); the slime-mould (Physarum)
+as registered operators: attraction–repulsion, boids, and rock–paper–scissors
+reaction–diffusion from [ParticleGraph](https://github.com/allierc/ParticleGraph);
+the slime-mould (Physarum)
 agent from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation);
 the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from
 [*The Well*](https://github.com/PolymathicAI/the_well) (Ohana et al., NeurIPS 2024); and
