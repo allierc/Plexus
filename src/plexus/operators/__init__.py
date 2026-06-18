@@ -19,7 +19,6 @@ from . import diffuse               # noqa: F401  field -> field
 from . import decay                 # noqa: F401  field -> field
 from . import sense                 # noqa: F401  field -> set (turn heading)
 from . import advance               # noqa: F401  set -> self-propelled move
-from . import alignment            # noqa: F401  registers alignment (lateral, 2nd-derivative)
 
-__all__ = ["alignment", "graph", "attraction_repulsion", "boids", "drag",
+__all__ = ["graph", "attraction_repulsion", "boids", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance"]
