@@ -22,6 +22,24 @@ def minimum_image(d: torch.Tensor, periodic: bool, world_width: float = 1.0) -> 
     return torch.stack([dx, dy], dim=-1)
 
 
+def neighbour_mean(pos, occ, edge_index, periodic, world_width, msg_fn) -> torch.Tensor:
+    """Mean over each receiver i's live neighbours j of `msg_fn(i, j, d_ij)` -> [N, 2].
+
+    `edge_index` is [2, E] (row0 receiver i, row1 neighbour j); `d_ij = pos_j - pos_i`
+    is the minimum-image displacement. The shared reduction behind the boids steering
+    rules (cohesion / alignment / separation), so each is one thin operator file.
+    """
+    N = pos.shape[0]
+    if edge_index.numel() == 0:
+        return torch.zeros(N, 2, device=pos.device)
+    i, j = edge_index[0], edge_index[1]
+    d = minimum_image(pos[j] - pos[i], periodic, world_width)
+    msg = msg_fn(i, j, d) * occ[j, None]                    # ignore dormant neighbours
+    acc = torch.zeros(N, 2, device=pos.device).index_add_(0, i, msg)
+    deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
+    return (acc / deg.clamp(min=1.0)[:, None]) * occ[:, None]
+
+
 def radius_edges(
     pos: torch.Tensor,
     occ: torch.Tensor,
