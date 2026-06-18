@@ -1,0 +1,26 @@
+# slime_three -- THREE species sharing one domain (3-channel field), each repelling
+# the others (cross=-1). Three interleaved networks competing for territory.
+general: {name: slime_three, seed: 2, n_frames: 420, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 15000
+    spawn: random
+    types:
+      a: {fraction: 0.3334, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.3333, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.3333, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+# below-saturation density (low deposit, higher decay) so the cross=-1 gradient
+# survives and the three species carve out distinct territories.
+- {op: deposit, at: cell, to: chemical, amount: 0.5}
+- {op: diffuse, at: cell, to: chemical, rate: 0.28}
+- {op: decay,   at: cell, to: chemical, rate: 0.03}
+- {op: sense,   at: cell, from: chemical, cross: -1.0}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, advance]
+plotting:
+  colors: {a: [0.2, 0.95, 0.65], b: [1.0, 0.35, 0.45], c: [0.45, 0.6, 1.0]}
+  background: black
+  gamma: 0.7

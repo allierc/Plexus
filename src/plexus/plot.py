@@ -34,6 +34,20 @@ def _sets_in(npz) -> list[str]:
     return sorted({k[:-len("__pos")] for k in npz.files if k.endswith("__pos")})
 
 
+def _fields_in(npz) -> list[str]:
+    """Field names present in a trajectory file (keys '<field>__grid')."""
+    return sorted({k[:-len("__grid")] for k in npz.files if k.endswith("__grid")})
+
+
+def _composite(frame, colors, gamma=0.7):
+    """[C, nx, ny] field + [C, 3] channel colours -> [ny, nx, 3] RGB image."""
+    C, nx, ny = frame.shape
+    rgb = np.zeros((ny, nx, 3), np.float32)
+    for c in range(C):
+        rgb += frame[c].T[:, :, None] * colors[c][None, None, :]
+    return np.clip(rgb, 0, 1) ** gamma                # gamma lifts faint trails
+
+
 def _render_meta(sname: str) -> dict:
     """Render hints for a set, from the entity registry (how to color/draw it)."""
     try:
@@ -101,6 +115,38 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         if movie:
             _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"), bg=bg)
 
+    # --- continuum fields: composite the channels and draw the heatmap ------- #
+    gamma = float(style.get("gamma", 0.7))
+    fbg = style.get("background", "black")
+    for fname in _fields_in(d):
+        grid = d[f"{fname}__grid"]                     # [T, C, nx, ny]
+        colors = d[f"{fname}__colors"]                 # [C, 3]
+        T = grid.shape[0]
+
+        def _fdraw(ax, i):
+            ax.set_facecolor(fbg)
+            ax.imshow(_composite(grid[i], colors, gamma), origin="lower", extent=[0, W, 0, 1],
+                      interpolation="bilinear")
+            ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
+
+        idx = [0, T // 5, 2 * T // 5, 3 * T // 5, T - 1]
+        fig, axes = plt.subplots(1, len(idx), figsize=(len(idx) * W * 3.2, 3.4))
+        fig.patch.set_facecolor(fbg)
+        for ax, i in zip(np.atleast_1d(axes), idx):
+            _fdraw(ax, i)
+        plt.tight_layout()
+        evo = os.path.join(data_dir, f"fig_{fname}_evolution.png")
+        plt.savefig(evo, dpi=100, facecolor=fbg); plt.close(fig)
+
+        fig, ax = plt.subplots(figsize=(6 * W, 6)); fig.patch.set_facecolor(fbg)
+        _fdraw(ax, T - 1); plt.tight_layout()
+        fin = os.path.join(data_dir, f"fig_{fname}_final.png")
+        plt.savefig(fin, dpi=110, facecolor=fbg); plt.close(fig)
+        print(f"[plot] {fname} (field): {os.path.basename(evo)}, {os.path.basename(fin)}", flush=True)
+
+        if movie:
+            _field_movie(grid, colors, W, os.path.join(data_dir, f"movie_{fname}"), gamma, fbg)
+
     print(f"[plot] figures -> {data_dir}", flush=True)
     return data_dir
 
@@ -142,3 +188,32 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
         anim.save(out, writer=PillowWriter(fps=20), savefig_kwargs={"facecolor": bg})
     plt.close(fig)
     print(f"[plot] movie -> {os.path.basename(out)}", flush=True)
+
+
+def _field_movie(grid, colors, W, out_base, gamma, bg, max_frames: int = 150) -> None:
+    """Render a field's composited heatmap over time (mp4 via ffmpeg, else gif)."""
+    from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+    T = grid.shape[0]
+    stride = max(1, T // max_frames)
+    frames = list(range(0, T, stride))
+    fig, ax = plt.subplots(figsize=(5 * W, 5)); fig.patch.set_facecolor(bg); ax.set_facecolor(bg)
+    ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
+    fig.tight_layout(pad=0)
+    im = ax.imshow(_composite(grid[0], colors, gamma), origin="lower", extent=[0, W, 0, 1],
+                   interpolation="bilinear")
+
+    def upd(i):
+        im.set_data(_composite(grid[i], colors, gamma))
+        return im,
+
+    anim = FuncAnimation(fig, upd, frames=frames, interval=50)
+    ff = _ffmpeg()
+    if ff:
+        matplotlib.rcParams["animation.ffmpeg_path"] = ff
+        out = out_base + ".mp4"
+        anim.save(out, writer=FFMpegWriter(fps=25, bitrate=4000), savefig_kwargs={"facecolor": bg})
+    else:
+        out = out_base + ".gif"
+        anim.save(out, writer=PillowWriter(fps=20), savefig_kwargs={"facecolor": bg})
+    plt.close(fig)
+    print(f"[plot] field movie -> {os.path.basename(out)}", flush=True)

@@ -57,6 +57,9 @@ def data_generate(
             flat[f"{sname}__occ"] = d["occ"]
             if d.get("node_type") is not None:
                 flat[f"{sname}__node_type"] = d["node_type"]
+        for fname, fd in out.get("fields", {}).items():     # continuum fields (heatmap movies)
+            flat[f"{fname}__grid"] = fd["grid"]
+            flat[f"{fname}__colors"] = fd["colors"]
         np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"], **flat)
 
     nrec = next(iter(out["sets"].values()))["pos"].shape[0]

@@ -12,5 +12,13 @@ from . import graph                 # noqa: F401  registers radius_graph (rewire
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
 from . import boids                 # noqa: F401  registers boids (lateral, 2nd-derivative)
 from . import drag                  # noqa: F401  registers drag (lateral, 2nd-derivative)
+# field-coupled primitives (the slime/Physarum decomposition: 1 set + 1 scalar field)
+from . import scalar_field          # noqa: F401  registers the `grid` scalar field
+from . import deposit               # noqa: F401  set -> field
+from . import diffuse               # noqa: F401  field -> field
+from . import decay                 # noqa: F401  field -> field
+from . import sense                 # noqa: F401  field -> set (turn heading)
+from . import advance               # noqa: F401  set -> self-propelled move
 
-__all__ = ["graph", "attraction_repulsion", "boids", "drag"]
+__all__ = ["graph", "attraction_repulsion", "boids", "drag",
+           "scalar_field", "deposit", "diffuse", "decay", "sense", "advance"]
