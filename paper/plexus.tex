@@ -1279,4 +1279,208 @@ This is ultimately the deepest connection to Lean. Both systems seek a compact s
 of primitives from which a much larger space of structures can be constructed.
 Lean does this for mathematics. Plexus attempts to do it for biological systems.
 
+\addcontentsline{toc}{section}{Appendix --- Plexus versus World Models}
+
+\section{Plexus versus World Models}
+\label{sec:worldmodels}
+
+The recent success of foundation models has led to a growing interest in
+\emph{world models}: systems that learn latent representations of the world and
+predict their future evolution from large collections of observations. Examples
+include self-supervised predictive architectures such as JEPA, video foundation
+models trained on internet-scale datasets, and multimodal models that generate
+future trajectories directly from images or videos.
+
+At first sight, Plexus appears to pursue a similar objective. Both seek to model
+the dynamics of complex systems and both can be coupled to optimization or
+agentic search procedures. The difference lies in what is being learned.
+
+World models learn a representation optimized for prediction. Plexus defines a
+representation optimized for explanation.
+
+\subsection{Latent representations versus explicit representations}
+
+A world model begins from observations:
+\[
+\text{video}
+\longrightarrow
+z_t
+\longrightarrow
+z_{t+1},
+\]
+where $z_t$ is a learned latent state. The representation is discovered
+automatically from data. If prediction is accurate, the internal structure of
+the latent space need not correspond to interpretable biological entities.
+
+In contrast, Plexus begins from explicit primitives:
+\[
+(S_\bullet,\, F_\bullet,\, \pi_\bullet)
+\]
+together with a collection of operators acting on them. Cells, particles,
+metabolites, morphogens, tissues, and fields remain explicit objects throughout
+the computation. Dynamics arise from compositions of operators rather than from
+opaque latent transitions.
+
+The objective is therefore different. A world model asks:
+
+\begin{quote}
+What representation best predicts future observations?
+\end{quote}
+
+Plexus asks:
+
+\begin{quote}
+What representation best expresses the mechanisms that generate those
+observations?
+\end{quote}
+
+Prediction is a consequence of the representation, not its primary purpose.
+
+\subsection{An illustrative failure}
+
+The distinction became apparent during an agentic modeling experiment on
+\emph{Dictyostelium} aggregation. An agent was tasked with discovering a model
+that reproduced a real biological image containing a dense aggregate with
+multiple visible mounds.
+
+The agent systematically explored a family of local mechanisms:
+
+\begin{itemize}
+\item linear chemotaxis,
+\item strong chemotaxis,
+\item adhesion,
+\item excitable cAMP relay,
+\item saturated chemotaxis,
+\item density repulsion,
+\item deformable MPM bodies,
+\item and related variants.
+\end{itemize}
+
+The search was scientifically productive. Several hypotheses were falsified,
+and the experiment revealed that saturated chemotaxis could transiently produce
+a morphology resembling the target. However, longer simulations showed that the
+multi-mound state eventually collapsed into a single aggregate. No tested
+two-dimensional mechanism reproduced the observed morphology in a stable manner.
+The agent therefore converged to the honest conclusion that the proposed
+mechanisms were insufficient.
+
+At first glance this appears to be a failure of search. A closer inspection
+reveals a deeper limitation.
+
+Human observers immediately proposed alternative explanations:
+
+\begin{itemize}
+\item long-range attraction between aggregates,
+\item a global radial field,
+\item three-dimensional stacking projected into two dimensions,
+\item coarsening dynamics,
+\item soft-body fusion of neighboring mounds.
+\end{itemize}
+
+These hypotheses were not explored because they did not exist in the agent's
+conceptual vocabulary. The search operated within the space of implemented
+mechanisms rather than within the space of possible explanations.
+
+The experiment therefore exposed a distinction between two kinds of knowledge.
+
+The first is procedural:
+
+\begin{quote}
+Given a mechanism, can we optimize its parameters?
+\end{quote}
+
+The second is mechanistic:
+
+\begin{quote}
+What classes of mechanisms are capable of generating the observed phenomenon?
+\end{quote}
+
+The agent possessed the first form of knowledge but only a limited version of
+the second.
+
+\subsection{What a world model would contribute}
+
+A learned world model could complement Plexus by providing a prior over
+mechanisms.
+
+Rather than directly predicting future frames, the world model would learn
+associations between observed morphologies and candidate generative processes.
+
+For example:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Observed morphology} & \textbf{Candidate mechanisms} \\
+\midrule
+single dense aggregate & global attraction, coarsening \\
+filament network & adhesion, trail following \\
+radial streaming & chemotaxis, external field \\
+segregated domains & differential adhesion \\
+wave propagation & excitable media, relay \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The role of the world model would therefore not be to replace simulation, but
+to guide the search over simulations.
+
+\subsection{A comparison with contemporary approaches}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\footnotesize
+\begin{tabular}{@{}p{3.1cm}p{4.3cm}p{4.3cm}@{}}
+\toprule
+& \textbf{World models (JEPA, video foundation models)} & \textbf{Plexus} \\
+\midrule
+Representation & learned latent variables & explicit sets, fields, operators \\
+Primary objective & prediction & mechanistic explanation \\
+Data requirement & very large & can operate from prior knowledge \\
+Interpretability & limited & high \\
+Counterfactual editing & implicit & explicit operator modification \\
+Scientific hypotheses & difficult to extract & native objects of the framework \\
+Optimization target & latent state & biophysical parameters and mechanisms \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The two approaches should therefore be viewed as complementary rather than
+competing. World models excel at discovering statistical regularities from large
+datasets. Plexus excels at expressing, testing, and optimizing mechanistic
+hypotheses.
+
+\addcontentsline{toc}{section}{Appendix --- Toward Mechanistic World Models}
+
+\section{Toward Mechanistic World Models}
+\label{sec:mechanistic-wm}
+
+The long-term objective is not a simulator alone and not a world model alone,
+but a synthesis of both.
+
+The language of Plexus provides explicit primitives: sets, fields, relations,
+and operators. Agentic search provides hypothesis generation and falsification.
+A world model supplies prior knowledge about which mechanisms are likely to
+produce a given observation.
+
+The resulting loop becomes
+\begin{align*}
+\text{Observation}
+&\rightarrow \text{World Model}
+\rightarrow \text{Mechanism Hypotheses}
+\rightarrow \text{Plexus Specifications}\\
+&\rightarrow \text{Simulation}
+\rightarrow \text{Falsification}
+\rightarrow \text{World Model Update}.
+\end{align*}
+
+In this view, the world model does not predict the future directly. Instead, it
+predicts which mechanistic explanations are worth testing.
+
+The ambition is therefore not merely to learn what happens next, but to learn
+which causal structures are capable of producing what is observed. Plexus
+provides the language in which those structures are expressed; the world model
+provides the experience from which they are proposed.
+
 \end{document}
