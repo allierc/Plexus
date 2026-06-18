@@ -11,9 +11,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.5}
-- {op: diffuse, at: chemical, rate: 0.28}
-- {op: decay,   at: chemical, rate: 0.03}
+- {op: deposit, at: cell, to: chemical, amount: 0.025}
+- {op: diffuse, at: chemical, rate: 0.014}
+- {op: decay,   at: chemical, rate: 0.0015}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -28,22 +28,26 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a complex network of orange and blue filaments evolving in a 2D
-      space. Over time, the filaments appear to shift and reorganize their positions while maintaining
-      their interconnected, thread-like structures. The density of the filaments remains relatively constant
-      as they weave through the black background. There is a subtle fluid-like motion as the paths of
-      the particles slightly deform and flow.
-    objects: 'The scene contains two primary sets of objects: orange filaments and blue filaments. Both
-      sets are composed of small, discrete particles that form continuous, winding, and interconnected
-      paths. The orange filaments are generally thicker and more prominent, while the blue filaments are
-      thinner and more delicate. All filaments are distributed uniformly across the black background,
-      creating a dense, web-like topology.'
+    description: The simulation shows a dense network of orange and blue particles moving in complex,
+      winding paths. Over time, the particles appear to follow fluid-like trajectories, weaving around
+      each other to form intricate, interconnected filaments. The overall structure remains relatively
+      stable, with the paths maintaining their general shapes while the individual points shift slightly.
+      The motion suggests a system governed by local interactions or a underlying flow field that guides
+      the particles into these organic, web-like patterns.
+    objects: The scene contains two distinct sets of particles, one colored bright orange and the other
+      a muted blue. These particles are arranged into long, continuous, and winding filaments that resemble
+      neural networks or river systems. Each individual particle is a small, uniform dot, but they cluster
+      together to form large, sprawling structures across the entire frame. The orange and blue filaments
+      frequently overlap and intertwine, creating a dense, multi-layered topological web against a black
+      background.
   movie_chemical:
-    description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
-      these particles organize into distinct, interconnected filamentary structures. The filaments expand
-      and weave together to form a complex, web-like network. By the final frame, the network is fully
-      established, showing a stable, interconnected topology.
-    objects: The scene contains two primary sets of filaments, one colored in cyan and the other in magenta.
-      These filaments are thin, elongated structures that branch and intersect throughout the space. They
-      are arranged in a dense, interconnected network that covers the entire field of view. The filaments
-      appear to have a consistent thickness and are distributed uniformly across the black background.
+    description: The simulation shows a complex network of intertwined filaments that remain relatively
+      static in their overall structure. There is a subtle, flickering intensity change across the filaments
+      as the simulation progresses. The spatial distribution of the red and green paths does not shift
+      significantly over the time sequence. The overall visual effect is a steady-state representation
+      of a dense, interconnected web.
+    objects: The scene contains two distinct sets of filaments, one colored in vibrant pinkish-red and
+      the other in bright cyan-green. These filaments are highly convoluted and intertwined, forming a
+      dense, non-linear mesh across the entire frame. Each filament is thin and elongated, exhibiting
+      a worm-like topology with many loops and sharp turns. The two colors are distributed somewhat uniformly,
+      overlapping and weaving through one another to create a complex network.

@@ -11,9 +11,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.5}
-- {op: diffuse, at: chemical, rate: 0.28}
-- {op: decay,   at: chemical, rate: 0.03}
+- {op: deposit, at: cell, to: chemical, amount: 0.025}
+- {op: diffuse, at: chemical, rate: 0.014}
+- {op: decay,   at: chemical, rate: 0.0015}
 - {op: sense,   at: cell, from: chemical, cross: 1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -28,23 +28,21 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a network of particles forming interconnected, loop-like structures
-      against a black background. Over time, the particles appear to shift and flow along these established
-      paths, maintaining the overall web-like topology. The density of the particles remains relatively
-      constant as they move through the network. There is no significant change in the global structure,
-      suggesting a steady-state flow or a stable equilibrium in the system.
-    objects: The scene contains thousands of small, individual particles that are primarily orange and
-      blue in color. These particles are organized into thin, curvilinear filaments that intersect to
-      form a complex, porous network. The filaments vary in length and curvature, creating a series of
-      irregular polygonal voids. Each particle is uniform in size, appearing as a single pixel or a small
-      cluster of pixels.
+    description: The video shows a static image of a complex network of particles. There is no movement
+      or evolution of the particles over time. The orange and blue dots remain in their fixed positions
+      throughout the sequence. The overall structure of the interconnected paths does not change.
+    objects: The scene contains thousands of small, circular particles in orange and blue. These particles
+      are arranged into long, winding, interconnected filaments that form a web-like topology. The orange
+      and blue dots are interspersed along these filaments, often appearing in alternating sequences.
+      The particles are uniform in size and are set against a solid black background.
   movie_chemical:
-    description: The simulation begins with a dense field of scattered, multicolored particles. Over time,
-      these particles rapidly aggregate and organize into a complex, interconnected network of white filaments.
-      The network expands and stabilizes into a web-like structure with distinct polygonal cells. The
-      final frames show a steady state where the filaments maintain their structural integrity against
-      a black background.
-    objects: The primary objects are white filaments that form a continuous, interconnected mesh. These
-      filaments vary in thickness but generally maintain a consistent width across the frame. Small, multicolored
-      specks in shades of cyan and magenta are visible both within the filaments and in the background.
-      The overall topology is a Voronoi-like tessellation of irregular polygons bounded by the white lines.
+    description: The simulation shows a network of interconnected filaments that gradually brighten and
+      thicken over time. The white lines expand and merge, creating a denser and more complex web of connections.
+      As the progression continues, the background remains dark while the foreground structure becomes
+      more prominent. By the final frame, the network has reached a state of high intensity and structural
+      complexity.
+    objects: The scene contains a network of thin, curvilinear filaments that are interconnected to form
+      a mesh-like topology. These filaments vary in color from faint teal and reddish hues to bright,
+      glowing white. The size of the individual strands is relatively uniform, though they vary in thickness
+      as they overlap. The overall structure is distributed evenly across the entire frame, creating a
+      continuous, web-like pattern.

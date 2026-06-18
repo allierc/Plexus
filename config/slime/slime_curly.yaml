@@ -11,9 +11,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 220, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.9}
-- {op: diffuse, at: chemical,            rate: 0.30}
-- {op: decay,   at: chemical,            rate: 0.015}
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical,            rate: 0.015}
+- {op: decay,   at: chemical,            rate: 0.00075}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -26,25 +26,22 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of blue particles initially forms a nearly solid circular mass. Over
-      time, the internal structure of the cluster begins to organize into a porous, web-like network of
-      interconnected loops. The outer boundary of the cluster becomes irregular as individual filaments
-      and small groups of particles break away from the main body. By the final frame, the central structure
-      is a complex, cellular lattice with several distinct "tentacles" extending into the surrounding
-      space.
-    objects: The primary objects are small, blue dots that represent individual particles or agents. These
-      particles are arranged in a complex, interconnected topology that resembles a biological cellular
-      network or a foam structure. The size of the individual particles is uniform and very small relative
-      to the overall cluster. The cluster itself is large and roughly circular, though it develops increasingly
-      irregular and elongated protrusions as the simulation progresses.
+    description: A large spherical cluster of blue particles begins as a dense, uniform mass. Over time,
+      the cluster develops a distinct porous, web-like internal structure. Small filaments of particles
+      begin to extend outward from the main sphere into the surrounding black space. The overall shape
+      remains spherical while the internal connectivity becomes increasingly complex and defined.
+    objects: The primary object is a large, spherical cluster composed of thousands of small blue dots.
+      These dots are arranged in a complex, interconnected network that resembles a porous sponge or a
+      geodesic dome. Several thin, linear filaments of blue particles radiate outward from the sphere's
+      surface into the void. All particles are uniform in size and maintain a consistent bright blue color
+      against a solid black background.
   movie_chemical:
-    description: A dense cluster of blue particles initially appears as a uniform, circular mass. Over
-      time, the cluster begins to expand and reorganize into a complex, interconnected network of filaments.
-      These filaments extend outward from the central mass, creating a web-like structure with many branching
-      points. By the final frame, the structure has evolved into a highly intricate, porous lattice of
-      interconnected blue strands.
-    objects: The primary objects are blue, thread-like filaments that form a porous, sponge-like network.
-      These filaments are interconnected at various points, creating a complex topology of loops and branches.
-      The color of the filaments is a consistent light blue against a solid black background. The size
-      of the individual filaments varies, but they collectively form a large, roughly circular cluster
-      that occupies most of the frame.
+    description: A central spherical cluster of interconnected filaments undergoes a structural transformation
+      over time. Initially, the internal network is coarse and highly porous with large open spaces. As
+      the simulation progresses, the internal filaments become increasingly dense and the pores shrink
+      significantly. By the final frame, the cluster appears as a nearly solid mass with only tiny, scattered
+      voids remaining.
+    objects: The primary object is a large, blue spherical cluster located in the center of the frame.
+      This cluster is composed of a complex, interconnected network of thin filaments. Radiating outward
+      from the sphere are numerous long, thin blue lines that extend into the black background. The overall
+      structure maintains a consistent size while the internal density of the central sphere increases.

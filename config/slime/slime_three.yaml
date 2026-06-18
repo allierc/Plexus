@@ -14,9 +14,9 @@ fields:
 operators:
 # below-saturation density (low deposit, higher decay) so the cross=-1 gradient
 # survives and the three species carve out distinct territories.
-- {op: deposit, at: cell, to: chemical, amount: 0.5}
-- {op: diffuse, at: chemical,            rate: 0.28}
-- {op: decay,   at: chemical,            rate: 0.03}
+- {op: deposit, at: cell, to: chemical, amount: 0.025}
+- {op: diffuse, at: chemical,            rate: 0.014}
+- {op: decay,   at: chemical,            rate: 0.0015}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -29,23 +29,23 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing streams
-      that move in undulating, wave-like patterns. The streams develop complex, intertwined trajectories,
-      weaving around each other and forming intricate loops and branches. By the final frame, the particles
-      have settled into a highly structured network of continuous, flowing filaments.
-    objects: The scene contains thousands of tiny, point-like particles that are primarily orange, green,
-      and blue. These particles are arranged into elongated, thread-like filaments that exhibit a fluid,
-      continuous topology. The filaments are interconnected and overlapping, creating a dense web of winding
-      paths across the entire field of view. Each individual particle is uniform in size, but they collectively
-      form large-scale, coherent structures that dominate the visual space.
+    description: The simulation shows a complex system of particles moving in fluid-like, undulating patterns.
+      Over time, the paths of the particles shift and morph, creating a sense of continuous flow. The
+      different colored streams appear to interact, occasionally merging or diverging as they navigate
+      the space. The overall motion is smooth and organic, resembling the movement of currents or biological
+      structures.
+    objects: The scene contains three distinct sets of particles colored orange, green, and blue. These
+      particles are arranged in elongated, curvilinear paths that form intricate, interconnected networks
+      across the frame. Each set of particles consists of small, individual dots that maintain a consistent
+      density along their respective trajectories. The paths vary in size and complexity, with some forming
+      tight loops and others stretching across the entire field of view.
   movie_chemical:
-    description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
-      these particles organize into distinct, flowing filaments that weave across the frame. The filaments
-      gradually thicken and smooth out, forming a complex network of interconnected paths. By the final
-      frame, the structure stabilizes into a coherent, turbulent web of continuous lines.
-    objects: The scene contains three primary sets of filaments in red, green, and blue. These filaments
-      are arranged in a dense, interconnected topology that resembles a fluid flow or a neural network.
-      Each filament is composed of small, glowing points that aggregate into continuous, wavy lines. The
-      size of the filaments varies, with some forming thick bundles and others remaining as thin, delicate
-      strands.
+    description: The simulation shows a complex network of intertwined, undulating filaments evolving
+      over time. These filaments appear to move with a fluid-like motion, shifting and overlapping as
+      they traverse the space. The overall structure maintains a high degree of entanglement throughout
+      the sequence. There is no significant change in the global density or the overall pattern of the
+      network.
+    objects: The scene contains three distinct sets of filaments colored red, green, and blue. These filaments
+      are long, continuous, and highly curved, forming a dense, tangled web. They are distributed uniformly
+      across the entire frame, overlapping and weaving through one another. Each filament has a similar
+      thickness and length, creating a homogeneous texture of intertwined lines.

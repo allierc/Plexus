@@ -11,9 +11,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.5}
-- {op: diffuse, at: chemical, rate: 0.28}
-- {op: decay,   at: chemical, rate: 0.03}
+- {op: deposit, at: cell, to: chemical, amount: 0.025}
+- {op: diffuse, at: chemical, rate: 0.014}
+- {op: decay,   at: chemical, rate: 0.0015}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -28,23 +28,24 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a dynamic system of particles forming complex, undulating patterns.
-      Over time, the orange and blue paths shift and morph, creating a fluid-like motion across the frame.
-      The structures appear to flow and weave around one another, maintaining a consistent density. The
-      overall movement suggests a continuous evolution of a field or a collective behavior of agents.
-    objects: The scene contains two primary sets of particles, one colored orange and the other blue.
-      These particles are arranged into elongated, curvilinear strands that resemble topographic contour
-      lines or streamlines. The strands are interconnected and intertwined, forming a dense, web-like
-      topology across the black background. Each individual particle is small and point-like, but they
-      collectively form large, continuous structures.
+    description: The simulation shows a dynamic system of orange and blue particles moving in a fluid-like
+      motion. Over time, the particles form intricate, winding paths that resemble streamlines or flow
+      patterns. The structures appear to shift and evolve, with some areas showing high concentration
+      and others showing sparse distribution. The overall motion suggests a complex, interconnected field
+      of movement across the entire frame.
+    objects: 'The scene contains two primary sets of objects: orange and blue particles. These particles
+      are arranged in long, continuous, and winding filaments that curve and loop across the black background.
+      Each particle is a small, uniform dot, creating a granular texture within the larger flow structures.
+      The orange and blue filaments often run parallel to or intertwine with each other, forming a complex
+      network of paths.'
   movie_chemical:
-    description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
-      these particles organize into distinct, winding filaments that move and shift across the frame.
-      The filaments continuously evolve, changing their curvature and connectivity while maintaining a
-      fluid, organic motion. By the final frame, the system has settled into a complex, interconnected
-      network of undulating lines.
-    objects: The scene contains two primary sets of filaments, one colored in vibrant pink and the other
-      in bright cyan. These filaments are arranged in a dense, intertwined topology, forming a labyrinthine
-      network of loops and branches. Each filament is relatively thin and uniform in width, though they
-      vary in length and curvature. The objects are set against a solid black background, which highlights
-      their high-contrast colors and intricate spatial arrangement.
+    description: The simulation begins with a dense, chaotic network of intertwined red and cyan filaments.
+      Over time, these filaments undergo a continuous, fluid-like deformation as they shift and undulate
+      across the frame. The overall structure maintains its interconnected complexity while the individual
+      paths of the lines evolve dynamically. By the final frame, the network has shifted into a new configuration
+      of winding, overlapping curves.
+    objects: 'The scene contains two primary sets of objects: red filaments and cyan filaments. These
+      filaments are arranged in a complex, non-linear topology, forming a dense web of interconnected
+      loops and curves. Each filament is relatively thin and uniform in width, spanning across the entire
+      field of view. The red and cyan lines are interwoven, creating a high-contrast, multi-layered network
+      against a black background.'

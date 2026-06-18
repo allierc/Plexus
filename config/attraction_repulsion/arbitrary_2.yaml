@@ -32,11 +32,12 @@ plotting:
 descriptions:
   movie_particle:
     description: The simulation shows a dense field of orange and blue particles distributed across a
-      black background. Over time, the particles appear to shift and reorganize into subtle, repeating
-      geometric patterns. These patterns manifest as faint, circular, and hexagonal structures that emerge
-      and fade. The overall distribution remains relatively uniform, with no significant large-scale movement
-      or clustering.
-    objects: The scene contains two distinct sets of small, point-like particles in orange and blue. These
-      particles are arranged in a stochastic distribution that gradually forms a periodic lattice. Each
-      individual particle is a single pixel or a very small cluster of pixels. The orange particles are
-      slightly more concentrated in certain areas, creating a textured, speckled appearance.
+      black background. Over time, the particles appear to undergo a subtle, stochastic shifting in their
+      spatial positions. There is no significant global movement or large-scale structural change visible
+      between the frames. The overall density and distribution of the two colors remain constant throughout
+      the sequence.
+    objects: 'The scene contains two distinct sets of small, circular particles: one set is orange and
+      the other is blue. These particles are distributed randomly across the entire frame without forming
+      any specific geometric patterns or clusters. Each individual particle is very small and uniform
+      in size relative to the total area. The orange and blue particles are intermingled, creating a speckled,
+      high-contrast visual texture.'

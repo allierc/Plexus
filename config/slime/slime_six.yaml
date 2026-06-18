@@ -15,9 +15,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.38}
-- {op: diffuse, at: chemical, rate: 0.25}
-- {op: decay,   at: chemical, rate: 0.042}
+- {op: deposit, at: cell, to: chemical, amount: 0.019}
+- {op: diffuse, at: chemical, rate: 0.0125}
+- {op: decay,   at: chemical, rate: 0.0021}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -37,23 +37,23 @@ plotting:
 descriptions:
   movie_cell:
     description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing stream-like
-      structures. These streams develop complex, swirling patterns and curved trajectories as they move
-      through the space. By the final frame, the particles have formed a highly structured network of
-      intertwined, wavy filaments.
+      across a black background. Over time, the particles begin to organize into distinct, flowing filaments
+      and swirling patterns. These structures evolve into complex, interconnected networks of curved lines
+      that move and shift across the frame. By the final frame, the particles have formed highly defined,
+      coherent trajectories that resemble fluid dynamics or magnetic field lines.
     objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
-      green, blue, and yellow. Initially, these objects are arranged in a stochastic, disordered distribution
-      with no clear spatial correlation. As the simulation progresses, the particles align into elongated,
-      continuous filaments that exhibit a fluid-like topology. These filaments are characterized by smooth,
-      undulating curves and nested loops that fill the entire frame.
+      green, blue, orange, and purple. Initially, these objects are arranged in a stochastic, disordered
+      distribution with no clear spatial correlation. As the simulation progresses, the objects align
+      into elongated, continuous filaments that form loops and vortices. These filaments maintain their
+      distinct colors, allowing for the visualization of different flow paths or agent behaviors within
+      the system.
   movie_chemical:
-    description: The simulation begins with a dense, chaotic field of multicolored particles and faint,
-      tangled filaments. Over time, these elements organize into distinct, flowing streamlines that move
-      in a coordinated, fluid-like motion. The filaments become more defined and vibrant as they trace
-      out complex, looping paths across the frame. By the final frame, the system reaches a steady state
-      of continuous, undulating flow with high visual clarity.
-    objects: The scene contains numerous elongated, thread-like filaments that are intertwined and looped
-      throughout the space. These filaments exhibit a vibrant color palette consisting of magenta, cyan,
-      yellow, and blue. Each filament is relatively thin and follows a continuous, curvilinear path, creating
-      a dense network of overlapping lines. The background is a dark, textured field populated by fine,
-      multicolored speckles that appear to be the underlying particles.
+    description: The simulation shows a dense network of intertwined, thread-like filaments evolving in
+      a complex, chaotic manner. Over time, the filaments shift and undulate, maintaining a high degree
+      of entanglement throughout the space. The movement appears fluid and continuous, with no significant
+      change in the overall density of the network. The filaments constantly weave over and under one
+      another, creating a dynamic, three-dimensional web of motion.
+    objects: The scene consists of numerous long, thin filaments that are highly curved and intertwined.
+      These filaments are colored in a variety of hues, including cyan, magenta, yellow, and blue. They
+      are arranged in a dense, stochastic network that fills the entire frame uniformly. Each filament
+      is of a similar scale and length, creating a homogeneous texture of overlapping lines.

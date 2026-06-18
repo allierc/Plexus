@@ -13,9 +13,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 240, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.4}
-- {op: diffuse, at: chemical, rate: 0.26}
-- {op: decay,   at: chemical, rate: 0.04}
+- {op: deposit, at: cell, to: chemical, amount: 0.02}
+- {op: diffuse, at: chemical, rate: 0.013}
+- {op: decay,   at: chemical, rate: 0.002}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -32,24 +32,24 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a chaotic distribution of multicolored particles scattered
-      across a black background. Over time, these particles begin to organize into distinct, flowing streams
-      that move in undulating, wave-like patterns. The streams develop complex, swirling structures and
-      loops as they interact with the underlying field. By the final frame, the particles have formed
-      highly coherent, continuous filaments that weave through the space in a fluid motion.
-    objects: The scene contains thousands of tiny, point-like particles in colors including red, green,
-      blue, and yellow. These particles are initially arranged in a random, high-entropy distribution
-      across the entire frame. As the simulation progresses, they form elongated, continuous filaments
-      that exhibit a smooth, curvilinear topology. The filaments vary in thickness and curvature, creating
-      a dense network of interconnected, flowing paths.
+    description: The simulation begins with a dense, chaotic distribution of multi-colored particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, winding filaments
+      and swirling patterns. These structures evolve and shift, with some filaments lengthening while
+      others curve and loop into complex shapes. By the final frame, the particles have formed a highly
+      structured network of interconnected, flowing paths.
+    objects: The scene contains thousands of tiny, point-like particles in red, green, blue, and orange.
+      These particles are arranged in long, continuous, and sinuous filaments that weave across the entire
+      frame. The filaments exhibit a complex topology of loops, curves, and branching paths that resemble
+      fluid flow or magnetic field lines. Each individual particle is uniform in size, but their collective
+      arrangement creates large-scale, dynamic structures.
   movie_chemical:
-    description: The simulation begins with a dense field of random, multicolored noise and scattered
-      points. Over time, these points organize into distinct, continuous curvilinear paths that weave
-      across the frame. The paths evolve by shifting and flowing, maintaining a complex, tangled network
-      of interconnected lines. By the final frame, the system has stabilized into a dense, fluid-like
-      web of vibrant, undulating trajectories.
-    objects: The scene contains multiple sets of continuous, thread-like trajectories that form a complex,
-      intertwined network. These lines are colored in distinct shades of cyan, magenta, yellow, and green.
-      Each individual path is relatively thin and elongated, winding and looping to fill the entire spatial
-      domain. The objects are densely packed, creating a high-entropy topological structure of overlapping
-      and adjacent curves.
+    description: The simulation shows a complex network of intertwined, undulating lines that remain relatively
+      static in their overall structure. The lines exhibit subtle, fluid-like oscillations and slight
+      shifts in their curvature over the duration of the sequence. There is no significant migration or
+      large-scale deformation of the network, suggesting a steady-state dynamic. The visual effect is
+      one of a shimmering, organic web of energy or flow.
+    objects: The scene consists of numerous thin, continuous lines that are densely packed and interwoven
+      across the entire frame. These lines are colored in a repeating palette of cyan, magenta, yellow,
+      and blue. They form a chaotic, non-linear topology characterized by frequent loops, knots, and overlapping
+      paths. Each individual line is of a uniform, small thickness, creating a high-frequency texture
+      against the black background.

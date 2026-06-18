@@ -11,9 +11,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 220, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.9}
-- {op: diffuse, at: chemical, rate: 0.3}
-- {op: decay,   at: chemical, rate: 0.01}
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical, rate: 0.015}
+- {op: decay,   at: chemical, rate: 0.0005}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -27,22 +27,25 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large cluster of blue particles initially forms a dense, roughly circular shape against
-      a black background. As time progresses, the cluster begins to expand and fragment into a complex
-      network of interconnected filaments. These filaments stretch outward and weave into a web-like structure
-      that fills the frame. By the final frames, the original circular form has completely dissolved into
-      a chaotic, sprawling lattice of thin lines.
-    objects: The primary objects are small, luminous blue particles that aggregate to form larger structures.
-      These particles are arranged in a dense, circular cluster at the beginning of the sequence. Over
-      time, they organize into a network of thin, curved filaments that intersect and overlap. The final
-      topology is a complex, web-like lattice of interconnected lines spanning the entire field of view.
+    description: A dense collection of blue particles initially forms a large, roughly circular cluster
+      in the center of a black field. Over time, the particles begin to organize into distinct, linear
+      filaments that radiate outward from the center. These filaments gradually lengthen and branch out,
+      creating a complex, web-like network across the entire frame. By the final frame, the original central
+      cluster has largely dissipated into a highly interconnected, sprawling structure of interconnected
+      lines.
+    objects: The primary objects are small, bright blue dots that represent individual particles or agents.
+      These particles are arranged in a dynamic topology, transitioning from a concentrated circular mass
+      to a sprawling, radial network of filaments. The filaments are composed of these dots connected
+      in linear paths that branch and intersect as they expand. The overall size of the structure grows
+      from a localized central region to fill the entire visual field.
   movie_chemical:
-    description: A dense collection of cyan particles initially forms a spherical cluster against a black
-      background. As time progresses, the sphere expands and transforms into a complex, interconnected
-      network of filaments. These filaments weave together to form a dense, web-like structure that fills
-      the entire frame. The final frames show a highly intricate, overlapping mesh of cyan lines with
-      small bright spots scattered throughout.
-    objects: The primary objects are cyan-colored particles and filaments. Initially, the particles are
-      arranged in a large, roughly spherical cluster. Over time, they organize into a network of thin,
-      curved filaments that intersect and overlap. The final structure is a dense, web-like topology of
-      varying filament thicknesses and small, bright point-like features.
+    description: A dense cluster of particles initially appears as a faint, speckled sphere against a
+      black background. Over time, the sphere becomes more defined and begins to emit long, fibrous filaments
+      that radiate outward. These filaments grow increasingly thick and bright, eventually filling the
+      entire frame with a complex web of interconnected lines. By the final frame, the central sphere
+      is almost entirely obscured by the dense, overlapping network of cyan fibers.
+    objects: The primary object is a spherical cluster of small, cyan-colored particles located in the
+      center of the frame. Radiating from this sphere are numerous long, thin filaments that extend toward
+      the edges of the image. These filaments are interconnected, forming a dense, web-like topology that
+      covers the background. The color of all elements remains a consistent cyan, while the size of the
+      filaments increases as they move away from the center.

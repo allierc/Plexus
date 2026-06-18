@@ -14,9 +14,9 @@ sets:
 fields:
   chemical: {frame: grid, res: 220, couples_to: cell}
 operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.9}
-- {op: diffuse, at: chemical,            rate: 0.35}
-- {op: decay,   at: chemical,            rate: 0.012}
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical,            rate: 0.0175}
+- {op: decay,   at: chemical,            rate: 0.0006}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
 - {op: advance, at: cell}
@@ -29,21 +29,23 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of blue particles initially forms a nearly solid circular mass. Over
-      time, the internal structure of this mass begins to organize into a network of interconnected loops
-      and cells. These loops expand and thin out as they push toward the periphery of the cluster. Finally,
-      long filaments of particles extend outward from the central network into the surrounding black space.
-    objects: The primary objects are small blue particles that aggregate into a large, circular formation.
-      These particles organize into a complex topology of interconnected, cell-like loops in the center.
-      Several long, linear filaments branch out from the central network toward the edges of the frame.
-      The entire system is composed of uniform blue dots set against a solid black background.
+    description: A dense cluster of blue particles initially forms a solid, circular mass. Over time,
+      the internal structure of this mass begins to organize into a complex, interconnected web of filaments.
+      These filaments eventually extend outward from the central core, creating a radial, spider-web-like
+      pattern. The overall structure transitions from a uniform distribution to a highly structured, branching
+      network.
+    objects: The scene contains thousands of small, bright blue particles against a black background.
+      These particles are initially arranged in a large, circular cluster in the center of the frame.
+      As the simulation progresses, they form a network of thin, curved lines that connect to one another.
+      The final structure consists of a central web with numerous long, radiating filaments extending
+      toward the edges.
   movie_chemical:
-    description: A dense cluster of teal particles initially forms a roughly spherical shape against a
-      black background. Over time, the particles begin to organize into a complex, interconnected network
-      of filaments. These filaments extend outward from the central mass, creating a web-like structure
-      with many branching points. The final frames show a highly intricate, porous lattice that fills
-      much of the frame.
-    objects: The primary objects are teal-colored particles and filaments. They are arranged in a dense,
-      spherical core that transitions into a radiating, web-like topology. The filaments are thin and
-      elongated, connecting to one another to form a continuous, porous network. The overall size of the
-      structure expands from a compact sphere to a large, sprawling geometric lattice.
+    description: A dense cluster of green particles initially forms a spherical shape in the center of
+      a black field. Over time, the particles begin to organize into a complex, interconnected network
+      of filaments. These filaments extend outward from the central sphere, creating a radial, web-like
+      structure. The final frames show a highly structured, symmetrical pattern of branching lines radiating
+      from a porous core.
+    objects: The primary objects are small, teal-colored particles that aggregate into a large central
+      sphere. This sphere is composed of a porous, sponge-like topology with many internal voids. Long,
+      thin filaments of the same teal color extend outward from the sphere's surface. These filaments
+      branch and curve as they move toward the edges of the frame, forming a radial network.

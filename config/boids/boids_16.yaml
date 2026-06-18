@@ -145,13 +145,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
-      a black background. Over time, the particles begin to aggregate into distinct, high-density clusters
-      while leaving large voids in the center. These clusters grow in size and complexity as they move
-      and merge with one another. By the final frame, the particles have organized into several large,
-      concentrated circular formations surrounded by a sparse field of scattered points.
-    objects: The scene contains thousands of small, circular particles of varying colors including white,
-      red, blue, green, and orange. Initially, these objects are distributed randomly and independently
-      across the entire 2D space. As the simulation progresses, the particles form dense, circular topologies
-      where they are packed closely together. The size of each individual particle remains constant, but
-      the collective size of the clusters increases significantly over time.
+    description: The simulation shows a large number of small, multi-colored particles distributed across
+      a black background. Over time, the particles appear to move and shift positions, though they maintain
+      a relatively uniform density across the frame. There are no significant large-scale structural changes
+      or massive aggregations of particles visible. The overall motion is subtle, creating a shimmering
+      effect as individual dots change their spatial coordinates.
+    objects: The scene contains thousands of tiny, circular dots of varying colors including white, red,
+      blue, green, orange, and pink. These particles are arranged in a stochastic, non-connected distribution
+      that fills the entire 2D space. Each particle is approximately the same small size, appearing as
+      single pixels or small clusters of pixels. The colors are distributed randomly, with no specific
+      color grouping or geometric patterns forming among the objects.
