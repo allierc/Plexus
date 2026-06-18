@@ -24,3 +24,25 @@ plotting:
   colors: {a: [0.2, 0.95, 0.65]}
   background: black
   gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cluster of blue particles initially forms a nearly solid circular mass. Over
+      time, the internal structure of this mass begins to organize into a network of interconnected loops
+      and cells. These loops expand and thin out as they push toward the periphery of the cluster. Finally,
+      long filaments of particles extend outward from the central network into the surrounding black space.
+    objects: The primary objects are small blue particles that aggregate into a large, circular formation.
+      These particles organize into a complex topology of interconnected, cell-like loops in the center.
+      Several long, linear filaments branch out from the central network toward the edges of the frame.
+      The entire system is composed of uniform blue dots set against a solid black background.
+  movie_chemical:
+    description: A dense cluster of teal particles initially forms a roughly spherical shape against a
+      black background. Over time, the particles begin to organize into a complex, interconnected network
+      of filaments. These filaments extend outward from the central mass, creating a web-like structure
+      with many branching points. The final frames show a highly intricate, porous lattice that fills
+      much of the frame.
+    objects: The primary objects are teal-colored particles and filaments. They are arranged in a dense,
+      spherical core that transitions into a radiating, web-like topology. The filaments are thin and
+      elongated, connecting to one another to form a continuous, porous network. The overall size of the
+      structure expands from a compact sphere to a large, sprawling geometric lattice.

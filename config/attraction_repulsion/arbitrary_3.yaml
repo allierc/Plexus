@@ -28,3 +28,17 @@ plotting:                      # render STYLE (read by plexus.plot; engine ignor
   background: black
   colormap: tab10
   point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles across
+      the entire field. Over time, the particles begin to aggregate into distinct, localized clusters
+      or "blobs." These clusters grow in size and density while the surrounding background becomes increasingly
+      sparse. By the final frame, the particles have organized into a structured network of large, circular
+      nodes connected by thin filaments.
+    objects: The primary objects are small, individual particles in shades of blue, green, and orange.
+      Initially, these particles are arranged in a stochastic, high-entropy distribution with no clear
+      spatial organization. As the simulation progresses, they form large, circular clusters that appear
+      as bright yellow-green nodes. These nodes eventually connect to form a complex, interconnected topology
+      resembling a biological tissue or a neural network.

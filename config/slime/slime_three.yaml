@@ -24,3 +24,27 @@ plotting:
   colors: {a: [0.2, 0.95, 0.65], b: [1.0, 0.35, 0.45], c: [0.45, 0.6, 1.0]}
   background: black
   gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
+      across a black background. Over time, these particles begin to organize into distinct, flowing streams
+      that move in undulating, wave-like patterns. The streams develop complex, intertwined trajectories,
+      weaving around each other and forming intricate loops and branches. By the final frame, the particles
+      have settled into a highly structured network of continuous, flowing filaments.
+    objects: The scene contains thousands of tiny, point-like particles that are primarily orange, green,
+      and blue. These particles are arranged into elongated, thread-like filaments that exhibit a fluid,
+      continuous topology. The filaments are interconnected and overlapping, creating a dense web of winding
+      paths across the entire field of view. Each individual particle is uniform in size, but they collectively
+      form large-scale, coherent structures that dominate the visual space.
+  movie_chemical:
+    description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
+      these particles organize into distinct, flowing filaments that weave across the frame. The filaments
+      gradually thicken and smooth out, forming a complex network of interconnected paths. By the final
+      frame, the structure stabilizes into a coherent, turbulent web of continuous lines.
+    objects: The scene contains three primary sets of filaments in red, green, and blue. These filaments
+      are arranged in a dense, interconnected topology that resembles a fluid flow or a neural network.
+      Each filament is composed of small, glowing points that aggregate into continuous, wavy lines. The
+      size of the filaments varies, with some forming thick bundles and others remaining as thin, delicate
+      strands.

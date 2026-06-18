@@ -27,3 +27,16 @@ plotting:
   background: black
   colormap: tab10
   point_size: 4.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense field of orange and blue particles distributed across a
+      black background. Over time, the particles appear to shift and reorganize into subtle, repeating
+      geometric patterns. These patterns manifest as faint, circular, and hexagonal structures that emerge
+      and fade. The overall distribution remains relatively uniform, with no significant large-scale movement
+      or clustering.
+    objects: The scene contains two distinct sets of small, point-like particles in orange and blue. These
+      particles are arranged in a stochastic distribution that gradually forms a periodic lattice. Each
+      individual particle is a single pixel or a very small cluster of pixels. The orange particles are
+      slightly more concentrated in certain areas, creating a textured, speckled appearance.

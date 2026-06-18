@@ -43,3 +43,15 @@ plotting:
   background: black
   colormap: tab20
   point_size: 6.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored particles against a black background.
+      There is no visible movement or evolution of the particles between the keyframes. The distribution
+      of the dots remains constant throughout the entire sequence. The scene represents a steady-state
+      distribution of discrete points.
+    objects: The scene contains thousands of small, circular dots of varying colors including white, red,
+      blue, green, and orange. These particles are distributed across the entire frame in a semi-random,
+      stochastic pattern. Some areas show higher local densities of dots, forming faint clusters or filaments.
+      Each individual particle is uniform in size and maintains a consistent shape throughout the video.

@@ -26,3 +26,27 @@ plotting:
   colors: {a: [0.2, 0.95, 0.65], b: [1.0, 0.35, 0.45]}
   background: black
   gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a dense field of orange and blue particles moving in complex, winding
+      paths. Over time, the particles form distinct, interconnected filamentary structures that resemble
+      neural networks or fluid flow patterns. The paths of the particles shift and evolve, maintaining
+      a consistent density while changing their specific geometric configurations. The overall motion
+      appears fluid and continuous, with the two colors weaving through one another across the entire
+      frame.
+    objects: The scene contains two primary sets of particles, one colored bright orange and the other
+      a deep blue. These particles are arranged into long, continuous, and winding filaments that curve
+      and loop throughout the space. Each filament is composed of many small, individual points that are
+      closely packed to form a coherent line. The filaments are interconnected at various points, creating
+      a complex, web-like topology against a solid black background.
+  movie_chemical:
+    description: The simulation begins with a dense field of scattered, multicolored noise. Over time,
+      these particles organize into distinct, winding filaments of red and cyan. The filaments grow and
+      intertwine, forming a complex, interconnected network across the frame. By the final frame, the
+      structure stabilizes into a dense, labyrinthine web of continuous lines.
+    objects: 'The scene contains two primary sets of objects: red and cyan filaments. These filaments
+      are long, continuous, and thread-like in shape. They are arranged in a highly interconnected topology,
+      frequently branching and crossing one another. The filaments vary slightly in thickness but maintain
+      a consistent, organic scale throughout the simulation.'

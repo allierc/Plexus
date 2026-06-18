@@ -29,3 +29,16 @@ plotting:
   background: black
   colormap: tab10
   point_size: 4.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, random distribution of multi-colored particles across
+      a black background. Over time, the particles begin to organize into distinct, curved filamentary
+      structures and clusters. These structures appear to grow and interconnect, forming a complex web-like
+      network. By the final frame, the particles have settled into a highly structured pattern of arcs
+      and dense nodes.
+    objects: The scene contains thousands of small, point-like particles in blue, orange, and green. Initially,
+      these objects are distributed in a stochastic, uniform manner across the entire field. As the simulation
+      progresses, they aggregate into elongated, curved filaments and concentrated clusters. The final
+      topology consists of interconnected arcs and dense nodes of varying sizes.

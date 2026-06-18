@@ -23,10 +23,14 @@ import json
 import argparse
 
 import cv2
+import yaml
 import torch
 from PIL import Image
 from transformers import AutoProcessor, AutoModelForMultimodalLM
 
+_SPEC_MARKER = "# --- auto: video descriptions (gemma-4-12B) ---"
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GEMMA = os.environ.get("GEMMA_DIR", "/workspace/Plexus/VLLM/gemma-4-12B-it")
 DEV = "cuda:0" if torch.cuda.is_available() else "cpu"
 DEFAULT_ROOT = os.environ.get(
@@ -93,6 +97,23 @@ def describe_one(proc, model, video, n_frames):
     return str(parsed).strip()
 
 
+def _write_into_spec(spec_path, desc_map):
+    """Append a `descriptions:` block (one entry per movie stem) to a data-folder
+    spec.yaml. Idempotent: replaces any prior auto-block (below the marker), leaving
+    the original spec text above it untouched."""
+    try:
+        text = open(spec_path).read()
+    except FileNotFoundError:
+        return False
+    i = text.find(_SPEC_MARKER)
+    if i != -1:
+        text = text[:i].rstrip() + "\n"
+    block = yaml.safe_dump({"descriptions": desc_map}, sort_keys=False,
+                           default_flow_style=False, width=100, allow_unicode=True)
+    open(spec_path, "w").write(text.rstrip() + "\n\n" + _SPEC_MARKER + "\n" + block)
+    return True
+
+
 def _video_name(path, root):
     """A meaningful id: <type>/<name>/<stem> relative to the graphs_data root."""
     ap = os.path.abspath(path)
@@ -109,6 +130,8 @@ def main():
     ap.add_argument("--out", default=None, help="aggregate text file (default <root>/video_descriptions.txt)")
     ap.add_argument("--frames", type=int, default=8)
     ap.add_argument("--append", action="store_true", help="append to --out instead of truncating it")
+    ap.add_argument("--config-root", default=os.path.join(_REPO, "config"),
+                    help="also write each description into the repo spec config/<type>/<name>.yaml")
     args = ap.parse_args()
 
     if args.videos:
@@ -127,6 +150,7 @@ def main():
     model = AutoModelForMultimodalLM.from_pretrained(GEMMA, dtype="bfloat16", device_map=DEV)
 
     records = []
+    spec_updates: dict[str, dict] = {}                             # spec.yaml -> {movie_stem: {...}}
     if not args.append:
         open(out_file, "w").close()                                # fresh aggregate
     for k, video in enumerate(videos, 1):
@@ -140,7 +164,20 @@ def main():
         with open(out_file, "a") as f:                             # append incrementally (crash-safe)
             f.write(entry)
         records.append({"video": video, "name": name, "description": desc, "objects": objs})
+        # store the description IN the spec.yaml next to the movie AND in the repo
+        # config (config/<type>/<name>.yaml), derived from the graphs_data layout.
+        ddir = os.path.dirname(os.path.abspath(video))
+        stem = os.path.splitext(os.path.basename(video))[0]
+        typ, nm = os.path.basename(os.path.dirname(ddir)), os.path.basename(ddir)
+        for tgt in (os.path.join(ddir, "spec.yaml"),
+                    os.path.join(args.config_root, typ, nm + ".yaml")):
+            if os.path.exists(tgt):
+                spec_updates.setdefault(tgt, {})[stem] = {"description": desc, "objects": objs}
         print("  " + desc.replace("\n", " ")[:160], flush=True)
+
+    for sp, dm in spec_updates.items():                            # write one block per spec
+        if _write_into_spec(sp, dm):
+            print(f"[spec] {len(dm)} description(s) -> {sp}", flush=True)
 
     jpath = os.path.splitext(out_file)[0] + ".json"
     prior = []

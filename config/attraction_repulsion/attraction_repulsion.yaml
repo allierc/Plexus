@@ -27,3 +27,15 @@ schedule: [radius_graph, attraction_repulsion]
 
 plotting:
   background: black
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored particles against a black background.
+      There is no visible movement or evolution of the particles between the four keyframes. The distribution
+      of the dots remains constant throughout the sequence. The scene represents a steady-state distribution
+      of discrete points.
+    objects: 'The scene contains thousands of small, circular dots scattered across the frame. These particles
+      are arranged in a random, non-connected distribution with no discernible patterns. The dots appear
+      in three distinct colors: orange, blue, and green. Each particle is uniform in size and maintains
+      a consistent diameter throughout the video.'
