@@ -5,7 +5,7 @@
 general:
   name: boids_16
   seed: 0
-  n_frames: 4000
+  n_frames: 8000
   dt: 0.5
   boundary: periodic
 
@@ -14,30 +14,126 @@ sets:
     n: 1792
     vel_init: 0.0004
     types:
-      t00: {fraction: 0.0625, cohesion: 27.600000381469727, alignment: 92.5, separation: 48.20000076293945}
-      t01: {fraction: 0.0625, cohesion: 32.0, alignment: 51.79999923706055, separation: 29.799999237060547}
-      t02: {fraction: 0.0625, cohesion: 23.600000381469727, alignment: 35.0, separation: 13.5}
-      t03: {fraction: 0.0625, cohesion: 3.299999952316284, alignment: 76.4000015258789, separation: 13.0}
-      t04: {fraction: 0.0625, cohesion: 94.0, alignment: 78.69999694824219, separation: 30.799999237060547}
-      t05: {fraction: 0.0625, cohesion: 81.4000015258789, alignment: 34.599998474121094, separation: 2.200000047683716}
-      t06: {fraction: 0.0625, cohesion: 3.0999999046325684, alignment: 40.5, separation: 17.0}
-      t07: {fraction: 0.0625, cohesion: 88.80000305175781, alignment: 7.199999809265137, separation: 29.799999237060547}
-      t08: {fraction: 0.0625, cohesion: 32.70000076293945, alignment: 76.80000305175781, separation: 26.100000381469727}
-      t09: {fraction: 0.0625, cohesion: 14.5, alignment: 56.79999923706055, separation: 27.600000381469727}
-      t10: {fraction: 0.0625, cohesion: 63.29999923706055, alignment: 99.9000015258789, separation: 13.899999618530273}
-      t11: {fraction: 0.0625, cohesion: 32.5, alignment: 25.200000762939453, separation: 24.399999618530273}
-      t12: {fraction: 0.0625, cohesion: 97.5999984741211, alignment: 56.5, separation: 12.100000381469727}
-      t13: {fraction: 0.0625, cohesion: 62.20000076293945, alignment: 9.100000381469727, separation: 28.299999237060547}
-      t14: {fraction: 0.0625, cohesion: 76.4000015258789, alignment: 52.900001525878906, separation: 32.0}
-      t15: {fraction: 0.0625, cohesion: 48.099998474121094, alignment: 54.400001525878906, separation: 30.700000762939453}
+      t00:
+        {
+          fraction: 0.0625,
+          cohesion: 27.600000381469727,
+          alignment: 92.5,
+          separation: 48.20000076293945,
+        }
+      t01:
+        {
+          fraction: 0.0625,
+          cohesion: 32.0,
+          alignment: 51.79999923706055,
+          separation: 29.799999237060547,
+        }
+      t02:
+        {
+          fraction: 0.0625,
+          cohesion: 23.600000381469727,
+          alignment: 35.0,
+          separation: 13.5,
+        }
+      t03:
+        {
+          fraction: 0.0625,
+          cohesion: 3.299999952316284,
+          alignment: 76.4000015258789,
+          separation: 13.0,
+        }
+      t04:
+        {
+          fraction: 0.0625,
+          cohesion: 94.0,
+          alignment: 78.69999694824219,
+          separation: 30.799999237060547,
+        }
+      t05:
+        {
+          fraction: 0.0625,
+          cohesion: 81.4000015258789,
+          alignment: 34.599998474121094,
+          separation: 2.200000047683716,
+        }
+      t06:
+        {
+          fraction: 0.0625,
+          cohesion: 3.0999999046325684,
+          alignment: 40.5,
+          separation: 17.0,
+        }
+      t07:
+        {
+          fraction: 0.0625,
+          cohesion: 88.80000305175781,
+          alignment: 7.199999809265137,
+          separation: 29.799999237060547,
+        }
+      t08:
+        {
+          fraction: 0.0625,
+          cohesion: 32.70000076293945,
+          alignment: 76.80000305175781,
+          separation: 26.100000381469727,
+        }
+      t09:
+        {
+          fraction: 0.0625,
+          cohesion: 14.5,
+          alignment: 56.79999923706055,
+          separation: 27.600000381469727,
+        }
+      t10:
+        {
+          fraction: 0.0625,
+          cohesion: 63.29999923706055,
+          alignment: 99.9000015258789,
+          separation: 13.899999618530273,
+        }
+      t11:
+        {
+          fraction: 0.0625,
+          cohesion: 32.5,
+          alignment: 25.200000762939453,
+          separation: 24.399999618530273,
+        }
+      t12:
+        {
+          fraction: 0.0625,
+          cohesion: 97.5999984741211,
+          alignment: 56.5,
+          separation: 12.100000381469727,
+        }
+      t13:
+        {
+          fraction: 0.0625,
+          cohesion: 62.20000076293945,
+          alignment: 9.100000381469727,
+          separation: 28.299999237060547,
+        }
+      t14:
+        {
+          fraction: 0.0625,
+          cohesion: 76.4000015258789,
+          alignment: 52.900001525878906,
+          separation: 32.0,
+        }
+      t15:
+        {
+          fraction: 0.0625,
+          cohesion: 48.099998474121094,
+          alignment: 54.400001525878906,
+          separation: 30.700000762939453,
+        }
 
 fields: {}
 
 operators:
-  - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
-  - {op: cohesion,     at: particle}   # boids decomposed: the three steering rules
-  - {op: alignment,    at: particle}   # are separate operators; the engine sums them
-  - {op: separation,   at: particle}
+  - { op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001 }
+  - { op: cohesion, at: particle } # boids decomposed: the three steering rules
+  - { op: alignment, at: particle } # are separate operators; the engine sums them
+  - { op: separation, at: particle }
 
 schedule: [radius_graph, cohesion, alignment, separation]
 
@@ -49,11 +145,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The video shows a static field of multicolored particles against a black background.
-      There is no visible movement or evolution of the particles between the keyframes. The distribution
-      of the dots remains constant throughout the entire sequence. The scene represents a steady-state
-      distribution of discrete points.
-    objects: The scene contains thousands of small, circular dots of varying colors including white, red,
-      blue, green, and orange. These particles are distributed across the entire frame in a semi-random,
-      stochastic pattern. Some areas show higher local densities of dots, forming faint clusters or filaments.
-      Each individual particle is uniform in size and maintains a consistent shape throughout the video.
+    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
+      a black background. Over time, the particles begin to aggregate into distinct, high-density clusters
+      while leaving large voids in the center. These clusters grow in size and complexity as they move
+      and merge with one another. By the final frame, the particles have organized into several large,
+      concentrated circular formations surrounded by a sparse field of scattered points.
+    objects: The scene contains thousands of small, circular particles of varying colors including white,
+      red, blue, green, and orange. Initially, these objects are distributed randomly and independently
+      across the entire 2D space. As the simulation progresses, the particles form dense, circular topologies
+      where they are packed closely together. The size of each individual particle remains constant, but
+      the collective size of the clusters increases significantly over time.
