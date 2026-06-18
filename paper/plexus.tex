@@ -651,97 +651,6 @@ references a declared set/field; type \code{fraction}s sum to one; every schedul
 token resolves. (One trap: never use a YAML~1.1 boolean key such as
 \code{on}/\code{off} --- we use \code{at}.)
 
-\section{Categorical discipline: what belongs where}
-\label{sec:category}
-
-The same structure that makes the spec powerful makes it fragile: it has a few
-\emph{orthogonal categories}, and every key belongs to exactly one. The schema
-catches a malformed spec, but it cannot catch a \emph{well-formed} spec that files
-a quantity under the wrong category --- a force constant placed on a set, a domain
-property placed on an operator, an integration knob placed on a particle. These are
-\textbf{category errors}, and for anything editing the representation --- a language
-model most of all --- they are the dominant failure mode. The type system cannot
-state this discipline, so we state it here, as a rule.
-
-\paragraph{The categories.} Every part of a spec answers exactly one question, and
-that question fixes its home (Table~\ref{tab:cat}).
-
-\begin{table}[h]
-\centering\footnotesize
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}l p{6.2cm} l@{}}
-\toprule
-\textbf{Category} & \textbf{Owns --- the question it answers} & \textbf{Home} \\
-\midrule
-World        & the space: boundary, domain size, obstacles --- \emph{``what space do nodes live in?''} & \code{general:} \\
-Set (entity) & what a node \emph{is}: count, composition (types $+$ per-type properties), initial state --- \emph{``what is a node, and how many?''} & \code{sets:} ($+$ \code{@register\_entity}) \\
-Operator     & the dynamics: an interaction law, its parameters, and what its output \emph{means} (\code{PREDICTION}, \code{KIND}) --- \emph{``how does state change?''} & \code{operators:} ($+$ the registry class) \\
-Schedule     & the composition: time step, order, rates --- \emph{``when, in what order?''} & \code{schedule:}, \code{dt} \\
-Style        & rendering only --- \emph{``how is it drawn?''} & \code{plotting:} \\
-\bottomrule
-\end{tabular}
-\caption{The categories of the spec. They are orthogonal; a quantity belongs to the
-one whose question it answers, never to two.}
-\label{tab:cat}
-\end{table}
-
-\paragraph{The litmus test.} When unsure where a quantity goes, ask whether it is a
-property of the \emph{thing} or of the \emph{process} acting on it. A property of
-the thing --- its identity, count, composition, the meaning of its state columns,
-its initial value --- belongs to the set/entity. A property of the process --- a
-rate, a coefficient, a force law, the order of the time-derivative it produces ---
-belongs to the operator. A property of the shared space belongs to the world; a
-property of timing, to the schedule. \emph{Thing $\to$ set; process $\to$ operator.}
-
-\paragraph{Worked category errors.} The tempting move is almost always to attach a
-\emph{process} parameter to the \emph{thing} it acts on. Table~\ref{tab:caterr}
-collects the ones we actually hit while building the framework.
-
-\begin{table}[h]
-\centering\footnotesize
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{@{}p{2.4cm} p{2.6cm} p{2.9cm} p{4.4cm}@{}}
-\toprule
-\textbf{Quantity} & \textbf{Tempting (wrong)} & \textbf{Correct} & \textbf{Why} \\
-\midrule
-integration order (1st/2nd derivative) & a field on the particle set & an intrinsic operator property (\code{PREDICTION}) & it is what the operator's output \emph{means} (velocity vs.\ acceleration), not what a particle is \\
-friction / damping & an integrator knob or a set field & a \code{drag} operator ($-\kappa v$) & friction is a force; forces are operators \\
-velocity cap & a particle field & a numerical guard in the integrator & it is about stepping, not the entity \\
-boundary (periodic/wall) & a per-operator flag & the world (\code{general:}) & the space is shared; all spatial operators must agree \\
-interaction radius, $\sigma$, $k$ & the set & the operator that uses them & they parameterize the law, not the node \\
-per-type law params $p$ & the operator's own table & the set's \code{types:}, \emph{read} by the operator & they are per-\emph{type} (a property of the node's kind) and the inverse-problem target; the type owns, the operator consumes \\
-which column is position / velocity & hard-coded in the operator & the entity state schema (\code{@register\_entity}) & column meaning is a property of the entity kind \\
-\bottomrule
-\end{tabular}
-\caption{Category errors and their corrections. The pattern is constant: a process
-parameter wrongly attached to the thing it acts on.}
-\label{tab:caterr}
-\end{table}
-
-\paragraph{Invariants (hold the line).}
-\begin{itemize}\itemsep2pt
-\item An operator never declares what a node \emph{is} (count, type, composition,
-initial state); it only \emph{reads} those.
-\item A set never declares how state \emph{changes} --- no rates, force constants,
-or integration order on a set; those are operators or the schedule.
-\item The world appears once, never per-operator: every spatial operator reads one
-boundary and one domain.
-\item Integration is the schedule's job, not an operator's; the only thing an
-operator says about integration is the \emph{order} of its delta (\code{PREDICTION}).
-\item A per-type property is owned by the type (\code{types:}) and read by whatever
-operator needs it (declared in \code{REQUIRES\_TYPE\_PROPS}), resolved along the
-containment chain.
-\item Style never changes dynamics: \code{plotting:} is read only by the visualizer.
-\end{itemize}
-
-\paragraph{The discard rule.} When a quantity does not obviously fit, do \emph{not}
-invent a new top-level key. Place it in the category whose question it answers; and
-if no operator or entity reads it, the validator's \emph{``read by no operator''}
-warning (Section~\ref{sec:gaps}) is the tripwire that catches the misfiling. New
-\emph{behaviour} is a new operator, never a set field; a new \emph{kind of node} is
-a new entity, never an operator parameter. Hold this line and the action space
-stays the single, well-defined one a search --- or a language model --- can explore.
-
 \section{Operator catalog}
 
 Operators are the system's vocabulary; it grows monotonically and every past spec
@@ -806,42 +715,6 @@ structure), it follows fixed rules; the most useful:
 Throughout, the mapping respects the categories of Section~\ref{sec:category}: a
 \emph{behaviour} becomes an operator, a \emph{kind of node} a type, the
 \emph{space} the \code{general:} block --- never the reverse.
-
-\section{When the present code is not enough}
-\label{sec:gaps}\label{sec:prop}
-
-The gatekeeper fails loudly and points at the gap --- never with a crash deep in a
-substep --- in two forms.
-
-\paragraph{A missing operator.} A request needing a behaviour no operator provides
-(say reaction--diffusion) is rejected at load:
-\begin{lstlisting}[style=yaml]
-operator 'reaction_diffusion' not in registry.
-Available: ['attraction_repulsion','boids','drag','radius_graph','divide','die', ...]
-\end{lstlisting}
-The fix is \textbf{one new \code{Operator} subclass} --- never an engine change:
-write \code{forward(self, H, mask) -> {set: delta}} (or mutate a field/relation and
-return \code{\{\}}); decorate \code{@register\_operator}; declare its needs;
-reference it in the spec. We exercised this live during the experiment: adding
-\code{adhesion} unlocked cell \emph{sorting} and \code{trail} unlocked ant
-\emph{trail-following} --- each $\sim$20 lines, the engine and every other spec
-untouched.
-
-\paragraph{A missing property.} Operators \emph{declare} what they need
-(\code{REQUIRES\_PARAMS}, \code{REQUIRES\_TYPE\_PROPS}); the validator checks before
-running, resolving a property along the containment chain (\code{mpm} acts on
-particles but \code{youngs} lives on the parent cell's types):
-\begin{lstlisting}[style=yaml]
-# missing required property -> hard error, before any computation:
-operator 'mpm' requires property 'youngs' on every type of 'cell'; missing on type 'soft'.
-# property no operator reads -> warning (typo guard + category-error tripwire):
-[warn] property 'viscosity' on cell.soft is read by no operator (known: ['fraction','youngs'])
-\end{lstlisting}
-\textbf{Design rule: capabilities are declared, not discovered at a crash.} The
-operator that consumes a property is the single place that declares the
-requirement, turning a would-be \code{AttributeError} thousands of substeps deep
-into a one-line message up front --- and that ``read by no operator'' warning is
-exactly the tripwire for the category errors of Section~\ref{sec:category}.
 
 \part*{Part III --- The experiment}
 \addcontentsline{toc}{section}{Part III --- The experiment}
@@ -949,7 +822,7 @@ objective is optimized by gradients through the rollout; the general recipe is
 gradient-through-rollout on a smooth surrogate for the continuous interior.
 
 The optimizer keeps a log of every accepted improvement (the auto-generated
-\code{WINNERS.md}, Table~\ref{tab:winners}), which is itself the finding: it shows
+\code{WINNERS.md}), which is itself the finding: it shows
 \emph{what makes a good forager}. Two parameters move monotonically to their bounds
 --- the colony grows to its cap ($n\!\approx\!120$: more foragers deliver more food)
 and the cells soften to the floor ($\text{youngs}\!\to\!20$: soft, deformable cells
@@ -963,28 +836,6 @@ best-so-far food rises monotonically by construction. The headline is that the
 search rediscovered, with nothing hand-coded, that a \emph{large swarm of small,
 soft, strongly-chemotactic cells} forages a maze best.
 
-\begin{table}[h]
-\centering\footnotesize
-\renewcommand{\arraystretch}{1.1}
-\begin{tabular}{@{}l r r r r r r r r r@{}}
-\toprule
-\# & food & speed & gain & drag & rot & youngs & a\_max & radius & $n$ \\
-\midrule
-init & 120 & 40 & 180 & 2.00 & 0.30 & 550 & 700 & 0.01 & 60 \\
-1 & 142 & 74 & 379 & 2.54 & 0.10 & 517 & 454 & 0.02 & 46 \\
-2 & 225 & 106 & 253 & 1.25 & 0.31 & 36 & 599 & 0.01 & 88 \\
-3 & 298 & 83 & 270 & 0.97 & 0.48 & 78 & 1362 & 0.01 & 93 \\
-4 & 423 & 49 & 391 & 1.55 & 0.18 & 160 & 1438 & 0.01 & 106 \\
-5 & 525 & 21 & 341 & 2.99 & 0.40 & 24 & 1633 & 0.01 & 120 \\
-6 & 553 & 52 & 400 & 0.92 & 0.56 & 20 & 880 & 0.01 & 116 \\
-7 & 587 & 46 & 342 & 1.70 & 0.39 & 20 & 988 & 0.01 & 120 \\
-\bottomrule
-\end{tabular}
-\caption{The optimization log (\code{WINNERS.md}): the initial design and each
-significantly-better foraging design UCB found, with the eight tuned parameters.
-Food delivered rises from 120 to 587 ($\sim$5$\times$).}
-\label{tab:winners}
-\end{table}
 
 The difference is visible in the trails themselves (Fig.~\ref{fig:initwin}): the
 initial colony barely establishes a route, whereas the optimized one lays a strong
@@ -1105,6 +956,155 @@ never an engine edit.
 This is the contract that lets the LLM operate at the top (intent $\to$ simulation,
 plus occasional single-operator authoring) while the low-level code stays a clean,
 growing, verifiable registry underneath.
+
+\section{Categorical discipline: what belongs where}
+\label{sec:category}
+
+The same structure that makes the spec powerful makes it fragile: it has a few
+\emph{orthogonal categories}, and every key belongs to exactly one. The schema
+catches a malformed spec, but it cannot catch a \emph{well-formed} spec that files
+a quantity under the wrong category --- a force constant placed on a set, a domain
+property placed on an operator, an integration knob placed on a particle. These are
+\textbf{category errors}, and for anything editing the representation --- a language
+model most of all --- they are the dominant failure mode. The type system cannot
+state this discipline, so we state it here, as a rule.
+
+\paragraph{The categories.} Every part of a spec answers exactly one question, and
+that question fixes its home (Table~\ref{tab:cat}).
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}l p{6.2cm} l@{}}
+\toprule
+\textbf{Category} & \textbf{Owns --- the question it answers} & \textbf{Home} \\
+\midrule
+World        & the space: boundary, domain size, obstacles --- \emph{``what space do nodes live in?''} & \code{general:} \\
+Set (entity) & what a node \emph{is}: count, composition (types $+$ per-type properties), initial state --- \emph{``what is a node, and how many?''} & \code{sets:} ($+$ \code{@register\_entity}) \\
+Operator     & the dynamics: an interaction law, its parameters, and what its output \emph{means} (\code{PREDICTION}, \code{KIND}) --- \emph{``how does state change?''} & \code{operators:} ($+$ the registry class) \\
+Schedule     & the composition: time step, order, rates --- \emph{``when, in what order?''} & \code{schedule:}, \code{dt} \\
+Style        & rendering only --- \emph{``how is it drawn?''} & \code{plotting:} \\
+\bottomrule
+\end{tabular}
+\caption{The categories of the spec. They are orthogonal; a quantity belongs to the
+one whose question it answers, never to two.}
+\label{tab:cat}
+\end{table}
+
+\paragraph{The litmus test.} When unsure where a quantity goes, ask whether it is a
+property of the \emph{thing} or of the \emph{process} acting on it. A property of
+the thing --- its identity, count, composition, the meaning of its state columns,
+its initial value --- belongs to the set/entity. A property of the process --- a
+rate, a coefficient, a force law, the order of the time-derivative it produces ---
+belongs to the operator. A property of the shared space belongs to the world; a
+property of timing, to the schedule. \emph{Thing $\to$ set; process $\to$ operator.}
+
+\paragraph{Worked category errors.} The tempting move is almost always to attach a
+\emph{process} parameter to the \emph{thing} it acts on. Table~\ref{tab:caterr}
+collects the ones we actually hit while building the framework.
+
+\begin{table}[h]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{2.4cm} p{2.6cm} p{2.9cm} p{4.4cm}@{}}
+\toprule
+\textbf{Quantity} & \textbf{Tempting (wrong)} & \textbf{Correct} & \textbf{Why} \\
+\midrule
+integration order (1st/2nd derivative) & a field on the particle set & an intrinsic operator property (\code{PREDICTION}) & it is what the operator's output \emph{means} (velocity vs.\ acceleration), not what a particle is \\
+friction / damping & an integrator knob or a set field & a \code{drag} operator ($-\kappa v$) & friction is a force; forces are operators \\
+velocity cap & a particle field & a numerical guard in the integrator & it is about stepping, not the entity \\
+boundary (periodic/wall) & a per-operator flag & the world (\code{general:}) & the space is shared; all spatial operators must agree \\
+interaction radius, $\sigma$, $k$ & the set & the operator that uses them & they parameterize the law, not the node \\
+per-type law params $p$ & the operator's own table & the set's \code{types:}, \emph{read} by the operator & they are per-\emph{type} (a property of the node's kind) and the inverse-problem target; the type owns, the operator consumes \\
+which column is position / velocity & hard-coded in the operator & the entity state schema (\code{@register\_entity}) & column meaning is a property of the entity kind \\
+\bottomrule
+\end{tabular}
+\caption{Category errors and their corrections. The pattern is constant: a process
+parameter wrongly attached to the thing it acts on.}
+\label{tab:caterr}
+\end{table}
+
+\paragraph{Invariants (hold the line).}
+\begin{itemize}\itemsep2pt
+\item An operator never declares what a node \emph{is} (count, type, composition,
+initial state); it only \emph{reads} those.
+\item A set never declares how state \emph{changes} --- no rates, force constants,
+or integration order on a set; those are operators or the schedule.
+\item The world appears once, never per-operator: every spatial operator reads one
+boundary and one domain.
+\item Integration is the schedule's job, not an operator's; the only thing an
+operator says about integration is the \emph{order} of its delta (\code{PREDICTION}).
+\item A per-type property is owned by the type (\code{types:}) and read by whatever
+operator needs it (declared in \code{REQUIRES\_TYPE\_PROPS}), resolved along the
+containment chain.
+\item Style never changes dynamics: \code{plotting:} is read only by the visualizer.
+\end{itemize}
+
+\paragraph{The discard rule.} When a quantity does not obviously fit, do \emph{not}
+invent a new top-level key. Place it in the category whose question it answers; and
+if no operator or entity reads it, the validator's \emph{``read by no operator''}
+warning is the tripwire that catches the misfiling. New
+\emph{behaviour} is a new operator, never a set field; a new \emph{kind of node} is
+a new entity, never an operator parameter. Hold this line and the action space
+stays the single, well-defined one a search --- or a language model --- can explore.
+
+\section{Rules for a well-formed operator}
+\label{sec:operator-rules}
+
+An operator is the only place new dynamics enter Plexus, so a few simple rules keep
+the calculus sound and the engine generic. They are enforced --- by the schema
+validator before a run, and by the engine on the first frame --- so a violation
+fails loudly rather than silently corrupting a trajectory.
+
+\paragraph{1. The integration invariant.}
+No operator writes the engine-integrated state ($\mathrm{pos}/\mathrm{vel}$)
+directly. A change to position or velocity must flow through the operator's
+\emph{returned delta}, which the engine integrates once per tick. Everything else
+is mutated in place and the operator returns \code{\{\}}: the relations $E$
+(\code{edge\_index}), the entities $|S|$ (\code{occ} and per-node buffers,
+structural operators only), the fields $F$ (\code{grid}), and auxiliary per-node
+control buffers (e.g.\ a slime agent's \code{heading}, which is not integrated
+state). A dynamics operator that Euler-steps \code{pos} itself is a category
+error --- exactly the bug an early \code{advance} contained, fixed by returning a
+velocity $v_i = s_i(\cos h_i,\sin h_i)$ and letting the engine do
+$x \leftarrow x + \Delta t\, v$.
+
+\paragraph{2. One operator, one category.}
+The operator's \code{KIND} must match what it changes:
+\code{lateral}/\code{aggregate}/\code{broadcast}/\code{exchange} move \emph{state}
+(return a delta); \code{rewire} changes the \emph{relations} $E$; \code{structural}
+changes the \emph{entities} $|S|$. An operator never does two of these at once.
+
+\paragraph{3. \code{at:} names the locality; \code{to:}/\code{from:} the field.}
+\code{at:} is the set an operator acts on, or --- for a field-internal operator
+such as \code{diffuse}/\code{decay} --- the field it reads and writes. A coupling
+operator names its field in \code{to:} (scatter, set$\to$field) or \code{from:}
+(gather, field$\to$set). So \code{diffuse} reads \code{at: chemical}, never the
+placeholder \code{at: cell}.
+
+\paragraph{4. \code{PREDICTION} matches the derivative order.}
+A force-emitting operator declares whether its delta is a velocity
+(\code{first\_derivative}, overdamped) or an acceleration
+(\code{second\_derivative}, inertial); all operators acting on one set must agree,
+since a set integrates as a single order. Operators that emit no force (\code{rewire},
+\code{structural}, field writes) set \code{PREDICTION\,=\,None}.
+
+\paragraph{5. Style stays in \code{plotting:}.}
+Colours, colormap, point size, gamma, and background are render \emph{style}; they
+live in the spec's \code{plotting:} block, read only by the plotter. They are never
+properties of a set or an operator (which carry only what the dynamics read).
+
+\paragraph{6. Dispatch tags are class attributes; values are spec.}
+\code{KIND}, \code{LEVEL}, and \code{PREDICTION} are fixed dispatch tags stamped on
+the class. Tunable numbers (rates, gains, coefficients, per-type parameters) come
+from the spec at run time --- never hoisted onto the class --- so one operator
+serves every parameterization.
+
+\paragraph{7. Declare the capability contract.}
+An operator lists the spec keys it needs (\code{REQUIRES\_PARAMS}) and the per-type
+node properties it reads (\code{REQUIRES\_TYPE\_PROPS}, resolved along the containment
+chain). The validator checks these \emph{before} the run, so a missing parameter is a
+clear message, not a crash deep in a substep.
 
 \appendix
 \part*{Appendix}
@@ -1519,65 +1519,5 @@ predicts which explanations are worth testing.
 
 In this view, Plexus is neither a simulator nor a world model alone. It is a
 language in which candidate worlds can be written, searched, and falsified.
-
-\addcontentsline{toc}{section}{Appendix --- Rules for a well-formed operator}
-
-\section{Rules for a well-formed operator}
-\label{sec:operator-rules}
-
-An operator is the only place new dynamics enter Plexus, so a few simple rules keep
-the calculus sound and the engine generic. They are enforced --- by the schema
-validator before a run, and by the engine on the first frame --- so a violation
-fails loudly rather than silently corrupting a trajectory.
-
-\paragraph{1. The integration invariant.}
-No operator writes the engine-integrated state ($\mathrm{pos}/\mathrm{vel}$)
-directly. A change to position or velocity must flow through the operator's
-\emph{returned delta}, which the engine integrates once per tick. Everything else
-is mutated in place and the operator returns \code{\{\}}: the relations $E$
-(\code{edge\_index}), the entities $|S|$ (\code{occ} and per-node buffers,
-structural operators only), the fields $F$ (\code{grid}), and auxiliary per-node
-control buffers (e.g.\ a slime agent's \code{heading}, which is not integrated
-state). A dynamics operator that Euler-steps \code{pos} itself is a category
-error --- exactly the bug an early \code{advance} contained, fixed by returning a
-velocity $v_i = s_i(\cos h_i,\sin h_i)$ and letting the engine do
-$x \leftarrow x + \Delta t\, v$.
-
-\paragraph{2. One operator, one category.}
-The operator's \code{KIND} must match what it changes:
-\code{lateral}/\code{aggregate}/\code{broadcast}/\code{exchange} move \emph{state}
-(return a delta); \code{rewire} changes the \emph{relations} $E$; \code{structural}
-changes the \emph{entities} $|S|$. An operator never does two of these at once.
-
-\paragraph{3. \code{at:} names the locality; \code{to:}/\code{from:} the field.}
-\code{at:} is the set an operator acts on, or --- for a field-internal operator
-such as \code{diffuse}/\code{decay} --- the field it reads and writes. A coupling
-operator names its field in \code{to:} (scatter, set$\to$field) or \code{from:}
-(gather, field$\to$set). So \code{diffuse} reads \code{at: chemical}, never the
-placeholder \code{at: cell}.
-
-\paragraph{4. \code{PREDICTION} matches the derivative order.}
-A force-emitting operator declares whether its delta is a velocity
-(\code{first\_derivative}, overdamped) or an acceleration
-(\code{second\_derivative}, inertial); all operators acting on one set must agree,
-since a set integrates as a single order. Operators that emit no force (\code{rewire},
-\code{structural}, field writes) set \code{PREDICTION\,=\,None}.
-
-\paragraph{5. Style stays in \code{plotting:}.}
-Colours, colormap, point size, gamma, and background are render \emph{style}; they
-live in the spec's \code{plotting:} block, read only by the plotter. They are never
-properties of a set or an operator (which carry only what the dynamics read).
-
-\paragraph{6. Dispatch tags are class attributes; values are spec.}
-\code{KIND}, \code{LEVEL}, and \code{PREDICTION} are fixed dispatch tags stamped on
-the class. Tunable numbers (rates, gains, coefficients, per-type parameters) come
-from the spec at run time --- never hoisted onto the class --- so one operator
-serves every parameterization.
-
-\paragraph{7. Declare the capability contract.}
-An operator lists the spec keys it needs (\code{REQUIRES\_PARAMS}) and the per-type
-node properties it reads (\code{REQUIRES\_TYPE\_PROPS}, resolved along the containment
-chain). The validator checks these \emph{before} the run, so a missing parameter is a
-clear message, not a crash deep in a substep.
 
 \end{document}
