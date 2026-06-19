@@ -25,3 +25,23 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.18, wall_damp: 0.5,
   wall_contact: 0.05}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A single blue dot appears in the upper left quadrant of the frame. It then moves diagonally
+      downward and to the right across the white background. The dot continues its steady trajectory toward
+      the bottom right corner. Finally, it settles near the bottom center of the image.
+    objects: The scene contains a single, small circular particle. The particle is a solid, vibrant blue
+      color. It is isolated in a vast, empty white space with no other objects. The size of the dot remains
+      constant throughout the entire sequence.
+  movie_mpm_particle:
+    description: A dense cluster of blue particles initially forms a circular shape in the upper left
+      corner of the frame. As time progresses, the cluster rapidly expands and migrates toward the bottom
+      of the screen. The particles spread out horizontally, eventually forming a thick, irregular layer
+      along the bottom edge. By the final frame, the particles have settled into a relatively flat, continuous
+      band across the base of the image.
+    objects: The scene contains a large collection of small, light blue particles. These particles are
+      initially clustered together in a compact, circular topology. Over time, they transition into a
+      dispersed, linear arrangement along the bottom of the frame. Each individual particle is uniform
+      in size and color, creating a grainy texture throughout the simulation.

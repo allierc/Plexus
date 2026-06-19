@@ -19,3 +19,25 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.9, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 10}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense vertical column of blue particles appears on the left side of the frame. The
+      column then rapidly collapses and spreads horizontally across the bottom of the image. As it spreads,
+      the particles form a thin, undulating layer that moves from left to right. Finally, the layer settles
+      into a relatively flat, horizontal band at the base of the frame.
+    objects: The primary objects are small, blue particles that form a cohesive mass. Initially, these
+      particles are arranged in a tall, narrow rectangular column. After the collapse, they transition
+      into a wide, thin horizontal layer with a wavy top edge. The particles maintain a consistent blue
+      color and small size throughout the entire simulation.
+  movie_mpm_particle:
+    description: A dense rectangular block of blue particles is initially positioned on the left side
+      of the frame. Over time, the block undergoes a dramatic transformation, breaking apart and collapsing
+      toward the bottom of the screen. The particles spread out horizontally, forming a thin, undulating
+      layer across the base of the image. By the final frame, the particles have settled into a relatively
+      stable, wavy distribution at the bottom.
+    objects: The primary objects are thousands of small, blue circular particles. Initially, they are
+      tightly packed into a vertical rectangular formation on the left. As the simulation progresses,
+      the particles lose their structured arrangement and become a scattered, fluid-like mass. In the
+      final state, they form a continuous, horizontal band with a textured, grainy appearance.

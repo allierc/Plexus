@@ -24,3 +24,26 @@ schedule:
   - aggregate
   - gravity
   - {substep: 18, dt: 2.0e-4, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue rectangular block initially appears on the left side of the frame. It then begins
+      to deform and stretch towards the right, losing its sharp edges. As it continues to move, it thins
+      out and spreads across the bottom of the screen. Finally, it transforms into a complex, elongated
+      shape with several small detached fragments at the top right.
+    objects: The primary object is a solid blue mass that changes shape throughout the sequence. It starts
+      as a large, vertical rectangle with a uniform light blue color. As time progresses, the object becomes
+      a horizontal, irregular shape that occupies the lower portion of the frame. By the end, the main
+      body is a wide, jagged strip accompanied by several tiny, scattered blue dots in the upper right
+      corner.
+  movie_mpm_particle:
+    description: A dense cluster of blue particles initially forms a vertical rectangular block on the
+      left side of the frame. Over time, the block begins to collapse and spread horizontally toward the
+      right. The particles eventually flatten out into a thin, elongated layer across the bottom of the
+      space. By the final frame, the particles have dispersed into a wavy, irregular band along the lower
+      edge.
+    objects: The scene contains a large collection of small, blue circular particles. Initially, these
+      particles are tightly packed into a tall, solid rectangular shape. As the simulation progresses,
+      the particles lose their vertical structure and move into a more fluid, horizontal arrangement.
+      The final state shows the particles forming a wide, low-profile band with varying thickness.

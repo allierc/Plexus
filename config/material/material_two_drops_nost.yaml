@@ -25,3 +25,24 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 14, dt_sub: 0.0002, a_max: 200, drag: 0.1, wall_damp: 1.0,
   surface_tension: 0.0}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The video shows two circular particles that remain stationary throughout the entire duration.
+      There is no movement, change in size, or change in color observed in the scene. The two particles
+      maintain a constant relative position to each other. The simulation appears to be in a static state
+      with no dynamic evolution.
+    objects: The scene contains two circular objects of equal size. One object is colored blue and is
+      positioned on the left side of the frame. The second object is colored orange and is positioned
+      on the right side of the frame. The two circles are placed side-by-side, slightly overlapping at
+      their center points.
+  movie_mpm_particle:
+    description: The video shows two circular clusters of particles that remain stationary throughout
+      the duration. The blue cluster is positioned on the left, while the orange cluster is on the right.
+      There is no movement, expansion, or contraction of the particles over time. The scene remains completely
+      static across all four keyframes.
+    objects: There are two distinct circular clusters composed of many small, individual particles. The
+      left cluster is blue and the right cluster is orange. Both clusters are approximately the same size
+      and are positioned side-by-side. The particles within each cluster are densely packed to form a
+      roughly spherical shape.

@@ -29,3 +29,25 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.25, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 12}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large blue sphere is positioned above a set of grey bars. As time progresses, a blue
+      horizontal field emerges and expands across the bottom of the frame. This blue field eventually
+      covers the grey bars and fills the lower portion of the scene. The final frame shows the blue field
+      fully integrated with the grey bars at the bottom.
+    objects: A large, circular blue sphere is located in the upper half of the frame. Five grey vertical
+      bars of varying heights are arranged in a row at the bottom. A blue horizontal field appears and
+      grows to span the width of the lower section. The blue field is semi-transparent and overlaps with
+      the grey bars in the final frames.
+  movie_mpm_particle:
+    description: A large cluster of blue particles is initially suspended in the upper half of the frame.
+      As the simulation progresses, these particles descend and interact with a series of grey vertical
+      bars. The particles eventually settle into the gaps between the bars, forming a continuous horizontal
+      layer. By the final frame, the particles have completely filled the lower section, creating a level
+      surface across the structure.
+    objects: The scene contains a large, roughly circular cluster of small blue particles at the top.
+      Below this, there are five grey vertical bars of varying heights arranged in a row. The bars are
+      solid in color and have a rectangular topology. The blue particles are much smaller than the grey
+      bars and transition from a concentrated mass to a distributed fluid-like state.

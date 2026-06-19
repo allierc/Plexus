@@ -27,3 +27,26 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.25, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 12}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue fluid-like substance initially appears as a circular blob in the upper left corner.
+      It then stretches horizontally to the right, forming a long, thin tail that curves downward. As
+      the simulation progresses, the substance begins to break apart and settle into three distinct horizontal
+      layers. By the final frame, the blue material is distributed across three parallel gray bars, with
+      a thin vertical connection remaining between the top and middle sections.
+    objects: The scene contains a blue fluid substance that changes from a circular shape to a stretched,
+      elongated form. Three horizontal gray bars are positioned at different heights to act as containers
+      or boundaries. The blue substance is relatively large at the start but becomes thinner and more
+      fragmented as it interacts with the bars. The gray bars are uniform in color and size, arranged
+      in a staggered, parallel configuration.
+  movie_mpm_particle:
+    description: A large mass of blue particles begins as a single concentrated cluster at the top left.
+      As time progresses, the cluster begins to flow and spill over the edge of a grey platform. The particles
+      cascade downward, forming a stream that eventually pools on a lower level. By the final frame, the
+      particles have distributed across multiple levels, creating a stepped waterfall effect.
+    objects: The scene contains a large collection of small, blue, point-like particles. These particles
+      are initially clustered into a dense, roughly circular shape. There are three horizontal, grey rectangular
+      platforms of varying lengths and positions. The platforms are arranged in a staggered, descending
+      formation to facilitate the flow of the blue particles.

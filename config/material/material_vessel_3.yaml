@@ -25,3 +25,24 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.4,
   wall_contact: 0.06, surface_tension: 30.0}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue spherical particle is initially positioned to the left of a vertical grey bar.
+      As time progresses, the particle rapidly moves downward and spreads out into a horizontal layer.
+      This blue substance settles at the bottom of the frame, forming a thick, irregular pool. The grey
+      bar remains stationary throughout the entire duration of the simulation.
+    objects: A light blue spherical particle is the primary dynamic object in the first frame. A vertical
+      grey bar serves as a stationary reference point in the center of the scene. The blue substance transforms
+      from a compact sphere into a wide, horizontal layer at the base. The background is a plain white
+      field that provides high contrast for the blue and grey elements.
+  movie_mpm_particle:
+    description: A dense cluster of blue particles initially forms a spherical shape on the left side
+      of the frame. As time progresses, the sphere rapidly expands and collapses toward the bottom of
+      the container. The particles eventually settle into a thin, uneven layer across the bottom of the
+      space. A vertical grey bar remains stationary throughout the entire duration of the simulation.
+    objects: The blue particles are small, individual points that aggregate into a large, roughly spherical
+      mass. This mass is light blue in color and occupies a significant portion of the left side of the
+      frame. A single, solid grey bar is positioned vertically in the center-right of the scene. The bar
+      is long and narrow, maintaining a constant position and size throughout the video.

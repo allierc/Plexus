@@ -28,3 +28,25 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 14, dt_sub: 0.0002, a_max: 200, drag: 0.1, wall_damp: 1.0,
   surface_tension: 120.0}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: Two separate circular regions initially exist side-by-side in the center of the frame.
+      They begin to move toward each other and merge into a single, unified shape. As they fuse, the internal
+      boundaries shift and reorganize to form a complex, interlocking pattern. Finally, the merged object
+      stabilizes into a single, multi-colored sphere with a distinct internal structure.
+    objects: The scene contains two primary circular regions that are initially distinct and separate.
+      One region is light blue while the other is light orange. Both regions are of equal size and occupy
+      the central portion of the white background. After merging, they form a single larger sphere with
+      a blue left side and an orange right side.
+  movie_mpm_particle:
+    description: Two separate circular clusters of blue and orange particles initially exist side-by-side.
+      As the simulation progresses, the two clusters move toward each other and begin to merge. The particles
+      intermingle, forming a single, unified spherical shape. By the final frame, the blue and orange
+      particles are fully integrated into a single globe-like structure.
+    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the
+      blue particles form a circular cluster on the left, while the orange particles form a similar cluster
+      on the right. As they merge, the particles maintain their individual colors but lose their separate
+      spatial boundaries. The final object is a single sphere composed of both blue and orange particles
+      of uniform size.

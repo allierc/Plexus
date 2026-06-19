@@ -28,3 +28,30 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.12, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 10}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: 'The blue area starts at a high level within the container.
+
+      It then rapidly descends to a much lower level.
+
+      The blue area remains at this lower level for the rest of the video.
+
+      The grey vertical bars remain stationary throughout the entire process.'
+    objects: 'The scene contains two thick, grey vertical bars on the left and right sides.
+
+      A large, blue rectangular field occupies the space between these bars.
+
+      The blue field changes its vertical position from the top half to the bottom half.
+
+      The background is a solid white color throughout the simulation.'
+  movie_mpm_particle:
+    description: A large volume of blue particles is initially contained within a vessel with a gap in
+      the right wall. As time progresses, the particles flow through the gap into a smaller adjacent chamber.
+      The flow rate decreases as the level of the particles in the main chamber drops. Eventually, the
+      particles fill the smaller chamber and the flow from the main chamber slows significantly.
+    objects: The scene contains a large main chamber on the left and a smaller chamber on the right. Both
+      chambers are bounded by thick, grey vertical walls. The blue particles are small, numerous, and
+      represent a fluid-like substance. The gap in the right wall is positioned at a height that allows
+      the particles to transition between the two chambers.

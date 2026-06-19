@@ -19,3 +19,25 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.15, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 10}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue mass starts as a thin, horizontal strip at the bottom of the frame. It then begins
+      to expand upward and to the right, forming a large, irregular shape. The mass continues to grow,
+      eventually filling a significant portion of the lower right quadrant. By the final frame, the blue
+      area has reached its maximum size, showing a jagged upper boundary.
+    objects: The primary object is a single, continuous blue mass. It is light blue in color and has a
+      textured, slightly fuzzy edge. The mass starts as a small, elongated rectangle and grows into a
+      large, irregular polygon. Its topology is a single connected component that expands from the bottom
+      left toward the top right.
+  movie_mpm_particle:
+    description: A dense cluster of blue particles begins at the bottom right and expands toward the left.
+      As time progresses, the particles form a distinct wave-like structure that curls and moves across
+      the frame. The wave eventually breaks and dissipates into a more uniform distribution of points.
+      By the final frame, the particles have settled into a steady, slightly rising gradient across the
+      bottom of the image.
+    objects: The scene consists of thousands of small, individual blue dots. These particles are initially
+      packed tightly together in a large, solid mass. Over time, they rearrange into a dynamic, fluid-like
+      shape that mimics the motion of a water wave. The dots maintain a consistent size and color throughout
+      the entire simulation.

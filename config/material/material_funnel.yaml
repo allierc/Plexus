@@ -32,3 +32,26 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 14}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large blue circular particle is initially centered within a white rectangular frame.
+      Over the course of the simulation, the circular particle rapidly deforms and collapses downward
+      into a jagged, irregular shape. This shape then continues to compress and stretch vertically, narrowing
+      into a thin, elongated column. Finally, the blue mass stabilizes into a narrow vertical line at
+      the bottom of the frame.
+    objects: The primary object is a blue particle that starts as a large, smooth circle. It is contained
+      within a white rectangular structure that has a stepped, downward-pointing base. The background
+      consists of a solid grey field that surrounds the white and blue elements. The blue mass changes
+      from a large diameter to a very small, thin width as it moves toward the bottom.
+  movie_mpm_particle:
+    description: A large circular cluster of blue particles is initially centered in the upper half of
+      the frame. The cluster then rapidly collapses and transforms into a jagged, irregular shape at the
+      bottom of the container. This shape settles into a more stable, tiered structure with a narrow vertical
+      column at the base. Finally, the blue particles stabilize into a flat, horizontal layer with a small
+      central peak.
+    objects: The primary objects are numerous small, light-blue particles that form a cohesive mass. These
+      particles are initially arranged in a large, dense circle. As time progresses, they reorganize into
+      a multi-tiered, stepped structure with a thin vertical tail. The background consists of a static,
+      grey rectangular field with a white central container.

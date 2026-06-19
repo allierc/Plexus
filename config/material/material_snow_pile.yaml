@@ -18,3 +18,24 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 20, dt_sub: 1.875e-04, a_max: 200, drag: 0.2, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 0}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A single blue dot appears at the top center of the frame in the first keyframe. In the
+      second keyframe, the dot moves downward toward the center of the image. By the third keyframe, the
+      dot has moved further down, approaching the bottom of the frame. In the final keyframe, the dot
+      is positioned near the bottom center of the image.
+    objects: The scene contains a single small blue dot. It is a circular point-like object. The dot is
+      isolated and does not interact with any other objects. Its size remains constant throughout the
+      entire sequence.
+  movie_mpm_particle:
+    description: A dense cluster of blue particles initially forms a large, roughly circular shape at
+      the top of the frame. This cluster then rapidly collapses and transforms into a thin, horizontal
+      layer of particles. From this layer, a stream of individual particles falls vertically toward the
+      bottom of the frame. Upon impact, the falling particles create a growing, irregular splash of blue
+      particles that spreads across the base.
+    objects: The primary objects are small, individual blue particles that aggregate into larger structures.
+      Initially, these particles form a large, dense, circular cluster at the top. As time progresses,
+      they form a thin, elongated horizontal band and a vertical stream of scattered points. Finally,
+      they accumulate into a wide, jagged splash at the bottom of the scene.

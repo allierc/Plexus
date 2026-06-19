@@ -19,3 +19,25 @@ operators:
 - {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.08, wall_damp: 0.5,
   wall_contact: 0.06, surface_tension: 10}
 schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue rectangular block initially occupies the left side of the frame. It then rapidly
+      transforms into a thin, horizontal blue layer at the bottom of the screen. This layer begins to
+      undulate and form complex, wave-like structures across the bottom. Finally, the blue mass settles
+      into a relatively flat, slightly irregular horizontal band.
+    objects: The primary object is a solid blue rectangular block with a textured edge. It transitions
+      into a thin, continuous blue strip that spans the width of the frame. This strip develops into a
+      series of connected, fluid-like blue waves and peaks. The final object is a wide, continuous blue
+      band with a jagged upper boundary.
+  movie_mpm_particle:
+    description: A dense rectangular block of blue particles is initially positioned on the left side
+      of the frame. Over time, the block undergoes a dramatic transformation, breaking apart and spreading
+      across the bottom of the screen. The particles form a dynamic, undulating wave-like structure that
+      moves from left to right. By the final frame, the particles have settled into a thin, irregular
+      layer along the bottom edge.
+    objects: The primary objects are thousands of small, individual blue particles. Initially, they are
+      tightly packed into a vertical rectangular column. As the simulation progresses, they transition
+      into a fluid-like mass with a varying height. The particles maintain a consistent size and color
+      throughout the entire sequence.
