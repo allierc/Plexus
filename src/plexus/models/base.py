@@ -94,12 +94,14 @@ import torch.nn as nn
 
 
 # The recognised operator kinds (dispatch tags), grouped by what they change:
-# four *dynamics* kinds (lateral / aggregate / broadcast / exchange) move STATE and
-# return a delta; `rewire` changes the RELATIONS (the edge set E); `structural`
-# changes the ENTITIES (the node set |S|). The last two mutate H and return no
-# delta. Naming them lets the registry enumerate "what can change the state, the
+# the *dynamics* kinds (lateral / aggregate / broadcast / exchange) move a SET's
+# STATE and return a delta; `field` is a FIELD's own self-dynamics (diffuse / decay /
+# react / playback -- field->field, mutates the field, returns {}); `exchange` couples
+# a SET to a field (set->field deposit, field->set sense/chemotaxis); `rewire` changes
+# the RELATIONS (the edge set E); `structural` changes the ENTITIES (the node set |S|).
+# Naming them lets the registry enumerate "what can change the state, the field, the
 # relation, or the set".
-KINDS = ("lateral", "aggregate", "broadcast", "exchange", "structural", "rewire")
+KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire")
 
 
 # --------------------------------------------------------------------------- #
@@ -363,6 +365,12 @@ class Operator(nn.Module):
     PREDICTION: Optional[str] = None
     REQUIRES_PARAMS: list = []          # param keys this operator must be given
     REQUIRES_TYPE_PROPS: list = []      # per-type node properties it reads (e.g. "youngs")
+    # World-model ledger metadata (spec -> mechanistic language; see plexus.tex Part IV).
+    # Declarative, optional: what mechanism this operator embodies, what morphologies it
+    # tends to produce, and what each tunable param *means* mechanistically.
+    MECHANISM_TAGS: list = []           # e.g. ["long_range_attraction", "coarsening"]
+    MORPHOLOGY_PRIOR: list = []         # e.g. ["single_cluster", "filaments"]
+    PARAM_ROLES: dict = {}              # e.g. {"sigma": "interaction_length", "gain": "field_sensitivity"}
 
     def __init__(self, params: Optional[dict] = None, device: str = "cpu"):
         super().__init__()
@@ -390,8 +398,16 @@ class Broadcast(Operator):
 
 class Exchange(Operator):
     """set <-> field (or set <-> set) scatter/gather. Unifies P2G/G2P, secrete/sense,
-    and reaction stoichiometry. Mutates a Field (or state) in place; returns `{}`."""
+    chemotaxis. Mutates a Field (or auxiliary set state) in place; returns `{}` -- OR,
+    for a field->set coupling, returns a velocity/accel delta the engine integrates."""
     KIND = "exchange"
+
+
+class FieldUpdate(Operator):
+    """A field's OWN dynamics: field -> field (diffuse, decay, react, or playback of
+    prescribed data). Mutates the Field's grid in place and returns `{}`. Distinct from
+    `exchange`, which couples a SET to a field; here no set is involved."""
+    KIND = "field"
 
 
 class Structural(Operator):

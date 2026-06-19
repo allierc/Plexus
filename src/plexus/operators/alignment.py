@@ -15,6 +15,9 @@ from plexus.geometry import neighbour_mean
 class Alignment(Lateral):
     PREDICTION = "second_derivative"
     REQUIRES_TYPE_PROPS = ["alignment"]
+    MECHANISM_TAGS = ["velocity_alignment", "collective_motion"]
+    MORPHOLOGY_PRIOR = ["flock", "streams"]
+    PARAM_ROLES = {"scale": "alignment_strength"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

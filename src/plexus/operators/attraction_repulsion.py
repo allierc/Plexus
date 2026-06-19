@@ -30,6 +30,12 @@ class AttractionRepulsion(Lateral):
     PREDICTION = "first_derivative"             # emits a velocity (overdamped law)
     REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
     REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]
+    # mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the
+    # short-range Gaussian (p3,p4) the push; their balance sets the phase.
+    MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
+    MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice", "filaments"]
+    PARAM_ROLES = {"sigma": "interaction_length",
+                   "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

@@ -44,6 +44,9 @@ def _sense_at(fld, pos, heading, angle_off, sensor_dist, sensor_size, weights):
 class Sense(Exchange):
     REQUIRES_PARAMS = ["from"]
     REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]
+    MECHANISM_TAGS = ["trail_following", "stigmergy", "physarum_sensing"]
+    MORPHOLOGY_PRIOR = ["filaments", "transport_network"]
+    PARAM_ROLES = {"cross": "inter_species_coupling_sign"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -84,7 +87,7 @@ class Sense(Exchange):
             torch.where(wL > wR, rnd * ts, torch.zeros_like(h)))))
 
         new_h = h + turn
-        m = (mask.float() if mask is not None else torch.ones(N, device=dev))
-        keep = m > 0
+        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
+        keep = m > 0                                       # only live, selected agents turn
         lvl.heading = torch.where(keep, new_h, h)
         return {}

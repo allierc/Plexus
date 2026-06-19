@@ -17,6 +17,9 @@ from plexus.geometry import neighbour_mean
 class Separation(Lateral):
     PREDICTION = "second_derivative"
     REQUIRES_TYPE_PROPS = ["separation"]
+    MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]
+    MORPHOLOGY_PRIOR = ["even_spacing"]
+    PARAM_ROLES = {"scale": "separation_strength"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

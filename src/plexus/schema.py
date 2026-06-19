@@ -72,7 +72,8 @@ class Spec:
 
 
 _RESERVED = {"op", "at", "to", "from"}
-_BUILTIN_STEPS = {"aggregate"}                      # plus '<field>.diffuse'; integration is implicit (end of tick)
+_BUILTIN_STEPS = {"aggregate"}                      # integration is implicit (end of tick).
+# NB: the `<field>.diffuse` builtin is retired -- `diffuse` is now a normal operator.
 
 
 def load(path: str) -> Spec:
@@ -183,11 +184,6 @@ def load(path: str) -> Spec:
         tokens = step if isinstance(step, list) else [step]
         for tok in tokens:
             if tok in _BUILTIN_STEPS:
-                continue
-            if tok.endswith(".diffuse"):
-                fld = tok[: -len(".diffuse")]
-                if fld not in raw["fields"]:
-                    raise ValueError(f"schedule step {tok!r} references unknown field")
                 continue
             if tok not in op_names:
                 raise ValueError(f"schedule step {tok!r} is not a declared operator or builtin")

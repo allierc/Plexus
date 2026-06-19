@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import torch
 
-from plexus.models.base import Field, Exchange
+from plexus.models.base import Field, FieldUpdate
 from plexus.models.registry import register_field, register_operator
 from plexus.paths import graphs_data_path
 
@@ -47,8 +47,8 @@ class VideoField(Field):
         return gx, gy
 
 
-@register_operator("playback", level="field", kind="exchange")
-class Playback(Exchange):
+@register_operator("playback", level="field", kind="field")
+class Playback(FieldUpdate):
     """field <- data: set the field grid to the current tick's video frame (looping).
     Reads the engine's current frame from `H.frame`. Mutates the field, returns {}."""
 

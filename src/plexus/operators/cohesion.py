@@ -16,6 +16,9 @@ from plexus.geometry import neighbour_mean
 class Cohesion(Lateral):
     PREDICTION = "second_derivative"
     REQUIRES_TYPE_PROPS = ["cohesion"]
+    MECHANISM_TAGS = ["cohesion", "collective_motion"]
+    MORPHOLOGY_PRIOR = ["flock", "cluster"]
+    PARAM_ROLES = {"scale": "cohesion_strength"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

@@ -6,12 +6,12 @@ Writes the field in place; returns {}.
 """
 from __future__ import annotations
 
-from plexus.models.base import Exchange
+from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("decay", level="field", kind="exchange")
-class Decay(Exchange):
+@register_operator("decay", level="field", kind="field")
+class Decay(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
     def __init__(self, params, device="cpu"):

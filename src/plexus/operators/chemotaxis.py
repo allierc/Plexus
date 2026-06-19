@@ -19,6 +19,9 @@ from plexus.models.registry import register_operator
 class Chemotaxis(Exchange):
     PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates
     REQUIRES_PARAMS = ["from"]
+    MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation"]
+    MORPHOLOGY_PRIOR = ["single_cluster", "field_outline"]
+    PARAM_ROLES = {"gain": "field_sensitivity"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -34,10 +37,13 @@ class Chemotaxis(Exchange):
         fld = H.fields[self.field_name]
         g = fld.grid[self.channel]                              # [nx, ny]
         W = float(getattr(H, "world_width", 1.0))
-        # central-difference gradient, per world unit (x spans [0,W], y spans [0,1])
-        gx = (torch.roll(g, -1, 0) - torch.roll(g, 1, 0)) * 0.5 * (fld.nx / W)
-        gy = (torch.roll(g, -1, 1) - torch.roll(g, 1, 1)) * 0.5 * fld.ny
-        grad = torch.stack([gx, gy], 0)[None]                  # [1, 2, nx, ny]
+        # boundary-aware central difference (x spans [0,W], y spans [0,1]): wrap under a
+        # periodic world, replicate under a wall -- so a wall edge has no artificial gradient.
+        mode = "circular" if getattr(H, "periodic", False) else "replicate"
+        gp = Fnn.pad(g[None, None], (1, 1, 1, 1), mode=mode)[0, 0]   # [nx+2, ny+2]
+        gx = (gp[2:, 1:-1] - gp[:-2, 1:-1]) * 0.5 * (fld.nx / W)     # d/dx, per world unit
+        gy = (gp[1:-1, 2:] - gp[1:-1, :-2]) * 0.5 * fld.ny           # d/dy, per world unit
+        grad = torch.stack([gx, gy], 0)[None]                       # [1, 2, nx, ny]
         # bilinear sample the gradient at particle positions
         gxn = (pos[:, 0] / W) * 2 - 1
         gyn = (pos[:, 1] / 1.0) * 2 - 1

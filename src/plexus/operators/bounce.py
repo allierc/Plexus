@@ -55,6 +55,8 @@ class Bounce(Lateral):
 
         nx = pos[:, 0] + dt * spd * torch.cos(h)
         ny = pos[:, 1] + dt * spd * torch.sin(h)
+        # the domain is [0, W] x [0, 1]: x spans the world width W, y is unit height.
+        # The asymmetry (nx >= W vs ny >= 1) is the convention, not a bug.
         out = (nx < 0) | (nx >= W) | (ny < 0) | (ny >= 1)
         out = out | _in_obstacles(nx, ny, getattr(H, "obstacles", []))
         rand = torch.rand(N, generator=H.rng, device=dev) * 2 * math.pi

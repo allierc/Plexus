@@ -10,12 +10,12 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as Fnn
 
-from plexus.models.base import Exchange
+from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("diffuse", level="field", kind="exchange")
-class Diffuse(Exchange):
+@register_operator("diffuse", level="field", kind="field")
+class Diffuse(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
     def __init__(self, params, device="cpu"):
