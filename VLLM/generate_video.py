@@ -21,6 +21,9 @@ import sys
 import glob
 import argparse
 
+import cv2          # NOTE: must precede torch/diffusers -- importing cv2 after them breaks libtiff/libjpeg
+from PIL import Image
+
 LTX = os.environ.get("LTX_DIR", "/workspace/Plexus/VLLM/LTX-Video")
 DEV = "cuda:0"
 DEFAULT_ROOT = os.environ.get(
@@ -63,6 +66,20 @@ def _safe(name):
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_")
 
 
+def grab_frame(video, w, h, idx=0):
+    """Frame `idx` of `video` (idx=-1 -> last) as a PIL image resized to w×h, or None."""
+    if not video or not os.path.isfile(video):
+        return None
+    cap = cv2.VideoCapture(video)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    want = (total - 1) if idx < 0 else idx
+    cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, want))
+    ok, fr = cap.read(); cap.release()
+    if not ok:
+        return None
+    return Image.fromarray(cv2.cvtColor(fr, cv2.COLOR_BGR2RGB)).resize((w, h))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prompt", default=None, help="single explicit prompt (overrides --descriptions)")
@@ -77,19 +94,25 @@ def main():
     ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0, help="cap number of prompts (0 = all)")
+    ap.add_argument("--condition", choices=["none", "first", "firstlast"], default="none",
+                    help="'first': seed with the real first frame; 'firstlast': pin real first AND last frame")
+    ap.add_argument("--init-image", default=None, help="explicit conditioning image for --prompt mode")
     ap.add_argument("--dry-run", action="store_true", help="parse + plan only; do not load the model")
     args = ap.parse_args()
 
     # ---- assemble the work list (prompt, out_name) ----
     if args.prompt:
-        jobs = [{"name": "prompt", "prompt": args.prompt}]
+        jobs = [{"name": "prompt", "prompt": args.prompt, "src": args.init_image}]
         out_dir = args.out_dir or os.path.join(os.getcwd(), "ltx_out")
     else:
         ledger = args.descriptions or os.path.join(DEFAULT_ROOT, "video_descriptions.txt")
         assert os.path.isfile(ledger), f"ledger not found: {ledger} (run describe_video.py first, or pass --prompt)"
+        root = os.path.dirname(os.path.abspath(ledger))           # ledger sits at the graphs_data root
         recs = parse_ledger(ledger)
-        jobs = [{"name": r["name"], "prompt": _prompt_of(r)} for r in recs if _prompt_of(r)]
-        out_dir = args.out_dir or os.path.join(os.path.dirname(os.path.abspath(ledger)), "ltx_out")
+        # the real source mp4 = <root>/<name>.mp4 (name is its path relative to root, sans extension)
+        jobs = [{"name": r["name"], "prompt": _prompt_of(r), "src": os.path.join(root, r["name"] + ".mp4")}
+                for r in recs if _prompt_of(r)]
+        out_dir = args.out_dir or os.path.join(root, "ltx_out")
     if args.limit:
         jobs = jobs[:args.limit]
     assert jobs, "no prompts to render"
@@ -105,24 +128,46 @@ def main():
         print("[dry-run] parsed + planned; model not loaded.", flush=True)
         return
 
-    # ---- load LTX once ----
+    # ---- load LTX once; pipeline class depends on the conditioning mode ----
     import torch
-    from diffusers import LTXPipeline
+    from diffusers import LTXPipeline, LTXImageToVideoPipeline, LTXConditionPipeline
+    from diffusers.pipelines.ltx.pipeline_ltx_condition import LTXVideoCondition
     from diffusers.utils import export_to_video
     assert os.path.isdir(args.model), (
         f"LTX weights not found: {args.model}\n"
         f"  download externally (HF is firewalled in-container):\n"
         f"  hf download Lightricks/LTX-Video --local-dir {args.model}")
-    print(f"[load] {args.model} on {DEV} ...", flush=True)
-    pipe = LTXPipeline.from_pretrained(args.model, torch_dtype=torch.bfloat16).to(DEV)
+    Pipe = {"none": LTXPipeline, "first": LTXImageToVideoPipeline,
+            "firstlast": LTXConditionPipeline}[args.condition]
+    print(f"[load] {Pipe.__name__} from {args.model} on {DEV} (condition={args.condition}) ...", flush=True)
+    pipe = Pipe.from_pretrained(args.model, torch_dtype=torch.bfloat16).to(DEV)
     pipe.vae.enable_tiling()                                  # keep VAE decode within memory
+    if Pipe is LTXConditionPipeline:                          # this path uses the linear-quadratic schedule,
+        pipe.scheduler.register_to_config(use_dynamic_shifting=False)   # which needs dynamic-shifting off (no mu)
 
     for k, j in enumerate(jobs, 1):
-        print(f"[{k}/{len(jobs)}] rendering {os.path.basename(j['out'])} ...", flush=True)
+        kw, tag = {}, ""
+        if args.condition == "first":
+            img = grab_frame(j.get("src"), args.width, args.height, 0)
+            if img is None:
+                print(f"  (no source frame for {j['name']}; text-only)", flush=True)
+            else:
+                kw["image"], tag = img, " [first]"
+        elif args.condition == "firstlast":
+            f0 = grab_frame(j.get("src"), args.width, args.height, 0)
+            fL = grab_frame(j.get("src"), args.width, args.height, -1)
+            if f0 is None or fL is None:
+                print(f"  (no source frames for {j['name']}; text-only)", flush=True)
+            else:                                            # pin real endpoints; LTX fills the middle
+                kw["conditions"] = [LTXVideoCondition(image=f0, frame_index=0),
+                                    LTXVideoCondition(image=fL, frame_index=args.frames - 1)]
+                tag = " [first+last]"
+        print(f"[{k}/{len(jobs)}] rendering {os.path.basename(j['out'])}{tag} ...", flush=True)
         gen = torch.Generator(device=DEV).manual_seed(args.seed)
-        frames = pipe(prompt=j["prompt"], negative_prompt=NEG,
+        frames = pipe(prompt=j["prompt"], negative_prompt=NEG, **kw,
                       width=args.width, height=args.height, num_frames=args.frames,
-                      num_inference_steps=args.steps, generator=gen).frames[0]
+                      num_inference_steps=args.steps, max_sequence_length=256,  # else 128-tok prompts truncate
+                      generator=gen).frames[0]
         export_to_video(frames, j["out"], fps=args.fps)
         print(f"  [saved] {j['out']}", flush=True)
 
