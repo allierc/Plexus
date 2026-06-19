@@ -27,9 +27,10 @@ from . import bounce                # noqa: F401  set -> wall/obstacle reflectio
 from . import video_field           # noqa: F401  registers the `video` field + playback
 from . import chemotaxis            # noqa: F401  field -> set gradient coupling
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
-from . import mpm                   # noqa: F401  FENCED TRANSITIONAL: MLS-MPM mechanics (mls_mpm_mechanics)
+from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: MLS-MPM mechanics (mls_mpm_mechanics)
+from . import mpm_decomposed        # noqa: F401  Phase-3 decomposition: mpm_grid + mpm_strain/p2g/mpm_grid_update/g2p
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion",
            "cohesion", "alignment", "separation", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
-           "video_field", "chemotaxis", "gravity", "mpm"]
+           "video_field", "chemotaxis", "gravity", "mpm", "mpm_decomposed"]

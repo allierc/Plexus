@@ -329,37 +329,50 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
     fstride = max(1, (sim.n_frames + field_cap) // field_cap)
     rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
 
+    def _run_tok(tok, frame):
+        """Run every operator instance named `tok` once, enforcing the frame-0
+        integration-invariant guard on non-opted-out operators."""
+        for nm, ob, sel in inst:
+            if nm != tok:
+                continue
+            snap = ({n: l.state.clone() for n, l in H.levels.items()}
+                    if frame == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
+            for lvlname, d in ob(H, _mask(H, sel)).items():
+                H.add_delta(lvlname, d)
+            if snap is not None:
+                for n, before in snap.items():
+                    if not torch.equal(before, H.levels[n].state):
+                        raise RuntimeError(
+                            f"operator {nm!r} wrote the integrated state of set {n!r} "
+                            f"directly. A dynamics operator must RETURN a delta (the engine "
+                            f"integrates it); only structural / derived-readout operators "
+                            f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
+
     with torch.no_grad():
         for frame in range(sim.n_frames + 1):
             H.frame = frame                          # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
             for step in sim.schedule:                # operators accumulate per-set deltas
+                # `{substep: N, dt: <dt>, steps: [...]}` -- a micro-loop: run the inner
+                # operators N times at the substep dt (e.g. the MPM P2G->grid->G2P cycle).
+                # Deltas accumulated by the OUTER schedule (gravity) persist across it.
+                if isinstance(step, dict) and "substep" in step:
+                    H.sub_dt = float(step.get("dt", sim.dt))
+                    for _ in range(int(step["substep"])):
+                        for tok in step["steps"]:
+                            _run_tok(tok, frame)
+                    H.sub_dt = None
+                    continue
                 for tok in (step if isinstance(step, list) else [step]):
-                    for nm, ob, sel in inst:
-                        if nm != tok:
-                            continue
-                        # integration invariant, checked per operator on frame 0: an
-                        # operator that has not opted in via MAY_MUTATE_INTEGRATED_STATE (structural
-                        # / derived readout) must NOT change any set's state in its
-                        # forward -- it returns a delta and the engine integrates it.
-                        snap = ({n: l.state.clone() for n, l in H.levels.items()}
-                                if frame == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
-                        for lvlname, d in ob(H, _mask(H, sel)).items():
-                            H.add_delta(lvlname, d)
-                        if snap is not None:
-                            for n, before in snap.items():
-                                if not torch.equal(before, H.levels[n].state):
-                                    raise RuntimeError(
-                                        f"operator {nm!r} wrote the integrated state of set {n!r} "
-                                        f"directly. A dynamics operator must RETURN a delta (the engine "
-                                        f"integrates it); only structural / derived-readout operators "
-                                        f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
+                    _run_tok(tok, frame)
             _integrate(H, sim.dt)                    # integrate each set once, at end of tick
             for name, lvl in H.levels.items():
                 rec_sets[name][frame] = lvl.get("pos").cpu().numpy()
                 occ_sets[name][frame] = lvl.active.cpu().numpy()
             if H.fields and (frame % fstride == 0 or frame == sim.n_frames):
                 for fn, fld in H.fields.items():
+                    if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
+                        continue
                     rec_fields[fn].append(fld.grid.detach().to("cpu", torch.float32).numpy().copy())
 
     out = {"sets": {name: {"pos": rec_sets[name], "occ": occ_sets[name],
