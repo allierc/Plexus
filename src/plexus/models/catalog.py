@@ -6,13 +6,21 @@ registries; `registry.catalog_summary()` then lists the full action set, and
 `registry.operators_at_level("cell")` enumerates what can run at a given scale.
 
 This is the porting worklist made executable: fill each `forward` by lifting the
-named class into the Operator / Field contract in base.py.
+named class into the Operator / Field contract in base.py. It spans the full
+seven-kind operator vocabulary: the four set-dynamics kinds that return a delta
+(`lateral`, `aggregate`, `broadcast`, `exchange`), `field` (a field's own
+self-dynamics), `rewire` (changes the relation E), and `structural` (changes the
+entity set |S|).
+
+NB: a stub here may share a name with a *validated* operator in `plexus.operators`
+(e.g. `diffuse`, `radius_graph`); this module is the worklist and is NOT imported
+alongside the validated package (it would re-register those names).
 """
 
 from __future__ import annotations
 
 from plexus.models.base import (
-    Lateral, Aggregate, Broadcast, Exchange, Field,
+    Lateral, Aggregate, Broadcast, Exchange, FieldUpdate, Rewire, Structural, Field,
 )
 from plexus.models.registry import (
     register_entity, register_operator, register_field,
@@ -125,6 +133,52 @@ class SecreteSenseExchange(Exchange):
 @register_operator("particle_field", level="particle", kind="exchange")
 class ParticleFieldExchange(Exchange):
     """Particle <-> continuous field. Port: ParticleGraph Interaction_Particle_Field."""
+
+
+# --------------------------------------------------------------------------- #
+#  Field self-dynamics  (field -> field; mutate the grid, return {})
+# --------------------------------------------------------------------------- #
+@register_operator("react", level="field", kind="field")
+class ReactionDiffusion(FieldUpdate):
+    """Reaction-diffusion kinetics (Gray-Scott / RPS). Port: ParticleGraph RD_*."""
+
+@register_operator("wave_acoustic", level="field", kind="field")
+class WaveAcoustic(FieldUpdate):
+    """Acoustic wave (leapfrog). Port: the_well acoustic_scattering."""
+
+@register_operator("advect", level="field", kind="field")
+class Advect(FieldUpdate):
+    """Semi-Lagrangian advection by a carrier flow. Port: the_well navier_stokes."""
+
+# (validated field self-dynamics already in plexus.operators: diffuse, decay, playback)
+
+
+# --------------------------------------------------------------------------- #
+#  Rewire operators  (rebuild the relation E = edge_index; emit no delta)
+# --------------------------------------------------------------------------- #
+@register_operator("neighbour_graph", level="particle", kind="rewire")
+class NeighbourGraph(Rewire):
+    """Proximity graph each tick (validated as `radius_graph`). Port: geometry.radius_edges."""
+
+@register_operator("membrane_ring", level="particle", kind="rewire")
+class MembraneRing(Rewire):
+    """Cyclic membrane bonds around a cell (MISSING -- new for deformable cells)."""
+
+
+# --------------------------------------------------------------------------- #
+#  Structural operators  (change cardinality |S| / membership via occupancy)
+# --------------------------------------------------------------------------- #
+@register_operator("divide", level="cell", kind="structural")
+class Divide(Structural):
+    """Mitosis: one cell -> two on a fixed buffer. Port: prototype ops_grow divide."""
+
+@register_operator("die", level="cell", kind="structural")
+class Die(Structural):
+    """Apoptosis / efflux: retire a cell (occ -> 0). Port: prototype death."""
+
+@register_operator("spawn", level="cell", kind="structural")
+class Spawn(Structural):
+    """Birth / nucleation: wake a dormant slot. Port: prototype dicty inflow."""
 
 
 # --------------------------------------------------------------------------- #

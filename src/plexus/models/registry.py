@@ -7,8 +7,11 @@ Three registries, all decorator-based (same pattern as cell-gnn's registry):
   - FIELD    : continuum discretizations  e.g. "grid", "mesh", "implicit"
 
 Operators and fields are tagged with the *level* they act on and the *kind* of
-operator (lateral / aggregate / broadcast / exchange) so a `Schedule` — or the
-LLM agentic loop — can enumerate "everything that can run at level k".
+operator — one of the seven in `base.KINDS`: the four set-dynamics kinds that
+return a delta (lateral / aggregate / broadcast / exchange), `field` (a field's
+own self-dynamics: diffuse / decay / playback), `rewire` (changes the relation E),
+and `structural` (changes the entity set |S|) — so a `Schedule`, or the LLM agentic
+loop, can enumerate "everything that can run at level k".
 
 Usage
 -----
