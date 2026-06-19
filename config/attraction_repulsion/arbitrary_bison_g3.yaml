@@ -23,7 +23,7 @@ operators:
   - {op: playback,             at: bison}                       # field <- video frame t
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
-  - {op: chemotaxis,           at: particle, from: bison, gain: 0.004}
+  - {op: chemotaxis,           at: particle, from: bison, gain: 0.0004}
 schedule: [playback, radius_graph, attraction_repulsion, chemotaxis]
 plotting:
   background: black
@@ -45,12 +45,13 @@ descriptions:
       smaller. The objects are connected by their proximity and social interaction as they navigate the
       open space.
   movie_particle:
-    description: The simulation shows a collection of multi-colored particles moving across a black background.
-      Over time, the particles form distinct horizontal linear structures that shift and undulate slightly.
-      In the center of the frame, a cluster of particles appears to rotate or swirl in a localized area.
-      The overall motion suggests a fluid-like flow with specific regions of high concentration and organized
-      movement.
-    objects: The scene contains thousands of small, circular particles of varying sizes. These particles
-      are colored in a palette of blue, green, orange, and yellow. They are arranged in long, horizontal
-      chains that span the width of the frame. A dense, circular cluster of particles is also visible
-      in the center, contrasting with the linear arrangements.
+    description: The simulation shows a dense field of multi-colored particles moving across a black background.
+      Over time, the particles appear to form transient, linear structures and clusters that shift and
+      reform. The movement is fluid, with individual points drifting while maintaining a collective, flowing
+      motion. The overall pattern remains consistent in density but varies in the specific arrangement
+      of the linear filaments.
+    objects: The scene contains thousands of small, circular points of varying colors including blue,
+      orange, and green. These particles are arranged in a stochastic distribution, occasionally aligning
+      into elongated, thread-like chains. The colors are distributed relatively evenly, though some clusters
+      show a higher concentration of a single hue. Each individual particle is uniform in size, creating
+      a granular texture across the entire frame.

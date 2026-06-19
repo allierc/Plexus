@@ -23,7 +23,7 @@ operators:
   - {op: playback,             at: bison}                       # field <- video frame t
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
-  - {op: chemotaxis,           at: particle, from: bison, gain: 0.0012}
+  - {op: chemotaxis,           at: particle, from: bison, gain: 0.00012}
 schedule: [playback, radius_graph, attraction_repulsion, chemotaxis]
 plotting:
   background: black
@@ -45,13 +45,12 @@ descriptions:
       smaller. The objects are connected by their proximity and social interaction as they navigate the
       open space.
   movie_particle:
-    description: The simulation shows a dense field of multi-colored particles moving across a black background.
-      Over time, the particles appear to form transient, linear structures and clusters that shift and
-      evolve. The movement suggests a fluid-like flow or a collective behavior where particles align into
-      horizontal bands. The overall pattern remains dynamic, with constant flux in the positions and local
-      densities of the points.
-    objects: The scene contains thousands of small, circular points of varying colors including blue,
-      orange, and green. These particles are arranged in a semi-ordered fashion, often forming elongated,
-      horizontal chains or filaments. The size of each individual point is uniform and very small relative
-      to the overall frame. The colors are distributed somewhat randomly but frequently cluster together
-      within the linear formations.
+    description: The simulation shows a large number of small particles distributed across a black background.
+      Over time, the particles appear to move and shift positions, though the overall density remains
+      relatively constant. There is no significant global trend or large-scale structural change visible
+      between the frames. The motion appears stochastic, with individual points flickering and drifting
+      slightly.
+    objects: The scene contains thousands of tiny, circular points of varying colors. The primary colors
+      are blue, orange, and green, which are scattered throughout the space. The particles are arranged
+      in a mostly random distribution, though some small clusters and linear chains occasionally form.
+      Each individual point is uniform in size and maintains a consistent appearance across the sequence.

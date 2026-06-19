@@ -23,7 +23,7 @@ operators:
   - {op: playback,             at: bison}                       # field <- video frame t
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
-  - {op: chemotaxis,           at: particle, from: bison, gain: 0.0002}
+  - {op: chemotaxis,           at: particle, from: bison, gain: 2e-05}
 schedule: [playback, radius_graph, attraction_repulsion, chemotaxis]
 plotting:
   background: black
@@ -47,10 +47,10 @@ descriptions:
   movie_particle:
     description: The simulation shows a large number of small particles distributed across a black background.
       Over time, the particles appear to move and shift positions, though the overall density remains
-      relatively constant. There is no significant global trend or large-scale structural change visible
-      between the frames. The motion appears stochastic, with individual points flickering and drifting
-      slightly.
-    objects: The scene contains thousands of tiny, point-like particles. These particles are colored in
-      distinct shades of blue, orange, and green. They are arranged in a sparse, random distribution with
-      some localized clusters forming. The particles are uniform in size and do not appear to be connected
-      to one another.
+      relatively constant. There is no significant change in the global structure or the distribution
+      of colors throughout the sequence. The motion appears stochastic, with individual points flickering
+      and drifting slightly in each frame.
+    objects: The scene contains thousands of tiny, circular points of varying colors. The primary colors
+      present are blue, orange, and green, which are scattered randomly across the space. The particles
+      are arranged in a sparse, non-connected distribution with no clear geometric patterns. Each individual
+      point is uniform in size, appearing as a single pixel or a small cluster of pixels.
