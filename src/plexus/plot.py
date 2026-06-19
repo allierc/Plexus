@@ -76,6 +76,7 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     cmap = plt.get_cmap(style.get("colormap", "tab10"))
     bg = style.get("background", "white")             # figure/axes background colour
     W = float(d["world"]) if "world" in d.files else sim.world
+    obstacles = list(getattr(sim, "obstacles", []) or [])   # wall geometry to overlay (grey)
 
     for sname in _sets_in(d):
         pos = d[f"{sname}__pos"]                      # [T, N, 2]
@@ -84,13 +85,31 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         nt = d[f"{sname}__{cby}"] if (cby and f"{sname}__{cby}" in d.files) else None
         T, N = pos.shape[0], pos.shape[1]
         s = _point_size(style, N)
-        color = (cmap(nt % cmap.N) if nt is not None else None)
+        # colour leaves by their PARENT cell when contained (distinguishes distinct
+        # bodies -- the two drops, the balls -- and reveals mixing); else by node_type.
+        par = d[f"{sname}__parent"] if f"{sname}__parent" in d.files else None
+        if par is not None:
+            color = cmap(par % cmap.N)
+        elif nt is not None:
+            color = cmap(nt % cmap.N)
+        else:
+            color = None
+        # a container set (parent of a denser child set) is drawn as its MERGED child
+        # cloud -- colour the particles by parent cell, then fuse them into one smooth
+        # blob per cell -- instead of a bare centroid dot.
+        container = _container_child(d, sname)
 
         def _draw(ax, i):
+            if container is not None:
+                cpos, par, ncell = container
+                ax.imshow(_merged_rgb(cpos[i], par, ncell, W, cmap), extent=[0, W, 0, 1], origin="upper")
+                _draw_obstacles(ax, obstacles)
+                ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off"); return
             live = occ[i]
             c = (color[live] if color is not None else "#1f77b4")
             ax.set_facecolor(bg)
             ax.scatter(pos[i, live, 0], pos[i, live, 1], s=s, c=c, linewidths=0)
+            _draw_obstacles(ax, obstacles)
             ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
 
         # evolution montage
@@ -113,7 +132,13 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         print(f"[plot] {sname}: {os.path.basename(evo)}, {os.path.basename(fin)}", flush=True)
 
         if movie:
-            _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"), bg=bg)
+            if container is not None:
+                cpos, par, ncell = container
+                _merged_movie(cpos, par, ncell, W, cmap, T, os.path.join(data_dir, f"movie_{sname}"),
+                              bg=bg, obstacles=obstacles)
+            else:
+                _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"),
+                       bg=bg, obstacles=obstacles)
 
     # --- continuum fields: composite the channels and draw the heatmap ------- #
     gamma = float(style.get("gamma", 0.7))
@@ -178,7 +203,79 @@ def _save_anim(anim, out_base: str, bg: str, fps: int = 25, dpi: int = 150) -> s
     return out
 
 
-def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white") -> None:
+def _draw_obstacles(ax, obstacles, color="0.45"):
+    """Draw the world's wall geometry (grey): [x0,y0,x1,y1] rectangles / [cx,cy,r] discs."""
+    from matplotlib.patches import Rectangle, Circle
+    for r in (obstacles or []):
+        v = [float(x) for x in r]
+        if len(v) == 4:
+            ax.add_patch(Rectangle((v[0], v[1]), v[2] - v[0], v[3] - v[1], color=color, zorder=3))
+        elif len(v) == 3:
+            ax.add_patch(Circle((v[0], v[1]), v[2], color=color, zorder=3))
+
+
+def _container_child(d, sname: str):
+    """If `sname` is a container -- some set names it as `parent_name` and has more
+    nodes -- return (child_pos[T,Nc,2], parent_idx[Nc], ncell); else None. A container
+    set is then drawn as its MERGED child cloud (each parent's particles fused into one
+    smooth blob), which is far more informative than its bare centroid dot."""
+    for c in _sets_in(d):
+        pn = d.get(f"{c}__parent_name")
+        if pn is not None and str(pn) == sname and f"{c}__parent" in d.files:
+            return d[f"{c}__pos"], d[f"{c}__parent"], int(d[f"{c}__parent"].max()) + 1
+    return None
+
+
+def _blur(a, sigma):
+    """Tiny separable Gaussian blur (no scipy dependency)."""
+    r = int(max(1, round(3 * sigma)))
+    k = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2); k /= k.sum()
+    a = np.apply_along_axis(lambda m: np.convolve(m, k, "same"), 0, a)
+    return np.apply_along_axis(lambda m: np.convolve(m, k, "same"), 1, a)
+
+
+def _merged_rgb(xy, par, ncell, W, cmap, res: int = 300, sigma: float = 2.2):
+    """Splat each parent's child particles to a blurred density mask and paint it the
+    parent's colour: a smooth, uniform per-cell blob composited over white. This is the
+    special cell<-MPM 'apply colour then merge the particles' container view -- a soft
+    blur (sigma ~2.2) + gentle alpha ramp gives the smooth, slightly-blurry cells the
+    user preferred (sharper edges read as noisy particle texture)."""
+    Hh = res; Wd = max(1, int(round(res * W)))
+    rgb = np.ones((Hh, Wd, 3))
+    gx = np.clip((xy[:, 0] / max(W, 1e-9) * Wd).astype(int), 0, Wd - 1)
+    gy = np.clip((xy[:, 1] * Hh).astype(int), 0, Hh - 1)
+    for c in range(ncell):
+        m = par == c
+        if not m.any():
+            continue
+        dens = np.zeros((Hh, Wd)); np.add.at(dens, (gy[m], gx[m]), 1.0)
+        dens = _blur(dens, sigma)
+        a = np.clip(dens / (dens.max() * 0.18 + 1e-9), 0, 1)[..., None]   # soft -> smooth blob
+        rgb = rgb * (1 - a) + np.asarray(cmap(c % cmap.N)[:3])[None, None, :] * a
+    return rgb[::-1]                                # image row 0 = top = high y
+
+
+def _merged_movie(cpos, par, ncell, W, cmap, T, out_base, max_frames: int = 120, bg: str = "white",
+                  obstacles=None) -> None:
+    """Movie of a container set rendered as merged per-cell blobs."""
+    from matplotlib.animation import FuncAnimation
+    stride = max(1, T // max_frames); frames = list(range(0, T, stride))
+    fig, ax = plt.subplots(figsize=(5 * W, 5)); ax.axis("off"); fig.patch.set_facecolor(bg)
+    fig.tight_layout(pad=0)
+    im = ax.imshow(_merged_rgb(cpos[0], par, ncell, W, cmap), extent=[0, W, 0, 1], origin="upper")
+    _draw_obstacles(ax, obstacles)
+    ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal")
+
+    def upd(i):
+        im.set_data(_merged_rgb(cpos[i], par, ncell, W, cmap)); return im,
+
+    anim = FuncAnimation(fig, upd, frames=frames, interval=50)
+    out = _save_anim(anim, out_base, bg); plt.close(fig)
+    print(f"[plot] merged-cell movie -> {os.path.basename(out)}", flush=True)
+
+
+def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white",
+           obstacles=None) -> None:
     """Render a movie of a set's trajectory. Writes mp4 via ffmpeg when available,
     else falls back to gif. `out_base` is the path without extension."""
     from matplotlib.animation import FuncAnimation
@@ -189,6 +286,7 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
     fig.tight_layout(pad=0)
     sc = ax.scatter(pos[0, :, 0], pos[0, :, 1], s=s, linewidths=0,
                     c=(color if color is not None else "#1f77b4"))
+    _draw_obstacles(ax, obstacles)
 
     def upd(i):
         live = occ[i]

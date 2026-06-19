@@ -1,0 +1,35 @@
+# Phagotrophy: a sessile ciliate sits in a gentle ambient current (drift) that
+# carries food parcels (tracers) past it left->right. Its feeding current bends the
+# nearby parcels and its absorbing mouth -- here facing UPSTREAM -- EATS the ones
+# that arrive. Parcels leaving the domain respawn at the left inlet, so the stream
+# is continuous and the eaten count climbs.
+#
+# Adds one set (tracer) + two operators (advect_particles, capture) to sessile.yaml
+# -- same registry, no engine change. Reference: Liu, Costello & Kanso, Nat Commun
+# 16, 4154 (2025).
+name: feeding
+seed: 0
+n_frames: 360
+record_every: 2
+dt: 1.0
+world: 1.6
+sets:
+  organism:
+    n: 1
+    radius: 0.14
+    n_mode: 40
+    axis: 0.0
+    types:
+      sessile: {fraction: 1.0, lifestyle: sessile, feeding_area: 0.3, mouth_offset: 3.14159}
+  surface_node: {parent: organism, per_parent: 240, role: membrane}
+  tracer: {n: 900}
+fields:
+  flow:     {kind: flow, res: 176, couples_to: organism}
+  chemical: {kind: chemical, res: 176, couples_to: surface_node, diffusion: 0.06, peclet: 120.0, c_inf: 1.0}
+operators:
+  - {op: squirmer_flow,    at: organism, to: flow, frame: body}
+  - {op: slip,             at: surface_node}
+  - {op: absorb,           at: "surface_node[type=mouth]", from: chemical, rate: 1.0}
+  - {op: advect_particles, at: tracer, from: flow, speed: 0.04, drift: [0.006, 0.0]}
+  - {op: capture,          at: tracer, margin: 0.25}
+schedule: [squirmer_flow, slip, absorb, chemical.diffuse, advect_particles, capture]

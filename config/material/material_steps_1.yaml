@@ -1,0 +1,33 @@
+# material_steps_1 -- auto-ported from prototype/water (water_steps_1.yaml).
+general:
+  name: material_steps_1
+  seed: 0
+  n_frames: 1000
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.0, 0.0, 0.142, 0.46]
+  - [0.142, 0.0, 0.285, 0.39]
+  - [0.285, 0.0, 0.428, 0.32]
+  - [0.428, 0.0, 0.571, 0.25]
+  - [0.571, 0.0, 0.714, 0.18]
+  - [0.714, 0.0, 0.857, 0.11]
+  - [0.857, 0.0, 1.0, 0.04]
+sets:
+  cell:
+    n: 1
+    start: [0.1, 0.8, 0.1, 0.8]
+    types:
+      water:
+        fraction: 1.0
+        youngs: 300
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.2, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.4,
+  wall_contact: 0.06, surface_tension: 30.0}
+schedule: [aggregate, gravity, mls_mpm_mechanics]

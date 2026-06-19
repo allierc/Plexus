@@ -1,0 +1,34 @@
+# material_funnel -- auto-ported from prototype/water (overnight_suite:ob_funnel).
+general:
+  name: material_funnel
+  seed: 0
+  n_frames: 1000
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.0, 0.0, 0.18, 1.0]
+  - [0.18, 0.0, 0.28, 0.62]
+  - [0.28, 0.0, 0.38, 0.42]
+  - [0.38, 0.0, 0.45, 0.26]
+  - [0.55, 0.0, 0.62, 0.26]
+  - [0.62, 0.0, 0.72, 0.42]
+  - [0.72, 0.0, 0.82, 0.62]
+  - [0.82, 0.0, 1.0, 1.0]
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.8, 0.5, 0.8]
+    types:
+      water:
+        fraction: 1.0
+        youngs: 300
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 7000, radius: 0.2, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.5,
+  wall_contact: 0.06, surface_tension: 14}
+schedule: [aggregate, gravity, mls_mpm_mechanics]

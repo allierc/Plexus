@@ -1,0 +1,24 @@
+# MIX: Rayleigh-Benard CONVECTION (fluid) stirring tracer PARTICLES (set), with
+# slower buoyancy (g=13) so the rolls turn over gently. Particles seeded as a layer
+# trace the convection cells -- lofted in the hot updrafts, dragged down in the cold
+# downdrafts. advect_particles carries the swarm by the fluid velocity (no self-prop).
+#   body_force -> advect -> diffuse -> poisson_solve -> advect(T) -> advect_particles
+name: mix_rb_particles
+seed: 2
+n_frames: 1000
+record_every: 5
+world: 1.0
+fields:
+  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
+sets:
+  active: {n: 5000, start: [0.0, 0.30, 1.0, 0.55]}
+init:
+  fluid: {preset: rayleigh_benard, seed: 0.03, width: 0.05}
+operators:
+  - {op: body_force, at: fluid, scalar: 2, g: 13.0, ref: 0.5, dt_sub: 0.006}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.012}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
+  - {op: advect_particles, at: active, from_field: fluid, vel: [0,1], speed: 0.012}
+schedule: [body_force, advect, diffuse, poisson_solve, advect, advect_particles]

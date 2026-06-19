@@ -66,6 +66,11 @@ def main():
     if not os.path.isfile(yaml_file):
         parser.error(f"config not found: {yaml_file}")
     print(f"task={task}  type={pre_folder.rstrip('/')}  config={name}  ({yaml_file})")
+    # MPM grid-dt CFL: auto-correct the SPEC (not the engine) so dt_sub respects the
+    # Courant condition before we generate; idempotent for non-MPM / already-stable specs.
+    if "generate" in task:
+        from plexus.generators.mpm_cfl import enforce_grid_cfl
+        enforce_grid_cfl(yaml_file)
     sim = load(yaml_file)
 
     # self-describing run dir: snapshot the spec into log/<type>/<name>/

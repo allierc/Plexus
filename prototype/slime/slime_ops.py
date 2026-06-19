@@ -278,6 +278,7 @@ class TrailGraphOperator(Rewire):
         self.radius = float(params.get("radius", 0.06))
         self.thresh = float(params.get("thresh", 0.12))
         self.edge_min = float(params.get("edge_min", 0.06))
+        self.edge_k = int(params.get("edge_k", 12))
         self.per_species = bool(params.get("per_species", False))
 
     def forward(self, H, mask=None):

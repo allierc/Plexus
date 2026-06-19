@@ -1,0 +1,57 @@
+# material_bowl_3 -- auto-ported from prototype/water (water_bowl_3.yaml).
+general:
+  name: material_bowl_3
+  seed: 0
+  n_frames: 1300
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.0, 0.0, 0.12, 0.5]
+  - [0.12, 0.0, 0.24, 0.38]
+  - [0.24, 0.0, 0.36, 0.27]
+  - [0.36, 0.0, 0.44, 0.18]
+  - [0.56, 0.0, 0.64, 0.18]
+  - [0.64, 0.0, 0.76, 0.27]
+  - [0.76, 0.0, 0.88, 0.38]
+  - [0.88, 0.0, 1.0, 0.5]
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.56, 0.5, 0.56]
+    types:
+      water:
+        fraction: 1.0
+        youngs: 300
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 11000, radius: 0.22, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 192, substeps: 22, dt_sub: 0.00015, a_max: 200, drag: 0.35, wall_damp: 0.6,
+  wall_contact: 0.05, surface_tension: 4.0}
+schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large blue circle appears in the center of a white background with gray stepped borders.
+      The circle then rapidly shrinks and fades into a light blue horizontal band. This band expands and
+      settles into a wider, more irregular shape across the middle of the frame. Finally, the blue area
+      stabilizes into a steady, horizontal layer with a small vertical extension at the bottom.
+    objects: A large, solid blue circle is initially centered in the upper half of the frame. The gray
+      borders are arranged in a symmetrical, stepped pattern on the left and right sides. A light blue
+      horizontal band forms in the middle, connecting the two gray structures. A small, vertical blue
+      column extends downward from the center of the horizontal band.
+  movie_mpm_particle:
+    description: A large, circular cluster of blue particles is initially centered in the upper half of
+      the frame. As the simulation progresses, the cluster rapidly expands downward and disintegrates
+      into a more diffuse, irregular shape. The particles eventually settle into a wide, horizontal band
+      that fills the lower portion of the frame. Finally, the particles concentrate into a central vertical
+      column that extends to the bottom edge.
+    objects: The primary objects are numerous small, light-blue particles that form a cohesive group.
+      These particles are initially arranged in a dense, circular topology in the center of the white
+      space. Over time, they transition into a wide, stepped horizontal formation that spans the width
+      of the gray base. The final state shows the particles organized into a narrow, vertical column at
+      the bottom center.

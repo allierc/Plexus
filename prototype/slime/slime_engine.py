@@ -169,6 +169,7 @@ def run(sc, device="cpu"):
     n_rec = sc.n_frames // re + 1
     fhist = np.zeros((n_rec, fld.C, fld.nx, fld.ny), np.float32)
     cpos = np.zeros((n_rec, cell.n, 2), np.float32)
+    chead = np.zeros((n_rec, cell.n), np.float32)
 
     graph_hist = []          # per recorded frame: (nodes [M,2], edges [2,E]) if trail_graph runs
     graph_chan_hist = []     # per recorded frame: [(nodes, edges, channel), ...] if per_species
@@ -188,6 +189,8 @@ def run(sc, device="cpu"):
         if frame % re == 0:
             fhist[rec] = fld.grid.cpu().numpy()
             cpos[rec] = cell.state[:, :2].cpu().numpy()
+            if hasattr(cell, "heading"):
+                chead[rec] = cell.heading.cpu().numpy()
             if hasattr(H, "graph_nodes"):                 # trail_graph (Rewire) ran -> record the scaffold
                 graph_hist.append((H.graph_nodes.cpu().numpy(), H.graph_edges.cpu().numpy()))
                 gc = getattr(H, "graph_channels", None)
@@ -203,7 +206,7 @@ def run(sc, device="cpu"):
         m = nt == c
         chan_color[c] = cols[m][0] if m.any() else slime_engine_default(c)
 
-    return dict(field=fhist[:rec], cell_pos=cpos[:rec], node_type=nt,
+    return dict(field=fhist[:rec], cell_pos=cpos[:rec], cell_head=chead[:rec], node_type=nt,
                 chan_color=chan_color, type_names=cell.type_names,
                 C=fld.C, W=H.world_width, n_agents=cell.n,
                 graph=graph_hist or None, graph_channels=graph_chan_hist or None)

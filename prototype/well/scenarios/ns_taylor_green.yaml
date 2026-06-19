@@ -1,0 +1,14 @@
+# Taylor-Green vortex decay -- the canonical incompressible-NS test (vortex lattice
+# that cascades to small scales). Pure advect + project, viscous decay.
+name: ns_taylor_green
+seed: 0
+n_frames: 420
+record_every: 3
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: taylor_green, U: 0.8}}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,2,3], dt_sub: 0.004, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.008}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+schedule: [advect, diffuse, poisson_solve]

@@ -1,0 +1,106 @@
+# Dicty aggregation -- PARENT / CONTROL config for Batch 36 — MPM ARM ADJUDICATION.
+#
+# **B36 RUN REQUIREMENT — ENGINE AUTOSELECT:** the on-disk `eval_sweeps.py:
+# _autodetect_engine()` (B34 fix) sees `inflow_mpm` / `op: mpm` / `particle:`
+# tokens in this spec and loads `dicty_engine_mpm` automatically. Env override
+# `DICTY_ENGINE=dicty_engine_mpm` still works.
+#
+# B35 OUTCOMES SUMMARY (the project's primary structural adjudication):
+#   - DECISIVE NEGATIVE: the MPM engine with the bare {secrete, sense,
+#     inflow_mpm, mpm} stack is STRUCTURALLY NON-AGGREGATING at every
+#     tested parameter (Est #130). sw 0 (n_frames at MPM base parent)
+#     shows inner_mass FLAT at 0.19 across n_frames in [120, 2400],
+#     n_mounds GROWS 43->79, morphology IDENTICAL sparse-scatter
+#     at every panel. **The finite-volume mechanism does NOT mitigate
+#     Est #82 — it replaces it with the OPPOSITE failure mode
+#     (under-aggregation).** The project's central structural
+#     hypothesis ("finite cell volume is the missing mechanism") is
+#     FALSIFIED in pilot.
+#   - DECISIVE NEGATIVE: cell.youngs across 4 orders of magnitude
+#     [1, 1000] AND at the n_frames=1200 stress test (sw 7, sw 15)
+#     produces NO morphological change (Est #136 + Est #144). The
+#     "structural stiffness is the key Est #82 mitigator" frame
+#     from B31 is FALSIFIED. High Young's >= 2000 explodes
+#     numerically; not a structural transition.
+#   - METHODOLOGICAL: engine outer `dt` is INERT in MPM (sw 10
+#     produces 16 PIXEL-IDENTICAL results — Est #139). Drop dt
+#     sweeps in future MPM batches; only `mpm.substeps` and
+#     `mpm.dt_sub` are live resolution knobs.
+#   - INFRASTRUCTURE: cell.n upper ceiling ~1600 at per_parent=24
+#     (Est #137); particle budget hard-fails at n >= 1800. Joint
+#     bound now respected in B36 plan.
+#   - SUSPECTED ARTEFACTS: PROJECT-BEST LOSS 1.141 at sw 11
+#     substeps=32 AND loss=1.17 at sw 15 youngs=5 (n_frames=1200)
+#     are both consistent with PARTICLE DEPLETION (numerical
+#     instability/escaping particles producing a sparse field that
+#     happens to score better in SSIM than the dense baseline
+#     scatter), not genuine aggregation. Est #140 + Est #144 are
+#     provisional; B36 adjudicates with n_final reporting +
+#     n_frames extension + visual zoom.
+#   - SEED NOISE: MPM has 3x point-cell sigma (B35 sw 14: σ≈1.5
+#     vs B31 σ≈0.022). Single-seed Δloss < 1.5 is NOT real
+#     (Est #143). The 16-seed verification protocol from point-cell
+#     transfers directly; thresholds tighten.
+#   - PARAMETER REFINEMENTS adopted as B36 parent (resolved working
+#     values; NO morphological effect, metric ripple only):
+#       - particle.per_parent: 8 -> 24 (sw 9 plateau; Est #138)
+#       - mpm.a_max: 1200 -> 1800 (sw 12 bowl floor; Est #141)
+#       - mpm.vmax: 6 -> 1.5 (sw 13 U-shape floor; Est #142)
+#       - mpm.drag: 4 -> 10 (sw 6 best; Est #135, metric-inert)
+#       - inflow_mpm.rate: 1.5 -> 0.5 (sw 5 best; Est #134, weak)
+#       - secrete.rate: 8 -> 6 (sw 2 best; Est #131-#133 family,
+#         metric-inert)
+#       - sense.gain: 30 -> 50 (sw 1 best; Est #131, metric-inert)
+#   - NOT ADOPTED (suspected artefacts pending B36 verification):
+#       - mpm.substeps: stays at 8 (sw 11 win at 32 = provisional
+#         Est #140, particle-depletion suspect)
+#       - cell.youngs: stays at 60 (sw 15 win at 5 = provisional
+#         Est #144, same artefact family)
+#
+# B36 STRATEGIC FRAME — TWO PRONGS:
+#   (alpha) **ADJUDICATE** the suspected metric-artefact wins
+#       (sw 11/sw 15) via stress sweeps + n_final reporting.
+#       Sweeps cover substeps x n_frames=1200, youngs x n_frames=1200,
+#       and a joint (substeps=32, youngs=5) corner test. If n_final
+#       collapses at the apparent-win point, Est #140/#144 RETRACT
+#       cleanly; if n_final stays full and morphology develops,
+#       project-best is genuine. Either is a clean adjudication.
+#   (beta) **JOINT SWEEPS** ruling out a narrow MPM productive
+#       corner (sense.gain x secrete.rate, sense.gain x camp.D,
+#       sense.gain x mpm.drag). If still flat, Est #130 is
+#       universally confirmed and the cohesion-mechanism path
+#       (deferred to B37) is the only remaining mitigator. A
+#       low-priority relay-ablation variant is included to test
+#       whether the relay (Est #4 in point-cell) is required in
+#       MPM.
+#
+# B37 WILL ADD INTER-CELL COHESION IN MPM (deferred from B36
+# to keep the infra surface stable while adjudicating B35):
+#   - Option A: enable existing `surface_tension` in `mpm.py:194`
+#     by adding `is_liquid` mask in `dicty_engine_mpm.build()`
+#     (conditional on `cell.types.dicty.liquid: true` flag).
+#   - Option B: dedicated MPM-native cell-cell adhesion operator
+#     (sigmoid-gated attraction, point-cell `spring` analogue).
+#   - Either way: sweep cohesion strength with 0 as the explicit
+#     ablation.
+name: dicty_mpm_b36
+seed: 0
+boundary: periodic
+n_frames: 240
+record_every: 5
+dt: 0.5
+sets:
+  cell:
+    n: 767
+    buffer: 1600
+    init_npz: target_density.npz
+    types: {dicty: {fraction: 1.0, youngs: 60.0}}
+  particle: {parent: cell, per_parent: 24, radius: 0.012, density: 1.0}
+fields:
+  camp: {res: 160, diffusion: 0.02, decay: 0.20, couples_to: cell}
+operators:
+  - {op: secrete,     at: cell, to: camp,   rate: 6.0}
+  - {op: sense,       at: cell, from: camp, gain: 50.0}
+  - {op: inflow_mpm,  at: cell, rate: 0.5}
+  - {op: mpm,         at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 1800, drag: 10.0, vmax: 1.5}
+schedule: [aggregate, secrete, camp.diffuse, sense, inflow_mpm, mpm]

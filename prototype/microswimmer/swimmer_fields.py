@@ -52,6 +52,16 @@ class FlowField(Field):
     def speed(self):
         return self.grid.norm(dim=-1)
 
+    def sample(self, pos):                # bilinear vector sample u(pos) -> [N,2] (for tracer advection)
+        gx = pos[:, 0].clamp(0, self.width - 1e-6) / self.dx
+        gy = pos[:, 1].clamp(0, 1 - 1e-6) / self.dx
+        i0x = gx.floor().long().clamp(0, self.nx - 1); fx = (gx - i0x.float())[:, None]
+        i0y = gy.floor().long().clamp(0, self.ny - 1); fy = (gy - i0y.float())[:, None]
+        i1x = (i0x + 1).clamp(max=self.nx - 1); i1y = (i0y + 1).clamp(max=self.ny - 1)
+        g = self.grid
+        a = g[i0x, i0y]; b = g[i1x, i0y]; c = g[i0x, i1y]; d = g[i1x, i1y]
+        return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+
     def step(self):                       # analytic field: rewritten by squirmer_flow, never integrated
         pass
 

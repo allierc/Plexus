@@ -41,6 +41,9 @@ discipline").
 | swim at $U=\tfrac23B_1$ | **Lateral** `swim` (organism self-propel) | within-set self-propulsion (1st-order, overdamped Stokes) | operator |
 | mouth uptake (the feeding) | **Exchange** `absorb` (surface_node[mouth] ← chemical) | gather field onto objects + accumulate the objective | operator |
 | advect + diffuse the nutrient (Péclet) | **builtin** `chemical.diffuse` | the field's own PDE; reads `flow` | `schedule:` |
+| food parcels carried by the fluid | **Set** `tracer` (passive particles) | a new sort, advected by `flow` | `sets:` |
+| a parcel swept into the fluid | **Exchange** `advect_particles` (tracer ← flow) | gather the fluid velocity onto the parcel | operator |
+| a parcel eaten at the mouth | **Structural** `capture` (the Die/eat primitive) | membership change (occupancy → 0) + count | operator |
 
 The flow field, the swim speed, and the mouth coverage are exactly the
 inverse-problem targets — and they live on the **operator** / **type**, never on a
@@ -69,11 +72,15 @@ still runs.
 ```
 squirmer.py          analytic squirmer flow + slip-mode design (port of Visual_flow.m)
 swimmer_fields.py    FlowField (analytic vector) + ChemField (advect-diffuse, axisymmetric)
-ops_swim.py          squirmer_flow / slip / swim / absorb   (the four operators)
-swimmer_engine.py    generic engine: build 2 sets + 2 fields, run the schedule
+ops_swim.py          squirmer_flow / slip / swim / absorb           (the four core operators)
+                     + advect_particles / capture                  (food parcels eaten)
+swimmer_engine.py    generic engine: build sets + fields, run the schedule
 sessile.yaml         a 20%-mouth attached ciliate (body frame)
 motile.yaml          a swimming ciliate (lab frame, depleted wake)
-render_swim.py       flow panels + concentration gifs
+feeding.yaml         a ciliate in a current eating drifting food parcels (phagotrophy)
+render_swim.py       flow panels + concentration gifs + feeding gif (mode: flow|conc|feed)
+viz_swim.py          flow-visualization gallery (PIV / pathlines / streak / quiver /
+                     vorticity / LIC / metachronal slip wave / dye) -> viz_gallery.png
 run_swim.py          the exhaustive suite + Sherwood curves
 results.md           auto-written metrics
 ```
@@ -98,6 +105,25 @@ PYTHONPATH=../../src python run_swim.py                          # full suite
 
 **Sherwood number** $\mathrm{Sh}=\dfrac{\text{uptake rate}(Pe)}{\text{uptake rate}(Pe{=}0)}$ —
 the advective feeding enhancement over pure diffusion, the paper's efficiency metric.
+
+### Flow-visualization gallery (`viz_swim.py` → `viz_gallery.png`)
+
+Because the flow is analytic, a rich gallery of flow viz needs no solver — one
+squirmer eval + numpy tracer integration. 21 gifs across 8 styles:
+
+| style | what it shows |
+|---|---|
+| `piv_*` | PIV-style tracer streaks (motion-blur) revealing the feeding current |
+| `pathlines_*` | integrated pathlines coloured by speed (incl. flow-past-a-cell) |
+| `streak_*` | streaklines from an upstream rake in an ambient current |
+| `quiver_*` | animated velocity arrows coloured by \|u\| (swimming cell) |
+| `vorticity_*` | curl of the flow — the **puller vs pusher** counter-rotating lobes |
+| `lic_*` | animated line-integral-convolution "smoke" texture along streamlines |
+| `slipwave_*` | the **wavy surface velocity**: tangential slip with a travelling metachronal wave |
+| `dye_*` | a passive dye blob advected + stretched by the feeding current |
+
+Each is sessile / motile-body / motile-lab where meaningful; `vorticity_puller`
+(small cap) vs `vorticity_pusher` (large cap) contrast the two swimming gaits.
 
 ### Aligning with the authors' viz (axisymmetry)
 

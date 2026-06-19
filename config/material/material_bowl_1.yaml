@@ -1,0 +1,57 @@
+# material_bowl_1 -- auto-ported from prototype/water (water_bowl_1.yaml).
+general:
+  name: material_bowl_1
+  seed: 0
+  n_frames: 1000
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.0, 0.0, 0.1, 0.6]
+  - [0.1, 0.0, 0.2, 0.47]
+  - [0.2, 0.0, 0.3, 0.36]
+  - [0.3, 0.0, 0.4, 0.26]
+  - [0.4, 0.0, 0.46, 0.18]
+  - [0.54, 0.0, 0.6, 0.18]
+  - [0.6, 0.0, 0.7, 0.26]
+  - [0.7, 0.0, 0.8, 0.36]
+  - [0.8, 0.0, 0.9, 0.47]
+  - [0.9, 0.0, 1.0, 0.6]
+sets:
+  cell:
+    n: 1
+    start: [0.4, 0.78, 0.4, 0.78]
+    types:
+      water:
+        fraction: 1.0
+        youngs: 300
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.2, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.4,
+  wall_contact: 0.06, surface_tension: 30.0}
+schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue, textured sphere is initially positioned at the top of a grey, stepped structure.
+      As the simulation progresses, the sphere appears to melt or dissolve into a liquid-like state. This
+      blue substance flows downward, filling the central channel of the grey structure. By the end of
+      the sequence, the blue material has settled into the bottom of the stepped formation.
+    objects: The primary object is a blue, circular sphere with a grainy, speckled texture. The background
+      structure consists of grey, blocky steps arranged in a symmetrical, downward-pointing shape. A white,
+      empty space exists between the blue sphere and the grey structure at the start. The blue liquid
+      occupies the central vertical path of the grey structure as it flows downward.
+  movie_mpm_particle:
+    description: A dense cluster of blue particles begins as a spherical mass at the top of the frame.
+      Gravity or a downward force causes the sphere to collapse and flow into a funnel-shaped container.
+      The particles accumulate at the bottom of the funnel, forming a thick layer. Finally, the particles
+      drain through a narrow opening at the base of the structure.
+    objects: The primary objects are numerous small, blue particles that form a cohesive mass. These particles
+      are initially arranged in a large, circular cluster. A grey, stepped structure provides a geometric
+      boundary for the particles to flow through. The final arrangement shows the particles concentrated
+      in a narrow vertical column at the bottom.

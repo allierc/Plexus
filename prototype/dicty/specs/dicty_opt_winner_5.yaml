@@ -1,0 +1,52 @@
+name: dicty_opt_winner_5
+seed: 0
+boundary: periodic
+n_frames: 400
+record_every: 6
+dt: 0.7690361760459483
+vmax: 0.06
+sets:
+  cell:
+    n: 478
+    buffer: 2600
+    init_npz: target_density.npz
+    types:
+      dicty:
+        fraction: 1.0
+fields:
+  camp:
+    res: 160
+    diffusion: 0.05639016596064266
+    decay: 0.28813017475755875
+    couples_to: cell
+operators:
+- op: spring
+  at: cell
+  k_rep: 73.73197109761182
+  r0: 0.03928011409103022
+  kadh: 174.59326213138493
+  r_on: 0.23385987597344818
+  delta: 0.001
+  mu_f: 0.057489082263762786
+- op: secrete
+  at: cell
+  to: camp
+  rate: 8.962976673898421
+- op: sense
+  at: cell
+  from: camp
+  gain: 32.87466179937341
+- op: inflow
+  at: cell
+  rate: 0.07544030548851399
+- op: random_walk
+  at: cell
+  strength: 0.0029527046651994294
+schedule:
+- spring
+- secrete
+- camp.diffuse
+- sense
+- inflow
+- random_walk
+- integrate

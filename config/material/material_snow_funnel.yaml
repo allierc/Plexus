@@ -1,0 +1,32 @@
+# material_snow_funnel -- auto-ported from prototype/water (overnight_suite:ph_snow_funnel).
+general:
+  name: material_snow_funnel
+  seed: 0
+  n_frames: 900
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.0, 0.0, 0.18, 1.0]
+  - [0.18, 0.0, 0.3, 0.55]
+  - [0.3, 0.0, 0.42, 0.32]
+  - [0.58, 0.0, 0.7, 0.32]
+  - [0.7, 0.0, 0.82, 0.55]
+  - [0.82, 0.0, 1.0, 1.0]
+sets:
+  cell:
+    n: 1
+    start: [0.5, 0.8, 0.5, 0.8]
+    types:
+      snow:
+        fraction: 1.0
+        youngs: 250
+        layers:
+        - {frac: 1.0, youngs: 250, material: snow}
+  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.18, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 20, dt_sub: 1.875e-04, a_max: 200, drag: 0.2, wall_damp: 0.5,
+  wall_contact: 0.06, surface_tension: 0}
+schedule: [aggregate, gravity, mls_mpm_mechanics]

@@ -1,0 +1,14 @@
+# A single vortex stirs a passive dye -> spiral mixing (filamentation). Shows the
+# advect operator transporting a tracer with no buoyancy.
+name: ns_swirl
+seed: 0
+n_frames: 460
+record_every: 3
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: swirl, G: 0.30, rc: 0.2, bands: 6}}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.005, substeps: 2}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [3], dt_sub: 0.005, substeps: 2}
+schedule: [advect, poisson_solve, advect]

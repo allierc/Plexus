@@ -3,7 +3,7 @@
 The `centroid` reduction: a parent's position is the occupancy-weighted mean of its
 children's positions (a cell's position = the centroid of its particles). This is a
 DERIVED readout, not an integrated force, so it writes the parent's position directly
-and declares MAY_MUTATE_STATE to opt out of the integration guard; returns {}.
+and declares MAY_MUTATE_INTEGRATED_STATE to opt out of the integration guard; returns {}.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("aggregate", level="cell", kind="aggregate")
 class Centroid(Aggregate):
-    MAY_MUTATE_STATE = True             # writes the parent's derived position (a readout)
+    MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

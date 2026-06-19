@@ -150,6 +150,11 @@ def build(sc, device="cpu"):
     for sname, ss in sc.sets.items():
         N = int(ss["n"])
         pos = torch.rand(N, 2, generator=g, device=device)
+        start = ss.get("start")                          # optional [x0,y0,x1,y1] seed box
+        if start is not None:
+            x0, y0, x1, y1 = start
+            pos[:, 0] = x0 + pos[:, 0] * (x1 - x0)
+            pos[:, 1] = y0 + pos[:, 1] * (y1 - y0)
         theta = torch.rand(N, generator=g, device=device) * 2 * math.pi
         # state = [x, y, vx, vy, theta]
         state = torch.zeros(N, 5, device=device)
@@ -172,7 +177,92 @@ def build(sc, device="cpu"):
     return H
 
 
+def _lamb_oseen(nx, ny, dx, device, vortices):
+    """Superposed Lamb-Oseen vortices -> (vx, vy). vortices: list of (cx,cy,Gamma,rc)."""
+    X, Y = _grid_xy(nx, ny, dx, device)
+    vx = torch.zeros(nx, ny, device=device); vy = torch.zeros(nx, ny, device=device)
+    for cx, cy, G, rc in vortices:
+        dxp = X - cx; dyp = Y - cy
+        r2 = dxp * dxp + dyp * dyp + 1e-6
+        ut = G / (2 * math.pi) * (1 - torch.exp(-r2 / (rc * rc))) / r2   # u_theta / r
+        vx = vx + (-dyp) * ut
+        vy = vy + (dxp) * ut
+    return vx, vy
+
+
+def _fluid_preset(fld, spec, g, device, sc):
+    """Build a fluid initial condition on channels [vx,vy,T,dye] from a named preset
+    (the_well incompressible-NS family). One preset = one Well scenario's IC."""
+    name = spec["preset"]
+    nx, ny, dx = fld.nx, fld.ny, fld.dx
+    X, Y = _grid_xy(nx, ny, dx, device)
+    grid = torch.zeros_like(fld.grid)
+    U = float(spec.get("U", 0.6)); pert = float(spec.get("pert", 0.02))
+    noise = (torch.rand(nx, ny, generator=g, device=device) - 0.5)
+
+    if name == "shear":                                  # Kelvin-Helmholtz shear layer
+        w = float(spec.get("width", 0.025))
+        grid[0] = U * torch.tanh((Y - 0.5) / w)
+        grid[1] = pert * torch.sin(2 * math.pi * float(spec.get("k", 4)) * X) \
+            * torch.exp(-((Y - 0.5) ** 2) / (2 * 0.05 ** 2)) + 0.002 * noise
+        grid[3] = (Y > 0.5).float()
+    elif name == "double_shear":                         # two interfaces -> richer KH
+        w = float(spec.get("width", 0.025))
+        grid[0] = U * (torch.tanh((Y - 0.25) / w) - torch.tanh((Y - 0.75) / w) - 1.0)
+        grid[1] = pert * torch.sin(2 * math.pi * float(spec.get("k", 4)) * X)
+        grid[3] = ((Y > 0.25) & (Y < 0.75)).float()
+    elif name == "taylor_green":                         # Taylor-Green vortex
+        grid[0] = U * torch.sin(2 * math.pi * X) * torch.cos(2 * math.pi * Y)
+        grid[1] = -U * torch.cos(2 * math.pi * X) * torch.sin(2 * math.pi * Y)
+        grid[3] = torch.sin(2 * math.pi * X) * torch.sin(2 * math.pi * Y)
+    elif name == "rayleigh_benard":                      # hot (buoyant) fluid below cold
+        w = float(spec.get("width", 0.05))
+        grid[2] = 0.5 * (1 + torch.tanh((0.45 - Y) / w)) + float(spec.get("seed", 0.02)) * noise
+        grid[3] = grid[2].clone()
+    elif name == "rayleigh_taylor":                      # heavy fluid above light
+        amp = float(spec.get("amp", 0.01)); kk = float(spec.get("k", 3))
+        yi = 0.5 + amp * torch.cos(2 * math.pi * kk * X)
+        grid[2] = 0.5 * (1 + torch.tanh((Y - yi) / 0.02))   # density: heavy (1) on top
+        grid[3] = grid[2].clone()
+    elif name == "plume":                                # buoyant thermal plume
+        cx = float(spec.get("cx", 0.5)); cy = float(spec.get("cy", 0.15)); r = float(spec.get("r", 0.08))
+        grid[2] = torch.exp(-(((X - cx) ** 2 + (Y - cy) ** 2) / (2 * r ** 2)))
+        grid[3] = grid[2].clone()
+    elif name in ("vortices", "swirl"):                  # superposed Lamb-Oseen vortices
+        n = int(spec.get("n", 6 if name == "vortices" else 1))
+        vs = []
+        if name == "swirl":
+            vs = [(0.5, 0.5, float(spec.get("G", 0.25)), float(spec.get("rc", 0.18)))]
+        else:
+            for _ in range(n):
+                cx = torch.rand(1, generator=g, device=device).item()
+                cy = torch.rand(1, generator=g, device=device).item()
+                G = (0.12 + 0.18 * torch.rand(1, generator=g, device=device).item()) * (1 if torch.rand(1, generator=g, device=device).item() > 0.5 else -1)
+                vs.append((cx, cy, G, 0.08 + 0.06 * torch.rand(1, generator=g, device=device).item()))
+        vx, vy = _lamb_oseen(nx, ny, dx, device, vs)
+        grid[0] = vx; grid[1] = vy
+        # dye: vertical bands so the stirring is visible
+        grid[3] = (torch.sin(2 * math.pi * float(spec.get("bands", 6)) * X) > 0).float()
+    elif name == "stir_rd":                              # vortices (vx,vy) + Gray-Scott seed (A,B in ch 2,3)
+        n = int(spec.get("n", 7)); vs = []
+        for _ in range(n):
+            cx = torch.rand(1, generator=g, device=device).item()
+            cy = torch.rand(1, generator=g, device=device).item()
+            G = (0.10 + 0.16 * torch.rand(1, generator=g, device=device).item()) * (1 if torch.rand(1, generator=g, device=device).item() > 0.5 else -1)
+            vs.append((cx, cy, G, 0.09 + 0.06 * torch.rand(1, generator=g, device=device).item()))
+        vx, vy = _lamb_oseen(nx, ny, dx, device, vs)
+        grid[0] = vx; grid[1] = vy
+        grid[2] = 1.0                                     # A := 1 everywhere
+        grid[3] = _seed_clusters((nx, ny), int(spec.get("seeds", 28)), 2.0, g, device, 1.0)   # B clusters
+    else:
+        raise ValueError(f"unknown fluid preset {name!r}")
+    fld.grid = grid
+
+
 def _init_field(fld, spec, g, device, sc):
+    if "preset" in spec:
+        _fluid_preset(fld, spec, g, device, sc)
+        return
     nx, ny = fld.nx, fld.ny
     # static coefficient map (acoustic rho)
     rho_spec = spec.get("rho")

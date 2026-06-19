@@ -1,0 +1,16 @@
+name: beat
+seed: 0
+boundary: periodic
+n_frames: 320
+record_every: 40
+dt: 0.5
+vmax: 0.061
+sets: {cell: {n: 900, buffer: 2200, init_npz: target_density.npz, types: {dicty: {fraction: 1.0, youngs: 60.0}}}}
+fields: {camp: {res: 140, diffusion: 0.008, decay: 0.1, couples_to: cell}}
+operators:
+  - {op: spring, at: cell, k_rep: 60.0, r0: 0.018, kadh: 10.0, r_on: 0.20, delta: 0.001, mu_f: 0.05}
+  - {op: secrete, at: cell, to: camp, rate: 11}
+  - {op: sense_sat, at: cell, from: camp, gain: 500, c_sat: 0.50, sat_n: 2.1}
+  - {op: inflow, at: cell, rate: 4.0}
+  - {op: random_walk, at: cell, strength: 0.003}
+schedule: [spring, secrete, camp.diffuse, sense_sat, inflow, random_walk, integrate]

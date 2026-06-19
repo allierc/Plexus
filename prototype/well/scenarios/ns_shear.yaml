@@ -1,0 +1,19 @@
+# Kelvin-Helmholtz shear layer -> the_well/shear_flow. Incompressible NS as a
+# Stable-Fluids SCHEDULE of registered operators (no monolithic solver):
+#   advect (self-advect velocity) -> diffuse (viscosity) -> poisson_solve (project
+#   divergence-free) -> advect (carry the dye tracer). Periodic torus.
+name: ns_shear
+seed: 0
+n_frames: 500
+record_every: 3
+world: 1.0
+fields:
+  fluid: {frame: grid, res: 256, channels: 4, bc: periodic}
+init:
+  fluid: {preset: shear, U: 0.7, pert: 0.03, k: 5, width: 0.02}
+operators:
+  - {op: advect, at: fluid, vel: [0, 1], channels: [0, 1], dt_sub: 0.004, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0, 1], D: 0.00003, dt_sub: 0.008}
+  - {op: poisson_solve, at: fluid, vel: [0, 1]}
+  - {op: advect, at: fluid, vel: [0, 1], channels: [2, 3], dt_sub: 0.004, substeps: 2}
+schedule: [advect, diffuse, poisson_solve, advect]

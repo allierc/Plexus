@@ -70,7 +70,7 @@ def design_modes(feeding_area, lifestyle, n_mode=40, n_quad=4000):
     a motile cell, U = (2/3) B[0]).
     """
     low, high = -1.0, 1.0 - 2.0 * float(feeding_area)
-    high = min(high, 1.0 - 1e-6)
+    high = min(max(high, low + 1e-3), 1.0 - 1e-6)          # guard feeding_area -> 0 or 1
     x = np.linspace(low, high, n_quad)
     xs = math.pi / (high - low)
     f_design = np.sin(xs * (high - x))                       # half-sine slip shape

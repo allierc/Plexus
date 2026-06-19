@@ -1,0 +1,50 @@
+# material_coalesce -- auto-ported from prototype/water (overnight_suite:ph_coalesce).
+general: {name: material_coalesce, seed: 0, n_frames: 500, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 2
+    start: [0.5, 0.54, 0.5, 0.54]
+    types:
+      a:
+        fraction: 0.5
+        youngs: 200
+        block: [0.3, 0.44, 0.5, 0.64]
+        layers:
+        - {frac: 1.0, youngs: 200, material: liquid}
+      b:
+        fraction: 0.5
+        youngs: 200
+        block: [0.5, 0.44, 0.7, 0.64]
+        layers:
+        - {frac: 1.0, youngs: 200, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 3500, radius: 0.24, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 0.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.12, wall_damp: 1.0,
+  wall_contact: 0.06, surface_tension: 30}
+schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with two distinct, rectangular blocks of blue and orange color.
+      Over time, the sharp edges of these blocks begin to soften and round out. The two shapes gradually
+      move toward each other until they make contact at the center. Finally, the shapes merge into a single,
+      continuous, pill-shaped blob with a shared boundary.
+    objects: 'The scene contains two primary objects: a blue block and an orange block. Initially, they
+      are separate, rectangular shapes with sharp corners. As the simulation progresses, they transform
+      into rounded, organic shapes while maintaining their distinct colors. By the end, they are joined
+      together to form a single, elongated, bi-colored object.'
+  movie_mpm_particle:
+    description: The simulation begins with two distinct rectangular blocks of particles, one blue and
+      one orange, positioned side-by-side. Over time, the sharp boundaries of these blocks begin to blur
+      and deform as the particles shift. The rectangular shapes gradually transition into more rounded,
+      organic, and irregular blobs. By the final frame, the two clusters have merged into a single, continuous,
+      and roughly oval-shaped mass with a distinct color split.
+    objects: The scene contains two primary clusters of particles, one blue and one orange. Initially,
+      the blue cluster is a sharp rectangle on the left, and the orange cluster is a sharp rectangle on
+      the right. As the simulation progresses, both clusters lose their geometric edges and expand into
+      irregular, rounded shapes. In the final state, the two clusters are joined together to form a single,
+      large, bi-colored oval.

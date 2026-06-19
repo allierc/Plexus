@@ -26,8 +26,10 @@ from . import advance               # noqa: F401  set -> self-propelled move
 from . import bounce                # noqa: F401  set -> wall/obstacle reflection (re-head)
 from . import video_field           # noqa: F401  registers the `video` field + playback
 from . import chemotaxis            # noqa: F401  field -> set gradient coupling
+from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
+from . import mpm                   # noqa: F401  FENCED TRANSITIONAL: MLS-MPM mechanics (mls_mpm_mechanics)
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion",
            "cohesion", "alignment", "separation", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
-           "video_field", "chemotaxis"]
+           "video_field", "chemotaxis", "gravity", "mpm"]

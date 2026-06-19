@@ -1,0 +1,16 @@
+# Rayleigh-Taylor instability -> the_well/rayleigh_taylor_instability. Heavy fluid
+# above light; body_force with g<0 makes it sink into fingers/mushrooms.
+name: ns_rayleigh_taylor
+seed: 3
+n_frames: 700
+record_every: 4
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: rayleigh_taylor, amp: 0.012, k: 3}}
+operators:
+  - {op: body_force, at: fluid, scalar: 2, g: -26.0, ref: 0.5, dt_sub: 0.006}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00003, dt_sub: 0.012}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
+schedule: [body_force, advect, diffuse, poisson_solve, advect]

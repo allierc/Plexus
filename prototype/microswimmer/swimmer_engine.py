@@ -94,6 +94,25 @@ def build(sc, device="cpu"):
     sn.type_names = ["mouth", "cilia"]
     H.add_level(sn)
 
+    # --- tracer set (optional: food parcels carried by the fluid) ---
+    if "tracer" in sc.sets:
+        ts = sc.sets["tracer"]
+        Nt = int(ts["n"])
+        gt = torch.Generator(device=device).manual_seed(sc.seed + 7)
+        pos = torch.rand(Nt, 2, generator=gt, device=device)
+        pos[:, 0] = pos[:, 0] * width
+        # keep initial parcels OUT of the sphere (flow is zero inside -> they'd sit stuck)
+        d0 = pos - org.state[0, :2]
+        inside = d0.norm(dim=1) < R * 1.2
+        ang = torch.atan2(d0[:, 1], d0[:, 0])
+        pos[inside] = org.state[0, :2] + R * 1.3 * torch.stack(
+            [torch.cos(ang[inside]), torch.sin(ang[inside])], 1)
+        tr = Level("tracer", level=0, state=torch.cat([pos, torch.zeros(Nt, 2, device=device)], 1))
+        tr.type_names = ["food"]
+        tr.register_buffer("node_type", torch.zeros(Nt, dtype=torch.long, device=device))
+        H.add_level(tr)
+        H.captured = 0
+
     # --- fields ---
     from swimmer_fields import FlowField, ChemField
     flow = None
@@ -142,6 +161,11 @@ def run(sc, device="cpu"):
     sn_pos = np.zeros((n_rec, sn.n, 2), np.float32)
     chem_hist = np.zeros((n_rec, H.fields[chem_name].nx, H.fields[chem_name].ny), np.float32) if chem_name else None
     uptake_t = np.zeros(n_rec, np.float32)
+    has_tr = "tracer" in H.levels
+    tr = H.level("tracer") if has_tr else None
+    tr_pos = np.zeros((n_rec, tr.n, 2), np.float32) if has_tr else None
+    tr_occ = np.zeros((n_rec, tr.n), np.float32) if has_tr else None
+    captured_t = np.zeros(n_rec, np.int32)
     dt = sc.dt
 
     rec = 0
@@ -166,6 +190,10 @@ def run(sc, device="cpu"):
             if chem_name:
                 chem_hist[rec] = H.fields[chem_name].grid.cpu().numpy()
             uptake_t[rec] = getattr(H, "uptake", 0.0)
+            if has_tr:
+                tr_pos[rec] = tr.state[:, :2].cpu().numpy()
+                tr_occ[rec] = tr.occ.cpu().numpy()
+            captured_t[rec] = getattr(H, "captured", 0)
             rec += 1
 
     flow_name = next((n for n, f in sc.fields.items() if f.get("kind", n) == "flow"), None)
@@ -178,4 +206,6 @@ def run(sc, device="cpu"):
         radius=float(org.radius[0]), world=H.world_width,
         uptake=float(getattr(H, "uptake", 0.0)), uptake_t=uptake_t[:rec],
         slip=sn.slip.cpu().numpy(), axis=float(org.axis[0]),
+        tr_pos=tr_pos[:rec] if has_tr else None, tr_occ=tr_occ[:rec] if has_tr else None,
+        captured=int(getattr(H, "captured", 0)), captured_t=captured_t[:rec],
     )

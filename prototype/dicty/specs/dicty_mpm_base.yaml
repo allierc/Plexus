@@ -1,0 +1,24 @@
+# Soft-MPM dicty arm: each cell = 8 MLS-MPM particles (deformable body, true volume exclusion via
+# the grid -> no `spring` op). Chemotaxis (secrete+sense) drives motion through the mpm operator;
+# inflow_mpm is the source. Same cAMP field + targets as the point-cell arm (comparable).
+name: dicty_mpm
+seed: 0
+boundary: periodic
+n_frames: 240
+record_every: 5
+dt: 0.5
+sets:
+  cell:
+    n: 767
+    buffer: 1600
+    init_npz: target_density.npz
+    types: {dicty: {fraction: 1.0, youngs: 60.0}}
+  particle: {parent: cell, per_parent: 8, radius: 0.012, density: 1.0}
+fields:
+  camp: {res: 160, diffusion: 0.02, decay: 0.20, couples_to: cell}
+operators:
+  - {op: secrete,     at: cell, to: camp,   rate: 8.0}
+  - {op: sense,       at: cell, from: camp, gain: 30.0}
+  - {op: inflow_mpm,  at: cell, rate: 1.5}
+  - {op: mpm,         at: particle, n_grid: 128, substeps: 8, dt_sub: 2.0e-4, a_max: 1200, drag: 4.0, vmax: 6.0}
+schedule: [aggregate, secrete, camp.diffuse, sense, inflow_mpm, mpm]

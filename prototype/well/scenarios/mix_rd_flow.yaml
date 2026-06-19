@@ -1,0 +1,21 @@
+# MIX: reaction-ADVECTION-diffusion. A Gray-Scott "worms" pattern (channels A,B = 2,3)
+# is stirred by a decaying-turbulence velocity field (channels vx,vy = 0,1). Three
+# fluid/Well operators compose on ONE field:
+#   advect (carry A,B by the velocity) -> reaction_diffusion (grow the pattern) ->
+#   advect+poisson_solve (evolve the carrier flow). The pattern is smeared along the
+#   streamlines -> Turing patterns wrapped onto vortices.
+name: mix_rd_flow
+seed: 3
+n_frames: 900
+record_every: 5
+world: 1.0
+fields:
+  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
+init:
+  fluid: {preset: stir_rd, n: 8, seeds: 30}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.004, substeps: 1}
+  - {op: reaction_diffusion, at: fluid, f: 0.058, k: 0.065, channels: [2,3], substeps: 8}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.004, substeps: 1}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+schedule: [advect, reaction_diffusion, advect, poisson_solve]

@@ -1,0 +1,24 @@
+# MIX: ACTIVE MATTER in a TURBULENT FLOW. A Vicsek swarm (SET) is simultaneously
+# self-propelled/aligning AND swept by a decaying-turbulence velocity field (FIELD).
+#   advect + poisson_solve  -> evolve the carrier flow (2D turbulence)
+#   radius_graph + active_matter -> flocking
+#   advect_particles        -> the flow carries the swarm (set<->field gather)
+# active_matter and advect_particles deltas SUM on the swarm -> flock riding vortices.
+name: mix_swarm_flow
+seed: 4
+n_frames: 520
+record_every: 3
+world: 1.0
+fields:
+  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
+sets:
+  active: {n: 4000}
+init:
+  fluid: {preset: vortices, n: 8, bands: 8}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,3], dt_sub: 0.005, substeps: 2}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: radius_graph, at: active, radius: 0.04}
+  - {op: active_matter, at: active, v0: 0.002, noise: 0.10}
+  - {op: advect_particles, at: active, from_field: fluid, vel: [0,1], speed: 0.9}
+schedule: [advect, poisson_solve, radius_graph, active_matter, advect_particles]

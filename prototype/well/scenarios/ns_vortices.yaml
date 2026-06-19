@@ -1,0 +1,14 @@
+# Decaying 2D turbulence: six random vortices merge and form coherent structures
+# (the inverse cascade). advect + project only.
+name: ns_vortices
+seed: 4
+n_frames: 520
+record_every: 3
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: vortices, n: 8, bands: 8}}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,2,3], dt_sub: 0.005, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00002, dt_sub: 0.01}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+schedule: [advect, diffuse, poisson_solve]

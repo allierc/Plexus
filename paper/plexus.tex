@@ -716,9 +716,6 @@ Throughout, the mapping respects the categories of Section~\ref{sec:category}: a
 \emph{behaviour} becomes an operator, a \emph{kind of node} a type, the
 \emph{space} the \code{general:} block --- never the reverse.
 
-\part*{Part III --- The experiment}
-\addcontentsline{toc}{section}{Part III --- The experiment}
-
 \section{A spread of simulations from one registry}
 
 Once the vocabulary existed, qualitatively different behaviours were \emph{just
@@ -919,192 +916,355 @@ must be stored, or the run is not bit-reproducible.
 \part*{Part IV --- Building the repository}
 \addcontentsline{toc}{section}{Part IV --- Building the repository}
 
-\section{Proposed methodology}
+\section{Repository contract}
 
-\paragraph{Layering (strict; no leaks across).}
-\begin{itemize}\itemsep1pt
-\item \code{models/base.py} --- entities, operator base, the capability-contract fields.
-\item \code{models/registry.py} --- the only name$\to$code map (entity / operator / field).
-\item \code{models/<domain>/*.py} --- operators, one concern per file, each declaring \code{REQUIRES\_*}.
-\item \code{schema.py} --- the schema $+$ validator (the contract gatekeeper).
-\item \code{engine.py} --- generic; contains \textbf{no} simulation-specific logic.
-\item \code{viz.py} --- generic over the \code{Hierarchy}/\code{zarr}; swappable backends (2-D now, 3-D later).
-\item \code{archive.py} $+$ \code{simulations/} --- the growing, reproducible gallery.
+Plexus is not a collection of simulations. It is an interpreter for a formal
+simulation language. The repository must therefore be built around one rule:
+
+\begin{quote}
+New biology enters Plexus by adding registered entities, fields, or operators;
+never by adding simulation-specific logic to the engine.
+\end{quote}
+
+The engine is the kernel. The spec is the program. The registry is the vocabulary.
+The validator is the contract gatekeeper. Operators are the only place where new
+dynamics live.
+
+Every coding change must preserve this separation.
+\[
+\text{spec.yaml}
+\longrightarrow \text{schema}
+\longrightarrow \text{registry}
+\longrightarrow \text{engine}
+\longrightarrow \text{trajectory}.
+\]
+If a change requires the engine to branch on a simulation name, biological case,
+operator name, or field name, the abstraction has failed. The correct fix is almost
+always a new registered operator, a new entity schema, a new field class, or a
+stronger validator rule.
+
+\section{Layering}
+
+The repository is divided into strict layers.
+
+\begin{itemize}\itemsep2pt
+\item \code{models/base.py}: the contract layer: \code{Level}, \code{Field},
+\code{Hierarchy}, \code{Operator}, and the semantic operator kinds.
+\item \code{models/registry.py}: the only name-to-code map. It registers entities,
+fields, and operators. The engine must resolve names only through this registry.
+\item \code{models/entities.py}: declares state schemas and rendering hints for
+entity kinds. It is the only source of truth for what columns of \code{Level.state}
+mean.
+\item \code{operators/*.py}: one operator per file, one concern per operator.
+Operators declare their \code{KIND}, \code{PREDICTION}, \code{REQUIRES\_PARAMS},
+\code{REQUIRES\_TYPE\_PROPS}, and optional mechanism-search metadata.
+\item \code{fields/*.py}: field state classes. A field stores continuum state and
+geometry. Field dynamics are operators, not field methods.
+\item \code{schema.py}: validates the spec before execution. A spec that passes
+schema validation should be runnable by the engine.
+\item \code{engine.py}: the generic interpreter. It builds the hierarchy,
+instantiates registered operators, executes the schedule, sums deltas, and
+integrates each set once per tick.
+\item \code{plot.py} or \code{viz.py}: generic visualization over recorded sets and
+fields. It must never branch on simulation names.
+\item \code{archive.py} and \code{simulations/}: reproducible gallery and ledger:
+spec, seed, metrics, thumbnails, mechanism captions, and failure notes.
 \end{itemize}
 
-\paragraph{The build loop (how LLM and code co-evolve).}
-\begin{enumerate}\itemsep1pt
-\item user states intent in natural language;
-\item LLM compiles $\to$ \code{spec.yaml} (following the mapping rules);
-\item validator runs: unknown op $\to$ write one operator; missing property $\to$ fix
-spec or add the requirement; else it is runnable;
-\item engine runs; \textbf{verify} checks intent $+$ repeatability $+$ well-formedness;
-\item \code{archive.py} records spec$+$seed$+$metrics$+$thumb into the gallery;
-\item new capability $\to$ one new registered operator ($+$ its \code{REQUIRES\_*}),
-never an engine edit.
+No layer may reach upward. The engine may import the registry; the schema may
+import the registry; operators may import base classes and geometry utilities.
+Operators may not import the engine. The schema may not execute simulations.
+
+\section{Operator kinds}
+
+Every operator must belong to exactly one kind. The kind is determined by what the
+operator changes.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\footnotesize
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Kind} & \textbf{Changes} & \textbf{Returns} & \textbf{Examples} \\
+\midrule
+\code{lateral}    & set state within one set      & delta                & attraction, boids, drag \\
+\code{aggregate}  & parent state from children    & delta or assignment  & particle-to-cell centroid \\
+\code{broadcast}  & child state from parent       & delta                & cell force to particles \\
+\code{exchange}   & set--field coupling           & delta or field write & deposit, sense, chemotaxis \\
+\code{field}      & field self-state              & \code{\{\}}          & diffuse, decay, playback, reaction \\
+\code{rewire}     & relations $E$                 & \code{\{\}}          & radius graph, membrane graph \\
+\code{structural} & entity membership $|S|$       & \code{\{\}}          & divide, die \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This table is normative. Do not reinterpret it locally.
+
+\paragraph{Forbidden shortcuts.}
+\begin{itemize}\itemsep2pt
+\item Do not implement field self-dynamics as \code{exchange}. Use \code{kind="field"}.
+\item Do not implement neighbour rebuilding inside a force operator. Use \code{rewire}.
+\item Do not implement division or death by resizing tensors. Use fixed buffers and \code{occ}.
+\item Do not implement friction as an integrator option. Use a \code{drag} operator.
+\item Do not implement biological behaviour in the engine. Use an operator.
+\end{itemize}
+
+\section{The integration invariant}
+
+The engine is the only code allowed to integrate position and velocity.
+
+A dynamics operator never writes \code{pos} or \code{vel} directly. It returns a
+delta:
+\[
+\Delta_i =
+\begin{cases}
+\text{a velocity}      & \text{if PREDICTION = first\_derivative},\\
+\text{an acceleration} & \text{if PREDICTION = second\_derivative}.
+\end{cases}
+\]
+The engine sums all deltas for a set and integrates once at the end of the tick.
+
+Allowed in-place mutations are limited to:
+\begin{itemize}\itemsep2pt
+\item relations: \code{edge\_index} by \code{rewire} operators;
+\item fields: \code{grid} by \code{field} or set-to-field exchange operators;
+\item membership: \code{occ}, \code{birth}, \code{lineage}, and per-node buffers by
+\code{structural} operators;
+\item auxiliary control state: e.g.\ \code{heading}, provided it is not part of the
+engine-integrated state.
+\end{itemize}
+Everything else must be returned as a delta.
+
+\paragraph{Engine guard.}
+The engine must check this invariant around every non-mutating operator. The guard
+must not be disabled globally just because one structural operator exists. Instead,
+only operators that explicitly declare permission to mutate integrated state may do
+so. The preferred rule is
+\begin{lstlisting}[style=yaml]
+MAY_MUTATE_INTEGRATED_STATE = False
+\end{lstlisting}
+by default. Structural operators that truly need to rewrite state must opt in
+explicitly and document why.
+
+\section{Selector and occupancy rule}
+
+Every operator acting on a set receives a selector mask. Every operator must also
+respect occupancy. The effective mask is always
+\[
+m_i = \mathbf{1}_{\mathrm{selector}}(i)\, w_i, \qquad w_i = \texttt{occ}_i .
+\]
+This applies to all operators, including operators that mutate auxiliary state such
+as \code{heading}. Dormant nodes must not move, sense, turn, deposit, attract,
+repel, divide, die again, or contribute to aggregates. Required pattern:
+\begin{lstlisting}[style=yaml]
+m = selector_mask * lvl.occ
+\end{lstlisting}
+For message passing, dormant senders and receivers must both be handled: sender
+occupancy weights messages; receiver occupancy masks the output.
+
+\section{Field rule}
+
+A field is pure state: a grid, geometry, and possibly external data. A field does
+not own its dynamics.
+\begin{itemize}\itemsep2pt
+\item \code{deposit}: set $\to$ field, \code{kind="exchange"}.
+\item \code{sense} or \code{chemotaxis}: field $\to$ set, \code{kind="exchange"}.
+\item \code{diffuse}, \code{decay}, \code{playback}, \code{react}: field $\to$ field,
+\code{kind="field"}.
+\end{itemize}
+Retired schedule forms such as \code{chemical.diffuse} are forbidden. Field updates
+are ordinary registered operators:
+\begin{lstlisting}[style=yaml]
+operators:
+  - {op: diffuse, at: chemical, rate: 0.2}
+  - {op: decay,   at: chemical, rate: 0.01}
+schedule: [deposit, diffuse, decay, sense]
+\end{lstlisting}
+The schema and engine must agree. If the schema accepts a schedule token, the
+engine must run it. If the engine rejects a token, the schema must reject it first.
+
+\section{Aggregate and broadcast rule}
+
+Aggregate and Broadcast are not optional conveniences. They are primitive operators
+of the calculus.
+
+\paragraph{Aggregate.}
+An aggregate operator moves information upward along a parent map, $S_\alpha \to
+S_\beta$. It must use \code{Level.parent} and occupancy-weighted reductions, and
+must not assume a linear scale ladder. Required form:
+\[
+x_\beta(b) = \frac{\sum_{i:\pi(i)=b} w_i\, x_i}{\sum_{i:\pi(i)=b} w_i}.
+\]
+
+\paragraph{Broadcast.}
+A broadcast operator moves information downward along the same parent map, $S_\beta
+\to S_\alpha$. It must use \code{Level.parent} to index parent state for each child,
+and must respect child occupancy.
+
+Aggregate and Broadcast are implemented as registered operators, not as special
+string builtins in the engine. The schedule names them like any other operator.
+
+\section{Structural rule: divide and die}
+
+Structural operators change membership, not tensor shape. All sets are allocated at
+a fixed buffer size; a node exists when $\texttt{occ}_i > 0$.
+
+\paragraph{Divide.}
+Division activates dormant slots. It must use \code{Level.spawn} or an equivalent
+central primitive that copies all per-node buffers safely. A division operator must
+not hand-copy only \code{state}; it must preserve all relevant per-node buffers:
+type, parent, mass, deformation state, lineage, and domain-specific buffers.
+
+\paragraph{Die.}
+Death sets \code{occ} $\to 0$. If a level has mass, death also sets mass to zero. A
+dead node should no longer contribute to rewire, lateral interactions, exchange,
+aggregation, visualization, or metrics.
+
+\paragraph{No resizing.}
+Structural operators never call tensor concatenation to change the number of nodes.
+They wake or retire fixed slots.
+
+\section{Boundary and geometry rule}
+
+The world owns geometry.
+\begin{itemize}\itemsep2pt
+\item Domain width, height convention, boundary type, and obstacles live in
+\code{general:}.
+\item Operators read \code{H.world\_width}, \code{H.periodic}, and \code{H.obstacles}.
+\item Boundary conventions must be shared by all spatial operators.
+\item A world is $[0,W]\times[0,1]$ unless the base geometry contract is changed
+globally.
+\end{itemize}
+No operator may define its own incompatible notion of the domain. For
+finite-difference field gradients, periodic worlds may wrap; wall worlds must not
+wrap --- use boundary-aware padding.
+
+\section{State schema rule}
+
+Operators must not hard-code state columns unless they are explicitly limited to an
+entity whose schema is fixed. Preferred form:
+\begin{lstlisting}[style=yaml]
+pos = lvl.get("pos")
+vel = lvl.get("vel")
+\end{lstlisting}
+The meaning of state columns belongs to \code{@register\_entity}, not to an
+operator; a new entity kind declares its schema once. Forbidden pattern (except in
+temporary code with a comment explaining why the entity schema is not yet
+available):
+\begin{lstlisting}[style=yaml]
+pos = lvl.state[:, :2]
+vel = lvl.state[:, 2:4]
+\end{lstlisting}
+
+\section{Type and parameter rule}
+
+A type is a parametric variant inside one set; a sort is a different set.
+\begin{itemize}\itemsep2pt
+\item Different state space or different admissible operators: new set.
+\item Same state space and same operators, different parameter values: type within
+one set.
+\item Per-type properties belong in \code{types:}.
+\item Operators read per-type properties only through declared
+\code{REQUIRES\_TYPE\_PROPS}.
+\end{itemize}
+When assigning type fractions to a buffer, rounding must not silently leave
+unassigned nodes. The final type receives all remaining nodes.
+
+\section{Schema--engine consistency}
+
+The schema is the contract gatekeeper; the engine must not discover avoidable errors
+at runtime. The schema must reject:
+\begin{itemize}\itemsep2pt
+\item unregistered operators; unknown sets or fields; unknown operator kinds;
+\item missing \code{REQUIRES\_PARAMS}; missing \code{REQUIRES\_TYPE\_PROPS};
+\item schedule tokens that do not resolve; retired builtins;
+\item conflicting prediction orders on the same set; invalid type fractions;
+\item field operators whose \code{at:} is not a field; set operators whose \code{at:}
+is not a set.
+\end{itemize}
+A validated spec should not hit \code{NotImplementedError} in the engine except for
+explicitly marked experimental features.
+
+\section{Mechanism metadata rule}
+
+Every operator should be captionable; this supports the mechanism-search ledger.
+Operators may declare \code{MECHANISM\_TAGS}, \code{MORPHOLOGY\_PRIOR}, and
+\code{PARAM\_ROLES}. These are not used by the engine --- they are used by
+documentation, the simulation ledger, and agentic mechanism search:
+\begin{lstlisting}[style=yaml]
+MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening"]
+MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice"]
+PARAM_ROLES = {"sigma": "interaction_length"}
+\end{lstlisting}
+The goal is to make every spec translatable into mechanistic language.
+
+\section{Build loop for a coding agent}
+
+A coding agent must follow this loop for every new capability.
+\begin{enumerate}\itemsep2pt
+\item Identify the category of the requested feature: state, field, relation, entity
+membership, hierarchy, world, visualization, or validation.
+\item Choose the correct home: operator, field, entity schema, validator, engine, or
+plotter.
+\item Before editing code, write the expected spec line.
+\item Implement the smallest registered primitive that makes that spec line valid.
+\item Add \code{REQUIRES\_PARAMS}, \code{REQUIRES\_TYPE\_PROPS}, and mechanism metadata.
+\item Add schema validation if the primitive introduces a new contract.
+\item Run a minimal spec.
+\item Verify three things: the spec validates, the engine runs, and the intended
+morphology or invariant is measured.
+\item Add the run to the gallery with spec, seed, metrics, thumbnail, and mechanistic
+caption.
+\item Do not edit the engine unless the new feature is impossible to express as a
+registered primitive.
 \end{enumerate}
 
-\paragraph{Invariants to hold the line.}
-\begin{itemize}\itemsep1pt
-\item Code lives only behind the registry; the engine never branches on simulation names.
-\item Every operator honours its selector mask and declares its \code{REQUIRES\_*}.
-\item Every simulation ships an intent check; ``it ran'' $\neq$ ``it worked''.
-\item Archive the recipe (spec$+$seed); regenerate the dish.
-\item When a result holds only in a regime, the spec/verify says so.
-\end{itemize}
+\section{Common failure modes and corrections}
 
-This is the contract that lets the LLM operate at the top (intent $\to$ simulation,
-plus occasional single-operator authoring) while the low-level code stays a clean,
-growing, verifiable registry underneath.
-
-\section{Categorical discipline: what belongs where}
-\label{sec:category}
-
-The same structure that makes the spec powerful makes it fragile: it has a few
-\emph{orthogonal categories}, and every key belongs to exactly one. The schema
-catches a malformed spec, but it cannot catch a \emph{well-formed} spec that files
-a quantity under the wrong category --- a force constant placed on a set, a domain
-property placed on an operator, an integration knob placed on a particle. These are
-\textbf{category errors}, and for anything editing the representation --- a language
-model most of all --- they are the dominant failure mode. The type system cannot
-state this discipline, so we state it here, as a rule.
-
-\paragraph{The categories.} Every part of a spec answers exactly one question, and
-that question fixes its home (Table~\ref{tab:cat}).
-
-\begin{table}[h]
-\centering\footnotesize
+\begin{center}
 \renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}l p{6.2cm} l@{}}
+\footnotesize
+\begin{tabular}{@{}p{4.6cm}p{7.4cm}@{}}
 \toprule
-\textbf{Category} & \textbf{Owns --- the question it answers} & \textbf{Home} \\
+\textbf{Failure} & \textbf{Correction} \\
 \midrule
-World        & the space: boundary, domain size, obstacles --- \emph{``what space do nodes live in?''} & \code{general:} \\
-Set (entity) & what a node \emph{is}: count, composition (types $+$ per-type properties), initial state --- \emph{``what is a node, and how many?''} & \code{sets:} ($+$ \code{@register\_entity}) \\
-Operator     & the dynamics: an interaction law, its parameters, and what its output \emph{means} (\code{PREDICTION}, \code{KIND}) --- \emph{``how does state change?''} & \code{operators:} ($+$ the registry class) \\
-Schedule     & the composition: time step, order, rates --- \emph{``when, in what order?''} & \code{schedule:}, \code{dt} \\
-Style        & rendering only --- \emph{``how is it drawn?''} & \code{plotting:} \\
+Operator directly updates \code{pos} & Return a delta; let the engine integrate. \\
+Field self-update registered as exchange & Use \code{FieldUpdate}, \code{kind="field"}. \\
+Dormant nodes still act & Multiply the selector mask by \code{occ}. \\
+Retired builtin accepted by schema & Remove it from schema and engine; use a registered operator. \\
+Rewire hidden inside a force law & Split into \code{radius\_graph} $+$ a lateral operator. \\
+Structural op resizes tensors & Use a fixed buffer $+$ \code{occ}. \\
+One structural op disables all guards & Guard per operator, not globally. \\
+Operator hard-codes \code{state[:, :2]} & Use \code{lvl.get("pos")} and entity schemas. \\
+Type fractions leave leftovers & Assign the remainder to the final type. \\
+Engine branches on a simulation name & Move the behaviour into a registered operator. \\
+Plotter branches on a simulation name & Render generically from the data layout and render hints. \\
+Metric says the run succeeded but the morphology is wrong & Add intent-level verification. \\
 \bottomrule
 \end{tabular}
-\caption{The categories of the spec. They are orthogonal; a quantity belongs to the
-one whose question it answers, never to two.}
-\label{tab:cat}
-\end{table}
+\end{center}
 
-\paragraph{The litmus test.} When unsure where a quantity goes, ask whether it is a
-property of the \emph{thing} or of the \emph{process} acting on it. A property of
-the thing --- its identity, count, composition, the meaning of its state columns,
-its initial value --- belongs to the set/entity. A property of the process --- a
-rate, a coefficient, a force law, the order of the time-derivative it produces ---
-belongs to the operator. A property of the shared space belongs to the world; a
-property of timing, to the schedule. \emph{Thing $\to$ set; process $\to$ operator.}
+\section{Definition of done}
 
-\paragraph{Worked category errors.} The tempting move is almost always to attach a
-\emph{process} parameter to the \emph{thing} it acts on. Table~\ref{tab:caterr}
-collects the ones we actually hit while building the framework.
-
-\begin{table}[h]
-\centering\footnotesize
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{@{}p{2.4cm} p{2.6cm} p{2.9cm} p{4.4cm}@{}}
-\toprule
-\textbf{Quantity} & \textbf{Tempting (wrong)} & \textbf{Correct} & \textbf{Why} \\
-\midrule
-integration order (1st/2nd derivative) & a field on the particle set & an intrinsic operator property (\code{PREDICTION}) & it is what the operator's output \emph{means} (velocity vs.\ acceleration), not what a particle is \\
-friction / damping & an integrator knob or a set field & a \code{drag} operator ($-\kappa v$) & friction is a force; forces are operators \\
-velocity cap & a particle field & a numerical guard in the integrator & it is about stepping, not the entity \\
-boundary (periodic/wall) & a per-operator flag & the world (\code{general:}) & the space is shared; all spatial operators must agree \\
-interaction radius, $\sigma$, $k$ & the set & the operator that uses them & they parameterize the law, not the node \\
-per-type law params $p$ & the operator's own table & the set's \code{types:}, \emph{read} by the operator & they are per-\emph{type} (a property of the node's kind) and the inverse-problem target; the type owns, the operator consumes \\
-which column is position / velocity & hard-coded in the operator & the entity state schema (\code{@register\_entity}) & column meaning is a property of the entity kind \\
-\bottomrule
-\end{tabular}
-\caption{Category errors and their corrections. The pattern is constant: a process
-parameter wrongly attached to the thing it acts on.}
-\label{tab:caterr}
-\end{table}
-
-\paragraph{Invariants (hold the line).}
+A new operator or capability is complete only when all of the following are true:
 \begin{itemize}\itemsep2pt
-\item An operator never declares what a node \emph{is} (count, type, composition,
-initial state); it only \emph{reads} those.
-\item A set never declares how state \emph{changes} --- no rates, force constants,
-or integration order on a set; those are operators or the schedule.
-\item The world appears once, never per-operator: every spatial operator reads one
-boundary and one domain.
-\item Integration is the schedule's job, not an operator's; the only thing an
-operator says about integration is the \emph{order} of its delta (\code{PREDICTION}).
-\item A per-type property is owned by the type (\code{types:}) and read by whatever
-operator needs it (declared in \code{REQUIRES\_TYPE\_PROPS}), resolved along the
-containment chain.
-\item Style never changes dynamics: \code{plotting:} is read only by the visualizer.
+\item It is registered. Its kind is correct. Its capability contract is declared.
+\item It respects selector masks and occupancy.
+\item It does not mutate integrated state unless explicitly structural.
+\item It has a minimal spec. The spec validates. The engine runs without special cases.
+\item The output has an intent metric.
+\item The result is archived with spec, seed, metrics, and caption.
 \end{itemize}
+If any item is missing, the feature is not part of Plexus yet --- it is only
+prototype code.
 
-\paragraph{The discard rule.} When a quantity does not obviously fit, do \emph{not}
-invent a new top-level key. Place it in the category whose question it answers; and
-if no operator or entity reads it, the validator's \emph{``read by no operator''}
-warning is the tripwire that catches the misfiling. New
-\emph{behaviour} is a new operator, never a set field; a new \emph{kind of node} is
-a new entity, never an operator parameter. Hold this line and the action space
-stays the single, well-defined one a search --- or a language model --- can explore.
+\section{The principle}
 
-\section{Rules for a well-formed operator}
-\label{sec:operator-rules}
+Plexus grows by expanding its vocabulary, not by weakening its grammar.
 
-An operator is the only place new dynamics enter Plexus, so a few simple rules keep
-the calculus sound and the engine generic. They are enforced --- by the schema
-validator before a run, and by the engine on the first frame --- so a violation
-fails loudly rather than silently corrupting a trajectory.
-
-\paragraph{1. The integration invariant.}
-No operator writes the engine-integrated state ($\mathrm{pos}/\mathrm{vel}$)
-directly. A change to position or velocity must flow through the operator's
-\emph{returned delta}, which the engine integrates once per tick. Everything else
-is mutated in place and the operator returns \code{\{\}}: the relations $E$
-(\code{edge\_index}), the entities $|S|$ (\code{occ} and per-node buffers,
-structural operators only), the fields $F$ (\code{grid}), and auxiliary per-node
-control buffers (e.g.\ a slime agent's \code{heading}, which is not integrated
-state). A dynamics operator that Euler-steps \code{pos} itself is a category
-error --- exactly the bug an early \code{advance} contained, fixed by returning a
-velocity $v_i = s_i(\cos h_i,\sin h_i)$ and letting the engine do
-$x \leftarrow x + \Delta t\, v$.
-
-\paragraph{2. One operator, one category.}
-The operator's \code{KIND} must match what it changes:
-\code{lateral}/\code{aggregate}/\code{broadcast}/\code{exchange} move \emph{state}
-(return a delta); \code{rewire} changes the \emph{relations} $E$; \code{structural}
-changes the \emph{entities} $|S|$. An operator never does two of these at once.
-
-\paragraph{3. \code{at:} names the locality; \code{to:}/\code{from:} the field.}
-\code{at:} is the set an operator acts on, or --- for a field-internal operator
-such as \code{diffuse}/\code{decay} --- the field it reads and writes. A coupling
-operator names its field in \code{to:} (scatter, set$\to$field) or \code{from:}
-(gather, field$\to$set). So \code{diffuse} reads \code{at: chemical}, never the
-placeholder \code{at: cell}.
-
-\paragraph{4. \code{PREDICTION} matches the derivative order.}
-A force-emitting operator declares whether its delta is a velocity
-(\code{first\_derivative}, overdamped) or an acceleration
-(\code{second\_derivative}, inertial); all operators acting on one set must agree,
-since a set integrates as a single order. Operators that emit no force (\code{rewire},
-\code{structural}, field writes) set \code{PREDICTION\,=\,None}.
-
-\paragraph{5. Style stays in \code{plotting:}.}
-Colours, colormap, point size, gamma, and background are render \emph{style}; they
-live in the spec's \code{plotting:} block, read only by the plotter. They are never
-properties of a set or an operator (which carry only what the dynamics read).
-
-\paragraph{6. Dispatch tags are class attributes; values are spec.}
-\code{KIND}, \code{LEVEL}, and \code{PREDICTION} are fixed dispatch tags stamped on
-the class. Tunable numbers (rates, gains, coefficients, per-type parameters) come
-from the spec at run time --- never hoisted onto the class --- so one operator
-serves every parameterization.
-
-\paragraph{7. Declare the capability contract.}
-An operator lists the spec keys it needs (\code{REQUIRES\_PARAMS}) and the per-type
-node properties it reads (\code{REQUIRES\_TYPE\_PROPS}, resolved along the containment
-chain). The validator checks these \emph{before} the run, so a missing parameter is a
-clear message, not a crash deep in a substep.
+A coding agent should therefore prefer adding one small, typed, registered primitive
+over adding a clever shortcut. Shortcuts make one simulation work. Primitives make
+the language larger.
 
 \appendix
 \part*{Appendix}

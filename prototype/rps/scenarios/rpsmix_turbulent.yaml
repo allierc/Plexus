@@ -9,5 +9,5 @@ record_every: 30
 init: random
 seed: 0
 flow: turbulent
-flow_strength: 6.0
+flow_strength: 4.0
 particles: 0

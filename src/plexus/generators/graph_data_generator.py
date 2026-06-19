@@ -57,6 +57,9 @@ def data_generate(
             flat[f"{sname}__occ"] = d["occ"]
             if d.get("node_type") is not None:
                 flat[f"{sname}__node_type"] = d["node_type"]
+            if d.get("parent") is not None:                  # containment: child -> parent index
+                flat[f"{sname}__parent"] = d["parent"]
+                flat[f"{sname}__parent_name"] = np.asarray(d["parent_name"])
         for fname, fd in out.get("fields", {}).items():     # continuum fields (heatmap movies)
             flat[f"{fname}__grid"] = fd["grid"]
             flat[f"{fname}__colors"] = fd["colors"]

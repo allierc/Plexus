@@ -1,0 +1,53 @@
+# material_crown_splash -- auto-ported from prototype/water (overnight_suite:ph_crown_splash).
+general: {name: material_crown_splash, seed: 0, n_frames: 900, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 2
+    start: [0.5, 0.86, 0.5, 0.86]
+    types:
+      water:
+        fraction: 0.5
+        youngs: 300
+        block: [0.03, 0.03, 0.97, 0.38]
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+      ball:
+        fraction: 0.5
+        youngs: 500
+        layers:
+        - {frac: 1.0, youngs: 500, material: elastic}
+  mpm_particle: {parent: cell, per_parent: 7000, radius: 0.1, density: 1.0}
+fields: {}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 28, dt_sub: 1.326e-04, a_max: 200, drag: 0.1, wall_damp: 0.5,
+  wall_contact: 0.06, surface_tension: 10}
+schedule: [aggregate, gravity, mls_mpm_mechanics]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: 'An orange sphere starts high in the white space above a blue rectangular base.
+
+      The sphere moves downward toward the blue base over the course of the sequence.
+
+      As it descends, the top edge of the blue base begins to deform into a wave-like shape.
+
+      The sphere eventually settles into the center of the blue base, which has formed a peak around it.'
+    objects: 'There is one orange sphere that remains a constant size throughout the simulation.
+
+      There is one blue base that starts as a flat rectangle and evolves into a wavy shape.
+
+      The orange sphere is positioned centrally above the blue base in the initial frame.
+
+      The blue base is located at the bottom of the frame and occupies roughly half of the vertical space.'
+  movie_mpm_particle:
+    description: The orange sphere begins high in the sky and descends toward the blue textured surface.
+      As it moves downward, the blue surface develops waves that rise to meet the sphere. The sphere eventually
+      makes contact with the surface and begins to submerge. By the final frame, the sphere is almost
+      entirely hidden beneath the blue textured layer.
+    objects: A large orange sphere composed of small dots represents the sun. A wide blue rectangular
+      field of dots at the bottom represents the ocean. The blue field is arranged horizontally and features
+      a wavy top edge. The orange sphere is centered horizontally and moves vertically through the white
+      space.

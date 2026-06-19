@@ -28,6 +28,30 @@ different *kind* and a different the_well dataset:
 Each operator is pure w.r.t. the framework contract: a FIELD self-update mutates
 its field's grid in place and returns {} (exactly like MPM's P2G/G2P Exchange and
 GridField.step); a SET operator returns a per-level delta the engine integrates.
+
+References (each operator's docstring repeats its own). The dataset is The Well,
+Ohana et al., NeurIPS 2024 -- https://github.com/PolymathicAI/the_well; each
+operator additionally cites the algorithm/source code it reimplements:
+  reaction_diffusion : Pearson, Science 261 (1993); the_well gen code
+                       https://github.com/danfortunato/spectral-gray-scott (D. Fortunato);
+                       ParticleGraph generators/RD_Gray_Scott.py (C. Allier).
+  wave_acoustic      : Clawpack/PyClaw, Mandli et al., PeerJ CS 2 (2016),
+                       https://github.com/clawpack/clawpack (acoustics_2d_interface).
+  active_matter      : Vicsek et al., PRL 75 (1995); the_well gen code
+                       https://github.com/SuryanarayanaMK/Learning_closures (S. Maddu).
+  radius_graph       : PyTorch Geometric `radius_graph`, Fey & Lenssen 2019,
+                       https://github.com/pyg-team/pytorch_geometric.
+  chemotaxis         : Keller & Segel, J. Theor. Biol. 26 (1971).
+  slime/deposit/     : Jones, Artif. Life 16 (2010); Sebastian Lague,
+  trail_diffuse/       https://github.com/SebLague/Slime-Simulation (port in
+  trail_follow         prototype/slime/slime_ops.py).
+  advect             : Stam, "Stable Fluids", SIGGRAPH 1999; ref impl
+                       https://github.com/GregTJ/stable-fluids.
+  poisson_solve      : Chorin, Math. Comp. 22 (1968) projection method (Leray 1934);
+                       spectral pressure solve via torch.fft.
+  body_force         : Boussinesq buoyancy (standard).
+  diffuse            : explicit FTCS Laplacian (standard).
+  cool               : the_well/turbulent_radiative_layer_2D (Fielding et al.).
 """
 
 from __future__ import annotations
@@ -37,6 +61,16 @@ import torch
 
 from plexus.models.base import Operator
 from plexus.models.registry import register_operator
+
+
+def _bilinear_periodic(field, xs, ys, nx, ny):
+    """Sample `field` [nx,ny] at fractional cell indices (xs,ys) [nx,ny] on a torus."""
+    x0 = torch.floor(xs); fx = xs - x0
+    y0 = torch.floor(ys); fy = ys - y0
+    x0 = x0.long() % nx; x1 = (x0 + 1) % nx
+    y0 = y0.long() % ny; y1 = (y0 + 1) % ny
+    a = field[x0, y0]; b = field[x1, y0]; c = field[x0, y1]; d = field[x1, y1]
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
 
 
 # --------------------------------------------------------------------------- #
@@ -52,6 +86,10 @@ class ReactionDiffusion(Operator):
     Normalized (grid-unit) form: dx:=1, the Pearson convention; the_well's
     physical (delta_A=2e-5 on [-1,1]^2) reduces to Da~0.16 here. The (f,k) zoo
     selects the pattern class (spots / worms / maze / ...).
+
+    Ref: Pearson, Science 261 (1993); the_well/gray_scott_reaction_diffusion gen
+    code github.com/danfortunato/spectral-gray-scott (D. Fortunato); ParticleGraph
+    generators/RD_Gray_Scott.py (C. Allier). the_well: Ohana et al., NeurIPS 2024.
     """
 
     REQUIRES_PARAMS = ["f", "k"]      # `field` is the `at:` target (injected by the engine)
@@ -65,12 +103,14 @@ class ReactionDiffusion(Operator):
         self.k = float(params["k"])
         self.dt = float(params.get("dt_sub", 1.0))
         self.substeps = int(params.get("substeps", 12))
+        self.ai, self.bi = list(params.get("channels", [0, 1]))   # A,B channel indices
 
     def forward(self, H, mask=None):
         fld = H.fields[self.field]
         g = fld.grid
+        ai, bi = self.ai, self.bi
         for _ in range(self.substeps):
-            A, B = g[0], g[1]
+            A, B = g[ai], g[bi]
             lapA = fld.laplacian(A, unit=True)
             lapB = fld.laplacian(B, unit=True)
             reaction = A * B * B
@@ -81,7 +121,8 @@ class ReactionDiffusion(Operator):
             if fld.walls.any():                       # sound/chem-hard obstacle: hold 0
                 A = torch.where(fld.walls, torch.zeros_like(A), A)
                 B = torch.where(fld.walls, torch.zeros_like(B), B)
-            g = torch.stack([A, B], 0)
+            g = g.clone()                             # write back only A,B (other channels, e.g. a
+            g[ai] = A; g[bi] = B                      # carrier velocity, are left untouched)
         fld.grid = g
         return {}
 
@@ -102,6 +143,9 @@ class WaveAcoustic(Operator):
     Reflecting walls handle x (clamp normal velocity); an absorbing sponge near the
     open boundaries radiates energy out; sound-hard obstacles zero the velocity.
     Leapfrog (staggered-in-time) update -> stable, non-dissipative in the interior.
+
+    Ref: Clawpack/PyClaw acoustics_2d_interface, Mandli et al., PeerJ CS 2 (2016),
+    github.com/clawpack/clawpack; the_well/acoustic_scattering_* (Ohana et al. 2024).
     """
 
     REQUIRES_PARAMS = []      # `field` is the `at:` target (injected by the engine)
@@ -175,7 +219,10 @@ class WaveAcoustic(Operator):
 class RadiusGraph(Operator):
     """Rebuild the lateral relation E each tick: all pairs within cutoff R
     (periodic torus). This is Plexus `Rewire` -- it changes WHO interacts, returns
-    no delta. Same role as the water particles' neighbour graph."""
+    no delta. Same role as the water particles' neighbour graph.
+
+    Ref: PyTorch Geometric `radius_graph`, Fey & Lenssen, ICLR-W 2019,
+    github.com/pyg-team/pytorch_geometric."""
 
     REQUIRES_PARAMS = ["radius"]
 
@@ -203,6 +250,9 @@ class ActiveMatter(Operator):
     angular noise, and self-propel at speed v0. The heading lives in state column 4;
     this op advances it in place and returns the position delta v0*(cos,sin) for the
     engine to integrate (1st order, overdamped) -- the SET analogue of a field PDE.
+
+    Ref: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet, PRL 75 (1995); the_well/
+    active_matter gen code github.com/SuryanarayanaMK/Learning_closures (S. Maddu).
     """
 
     PREDICTION = "velocity"                                 # 1st-order: delta is a velocity
@@ -244,7 +294,9 @@ class Chemotaxis(Operator):
     active_matter delta -- so flocking + chemotaxis simply SUM, the framework's
     'several operators on one set, deltas add' rule. This is the one primitive that
     MIXES a SET operator with a FIELD operator; coupling to a wave's pressure field
-    is the same op pointed at a different channel."""
+    is the same op pointed at a different channel.
+
+    Ref: Keller & Segel, J. Theor. Biol. 26 (1971) (chemotactic gradient ascent)."""
 
     PREDICTION = "velocity"
     REQUIRES_PARAMS = ["from_field", "gain"]
@@ -269,7 +321,9 @@ class Chemotaxis(Operator):
 @register_operator("deposit", level="active", kind="exchange")
 class Deposit(Operator):
     """Each agent lays trail into ITS OWN species channel (the slime scatter half).
-    Mutates the field, returns {} -- like MPM's P2G."""
+    Mutates the field, returns {} -- like MPM's P2G.
+    Ref: Jones, Artif. Life 16 (2010); S. Lague, github.com/SebLague/Slime-Simulation
+    (port in prototype/slime/slime_ops.py)."""
 
     REQUIRES_PARAMS = ["to_field"]
 
@@ -291,7 +345,8 @@ class Deposit(Operator):
 @register_operator("trail_diffuse", level="field", kind="exchange")
 class TrailDiffuse(Operator):
     """Per-channel trail diffusion + evaporation (the slime field self-update):
-    g <- (g + dt*D*lap(g)) * (1-decay), clamped >=0. Mutates field, returns {}."""
+    g <- (g + dt*D*lap(g)) * (1-decay), clamped >=0. Mutates field, returns {}.
+    Ref: Jones, Artif. Life 16 (2010); S. Lague, github.com/SebLague/Slime-Simulation."""
 
     def __init__(self, params, device="cpu"):
         super().__init__()
@@ -319,7 +374,8 @@ class TrailFollow(Operator):
     affinity matrix W [K,C] sets which trails each species seeks (+) or avoids (-).
     A *paired* W (species 0<->1 share, 2<->3 share, pairs repel) makes four types run
     along two coupled trail networks. Returns a velocity delta that SUMS with the
-    active_matter alignment delta on the same set -- that sum IS the slime+active mix."""
+    active_matter alignment delta on the same set -- that sum IS the slime+active mix.
+    Ref: Jones, Artif. Life 16 (2010); S. Lague, github.com/SebLague/Slime-Simulation."""
 
     PREDICTION = "velocity"
     REQUIRES_PARAMS = ["from_field", "gain", "affinity"]
@@ -359,6 +415,10 @@ class Slime(Operator):
       3. step forward at v0 and deposit onto its own trail channel.
     Self-contained (updates pos+heading in place, returns {}) -- the slime prototype's
     proven contract. A *paired* affinity W makes four types run two coupled networks.
+
+    Ref: Jones, "Characteristics of pattern formation and evolution in approximations
+    of Physarum transport networks", Artif. Life 16 (2010); Sebastian Lague,
+    github.com/SebLague/Slime-Simulation (faithful port in prototype/slime/slime_ops.py).
     """
 
     REQUIRES_PARAMS = ["from_field", "to_field", "affinity", "v0"]
@@ -420,3 +480,179 @@ class Slime(Operator):
         lvl.state[:, 4] = new_th
         fld.deposit_typed(new_pos, nt, torch.full((N,), self.amount, device=dev), cap=self.cap)
         return {}
+
+
+# --------------------------------------------------------------------------- #
+#  6. Incompressible Navier-Stokes primitives: advect + poisson_solve (+ forces)
+#     -> the_well/{shear_flow, rayleigh_benard, rayleigh_taylor_instability,
+#                  turbulent_radiative_layer_2D}
+#     A "Stable Fluids" (Stam 1999) step composes from these registered operators:
+#       body_force -> advect -> diffuse -> poisson_solve -> advect(scalars)
+#     on a fluid MultiField with channels [vx, vy, T, dye]. Each is one operator;
+#     the solver is the SCHEDULE, not a monolith.
+# --------------------------------------------------------------------------- #
+@register_operator("advect", level="field", kind="exchange")
+class Advect(Operator):
+    """Semi-Lagrangian transport: backtrace each cell along the velocity and resample
+    (unconditionally stable). Advects the listed channels by the velocity channels
+    `vel` (default [0,1] = vx,vy), velocity self-advection included. Periodic.
+    Ref: Stam, "Stable Fluids", SIGGRAPH 1999; ref impl github.com/GregTJ/stable-fluids.
+    Unlocks the_well/{shear_flow, rayleigh_benard, ...} (Ohana et al. 2024)."""
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.field = params["field"]
+        self.vel = list(params.get("vel", [0, 1]))
+        self.channels = params.get("channels", None)        # None -> all channels
+        self.dt = float(params.get("dt_sub", 1.0))
+        self.substeps = int(params.get("substeps", 1))
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field]
+        nx, ny, dx = fld.nx, fld.ny, fld.dx
+        dev = fld.grid.device
+        ii = torch.arange(nx, device=dev).view(nx, 1).expand(nx, ny).float()
+        jj = torch.arange(ny, device=dev).view(1, ny).expand(nx, ny).float()
+        g = fld.grid
+        chans = range(g.shape[0]) if self.channels is None else self.channels
+        for _ in range(self.substeps):
+            vx, vy = g[self.vel[0]], g[self.vel[1]]
+            xs = ii - vx * (self.dt / dx)                   # backtrace in cell units
+            ys = jj - vy * (self.dt / dx)
+            newg = g.clone()
+            for c in chans:
+                newg[c] = _bilinear_periodic(g[c], xs, ys, nx, ny)
+            g = newg
+        fld.grid = g
+        return {}
+
+
+@register_operator("poisson_solve", level="field", kind="exchange")
+class PoissonSolve(Operator):
+    """The elliptic solve: make the velocity divergence-free (incompressibility) by
+    Leray projection u <- u - grad(lap^{-1} div u), done EXACTLY in Fourier space for
+    a periodic domain. This is the framework's one *global/implicit* operator kind --
+    the same machinery would solve self-gravity. Acts on velocity channels `vel`.
+    Ref: Chorin, Math. Comp. 22 (1968) projection method (Leray, 1934); spectral
+    (FFT) pressure solve via torch.fft."""
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.field = params["field"]
+        self.vel = list(params.get("vel", [0, 1]))
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field]
+        nx, ny = fld.nx, fld.ny
+        dev = fld.grid.device
+        vx, vy = fld.grid[self.vel[0]], fld.grid[self.vel[1]]
+        uh = torch.fft.fft2(vx); vh = torch.fft.fft2(vy)
+        kx = torch.fft.fftfreq(nx, device=dev).view(nx, 1)
+        ky = torch.fft.fftfreq(ny, device=dev).view(1, ny)
+        k2 = kx * kx + ky * ky
+        k2[0, 0] = 1.0                                       # avoid /0; the k=0 mode is untouched
+        kdotu = kx * uh + ky * vh
+        uh = uh - kx * kdotu / k2
+        vh = vh - ky * kdotu / k2
+        fld.grid[self.vel[0]] = torch.fft.ifft2(uh).real
+        fld.grid[self.vel[1]] = torch.fft.ifft2(vh).real
+        return {}
+
+
+@register_operator("body_force", level="field", kind="exchange")
+class BodyForce(Operator):
+    """Buoyancy / gravity: add g*(scalar - ref) to a velocity channel (Boussinesq).
+    g>0 makes a high-`scalar` region rise (hot plume, RB convection); g<0 makes it
+    sink (heavy fluid in Rayleigh-Taylor).
+    Ref: Boussinesq buoyancy approximation (standard); the_well/{rayleigh_benard,
+    rayleigh_taylor_instability} (Ohana et al. 2024)."""
+
+    REQUIRES_PARAMS = ["scalar", "g"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.field = params["field"]
+        self.scalar = int(params["scalar"])
+        self.vy = int(params.get("vy_channel", 1))
+        self.g = float(params["g"])
+        self.ref = float(params.get("ref", 0.0))
+        self.dt = float(params.get("dt_sub", 1.0))
+
+    def forward(self, H, mask=None):
+        g = H.fields[self.field].grid
+        g[self.vy] = g[self.vy] + self.dt * self.g * (g[self.scalar] - self.ref)
+        return {}
+
+
+@register_operator("diffuse", level="field", kind="exchange")
+class Diffuse(Operator):
+    """Laplacian diffusion (viscosity on velocity, or scalar diffusivity) on the
+    listed channels: g[c] <- g[c] + dt*D*lap(g[c]). Periodic, grid units.
+    Ref: explicit FTCS heat-equation stencil (standard)."""
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.field = params["field"]
+        self.D = float(params.get("D", 0.0))
+        self.channels = list(params.get("channels", [0, 1]))
+        self.dt = float(params.get("dt_sub", 1.0))
+
+    def forward(self, H, mask=None):
+        if self.D <= 0:
+            return {}
+        fld = H.fields[self.field]
+        for c in self.channels:
+            fld.grid[c] = fld.grid[c] + self.dt * self.D * fld.laplacian(fld.grid[c], unit=True)
+        return {}
+
+
+@register_operator("cool", level="field", kind="exchange")
+class Cool(Operator):
+    """Local radiative relaxation: scalar -> target at `rate` (the source term of
+    the_well/turbulent_radiative_layer). Generalises reaction_diffusion's reaction.
+    Ref: the_well/turbulent_radiative_layer_2D, Fielding et al. (Ohana et al. 2024)."""
+
+    REQUIRES_PARAMS = ["scalar", "rate"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.field = params["field"]
+        self.scalar = int(params["scalar"])
+        self.rate = float(params["rate"])
+        self.target = float(params.get("target", 0.0))
+        self.dt = float(params.get("dt_sub", 1.0))
+
+    def forward(self, H, mask=None):
+        g = H.fields[self.field].grid
+        g[self.scalar] = g[self.scalar] - self.dt * self.rate * (g[self.scalar] - self.target)
+        return {}
+
+
+@register_operator("advect_particles", level="active", kind="exchange")
+class AdvectParticles(Operator):
+    """Carry a particle SET by a fluid velocity FIELD: sample (vx,vy) at each
+    particle and return it as a velocity delta (a set<->field gather). Sums with
+    active_matter, so the swarm is simultaneously self-propelled and swept by the
+    flow -- the SET analogue of the field-advection operator. `drift` adds a uniform
+    background current.
+    Ref: passive-tracer advection; same gather pattern as the microswimmer
+    prototype's advect_particles (Liu, Costello & Kanso, Nat Commun 16, 4154, 2025)."""
+
+    PREDICTION = "velocity"
+    REQUIRES_PARAMS = ["from_field"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.from_field = params["from_field"]
+        self.vel = list(params.get("vel", [0, 1]))
+        self.speed = float(params.get("speed", 1.0))
+        self.drift = torch.tensor(params.get("drift", [0.0, 0.0]), dtype=torch.float32, device=device)
+
+    def forward(self, H, mask=None):
+        lvl = H.level("active")
+        fld = H.fields[self.from_field]
+        pos = lvl.state[:, :2]
+        vx = fld._bilinear(fld.grid[self.vel[0]], pos)
+        vy = fld._bilinear(fld.grid[self.vel[1]], pos)
+        v = torch.stack([vx, vy], 1) * self.speed + self.drift
+        return {"active": v}

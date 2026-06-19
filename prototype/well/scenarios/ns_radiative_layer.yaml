@@ -1,0 +1,16 @@
+# Turbulent radiative layer -> the_well/turbulent_radiative_layer_2D. A KH shear layer
+# between hot and cold gas, with radiative COOLING (the `cool` source). advect +
+# project (turbulence) + cool (the local source term) -- three operators composed.
+name: ns_radiative_layer
+seed: 1
+n_frames: 600
+record_every: 3
+world: 1.0
+fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
+init: {fluid: {preset: shear, U: 0.7, pert: 0.04, k: 5, width: 0.02}}
+operators:
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.004, substeps: 2}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [3], dt_sub: 0.004, substeps: 2}
+  - {op: cool, at: fluid, scalar: 3, rate: 0.004, target: 0.0, dt_sub: 1.0}
+schedule: [advect, poisson_solve, advect, cool]

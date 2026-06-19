@@ -1,0 +1,26 @@
+# Dicty aggregation with an INFLUX SOURCE (not division): cells continuously enter the
+# imaged volume (`inflow`) and chemotax up the self-generated cAMP gradient into compact
+# mounds. Matches the movie's rising cell count (767 -> ~1400) as an influx, since dicty
+# does not divide during the (starvation) aggregation phase.
+name: dicty_inflow
+seed: 0
+boundary: periodic
+n_frames: 400
+record_every: 6
+dt: 0.5
+vmax: 0.06
+sets:
+  cell:
+    n: 767                # real frame-0 cell count
+    buffer: 2600          # headroom for inflowing cells
+    init_npz: target_density.npz   # seed frame 0 from the REAL cell positions
+    types: {dicty: {fraction: 1.0}}
+fields:
+  camp: {res: 160, diffusion: 0.02, decay: 0.20, couples_to: cell}
+operators:
+  - {op: spring,      at: cell, k_rep: 60.0, r0: 0.022, kadh: 150.0, r_on: 0.22, delta: 0.001, mu_f: 0.05}
+  - {op: secrete,     at: cell, to: camp,   rate: 8.0}
+  - {op: sense,       at: cell, from: camp, gain: 30.0}    # chemotaxis up self-generated gradient
+  - {op: inflow,      at: cell, rate: 2.0}                 # SOURCE: cells entering the volume (swept)
+  - {op: random_walk, at: cell, strength: 0.003}
+schedule: [spring, secrete, camp.diffuse, sense, inflow, random_walk, integrate]

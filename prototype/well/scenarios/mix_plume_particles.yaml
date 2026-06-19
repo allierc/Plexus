@@ -1,0 +1,25 @@
+# MIX: a buoyant thermal PLUME (fluid) lofting tracer PARTICLES (set). The hot blob
+# rises (slower buoyancy g=15) and its flow carries the particles up into the
+# mushroom cap. advect_particles samples the fluid velocity onto the swarm (set<->
+# field gather); no self-propulsion -> pure passive tracers riding the plume.
+#   body_force -> advect -> diffuse -> poisson_solve -> advect(T,dye) -> advect_particles
+# particle `speed` == fluid per-frame dt (substeps*dt_sub = 0.012) so they co-move.
+name: mix_plume_particles
+seed: 0
+n_frames: 195
+record_every: 3
+world: 1.0
+fields:
+  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
+sets:
+  active: {n: 4000, start: [0.12, 0.04, 0.88, 0.30]}
+init:
+  fluid: {preset: plume, cx: 0.5, cy: 0.13, r: 0.07}
+operators:
+  - {op: body_force, at: fluid, scalar: 2, g: 4.5, ref: 0.0, dt_sub: 0.006}
+  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
+  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.012}
+  - {op: poisson_solve, at: fluid, vel: [0,1]}
+  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
+  - {op: advect_particles, at: active, from_field: fluid, vel: [0,1], speed: 0.012}
+schedule: [body_force, advect, diffuse, poisson_solve, advect, advect_particles]

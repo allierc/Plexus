@@ -1,0 +1,218 @@
+"""dicty_ops.py -- the two flat, cell-level operators the Dictyostelium model needs
+on top of the registered chemotaxis ops (`secrete`, `sense`) and `random_walk`.
+
+A dicty amoeba is a POINT agent (one node), not a soft disc of MPM particles, so
+this prototype runs a flat single-level engine (`dicty_engine.py`): every node is
+a cell, with an occupancy mass `H.c_w in [0,1]` and an `H.c_active` mask over a
+fixed buffer of `N_max` slots -- exactly the continuous-occupancy / dormant-slot
+scheme of the framework (plexus.tex Sec. "Differentiating division and death":
+Die decays w->0, Divide activates a dormant slot). This file specialises that
+mechanism to flat point-cells and adds the short-range mechanics that keep a
+chemotactic aggregate from collapsing to a single point.
+
+Two operators, both @ cell:
+
+  divide   (structural): wake `rate` dormant cell slots per tick, each a copy of a
+           random active cell nudged a body-length away (proliferation at a rate).
+           This is the cell-level twin of ops_grow.duplicate (which wakes dormant
+           PARTICLE slots); same dormant-buffer mechanism, one node per cell.
+
+  interact (lateral): pairwise short-range REPULSION (volume exclusion -> finite
+           mound density, no Keller-Segel blow-up) + mid-range COHESION, a
+           difference-of-Gaussians force over active cells within a cutoff.
+"""
+from __future__ import annotations
+
+import math
+import torch
+
+from plexus.models.base import Lateral, Operator
+from plexus.models.registry import register_operator
+
+EPS = 1e-6
+
+
+@register_operator("interact", level="cell", kind="lateral")
+class Interact(Lateral):
+    """Difference-of-Gaussians pairwise law among active cells (a velocity):
+
+        f(r) = att * exp(-r^2 / 2 sa^2)  -  rep * exp(-r^2 / 2 sr^2)      (sr < sa)
+        dpos_i = mean_j  f(r_ij) * (pos_j - pos_i)
+
+    short range (r<sr): rep dominates -> push apart (volume exclusion);
+    mid range  (sr<r<sa): att dominates -> pull together (cohesion holds a mound).
+    O(N^2) over active cells with a cutoff at 3*sa -- fine for N up to a few k.
+    """
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.rep = float(params.get("rep", 1.0))      # short-range repulsion strength
+        self.att = float(params.get("att", 0.3))      # mid-range cohesion strength
+        self.sr = float(params.get("sr", 0.012))      # repulsion length (~ cell radius)
+        self.sa = float(params.get("sa", 0.030))      # cohesion length
+
+    def forward(self, H, mask=None):
+        cell = H.level("cell")
+        pos = cell.state[:, :2]
+        act = H.c_active
+        idx = act.nonzero(as_tuple=True)[0]
+        N = pos.shape[0]
+        out = torch.zeros(N, 2, device=pos.device)
+        if idx.numel() < 2:
+            return {"cell": out}
+        p = pos[idx]                                   # [n,2] active only
+        d = p[None, :, :] - p[:, None, :]              # j - i  [n,n,2]
+        if getattr(H, "periodic", False):              # minimum-image on the unit torus
+            d = d - torch.round(d)
+        r2 = (d * d).sum(-1)                            # [n,n]
+        sr2 = 2.0 * self.sr ** 2
+        sa2 = 2.0 * self.sa ** 2
+        f = self.att * torch.exp(-r2 / sa2) - self.rep * torch.exp(-r2 / sr2)
+        eye = torch.eye(p.shape[0], device=pos.device, dtype=torch.bool)
+        cutoff = (r2 <= (3.0 * self.sa) ** 2) & (~eye)
+        f = f * cutoff.float()
+        deg = cutoff.float().sum(1).clamp(min=1.0)
+        dpos = (f[..., None] * d).sum(1) / deg[:, None]   # mean over neighbours
+        out[idx] = dpos
+        if mask is not None:
+            out = out * mask.float()[:, None]
+        return {"cell": out}
+
+
+@register_operator("spring", level="cell", kind="lateral")
+class Spring(Lateral):
+    """The user's dicty force law (cell_gnn ParticleSpringForce): linear-spring
+    repulsion + sigmoid-gated adhesion, overdamped (returns a velocity).
+
+        F_rep = k_rep * relu(r0 - r)
+        g_on  = sigmoid((r - r0) / delta);  g_off = sigmoid(-(r - r_on) / delta)
+        F_adh = -kadh * g_on * g_off * (r - r0)
+        dpos_i = -mu_f * sum_j (F_rep + F_adh) * rhat_ij          (rhat = (j-i)/r)
+
+    Pairwise over active cells within r_on (adhesion vanishes beyond it), periodic
+    minimum-image. Params default to the dicty_1 type-0 values."""
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.k_rep = float(params.get("k_rep", 50.0))
+        self.r0 = float(params.get("r0", 0.10))
+        self.kadh = float(params.get("kadh", 50.0))
+        self.r_on = float(params.get("r_on", 0.14))
+        self.delta = float(params.get("delta", 0.001))
+        self.mu_f = float(params.get("mu_f", 0.05))
+
+    def forward(self, H, mask=None):
+        cell = H.level("cell")
+        pos = cell.state[:, :2]
+        idx = H.c_active.nonzero(as_tuple=True)[0]
+        N = pos.shape[0]
+        out = torch.zeros(N, 2, device=pos.device)
+        if idx.numel() < 2:
+            return {"cell": out}
+        p = pos[idx]
+        d = p[None, :, :] - p[:, None, :]                  # j - i  [n,n,2]
+        if getattr(H, "periodic", False):
+            d = d - torch.round(d)
+        r = d.norm(dim=-1)                                  # [n,n]
+        eye = torch.eye(p.shape[0], device=pos.device, dtype=torch.bool)
+        within = (r <= self.r_on) & (~eye)
+        r_safe = r.clamp(min=1e-8)
+        rhat = d / r_safe[..., None]
+        ds = max(self.delta, 1e-8)
+        F_rep = self.k_rep * torch.relu(self.r0 - r)
+        g_on = torch.sigmoid((r - self.r0) / ds)
+        g_off = torch.sigmoid(-(r - self.r_on) / ds)
+        F_adh = -self.kadh * g_on * g_off * (r - self.r0)
+        F = (F_rep + F_adh) * within.float()                # scalar magnitude per pair
+        dpos = -self.mu_f * (F[..., None] * rhat).sum(1)    # sum over neighbours j
+        out[idx] = dpos
+        if mask is not None:
+            out = out * mask.float()[:, None]
+        return {"cell": out}
+
+
+@register_operator("inflow", level="cell", kind="structural")
+class Inflow(Operator):
+    """A SOURCE of cells entering the world (not proliferation): each tick wake ~`rate`
+    dormant cell slots at INDEPENDENT positions -- uniformly across the domain (or within an
+    optional `region` [x0,y0,x1,y1]) -- representing amoebae streaming into the imaged volume
+    from the surrounding tissue / out of plane. Unlike `divide` (daughters next to a mother,
+    which reinforces existing clusters), inflow adds fresh cells that then chemotax in. `rate`
+    may be fractional (stochastic rounding). Honours the buffer cap. Returns no acceleration."""
+    REQUIRES_PARAMS = ["rate"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.rate = float(params["rate"])               # mean cells entering per frame
+        self.region = params.get("region")              # optional [x0,y0,x1,y1]; default whole domain
+
+    def forward(self, H, mask=None):
+        cell = H.level("cell")
+        dev = cell.state.device
+        dormant = (~H.c_active).nonzero(as_tuple=True)[0]
+        if dormant.numel() == 0 or self.rate <= 0:
+            return {}
+        base = int(math.floor(self.rate))
+        extra = int(torch.rand(1, generator=H.rng, device=dev).item() < (self.rate - base))
+        k = min(base + extra, dormant.numel())
+        if k == 0:
+            return {}
+        new = dormant[:k]
+        W = float(getattr(H, "world_width", 1.0))
+        pos = torch.rand(k, 2, generator=H.rng, device=dev)
+        if self.region is not None:
+            x0, y0, x1, y1 = self.region
+            pos[:, 0] = x0 + pos[:, 0] * (x1 - x0); pos[:, 1] = y0 + pos[:, 1] * (y1 - y0)
+        else:
+            pos[:, 0] *= W
+        cell.state[new, :2] = pos
+        cell.state[new, 2:] = 0.0
+        H.c_w[new] = 1.0
+        H.c_active[new] = True
+        if hasattr(cell, "heading"):
+            cell.heading[new] = torch.rand(k, generator=H.rng, device=dev) * 2 * math.pi
+        return {}
+
+
+@register_operator("divide", level="cell", kind="structural")
+class Divide(Operator):
+    """Proliferation on a dormant buffer: each tick wake ~`rate` dormant cell slots,
+    each a copy of a random active cell displaced by ~`spread` (a body length), with
+    a fresh random heading. `rate` may be fractional (stochastic rounding), so it is
+    a smooth per-frame division RATE -- the lever the optimizer sweeps. Honours the
+    buffer cap (stops when full). Mutates membership; returns no acceleration."""
+    REQUIRES_PARAMS = ["rate"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__()
+        self.rate = float(params["rate"])               # mean cells born per frame
+        self.spread = float(params.get("spread", 0.012))  # daughter offset from mother
+
+    def forward(self, H, mask=None):
+        cell = H.level("cell")
+        act = H.c_active
+        dev = cell.state.device
+        active = act.nonzero(as_tuple=True)[0]
+        dormant = (~act).nonzero(as_tuple=True)[0]
+        if active.numel() == 0 or dormant.numel() == 0 or self.rate <= 0:
+            return {}
+        # stochastic rounding: floor(rate) births + 1 more with prob frac
+        base = int(math.floor(self.rate))
+        frac = self.rate - base
+        extra = int(torch.rand(1, generator=H.rng, device=dev).item() < frac)
+        k = min(base + extra, dormant.numel())
+        if k == 0:
+            return {}
+        new = dormant[:k]
+        par = active[torch.randint(active.numel(), (k,), generator=H.rng, device=dev)]
+        ang = torch.rand(k, generator=H.rng, device=dev) * 2 * math.pi
+        off = self.spread * torch.stack([torch.cos(ang), torch.sin(ang)], 1)
+        cell.state[new, :2] = cell.state[par, :2] + off
+        cell.state[new, 2:] = 0.0
+        if getattr(H, "periodic", False):
+            cell.state[new, :2] = torch.remainder(cell.state[new, :2], 1.0)
+        H.c_w[new] = H.c_w[par]
+        H.c_active[new] = True
+        if hasattr(cell, "heading"):
+            cell.heading[new] = torch.rand(k, generator=H.rng, device=dev) * 2 * math.pi
+        return {}

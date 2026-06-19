@@ -64,6 +64,7 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("attraction_repulsion", ("attraction_repulsion", "attract", "repuls", "arbitrary")),
     ("boids",       ("boids", "flock", "swarm")),
     ("slime",       ("slime", "physarum", "trail")),
+    ("material",    ("material",)),
     ("mpm",         ("mpm", "tissue", "elastic", "soft")),
     ("divide",      ("divide", "grow", "mitosis", "morula")),
     ("forage",      ("forage", "maze", "race", "graze")),

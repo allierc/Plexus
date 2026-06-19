@@ -172,7 +172,8 @@ def load(path: str) -> Spec:
     used_props = set()
     for o in raw["operators"]:
         used_props |= set(getattr(registry.get_operator(o["op"]), "REQUIRES_TYPE_PROPS", []))
-    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers"} | used_props  # core/layers: per-particle stiffness (engine build)
+    # core/layers/block: consumed by an entity provision hook (e.g. mpm_particle), not by an operator
+    _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block"} | used_props
     for sname, s in raw["sets"].items():
         for tname, t in s.get("types", {}).items():
             for k in t:

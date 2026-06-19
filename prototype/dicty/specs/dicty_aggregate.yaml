@@ -1,0 +1,28 @@
+# Dictyostelium aggregation: scattered amoebae secrete cAMP, climb its self-generated
+# gradient (chemotaxis), and coalesce into streams + compact mounds. `spring` gives
+# volume exclusion (repulsion) so mounds have finite size; `divide` is the
+# proliferation lever (0 here -- aggregation barely divides; the optimizer sweeps it).
+name: dicty_aggregate
+seed: 0
+boundary: periodic
+n_frames: 300
+record_every: 6
+dt: 0.5
+vmax: 0.06                # per-frame speed cap (sub-cell); keeps chemotaxis stable
+sets:
+  cell:
+    n: 767                # real frame-0 cell count (make_target.py detected it)
+    buffer: 2400          # dormant headroom for `divide`
+    init_npz: target_density.npz   # seed frame 0 from the REAL cell positions
+    types: {dicty: {fraction: 1.0}}
+fields:
+  camp: {res: 160, diffusion: 0.008, decay: 0.10, couples_to: cell}
+operators:
+  # spring repulsion + sigmoid-gated adhesion (user's cell_gnn dicty law); kadh=0 ->
+  # pure volume exclusion (adhesion freezes a lattice and fights aggregation).
+  - {op: spring,      at: cell, k_rep: 30.0, r0: 0.02, kadh: 0.0, r_on: 0.02, delta: 0.001, mu_f: 0.05}
+  - {op: secrete,     at: cell, to: camp,   rate: 4.0}     # lay cAMP
+  - {op: sense,       at: cell, from: camp, gain: 10.0}    # chemotaxis up self-generated gradient
+  - {op: random_walk, at: cell, strength: 0.005}           # symmetry-breaking jitter
+  - {op: divide,      at: cell, rate: 0.0}                 # proliferation rate (swept by optimizer)
+schedule: [spring, secrete, camp.diffuse, sense, random_walk, integrate, divide]

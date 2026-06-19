@@ -12,7 +12,7 @@ sums and integrates once per tick (order -- 1st vs 2nd derivative -- from each
 operator's `PREDICTION`); `field` operators mutate a field in place; `rewire`
 rebuilds a relation; `structural` changes the entity set. The integration
 invariant -- only `_integrate` writes pos/vel, unless an operator declares
-`MAY_MUTATE_STATE` (structural / derived-readout) -- is enforced per operator on
+`MAY_MUTATE_INTEGRATED_STATE` (structural / derived-readout) -- is enforced per operator on
 frame 0.
 """
 from __future__ import annotations
@@ -95,6 +95,31 @@ def _entity_meta(sname: str) -> tuple[dict, dict, int]:
     return schema, render, level
 
 
+def _entity_class(sname: str):
+    """The registered entity class for a set name, or None. An entity MAY define a
+    `provision(lvl, parent, s, H, device)` classmethod to allocate domain-specific
+    per-node buffers at build time (e.g. mpm_particle's F/C/mass/mu/la/p_vol) -- the
+    contract-clean way to add new state without special-casing the engine."""
+    try:
+        return get_entity(sname)
+    except KeyError:
+        return None
+
+
+def _start_centers(start, n: int, rng, device: str) -> torch.Tensor:
+    """Explicit top-level placement from a spec `start`: either a list of [x,y]
+    points (deterministic, tiled to n) or a region rect [x0,y0,x1,y1] (uniform
+    sample). Used by sets that seed at known locations (e.g. an MPM water blob)."""
+    if isinstance(start[0], (list, tuple)):
+        pts = torch.tensor([[float(p[0]), float(p[1])] for p in start], device=device)
+        return pts[torch.arange(n, device=device) % pts.shape[0]]
+    x0, y0, x1, y1 = [float(v) for v in start]
+    c = torch.rand(n, 2, generator=rng, device=device)
+    c[:, 0] = x0 + c[:, 0] * (x1 - x0)
+    c[:, 1] = y0 + c[:, 1] * (y1 - y0)
+    return c
+
+
 def _resolve_prediction(sim: Spec) -> dict:
     """set -> integration order, read from the PREDICTION of the force-emitting
     operators acting on it. All such operators on one set must agree (a set
@@ -171,6 +196,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if "spawn" in s:
             pos, head = _spawn(s["spawn"], n, H.world_width,
                                float(s.get("spawn_radius", 0.3)), H.rng, device)
+        elif "start" in s:
+            pos = _start_centers(s["start"], n, H.rng, device)      # known locations (e.g. an MPM blob)
         else:
             pos = torch.rand(n, 2, generator=H.rng, device=device); pos[:, 0] *= H.world_width
         state[:n, px0:px1] = pos
@@ -185,6 +212,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             hbuf = torch.zeros(buffer, device=device); hbuf[:n] = head
             lvl.register_buffer("heading", hbuf)
         _assign_types(lvl, s, H, device)
+        lvl.types_raw = s.get("types")          # raw per-type config (layers/material/block) for child provisioning
         H.add_level(lvl)
 
     # pass 2: contained sets -- the typed containment graph. Each child set is
@@ -214,6 +242,12 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render
         _assign_types(lvl, s, H, device)
+        # an entity may provision domain-specific per-node buffers (e.g. mpm_particle's
+        # F/C/mass/mu/la/p_vol + block-fill) -- read off the parent's per-type config.
+        ent = _entity_class(sname)
+        provision = getattr(ent, "provision", None) if ent is not None else None
+        if provision is not None:
+            provision(lvl, parent, s, H, device)
         H.add_level(lvl)
 
     # pass 3: continuous fields -- a field is a pure-state continuum bound to one
@@ -305,11 +339,11 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
                         if nm != tok:
                             continue
                         # integration invariant, checked per operator on frame 0: an
-                        # operator that has not opted in via MAY_MUTATE_STATE (structural
+                        # operator that has not opted in via MAY_MUTATE_INTEGRATED_STATE (structural
                         # / derived readout) must NOT change any set's state in its
                         # forward -- it returns a delta and the engine integrates it.
                         snap = ({n: l.state.clone() for n, l in H.levels.items()}
-                                if frame == 0 and not getattr(ob, "MAY_MUTATE_STATE", False) else None)
+                                if frame == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
                         for lvlname, d in ob(H, _mask(H, sel)).items():
                             H.add_delta(lvlname, d)
                         if snap is not None:
@@ -319,7 +353,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
                                         f"operator {nm!r} wrote the integrated state of set {n!r} "
                                         f"directly. A dynamics operator must RETURN a delta (the engine "
                                         f"integrates it); only structural / derived-readout operators "
-                                        f"(MAY_MUTATE_STATE) may write state. (integration invariant)")
+                                        f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
             _integrate(H, sim.dt)                    # integrate each set once, at end of tick
             for name, lvl in H.levels.items():
                 rec_sets[name][frame] = lvl.get("pos").cpu().numpy()
@@ -331,7 +365,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
     out = {"sets": {name: {"pos": rec_sets[name], "occ": occ_sets[name],
                            "node_type": (H.level(name).node_type.cpu().numpy()
                                          if hasattr(H.level(name), "node_type") else None),
-                           "type_names": getattr(H.level(name), "type_names", None)}
+                           "type_names": getattr(H.level(name), "type_names", None),
+                           # containment: which parent set + the per-node parent index, so a
+                           # plotter can render a container set as its merged child cloud.
+                           "parent_name": getattr(H.level(name), "parent_name", None),
+                           "parent": (H.level(name).parent.cpu().numpy()
+                                      if H.level(name).parent.numel() else None)}
                     for name in H.levels},
            "fields": {fn: {"grid": np.stack(fr), "colors": _field_colors(H, sim, H.fields[fn]),
                            "world": H.world_width}

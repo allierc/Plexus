@@ -93,8 +93,48 @@ def render_conc(name, device="cpu"):
     print(f"[conc] {name}.gif  uptake={out['uptake']:.0f}", flush=True)
 
 
+def render_feeding(name, device="cpu"):
+    """Concentration field + food parcels (tracers) carried by the flow; parcels
+    eaten at the mouth vanish, and the running capture count is in the title."""
+    out = E.run(E.load(f"{name}.yaml"), device=device)
+    c = out["chem"]; x, y, W = _cell_axes(out); T = c.shape[0]
+    snp = out["sn_pos"]; mouth = out["sn_type"] == 0; op = out["org_pos"]; R = out["radius"]
+    tp = out["tr_pos"]; to = out["tr_occ"]
+    fig, ax = plt.subplots(figsize=(5.4 * max(W, 1), 5.4)); fig.patch.set_facecolor("white")
+    im = ax.imshow(c[0].T, origin="lower", extent=[0, W, 0, 1], cmap=CMAP, vmin=0, vmax=1)
+    body = Circle((op[0][0][0], op[0][0][1]), R, fc="0.9", ec="k", lw=1.2, zorder=4); ax.add_patch(body)
+    live0 = to[0] > 0
+    food = ax.scatter(tp[0][live0, 0], tp[0][live0, 1], s=6, c="white", edgecolors="k",
+                      linewidths=0.3, zorder=3)
+    mth = ax.scatter(snp[0][mouth, 0], snp[0][mouth, 1], s=10, c="#39ff14", zorder=5)
+    ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
+
+    def upd(fr):
+        im.set_data(c[fr].T); body.center = (op[fr][0][0], op[fr][0][1])
+        live = to[fr] > 0
+        food.set_offsets(tp[fr][live]); mth.set_offsets(snp[fr][mouth])
+        ax.set_title(f"{name}  frame {fr}/{T-1}   eaten = {out['captured_t'][fr]}", fontsize=10)
+        return [im, food, mth, body]
+
+    FuncAnimation(fig, upd, frames=T, blit=False).save(f"{name}.gif", writer=PillowWriter(fps=22))
+    plt.close(fig)
+    g = Image.open(f"{name}.gif"); fr = []
+    try:
+        while True:
+            fr.append(g.copy().convert("RGB")); g.seek(g.tell() + 1)
+    except EOFError:
+        pass
+    idx = [0, int(T * .2), int(T * .45), int(T * .7), T - 1]; sel = [fr[i] for i in idx]
+    w, h = sel[0].size; m = Image.new("RGB", (w * len(sel), h), "white")
+    for k, im2 in enumerate(sel):
+        m.paste(im2, (k * w, 0))
+    m.save(f"{name}_montage.png")
+    print(f"[feed] {name}.gif   eaten={out['captured']}", flush=True)
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "conc"
     names = sys.argv[2:] or ["sessile"]
+    fn = {"flow": render_flow, "conc": render_conc, "feed": render_feeding}[mode]
     for nm in names:
-        (render_flow if mode == "flow" else render_conc)(nm)
+        fn(nm, device="cuda")

@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 import torch
 
-from plexus.models.base import Exchange, Broadcast, Lateral
+from plexus.models.base import Exchange, Broadcast, Lateral, Structural
 from plexus.models.registry import register_operator
 
 import squirmer
@@ -139,4 +139,78 @@ class AbsorbOperator(Exchange):
             take = take * mask.float()
         fld.scatter(pos, -take)
         H.uptake = getattr(H, "uptake", 0.0) + float(take.sum())
+        return {}
+
+
+@register_operator("advect_particles", level="tracer", kind="exchange")
+class AdvectParticlesOperator(Exchange):
+    """Passive tracers (food parcels) carried by the fluid: gather the flow velocity
+    at each tracer and move with it. tracer <- flow. First-order (the parcel IS the
+    fluid velocity at low particle Reynolds number)."""
+
+    REQUIRES_PARAMS = ["from", "speed"]
+    PREDICTION = "first_derivative"
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.speed = float(params.get("speed", 1.0))
+        d = params.get("drift", [0.0, 0.0])               # uniform ambient current (the cell sits in a flow)
+        self.drift = [float(d[0]), float(d[1])]
+
+    def forward(self, H, mask=None):
+        tr = H.level("tracer")
+        u = H.fields[self.field_name].sample(tr.state[:, :2])     # [N,2] fluid velocity
+        drift = torch.tensor(self.drift, device=u.device)
+        vel = self.speed * u + drift
+        vel = vel * tr.occ[:, None]                              # dead parcels don't move
+        if mask is not None:
+            vel = vel * mask.float()[:, None]
+        return {"tracer": vel}
+
+
+@register_operator("capture", level="tracer", kind="structural")
+class CaptureOperator(Structural):
+    """Phagotrophy: a food parcel that reaches the absorbing mouth cap is eaten
+    (occupancy -> 0, parked off-domain) and counted in H.captured -- the discrete
+    'partial capture' objective of the paper. Eaten/escaped parcels respawn on the
+    domain border (the nutrient reservoir), so the feeding current is continuously
+    fed and the count keeps rising. tracer entities change membership -> structural."""
+
+    REQUIRES_PARAMS = ["margin"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.margin = float(params.get("margin", 0.15))     # capture shell thickness (x radius)
+        self.respawn = bool(params.get("respawn", True))
+
+    def forward(self, H, mask=None):
+        tr = H.level("tracer")
+        org = H.level("organism")
+        dev = tr.state.device
+        c = org.state[0, :2]
+        R = float(org.radius[0]); ax = float(org.axis[0])
+        mu1 = 1.0 - 2.0 * float(org.feeding[0]); off = float(org.mouth_off[0])
+        d = tr.state[:, :2] - c
+        dist = d.norm(dim=1)
+        ang = torch.atan2(d[:, 1], d[:, 0])
+        in_cap = torch.cos(ang - ax - off) > mu1                # within the mouth sector
+        eaten = (dist < R * (1.0 + self.margin)) & in_cap & (tr.occ > 0)
+        H.captured = getattr(H, "captured", 0) + int(eaten.sum())
+        # escaped: advected out of the domain
+        W = getattr(H, "world_width", 1.0)
+        p = tr.state[:, :2]
+        escaped = ((p[:, 0] < 0) | (p[:, 0] > W) | (p[:, 1] < 0) | (p[:, 1] > 1)) & (tr.occ > 0)
+        gone = eaten | escaped
+        if self.respawn and gone.any():
+            n = int(gone.sum())
+            # respawn at the upstream inlet (left edge): a steady stream of fresh
+            # parcels from the bath, so the feeding current is continuously fed.
+            newp = torch.rand(n, 2, generator=H.rng, device=dev)
+            newp[:, 0] = newp[:, 0] * 0.05 * W
+            tr.state[gone, :2] = newp
+            tr.occ[gone] = 1.0
+        elif gone.any():
+            tr.state[gone, :2] = torch.tensor([-1.0, -1.0], device=dev)
+            tr.occ[gone] = 0.0
         return {}

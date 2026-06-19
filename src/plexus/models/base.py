@@ -369,13 +369,34 @@ class Operator(nn.Module):
     # an operator that legitimately writes a set's `state` -- a structural op (divide/
     # die rewrites the buffer) or a derived-state readout (aggregate centroid) -- sets
     # this True to opt out of the guard. Everything else must NOT touch pos/vel.
-    MAY_MUTATE_STATE: bool = False
+    MAY_MUTATE_INTEGRATED_STATE: bool = False
     # World-model ledger metadata (spec -> mechanistic language; see plexus.tex Part IV).
     # Declarative, optional: what mechanism this operator embodies, what morphologies it
     # tends to produce, and what each tunable param *means* mechanistically.
     MECHANISM_TAGS: list = []           # e.g. ["long_range_attraction", "coarsening"]
     MORPHOLOGY_PRIOR: list = []         # e.g. ["single_cluster", "filaments"]
     PARAM_ROLES: dict = {}              # e.g. {"sigma": "interaction_length", "gain": "field_sensitivity"}
+
+    # --- the transitional fence (plexus.tex Part IV) ----------------------- #
+    # A *normal* operator obeys the whole contract: one concern, returns a delta,
+    # never integrates, never resizes. A *transitional* operator is the explicit
+    # exception -- it wraps a mature, validated multi-mechanism subsystem (e.g. the
+    # MLS-MPM solver: P2G + grid solve + stress + plasticity + boundary + G2P) that
+    # is too costly to decompose immediately. It is allowed to break the ideal
+    # architecture ONLY when the violation is fenced: explicit (`TRANSITIONAL=True`),
+    # enumerated (`ARCHITECTURAL_DEBT`), isolated, and scheduled for decomposition.
+    # The fence stops the exception from spreading -- an agent enumerates the
+    # `TRANSITIONAL` operators and treats everything else as ideal.
+    TRANSITIONAL: bool = False
+    ARCHITECTURAL_DEBT: list = []       # human-readable list of the contract clauses it breaks
+    # Engine-provisioning requirements (distinct from REQUIRES_PARAMS / REQUIRES_TYPE_PROPS,
+    # which are spec-time): per-node buffers the operator reads off its Level *besides*
+    # `state`, and Hierarchy run-time scratch the engine must attach. Declared so the
+    # dependency is visible in the contract, not hidden inside a substep. Checked at
+    # forward() entry (these are provisioned by the engine/entity build, not by a spec line,
+    # so the schema cannot see them -- a missing one must fail loudly, with a precise message).
+    REQUIRES_BUFFERS: list = []         # per-node Level buffers, e.g. ["C", "F", "mass", "mu", "la", "p_vol"]
+    REQUIRES_HSTATE: list = []          # Hierarchy scratch, e.g. ["cell_accel"] (parent->child broadcast)
 
     def __init__(self, params: Optional[dict] = None, device: str = "cpu"):
         super().__init__()
@@ -420,7 +441,7 @@ class Structural(Operator):
     via occupancy. May emit per-node deltas during a gradual transition (e.g.
     mitosis) and only relabel membership at completion; returns `{}` otherwise."""
     KIND = "structural"
-    MAY_MUTATE_STATE = True             # waking/retiring slots rewrites the state buffer
+    MAY_MUTATE_INTEGRATED_STATE = True             # waking/retiring slots rewrites the state buffer
 
 
 class Rewire(Operator):

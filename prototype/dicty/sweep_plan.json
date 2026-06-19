@@ -1,0 +1,102 @@
+{
+  "base_spec": "specs/dicty_loop_base.yaml",
+  "notes": "Batch 36 — MPM ARM ADJUDICATION BATCH. B35 produced the project's first usable MPM data and a DECISIVE STRUCTURAL NEGATIVE: the bare {secrete, sense, inflow_mpm, mpm} stack is NON-AGGREGATING at every tested parameter (Est #130; inner_mass FLAT 0.19, morphology IDENTICAL sparse-scatter across n_frames in [120, 2400]). The PROJECT-BEST LOSS 1.141 (sw 11 substeps=32) and the loss=1.17 at sw 15 youngs=5 (n_frames=1200) are both SUSPECTED particle-depletion artefacts (Est #140/#144 provisional). B36 ADJUDICATES THESE WINS and surveys joint parameter corners to rule out a narrow productive regime before committing to the B37 cohesion-mechanism edit (deferred to keep B36 infra surface stable). NO ENGINE CODE EDITS THIS BATCH. PRONGS: (alpha) ADJUDICATION sweeps 0-4 — does substeps=32 win survive n_frames=1200? does youngs=5 win survive across finer grid? are the wins 16-seed-robust? does the corner (substeps=32, youngs=5) compound? (beta) JOINT SWEEPS 5-7, 12-13 — survey sense.gain x {camp.D, secrete.rate, mpm.drag, mpm.a_max} at low-D corner for narrow productive niches; cell.n x n_frames=1200 stress test. (gamma) NEW PARENT VALIDATION 8-10, 14-15 — fine sweeps of camp.{D, decay}, inflow_mpm.rate, particle.per_parent at the NEW parent to confirm working values; the LIVE resolution knob `mpm.dt_sub` (sw 6, untested for 35 batches because dt was the bypassed surrogate). NEW PARENT (B36): per_parent=24, mpm.{a_max=1800, vmax=1.5, drag=10}, inflow=0.5, secrete=6, gain=50 — resolved working values from B35 metric ripples; cell.youngs=60 and mpm.substeps=8 UNCHANGED pending adjudication (not adopting suspected artefact wins).",
+  "sweeps": [
+    {
+      "param": "mpm.substeps",
+      "hypothesis": "H1-B36 CENTRAL ADJUDICATION — does the sw 11 substeps=32 PROJECT-BEST LOSS 1.141 SURVIVE the n_frames=1200 stress test, or does the field empty entirely (particle-depletion artefact)? If loss at (substeps=32, n_frames=1200) is still ~1.14 and morphology shows MORE structure than at n_frames=240, Est #140 SUPPORTED. If loss explodes / n_mounds collapses to 1-2 / morphology completely empty, Est #140 RETRACTED as artefact and project-best loss reverts to 0.9126 (point-cell floor).",
+      "fixed": {"n_frames": 1200},
+      "values": [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 64]
+    },
+    {
+      "param": "cell.youngs",
+      "hypothesis": "H2-B36 CENTRAL ADJUDICATION — does the sw 15 youngs=5 loss=1.17 win SURVIVE a fine-grained scan around 5 and at n_frames=1200? Refined around the apparent corner. If loss stays low only at one isolated point and morphology is sparse-scatter, particle-depletion artefact confirmed (Est #144 RETRACTED).",
+      "fixed": {"n_frames": 1200},
+      "values": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 30.0, 50.0, 100.0, 200.0]
+    },
+    {
+      "param": "mpm.substeps",
+      "hypothesis": "H3-B36 FINE — zooms substeps in [16, 64] at n_frames=240 (the B35 base evaluation point) to pin down the loss-corner shape. If the loss-vs-substeps curve has a SHARP isolated point at 32, with sparse morphology, it is a numerical instability point (artefact); if it shows a SMOOTH bowl with morphology improving with substeps, it is a genuine resolution effect.",
+      "fixed": {},
+      "values": [10, 14, 18, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 44, 48, 56]
+    },
+    {
+      "param": "seed",
+      "hypothesis": "H4-B36 — 16-seed verification at the project-best corner (mpm.substeps=32). If sigma_loss > 1.5 (the MPM seed-noise floor Est #143) the sw 11 win is within noise; if the win replicates across 16 seeds with low sigma it is a genuine corner. Adopts mpm.substeps=32 in the fixed overrides.",
+      "fixed": {"mpm.substeps": 32},
+      "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    },
+    {
+      "param": "seed",
+      "hypothesis": "H5-B36 — 16-seed verification at the suspected JOINT corner (mpm.substeps=32, cell.youngs=5, n_frames=1200). If the two suspected artefact wins COMPOUND (loss << 1.14), they are likely the SAME particle-depletion mechanism (additive depletion). If they are INDEPENDENT mechanisms (loss ~ 1.14, mid between sw 11/sw 15), each may represent a separate physical effect; warrants further inspection.",
+      "fixed": {"mpm.substeps": 32, "cell.youngs": 5.0, "n_frames": 1200},
+      "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    },
+    {
+      "param": "mpm.dt_sub",
+      "hypothesis": "H6-B36 — the LIVE MPM resolution knob, never swept in 35 batches because the engine outer `dt` was the (failed) surrogate (Est #139). Productive band identification. Default 2e-4; product substeps * dt_sub gates the cell-level integration accuracy.",
+      "fixed": {},
+      "values": [5.0e-5, 8.0e-5, 1.0e-4, 1.5e-4, 2.0e-4, 2.5e-4, 3.0e-4, 4.0e-4, 5.0e-4, 7.0e-4, 1.0e-3, 1.5e-3, 2.0e-3, 3.0e-3, 5.0e-3, 1.0e-2]
+    },
+    {
+      "param": "n_frames",
+      "hypothesis": "H7-B36 — n_frames break test at the NEW B36 parent (with resolved working values per_parent=24, a_max=1800, vmax=1.5, drag=10, inflow=0.5, secrete=6, gain=50). The B35 sw 0 was at the OLD parent values; this re-checks whether ANY of the parent shifts moved the n_frames response curve into a productive regime (it should not, per Est #130 universal non-aggregation, but verify).",
+      "fixed": {},
+      "values": [120, 180, 240, 300, 360, 480, 600, 750, 900, 1050, 1200, 1350, 1500, 1700, 1900, 2400]
+    },
+    {
+      "param": "sense.gain",
+      "hypothesis": "H8-B36 JOINT — sense.gain at low-D corner (camp.diffusion=0.001 — sw 3 best). The B35 sw 1 was at D=0.02 (base); this tests whether the steeper-gradient low-D regime opens a productive sense.gain band. If still flat morphology, Est #131 universally confirmed under the low-D corner.",
+      "fixed": {"camp.diffusion": 0.001},
+      "values": [5, 10, 20, 40, 60, 80, 100, 140, 200, 300, 500, 800, 1200, 2000, 4000, 8000]
+    },
+    {
+      "param": "sense.gain",
+      "hypothesis": "H9-B36 JOINT — sense.gain at strong source (secrete.rate=20). If gain x secrete jointly opens a productive corner where neither alone did, the chemotactic SOURCE is the limiting factor; if still flat, Est #130 universally confirmed.",
+      "fixed": {"secrete.rate": 20.0},
+      "values": [5, 10, 20, 40, 60, 80, 100, 140, 200, 300, 500, 800, 1200, 2000, 4000, 8000]
+    },
+    {
+      "param": "camp.diffusion",
+      "hypothesis": "H10-B36 FINE — camp.diffusion fine sweep around 0.001 (sw 3 best) at NEW parent. Refines the working D band. If still flat morphology, the low-D corner is metric ripple only.",
+      "fixed": {},
+      "values": [0.0001, 0.0003, 0.0005, 0.0008, 0.001, 0.0012, 0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005, 0.006, 0.008, 0.012, 0.020]
+    },
+    {
+      "param": "camp.decay",
+      "hypothesis": "H11-B36 FINE — camp.decay fine sweep around 1.0 (sw 4 best) at NEW parent. Identifies whether decay has a productive corner at low D.",
+      "fixed": {},
+      "values": [0.05, 0.10, 0.20, 0.30, 0.50, 0.70, 0.85, 1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.5, 5.0, 8.0]
+    },
+    {
+      "param": "mpm.drag",
+      "hypothesis": "H12-B36 STRESS TEST — mpm.drag x n_frames=1200. Does longer integration with productive drag=10 give morphology? Est #135 predicts no.",
+      "fixed": {"n_frames": 1200},
+      "values": [0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 14.0, 20.0, 28.0, 40.0, 60.0, 80.0, 120.0, 200.0, 400.0]
+    },
+    {
+      "param": "mpm.a_max",
+      "hypothesis": "H13-B36 JOINT — mpm.a_max at low-D corner (D=0.001). The B35 sw 12 found a_max=1800 best at base D; tests whether the steeper low-D gradient changes the productive band.",
+      "fixed": {"camp.diffusion": 0.001},
+      "values": [100, 300, 600, 1000, 1500, 1800, 2200, 2800, 3500, 4500, 6000, 8000, 12000, 18000, 30000, 60000]
+    },
+    {
+      "param": "cell.n",
+      "hypothesis": "H14-B36 STRESS — cell.n x n_frames=1200 capped to ~1600 (Est #137 ceiling). Does longer integration + more cells produce visible aggregation? Per Est #130, no.",
+      "fixed": {"n_frames": 1200},
+      "values": [200, 300, 400, 500, 600, 700, 767, 850, 950, 1050, 1150, 1250, 1350, 1450, 1550, 1600]
+    },
+    {
+      "param": "inflow_mpm.rate",
+      "hypothesis": "H15-B36 FINE — inflow_mpm.rate fine sweep around 0.5 (sw 5 best). Includes rate=0 ablation (no inflow, frame-0 cells only).",
+      "fixed": {},
+      "values": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1.0, 1.2, 1.5, 2.0, 2.7, 3.5, 5.0]
+    },
+    {
+      "param": "particle.per_parent",
+      "hypothesis": "H16-B36 FINE — particle.per_parent fine sweep around the resolved working value 24 (sw 9 plateau). Confirms per_parent=24 is at the metric plateau and that the morphology is unchanged across all values (no morphology corner).",
+      "fixed": {},
+      "values": [4, 8, 12, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 48, 60]
+    }
+  ]
+}
