@@ -1,0 +1,34 @@
+# boids_rand_4t -- random boids sweep: 4 types, 2048 particles, random per-type weights
+general: {name: boids_rand_4t, seed: 0, n_frames: 3000, dt: 0.5, boundary: periodic}
+sets:
+  particle:
+    n: 2048
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.25, cohesion: 63.3, alignment: 89.9, separation: 78.0}
+      t01: {fraction: 0.25, cohesion: 24.1, alignment: 31.4, separation: 87.6}
+      t02: {fraction: 0.25, cohesion: 2.5, alignment: 82.5, separation: 80.1}
+      t03: {fraction: 0.25, cohesion: 47.9, alignment: 31.7, separation: 29.3}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
+  - {op: cohesion,     at: particle}
+  - {op: alignment,    at: particle}
+  - {op: separation,   at: particle}
+schedule: [radius_graph, cohesion, alignment, separation]
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored dots on a black background. There is no
+      movement or change in the position of the particles over time. The distribution of the dots remains
+      constant throughout the entire sequence. The scene represents a steady-state distribution of discrete
+      points.
+    objects: 'The scene contains thousands of small, circular dots distributed uniformly across the frame.
+      The dots are colored in three distinct shades: orange, light blue, and white. Each dot is approximately
+      the same size and maintains a consistent spacing from its neighbors. The dots are not connected
+      to each other, forming a stochastic point cloud.'

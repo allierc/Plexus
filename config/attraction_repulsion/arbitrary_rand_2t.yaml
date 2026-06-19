@@ -1,0 +1,29 @@
+# arbitrary_rand_2t -- random attraction-repulsion sweep: 2 types, 6000 particles, random p
+general: {name: arbitrary_rand_2t, seed: 0, n_frames: 250, dt: 0.1, boundary: periodic}
+sets:
+  particle:
+    n: 6000
+    types:
+      t0: {fraction: 0.5, p: [1.3554, 1.5191, 1.7652, 1.9092]}
+      t1: {fraction: 0.5, p: [1.1511, 1.9334, 1.0052, 1.753]}
+fields: {}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of numerous small particles distributed across a black
+      background. There is no visible movement or evolution of the particles between the frames. The distribution
+      of the points remains constant throughout the entire sequence. The scene represents a steady-state
+      distribution of discrete elements.
+    objects: The scene contains two distinct sets of small, point-like particles. One set of particles
+      is colored orange, while the other set is colored blue. The particles are distributed randomly across
+      the entire frame without any specific geometric arrangement or connection. Each individual particle
+      is very small and uniform in size relative to the overall field.

@@ -1,0 +1,32 @@
+# arbitrary_rand_5t -- random attraction-repulsion sweep: 5 types, 12000 particles, random p
+general: {name: arbitrary_rand_5t, seed: 0, n_frames: 250, dt: 0.1, boundary: periodic}
+sets:
+  particle:
+    n: 12000
+    types:
+      t0: {fraction: 0.2, p: [1.8105, 1.1368, 1.4189, 1.8153]}
+      t1: {fraction: 0.2, p: [1.0143, 1.6285, 1.793, 1.513]}
+      t2: {fraction: 0.2, p: [1.7258, 1.2264, 1.1985, 1.3631]}
+      t3: {fraction: 0.2, p: [1.1794, 1.3461, 1.9481, 1.5733]}
+      t4: {fraction: 0.2, p: [1.3401, 1.2715, 1.952, 1.4445]}
+fields: {}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored particles against a black background.
+      There is no visible movement or evolution of the particles between the four keyframes. The distribution
+      of the dots remains constant throughout the entire sequence. The scene represents a steady-state
+      distribution of discrete points in a two-dimensional space.
+    objects: The scene contains thousands of tiny, circular particles distributed uniformly across the
+      frame. These particles appear in a variety of colors, including red, green, blue, yellow, and white.
+      They are arranged in a stochastic, non-connected pattern with no discernible clusters or structures.
+      Each individual particle is very small, appearing as a single pixel or a small cluster of pixels.

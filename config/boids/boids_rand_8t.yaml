@@ -1,0 +1,38 @@
+# boids_rand_8t -- random boids sweep: 8 types, 4096 particles, random per-type weights
+general: {name: boids_rand_8t, seed: 0, n_frames: 3000, dt: 0.5, boundary: periodic}
+sets:
+  particle:
+    n: 4096
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.125, cohesion: 27.0, alignment: 45.6, separation: 51.4}
+      t01: {fraction: 0.125, cohesion: 56.2, alignment: 99.6, separation: 79.7}
+      t02: {fraction: 0.125, cohesion: 63.0, alignment: 98.9, separation: 23.1}
+      t03: {fraction: 0.125, cohesion: 17.7, alignment: 62.0, separation: 6.3}
+      t04: {fraction: 0.125, cohesion: 5.5, alignment: 52.5, separation: 47.7}
+      t05: {fraction: 0.125, cohesion: 91.9, alignment: 63.7, separation: 52.4}
+      t06: {fraction: 0.125, cohesion: 50.7, alignment: 26.3, separation: 3.2}
+      t07: {fraction: 0.125, cohesion: 20.9, alignment: 69.8, separation: 21.7}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
+  - {op: cohesion,     at: particle}
+  - {op: alignment,    at: particle}
+  - {op: separation,   at: particle}
+schedule: [radius_graph, cohesion, alignment, separation]
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored dots on a black background. There is no
+      visible movement or evolution of the particles between the keyframes. The distribution of the dots
+      remains constant throughout the entire sequence. The scene represents a steady-state state of a
+      simulation or a static noise pattern.
+    objects: The scene contains thousands of small, circular dots distributed across the entire frame.
+      These dots are arranged in a dense, pseudo-random pattern with no clear geometric structure. The
+      dots feature a variety of colors, including red, blue, green, orange, and white. Each dot is uniform
+      in size and maintains a consistent diameter throughout the video.

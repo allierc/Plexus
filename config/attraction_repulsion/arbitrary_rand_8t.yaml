@@ -1,0 +1,37 @@
+# arbitrary_rand_8t -- random attraction-repulsion sweep: 8 types, 30000 particles, random p
+general: {name: arbitrary_rand_8t, seed: 0, n_frames: 250, dt: 0.1, boundary: periodic}
+sets:
+  particle:
+    n: 30000
+    types:
+      t0: {fraction: 0.125, p: [1.9804, 1.5155, 1.5212, 1.8965]}
+      t1: {fraction: 0.125, p: [1.7428, 1.5807, 1.4266, 1.8782]}
+      t2: {fraction: 0.125, p: [1.4116, 1.9228, 1.0687, 1.43]}
+      t3: {fraction: 0.125, p: [1.5195, 1.9509, 1.251, 1.806]}
+      t4: {fraction: 0.125, p: [1.6765, 1.7171, 1.6296, 1.9716]}
+      t5: {fraction: 0.125, p: [1.3327, 1.3983, 1.2029, 1.0507]}
+      t6: {fraction: 0.125, p: [1.2129, 1.9155, 1.8402, 1.1124]}
+      t7: {fraction: 0.125, p: [1.6038, 1.4792, 1.5947, 1.6593]}
+fields: {}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
+      across a black background. Over time, the particles begin to aggregate into distinct, elongated,
+      and branching filamentary structures. These filaments grow and interconnect, forming a complex,
+      web-like network that occupies the space. By the final frame, the network has matured into a highly
+      intricate, interconnected lattice of thin strands.
+    objects: The scene contains thousands of tiny, point-like particles in various colors including red,
+      green, blue, and yellow. Initially, these objects are randomly distributed with no specific spatial
+      correlation or connection. As the simulation progresses, they organize into long, thin, thread-like
+      filaments that branch out and merge. These filaments form a complex topology of interconnected networks
+      and clusters across the entire field of view.
