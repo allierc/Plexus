@@ -95,6 +95,12 @@ def _entity_meta(sname: str) -> tuple[dict, dict, int]:
     return schema, render, level
 
 
+def _dim_schema(D: int) -> dict:
+    """Dimension-aware pos/vel state schema: pos = 0:D, vel = D:2D (state dim = 2D).
+    The container is dimension-generic; only operators are dimension-specific."""
+    return {"pos": (0, D), "vel": (D, 2 * D)}
+
+
 def _entity_class(sname: str):
     """The registered entity class for a set name, or None. An entity MAY define a
     `provision(lvl, parent, s, H, device)` classmethod to allocate domain-specific
@@ -176,7 +182,10 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H = Hierarchy()
     H.config = sim
     H.rng = torch.Generator(device=device).manual_seed(sim.seed)
-    H.world_width = float(sim.world)
+    H.dim = int(getattr(sim, "dim", 2))                    # the dimension contract
+    H.world_size = torch.tensor([float(w) for w in getattr(sim, "world_size", [sim.world, 1.0])],
+                                device=device)             # per-axis box [w0 .. w_{D-1}]
+    H.world_width = float(H.world_size[0])                 # legacy scalar (axis-0 width)
     H.periodic = (sim.boundary == "periodic")
     H.obstacles = list(getattr(sim, "obstacles", []) or [])   # wall rects/discs for the `bounce` op
 
@@ -185,12 +194,14 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if "parent" in s:
             continue
         n = int(s["n"])
+        D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
-        schema, render, level = _entity_meta(sname)    # state-column semantics from the registry
+        _, render, level = _entity_meta(sname)         # render hints + level from the registry
+        schema = _dim_schema(D)                         # pos/vel sized to the dimension contract
         dim = max(b for _, b in schema.values())
         state = torch.zeros(buffer, dim, device=device)
         px0, px1 = schema["pos"]
-        # a self-propelled set declares a `spawn` mode (disc/point/ring/random) and
+        # a self-propelled set declares a `spawn` mode (disc/point/ring/random; 2D) and
         # carries a per-agent `heading`; otherwise positions are seeded across the domain.
         head = None
         if "spawn" in s:
@@ -199,12 +210,12 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         elif "start" in s:
             pos = _start_centers(s["start"], n, H.rng, device)      # known locations (e.g. an MPM blob)
         else:
-            pos = torch.rand(n, 2, generator=H.rng, device=device); pos[:, 0] *= H.world_width
+            pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
         state[:n, px0:px1] = pos
         vinit = float(s.get("vel_init", 0.0))               # random initial speed (e.g. boids start moving)
         if vinit > 0 and "vel" in schema:
             vx0, vx1 = schema["vel"]
-            state[:n, vx0:vx1] = (torch.rand(n, 2, generator=H.rng, device=device) - 0.5) * (2 * vinit)
+            state[:n, vx0:vx1] = (torch.rand(n, D, generator=H.rng, device=device) - 0.5) * (2 * vinit)
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
@@ -292,7 +303,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
     reads it as an acceleration (v += dt·acc; x += dt·v). Only sets that have
     force-emitting operators (a prediction) are integrated; others hold still.
     Friction is the `drag` operator, not a knob here."""
-    W = H.world_width
+    box = H.world_size                                     # [D] per-axis box size
     for name, pred in H.predict.items():
         lvl = H.levels[name]
         out = H.delta(name)
@@ -301,9 +312,9 @@ def _integrate(H: Hierarchy, dt: float) -> None:
         v = out if pred == "first_derivative" else v + dt * out
         x = x + dt * v
         if H.periodic:
-            x = torch.stack([torch.remainder(x[:, 0], W), torch.remainder(x[:, 1], 1.0)], 1)
+            x = torch.remainder(x, box)                    # torus: wrap each axis by its size
         else:
-            x = torch.stack([x[:, 0].clamp(0.0, W), x[:, 1].clamp(0.0, 1.0)], 1)
+            x = torch.minimum(x.clamp(min=0.0), box)       # wall: clamp each axis to [0, w_k]
         new = lvl.state.clone()
         new[:, px0:px1] = x; new[:, vx0:vx1] = v
         lvl.state = new
@@ -322,7 +333,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
             for o in sim.operators]
 
     n_rec = sim.n_frames + 1
-    rec_sets = {name: np.zeros((n_rec, lvl.n, 2), np.float32) for name, lvl in H.levels.items()}
+    rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32) for name, lvl in H.levels.items()}
     occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}
     # fields are large [C,nx,ny] grids -> record at a stride that caps ~160 frames.
     field_cap = 160

@@ -10,32 +10,38 @@ from __future__ import annotations
 import torch
 
 
-def minimum_image(d: torch.Tensor, periodic: bool, world_width: float = 1.0) -> torch.Tensor:
-    """Wrap a displacement `d[..., 2]` to the nearest periodic image on the torus
-    [0,W] x [0,1] (no-op when not periodic). Used for both the edge cutoff and the
-    force direction, so they agree."""
+def minimum_image(d: torch.Tensor, periodic: bool, world=1.0) -> torch.Tensor:
+    """Wrap a displacement `d[..., D]` to its nearest periodic image (no-op when not
+    periodic). `world` is the per-axis box size: a scalar keeps the legacy 2D torus
+    [0,W] x [0,1] (x wraps by W, y by 1); a length-D vector wraps each axis by its own
+    size -- the dimension-generic form. Used for both the edge cutoff and the force
+    direction, so they agree."""
     if not periodic:
         return d
-    W = world_width
-    dx = d[..., 0] - W * torch.round(d[..., 0] / W)
-    dy = d[..., 1] - torch.round(d[..., 1])
-    return torch.stack([dx, dy], dim=-1)
+    if d.shape[-1] == 2 and not torch.is_tensor(world) and not isinstance(world, (list, tuple)):
+        W = float(world)                                   # legacy 2D: [0,W] x [0,1]
+        dx = d[..., 0] - W * torch.round(d[..., 0] / W)
+        dy = d[..., 1] - torch.round(d[..., 1])
+        return torch.stack([dx, dy], dim=-1)
+    W = torch.as_tensor(world, device=d.device, dtype=d.dtype)   # [D] per-axis box size
+    return d - W * torch.round(d / W)
 
 
-def neighbour_mean(pos, occ, edge_index, periodic, world_width, msg_fn) -> torch.Tensor:
-    """Mean over each receiver i's live neighbours j of `msg_fn(i, j, d_ij)` -> [N, 2].
+def neighbour_mean(pos, occ, edge_index, periodic, world, msg_fn) -> torch.Tensor:
+    """Mean over each receiver i's live neighbours j of `msg_fn(i, j, d_ij)` -> [N, D].
 
     `edge_index` is [2, E] (row0 receiver i, row1 neighbour j); `d_ij = pos_j - pos_i`
     is the minimum-image displacement. The shared reduction behind the boids steering
-    rules (cohesion / alignment / separation), so each is one thin operator file.
+    rules (cohesion / alignment / separation). Dimension-generic: output width = D =
+    pos.shape[-1].
     """
-    N = pos.shape[0]
+    N, D = pos.shape[0], pos.shape[-1]
     if edge_index.numel() == 0:
-        return torch.zeros(N, 2, device=pos.device)
+        return torch.zeros(N, D, device=pos.device)
     i, j = edge_index[0], edge_index[1]
-    d = minimum_image(pos[j] - pos[i], periodic, world_width)
+    d = minimum_image(pos[j] - pos[i], periodic, world)
     msg = msg_fn(i, j, d) * occ[j, None]                    # ignore dormant neighbours
-    acc = torch.zeros(N, 2, device=pos.device).index_add_(0, i, msg)
+    acc = torch.zeros(N, D, device=pos.device).index_add_(0, i, msg)
     deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
     return (acc / deg.clamp(min=1.0)[:, None]) * occ[:, None]
 

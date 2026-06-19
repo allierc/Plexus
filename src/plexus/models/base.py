@@ -289,6 +289,7 @@ class Hierarchy(nn.Module):
         self.levels = nn.ModuleDict()         # name -> Level (insertion order = bottom-up)
         self.fields = nn.ModuleDict()         # name -> Field
         self._delta: dict[str, torch.Tensor] = {}
+        self.dim = 2                          # spatial dimensions (set by the engine from the spec)
 
     # --- structure -------------------------------------------------------- #
     def add_level(self, lvl: Level) -> Level:
@@ -317,8 +318,9 @@ class Hierarchy(nn.Module):
         return getattr(self.levels[name], "parent_name", None)
 
     # --- per-level delta accumulators (the integration scratch) ----------- #
-    def zero_delta(self, dim: int = 2) -> None:
+    def zero_delta(self, dim: int = None) -> None:
         """Reset every level's delta accumulator to zeros (called once per tick)."""
+        dim = self.dim if dim is None else dim
         dev = next(iter(self.levels.values())).state.device
         self._delta = {name: torch.zeros(l.n, dim, device=dev)
                        for name, l in self.levels.items()}
@@ -334,7 +336,7 @@ class Hierarchy(nn.Module):
         """The accumulated delta for a level (zeros if nothing wrote it)."""
         if level_name not in self._delta:
             lvl = self.levels[level_name]
-            self._delta[level_name] = torch.zeros(lvl.n, 2, device=lvl.state.device)
+            self._delta[level_name] = torch.zeros(lvl.n, self.dim, device=lvl.state.device)
         return self._delta[level_name]
 
 
@@ -365,6 +367,12 @@ class Operator(nn.Module):
     PREDICTION: Optional[str] = None
     REQUIRES_PARAMS: list = []          # param keys this operator must be given
     REQUIRES_TYPE_PROPS: list = []      # per-type node properties it reads (e.g. "youngs")
+    # Spatial dimensions this operator supports. The language/container is dimension-
+    # generic (general: dim: D, world: [w0..w_{D-1}]); an operator declares which D it
+    # implements so the schema rejects an incompatible spec BEFORE the run. Default 2D
+    # only; a dimension-generic operator (reads D = pos.shape[-1], no hard-coded 2) sets
+    # [2, 3] (or more). The 2D-specific kernels (MLS-MPM) stay [2].
+    SUPPORTED_DIMS: list = [2]
     # The integration invariant is enforced per-operator on frame 0 (see engine.run):
     # an operator that legitimately writes a set's `state` -- a structural op (divide/
     # die rewrites the buffer) or a derived-state readout (aggregate centroid) -- sets

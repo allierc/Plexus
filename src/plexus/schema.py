@@ -67,7 +67,9 @@ class Spec:
     schedule: list
     obstacles: list = field(default_factory=list)   # wall rectangles [x0,y0,x1,y1] or discs [cx,cy,r]
     boundary: str = "wall"                           # 'wall' (clamp) or 'periodic' (torus)
-    world: float = 1.0                               # domain width; world is [0,world]x[0,1]
+    world: float = 1.0                               # domain width (= world_size[0]); legacy 2D scalar
+    dim: int = 2                                     # spatial dimensions (the global dimension contract)
+    world_size: list = field(default_factory=lambda: [1.0, 1.0])   # per-axis box [w0 .. w_{D-1}]
     plotting: dict = field(default_factory=dict)     # render STYLE (colormap, point_size, ...) — read by plexus.plot
 
 
@@ -93,6 +95,17 @@ def load(path: str) -> Spec:
             raise ValueError(f"simulation missing required key: {key!r}")
     if gv("name") is None:
         raise ValueError("simulation missing required key: 'name' (under general:)")
+
+    # --- the dimension contract: dim (default 2) + per-axis world box -------- #
+    dim = int(gv("dim", 2))
+    world_raw = gv("world", 1.0)
+    if isinstance(world_raw, (list, tuple)):
+        world_size = [float(x) for x in world_raw]
+    else:
+        world_size = [float(world_raw)] + [1.0] * (dim - 1)   # scalar: axis-0 = width, rest = 1
+    if len(world_size) != dim:
+        raise ValueError(f"general.world has {len(world_size)} entries but dim={dim}; "
+                         f"give a length-{dim} box e.g. world: {[1.0] * dim}")
 
     # --- sets: type fractions sum to 1; buffer (if given) >= n -------------- #
     for sname, s in raw["sets"].items():
@@ -126,6 +139,11 @@ def load(path: str) -> Spec:
         if kind not in KINDS:
             raise ValueError(
                 f"operator {name!r} has unrecognised kind {kind!r}; expected one of {KINDS}.")
+        supported = getattr(cls, "SUPPORTED_DIMS", [2])
+        if dim not in supported:
+            raise ValueError(
+                f"operator {name!r} supports dims {supported}, not dim={dim} "
+                f"(set general.dim, or use a dimension-generic / *_3d operator).")
         sel = Selector.parse(o["at"])
         # `at:` names a SET (set/exchange operators) or a FIELD (field-internal
         # operators like diffuse/decay, which read & write the field at `at:`).
@@ -209,6 +227,8 @@ def load(path: str) -> Spec:
         schedule=raw["schedule"],
         obstacles=gv("obstacles", []),
         boundary=gv("boundary", "wall"),
-        world=float(gv("world", 1.0)),
+        world=world_size[0],
+        dim=dim,
+        world_size=world_size,
         plotting=raw.get("plotting", {}),
     )

@@ -28,6 +28,7 @@ from plexus.geometry import minimum_image
 @register_operator("attraction_repulsion", level="particle", kind="lateral")
 class AttractionRepulsion(Lateral):
     PREDICTION = "first_derivative"             # emits a velocity (overdamped law)
+    SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
     REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
     REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]
     # mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the
@@ -47,14 +48,14 @@ class AttractionRepulsion(Lateral):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         occ = lvl.occ
-        N = pos.shape[0]
+        N, D = pos.shape[0], pos.shape[-1]
         ei = lvl.edge_index                                  # [2, E]: row0 = receiver i, row1 = neighbour j
         if ei.numel() == 0:
-            return {self.at: torch.zeros(N, 2, device=pos.device)}
+            return {self.at: torch.zeros(N, D, device=pos.device)}
         i, j = ei[0], ei[1]
 
         d = minimum_image(pos[j] - pos[i], getattr(H, "periodic", False),
-                          getattr(H, "world_width", 1.0))    # j - i  [E, 2]
+                          getattr(H, "world_size", getattr(H, "world_width", 1.0)))   # j - i  [E, D]
         r2 = (d * d).sum(-1)                                  # [E]
         p = lvl.type_params[lvl.node_type[i]]                # receiver-type params [E, 4]
         s2 = 2.0 * self.sigma ** 2
@@ -62,7 +63,7 @@ class AttractionRepulsion(Lateral):
              - p[:, 2] * torch.exp(-(r2 ** p[:, 3]) / s2))   # [E]
         f = f * occ[j]                                       # ignore dormant neighbours
 
-        dpos = torch.zeros(N, 2, device=pos.device)
+        dpos = torch.zeros(N, D, device=pos.device)
         dpos.index_add_(0, i, f[:, None] * d)                # aggregate at the receiver
         if self.aggr == "mean":                              # average over neighbours (density-independent)
             deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])

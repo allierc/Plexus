@@ -18,6 +18,7 @@ class RadiusGraph(Rewire):
     """Set `Level.edge_index` to all live pairs within `radius` (optionally beyond
     `min_radius`). Blockwise build -> scales to 1e4-1e5 nodes; minimum-image under
     periodic BC. Run before a pairwise lateral operator in the schedule."""
+    SUPPORTED_DIMS = [2, 3]                      # pairwise distances are dimension-generic
     REQUIRES_PARAMS = ["radius"]
 
     def __init__(self, params, device="cpu"):
@@ -30,8 +31,8 @@ class RadiusGraph(Rewire):
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         lvl.edge_index = radius_edges(
-            lvl.state[:, :2], lvl.occ, self.r_min, self.r_max,
+            lvl.get("pos"), lvl.occ, self.r_min, self.r_max,
             periodic=getattr(H, "periodic", False),
-            world_width=getattr(H, "world_width", 1.0), block=self.block,
+            world_width=getattr(H, "world_size", getattr(H, "world_width", 1.0)), block=self.block,
         )
         return {}

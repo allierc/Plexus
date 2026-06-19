@@ -17,6 +17,7 @@ from plexus.models.registry import register_operator
 @register_operator("drag", level="particle", kind="lateral")
 class Drag(Lateral):
     PREDICTION = "second_derivative"            # emits an acceleration
+    SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
 
     def __init__(self, params, device="cpu"):
