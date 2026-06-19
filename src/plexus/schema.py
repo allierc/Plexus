@@ -72,8 +72,10 @@ class Spec:
 
 
 _RESERVED = {"op", "at", "to", "from"}
-_BUILTIN_STEPS = {"aggregate"}                      # integration is implicit (end of tick).
-# NB: the `<field>.diffuse` builtin is retired -- `diffuse` is now a normal operator.
+# No schedule builtins: `aggregate` and `diffuse` are ordinary registered operators
+# now, and integration is implicit (end of tick). Every schedule token must resolve
+# to a declared operator.
+_BUILTIN_STEPS: set = set()
 
 
 def load(path: str) -> Spec:

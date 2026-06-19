@@ -2,15 +2,18 @@
 
 This is the *interpreter* of the spec language. It contains NO spec-specific
 logic: it builds the sets the spec declares, instantiates the registered
-operators it names, and iterates the schedule. Operators are pure (return
-per-level deltas); the engine sums same-level deltas during the tick and
-integrates each set once at the end (implicitly; the order -- 1st vs 2nd
-derivative -- comes from each operator's `PREDICTION`).
+operators it names, and iterates the schedule. The build is three passes --
+top-level sets, then contained sets (the typed containment graph), then fields.
 
-Starting small (attraction/repulsion, boids): single top-level sets on a
-wall/periodic boundary. Containment (`aggregate`), fields (`<f>.diffuse`), MPM
-and cardinality change are stubbed with clear errors and get filled as we scale
-up -- the loop shape stays the same.
+Every operator is dispatched the same way (by name); the engine never special-
+cases a kind. The seven kinds split by what they touch: the set-dynamics kinds
+(lateral / aggregate / broadcast / exchange) return a per-level delta the engine
+sums and integrates once per tick (order -- 1st vs 2nd derivative -- from each
+operator's `PREDICTION`); `field` operators mutate a field in place; `rewire`
+rebuilds a relation; `structural` changes the entity set. The integration
+invariant -- only `_integrate` writes pos/vel, unless an operator declares
+`MAY_MUTATE_STATE` (structural / derived-readout) -- is enforced per operator on
+frame 0.
 """
 from __future__ import annotations
 
@@ -122,9 +125,11 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     lvl.type_names = list(types.keys())
     node_type = torch.zeros(lvl.n, dtype=torch.long, device=device)
     perm = torch.randperm(lvl.n, generator=H.rng, device=device)
+    type_list = list(types.values())
     start = 0
-    for tid, t in enumerate(types.values()):
-        k = int(round(t["fraction"] * lvl.n))
+    for tid, t in enumerate(type_list):
+        # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
+        k = (lvl.n - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * lvl.n))
         node_type[perm[start:start + k]] = tid; start += k
     lvl.register_buffer("node_type", node_type)
     if all("p" in t for t in types.values()):
@@ -135,7 +140,6 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
     # SpeciesSettings -- so operators read `lvl.move_speed` without indexing types.
     scalar_keys = {k for t in types.values() for k, v in t.items()
                    if k not in ("fraction", "p", "core", "layers", "color") and isinstance(v, (int, float))}
-    type_list = list(types.values())
     for k in sorted(scalar_keys):
         buf = torch.zeros(lvl.n, device=device)
         for tid, t in enumerate(type_list):
@@ -282,12 +286,6 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
              get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on)
             for o in sim.operators]
-    # integration invariant: no operator may write pos/vel directly (only _integrate
-    # does). Checked once on frame 0 -- a violator does it every tick, so one frame
-    # catches it for ~free. Skipped when a structural op is present (divide/die
-    # legitimately rewrite a set's state buffer when cardinality changes).
-    guard_state = not any(getattr(get_operator(o.op), "KIND", None) == "structural"
-                          for o in sim.operators)
 
     n_rec = sim.n_frames + 1
     rec_sets = {name: np.zeros((n_rec, lvl.n, 2), np.float32) for name, lvl in H.levels.items()}
@@ -301,30 +299,27 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
         for frame in range(sim.n_frames + 1):
             H.frame = frame                          # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
-            snap0 = ({name: lvl.state.clone() for name, lvl in H.levels.items()}
-                     if frame == 0 and guard_state else None)
             for step in sim.schedule:                # operators accumulate per-set deltas
                 for tok in (step if isinstance(step, list) else [step]):
-                    if tok == "aggregate":
-                        raise NotImplementedError("`aggregate` lands with containment (next scale-up step)")
-                    elif tok.endswith(".diffuse"):
-                        raise NotImplementedError(
-                            f"the `<field>.diffuse` builtin is retired; use the `diffuse` "
-                            f"operator in the schedule instead (got {tok!r}).")
-                    else:
-                        for nm, ob, sel in inst:
-                            if nm != tok:
-                                continue
-                            for lvlname, d in ob(H, _mask(H, sel)).items():
-                                H.add_delta(lvlname, d)
-            if snap0 is not None:                    # enforce the integration invariant
-                for name, before in snap0.items():
-                    if not torch.equal(before, H.levels[name].state):
-                        raise RuntimeError(
-                            f"an operator wrote the integrated state of set {name!r} directly during "
-                            f"the schedule. Dynamics operators must RETURN a delta (the engine "
-                            f"integrates it); only relations/entities/fields/aux state may be mutated "
-                            f"in place. (Plexus integration invariant; see models/base.Operator.)")
+                    for nm, ob, sel in inst:
+                        if nm != tok:
+                            continue
+                        # integration invariant, checked per operator on frame 0: an
+                        # operator that has not opted in via MAY_MUTATE_STATE (structural
+                        # / derived readout) must NOT change any set's state in its
+                        # forward -- it returns a delta and the engine integrates it.
+                        snap = ({n: l.state.clone() for n, l in H.levels.items()}
+                                if frame == 0 and not getattr(ob, "MAY_MUTATE_STATE", False) else None)
+                        for lvlname, d in ob(H, _mask(H, sel)).items():
+                            H.add_delta(lvlname, d)
+                        if snap is not None:
+                            for n, before in snap.items():
+                                if not torch.equal(before, H.levels[n].state):
+                                    raise RuntimeError(
+                                        f"operator {nm!r} wrote the integrated state of set {n!r} "
+                                        f"directly. A dynamics operator must RETURN a delta (the engine "
+                                        f"integrates it); only structural / derived-readout operators "
+                                        f"(MAY_MUTATE_STATE) may write state. (integration invariant)")
             _integrate(H, sim.dt)                    # integrate each set once, at end of tick
             for name, lvl in H.levels.items():
                 rec_sets[name][frame] = lvl.get("pos").cpu().numpy()

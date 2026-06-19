@@ -365,6 +365,11 @@ class Operator(nn.Module):
     PREDICTION: Optional[str] = None
     REQUIRES_PARAMS: list = []          # param keys this operator must be given
     REQUIRES_TYPE_PROPS: list = []      # per-type node properties it reads (e.g. "youngs")
+    # The integration invariant is enforced per-operator on frame 0 (see engine.run):
+    # an operator that legitimately writes a set's `state` -- a structural op (divide/
+    # die rewrites the buffer) or a derived-state readout (aggregate centroid) -- sets
+    # this True to opt out of the guard. Everything else must NOT touch pos/vel.
+    MAY_MUTATE_STATE: bool = False
     # World-model ledger metadata (spec -> mechanistic language; see plexus.tex Part IV).
     # Declarative, optional: what mechanism this operator embodies, what morphologies it
     # tends to produce, and what each tunable param *means* mechanistically.
@@ -415,6 +420,7 @@ class Structural(Operator):
     via occupancy. May emit per-node deltas during a gradual transition (e.g.
     mitosis) and only relabel membership at completion; returns `{}` otherwise."""
     KIND = "structural"
+    MAY_MUTATE_STATE = True             # waking/retiring slots rewrites the state buffer
 
 
 class Rewire(Operator):
