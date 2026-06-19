@@ -25,7 +25,7 @@ class ScalarField(Field):
     position to a pixel (`pix`). Operators read/write `grid` directly.
     """
 
-    def __init__(self, name, couples_to, components=1, res=200, width=1.0, device="cpu"):
+    def __init__(self, name, couples_to=None, components=1, res=200, width=1.0, device="cpu"):
         super().__init__(name, couples_to)
         self.C = int(components)
         self.R = int(res)

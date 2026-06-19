@@ -245,10 +245,13 @@ class Field(nn.Module):
     COUPLES_TO: Optional[str] = None    # stamped by @register_field
     FRAME: Optional[str] = None
 
-    def __init__(self, name: str, couples_to: str):
+    def __init__(self, name: str, couples_to: Optional[str] = None):
         super().__init__()
         self.name = name
-        self.couples_to = couples_to          # the Level this field exchanges with
+        # the Level whose types this field's channels mirror (slime: one channel per
+        # species). Optional: a prescribed field (e.g. a video) binds to no set --
+        # its coupling is established by the operator that reads it (`from:`), not here.
+        self.couples_to = couples_to
 
     def scatter(self, level: "Level") -> None:          # object -> field
         raise NotImplementedError

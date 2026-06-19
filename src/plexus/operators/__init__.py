@@ -22,6 +22,9 @@ from . import decay                 # noqa: F401  field -> field
 from . import sense                 # noqa: F401  field -> set (turn heading)
 from . import advance               # noqa: F401  set -> self-propelled move
 from . import bounce                # noqa: F401  set -> wall/obstacle reflection (re-head)
+from . import video_field           # noqa: F401  registers the `video` field + playback
+from . import chemotaxis            # noqa: F401  field -> set gradient coupling
 
 __all__ = ["graph", "attraction_repulsion", "cohesion", "alignment", "separation", "drag",
-           "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce"]
+           "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
+           "video_field", "chemotaxis"]

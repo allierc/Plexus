@@ -1,0 +1,56 @@
+# arbitrary_bison_g3 (chemotaxis gain 0.04, coupling-strength sweep) -- 3-type attraction-repulsion particles coupled to a field that
+# is PRESCRIBED from a movie (video_bisons.tif, a 257-frame 100x100 scalar field).
+# The Plexus form of ParticleGraph's node_value_map: a `video` field driven by
+# `playback` (field <- frame t) and read by `chemotaxis` (particles climb its
+# gradient). The two velocities -- type interaction + field gradient -- simply sum
+# on the particle set (the framework's "deltas add" rule).
+general:
+  name: arbitrary_bison_g3
+  seed: 0
+  n_frames: 256
+  dt: 0.1
+  boundary: periodic
+sets:
+  particle:
+    n: 4800
+    types:
+      t0: {fraction: 0.3334, p: [1.6233, 1.0413, 1.6012, 1.5615]}
+      t1: {fraction: 0.3333, p: [1.7667, 1.8308, 1.0855, 1.9055]}
+      t2: {fraction: 0.3333, p: [1.7226, 1.7850, 1.0584, 1.8579]}
+fields:
+  bison: {frame: video, source: video_bisons.tif}
+operators:
+  - {op: playback,             at: bison}                       # field <- video frame t
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+  - {op: chemotaxis,           at: particle, from: bison, gain: 0.004}
+schedule: [playback, radius_graph, attraction_repulsion, chemotaxis]
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 4.0
+  gamma: 0.8
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_bison:
+    description: A large bison moves from left to right across a white background while a smaller bison
+      follows closely behind it. The smaller bison eventually moves into the foreground, positioning itself
+      in front of the larger one. As the sequence progresses, a second large bison enters from the left
+      side of the frame. The two large bison then face each other in a head-to-head confrontation in the
+      center of the scene.
+    objects: The scene contains several large, dark-colored bison with prominent horns and heavy fur.
+      These agents are arranged in a loose group, moving relative to one another in a sparse white environment.
+      The bison vary slightly in size, with the primary subjects being large and the following agent being
+      smaller. The objects are connected by their proximity and social interaction as they navigate the
+      open space.
+  movie_particle:
+    description: The simulation shows a collection of multi-colored particles moving across a black background.
+      Over time, the particles form distinct horizontal linear structures that shift and undulate slightly.
+      In the center of the frame, a cluster of particles appears to rotate or swirl in a localized area.
+      The overall motion suggests a fluid-like flow with specific regions of high concentration and organized
+      movement.
+    objects: The scene contains thousands of small, circular particles of varying sizes. These particles
+      are colored in a palette of blue, green, orange, and yellow. They are arranged in long, horizontal
+      chains that span the width of the frame. A dense, circular cluster of particles is also visible
+      in the center, contrasting with the linear arrangements.

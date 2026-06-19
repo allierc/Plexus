@@ -62,14 +62,19 @@ def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
 
 
 def _field_colors(H: Hierarchy, sim: Spec, fld) -> np.ndarray:
-    """Per-channel RGB for a field: one channel per type of the coupled set, coloured
-    from the spec's `plotting.colors` (Style), falling back to a default palette."""
-    names = list(getattr(H.level(fld.couples_to), "type_names", []) or [])
+    """Per-channel RGB for a field. A field coupled to a set colours its channels by
+    the set's types (slime: one colour per species). An uncoupled / prescribed field
+    (e.g. a video) binds to no set and renders in white (grayscale). `plotting.colors`
+    (Style) overrides either."""
+    couples = getattr(fld, "couples_to", None)
+    lvl = H.levels[couples] if couples in H.levels else None
+    names = list(getattr(lvl, "type_names", []) or []) if lvl is not None else []
     pcolors = (sim.plotting or {}).get("colors", {})
     cols = []
     for c in range(fld.C):
         nm = names[c] if c < len(names) else None
-        cols.append(pcolors.get(nm, _DEFAULT_FIELD_COLORS[c % len(_DEFAULT_FIELD_COLORS)]))
+        default = _DEFAULT_FIELD_COLORS[c % len(_DEFAULT_FIELD_COLORS)] if names else (1.0, 1.0, 1.0)
+        cols.append(pcolors.get(nm, default))
     return np.array([[float(x) for x in col[:3]] for col in cols], np.float32)
 
 
@@ -213,12 +218,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     for fname, f in sim.fields.items():
         cls = get_field(f.get("frame", "grid"))
         couples = f.get("couples_to")
-        comp = f.get("components")
-        if comp is None:
+        fcfg = {k: v for k, v in f.items() if k != "frame"}    # passes couples_to/source/res/... by name
+        # a channel-per-type grid field defaults its components to the coupled set's
+        # type count; a prescribed field (e.g. `video`, carries `source`) defines its own.
+        if "components" not in fcfg and "source" not in fcfg:
             ntypes = len(getattr(H.level(couples), "type_names", []) or []) if couples in H.levels else 0
-            comp = ntypes or 1
-        fld = cls(fname, couples, components=int(comp), res=int(f.get("res", 200)),
-                  width=H.world_width, device=device)
+            fcfg["components"] = ntypes or 1
+        fld = cls(fname, width=H.world_width, device=device, **fcfg)   # name positional; rest by keyword
         H.add_field(fld)
 
     return H
@@ -293,6 +299,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
 
     with torch.no_grad():
         for frame in range(sim.n_frames + 1):
+            H.frame = frame                          # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
             snap0 = ({name: lvl.state.clone() for name, lvl in H.levels.items()}
                      if frame == 0 and guard_state else None)
