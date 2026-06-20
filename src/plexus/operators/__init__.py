@@ -28,9 +28,15 @@ from . import video_field           # noqa: F401  registers the `video` field + 
 from . import chemotaxis            # noqa: F401  field -> set gradient coupling
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
 from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: MLS-MPM mechanics (mls_mpm_mechanics)
-from . import mpm_decomposed        # noqa: F401  Phase-3 decomposition: mpm_grid + mpm_strain/p2g/mpm_grid_update/g2p
+# Phase-3 decomposition of the oracle -- one file per operator + the shared grid field:
+from . import mpm_grid              # noqa: F401  the mpm_grid background FIELD + B-spline kernel
+from . import mpm_strain            # noqa: F401  particle -> particle  (F + material update)
+from . import p2g                   # noqa: F401  particle -> mpm_grid   (scatter)
+from . import mpm_grid_update       # noqa: F401  mpm_grid -> mpm_grid    (grid solve + BCs)
+from . import g2p                   # noqa: F401  mpm_grid -> particle    (gather + advect)
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion",
            "cohesion", "alignment", "separation", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
-           "video_field", "chemotaxis", "gravity", "mpm", "mpm_decomposed"]
+           "video_field", "chemotaxis", "gravity", "mpm",
+           "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p"]
