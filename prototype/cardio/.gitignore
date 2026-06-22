@@ -1,0 +1,18 @@
+# Heavy / regenerable cardio artifacts -- keep code + specs + logbook only.
+# (Comments must be on their own line; .gitignore has no inline comments.)
+
+# training results: renders, mp4s, model_*.pt checkpoints, fit_pos.npy
+archive/
+
+# cardio_real.npz (regenerate from GraphData DERIV via cardio_data.py) + backups
+*.npz
+*.npz.*
+
+# microscope / cog / trajectory videos (regenerable)
+*.mp4
+
+# built from cardio.tex
+*.pdf
+
+__pycache__/
+*.pyc

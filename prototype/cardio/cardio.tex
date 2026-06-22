@@ -1,0 +1,362 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
+\usepackage{parskip}
+
+\definecolor{cset}{RGB}{31,119,180}
+\definecolor{cfield}{RGB}{44,160,44}
+\definecolor{cop}{RGB}{214,39,40}
+\definecolor{cgray}{RGB}{120,120,120}
+
+\lstdefinestyle{yaml}{
+  basicstyle=\ttfamily\scriptsize,
+  frame=single,
+  backgroundcolor=\color{gray!7},
+  columns=fullflexible,
+  breaklines=true,
+  keepspaces=true,
+  showstringspaces=false,
+  commentstyle=\color{cgray}\itshape,
+  morecomment=[l]{\#},
+}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\op}[1]{\textcolor{cop}{\texttt{#1}}}
+
+\title{\textbf{Cardiomyocyte reentry in Plexus}\\[3pt]
+\large An excitable active material: electromechanics on tissue material points}
+\author{Janelia Research Campus}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note specifies a Plexus model of a cultured cardiomyocyte sheet as an
+\textbf{excitable active material}, discretized by \textbf{material points} rather
+than segmented cells. We have no cell segmentation, and we do not pretend each node
+is a biological cell: the sheet is a fixed grid of \emph{tissue particles}, each
+carrying both an electrical state $(u,w)$ and a mechanical state
+$(x,v,F,C,m,\mu,\lambda)$. This is closer to a continuum discretization than to a
+cell model --- and Plexus expresses both. The design respects the Plexus contract
+(Sets / Fields / Operators; the spec is the program, the registry the vocabulary,
+the engine the interpreter): every mechanism is a typed operator, and no new
+dynamics enter the engine. The electrical kernel reuses the FitzHugh--Nagumo
+dynamics already implemented in \textsc{NeuralGraph} (\code{ODEs/Fitzhug\_Nagumo.py});
+the mechanics reuse the existing MLS-MPM stack (\code{p2g}, \code{mpm\_grid\_update},
+\code{g2p}). Because electrical and mechanical state share one set, the
+excitation--contraction and mechano-electric couplings are \emph{local} (per
+particle): the up/down \code{aggregate}/\code{broadcast} pair is not needed. The one
+methodological constraint that governs everything is that the only external input is
+a \emph{sparse, explicit trigger} --- never a learned field that could explain the
+data arbitrarily. The rotating reentrant pattern must arise from the excitable
+dynamics and the tissue geometry, and must persist after the trigger stops.
+\end{abstract}
+
+\section{The tissue as an excitable active material}
+
+We model the cardiomyocyte sheet as a fixed set of \textbf{material points} (tissue
+particles), not cells:
+\[
+  S_{\mathrm{site}}=\{1,\ldots,N\},\qquad N = 100\times 100 = 10{,}000,
+\]
+arranged on a regular grid. \textbf{The nodes are not cells} --- there is no
+segmentation. They are material sites that discretize the active medium; several
+sites cover what would biologically be one cardiomyocyte, exactly as in a continuum
+finite-element or material-point discretization. The biological claim is therefore
+clean: \emph{we model the cardiomyocyte sheet as an excitable active material,
+discretized by material particles}.
+
+Each site carries an electrical state and a mechanical state on the \emph{same} row:
+\[
+  s_i = \big(\underbrace{u_i,\,w_i}_{\text{electrical}},\;
+              \underbrace{x_i,\,v_i,\,F_i,\,C_i,\,m_i,\,\mu_i,\,\lambda_i}_{\text{mechanical (MPM)}}\big).
+\]
+Here $u_i$ is excitation and $w_i$ recovery; $x_i,v_i$ are position and velocity,
+$F_i$ the deformation gradient, $C_i$ the affine velocity, $m_i$ mass, and
+$\mu_i,\lambda_i$ the Lam\'e parameters.
+
+\paragraph{Material adjacency.}
+The sites are joined by a fixed relation
+\[
+  E_{\mathrm{grid}}\subseteq S_{\mathrm{site}}\times S_{\mathrm{site}},
+\]
+a four- or eight-neighbour lattice. This is the scaffold for electrical propagation
+(the gap-junction analogue). It is a property of the \emph{material}, built once and
+never rebuilt from deformed positions.
+
+\paragraph{External trigger.}
+We avoid a learnable field that could explain the data arbitrarily. The only
+external input is a sparse trigger current applied to a prescribed region
+$R\subset S_{\mathrm{site}}$ at discrete times:
+\[
+  I_i(t)=A\,\mathbf{1}_{i\in R}\,\mathbf{1}_{\,t\bmod T < \Delta T},
+\]
+with amplitude $A$, period $T$, pulse duration $\Delta T$. The rotating pattern must
+arise from the excitable dynamics and the tissue geometry, not from a hidden driving
+field.
+
+\paragraph{Excitable dynamics.}
+Electrical activity is a FitzHugh--Nagumo operator on the material graph:
+\[
+  \dot u_i
+    = u_i-\frac{u_i^3}{3}-w_i
+      + D\!\!\sum_{j:(i,j)\in E_{\mathrm{grid}}}\!\!(u_j-u_i)
+      + I_i(t),
+  \qquad
+  \dot w_i = \varepsilon\,(u_i+a-b\,w_i).
+\]
+The graph Laplacian propagates excitation between neighbouring sites; $w_i$ gives
+refractoriness. This is the minimal mechanism that supports traveling waves, wave
+break, and reentry. The single-site core ($D{=}0$) is exactly the dynamics validated
+in \textsc{NeuralGraph} (\code{ODEs/Fitzhug\_Nagumo.py}): same
+$\dot v=v-v^3/3-w+I_{\mathrm{ext}}$, $\dot w=\varepsilon(v+a-bw)$, Euler stepped,
+same pulse protocol (defaults $a{=}0.7$, $b{=}0.8$, $\varepsilon{=}0.18$). Plexus
+adds only the spatial coupling over $E_{\mathrm{grid}}$.
+
+\paragraph{Minimal Plexus form (Stage 1).}
+\[
+  \mathrm{grid\_graph}
+  \;\longrightarrow\;
+  \mathrm{trigger\_pulse}
+  \;\longrightarrow\;
+  \mathrm{excitable\_nagumo},
+\]
+\[
+  (u,w)_{t+1}
+    = \Phi_{\mathrm{Nagumo}}\!\Big((u,w)_t\,;\,
+        E_{\mathrm{grid}},\, I(t),\, D,\,\varepsilon,\,a,\,b\Big).
+\]
+
+\section{Electromechanics on one set (local couplings)}
+
+Because the electrical state $(u,w)$ and the mechanical state
+$(x,v,F,C,\dots)$ live on the \emph{same} material point, the two
+electromechanical couplings are \textbf{local} --- a per-site read/write, with no
+parent map to traverse. This is the simplification the material-point choice buys:
+the \code{aggregate}/\code{broadcast} pair (needed only to move information between a
+cell and its particles) disappears.
+
+\paragraph{Signal to mechanics (local).}
+Excitation produces active contraction at the same site:
+\[
+  f_i^{\mathrm{act}} = \alpha\,g(u_i)\,n_i,
+  \qquad
+  g(u_i)=\sigma\!\left(\frac{u_i-\theta}{\eta}\right)
+  \;\;\text{or}\;\;
+  g(u_i)=\mathbf{1}_{\,u_i>\theta},
+\]
+where $\alpha$ is contractility, $n_i$ a preferred contraction direction, and $g$ a
+smooth or thresholded gate. There is no broadcast: $f_i^{\mathrm{act}}$ is written on
+site $i$ as an active stress that the MPM solver reads.
+
+\paragraph{MPM mechanics.}
+The material sheet is advanced by the MLS-MPM exchange--field--exchange cycle through
+the background MPM grid (a mechanical \emph{field}, not a biological one):
+\[
+  S_{\mathrm{site}}
+  \xrightarrow{\;\mathrm{P2G}\;}
+  F_{\mathrm{MPM}}
+  \xrightarrow{\;\mathrm{grid\_update}\;}
+  F_{\mathrm{MPM}}
+  \xrightarrow{\;\mathrm{G2P}\;}
+  S_{\mathrm{site}},
+\]
+\[
+  (x,v,F,C)_{t+1}
+    = \Phi_{\mathrm{MPM}}\!\Big((x,v,F,C)_t\,;\,
+        f^{\mathrm{act}},\,\mu,\,\lambda\Big).
+\]
+
+\paragraph{Mechanics to signal (local).}
+Each site's own deformation gives a local stress/strain summary
+\[
+  \sigma_i = s(F_i)
+\]
+(a scalar invariant of the site's deformation gradient --- no fibre average, since
+there are no cells to average over). It feeds back into the excitable dynamics as a
+mechanosensitive current,
+\[
+  I_i(t)=I_i^{\mathrm{trigger}}(t)+\beta\,\sigma_i,
+\]
+or a stress-dependent threshold, $a_i=a_0+\beta\,\sigma_i$. The coupled electrical
+equation becomes
+\[
+  \dot u_i
+    = u_i-\frac{u_i^3}{3}-w_i
+      + D\!\!\sum_{j:(i,j)\in E_{\mathrm{grid}}}\!\!(u_j-u_i)
+      + I_i^{\mathrm{trigger}}(t)
+      + \beta\,\sigma_i.
+\]
+
+\section{Closed-loop model}
+
+The full electromechanical loop runs entirely on $S_{\mathrm{site}}$:
+\[
+  u_i
+  \longrightarrow f_i^{\mathrm{act}}
+  \longrightarrow (x_i,v_i,F_i)
+  \longrightarrow \sigma_i
+  \longrightarrow u_i,
+\]
+a composition of typed operators
+\[
+  \mathrm{trigger}\;\circ\;\mathrm{Nagumo}\;\circ\;
+  \mathrm{signal\_to\_force}\;\circ\;\mathrm{MPM}\;\circ\;\mathrm{stress\_to\_signal}.
+\]
+Stage~1 asks whether an explicit trigger plus excitable graph dynamics produce the
+observed rotating curved-string pattern; the later stages ask whether mechanical
+feedback stabilizes, bends, or sustains that rotating wave.
+
+\section{Operators: what exists, what is new}
+
+Each row is one operator, classified by the Plexus \emph{kind} it belongs to (what
+it changes), with its status in the current registry
+(\code{src/plexus/operators/}). All operators act on the single set
+\code{tissue\_particle}.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\footnotesize
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{operator} & \textbf{kind} & \textbf{role} & \textbf{status} \\
+\midrule
+\op{grid\_graph}            & rewire        & fixed material adjacency $E_{\mathrm{grid}}$            & \textbf{new} (fixed-once variant of \code{radius\_graph}) \\
+\op{trigger\_pulse}         & lateral (source) & sparse S1/S2 current into $u$ on $R$                 & \textbf{new} (small) \\
+\op{excitable\_nagumo}      & lateral       & FHN reaction $+$ graph Laplacian; updates $u,w$         & \textbf{new} (kernel from \textsc{NeuralGraph}) \\
+\op{signal\_to\_mpm\_force} & lateral (local) & $u_i\!\to$ active contraction stress on site $i$       & \textbf{new} (local, no broadcast) \\
+\op{mls\_mpm\_mechanics}    & exchange ($+$mpm grid) & deforms the sheet; $x,v$ at 2nd order           & \textbf{exists} \\
+\op{mpm\_stress\_to\_signal}& lateral (local) & site stress $\sigma_i\!\to$ excitability / threshold   & \textbf{new} (local, no aggregate) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The loop uses three kinds --- \code{rewire}, \code{lateral}, \code{exchange} (the MPM
+grid is the only field) --- and \emph{not} \code{aggregate}/\code{broadcast}: with
+electrical and mechanical state on one material set, every coupling is local.
+\code{divide}/\code{die} are unused (no proliferation). Four small new operators are
+required; the MPM stack already exists.
+
+\paragraph{On the kind of \code{trigger\_pulse}.}
+Conceptually the trigger is a \emph{set-local source}: it injects current into $u$
+on a region, not along edges. Plexus has no \code{source} kind yet, so the pragmatic
+implementation is \code{class TriggerPulse(Lateral)} with \code{PREDICTION = None},
+documented to mutate the auxiliary state $u$ in place (returning \code{\{\}}); a
+dedicated \code{source} kind can be promoted later. It honours the selector
+\code{tissue\_particle[...]} that scopes it to $R$.
+
+\section{Constraints the contract enforces}
+
+\begin{enumerate}\itemsep4pt
+\item \textbf{The nodes are material points, not cells.} No segmentation is claimed.
+The set is \code{tissue\_particle} on a grid; the biological object is an excitable
+active \emph{material}, and several sites tile one cardiomyocyte. This keeps the
+modelling honest about what the data support (a displacement field, not cell
+outlines).
+
+\item \textbf{The material adjacency is fixed.} \code{grid\_graph} is built once and
+never rebuilt from deformed positions (unlike \code{radius\_graph}, which rewires
+each tick). Mechanical deformation does not change $E_{\mathrm{grid}}$. Stretch may
+modify conduction \emph{parameters} (via \code{mpm\_stress\_to\_signal}); it must not
+rewire the graph.
+
+\item \textbf{$u,w$ are auxiliary state; $x,v$ are integrated.} On one set these
+coexist cleanly: \code{excitable\_nagumo} Euler-steps $u,w$ in place (the
+\code{heading} precedent in \code{models/base.py}) and returns \code{\{\}}, while
+only $x,v$ pass through the engine's second-order integrator (via \code{mpm}). There
+is no prediction-order conflict because the engine integrates only $x,v$.
+
+\item \textbf{The trigger must be explicit and sparse.} The only external input is
+\code{trigger\_pulse}, scoped by a selector and gated in time. No learned or dense
+driving field is permitted, so the reentrant pattern is a consequence of the
+dynamics, not an artifact of an over-expressive input.
+
+\item \textbf{The rotor must persist after the trigger stops.} The anti-cheating
+metric: if the rotating wave dies once the trigger ends, the pulse was carrying the
+pattern. Sustained rotation with the trigger \emph{off} is the criterion for success.
+\end{enumerate}
+
+\section{Implementation roadmap}
+
+Each stage ships an \emph{intent} metric --- ``it ran'' is not ``it worked''.
+
+\paragraph{Stage 1a --- planar conduction.}
+A fixed $100\times100$ material grid; \code{grid\_graph} built once; a single S1
+\code{trigger\_pulse} at one edge; \code{excitable\_nagumo}. The mechanical state is
+dormant. \emph{Intent metric:} a clean traveling wavefront with a stable conduction
+velocity.
+
+\begin{lstlisting}[style=yaml,caption={Stage 1a spec sketch (electrical only; names match the registry).}]
+general: {name: cardio_1a, seed: 0, n_frames: 600, dt: 0.1, boundary: wall}
+sets:
+  tissue_particle:
+    layout: grid
+    shape: [100, 100]          # 10000 material sites; state = x, v, u, w, F, C, m, mu, lambda
+operators:
+  - {op: grid_graph,       at: tissue_particle, neighbours: 8, fixed: true}
+  - {op: trigger_pulse,    at: "tissue_particle[x<0.03]", into: u, amp: 0.8, period: 1e9, dur: 1.0}
+  - {op: excitable_nagumo, at: tissue_particle, D: 0.1, a: 0.7, b: 0.8, eps: 0.18}
+schedule: [trigger_pulse, excitable_nagumo]      # grid_graph built once at init
+# stability: dt * D < 0.25 (Laplacian CFL)
+\end{lstlisting}
+
+\paragraph{Stage 1b --- rotor via S1--S2.}
+\code{trigger\_pulse} fires two pulses: S1 launches a planar wave, S2 fires later on
+a partial sub-domain in the refractory tail of S1, so the front curls into a rotor.
+\emph{Intent metric:} a sustained rotor \emph{after the trigger ends}, with its
+spiral-tip trajectory and rotation period.
+
+\paragraph{Stage 2 --- excitation--contraction coupling.}
+Activate the mechanical state on the same sites: \code{signal\_to\_mpm\_force} writes
+$\alpha g(u_i)n_i$ locally, \code{mls\_mpm\_mechanics} deforms the sheet.
+\emph{Intent metric:} contraction strain locked to the wave phase.
+
+\begin{lstlisting}[style=yaml,caption={Stage 2 spec sketch: add the local force and the MPM cycle on the same set.}]
+operators:
+  - {op: grid_graph,          at: tissue_particle, neighbours: 8, fixed: true}
+  - {op: trigger_pulse,       at: "tissue_particle[...]", into: u, ...}
+  - {op: excitable_nagumo,    at: tissue_particle, D: 0.1, a: 0.7, b: 0.8, eps: 0.18}
+  - {op: signal_to_mpm_force, at: tissue_particle, alpha: 1.0, theta: 0.5}   # u -> active stress (local)
+  - {op: mls_mpm_mechanics,   at: tissue_particle, youngs: 50, n_grid: 128, substeps: 8}
+schedule: [trigger_pulse, excitable_nagumo, signal_to_mpm_force, mls_mpm_mechanics]
+\end{lstlisting}
+
+\paragraph{Stage 3 --- mechano-electric feedback.}
+\code{mpm\_stress\_to\_signal} reads each site's stress and feeds it back as
+$+\beta\sigma_i$ (current) or $a_0+\beta\sigma_i$ (threshold). The sign is physical:
+stretch-activated channels depolarize, which can be pro- or anti-arrhythmic.
+\emph{Intent metric:} whether feedback changes the rotor's drift / anchoring /
+breakup relative to Stage~1b.
+
+\paragraph{Stage 4 --- mechanism search.}
+Search the coupling parameters $(D,\alpha,\theta,\beta,\dots)$ and, more importantly,
+the coupling \emph{family} (current vs.\ threshold; sign of $\beta$) with the bandit
+search already used in the prototype. The branches are hypotheses about
+mechano-electric feedback, not merely numerical settings.
+
+\section{Provenance and data}
+
+\paragraph{Electrical kernel.} Reused from \textsc{NeuralGraph}
+(\code{src/NeuralGraph/ODEs/}): \code{Fitzhug\_Nagumo.py} (single-site FHN generator
+$+$ inverse-problem trainer; same equations and rectangular pulse train) and
+\code{config\_Fitzhug\_Nagumo.py} (typed config; defaults $a{=}0.7,b{=}0.8,
+\varepsilon{=}0.18,dt{=}0.1$). Porting is: lift the per-site FHN update into
+\code{excitable\_nagumo}, add the graph-Laplacian coupling over $E_{\mathrm{grid}}$,
+and replace the scalar pulse with the selector-scoped \code{trigger\_pulse}.
+
+\paragraph{Real data (the fit target).} The Utrecht cardiomyocyte dataset lives at
+\code{.../GraphData/graphs\_data/cardiomyocytes\_real\_data/Cardio\_1/}: a raw
+microscope movie (\code{0\_B\_15kPa\_..ome.tif}, $[240,2048,2048]$; an HCM/diseased
+movie is also present) and its \code{.derivatives.npy} ($[239,137,137,12]$; channels
+$0,1$ are the tracked control-grid coordinates $X(t),Y(t)$ --- the displacement
+field). There is no cell segmentation; the tracked grid stands in for material-point
+motion. Rendering scripts and three mp4s (raw movie; movie $+$ tracked nodes;
+$10\times10$ amplified node trajectories) are in
+\code{Plexus/prototype/cardio/} alongside this document.
+
+\end{document}

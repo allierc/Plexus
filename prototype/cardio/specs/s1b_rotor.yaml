@@ -1,0 +1,10 @@
+general: {name: s1b_rotor, seed: 0, n_frames: 900, dt: 0.1, fps: 24, record_every: 3}
+sets:
+  tissue_particle: {layout: grid, shape: [120, 120]}
+operators:
+  - {op: grid_graph, neighbours: 8}
+  - {op: trigger_pulse, pulses: [
+      {region: [0.0, 0.05, 0.0, 1.0], t_start: 1,  dur: 6, amp: 2.0, mode: set},
+      {region: [0.0, 0.5,  0.0, 0.5], t_start: 95, dur: 6, amp: 2.0, mode: set}]}
+  - {op: excitable_nagumo, D: 0.6, a: 0.7, b: 0.8, eps: 0.08}
+schedule: [trigger_pulse, excitable_nagumo]

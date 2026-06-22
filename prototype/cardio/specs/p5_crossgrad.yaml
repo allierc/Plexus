@@ -1,0 +1,68 @@
+general:
+  cycle_frames: 180
+  dt: 0.1
+  fps: 24
+  n_cycles: 6
+  n_frames: 1080
+  record_every: 2
+  seed: 0
+  video_fps: 96
+  video_stride: 1
+  name: p5_crossgrad
+  step: 7
+operators:
+- neighbours: 8
+  op: grid_graph
+- amp: 2.0
+  dur: 6
+  op: pulse_field
+  period: 180
+  t_start: 1
+- D: 2.0
+  a: 0.7
+  b: 0.8
+  eps: 0.3
+  op: excitable_nagumo
+- eta: 0.3
+  op: signal_to_mpm_force
+  theta: 0.0
+- aniso: 0.85
+  beta: 0.4
+  gamma: 0.3
+  k_anchor: 0.1
+  op: mls_mpm_mechanics
+  substeps: 4
+schedule:
+- pulse_field
+- excitable_nagumo
+- signal_to_mpm_force
+- mls_mpm_mechanics
+sets:
+  tissue_particle:
+    layout: grid
+    shape:
+    - 137
+    - 137
+    patterns:
+      stiffness:
+        lo: 0.6
+        hi: 1.8
+        wavelength:
+        - 12
+        - 40
+        angle: 0.0
+        phase: 0.7
+      gain:
+        lo: 0.4
+        hi: 1.6
+        wavelength:
+        - 40
+        - 12
+        angle: 1.5708
+        phase: 0.0
+      fiber:
+        mode: swirl
+        center:
+        - 0.3
+        - 0.7
+        offset: 0.0

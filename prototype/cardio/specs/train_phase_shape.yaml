@@ -1,0 +1,24 @@
+# Training/inverse spec (analogue of the forward specs/*.yaml, for the inverse problem)
+name: train_08_01
+grid: [64, 64]
+n_iter: 350
+lr: 4.0e-3
+target: single_beat            # canonical | single_beat  (single strongest real beat)
+
+model:                         # the GIVEN forward model (synchronous; pulse is a known input)
+  pulse:   {period: 90, dur: 6, amp: 2.0}
+  nagumo:  {D: 2.0, a: 0.7, b: 0.8, eps: 0.3}
+  signal:  {theta: 0.0, eta: 0.3}
+  mechanics: {k_anchor: 0.06, substeps: 4}     # substrate spring restored (no drift)
+  boundary_width: 3                             # real-data Dirichlet BC band width
+
+loss: {mse: 1.0, amp: 3.0, length: 3.0, shape: 3.0}   # + shape: does a REWARDED phase fix orientation?
+
+learn:
+  maps: [stiffness, gain, fibre]                # UNet(image) -> mechanical tensor
+  phase:                                        # NEW degree of freedom: local activation time
+    enabled: true
+    coarse: 6                                   # learnable coarse grid -> smooth (~10-node wavelength)
+    max_lag: 18                                 # +/- ticks of per-node activation lag
+
+render: {cycles: 6, amp: 20, fps: 30}

@@ -1,0 +1,21 @@
+general: {name: coupled4, step: 1, seed: 0, n_frames: 720, dt: 0.1, fps: 24, record_every: 2, n_cycles: 4, cycle_frames: 180}
+sets:
+  tissue_particle:
+    layout: grid
+    shape: [100, 100]
+    pattern_wavelength: 10        # smooth heterogeneity, ~10-node wavelength (deterministic)
+    k_lo: 0.6
+    k_hi: 1.8
+    g_lo: 0.4
+    g_hi: 1.6
+operators:
+  - {op: grid_graph, neighbours: 8}
+  - {op: trigger_pulse, pulses: [
+      {region: [0.0, 0.10, 0.0, 0.10], t_start: 1,   dur: 6, amp: 2.0, mode: set},
+      {region: [0.0, 0.10, 0.0, 0.10], t_start: 181, dur: 6, amp: 2.0, mode: set},
+      {region: [0.0, 0.10, 0.0, 0.10], t_start: 361, dur: 6, amp: 2.0, mode: set},
+      {region: [0.0, 0.10, 0.0, 0.10], t_start: 541, dur: 6, amp: 2.0, mode: set}]}
+  - {op: excitable_nagumo, D: 2.0, a: 0.7, b: 0.8, eps: 0.08}
+  - {op: signal_to_mpm_force, theta: 0.0, eta: 0.3}
+  - {op: mls_mpm_mechanics, beta: 0.3, k_anchor: 0.03, gamma: 0.5, aniso: 0.85, substeps: 6}
+schedule: [trigger_pulse, excitable_nagumo, signal_to_mpm_force, mls_mpm_mechanics]
