@@ -137,9 +137,9 @@ from a hand-set design (left) to the best found (right), which delivers food
 roughly five-fold faster.
 
 ::: {layout-ncol=2}
-{{< video prototype/initial.mp4 title="initial hand-set colony" >}}
+{{< video gallery/initial.mp4 title="initial hand-set colony" >}}
 
-{{< video prototype/winner_7.mp4 title="optimized colony (winner 7)" >}}
+{{< video gallery/winner_7.mp4 title="optimized colony (winner 7)" >}}
 :::
 
 The same recipe scales to harder navigation — a porous **pillar** field and a
@@ -147,13 +147,13 @@ walled **maze**, each crossed by a self-generated attractant gradient and tuned
 by the same optimizer. Each is shown from its starting point to the optimized
 colony (see [Simulations](experiment.qmd) for the full runs):
 
-{{< video prototype/race_pillars_winner_1.mp4 title="pillars — starting point" >}}
+{{< video gallery/race_pillars_winner_1.mp4 title="pillars — starting point" >}}
 
-{{< video prototype/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escape the porous field)" >}}
+{{< video gallery/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escape the porous field)" >}}
 
-{{< video prototype/race_maze_hard_winner_1.mp4 title="maze — starting point" >}}
+{{< video gallery/race_maze_hard_winner_1.mp4 title="maze — starting point" >}}
 
-{{< video prototype/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}
+{{< video gallery/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}
 
 ## Read the blueprint
 
