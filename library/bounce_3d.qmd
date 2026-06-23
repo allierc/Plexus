@@ -1,0 +1,132 @@
+---
+title: "bounce_3d"
+subtitle: "Set (lateral). Reflect a 3D agent's heading off the domain walls."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Set (lateral). Reflect a 3D agent's heading off the domain walls.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Reads** &mdash; `move_speed`  (per-type props: `move_speed`)
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 3D.
+
+## Mechanism
+
+The 3D counterpart of `bounce`: if a dt-step along the current heading vector would
+leave the box on some axis, that axis's heading component is reflected (specular
+wall bounce), and the heading is renormalised. Run AFTER `sense_3d` (which steers)
+and BEFORE `advance_3d` (which emits the propulsion velocity), so the velocity
+already points back inside -- no agent ever crosses the wall.
+
+It mutates the heading vector (auxiliary control state, not the integrated
+position) and returns {} -- like the other in-place set ops, it is not a force.
+A torus domain has nothing to bounce off, so it is a no-op under periodic BC.
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: bounce_3d, at: cell}
+```
+
+## Typical schedules
+
+_Where this operator sits in a pipeline &mdash; to be written._
+
+## Identifiability
+
+_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
+
+## Failure modes
+
+_What breaks under bad parameters &mdash; to be written._
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`separation`](separation.qmd), [`drag`](drag.qmd).
+
+## Source
+
+[`src/plexus/operators/bounce_3d.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/bounce_3d.py) &mdash; the registered operator.
+
+```python
+"""bounce_3d -- set (lateral). Reflect a 3D agent's heading off the domain walls.
+
+The 3D counterpart of `bounce`: if a dt-step along the current heading vector would
+leave the box on some axis, that axis's heading component is reflected (specular
+wall bounce), and the heading is renormalised. Run AFTER `sense_3d` (which steers)
+and BEFORE `advance_3d` (which emits the propulsion velocity), so the velocity
+already points back inside -- no agent ever crosses the wall.
+
+It mutates the heading vector (auxiliary control state, not the integrated
+position) and returns {} -- like the other in-place set ops, it is not a force.
+A torus domain has nothing to bounce off, so it is a no-op under periodic BC.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Lateral
+from plexus.models.registry import register_operator
+
+
+@register_operator("bounce_3d", level="cell", kind="lateral")
+class Bounce3D(Lateral):
+    SUPPORTED_DIMS = [3]
+    REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+
+    def forward(self, H, mask=None):
+        if getattr(H, "periodic", False):
+            return {}                                       # torus: nothing to bounce off
+        lvl = H.level(self.at)
+        dev = lvl.state.device
+        N = lvl.n
+        pos = lvl.get("pos")                                # [N, 3]
+        h = lvl.heading                                     # [N, 3] unit heading
+        spd = lvl.move_speed
+        dt = float(getattr(H.config, "dt", 1.0))
+        box = H.world_size                                  # [3] per-axis box size
+        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
+        keep = (m > 0)[:, None]
+
+        nxt = pos + dt * spd[:, None] * h                   # tentative next position
+        out = (nxt < 0) | (nxt > box[None, :])              # which axes would exit the box
+        new_h = torch.where(out, -h, h)                     # reflect the exiting components
+        new_h = new_h / new_h.norm(dim=1, keepdim=True).clamp(min=1e-9)
+        lvl.heading = torch.where(keep, new_h, h)
+        return {}
+```

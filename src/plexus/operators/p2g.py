@@ -67,6 +67,13 @@ class P2G(Exchange):
         R = torch.stack([torch.stack([cs, -sn], -1), torch.stack([sn, cs], -1)], -2)
         stress = 2 * mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \
             + eye * (la * J * (J - 1))[:, None, None]
+        # optional MLS-MPM ACTIVE STRESS (-A n n^T from pulse_to_active_stress), added to the
+        # fixed-corotated elastic stress before the affine scatter. Default off (absent -> None ->
+        # pure elastic); same units / scaling / scatter as the elastic stress. Same H side-channel
+        # idiom as part_accel; it feeds the tissue through stress divergence, not a pointwise force.
+        act = getattr(H, "active_stress", None)
+        if act is not None:
+            stress = stress + act
         stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 

@@ -1,0 +1,178 @@
+---
+title: "pulse_to_active_stress"
+subtitle: "The STRESS half: activation field -> per-particle active stress."
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The STRESS half: activation field -> per-particle active stress.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field scatter / gather.
+- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Reads** &mdash; `from`, `direction_from`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D.
+
+## Mechanism
+
+The mechanical alternative to `pulse_to_contraction` (the FORCE half). Instead of injecting a
+per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
+elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
+
+    sigma_active(x) = - amplitude * a(x) * n(x) n(x)^T      (n = unit contraction axis)
+
+onto the side-channel `H.active_stress` (the same `H.part_accel` idiom). The MLS-MPM `p2g` scatter
+ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the
+tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n
+and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at
+the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
+not a pointwise push. This is the standard cardiac active-stress formulation.
+
+`kind=exchange`, `PREDICTION=None` (the stress is consumed by the MPM substep, never engine-
+integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
+which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `from` | &ndash; | **required** |
+| `direction_from` | contraction_axis_field | **required** |
+| `amplitude` | active_stress_gain | 50.0 |
+| `channel` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: pulse_to_active_stress, at: particle, from: ..., direction_from: ...}
+```
+
+## Typical schedules
+
+_Where this operator sits in a pipeline &mdash; to be written._
+
+## Identifiability
+
+_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
+
+## Failure modes
+
+_What breaks under bad parameters &mdash; to be written._
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`active_contraction`]{.op-badge} [`active_stress_tensor`]{.op-badge} [`directed_active_stress`]{.op-badge}  
+
+## Related operators
+
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`sense_3d`](sense_3d.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`apply_material_map`](apply_material_map.qmd).
+
+## Source
+
+[`src/plexus/operators/pulse_to_active_stress.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pulse_to_active_stress.py) &mdash; the registered operator.
+
+```python
+"""pulse_to_active_stress -- the STRESS half: activation field -> per-particle active stress.
+
+The mechanical alternative to `pulse_to_contraction` (the FORCE half). Instead of injecting a
+per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
+elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
+
+    sigma_active(x) = - amplitude * a(x) * n(x) n(x)^T      (n = unit contraction axis)
+
+onto the side-channel `H.active_stress` (the same `H.part_accel` idiom). The MLS-MPM `p2g` scatter
+ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the
+tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n
+and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at
+the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
+not a pointwise push. This is the standard cardiac active-stress formulation.
+
+`kind=exchange`, `PREDICTION=None` (the stress is consumed by the MPM substep, never engine-
+integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
+which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
+"""
+from __future__ import annotations
+
+import torch
+import torch.nn.functional as Fnn
+
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
+
+
+@register_operator("pulse_to_active_stress", level="particle", kind="exchange")
+class PulseToActiveStress(Exchange):
+    PREDICTION = None                         # stress is consumed by the MPM substep, not integrated
+    REQUIRES_PARAMS = ["from", "direction_from"]
+    MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
+    PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.amplitude = float(params.get("amplitude", 50.0))
+        self.channel = int(params.get("channel", 0))
+        self.direction_from = params.get("direction_from")
+        if self.direction_from is None:
+            raise ValueError("pulse_to_active_stress needs `direction_from:` "
+                             "(a vector_grid field giving the contraction axis n)")
+        self.at = params.get("_at", "particle")
+
+    def _sample(self, field_grid, pos, W):
+        """Bilinear-sample a `[C, nx, ny]` field at particle positions -> `[N, C]`.
+        Same convention as pulse_to_contraction so force<->stress is a clean mechanism swap."""
+        gxn = (pos[:, 0] / W) * 2 - 1
+        gyn = (pos[:, 1] / 1.0) * 2 - 1
+        grid = torch.stack([gyn, gxn], -1)[None, None]              # grid_sample expects (x=ny, y=nx)
+        return Fnn.grid_sample(field_grid[None], grid, mode="bilinear",
+                               padding_mode="border", align_corners=True)[0, :, 0].t()
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        fld = H.fields[self.field_name]
+        W = float(getattr(H, "world_width", 1.0))
+
+        a = self._sample(fld.grid[self.channel:self.channel + 1], pos, W)[:, 0]   # [N] activation a(x)
+        n = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2] contraction axis
+        n = n / n.norm(dim=1, keepdim=True).clamp(min=1e-9)                        # unit
+        gate = (a * lvl.occ).clamp(min=0.0)                                       # only inactive=0 particles off
+        if mask is not None:
+            gate = gate * mask.float()
+        nn = n[:, :, None] * n[:, None, :]                                        # [N, 2, 2]  n n^T
+        # Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the
+        # elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this
+        # sign is fixed empirically so axis n => contraction ALONG n, see active_stress_test.)
+        sigma = (self.amplitude * gate)[:, None, None] * nn                        # +A a n n^T
+        # side-channel for p2g (same idiom as H.part_accel); overwritten each frame, read every substep.
+        H.active_stress = sigma
+        return {}                                                                 # no body-force delta
+```

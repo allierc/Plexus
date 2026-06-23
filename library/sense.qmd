@@ -1,0 +1,184 @@
+---
+title: "sense"
+subtitle: "Field -> set. Sample the field at 3 sensors, turn the heading."
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Field -> set. Sample the field at 3 sensors, turn the heading.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field scatter / gather.
+- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Reads** &mdash; `from`, `turn_speed`, `sensor_angle`, `sensor_dist`, `sensor_size`  (per-type props: `turn_speed`, `sensor_angle`, `sensor_dist`, `sensor_size`)
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D.
+
+## Mechanism
+
+Each agent reads the field at three sensors (ahead-left / ahead / ahead-right),
+each a windowed, species-weighted sum (own channel +1, other channels `cross`),
+then turns its heading toward the strongest reading (Lague's 4-branch steer, scaled
+by a random strength). Reads per-agent sensor parameters the engine broadcast from
+`types`. Mutates `cell.heading` in place; returns {}.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `from` | &ndash; | **required** |
+| `cross` | inter_species_coupling_sign | -1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: sense, at: cell, from: ...}
+```
+
+## Typical schedules
+
+_Where this operator sits in a pipeline &mdash; to be written._
+
+## Identifiability
+
+_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
+
+## Failure modes
+
+_What breaks under bad parameters &mdash; to be written._
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`trail_following`]{.op-badge} [`stigmergy`]{.op-badge} [`physarum_sensing`]{.op-badge}  
+**Morphology prior** &mdash; [`filaments`]{.op-badge} [`transport_network`]{.op-badge}
+
+## Related operators
+
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense_3d`](sense_3d.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`apply_material_map`](apply_material_map.qmd).
+
+## Source
+
+[`src/plexus/operators/sense.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/sense.py) &mdash; the registered operator.
+
+```python
+"""sense -- field -> set. Sample the field at 3 sensors, turn the heading.
+
+Each agent reads the field at three sensors (ahead-left / ahead / ahead-right),
+each a windowed, species-weighted sum (own channel +1, other channels `cross`),
+then turns its heading toward the strongest reading (Lague's 4-branch steer, scaled
+by a random strength). Reads per-agent sensor parameters the engine broadcast from
+`types`. Mutates `cell.heading` in place; returns {}.
+"""
+from __future__ import annotations
+
+import math
+import torch
+
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
+
+
+def _sense_at(fld, pos, heading, angle_off, sensor_dist, sensor_size, weights):
+    """Windowed, species-weighted trail read at one sensor (field->scalar per agent).
+
+    Sum over a (2k+1)^2 window around the sensor centre of dot(weights, grid[:,x,y]);
+    per-agent `sensor_size` masks offsets outside each agent's own window.
+    """
+    a = heading + angle_off
+    cx, cy = fld.pix(pos[:, 0] + torch.cos(a) * sensor_dist,
+                     pos[:, 1] + torch.sin(a) * sensor_dist)
+    N = pos.shape[0]
+    out = pos.new_zeros(N)
+    g = fld.grid                                          # [C, nx, ny]
+    ks = int(sensor_size.max().item()) if torch.is_tensor(sensor_size) else int(sensor_size)
+    ssz = (sensor_size if torch.is_tensor(sensor_size)
+           else torch.full((N,), float(sensor_size), device=pos.device))
+    for ox in range(-ks, ks + 1):
+        px = (cx + ox).clamp(0, fld.nx - 1)
+        for oy in range(-ks, ks + 1):
+            py = (cy + oy).clamp(0, fld.ny - 1)
+            inwin = ((abs(ox) <= ssz) & (abs(oy) <= ssz)).float()
+            vals = g[:, px, py].t()                       # [N, C]
+            out = out + (weights * vals).sum(1) * inwin
+    return out
+
+
+@register_operator("sense", level="cell", kind="exchange")
+class Sense(Exchange):
+    REQUIRES_PARAMS = ["from"]
+    REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]
+    MECHANISM_TAGS = ["trail_following", "stigmergy", "physarum_sensing"]
+    MORPHOLOGY_PRIOR = ["filaments", "transport_network"]
+    PARAM_ROLES = {"cross": "inter_species_coupling_sign"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("from")
+        self.cross = float(params.get("cross", -1.0))    # sense weight on OTHER species' channels
+        self.at = params.get("_at", "cell")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        dev = lvl.state.device
+        N = lvl.n
+        pos = lvl.state[:, :2]
+        h = lvl.heading
+        fld = H.fields[self.field_name]
+        C = fld.C
+        nt = lvl.node_type
+
+        ts = lvl.turn_speed
+        ang = lvl.sensor_angle * (math.pi / 180.0)        # SpeciesSettings is in degrees
+        sd = lvl.sensor_dist
+        ssz = lvl.sensor_size
+
+        # senseWeight: +1 on own channel, `cross` on the others
+        w = torch.full((N, C), self.cross, device=dev)
+        w[torch.arange(N, device=dev), nt] = 1.0
+
+        wF = _sense_at(fld, pos, h, 0.0, sd, ssz, w)
+        wL = _sense_at(fld, pos, h, ang, sd, ssz, w)
+        wR = _sense_at(fld, pos, h, -ang, sd, ssz, w)
+
+        rnd = torch.rand(N, generator=H.rng, device=dev)
+        straight = (wF > wL) & (wF > wR)
+        randturn = (wF < wL) & (wF < wR)
+        turn = torch.where(
+            straight, torch.zeros_like(h),
+            torch.where(randturn, (rnd - 0.5) * 2.0 * ts,
+            torch.where(wR > wL, -rnd * ts,
+            torch.where(wL > wR, rnd * ts, torch.zeros_like(h)))))
+
+        new_h = h + turn
+        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
+        keep = m > 0                                       # only live, selected agents turn
+        lvl.heading = torch.where(keep, new_h, h)
+        return {}
+```

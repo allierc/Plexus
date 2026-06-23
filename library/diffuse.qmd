@@ -1,0 +1,150 @@
+---
+title: "diffuse"
+subtitle: "Field -> field. One discrete diffusion step on a scalar field."
+---
+
+::: {.op-head}
+![](../figures/icons/field.png){.op-logo}
+
+[`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
+
+One explicit step of isotropic diffusion on a scalar field &mdash; a per-channel 3&times;3 box-blur lerp that is exactly one forward-Euler step of $\partial_t c = D\,\nabla^2 c$ with edge-clamped boundaries. It mutates the field in place and returns nothing; it is the spreading half of every reaction&ndash;diffusion and stigmergy schedule.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\partial_t\phi$ **Field**: a field's own self-dynamics.
+- **Acts on** &mdash; `field` (the level the operator runs at).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+A per-channel 3x3 box-blur lerp: c <- (1-w)*c + w*mean_3x3(c), with w = saturate(
+rate*dt). mean_3x3(c) - c is a discrete Laplacian, so this is one explicit step of
+dc/dt = D nabla^2 c (the shader's `Diffuse`, edge-clamped). Writes the field in
+place; returns {}.
+
+## Equation
+
+$$
+c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
+\qquad w=\operatorname{sat}(\text{rate}\cdot\Delta t)
+$$
+$\overline{c}_{3\times3}-c$ is a discrete Laplacian, so this is one explicit step of
+$\partial_t c = D\,\nabla^2 c$ (3&times;3 in 2D, 3&times;3&times;3 in 3D).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `rate` | &ndash; | 0.35 |
+
+## Minimal spec
+
+```yaml
+fields:
+  chemical: {frame: grid, res: 96}
+operators:
+  - {op: diffuse, at: chemical, rate: 0.35}
+schedule: [secrete, diffuse, decay, sense]
+```
+
+## Typical schedules
+
+Sits between deposition and sensing: a source operator (`deposit` / `secrete`) writes the field, `diffuse` spreads it, `decay` removes it, and a `sense` / `chemotaxis` operator reads the gradient. Multiple `diffuse` steps per tick give a larger effective diffusion length.
+
+## Example output
+
+```{=html}
+<figure class="op-vid"><video src="../gallery/rd_worms.mp4" autoplay loop muted playsinline preload="metadata"></video>
+<figcaption>A Gray&ndash;Scott reaction&ndash;diffusion pattern &mdash; `diffuse` is the transport term that lets the worms spread and branch.</figcaption></figure>
+```
+
+## Identifiability
+
+Only the **product** rate&middot;$\Delta t$ and the number of steps per tick are observable &mdash; doubling `rate` and halving $\Delta t$ is invisible. The diffusion *length* $\sqrt{D\,t}$ is what patterns actually constrain, so from a single field snapshot `rate` and total time are confounded; you need either a known $\Delta t$ or the time-course of a spreading front to separate them.
+
+## Failure modes
+
+| when | what goes wrong |
+|---|---|
+| `rate`&middot;`dt` &gt; 1 | the lerp saturates (clamped to 1) &rarr; the field becomes its own neighbourhood mean in one step; over-smoothing, lost structure. |
+| too few steps for the domain | diffusion length too short &rarr; sources stay pinned, no long-range coupling. |
+| wrong boundary expectation | edges are clamped (zero-flux), not periodic &mdash; mass piles up at walls unless the field is periodic by design. |
+
+## Related operators
+
+- [`decay`](decay.qmd) &mdash; the companion sink term; diffuse spreads, decay removes
+- [`deposit`](deposit.qmd) &mdash; writes a scalar source into the field that diffuse then spreads
+- [`sense`](sense.qmd) &mdash; reads the diffused gradient back onto a set (stigmergy)
+- [`chemotaxis`](chemotaxis.qmd) &mdash; particle-level gradient following on a diffused field
+
+## Source
+
+[`src/plexus/operators/diffuse.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/diffuse.py) &mdash; the registered operator.
+
+```python
+"""diffuse -- field -> field. One discrete diffusion step on a scalar field.
+
+A per-channel 3x3 box-blur lerp: c <- (1-w)*c + w*mean_3x3(c), with w = saturate(
+rate*dt). mean_3x3(c) - c is a discrete Laplacian, so this is one explicit step of
+dc/dt = D nabla^2 c (the shader's `Diffuse`, edge-clamped). Writes the field in
+place; returns {}.
+"""
+from __future__ import annotations
+
+import torch
+import torch.nn.functional as Fnn
+
+from plexus.models.base import FieldUpdate
+from plexus.models.registry import register_operator
+
+
+@register_operator("diffuse", level="field", kind="field")
+class Diffuse(FieldUpdate):
+    """field -> field: acts on the field named by `at:` (no set involved)."""
+
+    SUPPORTED_DIMS = [2, 3]                     # 3x3 (2D) / 3x3x3 (3D) box-blur step
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")   # the field at `at:`
+        self.rate = float(params.get("rate", 0.35))     # diffusion weight per unit time
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        g = fld.grid                                                    # [C, *shape]
+        dt = float(getattr(H.config, "dt", 1.0))
+        if g.dim() == 3:                                               # 2D field [C, nx, ny]
+            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1), mode="replicate")   # edge-clamp
+            blur = Fnn.avg_pool2d(gp, 3, stride=1).squeeze(0)             # 3x3 mean, same size
+        else:                                                         # 3D field [C, nx, ny, nz]
+            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1, 1, 1), mode="replicate")
+            blur = Fnn.avg_pool3d(gp, 3, stride=1).squeeze(0)            # 3x3x3 mean, same size
+        dw = min(max(self.rate * dt, 0.0), 1.0)                        # saturate(rate*dt)
+        fld.grid = g * (1.0 - dw) + blur * dw
+        return {}
+```

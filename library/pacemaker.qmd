@@ -1,0 +1,154 @@
+---
+title: "pacemaker"
+subtitle: "A clocked scalar SOURCE: a periodic activation signal p(t)."
+---
+
+::: {.op-head}
+![](../figures/icons/field.png){.op-logo}
+
+[`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A clocked scalar SOURCE: a periodic activation signal p(t).
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\partial_t\phi$ **Field**: a field's own self-dynamics.
+- **Acts on** &mdash; `field` (the level the operator runs at).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+The temporal half of an active-stimulus decomposition
+(clock -> activation field -> contraction -> mechanics). It owns ONLY timing: it
+emits a scalar p(t) in [0,1] on a fixed period and writes it to `H.signals[name]`
+-- a scalar side-channel (the same pattern as `H.part_accel`) that any downstream
+operator reads by name. It knows nothing about space or mechanics, so one pacemaker
+can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or
+a secretion; `pacemaker_A`/`pacemaker_B` with different `period`/`phase` make a
+multi-site pacing graph.
+
+p(t) is a smooth raised bump of width `duration`, once per `period`, offset by
+`phase` (all in OUTER ticks, i.e. `H.frame`):
+
+    s = (frame + phase) mod period;   p = sin(pi * s / duration)  if s < duration else 0
+
+Set `period >= n_frames` for a one-shot pulse. `kind=field` (emits no set delta); its
+`at:` is only a scheduling anchor (any declared field) -- it mutates only `H.signals`.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `period` | beat_interval | 180.0 |
+| `duration` | active_width | 20.0 |
+| `phase` | beat_offset | 0.0 |
+| `name` | &ndash; | "pacemaker" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: pacemaker, at: field}
+```
+
+## Typical schedules
+
+_Where this operator sits in a pipeline &mdash; to be written._
+
+## Identifiability
+
+_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
+
+## Failure modes
+
+_What breaks under bad parameters &mdash; to be written._
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`periodic_source`]{.op-badge} [`clock`]{.op-badge} [`pacemaker`]{.op-badge}  
+
+## Related operators
+
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+
+## Source
+
+[`src/plexus/operators/pacemaker.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pacemaker.py) &mdash; the registered operator.
+
+```python
+"""pacemaker -- a clocked scalar SOURCE: a periodic activation signal p(t).
+
+The temporal half of an active-stimulus decomposition
+(clock -> activation field -> contraction -> mechanics). It owns ONLY timing: it
+emits a scalar p(t) in [0,1] on a fixed period and writes it to `H.signals[name]`
+-- a scalar side-channel (the same pattern as `H.part_accel`) that any downstream
+operator reads by name. It knows nothing about space or mechanics, so one pacemaker
+can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or
+a secretion; `pacemaker_A`/`pacemaker_B` with different `period`/`phase` make a
+multi-site pacing graph.
+
+p(t) is a smooth raised bump of width `duration`, once per `period`, offset by
+`phase` (all in OUTER ticks, i.e. `H.frame`):
+
+    s = (frame + phase) mod period;   p = sin(pi * s / duration)  if s < duration else 0
+
+Set `period >= n_frames` for a one-shot pulse. `kind=field` (emits no set delta); its
+`at:` is only a scheduling anchor (any declared field) -- it mutates only `H.signals`.
+"""
+from __future__ import annotations
+
+import math
+
+from plexus.models.base import FieldUpdate
+from plexus.models.registry import register_operator
+
+
+@register_operator("pacemaker", level="field", kind="field")
+class Pacemaker(FieldUpdate):
+    SUPPORTED_DIMS = [2, 3]
+    MECHANISM_TAGS = ["periodic_source", "clock", "pacemaker"]
+    PARAM_ROLES = {"period": "beat_interval", "duration": "active_width", "phase": "beat_offset"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.signal = str(params.get("name", "pacemaker"))   # the H.signals key it writes
+        self.period = float(params.get("period", 180.0))     # ticks between beats
+        self.duration = float(params.get("duration", 20.0))  # active width (ticks)
+        self.phase = float(params.get("phase", 0.0))         # tick offset
+
+    def clock(self, frame: int) -> float:
+        s = (frame + self.phase) % self.period
+        if s < self.duration:
+            return math.sin(math.pi * s / max(self.duration, 1e-9))   # smooth 0 -> 1 -> 0 bump
+        return 0.0
+
+    def forward(self, H, mask=None):
+        if getattr(H, "signals", None) is None:
+            H.signals = {}
+        H.signals[self.signal] = float(self.clock(int(getattr(H, "frame", 0))))
+        return {}
+```

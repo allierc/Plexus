@@ -1,0 +1,188 @@
+---
+title: "mpm_grid_update"
+subtitle: "Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve."
+---
+
+::: {.op-head}
+![](../figures/icons/field.png){.op-logo}
+
+[`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\partial_t\phi$ **Field**: a field's own self-dynamics.
+- **Acts on** &mdash; `field` (the level the operator runs at).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D.
+
+## Mechanism
+
+Grid velocity v = momentum / mass, plus the continuum surface force (CSF) from the
+liquid colour field and the boundary conditions: reflective domain walls, obstacle
+friction, and the interior wall mask (rasterized once from `general: obstacles:`).
+A pure field -> field operator; returns {}. Step 3 of the decomposed MLS-MPM
+(oracle: `mls_mpm_mechanics`).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `dt_sub` | &ndash; | 2e-4 |
+| `surface_tension` | &ndash; | 0.0 |
+| `wall_damp` | &ndash; | 1.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mpm_grid_update, at: field}
+```
+
+## Typical schedules
+
+_Where this operator sits in a pipeline &mdash; to be written._
+
+## Identifiability
+
+_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
+
+## Failure modes
+
+_What breaks under bad parameters &mdash; to be written._
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`grid_solve`]{.op-badge} [`surface_tension`]{.op-badge} [`boundary_conditions`]{.op-badge}  
+
+## Related operators
+
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd).
+
+## Source
+
+[`src/plexus/operators/mpm_grid_update.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_grid_update.py) &mdash; the registered operator.
+
+```python
+"""mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
+
+Grid velocity v = momentum / mass, plus the continuum surface force (CSF) from the
+liquid colour field and the boundary conditions: reflective domain walls, obstacle
+friction, and the interior wall mask (rasterized once from `general: obstacles:`).
+A pure field -> field operator; returns {}. Step 3 of the decomposed MLS-MPM
+(oracle: `mls_mpm_mechanics`).
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import FieldUpdate
+from plexus.models.registry import register_operator
+from plexus.operators.mpm_grid import sub_dt
+
+
+@register_operator("mpm_grid_update", level="field", kind="field")
+class MPMGridUpdate(FieldUpdate):
+    MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_grid")
+        self.dt_sub = float(params.get("dt_sub", 2e-4))
+        self.surface_tension = float(params.get("surface_tension", 0.0))
+        self.wall_damp = float(params.get("wall_damp", 1.0))
+        self._wall_key = None; self._wall_cache = None
+
+    def _walls(self, H, g, dev):
+        key = (g.nx, g.ny)
+        if self._wall_key == key and self._wall_cache is not None:
+            return self._wall_cache
+        walls = torch.zeros(g.nx, g.ny, dtype=torch.bool, device=dev)
+        obs = list(getattr(H, "obstacles", []) or [])
+        if obs:
+            xs = (torch.arange(g.nx, device=dev) + 0.5) * g.dx
+            ys = (torch.arange(g.ny, device=dev) + 0.5) * g.dx
+            gx = xs[:, None].expand(g.nx, g.ny); gy = ys[None, :].expand(g.nx, g.ny)
+            for rect in obs:
+                v = [float(x) for x in rect]
+                if len(v) == 4:
+                    walls = walls | ((gx >= v[0]) & (gx <= v[2]) & (gy >= v[1]) & (gy <= v[3]))
+                elif len(v) == 3:
+                    walls = walls | (((gx - v[0]) ** 2 + (gy - v[1]) ** 2) <= v[2] ** 2)
+        walls = walls.reshape(-1)
+        self._wall_key = key; self._wall_cache = walls
+        return walls
+
+    def forward(self, H, mask=None):
+        g = H.field(self.at); dev = g.m.device
+        dt = sub_dt(H, self.dt_sub)
+        nx, ny, inv_dx, dx = g.nx, g.ny, g.inv_dx, g.dx
+        periodic = bool(getattr(H, "periodic", False))
+        wd = self.wall_damp
+        gm, gmv, gc = g.m, g.mv, g.c
+        gv = gmv / gm.clamp(min=1e-10)[:, None]
+
+        surf = self.surface_tension
+        if surf > 0.0 and bool((gc > 0).any()):                    # CSF continuum surface force
+            c = gc.view(nx, ny)
+            cx = (torch.roll(c, -1, 0) - torch.roll(c, 1, 0)) * (0.5 * inv_dx)
+            cy = (torch.roll(c, -1, 1) - torch.roll(c, 1, 1)) * (0.5 * inv_dx)
+            gmag = torch.sqrt(cx * cx + cy * cy); eps = 1e-6
+            nxg, nyg = cx / (gmag + eps), cy / (gmag + eps)
+            kappa = -((torch.roll(nxg, -1, 0) - torch.roll(nxg, 1, 0)) * (0.5 * inv_dx)
+                      + (torch.roll(nyg, -1, 1) - torch.roll(nyg, 1, 1)) * (0.5 * inv_dx))
+            fmask = (gmag > 0.02 * gmag.max()).to(c.dtype)
+            stfx = (surf * kappa * cx * fmask).view(-1); stfy = (surf * kappa * cy * fmask).view(-1)
+            inv_m = (dx * dx) / gm.clamp(min=1e-8)
+            gv = gv + dt * torch.stack([stfx * inv_m, stfy * inv_m], dim=1)
+
+        if not periodic:                                            # reflective domain walls
+            gv = gv.view(nx, ny, 2)
+            ix = torch.arange(nx, device=dev); iy = torch.arange(ny, device=dev); bnd = 3
+            lox, hix = ix < bnd, ix > nx - bnd
+            loy, hiy = iy < bnd, iy > ny - bnd
+            gv[lox, :, 0] = gv[lox, :, 0].clamp(min=0); gv[hix, :, 0] = gv[hix, :, 0].clamp(max=0)
+            gv[:, loy, 1] = gv[:, loy, 1].clamp(min=0); gv[:, hiy, 1] = gv[:, hiy, 1].clamp(max=0)
+            if wd != 1.0:
+                gl = gv[lox, :, 1]; gv[lox, :, 1] = torch.where(gl > 0, gl * wd, gl)
+                gh = gv[hix, :, 1]; gv[hix, :, 1] = torch.where(gh > 0, gh * wd, gh)
+                gv[:, loy, 0] = gv[:, loy, 0] * wd
+                gv[:, hiy, 0] = gv[:, hiy, 0] * wd
+            gv = gv.view(nx * ny, 2)
+        walls = self._walls(H, g, dev)
+        if wd != 1.0 and walls.any():                              # friction in fluid cells touching obstacles
+            w2 = walls.view(nx, ny)
+            near = (torch.roll(w2, 1, 0) | torch.roll(w2, -1, 0)
+                    | torch.roll(w2, 1, 1) | torch.roll(w2, -1, 1)) & ~w2
+            gvv = gv.view(nx, ny, 2); gx_ = gvv[..., 0]; gy_ = gvv[..., 1]
+            gvv[..., 0] = torch.where(near, gx_ * wd, gx_)
+            gvv[..., 1] = torch.where(near & (gy_ > 0), gy_ * wd, gy_)
+            gv = gvv.view(nx * ny, 2)
+        gv = torch.where(walls[:, None], torch.zeros_like(gv), gv)  # interior wall BC
+        g.v = gv
+        return {}
+```
