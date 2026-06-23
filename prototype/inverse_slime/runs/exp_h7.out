@@ -1,0 +1,6 @@
+
+## H7 [11:57:51]: CONNECTOME-CX CURRICULUM scheme -- free-run heading (cos,sin), per-frame loss over a GROWING horizon [10,30,60,100,140], random start frames, soft tail, lr decay, grad clip, bounce resync. (My earlier recurrent only matched the FINAL net change.)
+  target0 stage0 K=10: angle_uerr=0.086 (turn=0.25 dist=0.23)
+  target0 stage1 K=30: angle_uerr=0.106 (turn=0.25 dist=0.23)
+  target0 stage2 K=60: angle_uerr=0.115 (turn=0.22 dist=0.21)
+  target0 stage3 K=100: angle_uerr=0.118 (turn=0.18 dist=0.16)

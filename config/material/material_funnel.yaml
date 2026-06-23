@@ -1,4 +1,3 @@
-# material_funnel -- auto-ported from prototype/water (overnight_suite:ob_funnel).
 general:
   name: material_funnel
   seed: 0
@@ -25,33 +24,41 @@ sets:
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
   mpm_particle: {parent: cell, per_parent: 7000, radius: 0.2, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.5,
-  wall_contact: 0.06, surface_tension: 14}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.3, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 14, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue circular particle is initially centered within a white rectangular frame.
-      Over the course of the simulation, the circular particle rapidly deforms and collapses downward
-      into a jagged, irregular shape. This shape then continues to compress and stretch vertically, narrowing
-      into a thin, elongated column. Finally, the blue mass stabilizes into a narrow vertical line at
-      the bottom of the frame.
-    objects: The primary object is a blue particle that starts as a large, smooth circle. It is contained
-      within a white rectangular structure that has a stepped, downward-pointing base. The background
-      consists of a solid grey field that surrounds the white and blue elements. The blue mass changes
-      from a large diameter to a very small, thin width as it moves toward the bottom.
+    description: A large blue circular particle is initially centered within a white rectangular area.
+      Over the course of the simulation, the particle rapidly deforms and stretches downward into a vertical
+      column. The blue mass continues to descend, narrowing into a thin stem at the bottom of the frame.
+      By the final frame, the blue shape has almost completely transitioned into a vertical line with
+      a small horizontal protrusion.
+    objects: The primary object is a blue particle that changes from a circle to a complex, elongated
+      shape. It is situated within a white background that is bordered by a grey frame. The blue shape
+      starts as a large, prominent circle and ends as a thin, vertical line. The white area serves as
+      a container, maintaining a consistent rectangular size throughout the sequence.
   movie_mpm_particle:
     description: A large circular cluster of blue particles is initially centered in the upper half of
-      the frame. The cluster then rapidly collapses and transforms into a jagged, irregular shape at the
-      bottom of the container. This shape settles into a more stable, tiered structure with a narrow vertical
-      column at the base. Finally, the blue particles stabilize into a flat, horizontal layer with a small
-      central peak.
-    objects: The primary objects are numerous small, light-blue particles that form a cohesive mass. These
-      particles are initially arranged in a large, dense circle. As time progresses, they reorganize into
-      a multi-tiered, stepped structure with a thin vertical tail. The background consists of a static,
-      grey rectangular field with a white central container.
+      the frame. The cluster then rapidly collapses and flows downward into a narrow, vertical channel.
+      As it descends, the particles spread out horizontally to fill the wider sections of the channel.
+      Finally, the particles settle into a steady, narrow stream at the bottom of the structure.
+    objects: The primary objects are numerous small, light-blue particles that form a dense, circular
+      cluster. These particles are contained within a white, geometric structure that has a wide top and
+      a narrow bottom. The white structure is set against a solid, neutral gray background. The particles
+      transition from a large, concentrated mass to a thin, elongated column as they move through the
+      white conduit.

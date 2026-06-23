@@ -1,0 +1,14 @@
+{
+  "mechanism": "slime",
+  "D": 8,
+  "n_specs": 24,
+  "n_seeds": 4,
+  "seed_floor_mean": 0.050814055459069335,
+  "seed_floor_max": 0.060890785245399,
+  "random_pair_min": 0.024490153179860398,
+  "random_pair_mean": 0.44326000768165585,
+  "random_pair_max": 2.9563915129804137,
+  "separation_ratio": 8.723177153980581,
+  "degenerate_fraction": 0.21014492753623187,
+  "seconds": 144.4
+}

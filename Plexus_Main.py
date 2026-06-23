@@ -44,6 +44,8 @@ def main():
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
                         help="on -o plot, also render a gif movie per set")
+    parser.add_argument("--grid", action="store_true",
+                        help="render the MLS-MPM 6-panel grid-diagnostic movie (objects/C/F/Jp/stress/grid)")
     parser.add_argument("--no-describe", action="store_true",
                         help="skip the automatic VLM video description that -o generate runs by default")
     parser.add_argument("--describe-out", default=None,
@@ -93,6 +95,14 @@ def main():
         data_dir = plot_dataset(sim, pre_folder, movie=(args.movie or describe))
         if "plot" in task:
             _mark(run_log_dir, "_completed_plot", data_dir)
+
+    # optional MLS-MPM grid-diagnostic movie (re-runs the sim to capture F/C/Jp/stress/grid)
+    if args.grid and data_dir is None and ("generate" in task or "plot" in task):
+        from plexus.paths import graphs_data_path
+        data_dir = os.path.join(graphs_data_path(), pre_folder.rstrip("/"), name)
+    if args.grid and data_dir:
+        from plexus.generators.mpm_grid_diag import generate_grid_movie
+        generate_grid_movie(sim, data_dir, device=args.device)
 
     # caption the freshly rendered movies (default on for -o generate; --no-describe to skip)
     if describe and "generate" in task and data_dir:

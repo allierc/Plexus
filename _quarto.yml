@@ -18,6 +18,8 @@ website:
         text: LLM ↔ registry
       - href: experiment.qmd
         text: Simulations
+      - href: inverse.qmd
+        text: Inverse problem
       - href: building.qmd
         text: Building Plexus
     tools:

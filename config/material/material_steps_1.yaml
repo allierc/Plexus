@@ -1,4 +1,3 @@
-# material_steps_1 -- auto-ported from prototype/water (water_steps_1.yaml).
 general:
   name: material_steps_1
   seed: 0
@@ -24,13 +23,21 @@ sets:
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
   mpm_particle: {parent: cell, per_parent: 6000, radius: 0.2, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.4,
-  wall_contact: 0.06, surface_tension: 30.0}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.3, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 30.0, wall_damp: 0.4}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.4, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
@@ -41,23 +48,23 @@ descriptions:
 
       The blue sphere remains stationary while the grey steps appear to be a static background element.
 
-      The overall scene is set against a plain white background with some faint blue textures appearing
-      in the lower half.'
+      The background is white, providing a high-contrast environment for the two primary objects.'
     objects: 'The blue sphere is a large, circular object with a mottled, icy texture.
 
       The grey structure consists of five distinct rectangular steps arranged in a descending staircase
       pattern.
 
-      The steps are uniform in grey color and are connected to form a solid block at the bottom.
+      The steps are solid grey and vary in width to create a diagonal downward slope.
 
-      The background is a large, white empty space that provides high contrast for the primary objects.'
+      The white background is a uniform, empty space that surrounds the two main objects.'
   movie_mpm_particle:
-    description: A dense cluster of blue particles is initially located in the upper-left corner of the
-      frame. As time progresses, these particles begin to descend and spread out across the bottom of
-      the screen. They interact with a series of gray, step-like platforms that appear to be descending
-      as well. By the end of the sequence, the particles have settled into a thin layer along the bottom
-      edge of the frame.
-    objects: The blue particles are small, individual points that form a large, dense cluster at the start.
-      These particles are light blue in color and move fluidly across the white background. The gray objects
-      are large, solid, rectangular blocks arranged in a descending staircase formation. These gray steps
-      are uniform in color and size, providing a structural boundary for the moving particles.
+    description: A large cluster of blue particles is initially located in the upper-left corner of the
+      frame. As the simulation progresses, these particles begin to descend and spread out across the
+      lower half of the screen. They interact with a grey, stepped geometric structure, accumulating along
+      its upper edges. By the final frame, the particles have mostly settled into a thin layer following
+      the downward slope of the steps.
+    objects: The primary objects are numerous small, blue circular particles that form a dense cloud.
+      A large, solid grey geometric shape occupies the bottom-left area, consisting of a series of descending
+      rectangular steps. The background is a plain, solid white field that provides high contrast for
+      the moving elements. The blue particles vary in density, appearing as a concentrated mass at the
+      start and a dispersed layer at the end.

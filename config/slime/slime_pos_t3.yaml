@@ -1,0 +1,44 @@
+general: {name: slime_pos_t3, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006863, turn_speed: 0.2126, sensor_angle: 14.747,
+        sensor_dist: 0.04958, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.06929}
+- {op: diffuse, at: chemical, rate: 0.024983}
+- {op: decay, at: chemical, rate: 0.000772}
+- {op: sense, at: cell, from: chemical, cross: -0.677325}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a static distribution of cyan particles against a black background.
+      There is no visible movement or evolution between the provided keyframes. The arrangement of the
+      particles remains constant throughout the sequence. The overall scene is a steady-state representation
+      of a spatial pattern.
+    objects: The scene contains thousands of small, circular cyan particles. These particles are arranged
+      in a complex, web-like topology of interconnected filaments and clusters. The filaments form a porous,
+      network-like structure with varying degrees of density. Each individual particle is uniform in size
+      and color, creating a high-contrast visual effect.
+  movie_chemical:
+    description: The simulation begins with a dense, interconnected network of teal fibers forming a complex
+      web. Over time, the fibers appear to thin out and lose their structural integrity. The network gradually
+      breaks apart into smaller, isolated segments and individual points. By the final frame, the original
+      web has almost completely dissipated into a sparse collection of disconnected fragments.
+    objects: The primary objects are teal-colored fibers that form a continuous, interconnected mesh.
+      These fibers vary in thickness, creating a porous, sponge-like topology across the entire frame.
+      The background is black, providing a high-contrast environment for the teal structures. As the simulation
+      progresses, the size of the connected components decreases until they become tiny, isolated dots.

@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/workspace/Plexus/prototype/inverse_slime/exp_posonly_full.py", line 71, in <module>
+    main()
+  File "/workspace/Plexus/prototype/inverse_slime/exp_posonly_full.py", line 47, in main
+    fld = dec(dif(dep(fld, p, nt, R)))                 # learnable field, self-evolved
+                  ^^^^^^^^^^^^^^^^^^
+  File "/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Plexus/prototype/inverse_slime/operators.py", line 48, in forward
+    flat = nt.long() * (nx * ny) + gx * ny + gy
+           ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu!

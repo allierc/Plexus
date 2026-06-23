@@ -1,0 +1,5 @@
+
+## H3 [11:08:45]: UCB/GD hybrid (black-box 2D grid over geometry + GD on ts/beta/temp, scored by one-step NLL) recovers sensor_angle better than pure-GD mixture.
+- pure-GD mixture: angle=0.179+/-0.155 turn=0.115 dist=0.216
+- UCB+GD hybrid  : angle=0.251+/-0.174 turn=0.104 dist=0.060
+- verdict: FALSIFIED  [pure-GD 0.179 vs hybrid 0.251; grid ceiling 0.121]

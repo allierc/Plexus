@@ -1,0 +1,50 @@
+general: {name: slime2_pos, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 0.5, move_speed: 0.005002, turn_speed: 0.5737, sensor_angle: 12.728,
+        sensor_dist: 0.04486, sensor_size: 1}
+      b: {fraction: 0.5, move_speed: 0.005002, turn_speed: 0.5737, sensor_angle: 12.728,
+        sensor_dist: 0.04486, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.053757}
+- {op: diffuse, at: chemical, rate: 0.036402}
+- {op: decay, at: chemical, rate: 0.003148}
+- {op: sense, at: cell, from: chemical, cross: -0.8599}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a collection of red and green particles moving in complex, winding
+      paths across a black background. Over time, the particles appear to follow fluid-like trajectories,
+      forming elongated, curved filaments. The density of the particles remains relatively constant as
+      they shift and weave through the space. The overall motion suggests a stochastic process or a flow
+      field where individual agents are constrained to continuous paths.
+    objects: The scene contains two distinct sets of small, circular particles colored in red and cyan-green.
+      These particles are arranged in long, interconnected, and winding filamentary structures that resemble
+      streamlines or neural networks. Each individual particle is very small and uniform in size, creating
+      a granular texture within the larger curves. The red and green filaments often run parallel or intersect,
+      creating a dense, interwoven web of motion.
+  movie_chemical:
+    description: The simulation begins with a sparse distribution of small, disconnected particles in
+      red and cyan. Over time, these particles begin to coalesce and elongate into thin, thread-like filaments.
+      As the simulation progresses, the filaments grow thicker and begin to intertwine with one another.
+      By the final frame, the filaments have expanded to fill the entire space, forming a dense, interconnected
+      network.
+    objects: The scene contains two sets of objects, one colored red and the other colored cyan. Initially,
+      the objects are small, discrete points scattered randomly across a black background. As time passes,
+      they transform into elongated, curvilinear filaments of varying lengths. In the final state, the
+      filaments form a complex, porous topology where they are densely packed and interwoven.

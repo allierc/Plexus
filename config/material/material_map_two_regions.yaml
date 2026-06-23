@@ -1,0 +1,44 @@
+fields:
+  activation: {frame: grid, res: 128}
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  stiffness_map: {frame: image, source: material/map_two_regions.tif}
+general: {boundary: wall, dt: 1.0, n_frames: 250, name: material_map_two_regions,
+  seed: 0}
+operators:
+- {at: cell, op: aggregate}
+- {op: apply_material_map, at: mpm_particle, from: stiffness_map, target: youngs,
+  min: 20, max: 200}
+- {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
+- at: activation
+  center: [0.5, 0.5]
+  clock: beat
+  op: pulse_stimulus
+  radius: 0.12
+- {amplitude: 20.0, at: mpm_particle, from: activation, mode: inward, op: pulse_to_contraction}
+- {at: mpm_particle, k: 30.0, op: mpm_drag}
+- {at: mpm_particle, dt_sub: 0.0002, op: mpm_strain}
+- {a_max: 200, at: mpm_particle, drag: 0.0, dt_sub: 0.0002, op: p2g, to: mpm_grid}
+- {at: mpm_grid, dt_sub: 0.0002, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, dt_sub: 0.0002, from: mpm_grid, op: g2p, wall_contact: 0.06,
+  wall_damp: 0.5}
+schedule:
+- aggregate
+- apply_material_map
+- pacemaker
+- pulse_stimulus
+- pulse_to_contraction
+- mpm_drag
+- dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
+  substep: 10
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5]
+    types:
+      sheet:
+        block: [0.15, 0.15, 0.85, 0.85]
+        fraction: 1.0
+        youngs: 80
+  mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}

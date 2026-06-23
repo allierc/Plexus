@@ -1,0 +1,25 @@
+# arbitrary_rand_8t_3d -- 3D version of arbitrary_rand_8t: attraction_repulsion in a periodic 3D box.
+# Same per-type force law + sigma as the 2D spec (the law is dimension-generic,
+# SUPPORTED_DIMS=[2,3]); only the container changes (dim: 3, world: [1,1,1]).
+general: {name: arbitrary_rand_8t_3d, seed: 0, n_frames: 250, dt: 0.1, boundary: periodic, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 30000
+    types:
+      t0: {fraction: 0.125, p: [1.9804, 1.5155, 1.5212, 1.8965]}
+      t1: {fraction: 0.125, p: [1.7428, 1.5807, 1.4266, 1.8782]}
+      t2: {fraction: 0.125, p: [1.4116, 1.9228, 1.0687, 1.43]}
+      t3: {fraction: 0.125, p: [1.5195, 1.9509, 1.251, 1.806]}
+      t4: {fraction: 0.125, p: [1.6765, 1.7171, 1.6296, 1.9716]}
+      t5: {fraction: 0.125, p: [1.3327, 1.3983, 1.2029, 1.0507]}
+      t6: {fraction: 0.125, p: [1.2129, 1.9155, 1.8402, 1.1124]}
+      t7: {fraction: 0.125, p: [1.6038, 1.4792, 1.5947, 1.6593]}
+fields: {}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  splat_size: 1.4

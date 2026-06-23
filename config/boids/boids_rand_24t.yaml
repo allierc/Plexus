@@ -1,5 +1,5 @@
 # boids_rand_24t -- random boids sweep: 24 types, 16384 particles, random per-type weights
-general: {name: boids_rand_24t, seed: 0, n_frames: 3000, dt: 0.5, boundary: periodic}
+general: {name: boids_rand_24t, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic}
 sets:
   particle:
     n: 16384
@@ -47,10 +47,9 @@ descriptions:
     description: The simulation begins with a sparse distribution of multicolored particles scattered
       across a black background. Over time, the density of these particles increases significantly as
       they populate the entire frame. The particles appear to move and redistribute, maintaining a relatively
-      uniform but stochastic spatial arrangement. By the final frame, the field is densely packed with
-      a high concentration of points across the entire area.
-    objects: The scene contains thousands of small, circular particles distributed throughout the 2D space.
-      These particles are arranged in a stochastic, non-connected topology with no visible clustering
-      or patterns. They feature a diverse color palette including shades of blue, orange, yellow, green,
-      and pink. Each individual particle is uniform in size, appearing as a single pixel or a small cluster
-      of pixels.
+      uniform but stochastic spatial arrangement. By the final frame, the scene is completely saturated
+      with a dense, multicolored field of points.
+    objects: The scene contains thousands of small, circular particles of uniform size. These particles
+      are arranged in a stochastic, non-connected distribution across a two-dimensional plane. The color
+      palette includes a diverse mix of red, blue, yellow, green, and pink hues. The particles are distributed
+      with varying local densities, creating a textured, granular appearance.

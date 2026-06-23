@@ -63,7 +63,8 @@ def data_generate(
         for fname, fd in out.get("fields", {}).items():     # continuum fields (heatmap movies)
             flat[f"{fname}__grid"] = fd["grid"]
             flat[f"{fname}__colors"] = fd["colors"]
-        np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"], **flat)
+        np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"],
+                 world_size=out["world_size"], **flat)
 
     nrec = next(iter(out["sets"].values()))["pos"].shape[0]
     print(f"[generate] done: {nrec} recorded frames -> {data_dir}", flush=True)

@@ -1,4 +1,3 @@
-# material_vessel_2 -- auto-ported from prototype/water (water_vessel_2.yaml).
 general:
   name: material_vessel_2
   seed: 0
@@ -18,32 +17,43 @@ sets:
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
   mpm_particle: {parent: cell, per_parent: 6000, radius: 0.22, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.4,
-  wall_contact: 0.06, surface_tension: 1500.0}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.3, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 1500.0, wall_damp: 0.4}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.4, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue circular particle is initially positioned on the left side of a vertical
-      grey line. As time progresses, the particle rapidly moves downward and deforms into a horizontal,
-      irregular blue shape. This shape eventually settles at the bottom of the frame, spreading out across
-      the base. The vertical grey line remains stationary throughout the entire duration of the simulation.
-    objects: The scene contains a single large, light blue circular particle that changes shape over time.
-      A thin, vertical grey line serves as a stationary reference point in the center of the frame. The
-      background is a solid white, providing a high-contrast environment for the objects. The blue object
-      transitions from a compact sphere to a wide, elongated horizontal mass at the bottom.
+    description: A large blue circular particle is initially positioned to the left of a vertical grey
+      line. As time progresses, the particle rapidly deforms and moves downward toward the bottom of the
+      frame. It eventually flattens into a horizontal, irregular blue shape that stretches across the
+      bottom. Finally, the shape splits into two distinct, rounded blue masses separated by the vertical
+      grey line.
+    objects: The scene contains a large, light blue circular particle that occupies the upper left quadrant.
+      A thin, vertical grey line serves as a stationary divider in the center of the frame. The blue particle
+      undergoes a significant change in topology, transitioning from a circle to a continuous horizontal
+      blob. In the final frames, the blue mass is divided into two smaller, separate rounded shapes at
+      the bottom.
   movie_mpm_particle:
-    description: A large circular cluster of blue particles is initially positioned on the left side of
-      the frame. As the simulation progresses, this cluster rapidly disintegrates and moves downward toward
-      the bottom edge. The particles eventually settle into a horizontal band along the bottom, with a
-      small detached cluster appearing on the left. A vertical grey bar remains stationary throughout
-      the entire duration of the sequence.
-    objects: The primary object is a large, circular cluster of light blue particles located in the upper
-      left. A solid, vertical grey bar is positioned in the center-right of the frame. A small, separate
-      cluster of blue particles appears briefly in the lower-left quadrant. A dense, horizontal band of
-      dark blue particles forms along the bottom edge of the scene.
+    description: A large circular cluster of light blue particles is initially positioned on the left
+      side of the frame. As the simulation progresses, this cluster rapidly disintegrates and moves downward
+      toward the bottom edge. The particles eventually settle into a horizontal, elongated shape along
+      the bottom of the screen. A vertical grey bar remains stationary throughout the entire duration
+      of the sequence.
+    objects: The primary object is a large, circular cluster composed of numerous small, light blue particles.
+      A solid, vertical grey bar is positioned on the right side of the frame, extending from the top
+      to the bottom. The light blue particles are small and densely packed in the first frame but become
+      more dispersed as they move. The grey bar is uniform in width and maintains a constant position
+      and color throughout the video.

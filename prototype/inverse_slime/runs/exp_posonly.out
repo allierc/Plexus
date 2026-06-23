@@ -1,0 +1,4 @@
+
+## POSITION-ONLY field test [13:23:50]: profile diffuse.rate from PARTICLE POSITIONS ALONE (field free-run, never observed). K=10.
+- diffuse.rate: true_u=0.99 argmin=0.05 depth=0.004 -> UNIDENTIFIABLE from positions (flat)
+- saved archive/profile_field_from_pos.png

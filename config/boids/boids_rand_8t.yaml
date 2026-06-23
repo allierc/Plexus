@@ -1,5 +1,5 @@
 # boids_rand_8t -- random boids sweep: 8 types, 4096 particles, random per-type weights
-general: {name: boids_rand_8t, seed: 0, n_frames: 3000, dt: 0.5, boundary: periodic}
+general: {name: boids_rand_8t, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic}
 sets:
   particle:
     n: 4096
@@ -28,11 +28,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The video shows a static field of multicolored dots on a black background. There is no
-      visible movement or evolution of the particles between the keyframes. The distribution of the dots
-      remains constant throughout the entire sequence. The scene represents a steady-state state of a
-      simulation or a static noise pattern.
-    objects: The scene contains thousands of small, circular dots distributed across the entire frame.
-      These dots are arranged in a dense, pseudo-random pattern with no clear geometric structure. The
-      dots feature a variety of colors, including red, blue, green, orange, and white. Each dot is uniform
-      in size and maintains a consistent diameter throughout the video.
+    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
+      a black background. Over time, the particles begin to aggregate into distinct, high-density clusters
+      and elongated filaments. These structures grow more pronounced as the particles organize into complex,
+      interconnected networks. By the final frame, the system has transitioned from a random state to
+      a highly structured pattern of concentrated nodes and connecting bridges.
+    objects: The scene contains thousands of small, circular particles in various colors including red,
+      blue, green, orange, and white. Initially, these objects are distributed randomly and independently
+      across the entire 2D space. As the simulation progresses, the particles form dense, circular clusters
+      and linear chains that connect different regions. The size of the individual particles remains constant,
+      but their local density varies significantly between the empty voids and the concentrated structures.

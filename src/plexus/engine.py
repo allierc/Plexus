@@ -64,6 +64,30 @@ def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
     return pos, head
 
 
+def _spawn3d(mode: str, n: int, box, radius: float, rng, device: str):
+    """Initial 3D positions + a unit-vector heading for a self-propelled set -- the
+    3D counterpart of `_spawn`. `disc`/`ball`/`sphere` seed a solid ball of `radius`
+    about the box centre; `point`/`center` a jittered centre; `random` fills the box.
+    Heading is a random unit 3-vector (the 3D agent steers a vector, not an angle)."""
+    box = torch.as_tensor(box, dtype=torch.float32, device=device)
+    c = box * 0.5
+    if mode == "random":
+        pos = torch.rand(n, 3, generator=rng, device=device) * box
+    elif mode in ("point", "center"):
+        pos = c.expand(n, 3) + (torch.rand(n, 3, generator=rng, device=device) - 0.5) * 1e-3
+    elif mode in ("disc", "ball", "sphere"):
+        d = torch.randn(n, 3, generator=rng, device=device)
+        d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
+        r = torch.rand(n, generator=rng, device=device).pow(1.0 / 3.0) * radius   # uniform in the ball
+        pos = c.expand(n, 3) + d * r[:, None]
+    else:
+        raise ValueError(f"unknown 3D spawn mode {mode!r}")
+    pos = torch.minimum(pos.clamp(min=0.0), box - 1e-6)
+    head = torch.randn(n, 3, generator=rng, device=device)
+    head = head / head.norm(dim=1, keepdim=True).clamp(min=1e-9)
+    return pos, head
+
+
 def _field_colors(H: Hierarchy, sim: Spec, fld) -> np.ndarray:
     """Per-channel RGB for a field. A field coupled to a set colours its channels by
     the set's types (slime: one colour per species). An uncoupled / prescribed field
@@ -186,6 +210,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     H.world_size = torch.tensor([float(w) for w in getattr(sim, "world_size", [sim.world, 1.0])],
                                 device=device)             # per-axis box [w0 .. w_{D-1}]
     H.world_width = float(H.world_size[0])                 # legacy scalar (axis-0 width)
+    H.boundary = sim.boundary                              # 'periodic' (wrap) | 'wall' (clamp) | 'free'/'none'/'open' (unbounded)
     H.periodic = (sim.boundary == "periodic")
     H.obstacles = list(getattr(sim, "obstacles", []) or [])   # wall rects/discs for the `bounce` op
 
@@ -205,8 +230,12 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # carries a per-agent `heading`; otherwise positions are seeded across the domain.
         head = None
         if "spawn" in s:
-            pos, head = _spawn(s["spawn"], n, H.world_width,
-                               float(s.get("spawn_radius", 0.3)), H.rng, device)
+            if D == 3:                                          # 3D agent: vector heading, ball spawn
+                pos, head = _spawn3d(s["spawn"], n, H.world_size,
+                                     float(s.get("spawn_radius", 0.3)), H.rng, device)
+            else:
+                pos, head = _spawn(s["spawn"], n, H.world_width,
+                                   float(s.get("spawn_radius", 0.3)), H.rng, device)
         elif "start" in s:
             pos = _start_centers(s["start"], n, H.rng, device)      # known locations (e.g. an MPM blob)
         else:
@@ -220,7 +249,10 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         if head is not None:
-            hbuf = torch.zeros(buffer, device=device); hbuf[:n] = head
+            # heading is a scalar angle (2D) or a unit vector [.,D] (3D); size the buffer to match
+            hbuf = (torch.zeros(buffer, device=device) if head.dim() == 1
+                    else torch.zeros(buffer, head.shape[1], device=device))
+            hbuf[:n] = head
             lvl.register_buffer("heading", hbuf)
         _assign_types(lvl, s, H, device)
         lvl.types_raw = s.get("types")          # raw per-type config (layers/material/block) for child provisioning
@@ -273,6 +305,9 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if "components" not in fcfg and "source" not in fcfg:
             ntypes = len(getattr(H.level(couples), "type_names", []) or []) if couples in H.levels else 0
             fcfg["components"] = ntypes or 1
+        import inspect
+        if "dim" in inspect.signature(cls.__init__).parameters and "dim" not in fcfg:
+            fcfg["dim"] = H.dim                                       # N-D grid field follows the dimension contract
         fld = cls(fname, width=H.world_width, device=device, **fcfg)   # name positional; rest by keyword
         H.add_field(fld)
 
@@ -311,8 +346,11 @@ def _integrate(H: Hierarchy, dt: float) -> None:
         x, v = lvl.state[:, px0:px1], lvl.state[:, vx0:vx1]
         v = out if pred == "first_derivative" else v + dt * out
         x = x + dt * v
-        if H.periodic:
+        b = getattr(H, "boundary", "wall")
+        if b == "periodic":
             x = torch.remainder(x, box)                    # torus: wrap each axis by its size
+        elif b in ("free", "none", "open"):
+            pass                                           # unbounded: particles drift in open space
         else:
             x = torch.minimum(x.clamp(min=0.0), box)       # wall: clamp each axis to [0, w_k]
         new = lvl.state.clone()
@@ -323,7 +361,8 @@ def _integrate(H: Hierarchy, dt: float) -> None:
 # --------------------------------------------------------------------------- #
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
-def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hierarchy, dict]:
+def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
+        on_frame=None) -> tuple[Hierarchy, dict]:
     H = build(sim, device)
     H.predict = _resolve_prediction(sim)         # set -> integration order (from the operators)
     # (op_name, instance, selector); params carry the field refs + the set name (_at)
@@ -385,6 +424,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
                         continue
                     rec_fields[fn].append(fld.grid.detach().to("cpu", torch.float32).numpy().copy())
+            # generic per-frame hook: lets a diagnostic capture live H state (e.g. the MPM
+            # continuum buffers F/C/Jp + the transient grid) that the trajectory does not store.
+            if on_frame is not None:
+                on_frame(H, frame)
 
     out = {"sets": {name: {"pos": rec_sets[name], "occ": occ_sets[name],
                            "node_type": (H.level(name).node_type.cpu().numpy()
@@ -399,7 +442,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu") -> tuple[Hi
            "fields": {fn: {"grid": np.stack(fr), "colors": _field_colors(H, sim, H.fields[fn]),
                            "world": H.world_width}
                       for fn, fr in rec_fields.items() if fr},
-           "world": H.world_width, "name": sim.name}
+           "world": H.world_width,
+           "world_size": H.world_size.cpu().numpy(),   # per-axis box [w0..w_{D-1}] (3D plotter reads it)
+           "name": sim.name}
     if out_path is not None:
         import zarr
         root = zarr.open_group(out_path, mode="w")

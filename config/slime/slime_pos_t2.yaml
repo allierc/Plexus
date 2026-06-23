@@ -1,0 +1,44 @@
+general: {name: slime_pos_t2, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.004582, turn_speed: 0.5715, sensor_angle: 39.383,
+        sensor_dist: 0.01996, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.033796}
+- {op: diffuse, at: chemical, rate: 0.03214}
+- {op: decay, at: chemical, rate: 0.001315}
+- {op: sense, at: cell, from: chemical, cross: -1.17277}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a collection of cyan particles moving across a black background.
+      Over time, the particles organize into winding, interconnected filamentary structures. These filaments
+      appear to grow and branch out, filling the space with a web-like network. The overall pattern remains
+      relatively stable in its complexity as the simulation progresses.
+    objects: The scene contains numerous small, circular cyan particles. These particles are arranged
+      into long, continuous, and winding filaments. The filaments form a complex, interconnected network
+      with many loops and branches. The size of the individual particles is uniform and very small relative
+      to the overall field.
+  movie_chemical:
+    description: The simulation shows a static network of interconnected filaments that does not change
+      over time. The teal-colored structures remain in a fixed position throughout the entire sequence.
+      There is no visible movement, growth, or decay of the network elements. The scene represents a steady-state
+      configuration of a continuous field or a fixed structural mesh.
+    objects: The scene contains a dense network of interconnected, thread-like filaments. These filaments
+      are colored in a vibrant teal or cyan hue against a black background. The topology is a complex,
+      non-linear mesh where individual strands branch and merge into a continuous web. Each filament is
+      relatively thin and uniform in width, creating a porous, sponge-like appearance.

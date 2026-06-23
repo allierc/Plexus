@@ -1,7 +1,3 @@
-# material_two_drops_st -- two tangent liquid droplets in ZERO GRAVITY, surface
-# tension ON. VERY LONG run (n_frames 4000) to see whether, after coalescing, the two
-# bodies actually MIX (interdiffuse across the interface) or stay segregated as two
-# halves under the internal circulation. (ported from prototype/water ph_two_drops_st.)
 general: {name: material_two_drops_st, seed: 0, n_frames: 4000, dt: 1.0, boundary: wall}
 sets:
   cell:
@@ -21,32 +17,40 @@ sets:
         layers:
         - {frac: 1.0, youngs: 200, material: liquid}
   mpm_particle: {parent: cell, per_parent: 3000, radius: 0.11, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 0.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 14, dt_sub: 0.0002, a_max: 200, drag: 0.1, wall_damp: 1.0,
-  surface_tension: 120.0}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 120.0, wall_damp: 1.0}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 14
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: Two separate circular regions initially exist side-by-side in the center of the frame.
-      They begin to move toward each other and merge into a single, unified shape. As they fuse, the internal
-      boundaries shift and reorganize to form a complex, interlocking pattern. Finally, the merged object
-      stabilizes into a single, multi-colored sphere with a distinct internal structure.
-    objects: The scene contains two primary circular regions that are initially distinct and separate.
-      One region is light blue while the other is light orange. Both regions are of equal size and occupy
-      the central portion of the white background. After merging, they form a single larger sphere with
-      a blue left side and an orange right side.
+    description: Two separate circular particles initially move toward each other from the left and right
+      sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse,
+      the boundary between the two colors becomes irregular and complex. Finally, the two particles completely
+      integrate into a single, multi-colored blob.
+    objects: The scene contains two primary circular particles that are initially distinct and separate.
+      One particle is light blue and the other is light orange, both having a similar diameter. As the
+      simulation progresses, the two circles overlap and deform into a single, larger irregular shape.
+      The final object is a single composite blob featuring both blue and orange colors with a jagged
+      internal boundary.
   movie_mpm_particle:
-    description: Two separate circular clusters of blue and orange particles initially exist side-by-side.
-      As the simulation progresses, the two clusters move toward each other and begin to merge. The particles
-      intermingle, forming a single, unified spherical shape. By the final frame, the blue and orange
-      particles are fully integrated into a single globe-like structure.
+    description: Two separate blue and orange circular clusters of particles initially exist side-by-side.
+      They begin to move toward each other and merge into a single, unified spherical mass. As they merge,
+      the blue and orange particles intermix to form a composite globe-like structure. The final frames
+      show a stable, integrated sphere where the two colors are distributed across the surface.
     objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the
-      blue particles form a circular cluster on the left, while the orange particles form a similar cluster
-      on the right. As they merge, the particles maintain their individual colors but lose their separate
-      spatial boundaries. The final object is a single sphere composed of both blue and orange particles
-      of uniform size.
+      blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation
+      progresses, the particles reorganize into a single spherical topology. The final object is a single
+      sphere composed of both blue and orange particles of uniform size.

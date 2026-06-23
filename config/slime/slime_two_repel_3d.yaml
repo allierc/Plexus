@@ -1,0 +1,104 @@
+# 3D variant of slime_two_repel -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_two_repel_3d
+  seed: 0
+  n_frames: 840
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      a:
+        fraction: 0.5
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      b:
+        fraction: 0.5
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.025
+- op: diffuse
+  at: chemical
+  rate: 0.014
+- op: decay
+  at: chemical
+  rate: 0.0015
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform distribution of orange and blue particles.
+      Over time, the particles begin to organize into distinct, elongated filamentary structures. These
+      filaments intertwine and weave through each other, creating a complex network of interconnected
+      paths. By the final frame, the structures have become highly defined, showing clear branching and
+      winding patterns.
+    objects: 'The scene contains two primary sets of objects: orange and blue particles. Initially, the
+      particles are small, individual points scattered randomly across the frame. As the simulation progresses,
+      they aggregate into long, continuous, thread-like filaments. These filaments maintain their distinct
+      colors while forming a tangled, three-dimensional web-like topology.'
+  movie_chemical:
+    description: The simulation shows a dense cluster of intertwined, worm-like filaments undergoing subtle
+      conformational changes. Over time, the red and green structures shift and rotate slightly while
+      maintaining their overall spatial distribution. The filaments appear to vibrate or fluctuate in
+      place rather than migrating across the frame. The overall volume of the cluster remains constant
+      throughout the sequence.
+    objects: The scene contains two distinct sets of elongated, thread-like filaments colored red and
+      green. These filaments are highly entangled and intertwined, forming a complex, porous network.
+      Each individual filament is relatively thin and exhibits a curved, irregular geometry. The entire
+      collection of objects is concentrated into a roughly diamond-shaped cluster against a black background.

@@ -1,0 +1,127 @@
+# 3D variant of slime_four -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_four_3d
+  seed: 0
+  n_frames: 840
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 14000
+    spawn: random
+    types:
+      a:
+        fraction: 0.25
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      b:
+        fraction: 0.25
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      c:
+        fraction: 0.25
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      d:
+        fraction: 0.25
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.02
+- op: diffuse
+  at: chemical
+  rate: 0.013
+- op: decay
+  at: chemical
+  rate: 0.002
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+    c:
+    - 0.4
+    - 0.65
+    - 1.0
+    d:
+    - 1.0
+    - 0.85
+    - 0.3
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform distribution of multi-colored particles forming
+      a diamond-shaped cluster. As time progresses, the particles begin to organize into distinct, winding
+      filaments and interconnected paths. These structures become increasingly complex and elongated,
+      weaving through the center of the cluster. By the final frame, the particles have formed a highly
+      intricate, tangled web of continuous trajectories.
+    objects: The scene contains thousands of small, point-like particles in red, green, blue, and orange.
+      Initially, these objects are arranged in a stochastic, high-density cloud with no clear connectivity.
+      Over time, they transition into long, continuous linear chains that represent the paths of moving
+      agents. These filaments are intertwined and overlapping, creating a complex topological network
+      within the diamond boundary.
+  movie_chemical:
+    description: The simulation begins with a sparse collection of individual points distributed in a
+      diamond-shaped volume. Over time, these points begin to elongate into thin, thread-like filaments
+      that weave through the space. As the simulation progresses, the filaments become increasingly dense
+      and complex, filling the volume with a tangled network. By the final frame, the structure has evolved
+      into a highly intricate, interconnected web of continuous curves.
+    objects: The scene contains a large number of individual filaments that are interconnected in a complex,
+      disordered network. These filaments are colored in a variety of hues, including blue, green, yellow,
+      and red. Each filament is thin and elongated, exhibiting a curved and winding topology. The overall
+      arrangement of these objects forms a dense, diamond-shaped cluster against a black background.

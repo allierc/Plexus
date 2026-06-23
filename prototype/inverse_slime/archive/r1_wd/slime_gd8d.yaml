@@ -1,0 +1,23 @@
+general: {name: slime_gd8d, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.004567, turn_speed: 0.2717, sensor_angle: 44.193,
+        sensor_dist: 0.02635, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.069592}
+- {op: diffuse, at: chemical, rate: 0.039464}
+- {op: decay, at: chemical, rate: 0.001971}
+- {op: sense, at: cell, from: chemical, cross: -0.605124}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7

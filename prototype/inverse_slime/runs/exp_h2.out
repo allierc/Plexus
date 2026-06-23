@@ -1,0 +1,8 @@
+
+## H2 [11:22:10]: RECURRENT K-step heading unroll recovers sensor_angle better than one-step (accumulation amplifies the weak angle signal). K=6, same lr/iters.
+- one-step    : angle=0.191+/-0.150 turn=0.134 dist=0.214
+- recurrent K=4: angle=0.184+/-0.110 turn=0.157 dist=0.069
+  verdict K=4: tie  [one-step 0.191 vs recurrent 0.184; grid ceiling 0.121]
+
+- recurrent K=8: angle=0.279+/-0.163 turn=0.190 dist=0.055
+  verdict K=8: FALSIFIED  [one-step 0.191 vs recurrent 0.279; grid ceiling 0.121]

@@ -1,0 +1,62 @@
+# boids_rand_24t_3d -- 3D variant of boids_rand_24t: the three flocking rules (cohesion /
+# alignment / separation) in a periodic 3D box. The rules are dimension-generic
+# (neighbour_mean is N-D; SUPPORTED_DIMS=[2,3]); only the container changes
+# (dim: 3, world: [1,1,1]). Interaction radius bumped 0.1 (from 0.04) so 3D
+# neighbour counts (~density*(4/3)pi r^3) match the 2D sweep; weights unchanged.
+general: {name: boids_rand_24t_3d, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 16384
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.041667, cohesion: 38.2, alignment: 2.4, separation: 83.3}
+      t01: {fraction: 0.041667, cohesion: 17.1, alignment: 28.2, separation: 88.3}
+      t02: {fraction: 0.041667, cohesion: 52, alignment: 85, separation: 64.7}
+      t03: {fraction: 0.041667, cohesion: 74.7, alignment: 11, separation: 55}
+      t04: {fraction: 0.041667, cohesion: 51.8, alignment: 87.4, separation: 37.4}
+      t05: {fraction: 0.041667, cohesion: 60.6, alignment: 7.8, separation: 40}
+      t06: {fraction: 0.041667, cohesion: 33.7, alignment: 16.7, separation: 82}
+      t07: {fraction: 0.041667, cohesion: 39.2, alignment: 97.9, separation: 59.8}
+      t08: {fraction: 0.041667, cohesion: 61.3, alignment: 64.5, separation: 68.3}
+      t09: {fraction: 0.041667, cohesion: 16.8, alignment: 45.2, separation: 25.5}
+      t10: {fraction: 0.041667, cohesion: 41.4, alignment: 11.5, separation: 96.8}
+      t11: {fraction: 0.041667, cohesion: 23.1, alignment: 67.8, separation: 31.4}
+      t12: {fraction: 0.041667, cohesion: 87.7, alignment: 66.9, separation: 14.9}
+      t13: {fraction: 0.041667, cohesion: 84.8, alignment: 94.6, separation: 90.6}
+      t14: {fraction: 0.041667, cohesion: 57.8, alignment: 16.3, separation: 20.9}
+      t15: {fraction: 0.041667, cohesion: 92.9, alignment: 56.1, separation: 19.7}
+      t16: {fraction: 0.041667, cohesion: 88.6, alignment: 64.9, separation: 57.8}
+      t17: {fraction: 0.041667, cohesion: 38.9, alignment: 42.3, separation: 25.5}
+      t18: {fraction: 0.041667, cohesion: 5.7, alignment: 87.9, separation: 47.8}
+      t19: {fraction: 0.041667, cohesion: 55.7, alignment: 33.6, separation: 75.6}
+      t20: {fraction: 0.041667, cohesion: 4.5, alignment: 38.5, separation: 5}
+      t21: {fraction: 0.041667, cohesion: 14, alignment: 96.8, separation: 66.5}
+      t22: {fraction: 0.041667, cohesion: 44, alignment: 53.3, separation: 87.5}
+      t23: {fraction: 0.041659, cohesion: 35.7, alignment: 59.8, separation: 69}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.1, min_radius: 0.005}
+  - {op: cohesion,     at: particle}
+  - {op: alignment,    at: particle}
+  - {op: separation,   at: particle}
+schedule: [radius_graph, cohesion, alignment, separation]
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform cloud of multicolored particles distributed
+      across a diamond-shaped area. Over time, the particles begin to aggregate into distinct, spherical
+      clusters while the background density decreases. These clusters grow in size and become more defined
+      as the surrounding individual particles are pulled into them. By the final frame, the system has
+      transitioned from a homogeneous distribution to a collection of large, concentrated masses separated
+      by a sparse field of remaining particles.
+    objects: The scene contains thousands of small, individual particles that are primarily cyan, orange,
+      and white in color. These particles are initially arranged in a loose, high-density cloud that fills
+      a central diamond-shaped region. As the simulation progresses, the particles organize into several
+      large, spherical clusters that appear as dense, multi-colored masses. These clusters vary in size
+      and are distributed somewhat evenly throughout the central area, surrounded by a thinning mist of
+      individual points.

@@ -14,15 +14,32 @@ sets:
   particle:
     n: 8000
     types:
-      t0: {fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615]}
-      t1: {fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055]}
-      t2: {fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579]}
+      t0: { fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615] }
+      t1: { fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055] }
+      t2: { fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579] }
 fields: {}
 operators:
-  - {op: radius_graph,         at: particle, radius: 0.12}
-  - {op: attraction_repulsion, at: particle, sigma: 0.01}
+  # 3D retune: neighbour counts scale by VOLUME, so the Gaussian width must be ~ the
+  # mean spacing n^(-1/3) ~ 0.05 (not the 2D 0.005). sigma/spacing ~ 0.7 (as in 2D)
+  # gives strong clustering (61% nn-distance drop vs 11% at sigma 0.01).
+  - { op: radius_graph, at: particle, radius: 0.12 }
+  - { op: attraction_repulsion, at: particle, sigma: 0.035 }
 schedule: [radius_graph, attraction_repulsion]
 plotting:
   background: black
   colormap: tab10
   point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cloud of particles that maintains a roughly diamond-shaped
+      boundary throughout the sequence. The particles exhibit a high degree of spatial mixing, with no
+      significant large-scale clustering or separation occurring over time. There is a subtle, continuous
+      fluctuation in the local density and distribution of the individual points. The overall structure
+      remains stable, suggesting a steady-state system or a balanced dynamic equilibrium.
+    objects: The scene contains thousands of small, point-like particles distributed in a three-dimensional
+      volume. These particles are colored in a mix of blue, orange, and green, appearing randomly interspersed.
+      They are arranged in a dense, stochastic cloud that occupies a central diamond-shaped region of
+      the frame. Each individual particle is uniform in size, creating a granular texture across the entire
+      field.

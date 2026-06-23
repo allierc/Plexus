@@ -1,0 +1,7 @@
+
+## PROFILE-POS [13:12:40]: loss ONLY ON PARTICLES (positions, free-run sense->advance). sensor_angle profile, K=20.
+- target0: true=0.88 argmin=0.94 depth=0.41 -> IDENTIFIABLE (dip at truth)
+- target1: true=0.30 argmin=0.30 depth=0.06 -> UNIDENTIFIABLE
+- target2: true=0.75 argmin=0.62 depth=0.11 -> UNIDENTIFIABLE
+- target3: true=0.08 argmin=0.14 depth=0.70 -> IDENTIFIABLE (dip at truth)
+- saved archive/profile_pos.png

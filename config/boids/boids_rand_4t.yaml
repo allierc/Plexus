@@ -1,5 +1,5 @@
 # boids_rand_4t -- random boids sweep: 4 types, 2048 particles, random per-type weights
-general: {name: boids_rand_4t, seed: 0, n_frames: 3000, dt: 0.5, boundary: periodic}
+general: {name: boids_rand_4t, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic}
 sets:
   particle:
     n: 2048
@@ -29,6 +29,6 @@ descriptions:
       constant throughout the entire sequence. The scene represents a steady-state distribution of discrete
       points.
     objects: 'The scene contains thousands of small, circular dots distributed uniformly across the frame.
-      The dots are colored in three distinct shades: orange, light blue, and white. Each dot is approximately
-      the same size and maintains a consistent spacing from its neighbors. The dots are not connected
-      to each other, forming a stochastic point cloud.'
+      The dots are colored in three distinct shades: orange, light blue, and white. Each dot is of a uniform,
+      very small size relative to the overall canvas. The dots are arranged in a random, non-connected
+      point cloud topology.'

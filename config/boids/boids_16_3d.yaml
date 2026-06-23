@@ -1,0 +1,53 @@
+# boids_16_3d -- 3D variant of boids_16: the three flocking rules (cohesion /
+# alignment / separation) in a periodic 3D box. The rules are dimension-generic
+# (neighbour_mean is N-D; SUPPORTED_DIMS=[2,3]); only the container changes
+# (dim: 3, world: [1,1,1]). Interaction radius bumped 0.1 (from 0.04) so 3D
+# neighbour counts (~density*(4/3)pi r^3) match the 2D sweep; weights unchanged.
+general: {name: boids_16_3d, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 1792
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.0625, cohesion: 27.6, alignment: 92.5, separation: 48.200001}
+      t01: {fraction: 0.0625, cohesion: 32, alignment: 51.799999, separation: 29.799999}
+      t02: {fraction: 0.0625, cohesion: 23.6, alignment: 35, separation: 13.5}
+      t03: {fraction: 0.0625, cohesion: 3.3, alignment: 76.400002, separation: 13}
+      t04: {fraction: 0.0625, cohesion: 94, alignment: 78.699997, separation: 30.799999}
+      t05: {fraction: 0.0625, cohesion: 81.400002, alignment: 34.599998, separation: 2.2}
+      t06: {fraction: 0.0625, cohesion: 3.1, alignment: 40.5, separation: 17}
+      t07: {fraction: 0.0625, cohesion: 88.800003, alignment: 7.2, separation: 29.799999}
+      t08: {fraction: 0.0625, cohesion: 32.700001, alignment: 76.800003, separation: 26.1}
+      t09: {fraction: 0.0625, cohesion: 14.5, alignment: 56.799999, separation: 27.6}
+      t10: {fraction: 0.0625, cohesion: 63.299999, alignment: 99.900002, separation: 13.9}
+      t11: {fraction: 0.0625, cohesion: 32.5, alignment: 25.200001, separation: 24.4}
+      t12: {fraction: 0.0625, cohesion: 97.599998, alignment: 56.5, separation: 12.1}
+      t13: {fraction: 0.0625, cohesion: 62.200001, alignment: 9.1, separation: 28.299999}
+      t14: {fraction: 0.0625, cohesion: 76.400002, alignment: 52.900002, separation: 32}
+      t15: {fraction: 0.0625, cohesion: 48.099998, alignment: 54.400002, separation: 30.700001}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.1, min_radius: 0.005}
+  - {op: cohesion,     at: particle}
+  - {op: alignment,    at: particle}
+  - {op: separation,   at: particle}
+schedule: [radius_graph, cohesion, alignment, separation]
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a large, dense cloud of multicolored particles distributed
+      across the center of the frame. Over time, the particles begin to aggregate into distinct, localized
+      clusters while the surrounding space becomes increasingly sparse. These clusters continue to move
+      and shift positions, becoming more defined and separated from one another as the simulation progresses.
+      By the final frame, the particles are organized into several small, tight groupings with very few
+      isolated points remaining in the background.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
+      blue, yellow, and white. Initially, these particles are arranged in a large, roughly diamond-shaped
+      cloud with a high density in the center. As time passes, the topology shifts from a continuous field
+      to a discrete set of several small, spherical clusters. Each cluster consists of a high concentration
+      of multi-colored dots packed closely together, surrounded by a few scattered individual points.

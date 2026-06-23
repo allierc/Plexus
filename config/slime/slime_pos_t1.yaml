@@ -1,0 +1,42 @@
+general: {name: slime_pos_t1, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.004673, turn_speed: 0.5846, sensor_angle: 26.174,
+        sensor_dist: 0.02583, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.066634}
+- {op: diffuse, at: chemical, rate: 0.005792}
+- {op: decay, at: chemical, rate: 0.002048}
+- {op: sense, at: cell, from: chemical, cross: -1.316704}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The video shows a static image of a network of particles. There is no movement or change
+      between the frames. The particles remain in the same positions throughout the sequence. The overall
+      scene is completely stationary.
+    objects: The scene contains numerous small, cyan-colored dots. These dots are arranged in interconnected,
+      web-like filaments across a black background. The filaments form a complex, porous network of irregular
+      loops and lines. Each individual dot is uniform in size and bright in color.
+  movie_chemical:
+    description: The teal network structure remains completely static throughout the entire duration of
+      the video. There is no movement, deformation, or change in the spatial arrangement of the fibers.
+      The background remains a constant solid black color. The visual state is identical in every frame
+      from start to finish.
+    objects: The scene contains a complex, interconnected web of teal-colored fibers. These fibers form
+      a porous, sponge-like topology with irregular, interconnected loops. The individual strands vary
+      in thickness but maintain a consistent teal hue against the black background. The overall structure
+      occupies the entire frame, creating a dense, uniform mesh.

@@ -1,0 +1,92 @@
+# 3D variant of slime_curly -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_curly_3d
+  seed: 1
+  n_frames: 800
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.32
+    types:
+      a:
+        fraction: 1.0
+        move_speed: 0.006
+        turn_speed: 0.95
+        sensor_angle: 45
+        sensor_dist: 0.013
+        sensor_size: 1
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.045
+- op: diffuse
+  at: chemical
+  rate: 0.015
+- op: decay
+  at: chemical
+  rate: 0.00075
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.45
+    - 0.75
+    - 1.0
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cluster of blue particles begins as a relatively smooth, spherical mass. Over
+      time, the cluster becomes increasingly irregular and develops jagged, protruding edges. The internal
+      structure of the mass appears to fragment and become more porous as the simulation progresses. By
+      the final frame, the cluster has transformed into a highly complex, asymmetrical shape with significant
+      internal voids.
+    objects: The primary object is a large, central cluster composed of thousands of small blue particles.
+      These particles are densely packed in the core but become more sparse toward the outer boundaries.
+      The cluster maintains a roughly circular topology that gradually deforms into a more irregular,
+      fractal-like geometry. Scattered individual blue dots appear around the main mass, representing
+      outliers or ejected particles from the main body.
+  movie_chemical:
+    description: A single blue spherical cluster remains stationary in the center of a black void. The
+      cluster maintains a consistent shape and size throughout the entire sequence. There is no visible
+      movement, expansion, or contraction of the object over time. The simulation shows a static state
+      of a single particle or field.
+    objects: The scene contains a single, large, spherical cluster of blue particles. It is positioned
+      centrally against a solid black background. The cluster has a rough, textured surface composed of
+      many smaller points. Its size and color remain constant across all frames of the simulation.

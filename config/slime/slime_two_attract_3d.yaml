@@ -1,0 +1,103 @@
+# 3D variant of slime_two_attract -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_two_attract_3d
+  seed: 0
+  n_frames: 840
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      a:
+        fraction: 0.5
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      b:
+        fraction: 0.5
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.025
+- op: diffuse
+  at: chemical
+  rate: 0.014
+- op: decay
+  at: chemical
+  rate: 0.0015
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: 1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, cloud-like distribution of orange and blue particles.
+      Over time, these particles begin to organize into distinct, elongated filamentary structures. These
+      filaments weave through the space, forming a complex, interconnected network of paths. By the final
+      frame, the network has become highly defined, showing clear branching and looping patterns.
+    objects: The scene contains two sets of small, point-like particles colored orange and blue. Initially,
+      the particles are arranged in a disorganized, high-density cluster. As the simulation progresses,
+      they align into thin, continuous lines that resemble neural pathways or vascular networks. These
+      filaments are interconnected, forming a complex topology of overlapping and branching strands.
+  movie_chemical:
+    description: The simulation begins with a dense, chaotic cloud of red and green particles. Over time,
+      these particles begin to coalesce and organize into distinct, elongated filamentary structures.
+      As the simulation progresses, the filaments become more defined and move in a coordinated, fluid-like
+      motion. By the final frame, the system has transitioned from a disordered state to a structured
+      network of intertwined strands.
+    objects: 'The scene contains two primary sets of objects: red and green filaments. These filaments
+      are long, thin, and highly curved, resembling tangled threads or polymer chains. They are densely
+      packed in the center of the frame and become sparser toward the edges. The filaments are interconnected
+      in a complex, overlapping network that occupies a roughly diamond-shaped volume.'

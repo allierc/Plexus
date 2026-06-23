@@ -1,0 +1,43 @@
+# boids_rand_8t_3d -- 3D variant of boids_rand_8t: the three flocking rules (cohesion /
+# alignment / separation) in a periodic 3D box. The rules are dimension-generic
+# (neighbour_mean is N-D; SUPPORTED_DIMS=[2,3]); only the container changes
+# (dim: 3, world: [1,1,1]). Interaction radius bumped 0.1 (from 0.04) so 3D
+# neighbour counts (~density*(4/3)pi r^3) match the 2D sweep; weights unchanged.
+general: {name: boids_rand_8t_3d, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 4096
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.125, cohesion: 27, alignment: 45.6, separation: 51.4}
+      t01: {fraction: 0.125, cohesion: 56.2, alignment: 99.6, separation: 79.7}
+      t02: {fraction: 0.125, cohesion: 63, alignment: 98.9, separation: 23.1}
+      t03: {fraction: 0.125, cohesion: 17.7, alignment: 62, separation: 6.3}
+      t04: {fraction: 0.125, cohesion: 5.5, alignment: 52.5, separation: 47.7}
+      t05: {fraction: 0.125, cohesion: 91.9, alignment: 63.7, separation: 52.4}
+      t06: {fraction: 0.125, cohesion: 50.7, alignment: 26.3, separation: 3.2}
+      t07: {fraction: 0.125, cohesion: 20.9, alignment: 69.8, separation: 21.7}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.1, min_radius: 0.005}
+  - {op: cohesion,     at: particle}
+  - {op: alignment,    at: particle}
+  - {op: separation,   at: particle}
+schedule: [radius_graph, cohesion, alignment, separation]
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform cloud of multicolored particles distributed
+      across the frame. Over time, the particles begin to aggregate into distinct, spherical clusters
+      while the background density decreases. These clusters grow in size and become more defined as they
+      move and merge within the space. By the final frame, the system has transitioned from a homogeneous
+      distribution to a sparse collection of well-separated, multi-colored spheres.
+    objects: The scene contains thousands of small, individual particles in shades of green, blue, orange,
+      and red. These particles are initially arranged in a large, roughly diamond-shaped cloud. As the
+      simulation progresses, they organize into several dozen spherical clusters of varying sizes. The
+      clusters maintain a multi-colored appearance, reflecting the diverse colors of the constituent particles.

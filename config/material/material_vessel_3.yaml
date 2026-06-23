@@ -1,4 +1,3 @@
-# material_vessel_3 -- auto-ported from prototype/water (water_vessel_3.yaml).
 general:
   name: material_vessel_3
   seed: 0
@@ -18,31 +17,39 @@ sets:
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
   mpm_particle: {parent: cell, per_parent: 6000, radius: 0.22, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.3, wall_damp: 0.4,
-  wall_contact: 0.06, surface_tension: 30.0}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.3, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 30.0, wall_damp: 0.4}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.4, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
     description: A blue spherical particle is initially positioned to the left of a vertical grey bar.
       As time progresses, the particle rapidly moves downward and spreads out into a horizontal layer.
-      This blue substance settles at the bottom of the frame, forming a thick, irregular pool. The grey
+      This blue substance settles at the bottom of the frame, forming a thick, irregular band. The grey
       bar remains stationary throughout the entire duration of the simulation.
-    objects: A light blue spherical particle is the primary dynamic object in the first frame. A vertical
-      grey bar serves as a stationary reference point in the center of the scene. The blue substance transforms
-      from a compact sphere into a wide, horizontal layer at the base. The background is a plain white
-      field that provides high contrast for the blue and grey elements.
+    objects: The scene contains a blue spherical particle that is relatively large and circular. A vertical
+      grey bar stands in the center, appearing as a thin, solid rectangle. Over time, the blue particle
+      transforms into a wide, horizontal blue field at the base of the frame. The background is a plain
+      white space that provides a high-contrast environment for the objects.
   movie_mpm_particle:
-    description: A dense cluster of blue particles initially forms a spherical shape on the left side
-      of the frame. As time progresses, the sphere rapidly expands and collapses toward the bottom of
-      the container. The particles eventually settle into a thin, uneven layer across the bottom of the
-      space. A vertical grey bar remains stationary throughout the entire duration of the simulation.
-    objects: The blue particles are small, individual points that aggregate into a large, roughly spherical
-      mass. This mass is light blue in color and occupies a significant portion of the left side of the
-      frame. A single, solid grey bar is positioned vertically in the center-right of the scene. The bar
-      is long and narrow, maintaining a constant position and size throughout the video.
+    description: A large cluster of blue particles initially forms a spherical shape in the upper left
+      of the frame. The sphere then rapidly collapses and falls toward the bottom of the container, spreading
+      out into a thin layer. As the particles settle, they form a wavy, uneven bed across the bottom of
+      the space. A vertical grey bar remains stationary throughout the entire duration of the simulation.
+    objects: The primary objects are numerous small blue particles that behave like a fluid or granular
+      material. These particles are initially concentrated into a large, dense sphere before dispersing
+      into a flat, horizontal layer. A single, thick grey vertical bar is positioned in the center-right
+      of the frame. The background is a plain white space that serves as the container for the simulation.
