@@ -8,6 +8,10 @@ decomposed MLS-MPM forward -> match the real cardiomyocyte trajectories. Learnab
     direction map d(x,y) (the active-stress orientation, mode: directional).
   * a scalar pulse DURATION (soft activation envelope). period + phase are LOCKED to the
     real beat timing (aligned to data); amplitude/drag are fixed knobs.
+  * PHASE SWEEP (--max_delay>0): a UNet 4th channel -> a learnable phase-delay map tau(x,y)
+    in [0,max_delay] frames, so the activation is a TRAVELLING wave a(x,y,t)=pulse(t-tau(x,y))
+    instead of a single global beat -- lets neighbouring regions fire in sequence (the
+    substrate for curved / rotary trajectories). 0=off (global pulse, the original behaviour).
 
 Strategy (the MPM is a stable elastic limit cycle -- points return to rest, the quiescent
 state is reproducible after one cycle): WARM UP `no_grad` for >=1 cycle to the reproducible
@@ -118,15 +122,17 @@ def _grid_idx(rest, n=12, lo=D.DOM_LO, hi=D.DOM_HI):
     return (((rest[None] - t[:, None]) ** 2).sum(-1)).argmin(1)
 
 
-def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info="", traj_amp=None):
-    """Checkpoint dashboard: trajectories (sim red / real green) | GT only | stiffness | direction.
-    traj_amp fixes the displacement amplification (default 10, matching gt_trajectories.png); None=auto."""
+def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info="", traj_amp=None, tau_grid=None):
+    """Checkpoint dashboard: trajectories (sim red / real green) | stiffness | direction (| phase delay tau).
+    traj_amp fixes the displacement amplification (default 10, matching gt_trajectories.png); None=auto.
+    tau_grid (the learnable phase-delay map, frames) adds a 3rd column when the phase sweep is on."""
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
     rest = rest.detach().cpu().numpy(); sim_d = sim_d.detach().cpu().numpy(); real_d = real_d.detach().cpu().numpy()
     ym = youngs_map.detach().cpu().numpy(); dg = dir_grid.detach().cpu().numpy()
     amp = float(traj_amp) if traj_amp else 0.12 / max(1e-9, float(np.abs(real_d[:, idx]).max()))
-    fig, axs = plt.subplots(2, 2, figsize=(15, 14), facecolor="black")
+    ncol = 3 if tau_grid is not None else 2
+    fig, axs = plt.subplots(2, ncol, figsize=(7.5 * ncol, 14), facecolor="black")
     Rr = rest[idx][None] + amp * real_d[:, idx]; A = rest[idx][None] + amp * sim_d[:, idx]
 
     def img(ax, m, cmap, title, **kw):
@@ -146,6 +152,10 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info
     img(axs[0, 1], ym, "viridis", "learned stiffness (youngs)")
     img(axs[1, 0], dg[0], "RdBu", "direction dx", vmin=-1, vmax=1)
     img(axs[1, 1], dg[1], "RdBu", "direction dy", vmin=-1, vmax=1)
+    if tau_grid is not None:                                            # phase sweep: the learned delay map
+        tg = tau_grid.detach().cpu().numpy()
+        img(axs[0, 2], tg, "magma", "learned phase delay tau (frames)")
+        axs[1, 2].set_facecolor("black"); axs[1, 2].axis("off")
     fig.suptitle(info, color="#9f9", fontsize=11)
     ck = os.path.join(outdir, "checkpoints"); os.makedirs(ck, exist_ok=True)
     fig.savefig(os.path.join(ck, f"dashboard_{it:05d}.png"), dpi=110, facecolor="black", bbox_inches="tight")
@@ -171,6 +181,11 @@ def main():
     ap.add_argument("--dur0", type=float, default=30.0, help="initial pulse duration (frames, learnable)")
     ap.add_argument("--w_amp", type=float, default=0.3, help="anti-collapse motion-energy match weight (0=off)")
     ap.add_argument("--resume", default="", help="resume from a checkpoint: a model_*.pt path, or 'auto' (latest in outdir)")
+    ap.add_argument("--mechanism", default="force", choices=["force", "stress"],
+                    help="M0 force=directional body force A*a*d ; M1 stress=active stress -A*a*nn^T")
+    ap.add_argument("--max_delay", type=float, default=0.0,
+                    help="phase sweep: >0 adds a LEARNABLE delay field tau(x,y) in [0,max_delay] frames "
+                         "(UNet 4th channel) so activation a(x,y,t)=pulse(t-tau(x,y)); 0=off (global pulse)")
     ap.add_argument("--tag", default="", help="suffix for the output dir (loop slots fitting one spec)")
     ap.add_argument("--outdir", default="", help="explicit output dir (the agentic loop sets this per slot)")
     ap.add_argument("--smoke", type=int, default=0, help="tiny run for testing")
@@ -203,19 +218,33 @@ def main():
     grad_len = min(grad_len, F - 1 - onset)
     warm = (args.warmup or period); start = max(0, onset - warm); warm = onset - start
     print(f"=== cardio_mpm_train {spec.name}: real beats@{onsets} period={period} | fit beat onset={onset} "
-          f"warmup[{start}:{onset}]({warm}f) grad[{onset}:{onset + grad_len}]({grad_len}f) sub={args.substeps} "
+          f"mech={args.mechanism} warmup[{start}:{onset}]({warm}f) grad[{onset}:{onset + grad_len}]({grad_len}f) sub={args.substeps} "
           f"band={int(bnd.sum())} N={rest.shape[0]} (dev={dev}) ===")
 
-    # model: UNet(image)->[stiffness, dx, dy]; learnable duration scalar
+    # model: UNet(image)->[stiffness, dx, dy(, tau)]; learnable duration scalar.
+    # phase sweep: --max_delay>0 adds a 4th channel -> a learnable phase-delay map tau(x,y).
+    phase = args.max_delay > 0
     img = load_image((RES, RES)).to(dev)
-    net = UNet(out=3).to(dev)
+    net = UNet(out=4 if phase else 3).to(dev)
     log_dur = torch.nn.Parameter(torch.tensor(np.log(args.dur0), device=dev))   # learnable pulse duration (frames)
     spatial = _spatial_profile(profile, center, radius, dev)         # 'uniform' for directional cardio
     ops = _ops_by_name(spec, str(dev))
-    ops["pulse_to_contraction"].amplitude = amp                     # apply amplitude (spec or --amplitude override)
     if args.drag_k:
         ops["mpm_drag"].k = args.drag_k                             # sweepable overdamped drag
-    force_ops = ["pulse_to_contraction", "mpm_drag"]
+    # MECHANISM (M0/M1): force = directional body force F=A*a*d (pushes particles along d -> closed
+    # out-and-back loops); stress = active stress sigma=-A*a*nn^T (shortening along the axis n ->
+    # coordinated shear via stress divergence). One-knob swap; amplitude means accel (force) vs
+    # stress-gain (stress), so it needs its own calibration when comparing M0 vs M1.
+    H.active_stress = None
+    pc = ops["pulse_to_contraction"]
+    if args.mechanism == "stress":
+        ops["pulse_to_active_stress"] = get_operator("pulse_to_active_stress")(
+            {"from": pc.field_name, "direction_from": pc.direction_from,
+             "amplitude": amp, "channel": pc.channel, "_at": pc.at}, str(dev))
+        force_ops = ["pulse_to_active_stress", "mpm_drag"]
+    else:
+        pc.amplitude = amp                                          # apply amplitude (spec or --amplitude override)
+        force_ops = ["pulse_to_contraction", "mpm_drag"]
     mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]
     pa, pb = lvl.state_schema["pos"]
     # rest-position sampling grid for the UNet stiffness map (particles -> map pixels)
@@ -232,18 +261,23 @@ def main():
     opt = torch.optim.Adam(list(net.parameters()) + [log_dur], lr=args.lr)
     x = img[None, None]
 
-    def pulse_env(fr, dur):                                                  # phase-locked to the real onset
-        ph = (fr - onset) % period; ph = min(ph, period - ph)               # frames to nearest beat onset
-        return torch.exp(-0.5 * (ph / (dur + 1e-3)) ** 2)
+    def pulse_env(fr, dur, tau=None):                                       # phase-locked to the real onset
+        if tau is None:                                                     # global pulse (no spatial delay)
+            ph = (fr - onset) % period; ph = min(ph, period - ph)           # frames to nearest beat onset
+            return torch.exp(-0.5 * (ph / (dur + 1e-3)) ** 2)               # scalar envelope
+        ph = torch.remainder((fr - tau) - onset, period)                    # per-pixel local phase (tau=delay map)
+        ph = torch.minimum(ph, period - ph)                                 # frames to nearest onset, per pixel
+        return torch.exp(-0.5 * (ph / (dur + 1e-3)) ** 2)                   # [RES,RES] delayed envelope
 
     def maps():
-        o = net(x)[0]                                                       # [3,RES,RES]
+        o = net(x)[0]                                                       # [3 or 4, RES,RES]
         stiff01 = torch.sigmoid(o[0])
         youngs = smin + stiff01 * (smax - smin)                            # [RES,RES]
         youngs_p = torch.nn.functional.grid_sample(youngs[None, None], samp, mode="bilinear",
                                                    padding_mode="border", align_corners=True)[0, 0, 0]  # [N]
         d = o[1:3]; d = d / d.norm(dim=0, keepdim=True).clamp(min=1e-6)     # unit-vector direction [2,RES,RES]
-        return youngs_p, stiff01, youngs, d
+        tau = (args.max_delay * torch.sigmoid(o[3])) if phase else None    # learnable delay map tau(x,y) [RES,RES]
+        return youngs_p, stiff01, youngs, d, tau
 
     outdir = args.outdir or os.path.join(HERE, "archive", "fit_" + spec.name + (("_" + args.tag) if args.tag else ""))
     os.makedirs(outdir, exist_ok=True)
@@ -281,19 +315,20 @@ def main():
     for it in pbar:
         with torch.no_grad():                                              # cheap per-iter re-init to rest
             reset_state(lvl, rest, dev)
-        youngs_p, stiff01, youngs_map, dir_grid = maps()
+        youngs_p, stiff01, youngs_map, dir_grid, tau_grid = maps()
         dur = torch.exp(log_dur)
+        tau_det = tau_grid.detach() if tau_grid is not None else None
         with torch.no_grad():                                              # warmup -> settle to the beat rhythm
             set_maps(H, lvl, youngs_p.detach(), dir_grid.detach())
             for fr in range(start, onset):
-                H.fields["activation"].grid = (pulse_env(fr, dur.detach()) * spatial)[None]
+                H.fields["activation"].grid = (pulse_env(fr, dur.detach(), tau_det) * spatial)[None]
                 step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
         set_maps(H, lvl, youngs_p, dir_grid)                               # differentiable beat
         sim = []
         for k in range(grad_len):
             fr = onset + k
-            H.fields["activation"].grid = (pulse_env(fr, dur) * spatial)[None]
+            H.fields["activation"].grid = (pulse_env(fr, dur, tau_grid) * spatial)[None]
             step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
             anchor(lvl, rest, real_disp[fr] - ref, bnd)
             sim.append(lvl.state[:, pa:pb])
@@ -316,9 +351,11 @@ def main():
                              f"dur={torch.exp(log_dur).item():.1f} youngs[{youngs_map.min().item():.0f},"
                              f"{youngs_map.max().item():.0f}]")
         if it % args.ckpt_every == 0 or it == args.n_iter - 1:
-            info = (f"{spec.name}  it {it}/{args.n_iter}  R2={r2:+.3f}  "
-                    f"dur={torch.exp(log_dur).item():.1f}  amp={amp}  youngs[{smin:.0f},{smax:.0f}]")
-            render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info=info, traj_amp=args.traj_amp)
+            tau_info = f"  tau[0,{tau_grid.max().item():.1f}]f(md={args.max_delay:.0f})" if tau_grid is not None else ""
+            info = (f"{spec.name} [{args.mechanism}]  it {it}/{args.n_iter}  R2={r2:+.3f}  "
+                    f"dur={torch.exp(log_dur).item():.1f}  amp={amp}  youngs[{smin:.0f},{smax:.0f}]{tau_info}")
+            render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info=info,
+                        traj_amp=args.traj_amp, tau_grid=tau_grid)
             torch.save({"net": net.state_dict(), "log_dur": log_dur.detach()},
                        os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:

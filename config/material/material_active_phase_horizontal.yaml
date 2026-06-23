@@ -1,0 +1,38 @@
+fields:
+  activation: {frame: grid, res: 128}
+  direction: {frame: vector_grid, source: material/dir_horizontal.tif}
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  delay_map: {frame: image, source: material/delay_x.tif}
+general: {boundary: wall, dt: 1.0, n_frames: 250, name: material_active_phase_horizontal,
+  seed: 0}
+operators:
+- {at: cell, op: aggregate}
+- {op: phase_delay_pulse, at: activation, delay_from: delay_map, max_delay: 60.0,
+  period: 150.0, duration: 30.0}
+- {amplitude: 10.0, at: mpm_particle, direction_from: direction, from: activation,
+  op: pulse_to_active_stress}
+- {at: mpm_particle, k: 30.0, op: mpm_drag}
+- {at: mpm_particle, dt_sub: 0.0002, op: mpm_strain}
+- {a_max: 200, at: mpm_particle, drag: 0.0, dt_sub: 0.0002, op: p2g, to: mpm_grid}
+- {at: mpm_grid, dt_sub: 0.0002, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, dt_sub: 0.0002, from: mpm_grid, op: g2p, wall_contact: 0.06,
+  wall_damp: 0.5}
+schedule:
+- aggregate
+- phase_delay_pulse
+- pulse_to_active_stress
+- mpm_drag
+- dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
+  substep: 10
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5]
+    types:
+      sheet:
+        block: [0.15, 0.15, 0.85, 0.85]
+        fraction: 1.0
+        youngs: 80
+  mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
