@@ -1,0 +1,11 @@
+{
+  "train_script": "cardio_mpm_train.py",
+  "configs": [
+    {"name": "parent_wamp03",  "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "2e-3", "--substeps": "5", "--amplitude": "15", "--dur0": "30", "--w_amp": "0.3", "--ckpt_every": "50"}},
+    {"name": "wamp0_ablation", "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "2e-3", "--substeps": "5", "--amplitude": "15", "--dur0": "30", "--w_amp": "0.0", "--ckpt_every": "50"}},
+    {"name": "wamp10",         "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "2e-3", "--substeps": "5", "--amplitude": "15", "--dur0": "30", "--w_amp": "1.0", "--ckpt_every": "50"}},
+    {"name": "wamp03_amp10",   "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "2e-3", "--substeps": "5", "--amplitude": "10", "--dur0": "30", "--w_amp": "0.3", "--ckpt_every": "50"}},
+    {"name": "wamp03_amp25",   "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "2e-3", "--substeps": "5", "--amplitude": "25", "--dur0": "30", "--w_amp": "0.3", "--ckpt_every": "50"}},
+    {"name": "wamp03_lr5e3",   "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "5e-3", "--substeps": "5", "--amplitude": "15", "--dur0": "30", "--w_amp": "0.3", "--ckpt_every": "50"}}
+  ]
+}

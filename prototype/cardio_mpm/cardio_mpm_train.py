@@ -19,7 +19,7 @@ Run (the user drives this; tune N_WARMUP / N_GRAD / SUBSTEPS for speed/memory):
   PYTHONPATH=../../src python cardio_mpm_train.py material/material_directional_cardio --device cuda:0
 """
 from __future__ import annotations
-import os, sys, argparse
+import os, sys, argparse, glob
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "cardio"))
@@ -118,32 +118,34 @@ def _grid_idx(rest, n=12, lo=D.DOM_LO, hi=D.DOM_HI):
     return (((rest[None] - t[:, None]) ** 2).sum(-1)).argmin(1)
 
 
-def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info=""):
-    """Checkpoint dashboard: trajectories (sim red / real green) | learned stiffness | learned direction."""
+def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info="", traj_amp=None):
+    """Checkpoint dashboard: trajectories (sim red / real green) | GT only | stiffness | direction.
+    traj_amp fixes the displacement amplification (default 10, matching gt_trajectories.png); None=auto."""
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
     rest = rest.detach().cpu().numpy(); sim_d = sim_d.detach().cpu().numpy(); real_d = real_d.detach().cpu().numpy()
     ym = youngs_map.detach().cpu().numpy(); dg = dir_grid.detach().cpu().numpy()
-    amp = 0.12 / max(1e-9, float(np.abs(real_d[:, idx]).max()))
-    fig, axs = plt.subplots(1, 4, figsize=(28, 7), facecolor="black")
+    amp = float(traj_amp) if traj_amp else 0.12 / max(1e-9, float(np.abs(real_d[:, idx]).max()))
+    fig, axs = plt.subplots(2, 2, figsize=(15, 14), facecolor="black")
     Rr = rest[idx][None] + amp * real_d[:, idx]; A = rest[idx][None] + amp * sim_d[:, idx]
 
-    def traj(ax, items, title):
-        ax.set_facecolor("black"); ax.set_aspect("equal"); ax.set_xlim(0, 1); ax.set_ylim(1, 0); ax.axis("off")
-        for Xc, col in items:
-            segs = np.stack([Xc[:-1], Xc[1:]], 2).transpose(1, 0, 2, 3).reshape(-1, 2, 2)
-            ax.add_collection(LineCollection(list(segs), colors=col, linewidths=1.3))
-        ax.scatter(items[0][0][0, :, 0], items[0][0][0, :, 1], s=10, c=items[0][1][:3], edgecolors="black", linewidths=0.3)
-        ax.set_title(title, color="#ccc")
+    def img(ax, m, cmap, title, **kw):
+        ax.set_facecolor("black"); im = ax.imshow(m.T, origin="lower", cmap=cmap, **kw)
+        ax.set_title(title, color="#ccc"); ax.set_xticks([]); ax.set_yticks([])
+        cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
 
-    traj(axs[0], [(Rr, (0.2, 1.0, 0.2, 0.7)), (A, (1.0, 0.0, 0.0, 0.85))], f"it {it}: sim red / real green (amp x{amp:.0f})")
-    traj(axs[1], [(Rr, (0.2, 1.0, 0.2, 0.9))], f"GT only (amp x{amp:.0f})")
-    ax = axs[2]; im = ax.imshow(ym.T, origin="lower", cmap="viridis"); ax.set_title("learned stiffness (youngs)", color="#ccc")
-    ax.set_xticks([]); ax.set_yticks([]); fig.colorbar(im, ax=ax, fraction=0.046)
-    ax = axs[3]; ang = (np.arctan2(dg[1], dg[0]) % np.pi); ax.imshow(ang.T, origin="lower", cmap="twilight")
-    s = max(1, dg.shape[1] // 26); yy, xx = np.meshgrid(np.arange(0, dg.shape[1], s), np.arange(0, dg.shape[1], s), indexing="ij")
-    ax.quiver(xx, yy, dg[0, ::s, ::s].T, dg[1, ::s, ::s].T, color="red", pivot="mid", scale=26)
-    ax.set_title("learned direction", color="#ccc"); ax.set_xticks([]); ax.set_yticks([])
+    # (0,0) trajectories: sim red / real green
+    ax = axs[0, 0]; ax.set_facecolor("black"); ax.set_aspect("equal"); ax.set_xlim(0, 1); ax.set_ylim(1, 0); ax.axis("off")
+    for Xc, col in ((Rr, (0.2, 1.0, 0.2, 0.7)), (A, (1.0, 0.0, 0.0, 0.85))):
+        segs = np.stack([Xc[:-1], Xc[1:]], 2).transpose(1, 0, 2, 3).reshape(-1, 2, 2)
+        ax.add_collection(LineCollection(list(segs), colors=col, linewidths=1.3))
+    ax.scatter(A[0, :, 0], A[0, :, 1], s=10, c="red", edgecolors="black", linewidths=0.3)
+    ax.set_title(f"it {it}: sim red / real green (amp x{amp:.0f})", color="#ccc")
+    # (0,1) stiffness, (1,0) direction dx, (1,1) direction dy
+    img(axs[0, 1], ym, "viridis", "learned stiffness (youngs)")
+    img(axs[1, 0], dg[0], "RdBu", "direction dx", vmin=-1, vmax=1)
+    img(axs[1, 1], dg[1], "RdBu", "direction dy", vmin=-1, vmax=1)
     fig.suptitle(info, color="#9f9", fontsize=11)
     ck = os.path.join(outdir, "checkpoints"); os.makedirs(ck, exist_ok=True)
     fig.savefig(os.path.join(ck, f"dashboard_{it:05d}.png"), dpi=110, facecolor="black", bbox_inches="tight")
@@ -163,6 +165,14 @@ def main():
     ap.add_argument("--substeps", type=int, default=10)
     ap.add_argument("--bwidth", type=float, default=0.06)
     ap.add_argument("--ckpt_every", type=int, default=50, help="save a dashboard + model every N iters")
+    ap.add_argument("--traj_amp", type=float, default=10.0, help="dashboard trajectory amplification (gt uses 10)")
+    ap.add_argument("--amplitude", type=float, default=0.0, help="override pulse_to_contraction amplitude (0=spec)")
+    ap.add_argument("--drag_k", type=float, default=0.0, help="override mpm_drag k (0=spec)")
+    ap.add_argument("--dur0", type=float, default=30.0, help="initial pulse duration (frames, learnable)")
+    ap.add_argument("--w_amp", type=float, default=0.3, help="anti-collapse motion-energy match weight (0=off)")
+    ap.add_argument("--resume", default="", help="resume from a checkpoint: a model_*.pt path, or 'auto' (latest in outdir)")
+    ap.add_argument("--tag", default="", help="suffix for the output dir (loop slots fitting one spec)")
+    ap.add_argument("--outdir", default="", help="explicit output dir (the agentic loop sets this per slot)")
     ap.add_argument("--smoke", type=int, default=0, help="tiny run for testing")
     args = ap.parse_args()
     if args.smoke:
@@ -174,7 +184,7 @@ def main():
     center = p_op("pulse_stimulus", "center", [0.5, 0.5])
     radius = float(p_op("pulse_stimulus", "radius", 0.12))
     profile = str(p_op("pulse_stimulus", "profile", "gaussian"))
-    amp = float(p_op("pulse_to_contraction", "amplitude", 25.0))
+    amp = args.amplitude or float(p_op("pulse_to_contraction", "amplitude", 25.0))
     smin = float(p_op("apply_material_map", "min", 20.0)); smax = float(p_op("apply_material_map", "max", 200.0))
     dt_sub = float(p_op("p2g", "dt_sub", 2e-4) or 2e-4)
 
@@ -185,8 +195,11 @@ def main():
     real_disp_np, bnd_np, onsets, period = D.load_real(rest.cpu().numpy(), args.bwidth)
     real_disp = torch.tensor(real_disp_np, device=dev); bnd = torch.tensor(bnd_np, device=dev)
     F = real_disp.shape[0]
-    # the ONE real beat to fit: pulse phase-locked to its onset; period = the real beat period.
-    onset = int(onsets[args.fit_beat]); grad_len = (args.grad or period)
+    # the ONE real beat to fit (FULL inter-onset interval -> closed loop); pulse phase-locked to onset.
+    fb = args.fit_beat % len(onsets)
+    onset = int(onsets[fb])
+    nxt = int(onsets[fb + 1]) if fb + 1 < len(onsets) else onset + period
+    grad_len = (args.grad or (nxt - onset + 1))
     grad_len = min(grad_len, F - 1 - onset)
     warm = (args.warmup or period); start = max(0, onset - warm); warm = onset - start
     print(f"=== cardio_mpm_train {spec.name}: real beats@{onsets} period={period} | fit beat onset={onset} "
@@ -196,9 +209,12 @@ def main():
     # model: UNet(image)->[stiffness, dx, dy]; learnable duration scalar
     img = load_image((RES, RES)).to(dev)
     net = UNet(out=3).to(dev)
-    log_dur = torch.nn.Parameter(torch.tensor(np.log(30.0), device=dev))    # learnable pulse duration (frames)
+    log_dur = torch.nn.Parameter(torch.tensor(np.log(args.dur0), device=dev))   # learnable pulse duration (frames)
     spatial = _spatial_profile(profile, center, radius, dev)         # 'uniform' for directional cardio
     ops = _ops_by_name(spec, str(dev))
+    ops["pulse_to_contraction"].amplitude = amp                     # apply amplitude (spec or --amplitude override)
+    if args.drag_k:
+        ops["mpm_drag"].k = args.drag_k                             # sweepable overdamped drag
     force_ops = ["pulse_to_contraction", "mpm_drag"]
     mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]
     pa, pb = lvl.state_schema["pos"]
@@ -229,11 +245,39 @@ def main():
         d = o[1:3]; d = d / d.norm(dim=0, keepdim=True).clamp(min=1e-6)     # unit-vector direction [2,RES,RES]
         return youngs_p, stiff01, youngs, d
 
-    outdir = os.path.join(HERE, "archive", "fit_" + spec.name); os.makedirs(outdir, exist_ok=True)
+    outdir = args.outdir or os.path.join(HERE, "archive", "fit_" + spec.name + (("_" + args.tag) if args.tag else ""))
+    os.makedirs(outdir, exist_ok=True)
     real_d = real_disp[onset:onset + grad_len] - real_disp[onset]       # [G,N,2] the fit beat (referenced to onset)
     ref = real_disp[start]                                              # anchor reference (window start -> no jump)
-    idx = _grid_idx(rest.cpu().numpy(), 12)                             # sampled nodes for the trajectory panel
-    pbar = tqdm(range(args.n_iter), ncols=120, desc=spec.name)
+    # dashboard trajectory nodes: the SAME 10x10 / margin-10 selection as gt_trajectories.png,
+    # mapped to the nearest MPM particle -> the dashboard green matches gt_compare.png cell-for-cell.
+    from cardio_real_render import select_grid_nodes
+    from scipy.spatial import cKDTree
+    canon_dom = D.DOM_LO + D.DOM * np.load(D.NPZ)["pos"][0].astype(np.float32)[select_grid_nodes(10, 10)]
+    idx = cKDTree(rest.cpu().numpy()).query(canon_dom)[1]              # nearest MPM particle per canonical node
+    # optional resume: reload net + learnable duration (and continue checkpoint numbering)
+    start_iter = 0
+    if args.resume:
+        ckpt_dir = os.path.join(outdir, "checkpoints")
+        if args.resume == "auto":
+            cks = sorted(glob.glob(os.path.join(ckpt_dir, "model_*.pt")))
+            path = cks[-1] if cks else ""
+        else:
+            path = args.resume
+        if path and os.path.exists(path):
+            sd = torch.load(path, map_location=dev)
+            net.load_state_dict(sd["net"])
+            with torch.no_grad():
+                log_dur.copy_(sd["log_dur"].to(dev))
+            try:
+                start_iter = int(os.path.basename(path).split("_")[1].split(".")[0]) + 1
+            except Exception:
+                start_iter = 0
+            print(f"  resumed from {path}  (start_iter={start_iter})")
+        else:
+            print(f"  --resume given but no checkpoint found ({args.resume}); starting fresh")
+
+    pbar = tqdm(range(start_iter, args.n_iter), ncols=170, desc=spec.name)
     for it in pbar:
         with torch.no_grad():                                              # cheap per-iter re-init to rest
             reset_state(lvl, rest, dev)
@@ -242,34 +286,45 @@ def main():
         with torch.no_grad():                                              # warmup -> settle to the beat rhythm
             set_maps(H, lvl, youngs_p.detach(), dir_grid.detach())
             for fr in range(start, onset):
-                H.fields["activation"].grid = (amp * pulse_env(fr, dur.detach()) * spatial)[None]
+                H.fields["activation"].grid = (pulse_env(fr, dur.detach()) * spatial)[None]
                 step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
         set_maps(H, lvl, youngs_p, dir_grid)                               # differentiable beat
         sim = []
         for k in range(grad_len):
             fr = onset + k
-            H.fields["activation"].grid = (amp * pulse_env(fr, dur) * spatial)[None]
+            H.fields["activation"].grid = (pulse_env(fr, dur) * spatial)[None]
             step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
             anchor(lvl, rest, real_disp[fr] - ref, bnd)
             sim.append(lvl.state[:, pa:pb])
         sim_s = torch.stack(sim); sim_d = sim_s - sim_s[0:1]               # [G,N,2] sim motion during the beat
         res = ((sim_d[:, mov] - real_d[:, mov]) ** 2).sum()
         tot = ((real_d[:, mov] - real_d[:, mov].mean(0, keepdim=True)) ** 2).sum().clamp(min=1e-12)
-        loss = res / tot                                                   # NRMSE^2 ; R2 = 1 - loss
+        r2_loss = res / tot                                                # NRMSE^2 ; R2 = 1 - this
+        # anti-collapse: the zero-motion "tiny dot" sits at r2_loss=1 (R2=0) -- a wide safe basin GD
+        # slides into instead of matching the full-size loop. Penalise the per-node motion energy being
+        # too small/large so collapse is punished; the term is 0 at the true fit (no bias on the optimum).
+        e_sim = (sim_d[:, mov] ** 2).sum().clamp(min=1e-12)
+        e_real = (real_d[:, mov] ** 2).sum().clamp(min=1e-12)
+        amp_loss = (e_sim.sqrt() - e_real.sqrt()) ** 2 / e_real            # 0 when motion magnitudes match
+        loss = r2_loss + args.w_amp * amp_loss
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(list(net.parameters()) + [log_dur], 1.0)
         opt.step()
-        pbar.set_postfix_str(f"loss={loss.item():.3f} R2={1 - loss.item():+.2f} "
+        r2 = 1 - r2_loss.item()
+        pbar.set_postfix_str(f"loss={loss.item():.3f} R2={r2:+.2f} ampL={amp_loss.item():.2f} "
                              f"dur={torch.exp(log_dur).item():.1f} youngs[{youngs_map.min().item():.0f},"
                              f"{youngs_map.max().item():.0f}]")
         if it % args.ckpt_every == 0 or it == args.n_iter - 1:
-            info = (f"{spec.name}  it {it}/{args.n_iter}  R2={1 - loss.item():+.3f}  "
+            info = (f"{spec.name}  it {it}/{args.n_iter}  R2={r2:+.3f}  "
                     f"dur={torch.exp(log_dur).item():.1f}  amp={amp}  youngs[{smin:.0f},{smax:.0f}]")
-            render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info=info)
+            render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, dir_grid, outdir, info=info, traj_amp=args.traj_amp)
             torch.save({"net": net.state_dict(), "log_dur": log_dur.detach()},
                        os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
-    print(f"  done -> {outdir}  (R2={1 - loss.item():+.3f})")
+            with open(os.path.join(outdir, "progress.txt"), "w") as pf:
+                pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} loss={loss.item():.3f} ampL={amp_loss.item():.3f} "
+                         f"dur={torch.exp(log_dur).item():.1f} amp={amp}")
+    print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f})")
 
 
 if __name__ == "__main__":

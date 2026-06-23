@@ -49,8 +49,10 @@ def main():
     spd = np.linalg.norm(np.diff(P, axis=0), axis=2).mean(1)
     pk, _ = find_peaks(spd, height=spd.mean(), distance=20)
     period = int(round(float(np.diff(pk).mean())))
-    onset = int(pk[args.fit_beat]); end = min(onset + period, A.shape[0])
-    beat = A[onset:end]                                   # the fit-beat segment (same coords)
+    fb = args.fit_beat % len(pk)                          # the FULL beat = onset -> NEXT onset (closes the loop)
+    onset = int(pk[fb])
+    end = int(pk[fb + 1]) + 1 if fb + 1 < len(pk) else min(onset + period, A.shape[0])
+    beat = A[onset:end]                                   # full inter-beat interval -> closed loop
 
     fig, ax = plt.subplots(figsize=(8, 8), facecolor="black"); ax.set_facecolor("black"); ax.axis("off")
     ax.set_aspect("equal"); ax.set_xlim(0, 1); ax.set_ylim(1, 0)   # Y-down (image convention, matches gt render)
