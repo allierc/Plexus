@@ -48,6 +48,15 @@ relies on the radius graph's `min_radius` so coincident neighbours don't blow up
 of the three rules whose deltas the engine sums to make a flock; see also cohesion,
 alignment.
 
+## Equation
+
+$$
+\mathbf a_i \;=\; -\,a_3\,w^s_i\,
+\Big\langle \frac{\mathbf x_j-\mathbf x_i}{\lVert\mathbf x_j-\mathbf x_i\rVert^{2}}\Big\rangle_{j\in\mathcal N(i)}
+$$
+The boids anti-crowding rule: push away from close neighbours, weighted by
+$1/\lVert d\rVert^{2}$. The graph's `min_radius` keeps coincident neighbours finite.
+
 ## Parameters
 
 | parameter | role | default |

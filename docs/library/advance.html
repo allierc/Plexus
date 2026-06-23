@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
   <li><a href="#identifiability" id="toc-identifiability" class="nav-link" data-scroll-target="#identifiability">Identifiability</a></li>
@@ -270,6 +271,12 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>A first-derivative dynamics operator: it returns a velocity delta <code>v_i = move_speed_i * (cos h_i, sin h_i)</code> and lets the ENGINE integrate the position (<code>pos += dt * v</code>), exactly like attraction_repulsion returns a dpos. It does NOT touch <code>pos</code>, and it is purely propulsion – domain/obstacle reflection is a separate <code>bounce</code> operator (run before advance), so this stays one concern.</p>
 <p>Renamed from the prototype <code>motility</code> (it is the slime “move” step).</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\dot{\mathbf x}_i \;=\; s_i\,(\cos\theta_i,\ \sin\theta_i)
+\]</span> Self-propulsion at speed <span class="math inline">\(s_i\)</span> (<code>move_speed</code>) along the scalar heading <span class="math inline">\(\theta_i\)</span>; the engine integrates the position (<span class="math inline">\(\mathbf x \mathrel{+}= \Delta t\,\dot{\mathbf x}\)</span>).</p>
 </section>
 <section id="minimal-spec" class="level2">
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>

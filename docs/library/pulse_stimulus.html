@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -274,6 +275,13 @@ window.Quarto = {
 <pre><code>a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius</code></pre>
 <p>It owns WHERE the stimulus is – not WHEN (the pacemaker) nor the mechanical effect (<code>pulse_to_contraction</code>). <code>kind=field</code>: writes the field grid in place, returns {}. With no pacemaker run before it (the key is absent from <code>H.signals</code>) p(t) defaults to 0, so the field is blank – schedule the pacemaker first.</p>
 </section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^{2}}{2\sigma^{2}}\Big),
+\qquad \sigma=\text{radius}
+\]</span> Paints the clock <span class="math inline">\(p(t)\)</span> (from a <code>pacemaker</code>) as a Gaussian bump centred at <span class="math inline">\(\mathbf x_0\)</span>. Owns <em>where</em> the stimulus is — not <em>when</em> (the pacemaker) nor its mechanical effect.</p>
+</section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
@@ -336,7 +344,7 @@ window.Quarto = {
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>field</strong> operators: <a href="../library/diffuse.html"><code>diffuse</code></a>, <a href="../library/decay.html"><code>decay</code></a>, <a href="../library/playback.html"><code>playback</code></a>, <a href="../library/pacemaker.html"><code>pacemaker</code></a>, <a href="../library/mpm_grid_update.html"><code>mpm_grid_update</code></a>.</p>
+<p>Other <strong>field</strong> operators: <a href="../library/diffuse.html"><code>diffuse</code></a>, <a href="../library/decay.html"><code>decay</code></a>, <a href="../library/playback.html"><code>playback</code></a>, <a href="../library/pacemaker.html"><code>pacemaker</code></a>, <a href="../library/phase_delay_pulse.html"><code>phase_delay_pulse</code></a>, <a href="../library/mpm_grid_update.html"><code>mpm_grid_update</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>

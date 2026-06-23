@@ -48,6 +48,19 @@ friction, and the interior wall mask (rasterized once from `general: obstacles:`
 A pure field -> field operator; returns {}. Step 3 of the decomposed MLS-MPM
 (oracle: `mls_mpm_mechanics`).
 
+## Equation
+
+$$
+\mathbf v_g = \frac{\mathbf p_g}{m_g},
+\qquad
+\mathbf v_g \mathrel{+}= \Delta t\,\mathbf f^{\,\text{CSF}}_g,
+\qquad
+\mathbf v_g \leftarrow \mathrm{BC}(\mathbf v_g)
+$$
+Grid momentum $\to$ velocity, plus the continuum surface force (CSF) from the liquid
+colour field, then boundary conditions: reflective walls, obstacle friction, interior
+mask. A pure field $\to$ field solve. Step 3 of the MLS-MPM decomposition.
+
 ## Parameters
 
 | parameter | role | default |
@@ -81,7 +94,7 @@ _What breaks under bad parameters &mdash; to be written._
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd).
 
 ## Source
 

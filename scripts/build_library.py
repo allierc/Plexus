@@ -184,6 +184,214 @@ operators:
                  ("p2g", "scatters this force onto the MPM grid as the body force a_ext"),
                  ("mpm_drag", "the companion damping force summed into the same particle delta")],
     ),
+
+    # --- equation-only enrichments (math straight from each operator's source) --- #
+    "Coulomb": dict(equation=r"""$$
+\ddot{\mathbf x}_i \;=\; \sum_{j\in\mathcal N(i)} -\,q_i q_j\,
+\frac{\mathbf x_j-\mathbf x_i}{\lVert\mathbf x_j-\mathbf x_i\rVert^{3}}
+$$
+The inverse-square law with superposition (`aggr: add`). Like charges $q_iq_j>0$
+repel, opposite charges attract; $\mathcal N(i)$ are the edges a `rewire` leaves."""),
+
+    "advance": dict(equation=r"""$$
+\dot{\mathbf x}_i \;=\; s_i\,(\cos\theta_i,\ \sin\theta_i)
+$$
+Self-propulsion at speed $s_i$ (`move_speed`) along the scalar heading $\theta_i$;
+the engine integrates the position ($\mathbf x \mathrel{+}= \Delta t\,\dot{\mathbf x}$)."""),
+
+    "advance_3d": dict(equation=r"""$$
+\dot{\mathbf x}_i \;=\; s_i\,\hat{\mathbf h}_i,\qquad \lVert\hat{\mathbf h}_i\rVert=1
+$$
+The 3D form: the heading is a unit vector $\hat{\mathbf h}_i$ rather than an angle."""),
+
+    "aggregate": dict(equation=r"""$$
+\mathbf x_P \;=\; \frac{\sum_{i\in P} o_i\,\mathbf x_i}{\sum_{i\in P} o_i}
+$$
+The occupancy-weighted centroid of a parent $P$'s children ($o_i$ = occupancy). A
+derived readout written straight onto the parent, not an integrated force."""),
+
+    "alignment": dict(equation=r"""$$
+\mathbf a_i \;=\; a_2\,w^a_i\,\big\langle \mathbf v_j-\mathbf v_i\big\rangle_{j\in\mathcal N(i)}
+$$
+The boids velocity-matching rule: steer toward the mean neighbour velocity.
+$w^a_i$ is the receiver type's `alignment` weight; $\langle\cdot\rangle$ is the mean over neighbours."""),
+
+    "cohesion": dict(equation=r"""$$
+\mathbf a_i \;=\; a_1\,w^c_i\,\big\langle \mathbf x_j-\mathbf x_i\big\rangle_{j\in\mathcal N(i)}
+$$
+The boids centring rule: steer toward the local centre of mass (mean offset to
+neighbours). $w^c_i$ is the receiver type's `cohesion` weight."""),
+
+    "separation": dict(equation=r"""$$
+\mathbf a_i \;=\; -\,a_3\,w^s_i\,
+\Big\langle \frac{\mathbf x_j-\mathbf x_i}{\lVert\mathbf x_j-\mathbf x_i\rVert^{2}}\Big\rangle_{j\in\mathcal N(i)}
+$$
+The boids anti-crowding rule: push away from close neighbours, weighted by
+$1/\lVert d\rVert^{2}$. The graph's `min_radius` keeps coincident neighbours finite."""),
+
+    "drag": dict(equation=r"""$$
+\mathbf a_i \;=\; -\,k\,\mathbf v_i
+$$
+Viscous friction as an acceleration ($k$ = drag coefficient). A force in the
+schedule, not an integrator knob, so it composes with the other second-derivative laws."""),
+
+    "gravity": dict(equation=r"""$$
+\mathbf a_{\text{ext}} \;=\; \mathbf g \qquad (\text{default } \mathbf g=(0,-g_y))
+$$
+A uniform body acceleration returned as a cell delta; in an MPM scene the substep
+reads it as the external body force rather than the engine integrating it."""),
+
+    "broadcast": dict(equation=r"""$$
+\dot{\mathbf x}_i \;=\; k\,\big(\mathbf x_{P(i)}-\mathbf x_i\big)
+$$
+The containment lift: each child is pulled toward its parent $P(i)$'s position with
+stiffness $k$ — the down-the-hierarchy dual of `aggregate`."""),
+
+    "chemotaxis": dict(equation=r"""$$
+\dot{\mathbf x}_i \;=\; g\,\nabla\phi(\mathbf x_i)
+$$
+The Keller–Segel coupling: climb (or, for $g<0$, flee) the gradient of field $\phi$
+sampled at the particle. A first-derivative velocity that simply sums with any other."""),
+
+    "decay": dict(equation=r"""$$
+c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)
+$$
+Linear evaporation of a scalar field at rate $k$ — the sink that lets stigmergic
+trails fade so the network coarsens. The companion of `deposit` / `diffuse`."""),
+
+    "deposit": dict(equation=r"""$$
+c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) \;\leftarrow\;
+\min\!\Big(1,\; c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) + a\,\Delta t\Big),
+\qquad s=\text{type}(i)
+$$
+Each agent adds $a\,\Delta t$ (`amount`) to its own species channel $s$ at the pixel
+under its position, clamped to 1 — the only place agents imprint the trail."""),
+
+    "radius_graph": dict(equation=r"""$$
+E \;=\; \big\{\,(i,j)\;:\; r_{\min} \le \lVert\mathbf x_i-\mathbf x_j\rVert < r\,\big\}
+$$
+Rebuilds the neighbour relation each tick: an edge for every pair within `radius` $r$
+(and beyond an optional `min_radius` floor). Emits no delta — lateral ops read these edges."""),
+
+    "pacemaker": dict(equation=r"""$$
+p(t) \;=\;
+\begin{cases}
+\sin\!\big(\pi\, s/\tau_d\big) & s<\tau_d\\[2pt]
+0 & \text{otherwise}
+\end{cases},
+\qquad s=(t+\varphi)\bmod T
+$$
+A smooth raised bump of width $\tau_d$ (`duration`) once per period $T$, offset by
+phase $\varphi$, in outer ticks $t$. Written to `H.signals[name]` for downstream ops."""),
+
+    "pulse_stimulus": dict(equation=r"""$$
+a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^{2}}{2\sigma^{2}}\Big),
+\qquad \sigma=\text{radius}
+$$
+Paints the clock $p(t)$ (from a `pacemaker`) as a Gaussian bump centred at $\mathbf x_0$.
+Owns *where* the stimulus is — not *when* (the pacemaker) nor its mechanical effect."""),
+
+    "phase_delay_pulse": dict(equation=r"""$$
+a(\mathbf x,t) \;=\; \text{pulse}\big(t-\tau(\mathbf x)\big),
+\qquad \tau(\mathbf x)=\tau_{\max}\,m(\mathbf x)
+$$
+Every pixel runs the same waveform, delayed by a per-pixel $\tau$ read from a map
+$m$. A delay gradient makes neighbouring regions fire in sequence — a travelling wave."""),
+
+    "pulse_to_active_stress": dict(equation=r"""$$
+\boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
+-\,A\,a(\mathbf x)\,\mathbf n(\mathbf x)\,\mathbf n(\mathbf x)^{\!\top},
+\qquad \lVert\mathbf n\rVert=1
+$$
+Activation $a$ becomes a rank-1 contractile stress along the unit axis $\mathbf n$
+($A$ = `amplitude`). `p2g` adds it to the elastic stress, so tissue feels its
+**divergence**: a patch under uniform $-A\,\mathbf n\mathbf n^{\!\top}$ shortens along $\mathbf n$."""),
+
+    "playback": dict(equation=r"""$$
+\phi(\cdot,\,t) \;=\; V\big[\,t \bmod N_{\text{frames}}\,\big]
+$$
+Prescribes the field from a recorded movie: the grid is set to the current tick's
+frame. A coupling op (e.g. `chemotaxis`) then drives particles from it."""),
+
+    "apply_material_map": dict(equation=r"""$$
+E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
+\qquad (\mu_i,\lambda_i) = \mathrm{Lam\acute e}(E_i)
+$$
+Bilinearly samples the image field $m\in[0,1]$ at each particle and maps it to a
+per-particle Young's modulus $E_i$, then to the Lamé buffers the MPM stress law reads.
+Not a force — it sets the *material*, breaking symmetry without changing MPM physics."""),
+
+    "mpm_strain": dict(equation=r"""$$
+\mathbf F \;\leftarrow\; (\mathbf I + \Delta t\,\mathbf C)\,\mathbf F
+\qquad\text{(liquid: } \mathbf F\leftarrow J^{1/d}\mathbf I,\ J=\det\mathbf F\text{)}
+$$
+Advances the deformation gradient from the affine velocity $\mathbf C$, then applies
+the material correction: liquids drop shape memory, snow clamps the singular values of
+$\mathbf F$ and hardens via the plastic ratio $J_p$. Step 1 of the MLS-MPM decomposition."""),
+
+    "p2g": dict(equation=r"""$$
+\boldsymbol\sigma = 2\mu(\mathbf F-\mathbf R)\mathbf F^{\!\top} + \lambda(J-1)J\,\mathbf I,
+\qquad
+\mathbf Q = -\frac{4\,\Delta t}{\Delta x^{2}}\,V\,\boldsymbol\sigma + m\,\mathbf C
+$$
+$$
+m_g \mathrel{+}= \sum_i w_{ig}\,m_i,
+\qquad
+\mathbf p_g \mathrel{+}= \sum_i w_{ig}\big(m_i\mathbf v_i + \mathbf Q_i(\mathbf x_g-\mathbf x_i)\big)
+$$
+The fixed-corotated stress ($\mathbf R$ = polar rotation of $\mathbf F$) forms the
+affine momentum matrix $\mathbf Q$, scattered to the grid by the quadratic B-spline
+weights $w_{ig}$. Step 2 of the MLS-MPM decomposition."""),
+
+    "mpm_grid_update": dict(equation=r"""$$
+\mathbf v_g = \frac{\mathbf p_g}{m_g},
+\qquad
+\mathbf v_g \mathrel{+}= \Delta t\,\mathbf f^{\,\text{CSF}}_g,
+\qquad
+\mathbf v_g \leftarrow \mathrm{BC}(\mathbf v_g)
+$$
+Grid momentum $\to$ velocity, plus the continuum surface force (CSF) from the liquid
+colour field, then boundary conditions: reflective walls, obstacle friction, interior
+mask. A pure field $\to$ field solve. Step 3 of the MLS-MPM decomposition."""),
+
+    "g2p": dict(equation=r"""$$
+\mathbf v_i = \sum_g w_{ig}\,\mathbf v_g,
+\qquad
+\mathbf C_i = \frac{4}{\Delta x^{2}}\sum_g w_{ig}\,\mathbf v_g\,(\mathbf x_g-\mathbf x_i)^{\!\top},
+\qquad
+\mathbf x_i \mathrel{+}= \Delta t\,\mathbf v_i
+$$
+Gathers grid velocity back to particles (new velocity + affine matrix $\mathbf C$),
+applies wall restitution and the CFL cap, then advects. Step 4 of the MLS-MPM decomposition."""),
+
+    "mpm_drag": dict(equation=r"""$$
+\mathbf a_i = -\,k\,\mathbf v_i
+\qquad\longrightarrow\qquad
+\mathbf a_{\text{ext}} \mathrel{+}= \mathbf a_i
+$$
+Viscous body drag as a particle delta that `p2g` consumes as a body force (not an
+integrator knob). Large $k$ gives the overdamped, tissue-like regime that creeps to
+$\mathbf a/k$ without ringing. Replaces `p2g`'s built-in `drag`."""),
+
+    "sense": dict(equation=r"""$$
+S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
+\quad k\in\{L,C,R\};
+\qquad
+\theta_i \leftarrow \theta_i + \Delta\theta\cdot\operatorname*{arg\,turn}_k S_k
+$$
+Reads the field in three windows $W_k$ (ahead-left / ahead / ahead-right), each a
+species-weighted sum (own channel $+1$, others $\kappa$ = `cross`), and turns the
+heading toward the strongest (Lague's 4-branch steer)."""),
+
+    "sense_3d": dict(equation=r"""$$
+S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
+\quad k\in\{C\}\cup\text{ring};
+\qquad
+\hat{\mathbf h}_i \leftarrow \mathrm{normalize}\big(\hat{\mathbf h}_i + \omega\,\mathbf r_{k^\star}\big)
+$$
+The 3D form: one centre sensor along $\hat{\mathbf h}$ plus a ring of $K$ sensors
+tilted by `sensor_angle`. If a ring direction $k^\star$ wins, rotate $\hat{\mathbf h}$
+toward its perpendicular component (up to `turn_speed` $\omega$) and renormalise."""),
 }
 
 

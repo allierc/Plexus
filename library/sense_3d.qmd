@@ -53,6 +53,18 @@ Each sensor is a windowed, species-weighted trail read (own channel +1, others
 perpendicular to h, scaled by a random strength up to `turn_speed`), then
 renormalises. Mutates `cell.heading` (the [N,3] vector) in place; returns {}.
 
+## Equation
+
+$$
+S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
+\quad k\in\{C\}\cup\text{ring};
+\qquad
+\hat{\mathbf h}_i \leftarrow \mathrm{normalize}\big(\hat{\mathbf h}_i + \omega\,\mathbf r_{k^\star}\big)
+$$
+The 3D form: one centre sensor along $\hat{\mathbf h}$ plus a ring of $K$ sensors
+tilted by `sensor_angle`. If a ring direction $k^\star$ wins, rotate $\hat{\mathbf h}$
+toward its perpendicular component (up to `turn_speed` $\omega$) and renormalise.
+
 ## Parameters
 
 | parameter | role | default |

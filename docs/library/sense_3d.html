@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -271,6 +272,15 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>The 3D counterpart of <code>sense</code>. Lague’s 2D Physarum agent reads three coplanar sensors (ahead-left / ahead / ahead-right) and turns its scalar heading toward the strongest. In 3D the heading is a unit VECTOR, so the three sensors become a CONE: one centre sensor along the heading <code>h</code>, plus a ring of <code>K</code> sensors tilted by the <code>sensor_angle</code> around <code>h</code> (using an orthonormal basis <code>(u, v)</code> perpendicular to h). Each sensor is a windowed, species-weighted trail read (own channel +1, others <code>cross</code>). If the centre is strongest the agent goes straight; otherwise it rotates <code>h</code> toward the winning ring direction (toward that direction’s component perpendicular to h, scaled by a random strength up to <code>turn_speed</code>), then renormalises. Mutates <code>cell.heading</code> (the [N,3] vector) in place; returns {}.</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
+\quad k\in\{C\}\cup\text{ring};
+\qquad
+\hat{\mathbf h}_i \leftarrow \mathrm{normalize}\big(\hat{\mathbf h}_i + \omega\,\mathbf r_{k^\star}\big)
+\]</span> The 3D form: one centre sensor along <span class="math inline">\(\hat{\mathbf h}\)</span> plus a ring of <span class="math inline">\(K\)</span> sensors tilted by <code>sensor_angle</code>. If a ring direction <span class="math inline">\(k^\star\)</span> wins, rotate <span class="math inline">\(\hat{\mathbf h}\)</span> toward its perpendicular component (up to <code>turn_speed</code> <span class="math inline">\(\omega\)</span>) and renormalise.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

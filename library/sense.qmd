@@ -48,6 +48,18 @@ then turns its heading toward the strongest reading (Lague's 4-branch steer, sca
 by a random strength). Reads per-agent sensor parameters the engine broadcast from
 `types`. Mutates `cell.heading` in place; returns {}.
 
+## Equation
+
+$$
+S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
+\quad k\in\{L,C,R\};
+\qquad
+\theta_i \leftarrow \theta_i + \Delta\theta\cdot\operatorname*{arg\,turn}_k S_k
+$$
+Reads the field in three windows $W_k$ (ahead-left / ahead / ahead-right), each a
+species-weighted sum (own channel $+1$, others $\kappa$ = `cross`), and turns the
+heading toward the strongest (Lague's 4-branch steer).
+
 ## Parameters
 
 | parameter | role | default |

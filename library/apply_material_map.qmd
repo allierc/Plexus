@@ -59,6 +59,16 @@ so a stiffness map breaks the contraction's symmetry WITHOUT changing MPM physic
 Anisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress
 law -- a later step; this does the scalar case the current fixed-corotated MPM supports.
 
+## Equation
+
+$$
+E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
+\qquad (\mu_i,\lambda_i) = \mathrm{Lam\acute e}(E_i)
+$$
+Bilinearly samples the image field $m\in[0,1]$ at each particle and maps it to a
+per-particle Young's modulus $E_i$, then to the Lamé buffers the MPM stress law reads.
+Not a force — it sets the *material*, breaking symmetry without changing MPM physics.
+
 ## Parameters
 
 | parameter | role | default |

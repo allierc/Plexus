@@ -59,6 +59,17 @@ not a pointwise push. This is the standard cardiac active-stress formulation.
 integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
 which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
 
+## Equation
+
+$$
+\boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
+-\,A\,a(\mathbf x)\,\mathbf n(\mathbf x)\,\mathbf n(\mathbf x)^{\!\top},
+\qquad \lVert\mathbf n\rVert=1
+$$
+Activation $a$ becomes a rank-1 contractile stress along the unit axis $\mathbf n$
+($A$ = `amplitude`). `p2g` adds it to the elastic stress, so tissue feels its
+**divergence**: a patch under uniform $-A\,\mathbf n\mathbf n^{\!\top}$ shortens along $\mathbf n$.
+
 ## Parameters
 
 | parameter | role | default |

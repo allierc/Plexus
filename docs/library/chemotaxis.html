@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -271,6 +272,12 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>The Keller-Segel coupling: each particle gets a velocity <code>gain * grad(field)</code> sampled at its position (gain&lt;0 to flee). A field-&gt;set Exchange that returns a first-derivative velocity delta – the ENGINE integrates it, and it simply sums with any other velocity the particle has (e.g.&nbsp;attraction_repulsion), the framework’s “deltas add” rule. The field may be deposited (slime), reaction-diffused, or prescribed from a video.</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\dot{\mathbf x}_i \;=\; g\,\nabla\phi(\mathbf x_i)
+\]</span> The Keller–Segel coupling: climb (or, for <span class="math inline">\(g&lt;0\)</span>, flee) the gradient of field <span class="math inline">\(\phi\)</span> sampled at the particle. A first-derivative velocity that simply sums with any other.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

@@ -34,6 +34,7 @@ from . import gravity               # noqa: F401  cell-level body force (feeds t
 # active-stimulus decomposition (clock -> activation field -> contraction -> MPM):
 from . import pacemaker             # noqa: F401  periodic scalar clock p(t) -> H.signals (field)
 from . import pulse_stimulus        # noqa: F401  clock x Gaussian -> activation field (field)
+from . import phase_delay           # noqa: F401  spatial phase-delay clock tau(x,y) -> activation field (field)
 from . import pulse_to_contraction  # noqa: F401  activation gradient -> per-particle force (exchange)
 from . import pulse_to_active_stress  # noqa: F401  activation -> per-particle active stress -A nn^T (exchange)
 from . import mpm_drag              # noqa: F401  viscous body drag -k*v as a particle force (lateral)
@@ -51,6 +52,6 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
            "sense_3d", "advance_3d", "bounce_3d",
            "video_field", "chemotaxis", "gravity",
-           "pacemaker", "pulse_stimulus", "pulse_to_contraction", "pulse_to_active_stress",
+           "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_drag", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p"]
