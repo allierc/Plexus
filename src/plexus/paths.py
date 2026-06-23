@@ -62,6 +62,7 @@ def config_path(*parts: str) -> str:
 # in the config name wins. Grow this as new simulation types are added.
 _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("attraction_repulsion", ("attraction_repulsion", "attract", "repuls", "arbitrary")),
+    ("Coulomb",     ("coulomb", "electro", "charge")),
     ("boids",       ("boids", "flock", "swarm")),
     ("slime",       ("slime", "physarum", "trail")),
     ("material",    ("material",)),

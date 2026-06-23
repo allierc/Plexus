@@ -14,6 +14,8 @@ from plexus.models.registry import register_operator
 class Decay(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
+    SUPPORTED_DIMS = [2, 3]                     # elementwise evaporation, dimension-agnostic
+
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("_at") or params.get("to")   # the field at `at:`

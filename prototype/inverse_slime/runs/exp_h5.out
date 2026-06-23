@@ -1,0 +1,5 @@
+
+## H5 [11:28:12]: heading as (cos,sin) unit vector in the recurrent unroll (turn=rotation, loss=MSE on cos/sin; the connectome-cx representation) beats scalar-angle recurrent on sensor_angle. K=6.
+- recurrent scalar : angle=0.238+/-0.136 turn=0.185 dist=0.049
+- recurrent (cos,sin): angle=0.225+/-0.124 turn=0.083 dist=0.067
+- verdict: VALIDATED ((cos,sin) better)  [scalar 0.238 vs (cos,sin) 0.225; grid ceiling 0.121]

@@ -1,4 +1,3 @@
-# material_hydrostatic -- auto-ported from prototype/water (overnight_suite:ph_hydrostatic).
 general: {name: material_hydrostatic, seed: 0, n_frames: 700, dt: 1.0, boundary: wall}
 sets:
   cell:
@@ -12,33 +11,40 @@ sets:
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
   mpm_particle: {parent: cell, per_parent: 10000, radius: 0.3, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.2, wall_damp: 0.5,
-  wall_contact: 0.06, surface_tension: 8}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.2, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 8, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A blue horizontal band initially occupies the bottom portion of the frame with a relatively
-      flat upper edge. Over time, the upper boundary of the blue region begins to fluctuate and develop
-      distinct peaks. These peaks grow in height and complexity, creating a more irregular, undulating
-      surface. By the final frame, the blue region has formed a series of prominent waves across its top
-      edge.
-    objects: The scene contains a single continuous blue field located at the bottom of the frame. This
-      field is rectangular in its overall footprint but possesses a dynamic, irregular upper boundary.
-      The color is a consistent medium blue throughout the entire duration of the simulation. The size
-      of the blue region remains constant in width, while its height varies slightly as the surface waves
-      evolve.
+    description: A blue horizontal band appears at the bottom of the frame and remains stationary. The
+      top edge of the blue band fluctuates slightly in height over time. The overall shape of the band
+      maintains a consistent width across the screen. The background remains a solid white color throughout
+      the entire sequence.
+    objects: The primary object is a single, continuous blue horizontal band. It is positioned at the
+      bottom of the frame, spanning the entire width. The band has a jagged, irregular top edge and a
+      relatively straight bottom edge. Its color is a uniform medium blue, and its height is small compared
+      to the total frame size.
   movie_mpm_particle:
-    description: A collection of blue particles is initially distributed in a rectangular block at the
-      bottom of the frame. Over time, the top surface of the particle mass begins to fluctuate and undulate.
-      The waves move across the surface, creating a dynamic, liquid-like appearance. By the final frame,
-      the surface has settled into a series of gentle, repeating peaks and valleys.
-    objects: The scene contains a large number of small, blue particles. These particles are densely packed
-      together to form a solid-looking mass at the base of the image. The particles are uniform in size
-      and color, appearing as a consistent blue hue. The overall shape of the particle mass is a wide
-      rectangle with a varying, wavy top boundary.
+    description: A collection of blue particles is initially concentrated in a dense, rectangular block
+      at the bottom of the frame. Over time, the particles begin to move upward, causing the top surface
+      of the mass to rise and fluctuate. The upper boundary of the particle group develops a wavy, undulating
+      shape as the particles spread out. By the final frame, the particles have reached a higher level,
+      maintaining a textured, granular appearance.
+    objects: The scene contains a large number of small, individual blue particles. These particles are
+      arranged in a dense, roughly rectangular cluster at the base of the image. Each particle is a tiny,
+      irregular speck of a consistent medium-blue color. The overall mass of particles forms a continuous,
+      granular field that occupies the lower portion of the white background.

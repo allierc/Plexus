@@ -5,7 +5,7 @@
 general:
   name: boids_16
   seed: 0
-  n_frames: 8000
+  n_frames: 16000
   dt: 0.5
   boundary: periodic
 
@@ -145,13 +145,12 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a large number of small, multi-colored particles distributed across
-      a black background. Over time, the particles appear to move and shift positions, though they maintain
-      a relatively uniform density across the frame. There are no significant large-scale structural changes
-      or massive aggregations of particles visible. The overall motion is subtle, creating a shimmering
-      effect as individual dots change their spatial coordinates.
-    objects: The scene contains thousands of tiny, circular dots of varying colors including white, red,
-      blue, green, orange, and pink. These particles are arranged in a stochastic, non-connected distribution
-      that fills the entire 2D space. Each particle is approximately the same small size, appearing as
-      single pixels or small clusters of pixels. The colors are distributed randomly, with no specific
-      color grouping or geometric patterns forming among the objects.
+    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
+      a black background. Over time, the particles begin to aggregate into distinct, circular clusters
+      of varying sizes. These clusters appear to form and dissolve dynamically, with some growing larger
+      while others shrink or dissipate. By the final frame, the particles are organized into several prominent,
+      high-density circular formations surrounded by a sparse field of individual dots.
+    objects: The scene contains thousands of small, circular particles of uniform size. These particles
+      are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
+      the particles are arranged in a random, scattered topology across the entire frame. As the simulation
+      progresses, they form dense, concentric circular clusters that stand out against the black background.

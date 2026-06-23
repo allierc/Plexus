@@ -1,0 +1,55 @@
+general: {name: slime4_pos, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 0.25, move_speed: 0.005002, turn_speed: 0.5899, sensor_angle: 12.733,
+        sensor_dist: 0.04511, sensor_size: 1}
+      b: {fraction: 0.25, move_speed: 0.005002, turn_speed: 0.5899, sensor_angle: 12.733,
+        sensor_dist: 0.04511, sensor_size: 1}
+      c: {fraction: 0.25, move_speed: 0.005002, turn_speed: 0.5899, sensor_angle: 12.733,
+        sensor_dist: 0.04511, sensor_size: 1}
+      d: {fraction: 0.25, move_speed: 0.005002, turn_speed: 0.5899, sensor_angle: 12.733,
+        sensor_dist: 0.04511, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.053757}
+- {op: diffuse, at: chemical, rate: 0.036402}
+- {op: decay, at: chemical, rate: 0.003148}
+- {op: sense, at: cell, from: chemical, cross: -0.801473}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, flowing trajectories
+      that resemble swirling currents or fluid streamlines. These paths become increasingly defined, forming
+      complex, interconnected loops and winding curves. By the final frame, the particles have settled
+      into a highly structured network of coherent, undulating streams.
+    objects: The scene contains thousands of small, circular particles of uniform size. These particles
+      are colored in a repeating palette of cyan, yellow, green, and magenta. Initially, the objects are
+      arranged in a stochastic, disordered spatial distribution. As the simulation progresses, they transition
+      into a topological arrangement of continuous, curvilinear paths and nested loops.
+  movie_chemical:
+    description: The simulation begins with a dense, chaotic field of multicolored filaments that appear
+      almost as static noise. Over time, these filaments begin to organize into distinct, coherent wavy
+      structures that become increasingly visible. The colors of the filaments intensify and become more
+      saturated as the underlying patterns emerge from the background. By the final frame, the filaments
+      have formed a highly structured, interlocking network of vibrant curves.
+    objects: The scene contains numerous long, thin, thread-like filaments that are intertwined in a complex
+      web. These filaments are colored in a repeating palette of red, yellow, green, and blue. They are
+      arranged in a dense, overlapping topology that fills the entire two-dimensional space. Each individual
+      filament is relatively small in width but spans a significant portion of the frame in length.

@@ -16,6 +16,7 @@ from plexus.models.registry import register_operator
 class Deposit(Exchange):
     """object -> field. Writes `to:` field in place; returns {}."""
 
+    SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
     REQUIRES_PARAMS = ["to"]
 
     def __init__(self, params, device="cpu"):
@@ -29,13 +30,21 @@ class Deposit(Exchange):
         dev = lvl.state.device
         N = lvl.n
         fld = H.fields[self.field_name]
-        pos = lvl.state[:, :2]
+        pos = lvl.get("pos")                                      # [N, D] (D = 2 or 3)
+        D = pos.shape[1]
         nt = lvl.node_type
         dt = float(getattr(H.config, "dt", 1.0))
         m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
 
-        gx, gy = fld.pix(pos[:, 0], pos[:, 1])
-        flat = nt * (fld.nx * fld.ny) + gx * fld.ny + gy          # channel-major flat index
+        gidx = fld.pix(*[pos[:, k] for k in range(D)])           # D-tuple of voxel indices
+        # channel-major, row-major flat index over the N-D grid (== the 2D
+        # `nt*(nx*ny) + gx*ny + gy` exactly when D == 2).
+        ravel = torch.zeros(N, dtype=torch.long, device=dev)
+        stride = 1
+        for k in reversed(range(D)):
+            ravel = ravel + gidx[k] * stride
+            stride *= fld.shape[k]
+        flat = nt * stride + ravel                               # stride == prod(shape)
         amt = torch.full((N,), self.amount * dt, device=dev) * m
         fld.grid.view(-1).index_add_(0, flat, amt)
         fld.grid.clamp_(max=1.0)

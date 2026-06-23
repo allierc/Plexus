@@ -1,0 +1,34 @@
+# Coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a periodic 3D box.
+# charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
+# Coulomb is 2nd-derivative + add-aggregated; like charges repel, opposite attract.
+# `charge` is a per-type parameter (electron/proton = types, per the Plexus type rule);
+# the engine broadcasts it to a per-particle buffer the operator reads.
+general: {name: Coulomb_6_3d, seed: 0, n_frames: 32000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 960
+    vel_init: 0.0001
+    types:
+      q_p1: {fraction: 0.1667, charge: 1}
+      q_n1: {fraction: 0.1667, charge: -1}
+      q_p2: {fraction: 0.1667, charge: 2}
+      q_n2: {fraction: 0.1667, charge: -2}
+      q_p3: {fraction: 0.1667, charge: 3}
+      q_n3: {fraction: 0.1665, charge: -3}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
+  - {op: Coulomb,      at: particle, clamp: 1000000.0}
+schedule: [radius_graph, Coulomb]
+plotting:
+  background: black
+  size_by: charge          # point size ~ |charge|
+  colors:                  # ParticleGraph PDE_E colour code (by type index)
+    q_p1: [1, 1, 1]
+    q_n1: [0, 0.5, 0.75]
+    q_p2: [1, 0, 0]
+    q_n2: [0.75, 0, 0]
+    q_p3: [0.5, 0.5, 0.5]
+    q_n3: [0.5, 0.5, 0.5]
+  splat_size: 1.9
+  splat_res: 820

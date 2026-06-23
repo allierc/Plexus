@@ -1,0 +1,7 @@
+
+## PROFILE [12:32:15]: likelihood profile of sensor_angle (turn,dist fixed at truth), curriculum loss, K=30.
+- target0: true_ang_u=0.88, argmin=0.98, relative well-depth=0.41, loss(true)=0.3611, loss(min)=0.3506  -> IDENTIFIABLE, fit missed (dip at truth)
+- target1: true_ang_u=0.30, argmin=0.94, relative well-depth=0.94, loss(true)=0.8371, loss(min)=0.5533  -> BIASED (dip away from truth)
+- target2: true_ang_u=0.75, argmin=0.94, relative well-depth=0.39, loss(true)=0.5987, loss(min)=0.5718  -> BIASED (dip away from truth)
+- target3: true_ang_u=0.08, argmin=0.42, relative well-depth=0.66, loss(true)=0.2082, loss(min)=0.1439  -> BIASED (dip away from truth)
+- saved plot -> archive/profile_sensor_angle.png

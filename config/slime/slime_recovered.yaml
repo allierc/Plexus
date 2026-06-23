@@ -1,0 +1,45 @@
+general: {name: slime_recovered, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.0045, turn_speed: 0.325, sensor_angle: 36.25,
+        sensor_dist: 0.02375, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.0625}
+- {op: diffuse, at: chemical, rate: 0.01375}
+- {op: decay, at: chemical, rate: 0.00305}
+- {op: sense, at: cell, from: chemical, cross: -1.125}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The video shows a static field of blue particles that do not move or change over time.
+      The distribution of the particles remains constant across all four keyframes. There is no evolution
+      of the underlying structure or the density of the points. The scene represents a steady-state snapshot
+      of a spatial distribution.
+    objects: The scene contains thousands of small, circular blue particles. These particles are arranged
+      in a complex, web-like topology of interconnected filaments and clusters. The filaments form a porous,
+      sponge-like network across the entire black background. Each individual particle is uniform in size
+      and bright blue in color.
+  movie_chemical:
+    description: The simulation shows a network of interconnected filaments that gradually thin and fragment
+      over time. The teal-colored structures appear to be receding or dissolving into the black background.
+      As the video progresses, the density of the network decreases significantly. By the final frame,
+      the once-continuous web has broken down into small, isolated clusters and sparse lines.
+    objects: The scene contains a complex, interconnected network of teal-colored filaments. These filaments
+      form a porous, web-like topology with irregular, cell-like voids. The structures vary in thickness,
+      with some areas showing dense clusters and others showing thin, thread-like connections. The overall
+      size of the network covers the entire frame, but the individual components shrink and disappear
+      as time passes.

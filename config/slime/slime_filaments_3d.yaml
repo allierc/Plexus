@@ -1,0 +1,93 @@
+# 3D variant of slime_filaments -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_filaments_3d
+  seed: 0
+  n_frames: 900
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 13000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a:
+        fraction: 1.0
+        move_speed: 0.007
+        turn_speed: 0.18
+        sensor_angle: 14
+        sensor_dist: 0.035
+        sensor_size: 1
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.045
+- op: diffuse
+  at: chemical
+  rate: 0.015
+- op: decay
+  at: chemical
+  rate: 0.0005
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cluster of blue particles begins as a compact, roughly spherical shape. Over
+      time, the cluster expands outward while simultaneously transitioning into a more defined, diamond-shaped
+      geometric structure. The particles maintain a high density in the center while becoming more sparse
+      at the outer edges. By the final frame, the distribution has stabilized into a large, faceted crystalline-like
+      volume.
+    objects: The scene contains a large collection of individual blue particles. These particles are arranged
+      in a three-dimensional cloud that evolves from a sphere into a diamond-shaped polyhedron. Each individual
+      particle is very small and appears as a single pixel or point of light. The overall color of the
+      entire set is a consistent medium blue against a black background.
+  movie_chemical:
+    description: A green, spherical cloud of particles initially appears in the center of a black void.
+      As time progresses, the cloud rapidly expands and begins to take on a distinct, sharp-edged cubic
+      shape. The cubic structure continues to grow and rotate slightly while maintaining its defined geometric
+      boundaries. By the final frame, the green mass has filled a large portion of the space as a well-defined,
+      rotating cube.
+    objects: The primary object is a dense collection of green particles forming a single continuous mass.
+      It starts as a small, roughly spherical cluster with fuzzy, irregular edges. It then transforms
+      into a large, solid cube with sharp vertices and flat faces. The object remains a uniform green
+      color throughout the entire transformation and expansion.

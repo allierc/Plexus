@@ -1,0 +1,7 @@
+
+## ABLATION recurrent x noise [13:35:53] (position loss; 2 targets t0,t1; mean u-err)
+- one-step,  no-noise   : angle=0.075 turn=0.069 dist=0.055
+- one-step,  noise.03   : angle=0.065 turn=0.060 dist=0.077
+- recurrent, no-noise   : angle=0.171 turn=0.388 dist=0.070
+- recurrent, noise.03   : angle=0.231 turn=0.309 dist=0.064
+- BEST (sum 3): one-step,  no-noise

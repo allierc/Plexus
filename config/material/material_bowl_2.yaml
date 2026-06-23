@@ -1,4 +1,3 @@
-# material_bowl_2 -- auto-ported from prototype/water (water_bowl_2.yaml).
 general:
   name: material_bowl_2
   seed: 0
@@ -25,35 +24,46 @@ sets:
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
   mpm_particle: {parent: cell, per_parent: 7000, radius: 0.22, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.35, wall_damp: 0.5,
-  wall_contact: 0.06, surface_tension: 16.0}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.35, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 16.0, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A blue textured sphere is initially centered in a white space above a grey stepped structure.
-      The sphere then disappears, and a blue textured fluid appears to flow into the central channel of
-      the grey structure. The blue fluid fills the stepped area from the bottom up, expanding horizontally
-      as it rises. By the final frame, the blue fluid has reached a level where it fills the central basin
-      and begins to overflow into the side channels.
-    objects: The first object is a large, circular blue sphere with a grainy, speckled texture. The second
-      object is a grey, symmetrical stepped structure that forms a central channel and two side basins.
-      The third object is a blue textured fluid that mimics the appearance of the sphere's surface. The
-      fluid is arranged in a way that it fills the bottom of the grey structure and spreads upwards and
-      outwards.
+    description: 'A large blue circle appears in the center of a white background with gray stepped borders.
+
+      The circle then transforms into a horizontal blue band that fills the space between the gray borders.
+
+      The blue band gradually darkens in color as the simulation progresses.
+
+      The final frame shows a dark blue band with a vertical extension at the bottom center.'
+    objects: 'The primary object is a large, circular blue shape centered in the upper half of the frame.
+
+      The background consists of a white upper region and a gray lower region with a stepped, symmetrical
+      border.
+
+      A horizontal blue band emerges, spanning the width of the central white area.
+
+      A vertical blue column extends downward from the center of the horizontal band in the final frames.'
   movie_mpm_particle:
     description: A large circular cluster of blue particles is initially suspended in the upper half of
-      the frame. As the simulation progresses, this cluster rapidly disintegrates and falls downward into
-      a stepped, gray container. The particles accumulate in the bottom of the container, filling the
-      lowest levels first. By the final frame, the particles have settled into a dense, solid mass at
-      the base of the structure.
-    objects: The primary objects are thousands of small, blue particles that form a large, circular cluster.
-      A gray, stepped container is positioned at the bottom of the frame, featuring a wide base and narrowing
-      towards the center. The background is a plain, solid white field that provides high contrast for
-      the blue particles. The particles are uniform in size and color, appearing as a grainy, point-like
-      texture throughout the motion.
+      the frame. As the simulation progresses, this cluster rapidly disintegrates and falls downward.
+      The particles settle into a stepped, symmetrical formation at the bottom of the frame. Finally,
+      the particles stabilize into a solid, tiered structure against a gray background.
+    objects: The primary objects are thousands of small, blue, circular particles. These particles are
+      initially arranged in a dense, spherical cluster in the center. They then transition into a structured,
+      symmetrical, stepped formation at the bottom. The background consists of a white upper region and
+      a gray, stepped lower region.

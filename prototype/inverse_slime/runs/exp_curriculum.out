@@ -1,0 +1,3 @@
+
+## H7 [12:08:38] CURRICULUM (per-frame (cos,sin) loss, free-run heading, random starts, bounce resync) -- the connectome-cx scheme. My prior recurrent matched only the FINAL net change; this scores every frame over the horizon.
+- schedule=(10,): angle=0.238 turn=0.152 dist=0.066  [at floor; prior floor 0.12-0.18]  (75s)

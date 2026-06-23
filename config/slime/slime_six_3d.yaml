@@ -1,0 +1,151 @@
+# 3D variant of slime_six -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 64.
+general:
+  name: slime_six_3d
+  seed: 0
+  n_frames: 840
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a:
+        fraction: 0.16667
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      b:
+        fraction: 0.16667
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      c:
+        fraction: 0.16667
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      d:
+        fraction: 0.16667
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      e:
+        fraction: 0.16666
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+      f:
+        fraction: 0.16666
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.032
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 64
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.019
+- op: diffuse
+  at: chemical
+  rate: 0.0125
+- op: decay
+  at: chemical
+  rate: 0.0021
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+    c:
+    - 0.4
+    - 0.65
+    - 1.0
+    d:
+    - 1.0
+    - 0.85
+    - 0.3
+    e:
+    - 0.95
+    - 0.4
+    - 0.95
+    f:
+    - 1.0
+    - 0.6
+    - 0.2
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, chaotic cloud of multicolored particles distributed
+      in a diamond-shaped volume. As time progresses, the particles begin to organize into distinct, elongated
+      filaments or strands. These strands weave through the volume, creating a complex network of interconnected
+      paths. By the final frame, the structure has evolved into a highly organized, tangled web of continuous
+      trajectories.
+    objects: The scene contains thousands of small, point-like particles in various colors including red,
+      orange, green, blue, and purple. These particles are initially arranged in a stochastic, high-density
+      distribution within a bounded space. Over time, they form continuous, thread-like filaments that
+      exhibit a complex, intertwined topology. Each filament maintains a consistent color, representing
+      a specific path or agent trajectory within the simulation.
+  movie_chemical:
+    description: The simulation begins with a dense cloud of discrete, multi-colored particles scattered
+      in a roughly diamond-shaped volume. Over time, these particles begin to elongate and connect, transforming
+      into a complex network of intertwined filaments. As the simulation progresses, the filaments become
+      more distinct and defined, weaving through one another to form a dense, tangled web. By the final
+      frame, the structure has evolved into a highly complex, three-dimensional mesh of continuous, overlapping
+      strands.
+    objects: The scene contains a large collection of multi-colored filaments that are densely interconnected
+      in a tangled, non-linear topology. These objects transition from small, point-like particles to
+      long, continuous strands that occupy a significant portion of the central volume. The color palette
+      is diverse, featuring distinct strands of magenta, cyan, yellow, and orange. The filaments vary
+      slightly in thickness but maintain a consistent, thread-like appearance as they weave together.

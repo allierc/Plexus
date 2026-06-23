@@ -1,0 +1,50 @@
+general: {name: slime2_gt, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 0.5, move_speed: 0.005002, turn_speed: 0.6368, sensor_angle: 10.184,
+        sensor_dist: 0.04374, sensor_size: 1}
+      b: {fraction: 0.5, move_speed: 0.005002, turn_speed: 0.6368, sensor_angle: 10.184,
+        sensor_dist: 0.04374, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.053757}
+- {op: diffuse, at: chemical, rate: 0.036402}
+- {op: decay, at: chemical, rate: 0.003148}
+- {op: sense, at: cell, from: chemical, cross: -0.824378}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform distribution of red and green particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, winding filamentary
+      structures. These filaments grow and intertwine, forming a complex network of interconnected paths.
+      By the final frame, the particles have transitioned from a random state into a highly structured,
+      web-like pattern.
+    objects: The scene contains two primary sets of small, circular particles in red and green. Initially,
+      these particles are distributed randomly and independently across the entire field. As the simulation
+      progresses, they aggregate into elongated, continuous filaments that curve and branch. The final
+      structures consist of overlapping, thread-like networks of varying lengths and orientations.
+  movie_chemical:
+    description: The simulation begins with a sparse distribution of small, noisy particles scattered
+      across a black background. Over time, these particles begin to coalesce and organize into distinct,
+      elongated filamentary structures. The filaments grow in length and thickness, weaving into a dense,
+      interconnected network. By the final frame, the network is fully developed, filling the entire space
+      with a complex, intertwined mesh.
+    objects: The scene contains two primary sets of filamentary structures, one colored in pink and the
+      other in cyan. These filaments are arranged in a complex, overlapping topology that resembles a
+      biological network or a polymer mesh. Each filament is relatively thin and elongated, exhibiting
+      a smooth, curved geometry. The two colors are interspersed throughout the frame, creating a high-contrast,
+      interwoven pattern.

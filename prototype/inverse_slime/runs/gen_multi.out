@@ -1,0 +1,129 @@
+task=generate  type=slime  config=slime_gt_t1  (/workspace/Plexus/config/slime/slime_gt_t1.yaml)
+[generate] slime/slime_gt_t1: 200 frames, sets={'cell': 6000} -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t1
+[generate] done: 201 recorded frames -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t1
+[plot] cell: fig_cell_evolution.png, fig_cell_final.png
+[plot] movie -> movie_cell.mp4
+[plot] chemical (field): fig_chemical_evolution.png, fig_chemical_final.png
+[plot] field movie -> movie_chemical.mp4
+[plot] figures -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t1
+[describe] captioning 2 movie(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[describe] 2 videos -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[load] /workspace/Plexus/VLLM/gemma-4-12B-it on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:46, 14.43it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:08, 80.29it/s]Loading weights:   6%|▋         | 44/677 [00:00<00:04, 133.96it/s]Loading weights:   9%|▉         | 63/677 [00:00<00:04, 149.15it/s]Loading weights:  12%|█▏        | 84/677 [00:00<00:03, 165.89it/s]Loading weights:  15%|█▌        | 104/677 [00:00<00:03, 172.20it/s]Loading weights:  19%|█▉        | 127/677 [00:00<00:02, 185.54it/s]Loading weights:  22%|██▏       | 147/677 [00:00<00:02, 179.40it/s]Loading weights:  25%|██▌       | 172/677 [00:01<00:02, 196.37it/s]Loading weights:  29%|██▊       | 193/677 [00:01<00:02, 199.13it/s]Loading weights:  32%|███▏      | 215/677 [00:01<00:02, 195.09it/s]Loading weights:  36%|███▌      | 242/677 [00:01<00:02, 215.03it/s]Loading weights:  39%|███▉      | 264/677 [00:01<00:01, 215.05it/s]Loading weights:  42%|████▏     | 286/677 [00:01<00:01, 202.35it/s]Loading weights:  46%|████▌     | 311/677 [00:01<00:01, 205.85it/s]Loading weights:  49%|████▉     | 335/677 [00:01<00:01, 213.86it/s]Loading weights:  53%|█████▎    | 357/677 [00:01<00:01, 205.29it/s]Loading weights:  56%|█████▋    | 381/677 [00:02<00:01, 197.41it/s]Loading weights:  60%|██████    | 408/677 [00:02<00:01, 211.88it/s]Loading weights:  64%|██████▎   | 430/677 [00:02<00:01, 211.37it/s]Loading weights:  67%|██████▋   | 452/677 [00:02<00:01, 201.86it/s]Loading weights:  70%|███████   | 477/677 [00:02<00:00, 214.28it/s]Loading weights:  74%|███████▎  | 499/677 [00:02<00:00, 212.60it/s]Loading weights:  77%|███████▋  | 521/677 [00:02<00:00, 201.28it/s]Loading weights:  81%|████████  | 547/677 [00:02<00:00, 211.68it/s]Loading weights:  85%|████████▍ | 574/677 [00:02<00:00, 220.34it/s]Loading weights:  88%|████████▊ | 597/677 [00:03<00:00, 212.39it/s]Loading weights:  91%|█████████▏| 619/677 [00:03<00:00, 205.18it/s]Loading weights:  95%|█████████▍| 642/677 [00:03<00:00, 206.24it/s]Loading weights:  99%|█████████▉| 670/677 [00:03<00:00, 225.58it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 197.51it/s]
+[1/2] slime/slime_gt_t1/movie_cell
+  The simulation shows a static distribution of cyan particles on a black background. There is no visible movement or evolution between the four keyframes provide
+[2/2] slime/slime_gt_t1/movie_chemical
+  The simulation shows a static, unchanging network of interconnected filaments. There is no movement or evolution of the structures across the time sequence. The
+[spec] 2 description(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t1/spec.yaml
+[spec] 2 description(s) -> /workspace/Plexus/config/slime/slime_gt_t1.yaml
+
+[saved] /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt  (2 videos)
+/workspace/Plexus/prototype/inverse_slime/autorun.py:113: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)
+  return float(dep.amount()), float(dif.rate()), float(dec.rate()), move
+target1: sensor_angle u-err=0.158
+task=generate  type=slime  config=slime_pos_t1  (/workspace/Plexus/config/slime/slime_pos_t1.yaml)
+[generate] slime/slime_pos_t1: 200 frames, sets={'cell': 6000} -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t1
+[generate] done: 201 recorded frames -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t1
+[plot] cell: fig_cell_evolution.png, fig_cell_final.png
+[plot] movie -> movie_cell.mp4
+[plot] chemical (field): fig_chemical_evolution.png, fig_chemical_final.png
+[plot] field movie -> movie_chemical.mp4
+[plot] figures -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t1
+[describe] captioning 2 movie(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[describe] 2 videos -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[load] /workspace/Plexus/VLLM/gemma-4-12B-it on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:48, 13.93it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:08, 74.45it/s]Loading weights:   7%|▋         | 45/677 [00:00<00:04, 131.68it/s]Loading weights:   9%|▉         | 64/677 [00:00<00:04, 144.52it/s]Loading weights:  13%|█▎        | 88/677 [00:00<00:03, 171.05it/s]Loading weights:  16%|█▌        | 107/677 [00:00<00:03, 175.27it/s]Loading weights:  19%|█▉        | 132/677 [00:00<00:02, 191.51it/s]Loading weights:  23%|██▎       | 156/677 [00:00<00:02, 204.90it/s]Loading weights:  26%|██▋       | 178/677 [00:01<00:02, 198.16it/s]Loading weights:  30%|██▉       | 200/677 [00:01<00:02, 191.67it/s]Loading weights:  33%|███▎      | 225/677 [00:01<00:02, 204.58it/s]Loading weights:  36%|███▋      | 246/677 [00:01<00:02, 200.37it/s]Loading weights:  40%|███▉      | 269/677 [00:01<00:01, 208.27it/s]Loading weights:  43%|████▎     | 291/677 [00:01<00:01, 205.73it/s]Loading weights:  46%|████▌     | 312/677 [00:01<00:01, 201.61it/s]Loading weights:  49%|████▉     | 334/677 [00:01<00:01, 204.39it/s]Loading weights:  52%|█████▏    | 355/677 [00:01<00:01, 200.20it/s]Loading weights:  56%|█████▋    | 381/677 [00:02<00:01, 211.00it/s]Loading weights:  60%|█████▉    | 405/677 [00:02<00:01, 219.19it/s]Loading weights:  63%|██████▎   | 427/677 [00:02<00:01, 208.85it/s]Loading weights:  66%|██████▋   | 450/677 [00:02<00:01, 210.63it/s]Loading weights:  70%|███████   | 474/677 [00:02<00:00, 217.88it/s]Loading weights:  73%|███████▎  | 496/677 [00:02<00:00, 212.99it/s]Loading weights:  77%|███████▋  | 519/677 [00:02<00:00, 205.16it/s]Loading weights:  81%|████████  | 546/677 [00:02<00:00, 222.63it/s]Loading weights:  84%|████████▍ | 569/677 [00:02<00:00, 218.52it/s]Loading weights:  87%|████████▋ | 592/677 [00:03<00:00, 211.65it/s]Loading weights:  91%|█████████ | 616/677 [00:03<00:00, 215.04it/s]Loading weights:  95%|█████████▍| 643/677 [00:03<00:00, 225.02it/s]Loading weights:  98%|█████████▊| 666/677 [00:03<00:00, 215.96it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 198.92it/s]
+[1/2] slime/slime_pos_t1/movie_cell
+  The video shows a static image of a network of particles. There is no movement or change between the frames. The particles remain in the same positions througho
+[2/2] slime/slime_pos_t1/movie_chemical
+  The teal network structure remains completely static throughout the entire duration of the video. There is no movement, deformation, or change in the spatial ar
+[spec] 2 description(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t1/spec.yaml
+[spec] 2 description(s) -> /workspace/Plexus/config/slime/slime_pos_t1.yaml
+
+[saved] /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt  (2 videos)
+target1: GT + recovery generated
+task=generate  type=slime  config=slime_gt_t2  (/workspace/Plexus/config/slime/slime_gt_t2.yaml)
+[generate] slime/slime_gt_t2: 200 frames, sets={'cell': 6000} -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t2
+[generate] done: 201 recorded frames -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t2
+[plot] cell: fig_cell_evolution.png, fig_cell_final.png
+[plot] movie -> movie_cell.mp4
+[plot] chemical (field): fig_chemical_evolution.png, fig_chemical_final.png
+[plot] field movie -> movie_chemical.mp4
+[plot] figures -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t2
+[describe] captioning 2 movie(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[describe] 2 videos -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[load] /workspace/Plexus/VLLM/gemma-4-12B-it on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:49, 13.57it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:08, 77.86it/s]Loading weights:   6%|▋         | 44/677 [00:00<00:04, 128.67it/s]Loading weights:   9%|▉         | 63/677 [00:00<00:04, 142.29it/s]Loading weights:  13%|█▎        | 89/677 [00:00<00:03, 173.28it/s]Loading weights:  17%|█▋        | 113/677 [00:00<00:02, 191.44it/s]Loading weights:  20%|█▉        | 134/677 [00:00<00:02, 187.39it/s]Loading weights:  23%|██▎       | 159/677 [00:00<00:02, 203.66it/s]Loading weights:  27%|██▋       | 181/677 [00:01<00:02, 191.64it/s]Loading weights:  30%|██▉       | 201/677 [00:01<00:02, 192.91it/s]Loading weights:  34%|███▎      | 228/677 [00:01<00:02, 207.29it/s]Loading weights:  37%|███▋      | 250/677 [00:01<00:02, 200.10it/s]Loading weights:  40%|████      | 271/677 [00:01<00:02, 198.60it/s]Loading weights:  44%|████▍     | 298/677 [00:01<00:01, 214.76it/s]Loading weights:  48%|████▊     | 322/677 [00:01<00:01, 221.71it/s]Loading weights:  51%|█████     | 345/677 [00:01<00:01, 214.32it/s]Loading weights:  54%|█████▍    | 367/677 [00:01<00:01, 210.49it/s]Loading weights:  58%|█████▊    | 394/677 [00:02<00:01, 221.11it/s]Loading weights:  62%|██████▏   | 417/677 [00:02<00:01, 210.77it/s]Loading weights:  65%|██████▍   | 439/677 [00:02<00:01, 206.13it/s]Loading weights:  69%|██████▊   | 464/677 [00:02<00:01, 211.27it/s]Loading weights:  72%|███████▏  | 488/677 [00:02<00:00, 217.64it/s]Loading weights:  75%|███████▌  | 510/677 [00:02<00:00, 208.29it/s]Loading weights:  79%|███████▊  | 533/677 [00:02<00:00, 208.26it/s]Loading weights:  82%|████████▏ | 557/677 [00:02<00:00, 215.55it/s]Loading weights:  86%|████████▌ | 579/677 [00:02<00:00, 204.38it/s]Loading weights:  89%|████████▉ | 601/677 [00:03<00:00, 207.90it/s]Loading weights:  92%|█████████▏| 622/677 [00:03<00:00, 206.20it/s]Loading weights:  95%|█████████▍| 643/677 [00:03<00:00, 203.56it/s]Loading weights:  98%|█████████▊| 665/677 [00:03<00:00, 204.07it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 197.15it/s]
+[1/2] slime/slime_gt_t2/movie_cell
+  The simulation shows a static distribution of teal particles on a black background. There is no visible movement or evolution between the four keyframes provide
+[2/2] slime/slime_gt_t2/movie_chemical
+  The simulation shows a network of interconnected filaments that remain largely static in their overall structure. There is no significant movement or evolution 
+[spec] 2 description(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t2/spec.yaml
+[spec] 2 description(s) -> /workspace/Plexus/config/slime/slime_gt_t2.yaml
+
+[saved] /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt  (2 videos)
+target2: sensor_angle u-err=0.092
+task=generate  type=slime  config=slime_pos_t2  (/workspace/Plexus/config/slime/slime_pos_t2.yaml)
+[generate] slime/slime_pos_t2: 200 frames, sets={'cell': 6000} -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t2
+[generate] done: 201 recorded frames -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t2
+[plot] cell: fig_cell_evolution.png, fig_cell_final.png
+[plot] movie -> movie_cell.mp4
+[plot] chemical (field): fig_chemical_evolution.png, fig_chemical_final.png
+[plot] field movie -> movie_chemical.mp4
+[plot] figures -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t2
+[describe] captioning 2 movie(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[describe] 2 videos -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[load] /workspace/Plexus/VLLM/gemma-4-12B-it on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:50, 13.25it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:08, 76.81it/s]Loading weights:   6%|▋         | 44/677 [00:00<00:04, 128.55it/s]Loading weights:   9%|▉         | 63/677 [00:00<00:04, 139.59it/s]Loading weights:  13%|█▎        | 89/677 [00:00<00:03, 174.86it/s]Loading weights:  16%|█▌        | 109/677 [00:00<00:03, 181.93it/s]Loading weights:  19%|█▉        | 131/677 [00:00<00:02, 192.61it/s]Loading weights:  22%|██▏       | 152/677 [00:00<00:02, 193.38it/s]Loading weights:  25%|██▌       | 172/677 [00:01<00:02, 192.32it/s]Loading weights:  29%|██▊       | 194/677 [00:01<00:02, 199.92it/s]Loading weights:  32%|███▏      | 215/677 [00:01<00:02, 196.60it/s]Loading weights:  35%|███▌      | 239/677 [00:01<00:02, 207.78it/s]Loading weights:  38%|███▊      | 260/677 [00:01<00:02, 200.71it/s]Loading weights:  42%|████▏     | 282/677 [00:01<00:01, 204.72it/s]Loading weights:  45%|████▌     | 305/677 [00:01<00:01, 210.53it/s]Loading weights:  48%|████▊     | 327/677 [00:01<00:01, 200.91it/s]Loading weights:  52%|█████▏    | 352/677 [00:01<00:01, 213.50it/s]Loading weights:  55%|█████▌    | 375/677 [00:02<00:01, 215.12it/s]Loading weights:  59%|█████▊    | 397/677 [00:02<00:01, 206.04it/s]Loading weights:  62%|██████▏   | 421/677 [00:02<00:01, 211.75it/s]Loading weights:  65%|██████▌   | 443/677 [00:02<00:01, 207.66it/s]Loading weights:  69%|██████▊   | 464/677 [00:02<00:01, 204.14it/s]Loading weights:  72%|███████▏  | 485/677 [00:02<00:00, 204.05it/s]Loading weights:  75%|███████▍  | 506/677 [00:02<00:00, 194.13it/s]Loading weights:  79%|███████▊  | 532/677 [00:02<00:00, 210.29it/s]Loading weights:  82%|████████▏ | 554/677 [00:02<00:00, 208.80it/s]Loading weights:  85%|████████▍ | 575/677 [00:03<00:00, 201.78it/s]Loading weights:  88%|████████▊ | 597/677 [00:03<00:00, 205.21it/s]Loading weights:  91%|█████████▏| 618/677 [00:03<00:00, 199.55it/s]Loading weights:  95%|█████████▌| 644/677 [00:03<00:00, 209.55it/s]Loading weights:  98%|█████████▊| 665/677 [00:03<00:00, 209.06it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 194.89it/s]
+[1/2] slime/slime_pos_t2/movie_cell
+  The simulation shows a collection of cyan particles moving across a black background. Over time, the particles organize into winding, interconnected filamentary
+[2/2] slime/slime_pos_t2/movie_chemical
+  The simulation shows a static network of interconnected filaments that does not change over time. The teal-colored structures remain in a fixed position through
+[spec] 2 description(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t2/spec.yaml
+[spec] 2 description(s) -> /workspace/Plexus/config/slime/slime_pos_t2.yaml
+
+[saved] /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt  (2 videos)
+target2: GT + recovery generated
+task=generate  type=slime  config=slime_gt_t3  (/workspace/Plexus/config/slime/slime_gt_t3.yaml)
+[generate] slime/slime_gt_t3: 200 frames, sets={'cell': 6000} -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t3
+[generate] done: 201 recorded frames -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t3
+[plot] cell: fig_cell_evolution.png, fig_cell_final.png
+[plot] movie -> movie_cell.mp4
+[plot] chemical (field): fig_chemical_evolution.png, fig_chemical_final.png
+[plot] field movie -> movie_chemical.mp4
+[plot] figures -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t3
+[describe] captioning 2 movie(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[describe] 2 videos -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[load] /workspace/Plexus/VLLM/gemma-4-12B-it on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:47, 14.09it/s]Loading weights:   3%|▎         | 20/677 [00:00<00:08, 75.63it/s]Loading weights:   6%|▌         | 42/677 [00:00<00:04, 127.69it/s]Loading weights:   9%|▉         | 64/677 [00:00<00:04, 151.10it/s]Loading weights:  13%|█▎        | 88/677 [00:00<00:03, 171.42it/s]Loading weights:  17%|█▋        | 114/677 [00:00<00:02, 197.32it/s]Loading weights:  20%|█▉        | 135/677 [00:00<00:02, 190.79it/s]Loading weights:  24%|██▎       | 160/677 [00:00<00:02, 198.62it/s]Loading weights:  27%|██▋       | 182/677 [00:01<00:02, 203.18it/s]Loading weights:  30%|██▉       | 203/677 [00:01<00:02, 197.62it/s]Loading weights:  34%|███▍      | 229/677 [00:01<00:02, 208.66it/s]Loading weights:  37%|███▋      | 253/677 [00:01<00:01, 217.47it/s]Loading weights:  41%|████      | 275/677 [00:01<00:01, 209.33it/s]Loading weights:  44%|████▍     | 298/677 [00:01<00:01, 198.38it/s]Loading weights:  48%|████▊     | 325/677 [00:01<00:01, 216.58it/s]Loading weights:  51%|█████▏    | 348/677 [00:01<00:01, 211.05it/s]Loading weights:  55%|█████▍    | 370/677 [00:01<00:01, 203.07it/s]Loading weights:  58%|█████▊    | 395/677 [00:02<00:01, 211.63it/s]Loading weights:  62%|██████▏   | 417/677 [00:02<00:01, 186.93it/s]Loading weights:  66%|██████▋   | 450/677 [00:02<00:01, 215.87it/s]Loading weights:  70%|██████▉   | 473/677 [00:02<00:00, 216.18it/s]Loading weights:  73%|███████▎  | 496/677 [00:02<00:00, 209.85it/s]Loading weights:  77%|███████▋  | 518/677 [00:02<00:00, 211.26it/s]Loading weights:  80%|███████▉  | 540/677 [00:02<00:00, 204.81it/s]Loading weights:  83%|████████▎ | 562/677 [00:02<00:00, 200.43it/s]Loading weights:  87%|████████▋ | 587/677 [00:03<00:00, 212.70it/s]Loading weights:  90%|████████▉ | 609/677 [00:03<00:00, 206.68it/s]Loading weights:  93%|█████████▎| 630/677 [00:03<00:00, 193.50it/s]Loading weights:  97%|█████████▋| 658/677 [00:03<00:00, 207.59it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 197.58it/s]
+[1/2] slime/slime_gt_t3/movie_cell
+  The simulation shows a network of teal particles forming interconnected filaments against a black background. Over time, the filaments appear to shift and reorg
+[2/2] slime/slime_gt_t3/movie_chemical
+  The simulation begins with a dense, interconnected network of teal filaments against a black background. Over time, the filaments appear to thin out and lose th
+[spec] 2 description(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_gt_t3/spec.yaml
+[spec] 2 description(s) -> /workspace/Plexus/config/slime/slime_gt_t3.yaml
+
+[saved] /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt  (2 videos)
+target3: sensor_angle u-err=0.051
+task=generate  type=slime  config=slime_pos_t3  (/workspace/Plexus/config/slime/slime_pos_t3.yaml)
+[generate] slime/slime_pos_t3: 200 frames, sets={'cell': 6000} -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t3
+[generate] done: 201 recorded frames -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t3
+[plot] cell: fig_cell_evolution.png, fig_cell_final.png
+[plot] movie -> movie_cell.mp4
+[plot] chemical (field): fig_chemical_evolution.png, fig_chemical_final.png
+[plot] field movie -> movie_chemical.mp4
+[plot] figures -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t3
+[describe] captioning 2 movie(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[describe] 2 videos -> /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt
+[load] /workspace/Plexus/VLLM/gemma-4-12B-it on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:46, 14.35it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:08, 76.10it/s]Loading weights:   7%|▋         | 47/677 [00:00<00:04, 138.60it/s]Loading weights:   9%|▉         | 64/677 [00:00<00:04, 146.98it/s]Loading weights:  13%|█▎        | 89/677 [00:00<00:03, 164.47it/s]Loading weights:  17%|█▋        | 113/677 [00:00<00:03, 185.44it/s]Loading weights:  20%|█▉        | 133/677 [00:00<00:03, 180.80it/s]Loading weights:  24%|██▎       | 160/677 [00:01<00:02, 190.37it/s]Loading weights:  28%|██▊       | 187/677 [00:01<00:02, 195.04it/s]Loading weights:  32%|███▏      | 214/677 [00:01<00:02, 212.92it/s]Loading weights:  35%|███▍      | 236/677 [00:01<00:02, 213.09it/s]Loading weights:  38%|███▊      | 258/677 [00:01<00:02, 199.73it/s]Loading weights:  42%|████▏     | 284/677 [00:01<00:01, 208.17it/s]Loading weights:  46%|████▌     | 311/677 [00:01<00:01, 220.56it/s]Loading weights:  49%|████▉     | 335/677 [00:01<00:01, 220.39it/s]Loading weights:  53%|█████▎    | 358/677 [00:01<00:01, 208.01it/s]Loading weights:  56%|█████▋    | 381/677 [00:02<00:01, 209.01it/s]Loading weights:  60%|██████    | 408/677 [00:02<00:01, 218.64it/s]Loading weights:  64%|██████▎   | 430/677 [00:02<00:01, 209.58it/s]Loading weights:  67%|██████▋   | 452/677 [00:02<00:01, 208.07it/s]Loading weights:  70%|███████   | 477/677 [00:02<00:00, 215.72it/s]Loading weights:  74%|███████▎  | 499/677 [00:02<00:00, 209.11it/s]Loading weights:  77%|███████▋  | 520/677 [00:02<00:00, 193.62it/s]Loading weights:  81%|████████  | 547/677 [00:02<00:00, 196.88it/s]Loading weights:  85%|████████▍ | 573/677 [00:02<00:00, 207.01it/s]Loading weights:  88%|████████▊ | 594/677 [00:03<00:00, 205.96it/s]Loading weights:  91%|█████████ | 616/677 [00:03<00:00, 205.08it/s]Loading weights:  95%|█████████▍| 642/677 [00:03<00:00, 204.05it/s]Loading weights:  99%|█████████▊| 667/677 [00:03<00:00, 213.12it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 196.75it/s]
+[1/2] slime/slime_pos_t3/movie_cell
+  The simulation shows a static distribution of cyan particles against a black background. There is no visible movement or evolution between the provided keyframe
+[2/2] slime/slime_pos_t3/movie_chemical
+  The simulation begins with a dense, interconnected network of teal fibers forming a complex web. Over time, the fibers appear to thin out and lose their structu
+[spec] 2 description(s) -> /groups/saalfeld/home/allierc/GraphData/graphs_data/slime/slime_pos_t3/spec.yaml
+[spec] 2 description(s) -> /workspace/Plexus/config/slime/slime_pos_t3.yaml
+
+[saved] /groups/saalfeld/home/allierc/GraphData/graphs_data/video_descriptions.txt  (2 videos)
+target3: GT + recovery generated

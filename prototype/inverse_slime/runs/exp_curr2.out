@@ -1,0 +1,7 @@
+
+## H7b [12:17:22] CURRICULUM + per-iter random-start DIVERSITY (resample=25), per-target breakdown. schedule=(10,30,60), iters=400.
+- target0: angle_uerr=0.120  turn=0.072 dist=0.038
+- target1: angle_uerr=0.545  turn=0.032 dist=0.032
+- target2: angle_uerr=0.248  turn=0.075 dist=0.095
+- target3: angle_uerr=0.291  turn=0.030 dist=0.288
+- MEAN angle=0.301 (min 0.120, max 0.545) -> target-DEPENDENT identifiability

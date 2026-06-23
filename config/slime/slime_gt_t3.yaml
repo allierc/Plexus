@@ -1,0 +1,47 @@
+general: {name: slime_gt_t3, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006863, turn_speed: 0.2146, sensor_angle: 12.955,
+        sensor_dist: 0.04912, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.06929}
+- {op: diffuse, at: chemical, rate: 0.024983}
+- {op: decay, at: chemical, rate: 0.000772}
+- {op: sense, at: cell, from: chemical, cross: -0.677325}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a network of teal particles forming interconnected filaments against
+      a black background. Over time, the filaments appear to shift and reorganize, with some paths thickening
+      while others thin out. The overall structure maintains a complex, web-like topology as the particles
+      move and cluster. The motion is fluid and continuous, suggesting a dynamic system of agents or fields
+      evolving in a shared space.
+    objects: The scene contains thousands of small, circular teal particles. These particles are arranged
+      into long, branching filaments that resemble a neural network or a vascular system. The filaments
+      are interconnected at various nodes, creating a dense, web-like topology across the entire frame.
+      Each individual particle is uniform in size and color, providing a consistent texture to the evolving
+      network.
+  movie_chemical:
+    description: The simulation begins with a dense, interconnected network of teal filaments against
+      a black background. Over time, the filaments appear to thin out and lose their structural integrity.
+      The network gradually breaks apart into smaller, isolated segments and dots. By the final frame,
+      the original web-like structure has almost completely dissolved into a sparse collection of disconnected
+      points.
+    objects: The primary objects are teal-colored filaments that form a complex, interconnected web. These
+      filaments vary in thickness, creating a porous, sponge-like topology across the frame. The background
+      is a solid black, providing high contrast for the teal structures. As the simulation progresses,
+      the size of the connected components decreases until they become tiny, individual specks.

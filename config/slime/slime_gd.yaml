@@ -1,0 +1,46 @@
+general: {name: slime_gd, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.004567, turn_speed: 0.2837, sensor_angle: 40.68,
+        sensor_dist: 0.02136, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.069596}
+- {op: diffuse, at: chemical, rate: 0.039529}
+- {op: decay, at: chemical, rate: 0.001972}
+- {op: sense, at: cell, from: chemical, cross: -0.605124}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a static distribution of blue particles against a black background.
+      There is no visible movement or evolution between the four keyframes provided. The spatial arrangement
+      of the points remains constant throughout the sequence. The scene represents a steady-state configuration
+      of a point-based system.
+    objects: The scene contains thousands of small, circular blue particles. These particles are arranged
+      in a complex, web-like topology forming interconnected filaments and clusters. The points vary slightly
+      in density, creating a porous, sponge-like structure across the frame. Each individual particle
+      is uniform in size and color, contrasting sharply with the solid black void.
+  movie_chemical:
+    description: The simulation begins with a dense, interconnected network of teal-colored filaments
+      forming a complex web. Over time, these filaments begin to break apart and fragment into smaller,
+      isolated clusters. As the simulation progresses, the clusters continue to shrink and disperse across
+      the field. By the final frame, the original network has completely disintegrated into a sparse distribution
+      of small, disconnected dots.
+    objects: The primary objects are teal-colored structures that transition from continuous filaments
+      to discrete particles. Initially, the filaments are large and highly interconnected, forming a labyrinthine
+      topology. As time passes, the objects become smaller and lose their connectivity, becoming isolated
+      from one another. In the final stage, the objects are tiny, scattered points distributed randomly
+      across the background.

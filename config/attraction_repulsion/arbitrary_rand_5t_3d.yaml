@@ -1,0 +1,22 @@
+# arbitrary_rand_5t_3d -- 3D version of arbitrary_rand_5t: attraction_repulsion in a periodic 3D box.
+# Same per-type force law + sigma as the 2D spec (the law is dimension-generic,
+# SUPPORTED_DIMS=[2,3]); only the container changes (dim: 3, world: [1,1,1]).
+general: {name: arbitrary_rand_5t_3d, seed: 0, n_frames: 250, dt: 0.1, boundary: periodic, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 12000
+    types:
+      t0: {fraction: 0.2, p: [1.8105, 1.1368, 1.4189, 1.8153]}
+      t1: {fraction: 0.2, p: [1.0143, 1.6285, 1.793, 1.513]}
+      t2: {fraction: 0.2, p: [1.7258, 1.2264, 1.1985, 1.3631]}
+      t3: {fraction: 0.2, p: [1.1794, 1.3461, 1.9481, 1.5733]}
+      t4: {fraction: 0.2, p: [1.3401, 1.2715, 1.952, 1.4445]}
+fields: {}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  splat_size: 1.7

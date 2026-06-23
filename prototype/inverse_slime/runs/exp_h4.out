@@ -1,0 +1,6 @@
+
+## H4 [11:15:45]: a little input noise (decaying pos+heading jitter) during training improves sensor recovery (your cross-repo trick).
+- noise_pos=0.000 noise_h=0.00: angle=0.179 turn=0.115 dist=0.216
+- noise_pos=0.003 noise_h=0.02: angle=0.208 turn=0.138 dist=0.258
+- noise_pos=0.008 noise_h=0.05: angle=0.239 turn=0.127 dist=0.244
+- noise_pos=0.015 noise_h=0.10: angle=0.227 turn=0.093 dist=0.217

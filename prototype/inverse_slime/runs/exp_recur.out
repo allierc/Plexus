@@ -1,0 +1,8 @@
+
+## RECURRENT-SCHEME SWEEP [13:02:32] (std3 steering; 3 targets, mean u-err)
+- one_step              : angle=0.354 turn=0.241 dist=0.190
+- rec_final_K6          : angle=0.159 turn=0.319 dist=0.095
+- curric_K10            : angle=0.164 turn=0.370 dist=0.179
+- curric_10_30_60       : angle=0.079 turn=0.285 dist=0.143
+- curric_10_30_60_100   : angle=0.118 turn=0.204 dist=0.150
+- best sensor_angle: curric_10_30_60 (0.079)

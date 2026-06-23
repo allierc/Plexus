@@ -1,0 +1,92 @@
+# 3D variant of slime_random_full -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_random_full_3d
+  seed: 0
+  n_frames: 800
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a:
+        fraction: 1.0
+        move_speed: 0.006
+        turn_speed: 0.45
+        sensor_angle: 28
+        sensor_dist: 0.025
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.045
+- op: diffuse
+  at: chemical
+  rate: 0.0175
+- op: decay
+  at: chemical
+  rate: 0.0006
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cluster of blue particles begins as a relatively uniform, diamond-shaped cloud.
+      Over time, the particles begin to organize into distinct, interconnected filamentary structures.
+      These filaments branch out and weave together, creating a complex, web-like network within the original
+      volume. By the final frame, the internal structure is highly defined with clear pathways and dense
+      nodes of connectivity.
+    objects: The scene contains a large collection of small, individual blue particles. These particles
+      are initially distributed in a roughly diamond-shaped spatial arrangement. As the simulation progresses,
+      they form elongated, thread-like filaments that connect to one another. The resulting topology is
+      a complex, three-dimensional branching network of interconnected lines and clusters.
+  movie_chemical:
+    description: The simulation shows a dense, green, cloud-like structure that gradually contracts and
+      rotates. As time progresses, the outer edges of the cluster become more defined and less diffuse.
+      The overall volume of the green mass appears to shrink while its internal density increases. By
+      the final frame, the structure has settled into a more compact, tilted orientation.
+    objects: The scene contains a single large, amorphous cluster of green particles. These particles
+      are densely packed in the center and become more sparse toward the outer boundaries. The cluster
+      maintains a roughly diamond-shaped topology as it evolves. The green color remains consistent throughout
+      the entire duration of the simulation.

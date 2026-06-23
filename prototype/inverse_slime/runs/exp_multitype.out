@@ -1,0 +1,27 @@
+
+## MULTI-TYPE (2 & 4 types) [17:01:22]: same one-step position-loss training; `cross` now recoverable (multi-channel field).
+/workspace/Plexus/prototype/inverse_slime/exp_multitype.py:56: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)
+  return float(dep.amount()), float(dif.rate()), float(dec.rate()), move
+
+  [slime2, C=2 channels] per-parameter recovery (u-space):
+  param      true_u   rec_u    err
+  amount      0.625   0.625  0.000
+  diffuse     0.897   0.897  0.000
+  decay       0.776   0.776  0.000
+  cross       0.225   0.213  0.012  <- now identifiable
+  move        0.300   0.300  0.000
+  turn        0.874   0.747  0.126
+  sensA       0.005   0.078  0.073
+  sensD       0.821   0.853  0.032
+
+  [slime4, C=4 channels] per-parameter recovery (u-space):
+  param      true_u   rec_u    err
+  amount      0.625   0.625  0.000
+  diffuse     0.897   0.897  0.000
+  decay       0.776   0.776  0.000
+  cross       0.225   0.233  0.008  <- now identifiable
+  move        0.300   0.300  0.000
+  turn        0.874   0.780  0.094
+  sensA       0.005   0.078  0.073
+  sensD       0.821   0.860  0.039

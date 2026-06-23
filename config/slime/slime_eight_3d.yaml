@@ -1,0 +1,173 @@
+# 3D variant of slime_eight -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 64.
+general:
+  name: slime_eight_3d
+  seed: 0
+  n_frames: 880
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 24000
+    spawn: random
+    types:
+      a:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      b:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      c:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      d:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      e:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      f:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      g:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+      h:
+        fraction: 0.125
+        move_speed: 0.006
+        turn_speed: 0.42
+        sensor_angle: 28
+        sensor_dist: 0.034
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 64
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.0165
+- op: diffuse
+  at: chemical
+  rate: 0.012
+- op: decay
+  at: chemical
+  rate: 0.0025
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+    b:
+    - 1.0
+    - 0.35
+    - 0.45
+    c:
+    - 0.4
+    - 0.65
+    - 1.0
+    d:
+    - 1.0
+    - 0.85
+    - 0.3
+    e:
+    - 0.95
+    - 0.4
+    - 0.95
+    f:
+    - 1.0
+    - 0.6
+    - 0.2
+    g:
+    - 0.2
+    - 0.85
+    - 0.85
+    h:
+    - 0.65
+    - 0.5
+    - 1.0
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform cloud of multicolored particles forming a
+      diamond-shaped cluster. As time progresses, internal structures begin to emerge as particles organize
+      into distinct, winding filaments and interconnected networks. These filaments grow more pronounced
+      and complex, weaving through the center of the cluster while maintaining the overall diamond boundary.
+      By the final frame, the system has transitioned from a stochastic distribution to a highly structured,
+      web-like topology of dense threads.
+    objects: The scene contains thousands of small, point-like particles distributed within a diamond-shaped
+      volume. These particles are multi-colored, featuring a mix of red, blue, green, orange, and purple
+      hues. Initially, the particles are arranged in a relatively homogeneous, disordered cloud with no
+      clear connectivity. Over time, they organize into elongated, curvilinear filaments that form a complex,
+      interconnected topological network.
+  movie_chemical:
+    description: The simulation begins with a dense cloud of individual particles distributed within a
+      diamond-shaped boundary. Over time, these particles begin to coalesce and elongate into distinct,
+      thread-like filaments. As the simulation progresses, the filaments become more defined and begin
+      to weave through one another. By the final frame, the system has transitioned from a granular state
+      into a complex, interconnected network of long, winding fibers.
+    objects: The scene contains a large number of small, multi-colored particles that are initially scattered
+      randomly. These particles evolve into elongated, worm-like filaments that maintain a high degree
+      of curvature. The filaments are colored in a variety of hues, including purple, orange, green, and
+      blue. The objects are arranged in a dense, overlapping mesh that fills the diamond-shaped volume
+      of the simulation space.

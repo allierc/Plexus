@@ -1,0 +1,36 @@
+general:
+  name: material_zigzag_fluid
+  seed: 0
+  n_frames: 1100
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.0, 0.66, 0.66, 0.72]
+  - [0.34, 0.4, 1.0, 0.46]
+  - [0.0, 0.16, 0.66, 0.22]
+sets:
+  cell:
+    n: 1
+    start: [0.18, 0.82, 0.18, 0.82]
+    types:
+      water:
+        fraction: 1.0
+        youngs: 300
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 7000, radius: 0.1, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 12, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]

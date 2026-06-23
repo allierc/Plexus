@@ -1,4 +1,3 @@
-# material_zigzag -- auto-ported from prototype/water (overnight_suite:ob_zigzag).
 general:
   name: material_zigzag
   seed: 0
@@ -19,34 +18,42 @@ sets:
         youngs: 300
         layers:
         - {frac: 1.0, youngs: 300, material: liquid}
-  mpm_particle: {parent: cell, per_parent: 7000, radius: 0.18, density: 1.0}
-fields: {}
+  mpm_particle: {parent: cell, per_parent: 7000, radius: 0.1, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 18, dt_sub: 0.0002, a_max: 200, drag: 0.25, wall_damp: 0.5,
-  wall_contact: 0.06, surface_tension: 12}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.25, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 12, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep: 18
+  dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
     description: A blue fluid-like substance initially appears as a circular blob in the upper left corner.
-      It then stretches horizontally to the right, forming a long, thin tail that curves downward. As
-      the simulation progresses, the substance begins to break apart and settle into three distinct horizontal
-      layers. By the final frame, the blue material is distributed across three parallel gray bars, with
-      a thin vertical connection remaining between the top and middle sections.
-    objects: The scene contains a blue fluid substance that changes from a circular shape to a stretched,
-      elongated form. Three horizontal gray bars are positioned at different heights to act as containers
-      or boundaries. The blue substance is relatively large at the start but becomes thinner and more
-      fragmented as it interacts with the bars. The gray bars are uniform in color and size, arranged
-      in a staggered, parallel configuration.
+      It then stretches horizontally to the right while simultaneously dripping downwards into a lower
+      section. As the simulation progresses, the blue substance expands and flows more freely across the
+      horizontal gray bars. By the final frame, the blue substance has formed a complex, interconnected
+      network of drips and pools across the three gray levels.
+    objects: The scene contains three horizontal gray bars of equal thickness and length, arranged vertically.
+      A blue substance, which changes from a solid circle to a fluid shape, interacts with these bars.
+      The blue substance is light blue in color and varies in size as it spreads and drips. The gray bars
+      are static, rectangular, and serve as the structural framework for the fluid's movement.
   movie_mpm_particle:
-    description: A large mass of blue particles begins as a single concentrated cluster at the top left.
-      As time progresses, the cluster begins to flow and spill over the edge of a grey platform. The particles
-      cascade downward, forming a stream that eventually pools on a lower level. By the final frame, the
-      particles have distributed across multiple levels, creating a stepped waterfall effect.
-    objects: The scene contains a large collection of small, blue, point-like particles. These particles
-      are initially clustered into a dense, roughly circular shape. There are three horizontal, grey rectangular
-      platforms of varying lengths and positions. The platforms are arranged in a staggered, descending
-      formation to facilitate the flow of the blue particles.
+    description: A large mass of blue particles begins as a single concentrated sphere at the top left.
+      The mass then flows horizontally to the right, spilling over the edge of a gray platform. As it
+      falls, it splits and spreads across multiple lower gray platforms in a cascading motion. By the
+      final frame, the particles have distributed themselves across three distinct levels, forming horizontal
+      layers.
+    objects: The primary objects are thousands of small blue particles that form a fluid-like mass. There
+      are three solid gray rectangular platforms arranged in a staggered, descending formation. The top
+      platform is the longest and positioned at the highest elevation. The middle and bottom platforms
+      are shorter and shifted to the right, creating a stepped structure for the particles to fall onto.

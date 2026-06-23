@@ -1,0 +1,27 @@
+# Coulomb_3 -- Coulomb (electrostatic inverse-square).
+# charges [2, 1, -1]; ported from ParticleGraph Coulomb (PDE_E).
+# Coulomb is 2nd-derivative + add-aggregated; like charges repel, opposite attract.
+# `charge` is a per-type parameter (electron/proton = types, per the Plexus type rule);
+# the engine broadcasts it to a per-particle buffer the operator reads.
+general: {name: Coulomb_3, seed: 0, n_frames: 32000, dt: 0.0000003, boundary: periodic}
+sets:
+  particle:
+    n: 960
+    vel_init: 0.0001
+    types:
+      q_p2: {fraction: 0.3333, charge: 2}
+      q_p1: {fraction: 0.3333, charge: 1}
+      q_n1: {fraction: 0.3334, charge: -1}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
+  - {op: Coulomb,      at: particle, clamp: 1000000.0}
+schedule: [radius_graph, Coulomb]
+plotting:
+  background: black
+  size_by: charge          # point size ~ |charge|
+  colors:                  # ParticleGraph PDE_E colour code (by type index)
+    q_p2: [1, 1, 1]
+    q_p1: [0, 0.5, 0.75]
+    q_n1: [1, 0, 0]
+  point_size: 9.0

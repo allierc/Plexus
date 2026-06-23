@@ -1,0 +1,47 @@
+general: {name: slime_gd8d_v2, seed: 0, n_frames: 200, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 6000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.004567, turn_speed: 0.2607, sensor_angle: 41.198,
+        sensor_dist: 0.02248, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 140, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.069592}
+- {op: diffuse, at: chemical, rate: 0.039464}
+- {op: decay, at: chemical, rate: 0.001971}
+- {op: sense, at: cell, from: chemical, cross: -0.605124}
+- {op: bounce, at: cell}
+- {op: advance, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, advance]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a static distribution of particles that does not change across the
+      time sequence. The teal dots remain in fixed positions throughout the entire duration of the video.
+      There is no visible motion, flow, or evolution of the underlying field. The scene represents a steady-state
+      snapshot of a spatial distribution.
+    objects: The scene contains thousands of small, circular teal particles distributed across a black
+      background. These particles are arranged in a complex, web-like topology characterized by filamentary
+      structures and voids. The filaments appear as interconnected chains of dots, while the voids are
+      regions of lower density. Each individual particle is uniform in size and color, creating a high-contrast
+      speckled effect.
+  movie_chemical:
+    description: The simulation begins with a dense, interconnected network of teal-colored filaments
+      forming a complex web-like structure. Over time, these filaments begin to break apart and fragment
+      into smaller, isolated clusters. As the simulation progresses, the clusters continue to shrink and
+      disperse into increasingly smaller, discrete points. By the final frame, the original network has
+      completely disintegrated into a sparse distribution of tiny, scattered particles.
+    objects: The initial objects are large, continuous teal filaments that are highly interconnected in
+      a mesh-like topology. As time passes, these filaments transition into medium-sized, irregular clusters
+      that are no longer physically connected. In the later stages, the objects become small, isolated
+      dots that are distributed randomly across the field. Throughout the entire sequence, the objects
+      maintain a consistent teal color while their size and connectivity decrease significantly.

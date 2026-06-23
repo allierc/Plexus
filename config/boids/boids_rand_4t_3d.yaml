@@ -1,0 +1,42 @@
+# boids_rand_4t_3d -- 3D variant of boids_rand_4t: the three flocking rules
+# (cohesion / alignment / separation) in a periodic 3D box. The rules are
+# dimension-generic (neighbour_mean is N-D; SUPPORTED_DIMS=[2,3]); only the
+# container changes (dim: 3, world: [1,1,1]). The interaction radius is bumped
+# ~2.5x vs the 2D sweep so 3D neighbour counts (~density * (4/3)pi r^3) match the
+# 2D ones (~density * pi r^2); per-type weights are carried over unchanged.
+general: {name: boids_rand_4t_3d, seed: 0, n_frames: 16000, dt: 0.5, boundary: periodic,
+          dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 2048
+    vel_init: 0.0004
+    types:
+      t00: {fraction: 0.25, cohesion: 63.3, alignment: 89.9, separation: 78.0}
+      t01: {fraction: 0.25, cohesion: 24.1, alignment: 31.4, separation: 87.6}
+      t02: {fraction: 0.25, cohesion: 2.5, alignment: 82.5, separation: 80.1}
+      t03: {fraction: 0.25, cohesion: 47.9, alignment: 31.7, separation: 29.3}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.1, min_radius: 0.005}
+  - {op: cohesion,     at: particle}
+  - {op: alignment,    at: particle}
+  - {op: separation,   at: particle}
+schedule: [radius_graph, cohesion, alignment, separation]
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a large collection of particles distributed in a roughly diamond-shaped
+      cluster against a black background. Over time, several distinct dense clusters of blue particles
+      emerge and migrate across the field. These clusters appear to interact with a background of orange
+      and grey particles that remain more dispersed. The movement is fluid, with the dense blue nodes
+      shifting positions and changing in intensity throughout the sequence.
+    objects: The scene contains thousands of small, point-like particles in orange, grey, and blue. The
+      orange and grey particles are sparsely distributed, forming a diffuse cloud that defines the overall
+      shape of the system. The blue particles aggregate into several large, dense circular clusters of
+      varying sizes. These blue clusters are the most prominent features, appearing as concentrated hubs
+      within the broader field of scattered points.

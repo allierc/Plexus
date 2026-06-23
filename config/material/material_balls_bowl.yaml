@@ -23,26 +23,29 @@ sets:
         layers:
         - {frac: 1.0, youngs: 500, material: elastic}
   mpm_particle: {parent: cell, per_parent: 1200, radius: 0.06, density: 1.0}
-fields: {}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mls_mpm_mechanics, at: mpm_particle, n_grid: 128, substeps: 29, dt_sub: 1.326e-04, a_max: 200, drag: 0.2, wall_damp: 0.6,
-  wall_contact: 0.06, surface_tension: 0}
-schedule: [aggregate, gravity, mls_mpm_mechanics]
+- {op: mpm_strain,      at: mpm_particle, dt_sub: 1.326e-04}
+- {op: p2g,             at: mpm_particle, to: mpm_grid, dt_sub: 1.326e-04, drag: 0.2, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 1.326e-04, surface_tension: 0, wall_damp: 0.6}
+- {op: g2p,             at: mpm_particle, from: mpm_grid, dt_sub: 1.326e-04, wall_damp: 0.6, wall_contact: 0.06, vmax: 1.0e9}
+schedule:
+- aggregate
+- gravity
+- {substep: 29, dt: 1.326e-04, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A cluster of multi-colored particles begins in a loose formation at the top of the frame.
-      The cluster quickly descends vertically while simultaneously contracting into a tighter group. During
-      the descent, a separate green particle moves toward the main cluster from the right. The particles
-      eventually settle into a dense, overlapping pile at the bottom center of the scene.
-    objects: The primary group consists of five overlapping circular particles in orange, brown, purple,
-      red, and blue. These particles are medium-sized and maintain a consistent diameter throughout the
-      simulation. A single, distinct green particle of similar size is positioned to the right of the
-      main cluster. The background features a white central area flanked by large, dark gray rectangular
-      blocks at the bottom.
+    description: A cluster of four overlapping circles moves downward and slightly to the right. A separate
+      green circle moves from the right side toward the center. The cluster and the green circle eventually
+      merge into a single group. The final group of five circles settles at the bottom center of the frame.
+    objects: The first set consists of four overlapping circles in orange, brown, purple, and red. These
+      circles are medium-sized and clustered closely together. The second object is a single green circle
+      of similar size. The green circle is initially isolated on the right side of the scene.
   movie_mpm_particle:
     description: A cluster of multi-colored particles is initially positioned in the upper left quadrant
       of the frame. Over time, this cluster moves downward and toward the center of the image. Simultaneously,

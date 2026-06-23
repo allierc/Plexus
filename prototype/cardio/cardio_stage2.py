@@ -286,7 +286,7 @@ def run(spec, device="cpu"):
            for o in spec["operators"]}
     ops["grid_graph"].forward(H)
     rec = int(g.get("record_every", 2))
-    pos, un = [], []
+    pos, un, wn, stress, speed = [], [], [], [], []
     for t in range(int(g["n_frames"])):
         H.tick = t
         for name in spec["schedule"]:
@@ -294,7 +294,12 @@ def run(spec, device="cpu"):
         if t % rec == 0:
             pos.append(lvl.get("pos").detach().cpu().numpy().copy())
             un.append(lvl.get("u").detach().cpu().numpy().squeeze(1).copy())
-    return np.stack(pos), np.stack(un), lvl
+            wn.append(lvl.get("w").detach().cpu().numpy().squeeze(1).copy())
+            act = getattr(lvl, "act", None)                                   # active contraction stress
+            stress.append((act if act is not None else lvl.get("u").squeeze(1) * 0).detach().cpu().numpy().copy())
+            speed.append(lvl.state[:, 2:4].detach().cpu().numpy().copy())     # velocity vector [N,2]
+    fields = {"w": np.stack(wn), "stress": np.stack(stress), "vel": np.stack(speed)}
+    return np.stack(pos), np.stack(un), lvl, fields
 
 
 # --------------------------------------------------------------------------- #
@@ -345,7 +350,7 @@ def render_nodes(pos, out, fps=48, stride=2, real=None):
     rsc = ax.scatter(real[0][:, 0], real[0][:, 1], s=1.6, c="lime",
                      linewidths=0, alpha=0.55) if real is not None else None
     sc = ax.scatter(pos[0][:, 0], pos[0][:, 1], s=1.6, c="red", linewidths=0, alpha=0.9)
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_aspect("equal")
+    ax.set_xlim(0, 1); ax.set_ylim(1, 0); ax.set_aspect("equal")   # Y down (image convention), matches traj/properties
     w = _writer(out, fps)
     frames = range(0, pos.shape[0], stride)
     with w.saving(fig, out, dpi=128):
@@ -356,6 +361,34 @@ def render_nodes(pos, out, fps=48, stride=2, real=None):
             w.grab_frame()
     plt.close(fig)
     print(f"saved {out}  ({os.path.getsize(out)/1e6:.1f} MB, {len(list(frames))} frames @ {fps}fps)")
+
+
+def render_field(pos, field, out, cmap, fps=48, stride=2, label="", vmin=None, vmax=None, sym=False):
+    """Per-node FIELD movie: nodes at their (moving) positions, coloured by a scalar field over time
+    (u, w, active stress, |velocity|). Same node-dot style as render_nodes, Y-down. MPM_pytorch
+    colour template: stress->'hot' (vmin=0), velocity->'viridis'. vmin/vmax are fixed across the
+    whole run so the colour scale is comparable frame-to-frame."""
+    import matplotlib; matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    if sym:
+        a = float(np.nanmax(np.abs(field))) or 1.0
+        vmin, vmax = -a, a
+    if vmin is None:
+        vmin = float(np.nanpercentile(field, 1))
+    if vmax is None:
+        vmax = float(np.nanpercentile(field, 99)) or 1.0
+    fig, ax = plt.subplots(figsize=(7, 7)); ax.set_position([0, 0, 1, 1]); ax.axis("off")
+    fig.set_facecolor("black"); ax.set_facecolor("black")
+    sc = ax.scatter(pos[0][:, 0], pos[0][:, 1], c=field[0], s=1.6, cmap=cmap,
+                    vmin=vmin, vmax=vmax, linewidths=0)
+    ax.set_xlim(0, 1); ax.set_ylim(1, 0); ax.set_aspect("equal")     # Y down, matches the other renders
+    w = _writer(out, fps)
+    frames = range(0, pos.shape[0], stride)
+    with w.saving(fig, out, dpi=128):
+        for f in frames:
+            sc.set_offsets(pos[f]); sc.set_array(field[f]); w.grab_frame()
+    plt.close(fig)
+    print(f"saved {out}  ({os.path.getsize(out)/1e6:.1f} MB, {label}, cmap={cmap}, range[{vmin:.3g},{vmax:.3g}])")
 
 
 def _sel_amp(pos, sel, amp):
@@ -450,7 +483,7 @@ def render_properties(lvl, out):
     print(f"saved {out}")
 
 
-def render_traj_png(pos, out, shape, grid_n=10, amp=12.0, real=None):
+def render_traj_png(pos, out, shape, grid_n=10, amp=12.0, real=None, verbose=True):
     """Static 10x10 amplified node trajectories (full run); synthetic green, real blue."""
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -474,7 +507,113 @@ def render_traj_png(pos, out, shape, grid_n=10, amp=12.0, real=None):
     ax.scatter(P[0, :, 0], P[0, :, 1], s=10, c="red", edgecolors="black", linewidths=0.4)
     fig.patch.set_facecolor("black")
     fig.savefig(out, dpi=130, facecolor="black"); plt.close(fig)
+    if verbose:
+        print(f"saved {out}")
+
+
+def render_param_maps(lvl, out, scalars=None):
+    """STATIC black-background multi-panel of every per-node PARAMETER map: stiffness, gain,
+    fibre angle, fibre quiver, and A_ij (per-node mean edge coupling). Scalar params
+    (beta/gamma/k_anchor/aniso) are listed as text."""
+    import matplotlib; matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    Hy, Wx = lvl.shape
+    stiff = lvl.stiff.cpu().numpy().reshape(Hy, Wx)
+    gain = lvl.gain.cpu().numpy().reshape(Hy, Wx)
+    fib = lvl.fiber.cpu().numpy().reshape(Hy, Wx)
+    i, j = (e.cpu().numpy() for e in lvl.edge_index); sk = lvl.stiff.cpu().numpy()
+    ke = 0.5 * (sk[i] + sk[j]); N = Hy * Wx
+    aij = np.zeros(N); cnt = np.zeros(N); np.add.at(aij, i, ke); np.add.at(cnt, i, 1.0)
+    aij = (aij / np.clip(cnt, 1, None)).reshape(Hy, Wx)
+    fig, axs = plt.subplots(2, 3, figsize=(16, 10), facecolor="black")
+
+    def panel(ax, m, cmap, title, **kw):
+        ax.set_facecolor("black"); im = ax.imshow(m, cmap=cmap, **kw)
+        ax.set_title(title, color="#ccc"); ax.set_xticks([]); ax.set_yticks([])
+        cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
+
+    panel(axs[0, 0], stiff, "viridis", "stiffness s(x,y)")
+    panel(axs[0, 1], gain, "magma", "gain g(x,y)")
+    panel(axs[0, 2], fib % np.pi, "twilight", "fibre angle φ(x,y) mod π")
+    panel(axs[1, 0], aij, "coolwarm", "k_ij (mean edge stiffness coupling)")
+    ax = axs[1, 1]; ax.set_facecolor("black"); s = max(1, Hy // 26)
+    yy, xx = np.meshgrid(np.arange(0, Hy, s), np.arange(0, Wx, s), indexing="ij")
+    ax.imshow(gain, cmap="gray", alpha=0.4)
+    ax.quiver(xx, yy, np.cos(fib[::s, ::s]), np.sin(fib[::s, ::s]), color="red", pivot="mid", scale=26)
+    ax.set_title("fibre directions over gain", color="#ccc"); ax.set_xticks([]); ax.set_yticks([]); ax.set_aspect("equal")
+    ax = axs[1, 2]; ax.set_facecolor("black"); ax.axis("off"); ax.set_title("scalar parameters", color="#ccc")
+    if scalars:
+        ax.text(0.05, 0.5, "\n".join(f"{k} = {v}" for k, v in scalars.items()),
+                color="#ccc", fontsize=13, family="monospace", va="center", transform=ax.transAxes)
+    fig.savefig(out, dpi=120, facecolor="black", bbox_inches="tight"); plt.close(fig)
     print(f"saved {out}")
+
+
+def _defgrad(pos_t, vel_t, X, i, j):
+    """Per-node deformation gradient F and velocity gradient C from the rest/current neighbourhoods
+    (MLS least squares over the 8-neighbour edges): F = (Σ dx dXᵀ)(Σ dX dXᵀ)⁻¹, C likewise from dv.
+    Returns ||F||, det(F)=Jp, ||C||. (Our mechanics is a spring stand-in; these are the standard
+    deformation-gradient estimates so the MPM-style panels are meaningful.)"""
+    dX = X[j] - X[i]; dx = pos_t[j] - pos_t[i]; dv = vel_t[j] - vel_t[i]; N = X.shape[0]
+    A = np.zeros((N, 2, 2)); Bx = np.zeros((N, 2, 2)); Bv = np.zeros((N, 2, 2))
+    np.add.at(A, i, dX[:, :, None] * dX[:, None, :])
+    np.add.at(Bx, i, dx[:, :, None] * dX[:, None, :])
+    np.add.at(Bv, i, dv[:, :, None] * dX[:, None, :])
+    A[:, 0, 0] += 1e-9; A[:, 1, 1] += 1e-9
+    Ainv = np.linalg.inv(A); F = Bx @ Ainv; Cc = Bv @ Ainv
+    return np.sqrt((F ** 2).sum((1, 2))), np.linalg.det(F), np.sqrt((Cc ** 2).sum((1, 2)))
+
+
+def render_mpm_dashboard(pos, un, fields, lvl, out, fps=48, stride=2):
+    """Dynamic MPM_pytorch-style field movie (3x3, white bg, per-panel colourbar). Top row: the
+    drive (u, w recovery, |v| velocity). Then the MPM particle fields with MPM colour template:
+    objects(gain), C (Jacobian of velocity, viridis), F (deformation, coolwarm~√2), Jp=det F
+    (viridis~1), stress (hot), grid momentum |v| (viridis). F/Jp/C computed per frame from the
+    node neighbourhoods (_defgrad)."""
+    import matplotlib; matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    X = lvl.X.cpu().numpy(); i, j = (e.cpu().numpy() for e in lvl.edge_index)
+    vel = fields["vel"]; w = fields["w"]; stress = fields["stress"]; T, N = pos.shape[0], pos.shape[1]
+    gain = lvl.gain.cpu().numpy()
+    Fn = np.zeros((T, N)); Jp = np.zeros((T, N)); Cn = np.zeros((T, N))
+    for t in range(T):
+        Fn[t], Jp[t], Cn[t] = _defgrad(pos[t], vel[t], X, i, j)
+    spd = np.linalg.norm(vel, axis=2)
+    pc = lambda a, q: max(float(np.nanpercentile(a, q)), 1e-9)
+    panels = [("u", un, "RdBu_r", -2.0, 2.0),
+              ("w (recovery)", w, "viridis", float(np.nanpercentile(w, 1)), pc(w, 99)),
+              ("|v| velocity", spd, "viridis", 0.0, pc(spd, 99)),
+              ("objects (gain)", None, "magma", None, None),
+              ("C (Jacobian of velocity)", Cn, "viridis", 0.0, pc(Cn, 99)),
+              ("F (deformation)", Fn, "coolwarm", 1.34, 1.54),
+              ("Jp (volume deformation)", Jp, "viridis", 0.75, 1.25),
+              ("stress", stress, "hot", 0.0, pc(stress, 99)),
+              ("grid momentum |v|", spd, "viridis", 0.0, pc(spd, 99))]
+    plt.rcParams["savefig.facecolor"] = "black"                  # FFMpegWriter grabs frames via savefig
+    fig, axs = plt.subplots(3, 3, figsize=(15, 15), facecolor="black"); axs = axs.ravel(); arts = []
+    fig.patch.set_facecolor("black")
+    for k, (title, arr, cmap, vmin, vmax) in enumerate(panels):
+        ax = axs[k]; ax.set_facecolor("black"); ax.set_title(title, color="#ccc")
+        ax.set_xlim(0, 1); ax.set_ylim(1, 0); ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color("#555")
+        c0 = gain if arr is None else arr[0]
+        sc = ax.scatter(pos[0][:, 0], pos[0][:, 1], c=c0, s=2, cmap=cmap, vmin=vmin, vmax=vmax, linewidths=0)
+        cb = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+        cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
+        arts.append((sc, arr))
+    plt.tight_layout()
+    w_ = _writer(out, fps)
+    with w_.saving(fig, out, dpi=100):
+        for t in range(0, T, stride):
+            for sc, arr in arts:
+                sc.set_offsets(pos[t])
+                if arr is not None:
+                    sc.set_array(arr[t])
+            w_.grab_frame()
+    plt.close(fig)
+    print(f"saved {out}  ({os.path.getsize(out)/1e6:.1f} MB, MPM-style fields)")
 
 
 def main():
@@ -490,7 +629,7 @@ def main():
     rec = int(spec["general"].get("record_every", 2))
     period_f = int(spec["general"]["cycle_frames"] // rec)
 
-    pos, un, lvl = run(spec, device=args.device)
+    pos, un, lvl, fields = run(spec, device=args.device)
     disp = np.linalg.norm(pos - pos[0], axis=2)
     met = metrics(pos, un, n_cyc, period_f)
     print(f"displacement mean {disp.mean():.4f} max {disp.max():.4f} | "
@@ -510,11 +649,16 @@ def main():
         real_rec = None
     anchored = any(o["op"] == "boundary_data" for o in spec["operators"])
     render_properties(lvl, os.path.join(d, f"{name}_properties.png"))
+    mech = next((o for o in spec["operators"] if o["op"] == "mls_mpm_mechanics"), {})
+    scal = {k: mech.get(k) for k in ("beta", "k_anchor", "gamma", "aniso")}
+    render_param_maps(lvl, os.path.join(d, f"{name}_params.png"), scalars=scal)   # static, black bg, all param maps
     render_traj_png(pos, os.path.join(d, f"{name}_trajectories.png"), shape, real=real_rec)
     render_nodes(pos, os.path.join(d, f"{name}_nodes.mp4"), fps=vfps, stride=vstride,
                  real=real_rec if anchored else None)
     render_trajectories(pos, os.path.join(d, f"{name}_trajectories.mp4"), shape, fps=vfps,
                         stride=vstride, real=real_rec if anchored else None)
+    render_mpm_dashboard(pos, un, fields, lvl, os.path.join(d, f"{name}_fields.mp4"),
+                         fps=vfps, stride=vstride)                                # dynamic MPM-style fields
     with open(os.path.join(d, "spec.yaml"), "w") as f:
         yaml.safe_dump(spec, f, sort_keys=False)
     with open(os.path.join(d, "metrics.yaml"), "w") as f:

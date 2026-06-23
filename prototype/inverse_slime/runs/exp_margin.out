@@ -1,0 +1,10 @@
+# Model/trainer improvement logbook (beyond hyperparameter grid)
+
+Started 11:03:23. The grid search ceilings the *hyperparameters*; here we improve the *model* and *trainer*. Benchmark to beat = grid-search best (sensor_angle u-err 0.121). Each experiment: a hypothesis, a controlled comparison on the same targets (mean+/-std), a verdict.
+
+
+## H1 [11:03:26]: a no-Gumbel margin/hinge loss recovers sensor_angle better than the softmax-mixture NLL.
+Controlled: same reconstruction + iters=800 restarts=3; only the sense model/loss differ.
+- mixture-NLL : angle=0.179+/-0.155 turn=0.115 dist=0.216
+- margin-hinge: angle=0.498+/-0.324 turn=0.369 dist=0.137
+- verdict: FALSIFIED (margin not better)  [mixture 0.179 vs margin 0.498; grid ceiling 0.121]

@@ -1,0 +1,93 @@
+# 3D variant of slime_default -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_default_3d
+  seed: 0
+  n_frames: 800
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a:
+        fraction: 1.0
+        move_speed: 0.006
+        turn_speed: 0.45
+        sensor_angle: 28
+        sensor_dist: 0.025
+        sensor_size: 1
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.045
+- op: diffuse
+  at: chemical
+  rate: 0.0175
+- op: decay
+  at: chemical
+  rate: 0.0006
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    a:
+    - 0.2
+    - 0.95
+    - 0.65
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cluster of blue particles begins as a compact, roughly spherical mass. Over time,
+      the particles begin to disperse outward from the center, creating a more diffuse and irregular shape.
+      The outer edges of the cluster become increasingly sparse as individual particles move further away
+      from the core. By the final frame, the central mass remains visible but is surrounded by a much
+      larger, more scattered cloud of points.
+    objects: The scene contains a large collection of small, blue particles. These particles are initially
+      arranged in a dense, spherical topology at the center of the frame. As the simulation progresses,
+      the topology shifts from a solid cluster to a scattered, cloud-like distribution. The individual
+      particles are uniform in size and color, appearing as distinct points against a black background.
+  movie_chemical:
+    description: A central green sphere remains stationary while a network of thin filaments grows outward
+      from its surface. These filaments initially appear as short, straight spikes before lengthening
+      and branching into complex, tangled structures. As time progresses, the filaments extend further
+      into the surrounding black space, becoming increasingly dense and irregular. The simulation concludes
+      with a large, web-like network of green fibers surrounding the core sphere.
+    objects: The primary object is a large, solid green sphere located at the center of the frame. Surrounding
+      this sphere is a set of thin, thread-like filaments that are also green in color. These filaments
+      are connected to the surface of the sphere and extend outward in various directions. The filaments
+      vary in length and complexity, forming a sprawling, interconnected network over time.

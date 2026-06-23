@@ -1,0 +1,104 @@
+# 3D variant of slime_two_asym -- N-D scalar field + vector-heading agents
+# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+general:
+  name: slime_two_asym_3d
+  seed: 0
+  n_frames: 880
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 11000
+    spawn: random
+    types:
+      fast:
+        fraction: 0.5
+        move_speed: 0.009
+        turn_speed: 0.2
+        sensor_angle: 16
+        sensor_dist: 0.04
+        sensor_size: 1
+      curly:
+        fraction: 0.5
+        move_speed: 0.004
+        turn_speed: 0.85
+        sensor_angle: 42
+        sensor_dist: 0.022
+        sensor_size: 1
+    spawn_radius: 0.28
+fields:
+  chemical:
+    frame: grid
+    res: 80
+    couples_to: cell
+operators:
+- op: deposit
+  at: cell
+  to: chemical
+  amount: 0.025
+- op: diffuse
+  at: chemical
+  rate: 0.014
+- op: decay
+  at: chemical
+  rate: 0.0015
+- op: sense_3d
+  at: cell
+  from: chemical
+  cross: -1.0
+- op: bounce_3d
+  at: cell
+- op: advance_3d
+  at: cell
+schedule:
+- deposit
+- diffuse
+- decay
+- sense_3d
+- bounce_3d
+- advance_3d
+plotting:
+  colors:
+    fast:
+    - 0.2
+    - 0.95
+    - 0.65
+    curly:
+    - 1.0
+    - 0.35
+    - 0.45
+  background: black
+  splat_size: 2.4
+  splat_sharpness: 0.85
+  splat_transparency: 0.14
+  splat_fog: 0.5
+  camera_azim: 0.7
+  camera_elev: 0.5
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a dense collection of particles and filaments evolving within a
+      bounded diamond-shaped region. Over time, the orange filaments appear to undergo a process of elongation
+      and complex folding. The blue particles remain relatively stationary, providing a background density
+      for the moving structures. The overall system maintains a high degree of spatial complexity as the
+      orange structures intertwine with one another.
+    objects: 'The scene contains two primary types of objects: orange filaments and blue particles. The
+      orange filaments are long, continuous, and highly curved structures that form a tangled network.
+      The blue particles are small, discrete points distributed throughout the volume. Both sets of objects
+      are concentrated within a diamond-shaped boundary against a black background.'
+  movie_chemical:
+    description: The simulation shows a dense network of red filaments evolving within a bounded diamond-shaped
+      region. Over time, the filaments appear to undergo subtle structural rearrangements and fluctuations
+      in their spatial distribution. The underlying green background field remains relatively static while
+      the red structures shift slightly. The overall density and connectivity of the red network remain
+      consistent throughout the sequence.
+    objects: The primary objects are elongated, thread-like red filaments that form a complex, interconnected
+      web. These filaments are distributed throughout a diamond-shaped volume against a dark background.
+      A faint green background field provides a secondary layer of spatial information. The red filaments
+      vary in length and curvature, creating a disordered, porous topology.

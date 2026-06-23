@@ -14,5 +14,10 @@ archive/
 # built from cardio.tex
 *.pdf
 
+# agentic loop -- human-only transcript + runtime state + per-job cluster logs
+cardio_cli_transcript.md
+cardio_loop_state.json
+loop_logs/
+
 __pycache__/
 *.pyc

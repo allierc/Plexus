@@ -14,6 +14,7 @@ from plexus.geometry import neighbour_mean
 @register_operator("alignment", level="particle", kind="lateral")
 class Alignment(Lateral):
     PREDICTION = "second_derivative"
+    SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
     REQUIRES_TYPE_PROPS = ["alignment"]
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion"]
     MORPHOLOGY_PRIOR = ["flock", "streams"]
@@ -29,7 +30,8 @@ class Alignment(Lateral):
         w = lvl.alignment
         vel = lvl.get("vel")
         acc = neighbour_mean(lvl.get("pos"), lvl.occ, lvl.edge_index,
-                             getattr(H, "periodic", False), getattr(H, "world_width", 1.0),
+                             getattr(H, "periodic", False),
+                             getattr(H, "world_size", getattr(H, "world_width", 1.0)),
                              lambda i, j, d: w[i, None] * self.a * (vel[j] - vel[i]))
         if mask is not None:
             acc = acc * mask[:, None].float()
