@@ -23,6 +23,9 @@ data**; the loss is the **honest motion-normalised interior R²/NRMSE** (boundar
 **Learned (UNet output):**
 - **stiffness field** s(x,y) → per-particle `youngs` → Lamé μ,λ (how hard each point resists).
 - **direction field** d(x,y) → the active-stress orientation (`mode: directional`, F = amplitude·a(t)·d).
+- **phase-delay field** τ(x,y) ∈ [0,`--max_delay`] frames (UNet 4th channel, **only when `--max_delay>0`**) →
+  the activation becomes a TRAVELLING wave a(x,y,t)=pulse(t−τ(x,y)), so regions fire in sequence (the
+  substrate for curved / rotary trajectories). `--max_delay=0` ⇒ a single global beat (original behaviour).
 - **pulse duration** (a learnable scalar, soft envelope).
 
 **Fixed/given:** pulse **period + phase locked to the real beat** (timing aligned to data),
@@ -30,9 +33,10 @@ amplitude, drag, the MPM physics. (Period ≈ 50 frames, 5 real beats.)
 
 ## What each job produces (`<dir> = archive/<arch>/`)
 
-- `checkpoints/dashboard_NNNNN.png` — **the primary evidence**, 2×2: (sim-red / real-green
+- `checkpoints/dashboard_NNNNN.png` — **the primary evidence**: (sim-red / real-green
   trajectories, amp ×10, same 10×10 selection as `gt_trajectories.png`) | learned stiffness | learned
-  **direction dx** | learned **direction dy**.
+  **direction dx** | learned **direction dy**. With `--max_delay>0` a 3rd column adds the learned
+  **phase-delay τ(x,y)** map (frames).
 - `checkpoints/model_NNNNN.pt`, `progress.txt` (live `it / R2 / loss / dur / amp`), `config.json`.
 - final: the job log prints `done -> <dir> (R2=…)`.
 
@@ -50,6 +54,9 @@ Schema: `{ "train_script": "cardio_mpm_train.py", "configs": [ {"name": "<slug>"
 | `--substeps` | MPM substeps/frame (↑ stability, ↓ speed) | 4–10 |
 | `--grad` | differentiable beat length (0 = full beat) | 0 |
 | `--warmup` | settle frames (0 = one period) | 0 |
+| `--mechanism` | **M0** `force` = body force A·a·d (closed out-and-back loops) vs **M1** `stress` = active stress −A·a·nnᵀ (shortening along axis n → coordinated shear via stress divergence) | force / stress |
+| `--max_delay` | **phase sweep**: >0 adds a learnable phase-delay field τ(x,y)∈[0,max_delay] frames → travelling-wave activation a=pulse(t−τ); 0=off (global pulse). Period≈50f, so a delay near/over a period wraps | 0 / 20–80 |
+| `--w_amp` | anti-collapse motion-energy match weight (0=off) | 0–1 |
 | `--fit_beat` | which real beat to fit (onset index) | -2 |
 | `--n_iter` | iterations (≈4 s/it at substeps 5) | 300–500 |
 | `spec` (`directional_*`) | the contraction mode + activation profile (UNet overrides the maps) | directional_cardio |

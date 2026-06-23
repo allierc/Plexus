@@ -10,7 +10,8 @@ mechanism). It RANKS on the interior R2 (motion-normalised, boundary excluded).
 
 The knobs are the new MLS-MPM ones: contraction mode/spec family (directional_* | map_*), amplitude,
 drag k, pulse duration init (dur0), lr, the differentiable-window cost (substeps / grad / warmup),
-fit_beat, bwidth. The learned objects are the two interpretable fields (stiffness + direction).
+fit_beat, bwidth, and the PHASE SWEEP max_delay (>0 => a learnable phase-delay field). The learned
+objects are the interpretable fields: stiffness + direction (+ phase-delay tau when max_delay>0).
 
   cd prototype/cardio_mpm   # run from an LSF SUBMIT HOST for cluster mode
   python cardio_mpm_loop.py 10                 # 10 batches; RESUMES saved state
@@ -232,11 +233,13 @@ def run_local(jobs):
 # --------------------------------------------------------------------------- #
 def start_prompt():
     return f"""CARDIO-MPM START. You are the scientist in a hypothesis-driven inverse-modelling loop:
-a UNet predicts two interpretable fields -- STIFFNESS and active-stress DIRECTION -- that drive the
-real MLS-MPM contraction forward, fit to the real cardiomyocyte beat (interior predicted, outer band
-anchored). Goal is KNOWLEDGE about which fields/knobs make the learned (red) per-node loops match the
-real (green) beat -- ranked by the interior R2 (motion-normalised, boundary excluded; 1=perfect, <=0=
-worse than no motion).
+a UNet predicts interpretable fields -- STIFFNESS, active-stress DIRECTION, and (when --max_delay>0) a
+learnable PHASE-DELAY map tau(x,y) -- that drive the real MLS-MPM contraction forward, fit to the real
+cardiomyocyte beat (interior predicted, outer band anchored). tau makes the activation a TRAVELLING wave
+a(x,y,t)=pulse(t-tau(x,y)) so neighbouring regions fire in sequence (the substrate for curved / rotary
+trajectories); --max_delay=0 recovers a single global beat. Goal is KNOWLEDGE about which fields/knobs make
+the learned (red) per-node loops match the real (green) beat -- ranked by the interior R2 (motion-normalised,
+boundary excluded; 1=perfect, <=0=worse than no motion). The seed plan is a PHASE SWEEP (--max_delay).
 
 Read (follow ALL of the instruction):
   instruction: {INSTR}
@@ -264,7 +267,8 @@ The result directories (Read the images -- trajectory morphology is the primary 
 
 Steps (do ALL):
 1. Per slot: Read its last `checkpoints/dashboard_*.png` (panels: sim-red/real-green trajectories,
-   learned stiffness, direction dx, direction dy) and its final interior R2 (progress.txt / the job
+   learned stiffness, direction dx, direction dy, and -- when --max_delay>0 -- the learned phase-delay
+   tau(x,y) map in frames) and its final interior R2 (progress.txt / the job
    log `done -> (R2=...)`) + `config.json`. Note in {ANALYSIS}: does red superpose on green? what
    stiffness/direction STRUCTURE did the UNet learn? the R2. RANK on R2.
 2. Update {LEDGER}: Established Principles / Falsified Hypotheses / Open Questions, each tied to the
