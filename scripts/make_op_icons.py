@@ -14,7 +14,7 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Rectangle, Arc
+from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Rectangle
 
 # --- palette lifted verbatim from paper/fig_ops.tex ----------------------- #
 CSET = (31 / 255, 119 / 255, 180 / 255)     # nodes (sets)
@@ -90,9 +90,6 @@ def draw_exchange(ax):
 
 def draw_field(ax):
     field(ax, 0.50, 0.50, w=0.46, h=0.46)
-    ax.add_patch(Arc((0.50, 0.50), 0.62, 0.62, theta1=20, theta2=300,
-                    color=COP, lw=2.0, zorder=5))
-    arrow(ax, (0.78, 0.34), (0.80, 0.46), color=COP, shrink=0, lw=2.0)
 
 
 def draw_rewire(ax):
