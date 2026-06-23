@@ -1,0 +1,151 @@
+---
+title: "pulse_stimulus"
+subtitle: "The SPATIAL half of an active stimulus: paint an activation field."
+---
+
+::: {.op-head}
+![](../figures/icons/field.png){.op-logo}
+
+[`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
+
+The SPATIAL half of an active stimulus: paint an activation field.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\partial_t\phi$ **Field**: a field's own self-dynamics.
+- **Acts on** &mdash; `field` (the level the operator runs at).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D.
+
+## Mechanism
+
+Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`) and
+writes a Gaussian activation bump, centred at `center` with width `radius`, into the
+scalar field named by `at:`:
+
+    a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius
+
+It owns WHERE the stimulus is -- not WHEN (the pacemaker) nor the mechanical effect
+(`pulse_to_contraction`). `kind=field`: writes the field grid in place, returns {}.
+With no pacemaker run before it (the key is absent from `H.signals`) p(t) defaults to
+0, so the field is blank -- schedule the pacemaker first.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `radius` | stimulus_width | 0.12 |
+| `center` | stimulus_site | [0.5, 0.5] |
+| `clock` | pacemaker_signal | "pacemaker" |
+| `profile` | &ndash; | "gaussian" |
+| `channel` | &ndash; | 0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: pulse_stimulus, at: field}
+```
+
+## Typical schedules
+
+_Where this operator sits in a pipeline &mdash; to be written._
+
+## Identifiability
+
+_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
+
+## Failure modes
+
+_What breaks under bad parameters &mdash; to be written._
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`activation_field`]{.op-badge} [`gaussian_source`]{.op-badge}  
+
+## Related operators
+
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+
+## Source
+
+[`src/plexus/operators/pulse_stimulus.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pulse_stimulus.py) &mdash; the registered operator.
+
+```python
+"""pulse_stimulus -- the SPATIAL half of an active stimulus: paint an activation field.
+
+Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`) and
+writes a Gaussian activation bump, centred at `center` with width `radius`, into the
+scalar field named by `at:`:
+
+    a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius
+
+It owns WHERE the stimulus is -- not WHEN (the pacemaker) nor the mechanical effect
+(`pulse_to_contraction`). `kind=field`: writes the field grid in place, returns {}.
+With no pacemaker run before it (the key is absent from `H.signals`) p(t) defaults to
+0, so the field is blank -- schedule the pacemaker first.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import FieldUpdate
+from plexus.models.registry import register_operator
+
+
+@register_operator("pulse_stimulus", level="field", kind="field")
+class PulseStimulus(FieldUpdate):
+    MECHANISM_TAGS = ["activation_field", "gaussian_source"]
+    PARAM_ROLES = {"radius": "stimulus_width", "center": "stimulus_site", "clock": "pacemaker_signal"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.field_name = params.get("_at") or params.get("to")   # the field at `at:`
+        self.clock = str(params.get("clock", "pacemaker"))         # H.signals key to read p(t)
+        self.profile = str(params.get("profile", "gaussian"))      # "gaussian" (localised) | "uniform" (global)
+        c = params.get("center", [0.5, 0.5])
+        self.center = (float(c[0]), float(c[1]))
+        self.sigma = float(params.get("radius", 0.12))
+        self.channel = int(params.get("channel", 0))
+
+    def forward(self, H, mask=None):
+        fld = H.fields[self.field_name]
+        dev = fld.grid.device
+        nx, ny, R = fld.nx, fld.ny, fld.R
+        # pixel-centre world coordinates: axis 0 spans [0, width], axis 1 spans [0, 1]
+        xs = (torch.arange(nx, device=dev) + 0.5) / R
+        ys = (torch.arange(ny, device=dev) + 0.5) / R
+        gx = xs[:, None].expand(nx, ny)
+        gy = ys[None, :].expand(nx, ny)
+        if self.profile == "uniform":
+            bump = torch.ones(nx, ny, device=dev)                  # global stimulus: a(x,t) = p(t)
+        else:
+            r2 = (gx - self.center[0]) ** 2 + (gy - self.center[1]) ** 2
+            bump = torch.exp(-r2 / (2.0 * self.sigma * self.sigma))   # localised Gaussian site
+        p = float((getattr(H, "signals", None) or {}).get(self.clock, 0.0))   # this tick's clock value
+        fld.grid[self.channel] = p * bump
+        return {}
+```

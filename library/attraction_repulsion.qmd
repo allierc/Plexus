@@ -1,0 +1,210 @@
+---
+title: "attraction_repulsion"
+subtitle: "Analytic attraction-repulsion: a smooth, per-type pairwise interaction law."
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: first_derivative`]{.op-badge}
+
+A smooth, per-type pairwise force law on a neighbour graph &mdash; the analytic core of [ParticleGraph](https://github.com/allierc/ParticleGraph). A long-range Gaussian pulls, a short-range Gaussian pushes; the balance between them, set per particle type, selects the emergent phase: single clusters, multi-cluster foams, lattices, or filaments.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Reads** &mdash; `sigma`, `p`  (per-type props: `p`)
+- **Writes / returns** &mdash; returns a **velocity** &mdash; the engine integrates $x \mathrel{+}= \Delta t\,\delta$.
+- **Prediction** &mdash; `first_derivative`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+A Lateral operator over a neighbour graph. For a receiver particle i of type t,
+summed over its neighbours j (the edges left by a `rewire` operator such as
+`radius_graph`):
+
+    f(r) = p1 * exp(-r^(2 p2) / 2σ²)  -  p3 * exp(-r^(2 p4) / 2σ²)      (a length)
+    dpos_i = Σ_j  f(r_ij) * (pos_j - pos_i)                            (a velocity)
+
+with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
+Gaussian is the long-range pull, the second the short-range push; their balance
+gives type-specific phases (clusters, networks, lattices). First-derivative law:
+returns a velocity (set `prediction: first_derivative`).
+
+This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
+a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
+(each type carries `p`), assembled by the engine into `Level.type_params`.
+
+## Equation
+
+$$
+f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
+\qquad
+\dot{\mathbf{x}}_i \;=\; \sum_{j\in\mathcal{N}(i)} f(r_{ij})\,(\mathbf{x}_j-\mathbf{x}_i)
+$$
+with $\mathbf p=[p_1,p_2,p_3,p_4]$ the receiver type's parameters and $\sigma$ a global width.
+The first term is the long-range pull, the second the short-range push.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `sigma` | interaction_length | **required** |
+| `p` | [pull_strength, pull_range, push_strength, push_range] per type | &ndash; |
+| `aggr` | &ndash; | "mean" |
+
+## Minimal spec
+
+```yaml
+sets:
+  particle:
+    n: 30000
+    types:                       # per-type force law p = [pull, pull_range, push, push_range]
+      t0: {fraction: 0.34, p: [1.62, 1.04, 1.60, 1.56]}
+      t1: {fraction: 0.33, p: [1.77, 1.83, 1.09, 1.91]}
+      t2: {fraction: 0.33, p: [1.72, 1.79, 1.06, 1.86]}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}   # the rewire that defines N(i)
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+```
+
+## Typical schedules
+
+Always paired with a `rewire` that supplies the neighbour graph it reads. The canonical tick is `radius_graph` &rarr; `attraction_repulsion`; the graph is rebuilt every step so the force tracks the moving particles.
+
+## Example output
+
+```{=html}
+<figure class="op-vid"><video src="../gallery/arbitrary_3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+<figcaption>Three types, 30&nbsp;000 particles, &sigma;=0.005, periodic &mdash; the field coarsens into a honeycomb of interconnected domains.</figcaption></figure>
+```
+
+## Identifiability
+
+Trajectories of a settled pattern pin down **ratios** far better than absolute scales. $\sigma$ and the $p$ magnitudes trade off (rescaling $\sigma$ while rescaling the exponents leaves the equilibrium spacing nearly unchanged), so recovering them needs the **transient** &mdash; the approach to equilibrium &mdash; not just the final frame. Inter-type parameters are only identifiable for type pairs that actually come into contact; types that never mix leave their cross terms unconstrained.
+
+## Failure modes
+
+| when | what goes wrong |
+|---|---|
+| `sigma` too large vs. graph `radius` | the cutoff clips the Gaussian before it decays &rarr; forces look truncated, clusters fray. |
+| net attraction with no repulsion (`p3`&approx;0) | runaway collapse to a single point; add short-range push or a `radius_graph` floor. |
+| `aggr: sum` at high density | force scales with neighbour count &rarr; denser regions blow up; `mean` (default) is density-independent. |
+| graph not rebuilt each tick | particles outrun their edges; the force goes stale and the pattern freezes. |
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`long_range_attraction`]{.op-badge} [`short_range_repulsion`]{.op-badge} [`coarsening`]{.op-badge} [`lattice_forming`]{.op-badge}  
+**Morphology prior** &mdash; [`single_cluster`]{.op-badge} [`multi_cluster`]{.op-badge} [`lattice`]{.op-badge} [`filaments`]{.op-badge}
+
+## Related operators
+
+- [`radius_graph`](radius_graph.qmd) &mdash; the rewire that builds the neighbour graph this operator reads
+- [`Coulomb`](Coulomb.qmd) &mdash; a fixed $1/r^2$ law &mdash; the non-parametric cousin
+- [`alignment`](alignment.qmd) &mdash; another lateral law, velocity-aligning rather than position-based
+- [`separation`](separation.qmd) &mdash; short-range repulsion alone, for collision handling
+
+## Source
+
+[`src/plexus/operators/attraction_repulsion.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/attraction_repulsion.py) &mdash; the registered operator.
+
+```python
+"""Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.
+
+A Lateral operator over a neighbour graph. For a receiver particle i of type t,
+summed over its neighbours j (the edges left by a `rewire` operator such as
+`radius_graph`):
+
+    f(r) = p1 * exp(-r^(2 p2) / 2σ²)  -  p3 * exp(-r^(2 p4) / 2σ²)      (a length)
+    dpos_i = Σ_j  f(r_ij) * (pos_j - pos_i)                            (a velocity)
+
+with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
+Gaussian is the long-range pull, the second the short-range push; their balance
+gives type-specific phases (clusters, networks, lattices). First-derivative law:
+returns a velocity (set `prediction: first_derivative`).
+
+This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
+a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
+(each type carries `p`), assembled by the engine into `Level.type_params`.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Lateral
+from plexus.models.registry import register_operator
+from plexus.geometry import minimum_image
+
+
+@register_operator("attraction_repulsion", level="particle", kind="lateral")
+class AttractionRepulsion(Lateral):
+    PREDICTION = "first_derivative"             # emits a velocity (overdamped law)
+    SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
+    REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
+    REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]
+    # mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the
+    # short-range Gaussian (p3,p4) the push; their balance sets the phase.
+    MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
+    MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice", "filaments"]
+    PARAM_ROLES = {"sigma": "interaction_length",
+                   "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.sigma = float(params["sigma"])
+        self.aggr = params.get("aggr", "mean")               # mean (default, matches the reference) or sum
+        self.at = params.get("_at", "particle")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        occ = lvl.occ
+        N, D = pos.shape[0], pos.shape[-1]
+        ei = lvl.edge_index                                  # [2, E]: row0 = receiver i, row1 = neighbour j
+        if ei.numel() == 0:
+            return {self.at: torch.zeros(N, D, device=pos.device)}
+        i, j = ei[0], ei[1]
+
+        d = minimum_image(pos[j] - pos[i], getattr(H, "periodic", False),
+                          getattr(H, "world_size", getattr(H, "world_width", 1.0)))   # j - i  [E, D]
+        r2 = (d * d).sum(-1)                                  # [E]
+        p = lvl.type_params[lvl.node_type[i]]                # receiver-type params [E, 4]
+        s2 = 2.0 * self.sigma ** 2
+        f = (p[:, 0] * torch.exp(-(r2 ** p[:, 1]) / s2)
+             - p[:, 2] * torch.exp(-(r2 ** p[:, 3]) / s2))   # [E]
+        f = f * occ[j]                                       # ignore dormant neighbours
+
+        dpos = torch.zeros(N, D, device=pos.device)
+        dpos.index_add_(0, i, f[:, None] * d)                # aggregate at the receiver
+        if self.aggr == "mean":                              # average over neighbours (density-independent)
+            deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
+            dpos = dpos / deg.clamp(min=1.0)[:, None]
+        dpos = dpos * occ[:, None]
+        if mask is not None:
+            dpos = dpos * mask[:, None].float()
+        return {self.at: dpos}
+```

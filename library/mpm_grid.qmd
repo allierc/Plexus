@@ -1,0 +1,126 @@
+---
+title: "mpm_grid"
+subtitle: "The Eulerian background grid FIELD + the shared transfer kernel for the"
+---
+
+::: {.op-head}
+![](../figures/icons/field.png){.op-logo}
+
+[`field`]{.op-badge} [`frame: None`]{.op-badge}
+
+The Eulerian background grid FIELD + the shared transfer kernel for the
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Frame** &mdash; `None` (how the continuum is discretized).
+- **Couples to** &mdash; any set, via an `exchange` operator.
+- **Used by** &mdash; `exchange` operators (scatter / gather) and `field` self-dynamics.
+
+## Description
+
+decomposed MLS-MPM operators (mpm_strain / p2g / mpm_grid_update / g2p).
+
+The grid is a FIELD, not an entity: transient scratch rebuilt every substep. p2g
+scatters mass/momentum/colour into it, mpm_grid_update solves on it, g2p reads it back.
+The B-spline weight helper lives here because both p2g (scatter) and g2p (gather)
+recompute it from the (pre-advection) particle positions -- so no per-substep scratch
+needs threading and the numbers match the `mls_mpm_mechanics` oracle.
+
+## Source
+
+[`src/plexus/operators/mpm_grid.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_grid.py)
+
+```python
+"""mpm_grid -- the Eulerian background grid FIELD + the shared transfer kernel for the
+decomposed MLS-MPM operators (mpm_strain / p2g / mpm_grid_update / g2p).
+
+The grid is a FIELD, not an entity: transient scratch rebuilt every substep. p2g
+scatters mass/momentum/colour into it, mpm_grid_update solves on it, g2p reads it back.
+The B-spline weight helper lives here because both p2g (scatter) and g2p (gather)
+recompute it from the (pre-advection) particle positions -- so no per-substep scratch
+needs threading and the numbers match the `mls_mpm_mechanics` oracle.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Field
+from plexus.models.registry import register_field
+
+# 3x3 stencil offsets, built once (CPU constant; moved to device in each operator)
+_OFFSETS = torch.tensor([[i, j] for i in range(3) for j in range(3)], dtype=torch.float32)
+
+
+@register_field("mpm_grid")
+class MPMGrid(Field):
+    """MLS-MPM background grid on [0,width]x[0,1] with square cells dx = 1/n_grid.
+    Channels: m (mass), mv (momentum), c (liquid colour for CSF), v (velocity). Pure
+    scratch: p2g zeroes + scatters into it each substep, grid_update solves on it, g2p
+    reads it back."""
+
+    RECORD = False                                   # transient scratch -- not recorded/rendered
+
+    def __init__(self, name, width=1.0, n_grid=128, device="cpu", **kw):
+        super().__init__(name)
+        self.ny = int(n_grid)
+        self.nx = int(round(float(width) * self.ny))
+        self.width = float(width)
+        self.dx = 1.0 / self.ny
+        self.inv_dx = float(self.ny)
+        n = self.nx * self.ny
+        self.register_buffer("m", torch.zeros(n, device=device))
+        self.register_buffer("mv", torch.zeros(n, 2, device=device))
+        self.register_buffer("c", torch.zeros(n, device=device))
+        self.register_buffer("v", torch.zeros(n, 2, device=device))
+
+    @property
+    def grid(self):                                  # [C,nx,ny] view for the recorder (mass density)
+        return self.m.view(1, self.nx, self.ny)
+
+
+def bspline(X, inv_dx, offsets, nx, ny, periodic):
+    """Quadratic B-spline weights of each particle over its 3x3 grid stencil.
+    Returns (fx, weight[N,9], flat[N*9]) -- identical to the oracle's P2G block."""
+    base = (X * inv_dx - 0.5).floor().long()
+    fx = X * inv_dx - base.float()
+    w = torch.stack([0.5 * (1.5 - fx) ** 2,
+                     0.75 - (fx - 1) ** 2,
+                     0.5 * (fx - 0.5) ** 2], dim=1)                 # [N,3,2]
+    oi = offsets[:, 0].long(); oj = offsets[:, 1].long()
+    weight = w[:, oi, 0] * w[:, oj, 1]                             # [N,9]
+    gpos = base[:, None, :] + offsets.long()[None]
+    if periodic:
+        gpos = torch.stack([gpos[..., 0] % nx, gpos[..., 1] % ny], dim=-1)
+    else:
+        gpos = torch.stack([gpos[..., 0].clamp(0, nx - 1), gpos[..., 1].clamp(0, ny - 1)], dim=-1)
+    flat = (gpos[..., 0] * ny + gpos[..., 1]).reshape(-1)
+    return fx, weight, flat
+
+
+def sub_dt(H, fallback):
+    """The current substep dt: the schedule's `{substep: N, dt}` loop sets `H.sub_dt`;
+    fall back to the operator's own `dt_sub` param if run outside a substep loop."""
+    sd = getattr(H, "sub_dt", None)
+    return float(sd if sd is not None else fallback)
+```

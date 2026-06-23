@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.54">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Operator library – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./abstraction.html"> 
+<span class="menu-text">The abstraction</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./methodology.html"> 
+<span class="menu-text">LLM ↔︎ registry</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link active" href="./library.html" aria-current="page"> 
+<span class="menu-text">Library</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./experiment.html"> 
+<span class="menu-text">Simulations</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./inverse.html"> 
+<span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./building.html"> 
+<span class="menu-text">Building Plexus</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#operators" id="toc-operators" class="nav-link active" data-scroll-target="#operators">Operators</a>
+  <ul class="collapse">
+  <li><a href="#lateral-mathcalo_e" id="toc-lateral-mathcalo_e" class="nav-link" data-scroll-target="#lateral-mathcalo_e"><img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym"><span class="math inline">\(\mathcal{O}_E\)</span></span></a></li>
+  <li><a href="#aggregate-textstylesum_pi" id="toc-aggregate-textstylesum_pi" class="nav-link" data-scroll-target="#aggregate-textstylesum_pi"><img class="kind-h" src="figures/icons/aggregate.png"> Aggregate <span class="kind-sym"><span class="math inline">\(\textstyle\sum_\pi\)</span></span></a></li>
+  <li><a href="#broadcast-pi" id="toc-broadcast-pi" class="nav-link" data-scroll-target="#broadcast-pi"><img class="kind-h" src="figures/icons/broadcast.png"> Broadcast <span class="kind-sym"><span class="math inline">\(\pi^*\)</span></span></a></li>
+  <li><a href="#exchange-mathcalsmathcalg" id="toc-exchange-mathcalsmathcalg" class="nav-link" data-scroll-target="#exchange-mathcalsmathcalg"><img class="kind-h" src="figures/icons/exchange.png"> Exchange <span class="kind-sym"><span class="math inline">\(\mathcal{S},\mathcal{G}\)</span></span></a></li>
+  <li><a href="#field-partial_tphi" id="toc-field-partial_tphi" class="nav-link" data-scroll-target="#field-partial_tphi"><img class="kind-h" src="figures/icons/field.png"> Field <span class="kind-sym"><span class="math inline">\(\partial_t\phi\)</span></span></a></li>
+  <li><a href="#rewire-mathcalre" id="toc-rewire-mathcalre" class="nav-link" data-scroll-target="#rewire-mathcalre"><img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym"><span class="math inline">\(\mathcal{R}\!:E\)</span></span></a></li>
+  </ul></li>
+  <li><a href="#sets" id="toc-sets" class="nav-link" data-scroll-target="#sets">Sets</a></li>
+  <li><a href="#fields" id="toc-fields" class="nav-link" data-scroll-target="#fields">Fields</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Operator library</h1>
+<p class="subtitle lead">Every set, field, and operator in Plexus — the validated registry to date</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The whole calculus is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>32 operators</strong> (40 primitives in all). Every simulation on this site is a schedule composed from this list — nothing else. Each entry below is introspected live from the registry, so the catalog never drifts from the code. The logo marks the operator <strong>kind</strong> in the visual language of <a href="./index.html">Figure 1</a> (<code>paper/fig_ops.tex</code>).</p>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="operators" class="level2">
+<h2 class="anchored" data-anchor-id="operators">Operators</h2>
+<section id="lateral-mathcalo_e" class="level3">
+<h3 class="anchored" data-anchor-id="lateral-mathcalo_e"><img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym"><span class="math inline">\(\mathcal{O}_E\)</span></span></h3>
+<p><em>Within-set interaction over a relation <span class="math inline">\(E\)</span>.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/Coulomb.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Coulomb</span><span class="op-card-sub">The electrostatic inverse-square law between charged particles.</span></span></a> <a class="op-card" href="library/advance.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">advance</span><span class="op-card-sub">Set (lateral). Self-propulsion: move along the heading at speed.</span></span></a> <a class="op-card" href="library/advance_3d.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">advance_3d</span><span class="op-card-sub">Set (lateral). Self-propulsion along a 3D heading vector.</span></span></a> <a class="op-card" href="library/alignment.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">alignment</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a> <a class="op-card" href="library/attraction_repulsion.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">attraction_repulsion</span><span class="op-card-sub">Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.</span></span></a> <a class="op-card" href="library/bounce.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">bounce</span><span class="op-card-sub">Set. Reflect a self-propelled agent off the domain walls / obstacles.</span></span></a> <a class="op-card" href="library/bounce_3d.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">bounce_3d</span><span class="op-card-sub">Set (lateral). Reflect a 3D agent’s heading off the domain walls.</span></span></a> <a class="op-card" href="library/cohesion.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">cohesion</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a> <a class="op-card" href="library/drag.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">drag</span><span class="op-card-sub">Viscous friction as a composable operator (not an integration knob).</span></span></a> <a class="op-card" href="library/gravity.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">gravity</span><span class="op-card-sub">A uniform body force at the cell level.</span></span></a> <a class="op-card" href="library/mpm_drag.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_drag</span><span class="op-card-sub">Viscous body drag for MLS-MPM particles (a force, not an integrator knob).</span></span></a> <a class="op-card" href="library/mpm_strain.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_strain</span><span class="op-card-sub">Mpm_strain (particle -&gt; particle): the MLS-MPM deformation-gradient + material update.</span></span></a> <a class="op-card" href="library/separation.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">separation</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a></p>
+</div>
+</section>
+<section id="aggregate-textstylesum_pi" class="level3">
+<h3 class="anchored" data-anchor-id="aggregate-textstylesum_pi"><img class="kind-h" src="figures/icons/aggregate.png"> Aggregate <span class="kind-sym"><span class="math inline">\(\textstyle\sum_\pi\)</span></span></h3>
+<p><em>Children → parent, up the containment <span class="math inline">\(\pi\)</span>.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/aggregate.html"><img src="figures/icons/aggregate.png" alt="aggregate"><span class="op-card-body"><span class="op-card-name">aggregate</span><span class="op-card-sub">Children -&gt; parent. Reduce a contained set onto its parent.</span></span></a></p>
+</div>
+</section>
+<section id="broadcast-pi" class="level3">
+<h3 class="anchored" data-anchor-id="broadcast-pi"><img class="kind-h" src="figures/icons/broadcast.png"> Broadcast <span class="kind-sym"><span class="math inline">\(\pi^*\)</span></span></h3>
+<p><em>Parent → children, down the containment <span class="math inline">\(\pi\)</span>.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/broadcast.html"><img src="figures/icons/broadcast.png" alt="broadcast"><span class="op-card-body"><span class="op-card-name">broadcast</span><span class="op-card-sub">Parent -&gt; children. Lift a parent quantity onto its children.</span></span></a></p>
+</div>
+</section>
+<section id="exchange-mathcalsmathcalg" class="level3">
+<h3 class="anchored" data-anchor-id="exchange-mathcalsmathcalg"><img class="kind-h" src="figures/icons/exchange.png"> Exchange <span class="kind-sym"><span class="math inline">\(\mathcal{S},\mathcal{G}\)</span></span></h3>
+<p><em>Set ↔︎ field scatter / gather.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/apply_material_map.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">apply_material_map</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus <code>apply_material_map</code>,</span></span></a> <a class="op-card" href="library/chemotaxis.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">chemotaxis</span><span class="op-card-sub">Set &lt;- field. Particles climb (or flee) a field’s gradient.</span></span></a> <a class="op-card" href="library/deposit.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">deposit</span><span class="op-card-sub">Set -&gt; field. Each agent adds to the field at its own pixel.</span></span></a> <a class="op-card" href="library/g2p.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">g2p</span><span class="op-card-sub">G2p (mpm_grid -&gt; particle): the MLS-MPM grid-to-particle gather + advection.</span></span></a> <a class="op-card" href="library/mls_mpm_mechanics.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">mls_mpm_mechanics</span><span class="op-card-sub">A FENCED TRANSITIONAL operator wrapping the MLS-MPM solver.</span></span></a> <a class="op-card" href="library/p2g.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">p2g</span><span class="op-card-sub">P2g (particle -&gt; mpm_grid): the MLS-MPM particle-to-grid scatter.</span></span></a> <a class="op-card" href="library/pulse_to_active_stress.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">pulse_to_active_stress</span><span class="op-card-sub">The STRESS half: activation field -&gt; per-particle active stress.</span></span></a> <a class="op-card" href="library/pulse_to_contraction.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">pulse_to_contraction</span><span class="op-card-sub">The FORCE half: activation field -&gt; per-particle MPM force.</span></span></a> <a class="op-card" href="library/sense.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense</span><span class="op-card-sub">Field -&gt; set. Sample the field at 3 sensors, turn the heading.</span></span></a> <a class="op-card" href="library/sense_3d.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense_3d</span><span class="op-card-sub">Field -&gt; set. Sample the field on a 3D sensor cone, steer the heading.</span></span></a></p>
+</div>
+</section>
+<section id="field-partial_tphi" class="level3">
+<h3 class="anchored" data-anchor-id="field-partial_tphi"><img class="kind-h" src="figures/icons/field.png"> Field <span class="kind-sym"><span class="math inline">\(\partial_t\phi\)</span></span></h3>
+<p><em>A field’s own self-dynamics.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/decay.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">decay</span><span class="op-card-sub">Field -&gt; field. Linear evaporation of a scalar field.</span></span></a> <a class="op-card" href="library/diffuse.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">diffuse</span><span class="op-card-sub">Field -&gt; field. One discrete diffusion step on a scalar field.</span></span></a> <a class="op-card" href="library/mpm_grid_update.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">mpm_grid_update</span><span class="op-card-sub">Mpm_grid_update (mpm_grid -&gt; mpm_grid): the MLS-MPM grid solve.</span></span></a> <a class="op-card" href="library/pacemaker.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">pacemaker</span><span class="op-card-sub">A clocked scalar SOURCE: a periodic activation signal p(t).</span></span></a> <a class="op-card" href="library/playback.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">playback</span><span class="op-card-sub">A scalar field <em>prescribed</em> from an external video, plus the</span></span></a> <a class="op-card" href="library/pulse_stimulus.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">pulse_stimulus</span><span class="op-card-sub">The SPATIAL half of an active stimulus: paint an activation field.</span></span></a></p>
+</div>
+</section>
+<section id="rewire-mathcalre" class="level3">
+<h3 class="anchored" data-anchor-id="rewire-mathcalre"><img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym"><span class="math inline">\(\mathcal{R}\!:E\)</span></span></h3>
+<p><em>Rebuild the relation <span class="math inline">\(E\)</span> each tick.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/radius_graph.html"><img src="figures/icons/rewire.png" alt="rewire"><span class="op-card-body"><span class="op-card-name">radius_graph</span><span class="op-card-sub">Relation-building (rewire) operators: construct a Level’s <code>edge_index</code>.</span></span></a></p>
+</div>
+</section>
+</section>
+<section id="sets" class="level2">
+<h2 class="anchored" data-anchor-id="sets">Sets</h2>
+<p><em>Node kinds — the levels a hierarchy is built from.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/particle.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">particle</span><span class="op-card-sub">A point with position + velocity (the interacting-particle / boid leaf).</span></span></a> <a class="op-card" href="library/mpm_particle.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">mpm_particle</span><span class="op-card-sub">A material point for MLS-MPM: position + velocity PLUS the per-particle</span></span></a> <a class="op-card" href="library/cell.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">cell</span><span class="op-card-sub">A set of particles/molecules; its position is an aggregate of its children.</span></span></a></p>
+</div>
+</section>
+<section id="fields" class="level2">
+<h2 class="anchored" data-anchor-id="fields">Fields</h2>
+<p><em>Continuum discretizations — coupled to sets through <code>exchange</code> operators.</em></p>
+<div class="op-grid">
+<p><a class="op-card" href="library/grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">grid</span><span class="op-card-sub">A pure-state continuum: a C-channel scalar grid, NO behaviour.</span></span></a> <a class="op-card" href="library/image.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">image</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus <code>apply_material_map</code>,</span></span></a> <a class="op-card" href="library/mpm_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">mpm_grid</span><span class="op-card-sub">The Eulerian background grid FIELD + the shared transfer kernel for the</span></span></a> <a class="op-card" href="library/vector_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">vector_grid</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus <code>apply_material_map</code>,</span></span></a> <a class="op-card" href="library/video.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">video</span><span class="op-card-sub">A scalar field <em>prescribed</em> from an external video, plus the</span></span></a></p>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
