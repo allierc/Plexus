@@ -48,6 +48,13 @@ VECTOR and moves along it: `v_i = move_speed_i * heading_i`. First-derivative la
 (emits a velocity; the ENGINE integrates the position). Purely propulsion -- wall
 reflection is the separate `bounce_3d` operator, so this stays one concern.
 
+## Equation
+
+$$
+\dot{\mathbf x}_i \;=\; s_i\,\hat{\mathbf h}_i,\qquad \lVert\hat{\mathbf h}_i\rVert=1
+$$
+The 3D form: the heading is a unit vector $\hat{\mathbf h}_i$ rather than an angle.
+
 ## Minimal spec
 
 ```yaml

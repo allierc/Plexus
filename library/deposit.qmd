@@ -46,6 +46,16 @@ The stigmergy write: agent i adds `amount*dt` to channel `node_type[i]` (its own
 species) at the pixel under its position, clamped to 1 (the shader's `min(1,...)`).
 This is the only place the agents imprint the trail they then sense.
 
+## Equation
+
+$$
+c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) \;\leftarrow\;
+\min\!\Big(1,\; c_{s}\big(\mathrm{pix}(\mathbf x_i)\big) + a\,\Delta t\Big),
+\qquad s=\text{type}(i)
+$$
+Each agent adds $a\,\Delta t$ (`amount`) to its own species channel $s$ at the pixel
+under its position, clamped to 1 — the only place agents imprint the trail.
+
 ## Parameters
 
 | parameter | role | default |

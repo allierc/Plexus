@@ -46,6 +46,14 @@ c <- max(0, c - k*dt). Without decay the deposited trail would only accumulate;
 decay is what lets unused filaments fade so the network coarsens (stigmergy).
 Writes the field in place; returns {}.
 
+## Equation
+
+$$
+c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)
+$$
+Linear evaporation of a scalar field at rate $k$ — the sink that lets stigmergic
+trails fade so the network coarsens. The companion of `deposit` / `diffuse`.
+
 ## Parameters
 
 | parameter | role | default |
@@ -73,7 +81,7 @@ _What breaks under bad parameters &mdash; to be written._
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 

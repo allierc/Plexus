@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -270,6 +271,12 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>A <code>drag</code> force opposes velocity: acc = -k * vel. Modelling friction as an operator (rather than a <code>damping</code> field baked into the integrator) keeps the integrator generic and lets drag compose in the schedule with the other forces. It is a second-derivative contribution (an acceleration), so it lives on sets integrated with <code>prediction: second_derivative</code> (e.g.&nbsp;alongside boids).</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\mathbf a_i \;=\; -\,k\,\mathbf v_i
+\]</span> Viscous friction as an acceleration (<span class="math inline">\(k\)</span> = drag coefficient). A force in the schedule, not an integrator knob, so it composes with the other second-derivative laws.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

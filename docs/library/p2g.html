@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -271,6 +272,18 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>Computes the fixed-corotated stress (with snow hardening from Jp) -&gt; affine momentum matrix, applies the external body force + Stokes drag to the local velocity, then scatters mass, momentum and the liquid colour field onto the background grid via the quadratic B-spline weights. Writes the <code>mpm_grid</code> field; returns {}. Step 2 of the decomposed MLS-MPM (oracle: <code>mls_mpm_mechanics</code>).</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\boldsymbol\sigma = 2\mu(\mathbf F-\mathbf R)\mathbf F^{\!\top} + \lambda(J-1)J\,\mathbf I,
+\qquad
+\mathbf Q = -\frac{4\,\Delta t}{\Delta x^{2}}\,V\,\boldsymbol\sigma + m\,\mathbf C
+\]</span> <span class="math display">\[
+m_g \mathrel{+}= \sum_i w_{ig}\,m_i,
+\qquad
+\mathbf p_g \mathrel{+}= \sum_i w_{ig}\big(m_i\mathbf v_i + \mathbf Q_i(\mathbf x_g-\mathbf x_i)\big)
+\]</span> The fixed-corotated stress (<span class="math inline">\(\mathbf R\)</span> = polar rotation of <span class="math inline">\(\mathbf F\)</span>) forms the affine momentum matrix <span class="math inline">\(\mathbf Q\)</span>, scattered to the grid by the quadratic B-spline weights <span class="math inline">\(w_{ig}\)</span>. Step 2 of the MLS-MPM decomposition.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

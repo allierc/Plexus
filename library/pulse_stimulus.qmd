@@ -53,6 +53,15 @@ It owns WHERE the stimulus is -- not WHEN (the pacemaker) nor the mechanical eff
 With no pacemaker run before it (the key is absent from `H.signals`) p(t) defaults to
 0, so the field is blank -- schedule the pacemaker first.
 
+## Equation
+
+$$
+a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^{2}}{2\sigma^{2}}\Big),
+\qquad \sigma=\text{radius}
+$$
+Paints the clock $p(t)$ (from a `pacemaker`) as a Gaussian bump centred at $\mathbf x_0$.
+Owns *where* the stimulus is — not *when* (the pacemaker) nor its mechanical effect.
+
 ## Parameters
 
 | parameter | role | default |
@@ -88,7 +97,7 @@ _What breaks under bad parameters &mdash; to be written._
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 

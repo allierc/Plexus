@@ -47,6 +47,14 @@ children's positions (a cell's position = the centroid of its particles). This i
 DERIVED readout, not an integrated force, so it writes the parent's position directly
 and declares MAY_MUTATE_INTEGRATED_STATE to opt out of the integration guard; returns {}.
 
+## Equation
+
+$$
+\mathbf x_P \;=\; \frac{\sum_{i\in P} o_i\,\mathbf x_i}{\sum_{i\in P} o_i}
+$$
+The occupancy-weighted centroid of a parent $P$'s children ($o_i$ = occupancy). A
+derived readout written straight onto the parent, not an integrated force.
+
 ## Minimal spec
 
 ```yaml

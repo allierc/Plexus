@@ -6,7 +6,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/diffuse.html</loc>
-    <lastmod>2026-06-23T21:39:06.288Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.177Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/methodology.html</loc>
@@ -14,178 +14,182 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/vector_grid.html</loc>
-    <lastmod>2026-06-23T21:39:06.656Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.478Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/sense_3d.html</loc>
-    <lastmod>2026-06-23T21:39:06.352Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.231Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/radius_graph.html</loc>
-    <lastmod>2026-06-23T21:39:06.161Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.067Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/pulse_stimulus.html</loc>
-    <lastmod>2026-06-23T21:39:06.448Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.312Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/particle.html</loc>
-    <lastmod>2026-06-23T21:39:06.685Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/phase_delay_pulse.html</loc>
+    <lastmod>2026-06-23T23:06:08.322Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/p2g.html</loc>
-    <lastmod>2026-06-23T21:39:06.561Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/pacemaker.html</loc>
+    <lastmod>2026-06-23T23:06:08.301Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/mpm_particle.html</loc>
-    <lastmod>2026-06-23T21:39:06.696Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/mpm_strain.html</loc>
+    <lastmod>2026-06-23T23:06:08.398Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/mpm_grid.html</loc>
-    <lastmod>2026-06-23T21:39:06.668Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/mpm_grid_update.html</loc>
+    <lastmod>2026-06-23T23:06:08.419Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/mls_mpm_mechanics.html</loc>
-    <lastmod>2026-06-23T21:39:06.528Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/mpm_drag.html</loc>
+    <lastmod>2026-06-23T23:06:08.358Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/grid.html</loc>
-    <lastmod>2026-06-23T21:39:06.611Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/image.html</loc>
+    <lastmod>2026-06-23T23:06:08.468Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/g2p.html</loc>
-    <lastmod>2026-06-23T21:39:06.590Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/gravity.html</loc>
+    <lastmod>2026-06-23T23:06:08.290Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/deposit.html</loc>
-    <lastmod>2026-06-23T21:39:06.275Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/drag.html</loc>
+    <lastmod>2026-06-23T23:06:08.156Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/cohesion.html</loc>
-    <lastmod>2026-06-23T21:39:06.227Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/decay.html</loc>
+    <lastmod>2026-06-23T23:06:08.188Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/cell.html</loc>
-    <lastmod>2026-06-23T21:39:06.709Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/chemotaxis.html</loc>
+    <lastmod>2026-06-23T23:06:08.278Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/bounce_3d.html</loc>
-    <lastmod>2026-06-23T21:39:06.380Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/broadcast.html</loc>
+    <lastmod>2026-06-23T23:06:08.087Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/apply_material_map.html</loc>
-    <lastmod>2026-06-23T21:39:06.511Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/bounce.html</loc>
+    <lastmod>2026-06-23T23:06:08.219Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/aggregate.html</loc>
-    <lastmod>2026-06-23T21:39:06.175Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/alignment.html</loc>
+    <lastmod>2026-06-23T23:06:08.134Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/advance.html</loc>
-    <lastmod>2026-06-23T21:39:06.326Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/advance_3d.html</loc>
+    <lastmod>2026-06-23T23:06:08.243Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library.html</loc>
-    <lastmod>2026-06-23T21:39:06.718Z</lastmod>
-  </url>
-  <url>
-    <loc>https://allierc.github.io/Plexus/building.html</loc>
-    <lastmod>2026-06-17T00:22:23.921Z</lastmod>
-  </url>
-  <url>
-    <loc>https://allierc.github.io/Plexus/abstraction.html</loc>
-    <lastmod>2026-06-17T14:07:59.825Z</lastmod>
-  </url>
-  <url>
-    <loc>https://allierc.github.io/Plexus/inverse.html</loc>
-    <lastmod>2026-06-22T13:38:53.119Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/Coulomb.html</loc>
+    <lastmod>2026-06-23T23:06:08.111Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/experiment.html</loc>
     <lastmod>2026-06-18T00:11:09.329Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/Coulomb.html</loc>
-    <lastmod>2026-06-23T21:39:06.214Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/inverse.html</loc>
+    <lastmod>2026-06-22T13:38:53.119Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/advance_3d.html</loc>
-    <lastmod>2026-06-23T21:39:06.365Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/abstraction.html</loc>
+    <lastmod>2026-06-17T14:07:59.825Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/alignment.html</loc>
-    <lastmod>2026-06-23T21:39:06.238Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/building.html</loc>
+    <lastmod>2026-06-17T00:22:23.921Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/bounce.html</loc>
-    <lastmod>2026-06-23T21:39:06.339Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library.html</loc>
+    <lastmod>2026-06-23T23:06:08.534Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/broadcast.html</loc>
-    <lastmod>2026-06-23T21:39:06.188Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/advance.html</loc>
+    <lastmod>2026-06-23T23:06:08.209Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/chemotaxis.html</loc>
-    <lastmod>2026-06-23T21:39:06.407Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/aggregate.html</loc>
+    <lastmod>2026-06-23T23:06:08.077Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/decay.html</loc>
-    <lastmod>2026-06-23T21:39:06.301Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/apply_material_map.html</loc>
+    <lastmod>2026-06-23T23:06:08.373Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/drag.html</loc>
-    <lastmod>2026-06-23T21:39:06.263Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/bounce_3d.html</loc>
+    <lastmod>2026-06-23T23:06:08.253Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/gravity.html</loc>
-    <lastmod>2026-06-23T21:39:06.420Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/cell.html</loc>
+    <lastmod>2026-06-23T23:06:08.526Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/image.html</loc>
-    <lastmod>2026-06-23T21:39:06.640Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/cohesion.html</loc>
+    <lastmod>2026-06-23T23:06:08.122Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/mpm_drag.html</loc>
-    <lastmod>2026-06-23T21:39:06.487Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/deposit.html</loc>
+    <lastmod>2026-06-23T23:06:08.167Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/mpm_grid_update.html</loc>
-    <lastmod>2026-06-23T21:39:06.576Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/g2p.html</loc>
+    <lastmod>2026-06-23T23:06:08.430Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/mpm_strain.html</loc>
-    <lastmod>2026-06-23T21:39:06.540Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/grid.html</loc>
+    <lastmod>2026-06-23T23:06:08.440Z</lastmod>
   </url>
   <url>
-    <loc>https://allierc.github.io/Plexus/library/pacemaker.html</loc>
-    <lastmod>2026-06-23T21:39:06.434Z</lastmod>
+    <loc>https://allierc.github.io/Plexus/library/mls_mpm_mechanics.html</loc>
+    <lastmod>2026-06-23T23:06:08.386Z</lastmod>
+  </url>
+  <url>
+    <loc>https://allierc.github.io/Plexus/library/mpm_grid.html</loc>
+    <lastmod>2026-06-23T23:06:08.489Z</lastmod>
+  </url>
+  <url>
+    <loc>https://allierc.github.io/Plexus/library/mpm_particle.html</loc>
+    <lastmod>2026-06-23T23:06:08.515Z</lastmod>
+  </url>
+  <url>
+    <loc>https://allierc.github.io/Plexus/library/p2g.html</loc>
+    <lastmod>2026-06-23T23:06:08.409Z</lastmod>
+  </url>
+  <url>
+    <loc>https://allierc.github.io/Plexus/library/particle.html</loc>
+    <lastmod>2026-06-23T23:06:08.503Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/playback.html</loc>
-    <lastmod>2026-06-23T21:39:06.394Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.266Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/pulse_to_active_stress.html</loc>
-    <lastmod>2026-06-23T21:39:06.475Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.346Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/sense.html</loc>
-    <lastmod>2026-06-23T21:39:06.313Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.198Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/separation.html</loc>
-    <lastmod>2026-06-23T21:39:06.250Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.145Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/video.html</loc>
-    <lastmod>2026-06-23T21:39:06.628Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.453Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/attraction_repulsion.html</loc>
-    <lastmod>2026-06-23T21:39:06.202Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.099Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/pulse_to_contraction.html</loc>
-    <lastmod>2026-06-23T21:39:06.461Z</lastmod>
+    <lastmod>2026-06-23T23:06:08.335Z</lastmod>
   </url>
 </urlset>

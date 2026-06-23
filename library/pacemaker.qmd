@@ -59,6 +59,19 @@ p(t) is a smooth raised bump of width `duration`, once per `period`, offset by
 Set `period >= n_frames` for a one-shot pulse. `kind=field` (emits no set delta); its
 `at:` is only a scheduling anchor (any declared field) -- it mutates only `H.signals`.
 
+## Equation
+
+$$
+p(t) \;=\;
+\begin{cases}
+\sin\!\big(\pi\, s/\tau_d\big) & s<\tau_d\\[2pt]
+0 & \text{otherwise}
+\end{cases},
+\qquad s=(t+\varphi)\bmod T
+$$
+A smooth raised bump of width $\tau_d$ (`duration`) once per period $T$, offset by
+phase $\varphi$, in outer ticks $t$. Written to `H.signals[name]` for downstream ops.
+
 ## Parameters
 
 | parameter | role | default |
@@ -93,7 +106,7 @@ _What breaks under bad parameters &mdash; to be written._
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 

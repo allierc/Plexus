@@ -53,6 +53,14 @@ slime trail used, but the field is supplied rather than deposited.
 
 This is the Plexus form of ParticleGraph's `node_value_map: video_bisons.tif`.
 
+## Equation
+
+$$
+\phi(\cdot,\,t) \;=\; V\big[\,t \bmod N_{\text{frames}}\,\big]
+$$
+Prescribes the field from a recorded movie: the grid is set to the current tick's
+frame. A coupling op (e.g. `chemotaxis`) then drives particles from it.
+
 ## Minimal spec
 
 ```yaml
@@ -74,7 +82,7 @@ _What breaks under bad parameters &mdash; to be written._
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 

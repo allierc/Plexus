@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
   <li><a href="#identifiability" id="toc-identifiability" class="nav-link" data-scroll-target="#identifiability">Identifiability</a></li>
@@ -269,6 +270,12 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>The 3D counterpart of <code>advance</code>: where the 2D agent carries a scalar <code>heading</code> angle and moves along <code>(cos h, sin h)</code>, the 3D agent carries a unit <code>heading</code> VECTOR and moves along it: <code>v_i = move_speed_i * heading_i</code>. First-derivative law (emits a velocity; the ENGINE integrates the position). Purely propulsion – wall reflection is the separate <code>bounce_3d</code> operator, so this stays one concern.</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\dot{\mathbf x}_i \;=\; s_i\,\hat{\mathbf h}_i,\qquad \lVert\hat{\mathbf h}_i\rVert=1
+\]</span> The 3D form: the heading is a unit vector <span class="math inline">\(\hat{\mathbf h}_i\)</span> rather than an angle.</p>
 </section>
 <section id="minimal-spec" class="level2">
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>

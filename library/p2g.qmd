@@ -48,6 +48,22 @@ scatters mass, momentum and the liquid colour field onto the background grid via
 quadratic B-spline weights. Writes the `mpm_grid` field; returns {}. Step 2 of the
 decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
 
+## Equation
+
+$$
+\boldsymbol\sigma = 2\mu(\mathbf F-\mathbf R)\mathbf F^{\!\top} + \lambda(J-1)J\,\mathbf I,
+\qquad
+\mathbf Q = -\frac{4\,\Delta t}{\Delta x^{2}}\,V\,\boldsymbol\sigma + m\,\mathbf C
+$$
+$$
+m_g \mathrel{+}= \sum_i w_{ig}\,m_i,
+\qquad
+\mathbf p_g \mathrel{+}= \sum_i w_{ig}\big(m_i\mathbf v_i + \mathbf Q_i(\mathbf x_g-\mathbf x_i)\big)
+$$
+The fixed-corotated stress ($\mathbf R$ = polar rotation of $\mathbf F$) forms the
+affine momentum matrix $\mathbf Q$, scattered to the grid by the quadratic B-spline
+weights $w_{ig}$. Step 2 of the MLS-MPM decomposition.
+
 ## Parameters
 
 | parameter | role | default |

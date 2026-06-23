@@ -50,6 +50,14 @@ is a separate `bounce` operator (run before advance), so this stays one concern.
 
 Renamed from the prototype `motility` (it is the slime "move" step).
 
+## Equation
+
+$$
+\dot{\mathbf x}_i \;=\; s_i\,(\cos\theta_i,\ \sin\theta_i)
+$$
+Self-propulsion at speed $s_i$ (`move_speed`) along the scalar heading $\theta_i$;
+the engine integrates the position ($\mathbf x \mathrel{+}= \Delta t\,\dot{\mathbf x}$).
+
 ## Minimal spec
 
 ```yaml

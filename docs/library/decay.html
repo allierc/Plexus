@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -271,6 +272,12 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>c &lt;- max(0, c - k*dt). Without decay the deposited trail would only accumulate; decay is what lets unused filaments fade so the network coarsens (stigmergy). Writes the field in place; returns {}.</p>
 </section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)
+\]</span> Linear evaporation of a scalar field at rate <span class="math inline">\(k\)</span> — the sink that lets stigmergic trails fade so the network coarsens. The companion of <code>deposit</code> / <code>diffuse</code>.</p>
+</section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
@@ -309,7 +316,7 @@ window.Quarto = {
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>field</strong> operators: <a href="../library/diffuse.html"><code>diffuse</code></a>, <a href="../library/playback.html"><code>playback</code></a>, <a href="../library/pacemaker.html"><code>pacemaker</code></a>, <a href="../library/pulse_stimulus.html"><code>pulse_stimulus</code></a>, <a href="../library/mpm_grid_update.html"><code>mpm_grid_update</code></a>.</p>
+<p>Other <strong>field</strong> operators: <a href="../library/diffuse.html"><code>diffuse</code></a>, <a href="../library/playback.html"><code>playback</code></a>, <a href="../library/pacemaker.html"><code>pacemaker</code></a>, <a href="../library/pulse_stimulus.html"><code>pulse_stimulus</code></a>, <a href="../library/phase_delay_pulse.html"><code>phase_delay_pulse</code></a>, <a href="../library/mpm_grid_update.html"><code>mpm_grid_update</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>

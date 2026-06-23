@@ -48,6 +48,14 @@ integrator generic and lets drag compose in the schedule with the other forces.
 It is a second-derivative contribution (an acceleration), so it lives on sets
 integrated with `prediction: second_derivative` (e.g. alongside boids).
 
+## Equation
+
+$$
+\mathbf a_i \;=\; -\,k\,\mathbf v_i
+$$
+Viscous friction as an acceleration ($k$ = drag coefficient). A force in the
+schedule, not an integrator knob, so it composes with the other second-derivative laws.
+
 ## Parameters
 
 | parameter | role | default |

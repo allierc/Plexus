@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -274,6 +275,13 @@ window.Quarto = {
 <pre><code>a_i = Σ_j  -q_i q_j (pos_j - pos_i) / |d_ij|^3                  (an acceleration)</code></pre>
 <p>i.e.&nbsp;Coulomb’s law a = q_i q_j r / |r|^3 with the sign convention that LIKE charges (q_i q_j &gt; 0) repel and OPPOSITE charges attract. Per-type <code>charge</code> comes from the spec’s <code>types:</code> block; aggregation is <code>add</code> (the physical superposition of forces, NOT a mean). Second-derivative law: returns an acceleration the engine integrates (v += dt·a; x += dt·v). Dimension-generic (SUPPORTED_DIMS [2,3]) – the law reads D = pos.shape[-1], so the same operator runs in 2D and 3D.</p>
 <p>Message passing on <code>Level.edge_index</code> (O(E)); the <code>radius_graph</code>’s <code>min_radius</code> keeps |d| off zero so the 1/|d|^3 stays finite (optionally bounded by <code>clamp</code>).</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\ddot{\mathbf x}_i \;=\; \sum_{j\in\mathcal N(i)} -\,q_i q_j\,
+\frac{\mathbf x_j-\mathbf x_i}{\lVert\mathbf x_j-\mathbf x_i\rVert^{3}}
+\]</span> The inverse-square law with superposition (<code>aggr: add</code>). Like charges <span class="math inline">\(q_iq_j&gt;0\)</span> repel, opposite charges attract; <span class="math inline">\(\mathcal N(i)\)</span> are the edges a <code>rewire</code> leaves.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

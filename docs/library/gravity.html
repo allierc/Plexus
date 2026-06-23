@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -273,6 +274,12 @@ window.Quarto = {
 <p>Applies the same acceleration to every selected cell and RETURNS it as a delta <code>{cell: a}</code>. In an MPM scene the cell is a derived aggregate (its position is the centroid of its particles), so the engine does not integrate it; instead the <code>mls_mpm_mechanics</code> operator reads the cell’s accumulated delta and feeds it into the substep as the external body force <code>a_ext</code>. So gravity is an ordinary operator – it does not touch <code>pos</code>/<code>vel</code>, it just contributes a force.</p>
 <p>The <em>bounce</em> of a dropped soft body is NOT a force here: it is the emergent elastic response when the body compresses against the reflective floor (grid velocity into a wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer <code>youngs</code> -&gt; livelier bounce; <code>drag</code> on the mpm operator sets how fast it decays.</p>
 <p>Default direction is -y (down). Override <code>gx</code>/<code>gy</code> for an incline or sideways pull (e.g.&nbsp;a tilted-gravity slosh).</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\mathbf a_{\text{ext}} \;=\; \mathbf g \qquad (\text{default } \mathbf g=(0,-g_y))
+\]</span> A uniform body acceleration returned as a cell delta; in an MPM scene the substep reads it as the external body force rather than the engine integrating it.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

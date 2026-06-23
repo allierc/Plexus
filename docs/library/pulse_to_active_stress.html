@@ -201,6 +201,7 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -274,6 +275,14 @@ window.Quarto = {
 <pre><code>sigma_active(x) = - amplitude * a(x) * n(x) n(x)^T      (n = unit contraction axis)</code></pre>
 <p>onto the side-channel <code>H.active_stress</code> (the same <code>H.part_accel</code> idiom). The MLS-MPM <code>p2g</code> scatter ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at the boundary – coordinated shortening / shear (the “direction map = contraction AXIS” reading), not a pointwise push. This is the standard cardiac active-stress formulation.</p>
 <p><code>kind=exchange</code>, <code>PREDICTION=None</code> (the stress is consumed by the MPM substep, never engine- integrated). forward() returns NO delta (<code>{}</code>) – it only sets the <code>H.active_stress</code> side-channel, which <code>p2g</code> reads via <code>getattr(H, "active_stress", None)</code> (default off: absent -&gt; pure elastic).</p>
+</section>
+<section id="equation" class="level2">
+<h2 class="anchored" data-anchor-id="equation">Equation</h2>
+<p><span class="math display">\[
+\boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
+-\,A\,a(\mathbf x)\,\mathbf n(\mathbf x)\,\mathbf n(\mathbf x)^{\!\top},
+\qquad \lVert\mathbf n\rVert=1
+\]</span> Activation <span class="math inline">\(a\)</span> becomes a rank-1 contractile stress along the unit axis <span class="math inline">\(\mathbf n\)</span> (<span class="math inline">\(A\)</span> = <code>amplitude</code>). <code>p2g</code> adds it to the elastic stress, so tissue feels its <strong>divergence</strong>: a patch under uniform <span class="math inline">\(-A\,\mathbf n\mathbf n^{\!\top}\)</span> shortens along <span class="math inline">\(\mathbf n\)</span>.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>

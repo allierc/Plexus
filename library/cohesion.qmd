@@ -47,6 +47,14 @@ Steer toward the local centre of mass: the mean offset to neighbours,
 named `cohesion` property. One of the three rules whose deltas the engine sums to
 make a flock; see also alignment, separation.
 
+## Equation
+
+$$
+\mathbf a_i \;=\; a_1\,w^c_i\,\big\langle \mathbf x_j-\mathbf x_i\big\rangle_{j\in\mathcal N(i)}
+$$
+The boids centring rule: steer toward the local centre of mass (mean offset to
+neighbours). $w^c_i$ is the receiver type's `cohesion` weight.
+
 ## Parameters
 
 | parameter | role | default |

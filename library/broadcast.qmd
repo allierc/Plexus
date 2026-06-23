@@ -47,6 +47,14 @@ child_pos)` -- pulled toward its parent's (e.g. aggregated centroid) position, s
 cell holds its particles together. Unlike `aggregate` (a derived readout that writes
 the parent), this RETURNS a delta on the children that the engine integrates.
 
+## Equation
+
+$$
+\dot{\mathbf x}_i \;=\; k\,\big(\mathbf x_{P(i)}-\mathbf x_i\big)
+$$
+The containment lift: each child is pulled toward its parent $P(i)$'s position with
+stiffness $k$ — the down-the-hierarchy dual of `aggregate`.
+
 ## Parameters
 
 | parameter | role | default |
