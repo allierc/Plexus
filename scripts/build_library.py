@@ -291,12 +291,69 @@ $$
 Paints the clock $p(t)$ (from a `pacemaker`) as a Gaussian bump centred at $\mathbf x_0$.
 Owns *where* the stimulus is — not *when* (the pacemaker) nor its mechanical effect."""),
 
-    "phase_delay_pulse": dict(equation=r"""$$
-a(\mathbf x,t) \;=\; \text{pulse}\big(t-\tau(\mathbf x)\big),
-\qquad \tau(\mathbf x)=\tau_{\max}\,m(\mathbf x)
+    "phase_delay_pulse": dict(
+        lead="The spatial generalization of the `pacemaker`&rarr;`pulse_stimulus` pair: "
+             "every pixel runs the **same** raised-bump waveform, but offset by a per-pixel "
+             "delay $\\tau(\\mathbf x)$ read from an image map. A delay **gradient** makes "
+             "neighbouring regions fire in sequence &mdash; a travelling activation wave &mdash; and "
+             "under an elastic tissue (with a downstream active-stress / contraction operator) that "
+             "timing gradient becomes curved, rotating, cardiac-like motion. It owns both **when** "
+             "(per pixel) and **where** (via the map), so it schedules in place of the "
+             "pacemaker+stimulus pair it subsumes.",
+        equation=r"""$$
+a(\mathbf x,t) \;=\; \mathrm{pulse}\big(t-\tau(\mathbf x)\big),
+\qquad \tau(\mathbf x)=\tau_{\max}\,m(\mathbf x),\quad m(\mathbf x)\in[0,1]
 $$
-Every pixel runs the same waveform, delayed by a per-pixel $\tau$ read from a map
-$m$. A delay gradient makes neighbouring regions fire in sequence — a travelling wave."""),
+$$
+\mathrm{pulse}(t') \;=\;
+\begin{cases}
+\sin\!\big(\pi\, s/\tau_d\big) & s<\tau_d\\[2pt]
+0 & \text{otherwise}
+\end{cases},
+\qquad s=(t'+\varphi)\bmod T
+$$
+The same smooth bump as `pacemaker` (width $\tau_d$ = `duration`, period $T$, phase $\varphi$),
+evaluated per pixel at its own local time $t-\tau$. The delay map $m$ is an `image` field;
+$\tau_{\max}$ (`max_delay`) is the delay where the map saturates. So `pacemaker` is the special
+case $\tau\equiv 0$, and a linear $m$ (e.g. $m=x$) gives a plane wave, a radial $m$ a target wave.""",
+        spec="""fields:
+  delay:      {frame: image, source: material/delay_radial.tif}   # tau(x,y) normalised to [0,1]
+  activation: {frame: grid, res: 128}
+operators:
+  - {op: phase_delay_pulse, at: activation, delay_from: delay,
+     period: 150, duration: 30, max_delay: 40}                    # subsumes pacemaker + pulse_stimulus
+  - {op: pulse_to_active_stress, at: mpm_particle, from: activation, amplitude: 25.0}
+schedule: [phase_delay_pulse, pulse_to_active_stress, mpm_drag,
+           mpm_strain, p2g, mpm_grid_update, g2p]""",
+        schedule="Drops in **where `pacemaker` + `pulse_stimulus` would go** &mdash; it is a field "
+                 "source, scheduled before the operator that reads the activation, then the MPM "
+                 "mechanics chain:\n\n"
+                 "```\nphase_delay_pulse → pulse_to_active_stress → mpm_drag → "
+                 "[mpm_strain, p2g, mpm_grid_update, g2p]×substeps\n```\n\n"
+                 "Swap `pulse_to_active_stress` for `pulse_to_contraction` to drive the tissue by "
+                 "body force instead of active stress &mdash; the activation field is identical.",
+        identifiability=(
+            "Only the delay **modulo the period** is observable: the activation is periodic in $t$, "
+            "so $\\tau_{\\max}$ and $T$ are confounded unless `max_delay` &lt; `period` (otherwise the "
+            "late regions alias back onto the early phase and the wave appears to re-enter). The delay "
+            "**map shape** $m(\\mathbf x)$ is what sets the wavefront geometry and is well constrained "
+            "by the *direction* of the observed travelling wave; its overall *scale* $\\tau_{\\max}$ "
+            "trades off against both the period and the tissue stiffness it works against, so recovering "
+            "it needs the transient (the wave sweeping across) rather than a single phase. The map is "
+            "analytic now (a TIFF) and learnable later, exactly like a stiffness map."),
+        failure_modes=[
+            ("`max_delay` &ge; `period`", "the latest pixels wrap past a full beat &rarr; spurious re-entry / the wave appears to fold back; keep the spread of $\\tau$ below one period."),
+            ("delay map not normalised to [0,1]", "$\\tau=\\tau_{\\max}m$ is mis-scaled &mdash; the operator expects a normalised map (like a stiffness map); an unnormalised TIFF gives the wrong wave speed."),
+            ("missing `delay_from`", "hard error &mdash; the operator requires an image field for $\\tau(\\mathbf x)$ (there is no sensible default map)."),
+            ("`duration` too short vs. substep response", "the bump passes a pixel before the tissue mechanically responds &rarr; weak / no motion; widen `duration` or raise `amplitude` downstream."),
+            ("map resolution &ne; field resolution", "silently bilinear-resampled to the activation grid &mdash; harmless, but a coarse map blurs the wavefront."),
+        ],
+        related=[("pacemaker", "the global clock this subsumes &mdash; the $\\tau\\equiv 0$ special case (owns *when*)"),
+                 ("pulse_stimulus", "the fixed spatial paint this subsumes (owns *where*)"),
+                 ("pulse_to_active_stress", "reads the delayed activation and turns it into contractile stress"),
+                 ("pulse_to_contraction", "the body-force alternative downstream; same activation field"),
+                 ("apply_material_map", "the same image-field idiom &mdash; a TIFF sampled per particle/pixel")],
+    ),
 
     "pulse_to_active_stress": dict(equation=r"""$$
 \boldsymbol\sigma_{\text{active}}(\mathbf x) \;=\;
