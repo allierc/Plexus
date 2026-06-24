@@ -46,14 +46,10 @@ Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`) a
 writes a Gaussian activation bump, centred at `center` with width `radius`, into the
 scalar field named by `at:`:
 
-    a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius
-
 It owns WHERE the stimulus is -- not WHEN (the pacemaker) nor the mechanical effect
 (`pulse_to_contraction`). `kind=field`: writes the field grid in place, returns {}.
 With no pacemaker run before it (the key is absent from `H.signals`) p(t) defaults to
 0, so the field is blank -- schedule the pacemaker first.
-
-## Equation
 
 $$
 a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^{2}}{2\sigma^{2}}\Big),

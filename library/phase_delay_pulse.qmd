@@ -59,14 +59,10 @@ later.
 The pulse is the same smooth raised bump as `pacemaker` (so force<->stress<->wave is a
 clean swap), evaluated per pixel at its own local time `t - tau`:
 
-    s = (t - tau + phase) mod period;   pulse = sin(pi * s / duration)  if s < duration else 0
-
 `kind=field`: writes the activation grid named by `at:` in place and returns {}. It
 SUBSUMES pacemaker+pulse_stimulus -- it owns both WHEN (per pixel) and WHERE (via the
 map) -- so schedule it in their place. Downstream `pulse_to_active_stress` /
 `pulse_to_contraction` read the delayed activation field exactly as before.
-
-## Equation
 
 $$
 a(\mathbf x,t) \;=\; \mathrm{pulse}\big(t-\tau(\mathbf x)\big),

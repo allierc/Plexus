@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
   <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
@@ -284,9 +283,6 @@ window.Quarto = {
 <p><code>playback</code> operator that advances it frame by frame.</p>
 <p>Some fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded movie becomes a time-varying scalar field over the domain. The field is pure state (it holds the video buffer and the current grid); <code>playback</code> sets the grid to the current tick’s frame (a field self-update, returns {}). A coupling operator such as <code>chemotaxis</code> then drives the particles from it – the same set&lt;-&gt;field Exchange the slime trail used, but the field is supplied rather than deposited.</p>
 <p>This is the Plexus form of ParticleGraph’s <code>node_value_map: video_bisons.tif</code>.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 \phi(\cdot,\,t) \;=\; V\big[\,t \bmod N_{\text{frames}}\,\big]
 \]</span> Prescribes the field from a recorded movie: the grid is set to the current tick’s frame. A coupling op (e.g.&nbsp;<code>chemotaxis</code>) then drives particles from it.</p>

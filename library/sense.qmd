@@ -48,8 +48,6 @@ then turns its heading toward the strongest reading (Lague's 4-branch steer, sca
 by a random strength). Reads per-agent sensor parameters the engine broadcast from
 `types`. Mutates `cell.heading` in place; returns {}.
 
-## Equation
-
 $$
 S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
 \quad k\in\{L,C,R\};

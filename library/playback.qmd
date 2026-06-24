@@ -53,8 +53,6 @@ slime trail used, but the field is supplied rather than deposited.
 
 This is the Plexus form of ParticleGraph's `node_value_map: video_bisons.tif`.
 
-## Equation
-
 $$
 \phi(\cdot,\,t) \;=\; V\big[\,t \bmod N_{\text{frames}}\,\big]
 $$

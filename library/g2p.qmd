@@ -49,8 +49,6 @@ positions so they match p2g exactly. Advection is integrated state, so this opts
 of the engine guard (MAY_MUTATE_INTEGRATED_STATE) -- the substep loop owns it, like the
 oracle. Step 4 of the decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
 
-## Equation
-
 $$
 \mathbf v_i = \sum_g w_{ig}\,\mathbf v_g,
 \qquad

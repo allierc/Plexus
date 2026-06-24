@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -284,11 +283,7 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>Reads the scalar clock p(t) from <code>H.signals[clock]</code> (written by a <code>pacemaker</code>) and writes a Gaussian activation bump, centred at <code>center</code> with width <code>radius</code>, into the scalar field named by <code>at:</code>:</p>
-<pre><code>a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius</code></pre>
 <p>It owns WHERE the stimulus is – not WHEN (the pacemaker) nor the mechanical effect (<code>pulse_to_contraction</code>). <code>kind=field</code>: writes the field grid in place, returns {}. With no pacemaker run before it (the key is absent from <code>H.signals</code>) p(t) defaults to 0, so the field is blank – schedule the pacemaker first.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^{2}}{2\sigma^{2}}\Big),
 \qquad \sigma=\text{radius}
@@ -335,8 +330,8 @@ a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^
 </section>
 <section id="minimal-spec" class="level2">
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> pulse_stimulus</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> field</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> pulse_stimulus</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> field</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
@@ -349,59 +344,59 @@ a(\mathbf x,t) \;=\; p(t)\,\exp\!\Big(-\tfrac{\lVert\mathbf x-\mathbf x_0\rVert^
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
 <p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pulse_stimulus.py"><code>src/plexus/operators/pulse_stimulus.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""pulse_stimulus -- the SPATIAL half of an active stimulus: paint an activation field.</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`) and</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">writes a Gaussian activation bump, centred at `center` with width `radius`, into the</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">scalar field named by `at:`:</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">    a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">It owns WHERE the stimulus is -- not WHEN (the pacemaker) nor the mechanical effect</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">(`pulse_to_contraction`). `kind=field`: writes the field grid in place, returns {}.</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">With no pacemaker run before it (the key is absent from `H.signals`) p(t) defaults to</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">0, so the field is blank -- schedule the pacemaker first.</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> FieldUpdate</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"pulse_stimulus"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PulseStimulus(FieldUpdate):</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"activation_field"</span>, <span class="st">"gaussian_source"</span>]</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"radius"</span>: <span class="st">"stimulus_width"</span>, <span class="st">"center"</span>: <span class="st">"stimulus_site"</span>, <span class="st">"clock"</span>: <span class="st">"pacemaker_signal"</span>}</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.clock <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"clock"</span>, <span class="st">"pacemaker"</span>))         <span class="co"># H.signals key to read p(t)</span></span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.profile <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"profile"</span>, <span class="st">"gaussian"</span>))      <span class="co"># "gaussian" (localised) | "uniform" (global)</span></span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> params.get(<span class="st">"center"</span>, [<span class="fl">0.5</span>, <span class="fl">0.5</span>])</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.center <span class="op">=</span> (<span class="bu">float</span>(c[<span class="dv">0</span>]), <span class="bu">float</span>(c[<span class="dv">1</span>]))</span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sigma <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"radius"</span>, <span class="fl">0.12</span>))</span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.channel <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"channel"</span>, <span class="dv">0</span>))</span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> fld.grid.device</span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>        nx, ny, R <span class="op">=</span> fld.nx, fld.ny, fld.R</span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        <span class="co"># pixel-centre world coordinates: axis 0 spans [0, width], axis 1 spans [0, 1]</span></span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>        xs <span class="op">=</span> (torch.arange(nx, device<span class="op">=</span>dev) <span class="op">+</span> <span class="fl">0.5</span>) <span class="op">/</span> R</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>        ys <span class="op">=</span> (torch.arange(ny, device<span class="op">=</span>dev) <span class="op">+</span> <span class="fl">0.5</span>) <span class="op">/</span> R</span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>        gx <span class="op">=</span> xs[:, <span class="va">None</span>].expand(nx, ny)</span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>        gy <span class="op">=</span> ys[<span class="va">None</span>, :].expand(nx, ny)</span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.profile <span class="op">==</span> <span class="st">"uniform"</span>:</span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>            bump <span class="op">=</span> torch.ones(nx, ny, device<span class="op">=</span>dev)                  <span class="co"># global stimulus: a(x,t) = p(t)</span></span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>            r2 <span class="op">=</span> (gx <span class="op">-</span> <span class="va">self</span>.center[<span class="dv">0</span>]) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> (gy <span class="op">-</span> <span class="va">self</span>.center[<span class="dv">1</span>]) <span class="op">**</span> <span class="dv">2</span></span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>            bump <span class="op">=</span> torch.exp(<span class="op">-</span>r2 <span class="op">/</span> (<span class="fl">2.0</span> <span class="op">*</span> <span class="va">self</span>.sigma <span class="op">*</span> <span class="va">self</span>.sigma))   <span class="co"># localised Gaussian site</span></span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> <span class="bu">float</span>((<span class="bu">getattr</span>(H, <span class="st">"signals"</span>, <span class="va">None</span>) <span class="kw">or</span> {}).get(<span class="va">self</span>.clock, <span class="fl">0.0</span>))   <span class="co"># this tick's clock value</span></span>
-<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>        fld.grid[<span class="va">self</span>.channel] <span class="op">=</span> p <span class="op">*</span> bump</span>
-<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""pulse_stimulus -- the SPATIAL half of an active stimulus: paint an activation field.</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">Reads the scalar clock p(t) from `H.signals[clock]` (written by a `pacemaker`) and</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">writes a Gaussian activation bump, centred at `center` with width `radius`, into the</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">scalar field named by `at:`:</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">    a(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">It owns WHERE the stimulus is -- not WHEN (the pacemaker) nor the mechanical effect</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">(`pulse_to_contraction`). `kind=field`: writes the field grid in place, returns {}.</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">With no pacemaker run before it (the key is absent from `H.signals`) p(t) defaults to</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">0, so the field is blank -- schedule the pacemaker first.</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> FieldUpdate</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"pulse_stimulus"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PulseStimulus(FieldUpdate):</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"activation_field"</span>, <span class="st">"gaussian_source"</span>]</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"radius"</span>: <span class="st">"stimulus_width"</span>, <span class="st">"center"</span>: <span class="st">"stimulus_site"</span>, <span class="st">"clock"</span>: <span class="st">"pacemaker_signal"</span>}</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.clock <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"clock"</span>, <span class="st">"pacemaker"</span>))         <span class="co"># H.signals key to read p(t)</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.profile <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"profile"</span>, <span class="st">"gaussian"</span>))      <span class="co"># "gaussian" (localised) | "uniform" (global)</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> params.get(<span class="st">"center"</span>, [<span class="fl">0.5</span>, <span class="fl">0.5</span>])</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.center <span class="op">=</span> (<span class="bu">float</span>(c[<span class="dv">0</span>]), <span class="bu">float</span>(c[<span class="dv">1</span>]))</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sigma <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"radius"</span>, <span class="fl">0.12</span>))</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.channel <span class="op">=</span> <span class="bu">int</span>(params.get(<span class="st">"channel"</span>, <span class="dv">0</span>))</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> fld.grid.device</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        nx, ny, R <span class="op">=</span> fld.nx, fld.ny, fld.R</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="co"># pixel-centre world coordinates: axis 0 spans [0, width], axis 1 spans [0, 1]</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        xs <span class="op">=</span> (torch.arange(nx, device<span class="op">=</span>dev) <span class="op">+</span> <span class="fl">0.5</span>) <span class="op">/</span> R</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        ys <span class="op">=</span> (torch.arange(ny, device<span class="op">=</span>dev) <span class="op">+</span> <span class="fl">0.5</span>) <span class="op">/</span> R</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        gx <span class="op">=</span> xs[:, <span class="va">None</span>].expand(nx, ny)</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        gy <span class="op">=</span> ys[<span class="va">None</span>, :].expand(nx, ny)</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.profile <span class="op">==</span> <span class="st">"uniform"</span>:</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>            bump <span class="op">=</span> torch.ones(nx, ny, device<span class="op">=</span>dev)                  <span class="co"># global stimulus: a(x,t) = p(t)</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>            r2 <span class="op">=</span> (gx <span class="op">-</span> <span class="va">self</span>.center[<span class="dv">0</span>]) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> (gy <span class="op">-</span> <span class="va">self</span>.center[<span class="dv">1</span>]) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>            bump <span class="op">=</span> torch.exp(<span class="op">-</span>r2 <span class="op">/</span> (<span class="fl">2.0</span> <span class="op">*</span> <span class="va">self</span>.sigma <span class="op">*</span> <span class="va">self</span>.sigma))   <span class="co"># localised Gaussian site</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> <span class="bu">float</span>((<span class="bu">getattr</span>(H, <span class="st">"signals"</span>, <span class="va">None</span>) <span class="kw">or</span> {}).get(<span class="va">self</span>.clock, <span class="fl">0.0</span>))   <span class="co"># this tick's clock value</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        fld.grid[<span class="va">self</span>.channel] <span class="op">=</span> p <span class="op">*</span> bump</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

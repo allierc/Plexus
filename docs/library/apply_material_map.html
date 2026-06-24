@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -289,9 +288,6 @@ window.Quarto = {
 ops:     {op: apply_material_map, at: mpm_particle, from: stiffness_map,
           target: youngs, min: 20, max: 200}</code></pre>
 <p>Anisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress law – a later step; this does the scalar case the current fixed-corotated MPM supports.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
 \qquad (\mu_i,\lambda_i) = \mathrm{Lam\acute e}(E_i)

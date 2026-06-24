@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
@@ -283,9 +282,6 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>A <code>rewire</code> operator rebuilds the within-set relation E each tick so it tracks the live configuration, then emits no delta – lateral operators (interaction, springs, …) read the edges it leaves on the Level. Separating “who interacts” (rewire) from “how they interact” (lateral) is what lets a dense pairwise law become O(E) message passing.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 E \;=\; \big\{\,(i,j)\;:\; r_{\min} \le \lVert\mathbf x_i-\mathbf x_j\rVert &lt; r\,\big\}
 \]</span> Rebuilds the neighbour relation each tick: an edge for every pair within <code>radius</code> <span class="math inline">\(r\)</span> (and beyond an optional <code>min_radius</code> floor). Emits no delta — lateral ops read these edges.</p>

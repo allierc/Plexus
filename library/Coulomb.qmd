@@ -46,19 +46,14 @@ A Lateral, second-derivative operator over a neighbour graph (the Plexus port of
 ParticleGraph's `PDE_E`). For a receiver particle i of charge q_i, summed over its
 neighbours j (the edges left by a `rewire` op such as `radius_graph`):
 
-    a_i = Σ_j  -q_i q_j (pos_j - pos_i) / |d_ij|^3                  (an acceleration)
-
 i.e. Coulomb's law a = q_i q_j r / |r|^3 with the sign convention that LIKE charges
 (q_i q_j > 0) repel and OPPOSITE charges attract. Per-type `charge` comes from the
 spec's `types:` block; aggregation is `add` (the physical superposition of forces,
-NOT a mean). Second-derivative law: returns an acceleration the engine integrates
-(v += dt·a; x += dt·v). Dimension-generic (SUPPORTED_DIMS [2,3]) -- the law reads
+NOT a mean). Second-derivative law: returns an acceleration the engine integrates. Dimension-generic (SUPPORTED_DIMS [2,3]) -- the law reads
 D = pos.shape[-1], so the same operator runs in 2D and 3D.
 
 Message passing on `Level.edge_index` (O(E)); the `radius_graph`'s `min_radius`
 keeps |d| off zero so the 1/|d|^3 stays finite (optionally bounded by `clamp`).
-
-## Equation
 
 $$
 \ddot{\mathbf x}_i \;=\; \sum_{j\in\mathcal N(i)} -\,q_i q_j\,

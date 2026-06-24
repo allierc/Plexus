@@ -48,8 +48,6 @@ friction, and the interior wall mask (rasterized once from `general: obstacles:`
 A pure field -> field operator; returns {}. Step 3 of the decomposed MLS-MPM
 (oracle: `mls_mpm_mechanics`).
 
-## Equation
-
 $$
 \mathbf v_g = \frac{\mathbf p_g}{m_g},
 \qquad

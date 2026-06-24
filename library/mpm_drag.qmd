@@ -52,8 +52,6 @@ integrator"); it replaces `p2g`'s built-in `drag` param, so set `p2g drag: 0` an
 `mpm_drag` to the schedule instead. Large k -> the overdamped (quasi-static, tissue)
 regime where the sheet creeps to a/k and relaxes without ringing.
 
-## Equation
-
 $$
 \mathbf a_i = -\,k\,\mathbf v_i
 \qquad\longrightarrow\qquad

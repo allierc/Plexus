@@ -48,8 +48,6 @@ springs, ...) read the edges it leaves on the Level. Separating "who interacts"
 (rewire) from "how they interact" (lateral) is what lets a dense pairwise law
 become O(E) message passing.
 
-## Equation
-
 $$
 E \;=\; \big\{\,(i,j)\;:\; r_{\min} \le \lVert\mathbf x_i-\mathbf x_j\rVert < r\,\big\}
 $$

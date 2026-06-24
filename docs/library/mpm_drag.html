@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -284,9 +283,6 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>acc = -k * vel, returned as a particle-level delta the engine sums into H.delta(mpm_particle); the MLS-MPM <code>p2g</code> scatter consumes it as a body force (a_ext += H.delta(particle)). <code>PREDICTION=None</code>: the engine does not integrate the particle set (g2p owns advection), so the drag enters mechanics only through the substep – exactly like the contraction force. This is the composable-operator form of friction (plexus.tex Part IV: “friction is the <code>drag</code> operator, not a knob in the integrator”); it replaces <code>p2g</code>’s built-in <code>drag</code> param, so set <code>p2g drag: 0</code> and add <code>mpm_drag</code> to the schedule instead. Large k -&gt; the overdamped (quasi-static, tissue) regime where the sheet creeps to a/k and relaxes without ringing.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 \mathbf a_i = -\,k\,\mathbf v_i
 \qquad\longrightarrow\qquad
