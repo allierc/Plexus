@@ -459,3 +459,54 @@ Each slot changes ONE knob from the parent. Spec `material_aniso_cardio` (parame
 **Verdict:** SUPPORTED — fibre params DO differentiate R² (4× range, -5 to -21), confirming the parametric inverse is sensitive to fibre init. FALSIFIED — the Phase-1 forward-atlas morphology winner (wl=40, angle=0.6, fibre_amp=1.0) is NOT the inverse winner; the optimizer kills its fibre_amp. The live finding is that HIGH fibre_amp (1.5) is needed for the fibre pattern to SURVIVE gradient descent and contribute positively.
 
 **Next:** Batch 2 = `--learn stiff`. Freeze fibre at s5's converged values (wl=40.2, angle=0.72, amp=1.52, phase=1.53). Sweep stiffness range variants (stiff_lo/stiff_hi) and test whether the UNet-derived microscope stiffness pattern improves R² from the fibre-only baseline. Include one slot with s3's converged fibre (wl=28) to test whether finer fibre + stiff learning helps, and an amplitude=12 slot to address the under-driving (ampL=0.315). Ablation = uniform stiffness (stiff_lo=stiff_hi=100) to test whether SPATIAL stiffness variation matters.
+
+---
+
+## Phase2 Batch 2 [learn=stiff] — 2026-06-24
+
+**Runner:** `cardio_mpm_train2.py` (Phase 2 PARAMETRIC inverse fit on the REAL beat).
+
+**Parent config (s0):** Fibre frozen at b1 s5 converged values (wl=40.2, angle=0.72, amp=1.52, phase=1.53), gain0=1.0, stiff [50,150], amplitude=10, drag_k=30, dur0=8, learn=stiff. 300 iterations. The b1 fibre-only winner had R²=−5.448.
+
+**Hypothesis:** "The UNet-derived microscope stiffness pattern will improve R² from the fibre-only baseline (−5.448). The microscope image encodes real structural variation that should create a spatially-varying youngs modulus field making the anisotropic contraction pattern more physically accurate."
+
+**User input acknowledged (2026-06-24):** User diagnosed that dur=8 frozen at 16% duty cycle (period ~50) is the root cause of deeply-negative R² — the short pulse creates a violent contraction kick → inertial ringing → overshoot. User advises co-learning dur alongside each group (`--learn X,dur`) rather than strict one-at-a-time isolation. dur bounded [3,14] is cheap (1 scalar) and clearly load-bearing. This guidance is reflected in the batch 3 plan.
+
+**Results per slot (from progress.txt final line + dashboard):**
+
+| Slot | Config (ONE knob from parent) | R2 | ampL | open | chir | size | red-on-green | stiffness panel |
+|------|------|-----|------|------|------|------|------|------|
+| **s3** | **stiff [50,150] on wl28 fibre** (fibre from b1 s3: wl=28.1/0.69/0.34/0.71) | **−5.181** | **0.431** | 0.321 | 0.52 | 1.49e-3 | best overlap; red loops smaller, more contained; finer fibre pattern | mottled yellow/purple, moderate structure |
+| s5 | stiff UNIFORM ABL [100,100] | −6.477 | 0.507 | 0.274 | 0.62 | 1.64e-3 | similar to s0/s1; red overshoots green | perfectly UNIFORM teal (no spatial variation) |
+| s1 | stiff WIDE [20,250] | −6.619 | 0.764 | 0.302 | 0.56 | 1.66e-3 | similar to s0; slight overshoot | mottled yellow/purple, more contrast than s0 |
+| s0 | stiff PARENT [50,150] (CONTROL) | −7.426 | 0.801 | 0.304 | 0.55 | 1.77e-3 | red overshoots green; no clean superposition | mottled yellow/purple, noisy |
+| s4 | stiff [50,150] amp=12 | −9.737 | 1.442 | 0.276 | 0.52 | 1.97e-3 | red larger than green; more overshoot | mostly yellow (saturated high) |
+| s2 | stiff SOFT [20,80] (CATASTROPHIC) | −25.039 | 7.278 | 0.261 | 0.63 | 3.43e-3 | red WILDLY larger than green; massive overshoot | mostly yellow (saturated at 80 ceiling) |
+
+**Ranking by interior R² (higher = better):**
+1. **s3 stiff_on_wl28** (R²=−5.181, **NEW PHASE-2 BEST** — beats b1 s5's −5.448!)
+2. s5 stiff_uniform_abl (R²=−6.477)
+3. s1 stiff_wide (R²=−6.619)
+4. s0 stiff_parent (R²=−7.426)
+5. s4 stiff_amp12 (R²=−9.737)
+6. s2 stiff_soft (R²=−25.039)
+
+**Winner: s3 (wl28 fibre + stiff [50,150], R²=−5.181)**. New Phase-2 best. BUT all R² remain deeply negative.
+
+**Key findings:**
+
+1. **Spatial stiffness is a NEAR-DEAD lever on the wl40 fibre base.** The uniform ablation s5 (−6.477) BEATS the spatial parent s0 (−7.426) — the UNet's learned spatial stiffness pattern is net-HARMFUL. The mottled yellow/purple pattern the UNet produces adds spatial variation that generates overshoot in wrong directions. This parallels the Phase-1 forward atlas finding (Est.#29) that stiffness wavelength was INERT. On the wl40/high-fibre-amp base, the fibre pattern already dominates the active-stress field; adding stiffness modulation just adds noise.
+
+2. **BUT finer fibre (wl28) + stiffness DOES help.** s3 (R²=−5.181) beats the b1 fibre-only winner (−5.448). The wl28 base has LOW fibre_amp (0.34, the "collapsed" regime from b1) — with weak fibre structure, the stiffness UNet can compensate by providing spatial modulation that the weak fibre alone cannot. This is a COMPLEMENTARITY effect: strong fibre + stiff = redundant/harmful; weak fibre + stiff = complementary/beneficial.
+
+3. **Soft stiffness [20,80] is CATASTROPHIC.** R²=−25.039, ampL=7.278 (7× over-driven). The material is too soft to resist the active contraction → massive overshoot. The stiffness panel shows everything saturated to the 80 ceiling (the UNet tries to maximize stiffness within the soft range). This sets a LOWER BOUND on useful stiffness: don't go below ~50.
+
+4. **amp=12 HURTS at dur=8.** s4 (−9.737) is worse than the parent s0 (−7.426) with ampL=1.442 (1.8× the parent). At dur=8 frozen (16% duty), more amplitude just adds more overshoot. This is consistent with the pre-rotary regime (Est.#6) where amplitude was monotone-DOWN. The amplitude-UP regime (Est.#27) required the rotary DOF to make the extra motion efficient.
+
+5. **dur=8 frozen is confirmed as the ROOT CAUSE.** All R² are deeply negative (−5 to −25); the stiffness lever's true contribution is masked by the short-duty-cycle inertial ringing. User input confirms this diagnosis and advises co-learning dur with each group.
+
+6. **Wider stiffness range [20,250] helps marginally** (s1 −6.619 vs s0 −7.426, Δ+0.8). More expressiveness gives the UNet slightly more room, but the spatial pattern is still net-negative vs the uniform ablation (s5 −6.477 > s1 −6.619).
+
+**Verdict:** Hypothesis PARTLY FALSIFIED — spatial stiffness does NOT improve R² on the wl40 fibre base (the uniform ablation beats it). PARTLY SUPPORTED — stiffness + wl28 fibre IS beneficial (complementarity). The overall finding is that stiffness is a SECONDARY lever at best, and its true effect is MASKED by the dur=8 regime. The deeply-negative R² (−5 to −25) confirm that the short duty cycle is the primary bottleneck, not material expressiveness.
+
+**Next:** Batch 3 = `--learn X,dur` (co-learn dur with each group per user guidance). Test dur alone, fibre+dur, stiff+dur, gain+dur, fibre+dur on wl28, and full combine (all). This should break out of the deeply-negative R² regime by allowing the pulse duration to optimize alongside each lever.

@@ -2,7 +2,7 @@
   "train_script": "cardio_mpm_train2.py",
   "configs": [
     {
-      "name": "stiff_parent",
+      "name": "dur_only",
       "spec": "material/material_aniso_cardio",
       "args": {
         "--fibre_wl": "40.2",
@@ -15,11 +15,11 @@
         "--amplitude": "10",
         "--drag_k": "30",
         "--dur0": "8",
-        "--learn": "stiff"
+        "--learn": "dur"
       }
     },
     {
-      "name": "stiff_wide",
+      "name": "fibre_dur",
       "spec": "material/material_aniso_cardio",
       "args": {
         "--fibre_wl": "40.2",
@@ -27,16 +27,16 @@
         "--fibre_amp": "1.52",
         "--fibre_phase": "1.53",
         "--gain0": "1.0",
-        "--stiff_lo": "20",
-        "--stiff_hi": "250",
+        "--stiff_lo": "50",
+        "--stiff_hi": "150",
         "--amplitude": "10",
         "--drag_k": "30",
         "--dur0": "8",
-        "--learn": "stiff"
+        "--learn": "fibre,dur"
       }
     },
     {
-      "name": "stiff_soft",
+      "name": "stiff_dur",
       "spec": "material/material_aniso_cardio",
       "args": {
         "--fibre_wl": "40.2",
@@ -44,16 +44,33 @@
         "--fibre_amp": "1.52",
         "--fibre_phase": "1.53",
         "--gain0": "1.0",
-        "--stiff_lo": "20",
-        "--stiff_hi": "80",
+        "--stiff_lo": "50",
+        "--stiff_hi": "150",
         "--amplitude": "10",
         "--drag_k": "30",
         "--dur0": "8",
-        "--learn": "stiff"
+        "--learn": "stiff,dur"
       }
     },
     {
-      "name": "stiff_on_wl28",
+      "name": "gain_dur",
+      "spec": "material/material_aniso_cardio",
+      "args": {
+        "--fibre_wl": "40.2",
+        "--fibre_angle": "0.72",
+        "--fibre_amp": "1.52",
+        "--fibre_phase": "1.53",
+        "--gain0": "1.0",
+        "--stiff_lo": "50",
+        "--stiff_hi": "150",
+        "--amplitude": "10",
+        "--drag_k": "30",
+        "--dur0": "8",
+        "--learn": "gain,dur"
+      }
+    },
+    {
+      "name": "fibre_dur_wl28",
       "spec": "material/material_aniso_cardio",
       "args": {
         "--fibre_wl": "28.1",
@@ -66,11 +83,11 @@
         "--amplitude": "10",
         "--drag_k": "30",
         "--dur0": "8",
-        "--learn": "stiff"
+        "--learn": "fibre,dur"
       }
     },
     {
-      "name": "stiff_amp12",
+      "name": "all_combine",
       "spec": "material/material_aniso_cardio",
       "args": {
         "--fibre_wl": "40.2",
@@ -80,27 +97,10 @@
         "--gain0": "1.0",
         "--stiff_lo": "50",
         "--stiff_hi": "150",
-        "--amplitude": "12",
-        "--drag_k": "30",
-        "--dur0": "8",
-        "--learn": "stiff"
-      }
-    },
-    {
-      "name": "stiff_uniform_abl",
-      "spec": "material/material_aniso_cardio",
-      "args": {
-        "--fibre_wl": "40.2",
-        "--fibre_angle": "0.72",
-        "--fibre_amp": "1.52",
-        "--fibre_phase": "1.53",
-        "--gain0": "1.0",
-        "--stiff_lo": "100",
-        "--stiff_hi": "100",
         "--amplitude": "10",
         "--drag_k": "30",
         "--dur0": "8",
-        "--learn": "stiff"
+        "--learn": "all"
       }
     }
   ]
