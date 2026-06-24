@@ -26,10 +26,10 @@ resources:
 ```
 
 
-The whole calculus is **3 sets**, **5 fields**, and **34 operators** (42 primitives in all). Every simulation on this site is a schedule composed from this list &mdash; nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages &mdash; the two objects (**sets** and **fields**) and the **operators** that move state between them:
+The whole calculus is **3 sets**, **5 fields**, and **31 operators** (39 primitives in all). Every simulation on this site is a schedule composed from this list &mdash; nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages &mdash; the two objects (**sets** and **fields**) and the **operators** that move state between them:
 
 ::: {.op-grid}
 <a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds &mdash; the levels a hierarchy is built from.</span></span></a>
 <a class="op-card" href="library_fields.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">Fields</span><span class="op-card-sub">5 continuum discretizations &mdash; coupled to sets through exchange.</span></span></a>
-<a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">34 operators, grouped by kind &mdash; how state moves.</span></span></a>
+<a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">31 operators, grouped by kind &mdash; how state moves.</span></span></a>
 :::

@@ -200,15 +200,11 @@ The inverse-square law with superposition (`aggr: add`). Like charges $q_iq_j>0$
 repel, opposite charges attract; $\mathcal N(i)$ are the edges a `rewire` leaves."""),
 
     "advance": dict(equation=r"""$$
-\dot{\mathbf x}_i \;=\; s_i\,(\cos\theta_i,\ \sin\theta_i)
-$$
-Self-propulsion at speed $s_i$ (`move_speed`) along the scalar heading $\theta_i$;
-the engine integrates the position ($\mathbf x \mathrel{+}= \Delta t\,\dot{\mathbf x}$)."""),
-
-    "advance_3d": dict(equation=r"""$$
 \dot{\mathbf x}_i \;=\; s_i\,\hat{\mathbf h}_i,\qquad \lVert\hat{\mathbf h}_i\rVert=1
 $$
-The 3D form: the heading is a unit vector $\hat{\mathbf h}_i$ rather than an angle."""),
+Self-propulsion at speed $s_i$ (`move_speed`) along the unit heading vector
+$\hat{\mathbf h}_i$ (the same $[N,D]$ orientation in 2D and 3D); the engine
+integrates the position ($\mathbf x \mathrel{+}= \Delta t\,\dot{\mathbf x}$)."""),
 
     "aggregate": dict(equation=r"""$$
 \mathbf x_P \;=\; \frac{\sum_{i\in P} o_i\,\mathbf x_i}{\sum_{i\in P} o_i}
@@ -438,23 +434,15 @@ $\mathbf a/k$ without ringing. Replaces `p2g`'s built-in `drag`."""),
 
     "sense": dict(equation=r"""$$
 S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
-\quad k\in\{L,C,R\};
-\qquad
-\theta_i \leftarrow \theta_i + \Delta\theta\cdot\operatorname*{arg\,turn}_k S_k
-$$
-Reads the field in three windows $W_k$ (ahead-left / ahead / ahead-right), each a
-species-weighted sum (own channel $+1$, others $\kappa$ = `cross`), and turns the
-heading toward the strongest (Lague's 4-branch steer)."""),
-
-    "sense_3d": dict(equation=r"""$$
-S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
-\quad k\in\{C\}\cup\text{ring};
+\quad k\in\{C\}\cup\text{fan};
 \qquad
 \hat{\mathbf h}_i \leftarrow \mathrm{normalize}\big(\hat{\mathbf h}_i + \omega\,\mathbf r_{k^\star}\big)
 $$
-The 3D form: one centre sensor along $\hat{\mathbf h}$ plus a ring of $K$ sensors
-tilted by `sensor_angle`. If a ring direction $k^\star$ wins, rotate $\hat{\mathbf h}$
-toward its perpendicular component (up to `turn_speed` $\omega$) and renormalise."""),
+Dimension-generic Physarum sensing: a centre sensor along $\hat{\mathbf h}$ plus a
+fan tilted by `sensor_angle` -- two sensors (ahead-left / ahead-right) in 2D, a ring
+of $K$ in 3D. Each window $W_k$ is a species-weighted sum (own channel $+1$, others
+$\kappa$ = `cross`). If a fan direction $k^\star$ beats the centre, rotate
+$\hat{\mathbf h}$ toward it (up to `turn_speed` $\omega$) and renormalise."""),
 }
 
 
