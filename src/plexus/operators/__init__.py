@@ -38,6 +38,7 @@ from . import phase_delay           # noqa: F401  spatial phase-delay clock tau(
 from . import pulse_to_contraction  # noqa: F401  activation gradient -> per-particle force (exchange)
 from . import pulse_to_active_stress  # noqa: F401  activation -> per-particle active stress -A nn^T (exchange)
 from . import mpm_drag              # noqa: F401  viscous body drag -k*v as a particle force (lateral)
+from . import mpm_anchor            # noqa: F401  substrate/boundary rest-anchor k*(rest-pos) (lateral)
 from . import material_map          # noqa: F401  image field + apply_material_map (per-particle stiffness)
 from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: MLS-MPM mechanics (mls_mpm_mechanics)
 # Phase-3 decomposition of the oracle -- one file per operator + the shared grid field:

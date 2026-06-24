@@ -1,0 +1,47 @@
+# Anisotropic structured cardio (cardio_mpm): loops from MATERIAL STRUCTURE, not an imposed rotation.
+# Reproduces the p1_aniso symmetry-breaking (prototype/cardio/archive/3_p1_aniso) in Plexus MLS-MPM:
+# a GLOBAL synchronous pulse (uniform pulse_stimulus -- no FitzHugh-Nagumo, no travelling wave) drives an
+# active stress sigma_a = gain(x) * A * a(t) * n(x) n(x)^T whose contraction AXIS n(x) is a spatially-varying
+# FIBRE field, on a sheet with structured STIFFNESS and GAIN. The per-node beat loops then have to emerge from
+# the anisotropic structure (different regions shorten along different axes), not from a rotary force.
+# Maps (analytic patterns -- the params to LEARN later): scripts -> prototype/cardio_mpm/make_aniso_maps.py
+fields:
+  activation: {frame: grid, res: 128}
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  direction: {frame: vector_grid, source: material/dir_aniso_fiber.tif}   # fibre orientation n(x) (smooth, wl 16)
+  stiffness_map: {frame: image, source: material/map_aniso_stiffness.tif} # striped stiffness (wl [8,26])
+  gain_map: {frame: image, source: material/map_aniso_gain.tif}           # striped gain (wl [26,8], perpendicular)
+general: {boundary: wall, dt: 1.0, n_frames: 300, name: material_aniso_cardio, seed: 0}
+operators:
+- {at: cell, op: aggregate}
+- {op: apply_material_map, at: mpm_particle, from: stiffness_map, target: youngs, min: 50, max: 150}
+- {op: apply_material_map, at: mpm_particle, from: gain_map, target: gain, min: 0.4, max: 1.6}
+- {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
+- {at: activation, center: [0.5, 0.5], clock: beat, op: pulse_stimulus, radius: 0.12, profile: uniform}
+- {amplitude: 10.0, at: mpm_particle, from: activation, op: pulse_to_active_stress, direction_from: direction}
+- {at: mpm_particle, k: 30.0, op: mpm_drag}
+- {at: mpm_particle, dt_sub: 0.0002, op: mpm_strain}
+- {a_max: 200, at: mpm_particle, drag: 0.0, dt_sub: 0.0002, op: p2g, to: mpm_grid}
+- {at: mpm_grid, dt_sub: 0.0002, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, dt_sub: 0.0002, from: mpm_grid, op: g2p, wall_contact: 0.06, wall_damp: 0.5}
+schedule:
+- aggregate
+- apply_material_map
+- pacemaker
+- pulse_stimulus
+- pulse_to_active_stress
+- mpm_drag
+- dt: 0.0002
+  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
+  substep: 10
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5]
+    types:
+      sheet:
+        block: [0.15, 0.15, 0.85, 0.85]
+        fraction: 1.0
+        youngs: 80
+  mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
