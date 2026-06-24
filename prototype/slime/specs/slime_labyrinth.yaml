@@ -1,0 +1,19 @@
+# slime_labyrinth -- uniform spawn + low turn + low decay + wide cone -> a space-filling
+# Turing maze of evenly spaced corridors (distinct from the radial filament colony).
+general: {name: slime_labyrinth, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
+sets:
+  cell:
+    n: 16000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 30, sensor_dist: 0.03, sensor_size: 1}
+fields:
+  trail: {frame: trail, res: 240, deposit: 0.7, decay: 0.045, diffuse: 0.26, couples_to: cell}
+operators:
+- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
+schedule: [slime, trail.diffuse]
+plotting:
+  colors:
+    a: [0.35, 0.8, 1.0]
+  background: black
+  gamma: 0.7
