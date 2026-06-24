@@ -38,7 +38,7 @@ set), **aggregate** (upward), **broadcast** (downward), and **exchange** (betwee
 sets and fields). Complex simulations emerge from composing a few primitive
 operations.
 
-![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* pushes ($\mathcal{S}$) to and pulls ($\mathcal{G}$) from a field.](figures/fig_ops.png){width=70% fig-align="center"}
+![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* pushes to and pulls from a field.](figures/fig_ops.png){width=70% fig-align="center"}
 
 ## A language *and* a calculus — two layers that never touch
 

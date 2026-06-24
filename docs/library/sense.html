@@ -200,9 +200,6 @@ window.Quarto = {
   <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
-  <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
-  <li><a href="#identifiability" id="toc-identifiability" class="nav-link" data-scroll-target="#identifiability">Identifiability</a></li>
-  <li><a href="#failure-modes" id="toc-failure-modes" class="nav-link" data-scroll-target="#failure-modes">Failure modes</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
   <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
   <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
@@ -257,7 +254,7 @@ window.Quarto = {
 <section id="role-in-plexus" class="level2">
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
-<li><strong>Kind</strong> — <span class="math inline">\(\mathcal{S},\mathcal{G}\)</span> <strong>Exchange</strong>: set ↔︎ field push / pull.</li>
+<li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
 <li><strong>Acts on</strong> — <code>cell</code> (the level the operator runs at).</li>
 <li><strong>Reads</strong> — <code>from</code>, <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>, <code>sensor_size</code> (per-type props: <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>, <code>sensor_size</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
@@ -306,18 +303,6 @@ S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\s
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="typical-schedules" class="level2">
-<h2 class="anchored" data-anchor-id="typical-schedules">Typical schedules</h2>
-<p><em>Where this operator sits in a pipeline — to be written.</em></p>
-</section>
-<section id="identifiability" class="level2">
-<h2 class="anchored" data-anchor-id="identifiability">Identifiability</h2>
-<p><em>What observations can (and cannot) recover this operator’s parameters — to be written.</em></p>
-</section>
-<section id="failure-modes" class="level2">
-<h2 class="anchored" data-anchor-id="failure-modes">Failure modes</h2>
-<p><em>What breaks under bad parameters — to be written.</em></p>
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>

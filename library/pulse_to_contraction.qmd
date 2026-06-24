@@ -33,7 +33,7 @@ The force half of an active-matter actuator: it reads an activation field $a(\ma
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field push / pull.
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

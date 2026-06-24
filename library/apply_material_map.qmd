@@ -33,7 +33,7 @@ A static image FIELD read from a TIFF, plus `apply_material_map`,
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field push / pull.
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `from`, `target`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
@@ -85,18 +85,6 @@ Not a force — it sets the *material*, breaking symmetry without changing MPM p
 operators:
   - {op: apply_material_map, at: particle, from: ..., target: ...}
 ```
-
-## Typical schedules
-
-_Where this operator sits in a pipeline &mdash; to be written._
-
-## Identifiability
-
-_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
-
-## Failure modes
-
-_What breaks under bad parameters &mdash; to be written._
 
 ## Mechanism-search tags
 

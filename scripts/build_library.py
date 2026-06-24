@@ -35,7 +35,7 @@ KIND_INFO = {
     "lateral":    ("Lateral", r"$\mathcal{O}_E$",  "within-set interaction over a relation $E$"),
     "aggregate":  ("Aggregate", r"$\textstyle\sum_\pi$", "children &rarr; parent, up the containment $\\pi$"),
     "broadcast":  ("Broadcast", r"$\pi^*$",        "parent &rarr; children, down the containment $\\pi$"),
-    "exchange":   ("Exchange", r"$\mathcal{S},\mathcal{G}$", "set &harr; field push / pull"),
+    "exchange":   ("Exchange", "push / pull", "set &harr; field"),
     "field":      ("Field", r"$\partial_t\phi$",   "a field's own self-dynamics"),
     "rewire":     ("Rewire", r"$\mathcal{R}\!:E$", "rebuild the relation $E$ each tick"),
     "structural": ("Structural", r"$|S|$",         "change the node set (divide / die / spawn)"),
@@ -604,11 +604,12 @@ def render_operator_page(name: str, cls) -> str:
         out.append("```")
     out.append("")
 
-    # Typical schedules
-    out.append("## Typical schedules")
-    out.append("")
-    out.append(e.get("schedule") or "_Where this operator sits in a pipeline &mdash; to be written._")
-    out.append("")
+    # Typical schedules (only when authored — no placeholder)
+    if e.get("schedule"):
+        out.append("## Typical schedules")
+        out.append("")
+        out.append(e["schedule"])
+        out.append("")
 
     # Example output
     if e.get("gallery"):
@@ -622,24 +623,22 @@ def render_operator_page(name: str, cls) -> str:
         out.append("```")
         out.append("")
 
-    # Identifiability
-    out.append("## Identifiability")
-    out.append("")
-    out.append(e.get("identifiability")
-               or "_What observations can (and cannot) recover this operator's parameters &mdash; to be written._")
-    out.append("")
+    # Identifiability (only when authored — no placeholder)
+    if e.get("identifiability"):
+        out.append("## Identifiability")
+        out.append("")
+        out.append(e["identifiability"])
+        out.append("")
 
-    # Failure modes
-    out.append("## Failure modes")
-    out.append("")
+    # Failure modes (only when authored — no placeholder)
     if e.get("failure_modes"):
+        out.append("## Failure modes")
+        out.append("")
         out.append("| when | what goes wrong |")
         out.append("|---|---|")
         for cause, effect in e["failure_modes"]:
             out.append(f"| {cause} | {effect} |")
-    else:
-        out.append("_What breaks under bad parameters &mdash; to be written._")
-    out.append("")
+        out.append("")
 
     # Mechanism-search tags
     if tags or morph:
