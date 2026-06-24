@@ -275,12 +275,13 @@ window.Quarto = {
 <li><strong>Reads</strong> — <code>move_speed</code> (per-type props: <code>move_speed</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
-<li><strong>Dimensions</strong> — 2D.</li>
+<li><strong>Dimensions</strong> — 2D, 3D.</li>
 </ul>
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>A boundary condition on <em>orientation</em>, kept separate from propulsion: if a dt-step along the current heading would leave the domain (or enter an obstacle), the agent picks a fresh random heading. Run it AFTER <code>sense</code> (which steers) and BEFORE <code>advance</code> (which emits the propulsion velocity), so the velocity already points back inside – proactive bounce, no agent ever crosses the wall.</p>
+<p>A boundary condition on <em>orientation</em>, kept separate from propulsion: if a dt-step along the current heading would leave the box (or enter an obstacle), the heading is turned back inside. Run it AFTER <code>sense</code> (which steers) and BEFORE <code>advance</code> (which emits the propulsion velocity), so the velocity already points back inside – proactive bounce, no agent ever crosses the wall.</p>
+<p>Dimension-generic (the dimension contract): <code>heading</code> is a unit VECTOR [N, D] in every dimension. Walls use <strong>specular reflection</strong> – the heading component on any axis the step would exit is negated (<code>heading[out_axis] *= -1</code>), which works identically in 2D and 3D and replaces the old scalar-angle random re-heading. Obstacles (rect/disc walls, a 2D maze feature) still re-head randomly, since they have no single axis-aligned normal. Replaces the old 2D <code>bounce</code> + <code>bounce_3d</code>.</p>
 <p>It mutates the heading (auxiliary control state, not the integrated position) and returns {} – like the other in-place set ops, it is not a force.</p>
 </section>
 <section id="minimal-spec" class="level2">
@@ -298,67 +299,85 @@ window.Quarto = {
 <div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""bounce -- set. Reflect a self-propelled agent off the domain walls / obstacles.</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">A boundary condition on *orientation*, kept separate from propulsion: if a dt-step</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">along the current heading would leave the domain (or enter an obstacle), the agent</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">picks a fresh random heading. Run it AFTER `sense` (which steers) and BEFORE</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">`advance` (which emits the propulsion velocity), so the velocity already points</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">back inside -- proactive bounce, no agent ever crosses the wall.</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">along the current heading would leave the box (or enter an obstacle), the heading is</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">turned back inside. Run it AFTER `sense` (which steers) and BEFORE `advance` (which</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">emits the propulsion velocity), so the velocity already points back inside --</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">proactive bounce, no agent ever crosses the wall.</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">It mutates the heading (auxiliary control state, not the integrated position) and</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">returns {} -- like the other in-place set ops, it is not a force.</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">every dimension. Walls use **specular reflection** -- the heading component on any</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">axis the step would exit is negated (`heading[out_axis] *= -1`), which works</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">identically in 2D and 3D and replaces the old scalar-angle random re-heading.</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">Obstacles (rect/disc walls, a 2D maze feature) still re-head randomly, since they</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">have no single axis-aligned normal. Replaces the old 2D `bounce` + `bounce_3d`.</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">It mutates the heading (auxiliary control state, not the integrated position) and</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">returns {} -- like the other in-place set ops, it is not a force.</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _in_obstacles(x, y, obstacles):</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Bool mask: is (x, y) inside any obstacle? rect=[x0,y0,x1,y1], disc=[cx,cy,r]."""</span></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    hit <span class="op">=</span> torch.zeros_like(x, dtype<span class="op">=</span>torch.<span class="bu">bool</span>)</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> o <span class="kw">in</span> (obstacles <span class="kw">or</span> []):</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(o) <span class="op">==</span> <span class="dv">4</span>:</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>            x0, y0, x1, y1 <span class="op">=</span> o</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>            hit <span class="op">=</span> hit <span class="op">|</span> ((x <span class="op">&gt;=</span> x0) <span class="op">&amp;</span> (x <span class="op">&lt;=</span> x1) <span class="op">&amp;</span> (y <span class="op">&gt;=</span> y0) <span class="op">&amp;</span> (y <span class="op">&lt;=</span> y1))</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> <span class="bu">len</span>(o) <span class="op">==</span> <span class="dv">3</span>:</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>            cx, cy, r <span class="op">=</span> o</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>            hit <span class="op">=</span> hit <span class="op">|</span> (((x <span class="op">-</span> cx) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> (y <span class="op">-</span> cy) <span class="op">**</span> <span class="dv">2</span>) <span class="op">&lt;=</span> r <span class="op">*</span> r)</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> hit</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"bounce"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Bounce(Lateral):</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    REQUIRES_TYPE_PROPS <span class="op">=</span> [<span class="st">"move_speed"</span>]        <span class="co"># needs the step length it is about to take</span></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"cell"</span>)</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>):</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}                                       <span class="co"># torus: nothing to bounce off</span></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        N <span class="op">=</span> lvl.n</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        h <span class="op">=</span> lvl.heading</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        spd <span class="op">=</span> lvl.move_speed</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        W <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H, <span class="st">"world_width"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> (mask.<span class="bu">float</span>() <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> torch.ones(N, device<span class="op">=</span>dev)) <span class="op">*</span> lvl.occ</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> m <span class="op">&gt;</span> <span class="dv">0</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        nx <span class="op">=</span> pos[:, <span class="dv">0</span>] <span class="op">+</span> dt <span class="op">*</span> spd <span class="op">*</span> torch.cos(h)</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        ny <span class="op">=</span> pos[:, <span class="dv">1</span>] <span class="op">+</span> dt <span class="op">*</span> spd <span class="op">*</span> torch.sin(h)</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="co"># the domain is [0, W] x [0, 1]: x spans the world width W, y is unit height.</span></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="co"># The asymmetry (nx &gt;= W vs ny &gt;= 1) is the convention, not a bug.</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        out <span class="op">=</span> (nx <span class="op">&lt;</span> <span class="dv">0</span>) <span class="op">|</span> (nx <span class="op">&gt;=</span> W) <span class="op">|</span> (ny <span class="op">&lt;</span> <span class="dv">0</span>) <span class="op">|</span> (ny <span class="op">&gt;=</span> <span class="dv">1</span>)</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        out <span class="op">=</span> out <span class="op">|</span> _in_obstacles(nx, ny, <span class="bu">getattr</span>(H, <span class="st">"obstacles"</span>, []))</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        rand <span class="op">=</span> torch.rand(N, generator<span class="op">=</span>H.rng, device<span class="op">=</span>dev) <span class="op">*</span> <span class="dv">2</span> <span class="op">*</span> math.pi</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        lvl.heading <span class="op">=</span> torch.where(out <span class="op">&amp;</span> keep, rand, h)</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _in_obstacles(x, y, obstacles):</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Bool mask: is (x, y) inside any obstacle? rect=[x0,y0,x1,y1], disc=[cx,cy,r]."""</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    hit <span class="op">=</span> torch.zeros_like(x, dtype<span class="op">=</span>torch.<span class="bu">bool</span>)</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> o <span class="kw">in</span> (obstacles <span class="kw">or</span> []):</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(o) <span class="op">==</span> <span class="dv">4</span>:</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>            x0, y0, x1, y1 <span class="op">=</span> o</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>            hit <span class="op">=</span> hit <span class="op">|</span> ((x <span class="op">&gt;=</span> x0) <span class="op">&amp;</span> (x <span class="op">&lt;=</span> x1) <span class="op">&amp;</span> (y <span class="op">&gt;=</span> y0) <span class="op">&amp;</span> (y <span class="op">&lt;=</span> y1))</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> <span class="bu">len</span>(o) <span class="op">==</span> <span class="dv">3</span>:</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>            cx, cy, r <span class="op">=</span> o</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>            hit <span class="op">=</span> hit <span class="op">|</span> (((x <span class="op">-</span> cx) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> (y <span class="op">-</span> cy) <span class="op">**</span> <span class="dv">2</span>) <span class="op">&lt;=</span> r <span class="op">*</span> r)</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> hit</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _random_unit(n, D, rng, device):</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""A random unit vector per agent [n, D] (isotropic re-heading off obstacles)."""</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    v <span class="op">=</span> torch.randn(n, D, generator<span class="op">=</span>rng, device<span class="op">=</span>device)</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> v <span class="op">/</span> v.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"bounce"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Bounce(Lateral):</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                      <span class="co"># dimension-generic specular wall reflection</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    REQUIRES_TYPE_PROPS <span class="op">=</span> [<span class="st">"move_speed"</span>]        <span class="co"># needs the step length it is about to take</span></span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"cell"</span>)</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>):</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}                                       <span class="co"># torus: nothing to bounce off</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        N <span class="op">=</span> lvl.n</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)                                <span class="co"># [N, D]</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        h <span class="op">=</span> lvl.heading                                     <span class="co"># [N, D] unit heading</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        spd <span class="op">=</span> lvl.move_speed</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        box <span class="op">=</span> H.world_size                                  <span class="co"># [D] per-axis box size</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> (mask.<span class="bu">float</span>() <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> torch.ones(N, device<span class="op">=</span>dev)) <span class="op">*</span> lvl.occ</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> (m <span class="op">&gt;</span> <span class="dv">0</span>)[:, <span class="va">None</span>]</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        nxt <span class="op">=</span> pos <span class="op">+</span> dt <span class="op">*</span> spd[:, <span class="va">None</span>] <span class="op">*</span> h                   <span class="co"># tentative next position</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        out <span class="op">=</span> (nxt <span class="op">&lt;</span> <span class="dv">0</span>) <span class="op">|</span> (nxt <span class="op">&gt;</span> box[<span class="va">None</span>, :])              <span class="co"># which axes would exit the box</span></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> torch.where(out, <span class="op">-</span>h, h)                     <span class="co"># specular reflect the exiting components</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># obstacles (2D maze rects/discs): re-head isotropically where the step would</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        <span class="co"># enter one -- they carry no single axis-aligned normal to reflect against.</span></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        obs <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"obstacles"</span>, [])</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> obs <span class="kw">and</span> pos.shape[<span class="dv">1</span>] <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>            hit <span class="op">=</span> _in_obstacles(nxt[:, <span class="dv">0</span>], nxt[:, <span class="dv">1</span>], obs)</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>            new_h <span class="op">=</span> torch.where(hit[:, <span class="va">None</span>], _random_unit(N, <span class="dv">2</span>, H.rng, dev), new_h)</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> new_h <span class="op">/</span> new_h.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        lvl.heading <span class="op">=</span> torch.where(keep, new_h, h)</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
