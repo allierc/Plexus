@@ -16,8 +16,12 @@ prototype/*.zarr
 /.quarto/
 **/*.quarto_ipynb
 paper/*.synctex.gz
+paper/*.synctex*
 paper/*.toc
 papers/*.pdf
+
+# NFS silly-rename locks (transient, never commit)
+**/.nfs*
 
 # prototype renders (recursive: also ant/, water/, slime/, ... subdirs)
 prototype/**/*.gif
