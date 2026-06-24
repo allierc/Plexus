@@ -198,7 +198,6 @@ window.Quarto = {
    
   <ul>
   <li><a href="#a-language-and-a-calculus-two-layers-that-never-touch" id="toc-a-language-and-a-calculus-two-layers-that-never-touch" class="nav-link active" data-scroll-target="#a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</a></li>
-  <li><a href="#re-converging-four-frameworks" id="toc-re-converging-four-frameworks" class="nav-link" data-scroll-target="#re-converging-four-frameworks">Re-converging four frameworks</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
   <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
   </ul>
@@ -273,46 +272,6 @@ window.Quarto = {
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at">     </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>and the engine resolves each <code>op</code> against the registry and runs it — producing the <em>aggregate</em> result shown below. No operator was written; the selector <code>cell[type=soft]</code> did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
-</section>
-<section id="re-converging-four-frameworks" class="level2">
-<h2 class="anchored" data-anchor-id="re-converging-four-frameworks">Re-converging four frameworks</h2>
-<p>Plexus re-converges four sibling frameworks that all forked from <a href="https://github.com/allierc/ParticleGraph"><code>ParticleGraph</code></a> and then drifted — each implements <em>one</em> graph type; a tissue needs them coexisting.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Framework</th>
-<th>Domain</th>
-<th>Becomes (in Plexus)</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><strong>CellGraph</strong></td>
-<td>collective cell interactions</td>
-<td><code>Lateral</code> operators @ cell level</td>
-</tr>
-<tr class="even">
-<td><strong>NeuralGraph</strong></td>
-<td>neural / signalling networks</td>
-<td><code>Lateral</code> operators @ cell level</td>
-</tr>
-<tr class="odd">
-<td><strong>MPMGraph</strong></td>
-<td>tissue mechanics, deformable matter</td>
-<td><code>Exchange</code> (P2G/G2P) @ particle level</td>
-</tr>
-<tr class="even">
-<td><strong>MetabolismGraph</strong></td>
-<td>bipartite reaction networks</td>
-<td><code>Exchange</code> (stoichiometry) @ molecule level</td>
-</tr>
-</tbody>
-</table>
 </section>
 <section id="what-it-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>

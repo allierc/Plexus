@@ -98,19 +98,6 @@ the *aggregate* result shown below. No operator was written; the selector
 compilation rules, and how the contract fails loudly on a bad spec are on the
 **[LLM ↔ registry](methodology.qmd)** page.
 
-## Re-converging four frameworks
-
-Plexus re-converges four sibling frameworks that all forked from
-[`ParticleGraph`](https://github.com/allierc/ParticleGraph) and then drifted —
-each implements *one* graph type; a tissue needs them coexisting.
-
-| Framework | Domain | Becomes (in Plexus) |
-|---|---|---|
-| **CellGraph** | collective cell interactions | `Lateral` operators @ cell level |
-| **NeuralGraph** | neural / signalling networks | `Lateral` operators @ cell level |
-| **MPMGraph** | tissue mechanics, deformable matter | `Exchange` (P2G/G2P) @ particle level |
-| **MetabolismGraph** | bipartite reaction networks | `Exchange` (stoichiometry) @ molecule level |
-
 ## What it looks like
 
 Qualitatively different dynamical systems expressed within the same language. Each

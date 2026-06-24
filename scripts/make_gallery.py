@@ -68,7 +68,6 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
     ],
     "Reaction–diffusion — cyclic competition (rock–paper–scissors)": [
         ("rps_random", "prototype/rps/rps_random.gif", "prototype/rps/scenarios/rps_random.yaml", "3 species quenched from disorder → spiral turbulence"),
-        ("rps_species_3", "prototype/rps/rps_species_3.gif", "prototype/rps/scenarios/rps_species_3.yaml", "3 species seeded as a pinwheel → one spiral core"),
         ("rps_species_4", "prototype/rps/rps_species_4.gif", "prototype/rps/scenarios/rps_species_4.yaml", "4-species cyclic competition"),
         ("rps_species_6", "prototype/rps/rps_species_6.gif", "prototype/rps/scenarios/rps_species_6.yaml", "6-species cyclic competition (validated vs ParticleGraph RD_RPS)"),
     ],
@@ -80,7 +79,7 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("mix_rd_flow", "prototype/well/mix_rd_flow.gif", "prototype/well/scenarios/mix_rd_flow.yaml", "a reaction–diffusion pattern stirred by turbulence"),
         ("mix_acoustic_push", "prototype/well/mix_acoustic_push.gif", "prototype/well/scenarios/mix_acoustic_push.yaml", "expanding acoustic wavefronts herd a swarm"),
     ],
-    "Microswimmers": [
+    "Building a microswimmers simulation": [
         ("motile", "prototype/microswimmer/motile.gif", "prototype/microswimmer/motile.yaml", "active self-propelled swimmers"),
         ("slipwave_motile", "prototype/microswimmer/slipwave_motile.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — slip-wave field overlay"),
         ("vorticity_motile", "prototype/microswimmer/vorticity_motile.gif", "prototype/microswimmer/motile.yaml", "motile swimmer — vorticity field overlay"),
