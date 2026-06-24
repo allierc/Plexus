@@ -50,5 +50,5 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
            "video_field", "chemotaxis", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
-           "mpm_drag", "material_map", "mpm",
+           "mpm_drag", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p"]
