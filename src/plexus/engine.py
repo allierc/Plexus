@@ -279,12 +279,23 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         dim = max(b for _, b in schema.values())
         Np = parent.n * per                                       # one block of `per` children per parent slot
         parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per)
-        ppos = parent.get("pos")[parent_idx]                      # each child's parent position
-        r = torch.sqrt(torch.rand(Np, generator=H.rng, device=device)) * radius
-        th = torch.rand(Np, generator=H.rng, device=device) * 2 * math.pi
         state = torch.zeros(Np, dim, device=device)
         px0, px1 = schema["pos"]
-        state[:, px0:px1] = ppos + torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
+        D = px1 - px0                                             # the child's own pos dimension
+        ppos = parent.get("pos")[parent_idx][:, :D]              # parent position, projected to the child's dim
+        # scatter each child uniformly in a ball of `radius` about its parent. The 2D
+        # polar path is kept verbatim (bit-identical MPM particle seeding); 3D+ uses a
+        # random unit direction so true 3D child sets are not collapsed onto a plane.
+        if D == 2:
+            r = torch.sqrt(torch.rand(Np, generator=H.rng, device=device)) * radius
+            th = torch.rand(Np, generator=H.rng, device=device) * 2 * math.pi
+            offset = torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
+        else:
+            d = torch.randn(Np, D, generator=H.rng, device=device)        # isotropic direction
+            d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
+            r = torch.rand(Np, generator=H.rng, device=device).pow(1.0 / D) * radius   # uniform in the D-ball
+            offset = d * r[:, None]
+        state[:, px0:px1] = ppos + offset
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
