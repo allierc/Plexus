@@ -37,3 +37,7 @@ config/material/material_looptest_*.yaml
 prototype/cardio_mpm/loop_logs/
 prototype/cardio_mpm/*_loop_state.json
 prototype/cardio_mpm/*_loop2_state.json
+config/material/gainsweep_*.yaml
+config/material/material_gainsweep_*.yaml
+config/material/material_stiffsweep_*.yaml
+config/material/material_stiffcoarse_*.yaml

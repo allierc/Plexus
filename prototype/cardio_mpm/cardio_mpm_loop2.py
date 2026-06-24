@@ -45,15 +45,17 @@ def _slots(batch):
 
 
 def start_prompt():
-    return f"""CARDIO-MPM PHASE 2 START. You are the scientist in a hypothesis-driven PARAMETRIC inverse-fit
-loop. Phase 1 (the SHAPE ATLAS) is DONE; the deliverable ledger records that the anisotropic active-stress
-pattern family spans the real loop morphology, with fibre_wl~40 leading. Phase 2 INVERTS that family:
-`cardio_mpm_train2.py` learns 12 PARAMETRIC PATTERN scalars (fibre wl/angle/amp/phase, gain wl/phase/lo/hi,
-stiff wl/phase/lo/hi) + a learnable pulse duration, NOT free pixels. The outer band is Dirichlet-anchored to
-the real beat; the interior is fit. AMPLITUDE + DRAG are FIXED per-slot knobs (the plan sweeps them; amplitude
-is CONSTRAINED to 10-15). Goal = KNOWLEDGE about which parametric patterns make the learned (red) per-node
-loops match the real (green) beat -- ranked by interior R2 (motion-normalised, boundary excluded; 1=perfect,
-<=0=worse than no motion), with loop-morphology (openness/chirality/size) as a secondary validator.
+    return f"""CARDIO-MPM PHASE 2 START. You are the scientist in a hypothesis-driven inverse-fit loop. Phase 1
+(the SHAPE ATLAS) is DONE. Phase 2 INVERTS an interpretable material model with `cardio_mpm_train2.py`:
+  - FIBRE (primary): parametric contraction-axis field (fibre wl/angle/amp/phase, 4 scalars).
+  - STIFFNESS: UNet(real microscope image) -> youngs pattern, registered IDENTITY (no flip).
+  - GAIN: a single UNIFORM GLOBAL learnable scalar (the magnitude/size lever).
+  - PULSE DURATION: learnable, bounded SHARP [3,14] so the pulse turns off -> inertial-recoil LOOPS.
+AMPLITUDE + DRAG are FIXED per-slot knobs (amplitude CONSTRAINED 10-15). The outer band is Dirichlet-anchored
+to the real beat; the interior is fit. PARTITIONED PROTOCOL: use `--learn {{fibre,stiff,gain,dur,all}}` to
+optimize ONE group per batch (others stay at init) to isolate each lever, THEN combine with `--learn all`.
+Goal = KNOWLEDGE about which levers make the learned (red) loops match the real (green) beat -- ranked by
+interior R2 (motion-normalised, boundary excluded; 1=perfect, <=0=worse than no motion), morphology secondary.
 
 Read (follow ALL of the instruction):
   instruction: {L.INSTR}
@@ -61,9 +63,10 @@ Read (follow ALL of the instruction):
   running analysis (append Phase-2 batch sections): {L.ANALYSIS}
   user input (read + acknowledge pending, if present): {L.USERIN}
 
-A seed {L.PLAN} already exists (parent fibre_wl40 + fibre_angle/gain_wl sweep + an amplitude15 slot). Review
-it against the ledger; if you would design batch 1 differently, REWRITE {L.PLAN} (<=6 configs, schema in the
-instruction). Otherwise leave it. Do not launch anything."""
+A seed {L.PLAN} already exists = BATCH 1 fibre sweep (--learn fibre): parent fibre_wl40 + fibre_angle/wl/amp
+variants. The starting basin is VERIFIED GOOD (red loops on green at init). Review it against the ledger; if
+you would design batch 1 differently, REWRITE {L.PLAN} (<=6 configs, keep --learn fibre for batch 1). Do not
+launch anything."""
 
 
 def analysis_prompt(batch, n, jobs):
