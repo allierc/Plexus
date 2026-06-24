@@ -59,18 +59,6 @@ operators:
   - {op: bounce_3d, at: cell}
 ```
 
-## Typical schedules
-
-_Where this operator sits in a pipeline &mdash; to be written._
-
-## Identifiability
-
-_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
-
-## Failure modes
-
-_What breaks under bad parameters &mdash; to be written._
-
 ## Related operators
 
 Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`separation`](separation.qmd), [`drag`](drag.qmd).

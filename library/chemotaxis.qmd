@@ -33,7 +33,7 @@ Set <- field. Particles climb (or flee) a field's gradient.
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field push / pull.
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; returns a **velocity** &mdash; the engine integrates $x \mathrel{+}= \Delta t\,\delta$.
@@ -70,18 +70,6 @@ sampled at the particle. A first-derivative velocity that simply sums with any o
 operators:
   - {op: chemotaxis, at: particle, from: ...}
 ```
-
-## Typical schedules
-
-_Where this operator sits in a pipeline &mdash; to be written._
-
-## Identifiability
-
-_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
-
-## Failure modes
-
-_What breaks under bad parameters &mdash; to be written._
 
 ## Mechanism-search tags
 

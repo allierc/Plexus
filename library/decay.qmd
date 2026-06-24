@@ -67,18 +67,6 @@ operators:
   - {op: decay, at: field}
 ```
 
-## Typical schedules
-
-_Where this operator sits in a pipeline &mdash; to be written._
-
-## Identifiability
-
-_What observations can (and cannot) recover this operator's parameters &mdash; to be written._
-
-## Failure modes
-
-_What breaks under bad parameters &mdash; to be written._
-
 ## Related operators
 
 Other **field** operators: [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).

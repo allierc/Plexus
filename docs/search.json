@@ -207,7 +207,7 @@
     "href": "library/sense_3d.html#role-in-plexus",
     "title": "sense_3d",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — cell (the level the operator runs at).\nReads — from, turn_speed, sensor_angle, sensor_dist, sensor_size (per-type props: turn_speed, sensor_angle, sensor_dist, sensor_size)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 3D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — cell (the level the operator runs at).\nReads — from, turn_speed, sensor_angle, sensor_dist, sensor_size (per-type props: turn_speed, sensor_angle, sensor_dist, sensor_size)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 3D."
   },
   {
     "objectID": "library/sense_3d.html#mechanism",
@@ -236,27 +236,6 @@
     "title": "sense_3d",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: sense_3d, at: cell, from: ...}"
-  },
-  {
-    "objectID": "library/sense_3d.html#typical-schedules",
-    "href": "library/sense_3d.html#typical-schedules",
-    "title": "sense_3d",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/sense_3d.html#identifiability",
-    "href": "library/sense_3d.html#identifiability",
-    "title": "sense_3d",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/sense_3d.html#failure-modes",
-    "href": "library/sense_3d.html#failure-modes",
-    "title": "sense_3d",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/sense_3d.html#mechanism-search-tags",
@@ -322,27 +301,6 @@
     "text": "Minimal spec\noperators:\n  - {op: radius_graph, at: particle, radius: ...}"
   },
   {
-    "objectID": "library/radius_graph.html#typical-schedules",
-    "href": "library/radius_graph.html#typical-schedules",
-    "title": "radius_graph",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/radius_graph.html#identifiability",
-    "href": "library/radius_graph.html#identifiability",
-    "title": "radius_graph",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/radius_graph.html#failure-modes",
-    "href": "library/radius_graph.html#failure-modes",
-    "title": "radius_graph",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/radius_graph.html#related-operators",
     "href": "library/radius_graph.html#related-operators",
     "title": "radius_graph",
@@ -397,27 +355,6 @@
     "title": "pulse_stimulus",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: pulse_stimulus, at: field}"
-  },
-  {
-    "objectID": "library/pulse_stimulus.html#typical-schedules",
-    "href": "library/pulse_stimulus.html#typical-schedules",
-    "title": "pulse_stimulus",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/pulse_stimulus.html#identifiability",
-    "href": "library/pulse_stimulus.html#identifiability",
-    "title": "pulse_stimulus",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/pulse_stimulus.html#failure-modes",
-    "href": "library/pulse_stimulus.html#failure-modes",
-    "title": "pulse_stimulus",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/pulse_stimulus.html#mechanism-search-tags",
@@ -567,27 +504,6 @@
     "text": "Minimal spec\noperators:\n  - {op: pacemaker, at: field}"
   },
   {
-    "objectID": "library/pacemaker.html#typical-schedules",
-    "href": "library/pacemaker.html#typical-schedules",
-    "title": "pacemaker",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/pacemaker.html#identifiability",
-    "href": "library/pacemaker.html#identifiability",
-    "title": "pacemaker",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/pacemaker.html#failure-modes",
-    "href": "library/pacemaker.html#failure-modes",
-    "title": "pacemaker",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/pacemaker.html#mechanism-search-tags",
     "href": "library/pacemaker.html#mechanism-search-tags",
     "title": "pacemaker",
@@ -649,27 +565,6 @@
     "title": "mpm_strain",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: mpm_strain, at: particle}"
-  },
-  {
-    "objectID": "library/mpm_strain.html#typical-schedules",
-    "href": "library/mpm_strain.html#typical-schedules",
-    "title": "mpm_strain",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/mpm_strain.html#identifiability",
-    "href": "library/mpm_strain.html#identifiability",
-    "title": "mpm_strain",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/mpm_strain.html#failure-modes",
-    "href": "library/mpm_strain.html#failure-modes",
-    "title": "mpm_strain",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/mpm_strain.html#mechanism-search-tags",
@@ -735,27 +630,6 @@
     "text": "Minimal spec\noperators:\n  - {op: mpm_grid_update, at: field}"
   },
   {
-    "objectID": "library/mpm_grid_update.html#typical-schedules",
-    "href": "library/mpm_grid_update.html#typical-schedules",
-    "title": "mpm_grid_update",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/mpm_grid_update.html#identifiability",
-    "href": "library/mpm_grid_update.html#identifiability",
-    "title": "mpm_grid_update",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/mpm_grid_update.html#failure-modes",
-    "href": "library/mpm_grid_update.html#failure-modes",
-    "title": "mpm_grid_update",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/mpm_grid_update.html#mechanism-search-tags",
     "href": "library/mpm_grid_update.html#mechanism-search-tags",
     "title": "mpm_grid_update",
@@ -817,27 +691,6 @@
     "title": "mpm_drag",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: mpm_drag, at: particle, k: ...}"
-  },
-  {
-    "objectID": "library/mpm_drag.html#typical-schedules",
-    "href": "library/mpm_drag.html#typical-schedules",
-    "title": "mpm_drag",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/mpm_drag.html#identifiability",
-    "href": "library/mpm_drag.html#identifiability",
-    "title": "mpm_drag",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/mpm_drag.html#failure-modes",
-    "href": "library/mpm_drag.html#failure-modes",
-    "title": "mpm_drag",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/mpm_drag.html#mechanism-search-tags",
@@ -931,27 +784,6 @@
     "text": "Minimal spec\noperators:\n  - {op: gravity, at: cell}"
   },
   {
-    "objectID": "library/gravity.html#typical-schedules",
-    "href": "library/gravity.html#typical-schedules",
-    "title": "gravity",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/gravity.html#identifiability",
-    "href": "library/gravity.html#identifiability",
-    "title": "gravity",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/gravity.html#failure-modes",
-    "href": "library/gravity.html#failure-modes",
-    "title": "gravity",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/gravity.html#mechanism-search-tags",
     "href": "library/gravity.html#mechanism-search-tags",
     "title": "gravity",
@@ -1015,27 +847,6 @@
     "text": "Minimal spec\noperators:\n  - {op: drag, at: particle, k: ...}"
   },
   {
-    "objectID": "library/drag.html#typical-schedules",
-    "href": "library/drag.html#typical-schedules",
-    "title": "drag",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/drag.html#identifiability",
-    "href": "library/drag.html#identifiability",
-    "title": "drag",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/drag.html#failure-modes",
-    "href": "library/drag.html#failure-modes",
-    "title": "drag",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/drag.html#related-operators",
     "href": "library/drag.html#related-operators",
     "title": "drag",
@@ -1092,27 +903,6 @@
     "text": "Minimal spec\noperators:\n  - {op: decay, at: field}"
   },
   {
-    "objectID": "library/decay.html#typical-schedules",
-    "href": "library/decay.html#typical-schedules",
-    "title": "decay",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/decay.html#identifiability",
-    "href": "library/decay.html#identifiability",
-    "title": "decay",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/decay.html#failure-modes",
-    "href": "library/decay.html#failure-modes",
-    "title": "decay",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/decay.html#related-operators",
     "href": "library/decay.html#related-operators",
     "title": "decay",
@@ -1138,7 +928,7 @@
     "href": "library/chemotaxis.html#role-in-plexus",
     "title": "chemotaxis",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — from\nWrites / returns — returns a velocity — the engine integrates \\(x \\mathrel{+}= \\Delta t\\,\\delta\\).\nPrediction — first_derivative.\nDimensions — 2D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — from\nWrites / returns — returns a velocity — the engine integrates \\(x \\mathrel{+}= \\Delta t\\,\\delta\\).\nPrediction — first_derivative.\nDimensions — 2D."
   },
   {
     "objectID": "library/chemotaxis.html#mechanism",
@@ -1167,27 +957,6 @@
     "title": "chemotaxis",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: chemotaxis, at: particle, from: ...}"
-  },
-  {
-    "objectID": "library/chemotaxis.html#typical-schedules",
-    "href": "library/chemotaxis.html#typical-schedules",
-    "title": "chemotaxis",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/chemotaxis.html#identifiability",
-    "href": "library/chemotaxis.html#identifiability",
-    "title": "chemotaxis",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/chemotaxis.html#failure-modes",
-    "href": "library/chemotaxis.html#failure-modes",
-    "title": "chemotaxis",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/chemotaxis.html#mechanism-search-tags",
@@ -1253,27 +1022,6 @@
     "text": "Minimal spec\noperators:\n  - {op: broadcast, at: particle, stiffness: ...}"
   },
   {
-    "objectID": "library/broadcast.html#typical-schedules",
-    "href": "library/broadcast.html#typical-schedules",
-    "title": "broadcast",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/broadcast.html#identifiability",
-    "href": "library/broadcast.html#identifiability",
-    "title": "broadcast",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/broadcast.html#failure-modes",
-    "href": "library/broadcast.html#failure-modes",
-    "title": "broadcast",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/broadcast.html#related-operators",
     "href": "library/broadcast.html#related-operators",
     "title": "broadcast",
@@ -1314,27 +1062,6 @@
     "title": "bounce",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: bounce, at: cell}"
-  },
-  {
-    "objectID": "library/bounce.html#typical-schedules",
-    "href": "library/bounce.html#typical-schedules",
-    "title": "bounce",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/bounce.html#identifiability",
-    "href": "library/bounce.html#identifiability",
-    "title": "bounce",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/bounce.html#failure-modes",
-    "href": "library/bounce.html#failure-modes",
-    "title": "bounce",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/bounce.html#related-operators",
@@ -1393,27 +1120,6 @@
     "text": "Minimal spec\noperators:\n  - {op: alignment, at: particle}"
   },
   {
-    "objectID": "library/alignment.html#typical-schedules",
-    "href": "library/alignment.html#typical-schedules",
-    "title": "alignment",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/alignment.html#identifiability",
-    "href": "library/alignment.html#identifiability",
-    "title": "alignment",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/alignment.html#failure-modes",
-    "href": "library/alignment.html#failure-modes",
-    "title": "alignment",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/alignment.html#mechanism-search-tags",
     "href": "library/alignment.html#mechanism-search-tags",
     "title": "alignment",
@@ -1470,27 +1176,6 @@
     "text": "Minimal spec\noperators:\n  - {op: advance_3d, at: cell}"
   },
   {
-    "objectID": "library/advance_3d.html#typical-schedules",
-    "href": "library/advance_3d.html#typical-schedules",
-    "title": "advance_3d",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/advance_3d.html#identifiability",
-    "href": "library/advance_3d.html#identifiability",
-    "title": "advance_3d",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/advance_3d.html#failure-modes",
-    "href": "library/advance_3d.html#failure-modes",
-    "title": "advance_3d",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/advance_3d.html#related-operators",
     "href": "library/advance_3d.html#related-operators",
     "title": "advance_3d",
@@ -1545,27 +1230,6 @@
     "title": "Coulomb",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: Coulomb, at: particle}"
-  },
-  {
-    "objectID": "library/Coulomb.html#typical-schedules",
-    "href": "library/Coulomb.html#typical-schedules",
-    "title": "Coulomb",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/Coulomb.html#identifiability",
-    "href": "library/Coulomb.html#identifiability",
-    "title": "Coulomb",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/Coulomb.html#failure-modes",
-    "href": "library/Coulomb.html#failure-modes",
-    "title": "Coulomb",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/Coulomb.html#mechanism-search-tags",
@@ -1628,7 +1292,7 @@
     "href": "abstraction.html#operators",
     "title": "The abstraction",
     "section": "Operators",
-    "text": "Operators\nA GNN is an operator \\(\\mathcal{O}\\) dispatched by the relation it acts on. An operator changes exactly one of the three things the container holds: the state on the nodes, the relations between them, or the entities themselves. Four dynamics operators move state along a fixed structure, one per relation the container admits. Rewire changes the relations — the edge set \\(E\\), which nodes interact. Divide and Die change the entities — the node set \\(|S_k|\\), which nodes exist. Those last three return no state delta. The four dynamics operators:\n\\[\n\\begin{aligned}\n\\textbf{Lateral}\\quad   & \\mathcal{O}_E,\\ E\\subseteq S_k\\times S_k\n  && \\text{(ODE interaction } + \\text{ graph Laplacian)}\\\\\n\\textbf{Aggregate}\\ \\uparrow\\quad & \\textstyle\\sum_{\\pi}: S_k \\to S_{k+1}\n  && \\text{(reduction over fibres of } \\pi)\\\\\n\\textbf{Broadcast}\\ \\downarrow\\quad & \\pi^{*}: S_{k+1}\\to S_k\n  && \\text{(lift along } \\pi)\\\\\n\\textbf{Exchange}\\quad  & \\mathcal{S},\\mathcal{G}: S_k \\leftrightarrow F\n  && \\text{(push / pull; bipartite)}\n\\end{aligned}\n\\]\nTwo pieces of notation: \\(S_k\\times S_k\\) is the set of all node pairs, so an edge set \\(E\\subseteq S_k\\times S_k\\) is simply a graph on \\(S_k\\) — which nodes interact (e.g. neighbours within a cutoff radius, or a fixed connectome). And \\(\\mathcal{S},\\mathcal{G}\\) are the two halves of a field coupling: push \\(\\mathcal{S}:S_k\\to F\\) writes object state into the field (set → field), while pull \\(\\mathcal{G}:F\\to S_k\\) reads it back (field → set).\nLateral \\(\\mathcal{O}_E\\). Message passing within one scale along the edges \\(E\\). It carries the within-scale physics: pairwise interactions (forces, adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities over the edges. Examples: particle–particle elasticity, cell–cell flocking or adhesion, neuron–neuron signal propagation.\nAggregate \\(\\textstyle\\sum_\\pi\\) (up). Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.\nBroadcast \\(\\pi^{*}\\) (down). The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map \\(\\pi\\).\nExchange \\(\\mathcal{S},\\mathcal{G}\\). Couples a set to a field: push \\(\\mathcal{S}\\) deposits/secretes object state into the field (set → field), pull \\(\\mathcal{G}\\) samples/senses the field back onto the objects (field → set). The relation is bipartite (objects \\(\\leftrightarrow\\) grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.\nRewire \\(\\mathcal{R}\\) (relations). Rewire changes the relation \\(E\\subseteq S_k\\times S_k\\) on which the lateral operators act — which nodes are neighbours — and returns no state delta. A geometric relation is rebuilt every tick from the live configuration (a radius graph: all pairs within a cutoff; or a \\(k\\)-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a fixed relation (a connectome) is built once and never rewired. Rewire is of a different nature from the other five: it neither moves state nor changes who exists — it maintains the scaffold the dynamics run on. Separating who interacts (Rewire) from how they interact (Lateral) also turns a dense \\(O(N^2)\\) force law into \\(O(|E|)\\) message passing.\nDivide and Die (entities). The dynamics operators move state and Rewire moves relations, both while the node set stays fixed; living matter also rewrites its own membership. Divide \\(\\mathcal{B}: x \\mapsto \\{x',x''\\}\\) (proliferation) and Die \\(\\mathcal{D}: x \\mapsto \\varnothing\\) (apoptosis / efflux) are the only operators that change the entities themselves — the cardinality \\(|S_k|\\). For a living system they are as primordial as the four dynamics operators: a tissue is defined as much by the cells it makes and loses as by how they move. Everything else assumes the cells it acts on already exist.\n\n\n\nThe operators, grouped by what they change. The first four are dynamics — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment \\(\\pi\\); Exchange to/from a field). The last three return no state delta: Rewire changes the relations — the edge set \\(E\\), which nodes interact (a radius graph rebuilt each tick, dashed cutoff); Divide and Die change the entities — the node set \\(|S_k|\\), on a fixed buffer with per-element occupancy \\(w\\).\n\n\n\nDifferentiating division and death\nChanging \\(|S_k|\\) is the one move that resists automatic differentiation: it alters a tensor’s shape, and “does this cell divide?” is a discrete event with no useful gradient. Plexus keeps differentiable with a continuous-occupancy formulation. Rather than resize, hold a fixed buffer of \\(N_{\\max}\\) slots and give every element a mass \\(w_i\\in[0,1]\\):\n\nDie decays \\(w_i\\to 0\\) — the slot goes dormant, not deleted.\nDivide activates a dormant slot, copies the mother’s state with a small perturbation, and splits the mass \\(w\\to(\\tfrac{w}{2},\\tfrac{w}{2})\\).\n\nEvery operator then honours \\(w\\): Aggregate becomes a mass-weighted reduction \\(\\left(\\sum_i w_i x_i\\right)/\\sum_i w_i\\), Lateral weights each message by \\(w_j\\), and so on — so the boolean selector mask is just the \\(\\{0,1\\}\\) special case of \\(w\\). The trajectory between events is now smooth in \\(w\\), so gradients flow on a fixed-shape tensor (and torch.compile still applies).\nThe one genuinely non-differentiable part — the integer decision of when to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division policy; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death rates; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the use both recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.\nSets, fields, and these operators are the entire vocabulary. The wager of Plexus is that this is enough to describe a complex living system — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields."
+    "text": "Operators\nA GNN is an operator \\(\\mathcal{O}\\) dispatched by the relation it acts on. An operator changes exactly one of the three things the container holds: the state on the nodes, the relations between them, or the entities themselves. Four dynamics operators move state along a fixed structure, one per relation the container admits. Rewire changes the relations — the edge set \\(E\\), which nodes interact. Divide and Die change the entities — the node set \\(|S_k|\\), which nodes exist. Those last three return no state delta. The four dynamics operators:\n\\[\n\\begin{aligned}\n\\textbf{Lateral}\\quad   & \\mathcal{O}_E,\\ E\\subseteq S_k\\times S_k\n  && \\text{(ODE interaction } + \\text{ graph Laplacian)}\\\\\n\\textbf{Aggregate}\\ \\uparrow\\quad & \\textstyle\\sum_{\\pi}: S_k \\to S_{k+1}\n  && \\text{(reduction over fibres of } \\pi)\\\\\n\\textbf{Broadcast}\\ \\downarrow\\quad & \\pi^{*}: S_{k+1}\\to S_k\n  && \\text{(lift along } \\pi)\\\\\n\\textbf{Exchange}\\quad  & \\text{push},\\ \\text{pull}: S_k \\leftrightarrow F\n  && \\text{(set} \\leftrightarrow \\text{field; bipartite)}\n\\end{aligned}\n\\]\nTwo pieces of notation: \\(S_k\\times S_k\\) is the set of all node pairs, so an edge set \\(E\\subseteq S_k\\times S_k\\) is simply a graph on \\(S_k\\) — which nodes interact (e.g. neighbours within a cutoff radius, or a fixed connectome). The two halves of a field coupling are push (\\(S_k\\to F\\), which writes object state into the field) and pull (\\(F\\to S_k\\), which reads it back).\nLateral \\(\\mathcal{O}_E\\). Message passing within one scale along the edges \\(E\\). It carries the within-scale physics: pairwise interactions (forces, adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities over the edges. Examples: particle–particle elasticity, cell–cell flocking or adhesion, neuron–neuron signal propagation.\nAggregate \\(\\textstyle\\sum_\\pi\\) (up). Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.\nBroadcast \\(\\pi^{*}\\) (down). The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map \\(\\pi\\).\nExchange (push / pull). Couples a set to a field: push deposits/secretes object state into the field (set → field), pull samples/senses the field back onto the objects (field → set). The relation is bipartite (objects \\(\\leftrightarrow\\) grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.\nRewire \\(\\mathcal{R}\\) (relations). Rewire changes the relation \\(E\\subseteq S_k\\times S_k\\) on which the lateral operators act — which nodes are neighbours — and returns no state delta. A geometric relation is rebuilt every tick from the live configuration (a radius graph: all pairs within a cutoff; or a \\(k\\)-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a fixed relation (a connectome) is built once and never rewired. Rewire is of a different nature from the other five: it neither moves state nor changes who exists — it maintains the scaffold the dynamics run on. Separating who interacts (Rewire) from how they interact (Lateral) also turns a dense \\(O(N^2)\\) force law into \\(O(|E|)\\) message passing.\nDivide and Die (entities). The dynamics operators move state and Rewire moves relations, both while the node set stays fixed; living matter also rewrites its own membership. Divide \\(\\mathcal{B}: x \\mapsto \\{x',x''\\}\\) (proliferation) and Die \\(\\mathcal{D}: x \\mapsto \\varnothing\\) (apoptosis / efflux) are the only operators that change the entities themselves — the cardinality \\(|S_k|\\). For a living system they are as primordial as the four dynamics operators: a tissue is defined as much by the cells it makes and loses as by how they move. Everything else assumes the cells it acts on already exist.\n\n\n\nThe operators, grouped by what they change. The first four are dynamics — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment \\(\\pi\\); Exchange to/from a field). The last three return no state delta: Rewire changes the relations — the edge set \\(E\\), which nodes interact (a radius graph rebuilt each tick, dashed cutoff); Divide and Die change the entities — the node set \\(|S_k|\\), on a fixed buffer with per-element occupancy \\(w\\).\n\n\n\nDifferentiating division and death\nChanging \\(|S_k|\\) is the one move that resists automatic differentiation: it alters a tensor’s shape, and “does this cell divide?” is a discrete event with no useful gradient. Plexus keeps differentiable with a continuous-occupancy formulation. Rather than resize, hold a fixed buffer of \\(N_{\\max}\\) slots and give every element a mass \\(w_i\\in[0,1]\\):\n\nDie decays \\(w_i\\to 0\\) — the slot goes dormant, not deleted.\nDivide activates a dormant slot, copies the mother’s state with a small perturbation, and splits the mass \\(w\\to(\\tfrac{w}{2},\\tfrac{w}{2})\\).\n\nEvery operator then honours \\(w\\): Aggregate becomes a mass-weighted reduction \\(\\left(\\sum_i w_i x_i\\right)/\\sum_i w_i\\), Lateral weights each message by \\(w_j\\), and so on — so the boolean selector mask is just the \\(\\{0,1\\}\\) special case of \\(w\\). The trajectory between events is now smooth in \\(w\\), so gradients flow on a fixed-shape tensor (and torch.compile still applies).\nThe one genuinely non-differentiable part — the integer decision of when to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division policy; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death rates; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the use both recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.\nSets, fields, and these operators are the entire vocabulary. The wager of Plexus is that this is enough to describe a complex living system — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields."
   },
   {
     "objectID": "abstraction.html#dynamics-a-schedule",
@@ -1642,7 +1306,7 @@
     "href": "abstraction.html#glossary",
     "title": "The abstraction",
     "section": "Glossary",
-    "text": "Glossary\n\n\n\n\n\n\n\n\n\nConcept\nSet/operator term\nSymbol\nCode\n\n\n\n\ncollection of like nodes\nset (level)\n\\(S_k\\)\nLevel\n\n\na single node\nelement\n\\(x\\in S_k\\)\nrow of Level.state\n\n\nlearnable per-node code\nembedding\n\\(a_i\\)\nLevel.embedding\n\n\ncontainment\npartition\n\\(\\pi_k\\!:\\!S_k\\!\\to\\!S_{k+1}\\)\nLevel.parent\n\n\nwithin-set links\nrelation\n\\(E\\subseteq S_k\\times S_k\\)\nLevel.edge_index\n\n\ncontinuum quantity\nfield\n\\(f:\\Omega\\to\\mathbb{R}^c\\)\nField\n\n\ndynamics (GNN)\noperator: ODE+Laplacian\n\\(\\mathcal{O}\\)\nOperator\n\n\nwithin-set op\nlateral\n\\(\\mathcal{O}_E\\)\nLateral\n\n\nup op\nreduction over fibres\n\\(\\sum_\\pi\\)\nAggregate\n\n\ndown op\nlift\n\\(\\pi^{*}\\)\nBroadcast\n\n\nset \\(\\leftrightarrow\\) field op\ntransfer\n\\(\\mathcal{S},\\mathcal{G}\\)\nExchange\n\n\nrebuild the relation\nrelations: rewire\n\\(\\mathcal{R}\\!:\\,\\to\\!E\\)\nRewire\n\n\nmake an element\nentities: division\n\\(\\mathcal{B}:x\\!\\mapsto\\!\\{x',x''\\}\\)\nDivide\n\n\nremove an element\nentities: death\n\\(\\mathcal{D}:x\\!\\mapsto\\!\\varnothing\\)\nDie\n\n\nper-element occupancy\noccupancy\n\\(w_i\\in[0,1]\\)\nLevel.occ\n\n\nthe container\nhierarchy\n\\((S_\\bullet,F_\\bullet,\\pi_\\bullet)\\)\nHierarchy\n\n\nthe model\ncomposition of ops\n\\(\\mathcal{O}_n\\!\\circ\\!\\cdots\\!\\circ\\!\\mathcal{O}_1\\)\nSchedule"
+    "text": "Glossary\n\n\n\n\n\n\n\n\n\nConcept\nSet/operator term\nSymbol\nCode\n\n\n\n\ncollection of like nodes\nset (level)\n\\(S_k\\)\nLevel\n\n\na single node\nelement\n\\(x\\in S_k\\)\nrow of Level.state\n\n\nlearnable per-node code\nembedding\n\\(a_i\\)\nLevel.embedding\n\n\ncontainment\npartition\n\\(\\pi_k\\!:\\!S_k\\!\\to\\!S_{k+1}\\)\nLevel.parent\n\n\nwithin-set links\nrelation\n\\(E\\subseteq S_k\\times S_k\\)\nLevel.edge_index\n\n\ncontinuum quantity\nfield\n\\(f:\\Omega\\to\\mathbb{R}^c\\)\nField\n\n\ndynamics (GNN)\noperator: ODE+Laplacian\n\\(\\mathcal{O}\\)\nOperator\n\n\nwithin-set op\nlateral\n\\(\\mathcal{O}_E\\)\nLateral\n\n\nup op\nreduction over fibres\n\\(\\sum_\\pi\\)\nAggregate\n\n\ndown op\nlift\n\\(\\pi^{*}\\)\nBroadcast\n\n\nset \\(\\leftrightarrow\\) field op\ntransfer\npush / pull\nExchange\n\n\nrebuild the relation\nrelations: rewire\n\\(\\mathcal{R}\\!:\\,\\to\\!E\\)\nRewire\n\n\nmake an element\nentities: division\n\\(\\mathcal{B}:x\\!\\mapsto\\!\\{x',x''\\}\\)\nDivide\n\n\nremove an element\nentities: death\n\\(\\mathcal{D}:x\\!\\mapsto\\!\\varnothing\\)\nDie\n\n\nper-element occupancy\noccupancy\n\\(w_i\\in[0,1]\\)\nLevel.occ\n\n\nthe container\nhierarchy\n\\((S_\\bullet,F_\\bullet,\\pi_\\bullet)\\)\nHierarchy\n\n\nthe model\ncomposition of ops\n\\(\\mathcal{O}_n\\!\\circ\\!\\cdots\\!\\circ\\!\\mathcal{O}_1\\)\nSchedule"
   },
   {
     "objectID": "inverse.html",
@@ -1750,27 +1414,6 @@
     "text": "Minimal spec\noperators:\n  - {op: advance, at: cell}"
   },
   {
-    "objectID": "library/advance.html#typical-schedules",
-    "href": "library/advance.html#typical-schedules",
-    "title": "advance",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/advance.html#identifiability",
-    "href": "library/advance.html#identifiability",
-    "title": "advance",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/advance.html#failure-modes",
-    "href": "library/advance.html#failure-modes",
-    "title": "advance",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/advance.html#related-operators",
     "href": "library/advance.html#related-operators",
     "title": "advance",
@@ -1820,27 +1463,6 @@
     "text": "Minimal spec\noperators:\n  - {op: aggregate, at: cell}"
   },
   {
-    "objectID": "library/aggregate.html#typical-schedules",
-    "href": "library/aggregate.html#typical-schedules",
-    "title": "aggregate",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/aggregate.html#identifiability",
-    "href": "library/aggregate.html#identifiability",
-    "title": "aggregate",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/aggregate.html#failure-modes",
-    "href": "library/aggregate.html#failure-modes",
-    "title": "aggregate",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/aggregate.html#related-operators",
     "href": "library/aggregate.html#related-operators",
     "title": "aggregate",
@@ -1866,7 +1488,7 @@
     "href": "library/apply_material_map.html#role-in-plexus",
     "title": "apply_material_map",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — from, target\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D, 3D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — from, target\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D, 3D."
   },
   {
     "objectID": "library/apply_material_map.html#mechanism",
@@ -1895,27 +1517,6 @@
     "title": "apply_material_map",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: apply_material_map, at: particle, from: ..., target: ...}"
-  },
-  {
-    "objectID": "library/apply_material_map.html#typical-schedules",
-    "href": "library/apply_material_map.html#typical-schedules",
-    "title": "apply_material_map",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/apply_material_map.html#identifiability",
-    "href": "library/apply_material_map.html#identifiability",
-    "title": "apply_material_map",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/apply_material_map.html#failure-modes",
-    "href": "library/apply_material_map.html#failure-modes",
-    "title": "apply_material_map",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/apply_material_map.html#mechanism-search-tags",
@@ -1965,27 +1566,6 @@
     "title": "bounce_3d",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: bounce_3d, at: cell}"
-  },
-  {
-    "objectID": "library/bounce_3d.html#typical-schedules",
-    "href": "library/bounce_3d.html#typical-schedules",
-    "title": "bounce_3d",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/bounce_3d.html#identifiability",
-    "href": "library/bounce_3d.html#identifiability",
-    "title": "bounce_3d",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/bounce_3d.html#failure-modes",
-    "href": "library/bounce_3d.html#failure-modes",
-    "title": "bounce_3d",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/bounce_3d.html#related-operators",
@@ -2072,27 +1652,6 @@
     "text": "Minimal spec\noperators:\n  - {op: cohesion, at: particle}"
   },
   {
-    "objectID": "library/cohesion.html#typical-schedules",
-    "href": "library/cohesion.html#typical-schedules",
-    "title": "cohesion",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/cohesion.html#identifiability",
-    "href": "library/cohesion.html#identifiability",
-    "title": "cohesion",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/cohesion.html#failure-modes",
-    "href": "library/cohesion.html#failure-modes",
-    "title": "cohesion",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/cohesion.html#mechanism-search-tags",
     "href": "library/cohesion.html#mechanism-search-tags",
     "title": "cohesion",
@@ -2125,7 +1684,7 @@
     "href": "library/deposit.html#role-in-plexus",
     "title": "deposit",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — cell (the level the operator runs at).\nReads — to\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D, 3D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — cell (the level the operator runs at).\nReads — to\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D, 3D."
   },
   {
     "objectID": "library/deposit.html#mechanism",
@@ -2156,27 +1715,6 @@
     "text": "Minimal spec\noperators:\n  - {op: deposit, at: cell, to: ...}"
   },
   {
-    "objectID": "library/deposit.html#typical-schedules",
-    "href": "library/deposit.html#typical-schedules",
-    "title": "deposit",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/deposit.html#identifiability",
-    "href": "library/deposit.html#identifiability",
-    "title": "deposit",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/deposit.html#failure-modes",
-    "href": "library/deposit.html#failure-modes",
-    "title": "deposit",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/deposit.html#related-operators",
     "href": "library/deposit.html#related-operators",
     "title": "deposit",
@@ -2202,7 +1740,7 @@
     "href": "library/g2p.html#role-in-plexus",
     "title": "g2p",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — –\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — –\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
   },
   {
     "objectID": "library/g2p.html#mechanism",
@@ -2231,27 +1769,6 @@
     "title": "g2p",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: g2p, at: particle}"
-  },
-  {
-    "objectID": "library/g2p.html#typical-schedules",
-    "href": "library/g2p.html#typical-schedules",
-    "title": "g2p",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/g2p.html#identifiability",
-    "href": "library/g2p.html#identifiability",
-    "title": "g2p",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/g2p.html#failure-modes",
-    "href": "library/g2p.html#failure-modes",
-    "title": "g2p",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/g2p.html#mechanism-search-tags",
@@ -2314,7 +1831,7 @@
     "href": "library/mls_mpm_mechanics.html#role-in-plexus",
     "title": "mls_mpm_mechanics",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — youngs, C, F, mass, mu, la, p_vol (per-type props: youngs)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D.\nTransitional — wraps a mature multi-mechanism subsystem (fenced; scheduled for decomposition)."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — youngs, C, F, mass, mu, la, p_vol (per-type props: youngs)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D.\nTransitional — wraps a mature multi-mechanism subsystem (fenced; scheduled for decomposition)."
   },
   {
     "objectID": "library/mls_mpm_mechanics.html#mechanism",
@@ -2336,27 +1853,6 @@
     "title": "mls_mpm_mechanics",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: mls_mpm_mechanics, at: particle}"
-  },
-  {
-    "objectID": "library/mls_mpm_mechanics.html#typical-schedules",
-    "href": "library/mls_mpm_mechanics.html#typical-schedules",
-    "title": "mls_mpm_mechanics",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/mls_mpm_mechanics.html#identifiability",
-    "href": "library/mls_mpm_mechanics.html#identifiability",
-    "title": "mls_mpm_mechanics",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/mls_mpm_mechanics.html#failure-modes",
-    "href": "library/mls_mpm_mechanics.html#failure-modes",
-    "title": "mls_mpm_mechanics",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/mls_mpm_mechanics.html#mechanism-search-tags",
@@ -2447,7 +1943,7 @@
     "href": "library/p2g.html#role-in-plexus",
     "title": "p2g",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — youngs (per-type props: youngs)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — youngs (per-type props: youngs)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
   },
   {
     "objectID": "library/p2g.html#mechanism",
@@ -2476,27 +1972,6 @@
     "title": "p2g",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: p2g, at: particle}"
-  },
-  {
-    "objectID": "library/p2g.html#typical-schedules",
-    "href": "library/p2g.html#typical-schedules",
-    "title": "p2g",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/p2g.html#identifiability",
-    "href": "library/p2g.html#identifiability",
-    "title": "p2g",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/p2g.html#failure-modes",
-    "href": "library/p2g.html#failure-modes",
-    "title": "p2g",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/p2g.html#mechanism-search-tags",
@@ -2583,27 +2058,6 @@
     "text": "Minimal spec\noperators:\n  - {op: playback, at: field}"
   },
   {
-    "objectID": "library/playback.html#typical-schedules",
-    "href": "library/playback.html#typical-schedules",
-    "title": "playback",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/playback.html#identifiability",
-    "href": "library/playback.html#identifiability",
-    "title": "playback",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/playback.html#failure-modes",
-    "href": "library/playback.html#failure-modes",
-    "title": "playback",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
-  },
-  {
     "objectID": "library/playback.html#related-operators",
     "href": "library/playback.html#related-operators",
     "title": "playback",
@@ -2629,7 +2083,7 @@
     "href": "library/pulse_to_active_stress.html#role-in-plexus",
     "title": "pulse_to_active_stress",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — from, direction_from\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — from, direction_from\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
   },
   {
     "objectID": "library/pulse_to_active_stress.html#mechanism",
@@ -2658,27 +2112,6 @@
     "title": "pulse_to_active_stress",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: pulse_to_active_stress, at: particle, from: ..., direction_from: ...}"
-  },
-  {
-    "objectID": "library/pulse_to_active_stress.html#typical-schedules",
-    "href": "library/pulse_to_active_stress.html#typical-schedules",
-    "title": "pulse_to_active_stress",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/pulse_to_active_stress.html#identifiability",
-    "href": "library/pulse_to_active_stress.html#identifiability",
-    "title": "pulse_to_active_stress",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/pulse_to_active_stress.html#failure-modes",
-    "href": "library/pulse_to_active_stress.html#failure-modes",
-    "title": "pulse_to_active_stress",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/pulse_to_active_stress.html#mechanism-search-tags",
@@ -2713,7 +2146,7 @@
     "href": "library/sense.html#role-in-plexus",
     "title": "sense",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — cell (the level the operator runs at).\nReads — from, turn_speed, sensor_angle, sensor_dist, sensor_size (per-type props: turn_speed, sensor_angle, sensor_dist, sensor_size)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — cell (the level the operator runs at).\nReads — from, turn_speed, sensor_angle, sensor_dist, sensor_size (per-type props: turn_speed, sensor_angle, sensor_dist, sensor_size)\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
   },
   {
     "objectID": "library/sense.html#mechanism",
@@ -2742,27 +2175,6 @@
     "title": "sense",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: sense, at: cell, from: ...}"
-  },
-  {
-    "objectID": "library/sense.html#typical-schedules",
-    "href": "library/sense.html#typical-schedules",
-    "title": "sense",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/sense.html#identifiability",
-    "href": "library/sense.html#identifiability",
-    "title": "sense",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/sense.html#failure-modes",
-    "href": "library/sense.html#failure-modes",
-    "title": "sense",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/sense.html#mechanism-search-tags",
@@ -2826,27 +2238,6 @@
     "title": "separation",
     "section": "Minimal spec",
     "text": "Minimal spec\noperators:\n  - {op: separation, at: particle}"
-  },
-  {
-    "objectID": "library/separation.html#typical-schedules",
-    "href": "library/separation.html#typical-schedules",
-    "title": "separation",
-    "section": "Typical schedules",
-    "text": "Typical schedules\nWhere this operator sits in a pipeline — to be written."
-  },
-  {
-    "objectID": "library/separation.html#identifiability",
-    "href": "library/separation.html#identifiability",
-    "title": "separation",
-    "section": "Identifiability",
-    "text": "Identifiability\nWhat observations can (and cannot) recover this operator’s parameters — to be written."
-  },
-  {
-    "objectID": "library/separation.html#failure-modes",
-    "href": "library/separation.html#failure-modes",
-    "title": "separation",
-    "section": "Failure modes",
-    "text": "Failure modes\nWhat breaks under bad parameters — to be written."
   },
   {
     "objectID": "library/separation.html#mechanism-search-tags",
@@ -3000,7 +2391,7 @@
     "href": "library/pulse_to_contraction.html#role-in-plexus",
     "title": "pulse_to_contraction",
     "section": "Role in Plexus",
-    "text": "Role in Plexus\n\nKind — \\(\\mathcal{S},\\mathcal{G}\\) Exchange: set ↔︎ field push / pull.\nActs on — particle (the level the operator runs at).\nReads — from\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
+    "text": "Role in Plexus\n\nKind — push / pull Exchange: set ↔︎ field.\nActs on — particle (the level the operator runs at).\nReads — from\nWrites / returns — emits no integrated force — it mutates a field / relation / membership, or feeds a substep.\nPrediction — none.\nDimensions — 2D."
   },
   {
     "objectID": "library/pulse_to_contraction.html#mechanism",
