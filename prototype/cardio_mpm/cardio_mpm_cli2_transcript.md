@@ -28,3 +28,28 @@ Replaced `amplitude_15_abl` (mislabeled — was just an amp variant, not an abla
 ### No user_input.md found — no pending user input to acknowledge.
 
 Ready for launch on your signal.
+
+
+================================================================================
+## START -- 2026-06-24 11:20:28
+================================================================================
+## Phase 2 Batch 1 — Plan Rewritten
+
+**Parent:** fibre_wl40 (Phase 1 atlas winner: aspect 0.35, angle 3.06 rad, most elliptical/rotated morphology).
+
+**Hypothesis:** "The fibre_wl40 parametric family, inverse-fit on the real beat via 12 learnable pattern scalars + pulse duration, will achieve positive interior R² when amplitude, fibre_angle, gain_wl, and drag are set to values within the atlas-identified morphology-rich region. The key axes to probe are: (a) does amp15 help the inverse as it did in the old track, or collapse as in the forward atlas? (b) does fibre_angle 0.3 improve chirality match as the atlas showed? (c) does finer gain_wl improve spatial R²? (d) does drag60 help the inverse as in the old track? (e) is stiffness learning a dead lever (freeze_stiff ablation)?"
+
+**6 slots (each ONE knob from parent):**
+
+| Slot | Name | Change from parent | Rationale |
+|------|------|--------------------|-----------|
+| s0 | `parent_wl40` | control (amp10, drag30) | Baseline — the Phase 1 winner as-is |
+| s1 | `amplitude15` | `--amplitude 15` | Upper bound of [10,15] constraint; old inverse winner (Est.#27); did the inverse learn structure that harnesses amp15, or does it collapse as in forward atlas (Q24)? |
+| s2 | `fibre_angle_0.3` | `--fibre_angle 0.3` | Atlas best chirality (0.58 vs 0.46); tests if halved rotation improves real-beat handedness match |
+| s3 | `gain_wl_16` | `--gain_wl 16` | Finer gain spatial structure (16 vs 26); tests if sharper per-pixel gain modulation improves R² |
+| s4 | `drag60` | `--drag_k 60` | Atlas most open/elliptical; old inverse track: drag UP was the lever (Est.#14); tests quasi-static regime |
+| s5 | `freeze_stiff_abl` | `--freeze_stiff 1` | ABLATION: stiffness was ~inert in Phase 1 (Est.#29); tests whether learning 4 stiffness params adds anything |
+
+**Changes from the seed plan:** Replaced `drag15` and `drag6` (drag DOWN, wrong direction per ledger) with `amplitude15` (essential upper-constraint test) and `drag60` (atlas + old track both say drag UP helps). All other slots retained.
+
+Ready to launch on your signal.
