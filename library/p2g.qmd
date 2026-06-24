@@ -48,8 +48,6 @@ scatters mass, momentum and the liquid colour field onto the background grid via
 quadratic B-spline weights. Writes the `mpm_grid` field; returns {}. Step 2 of the
 decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
 
-## Equation
-
 $$
 \boldsymbol\sigma = 2\mu(\mathbf F-\mathbf R)\mathbf F^{\!\top} + \lambda(J-1)J\,\mathbf I,
 \qquad

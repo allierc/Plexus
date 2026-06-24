@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
   <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
@@ -282,9 +281,6 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>The <code>centroid</code> reduction: a parent’s position is the occupancy-weighted mean of its children’s positions (a cell’s position = the centroid of its particles). This is a DERIVED readout, not an integrated force, so it writes the parent’s position directly and declares MAY_MUTATE_INTEGRATED_STATE to opt out of the integration guard; returns {}.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 \mathbf x_P \;=\; \frac{\sum_{i\in P} o_i\,\mathbf x_i}{\sum_{i\in P} o_i}
 \]</span> The occupancy-weighted centroid of a parent <span class="math inline">\(P\)</span>’s children (<span class="math inline">\(o_i\)</span> = occupancy). A derived readout written straight onto the parent, not an integrated force.</p>

@@ -57,8 +57,6 @@ wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer
 Default direction is -y (down). Override `gx`/`gy` for an incline or sideways pull
 (e.g. a tilted-gravity slosh).
 
-## Equation
-
 $$
 \mathbf a_{\text{ext}} \;=\; \mathbf g \qquad (\text{default } \mathbf g=(0,-g_y))
 $$

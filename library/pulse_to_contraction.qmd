@@ -49,8 +49,6 @@ as the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counte
 of the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)
 points toward the centre, so
 
-    F_i = sign * amplitude * grad(a)(x_i)          sign = +1 (inward) / -1 (outward)
-
 contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
 mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).
 
@@ -58,8 +56,6 @@ mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).
 particle set (g2p owns advection) -- the force enters mechanics only through the MPM
 substep. The engine's `zero_delta` resets the delta each outer tick, and the substep
 loop reads that constant body force on each of its iterations.
-
-## Equation
 
 $$
 \mathbf F_i \;=\;

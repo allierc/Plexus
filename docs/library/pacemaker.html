@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -285,11 +284,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>The temporal half of an active-stimulus decomposition (clock -&gt; activation field -&gt; contraction -&gt; mechanics). It owns ONLY timing: it emits a scalar p(t) in [0,1] on a fixed period and writes it to <code>H.signals[name]</code> – a scalar side-channel (the same pattern as <code>H.part_accel</code>) that any downstream operator reads by name. It knows nothing about space or mechanics, so one pacemaker can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or a secretion; <code>pacemaker_A</code>/<code>pacemaker_B</code> with different <code>period</code>/<code>phase</code> make a multi-site pacing graph.</p>
 <p>p(t) is a smooth raised bump of width <code>duration</code>, once per <code>period</code>, offset by <code>phase</code> (all in OUTER ticks, i.e.&nbsp;<code>H.frame</code>):</p>
-<pre><code>s = (frame + phase) mod period;   p = sin(pi * s / duration)  if s &lt; duration else 0</code></pre>
 <p>Set <code>period &gt;= n_frames</code> for a one-shot pulse. <code>kind=field</code> (emits no set delta); its <code>at:</code> is only a scheduling anchor (any declared field) – it mutates only <code>H.signals</code>.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 p(t) \;=\;
 \begin{cases}
@@ -335,8 +330,8 @@ p(t) \;=\;
 </section>
 <section id="minimal-spec" class="level2">
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> pacemaker</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> field</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> pacemaker</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> field</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
@@ -349,57 +344,57 @@ p(t) \;=\;
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
 <p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pacemaker.py"><code>src/plexus/operators/pacemaker.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""pacemaker -- a clocked scalar SOURCE: a periodic activation signal p(t).</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">The temporal half of an active-stimulus decomposition</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">(clock -&gt; activation field -&gt; contraction -&gt; mechanics). It owns ONLY timing: it</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">emits a scalar p(t) in [0,1] on a fixed period and writes it to `H.signals[name]`</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- a scalar side-channel (the same pattern as `H.part_accel`) that any downstream</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">operator reads by name. It knows nothing about space or mechanics, so one pacemaker</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">a secretion; `pacemaker_A`/`pacemaker_B` with different `period`/`phase` make a</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">multi-site pacing graph.</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">p(t) is a smooth raised bump of width `duration`, once per `period`, offset by</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">`phase` (all in OUTER ticks, i.e. `H.frame`):</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">    s = (frame + phase) mod period;   p = sin(pi * s / duration)  if s &lt; duration else 0</span></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">Set `period &gt;= n_frames` for a one-shot pulse. `kind=field` (emits no set delta); its</span></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">`at:` is only a scheduling anchor (any declared field) -- it mutates only `H.signals`.</span></span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> FieldUpdate</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"pacemaker"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Pacemaker(FieldUpdate):</span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"periodic_source"</span>, <span class="st">"clock"</span>, <span class="st">"pacemaker"</span>]</span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"period"</span>: <span class="st">"beat_interval"</span>, <span class="st">"duration"</span>: <span class="st">"active_width"</span>, <span class="st">"phase"</span>: <span class="st">"beat_offset"</span>}</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.signal <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"name"</span>, <span class="st">"pacemaker"</span>))   <span class="co"># the H.signals key it writes</span></span>
-<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.period <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"period"</span>, <span class="fl">180.0</span>))     <span class="co"># ticks between beats</span></span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.duration <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"duration"</span>, <span class="fl">20.0</span>))  <span class="co"># active width (ticks)</span></span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.phase <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"phase"</span>, <span class="fl">0.0</span>))         <span class="co"># tick offset</span></span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> clock(<span class="va">self</span>, frame: <span class="bu">int</span>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>        s <span class="op">=</span> (frame <span class="op">+</span> <span class="va">self</span>.phase) <span class="op">%</span> <span class="va">self</span>.period</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> s <span class="op">&lt;</span> <span class="va">self</span>.duration:</span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> math.sin(math.pi <span class="op">*</span> s <span class="op">/</span> <span class="bu">max</span>(<span class="va">self</span>.duration, <span class="fl">1e-9</span>))   <span class="co"># smooth 0 -&gt; 1 -&gt; 0 bump</span></span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.0</span></span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">getattr</span>(H, <span class="st">"signals"</span>, <span class="va">None</span>) <span class="kw">is</span> <span class="va">None</span>:</span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>            H.signals <span class="op">=</span> {}</span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        H.signals[<span class="va">self</span>.signal] <span class="op">=</span> <span class="bu">float</span>(<span class="va">self</span>.clock(<span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="dv">0</span>))))</span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""pacemaker -- a clocked scalar SOURCE: a periodic activation signal p(t).</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">The temporal half of an active-stimulus decomposition</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">(clock -&gt; activation field -&gt; contraction -&gt; mechanics). It owns ONLY timing: it</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">emits a scalar p(t) in [0,1] on a fixed period and writes it to `H.signals[name]`</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- a scalar side-channel (the same pattern as `H.part_accel`) that any downstream</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">operator reads by name. It knows nothing about space or mechanics, so one pacemaker</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">a secretion; `pacemaker_A`/`pacemaker_B` with different `period`/`phase` make a</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">multi-site pacing graph.</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">p(t) is a smooth raised bump of width `duration`, once per `period`, offset by</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">`phase` (all in OUTER ticks, i.e. `H.frame`):</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">    s = (frame + phase) mod period;   p = sin(pi * s / duration)  if s &lt; duration else 0</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">Set `period &gt;= n_frames` for a one-shot pulse. `kind=field` (emits no set delta); its</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">`at:` is only a scheduling anchor (any declared field) -- it mutates only `H.signals`.</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> FieldUpdate</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"pacemaker"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Pacemaker(FieldUpdate):</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"periodic_source"</span>, <span class="st">"clock"</span>, <span class="st">"pacemaker"</span>]</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"period"</span>: <span class="st">"beat_interval"</span>, <span class="st">"duration"</span>: <span class="st">"active_width"</span>, <span class="st">"phase"</span>: <span class="st">"beat_offset"</span>}</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.signal <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"name"</span>, <span class="st">"pacemaker"</span>))   <span class="co"># the H.signals key it writes</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.period <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"period"</span>, <span class="fl">180.0</span>))     <span class="co"># ticks between beats</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.duration <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"duration"</span>, <span class="fl">20.0</span>))  <span class="co"># active width (ticks)</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.phase <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"phase"</span>, <span class="fl">0.0</span>))         <span class="co"># tick offset</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> clock(<span class="va">self</span>, frame: <span class="bu">int</span>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        s <span class="op">=</span> (frame <span class="op">+</span> <span class="va">self</span>.phase) <span class="op">%</span> <span class="va">self</span>.period</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> s <span class="op">&lt;</span> <span class="va">self</span>.duration:</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> math.sin(math.pi <span class="op">*</span> s <span class="op">/</span> <span class="bu">max</span>(<span class="va">self</span>.duration, <span class="fl">1e-9</span>))   <span class="co"># smooth 0 -&gt; 1 -&gt; 0 bump</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.0</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">getattr</span>(H, <span class="st">"signals"</span>, <span class="va">None</span>) <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>            H.signals <span class="op">=</span> {}</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        H.signals[<span class="va">self</span>.signal] <span class="op">=</span> <span class="bu">float</span>(<span class="va">self</span>.clock(<span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="dv">0</span>))))</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

@@ -47,8 +47,6 @@ F <- (I + dt C) F, then the per-material correction: liquid drops shape memory
 ratio Jp. Writes the aux buffers F / Jp in place; returns {}. Step 1 of the decomposed
 MLS-MPM (oracle: `mls_mpm_mechanics`).
 
-## Equation
-
 $$
 \mathbf F \;\leftarrow\; (\mathbf I + \Delta t\,\mathbf C)\,\mathbf F
 \qquad\text{(liquid: } \mathbf F\leftarrow J^{1/d}\mathbf I,\ J=\det\mathbf F\text{)}

@@ -2,30 +2,30 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "The abstraction",
+    "title": "Plexus",
     "section": "",
     "text": "Operators adapted from prior work. Plexus re-implements published simulation code as registered operators: attraction–repulsion, boids, and rock–paper–scissors reaction–diffusion from ParticleGraph; the slime-mould (Physarum) agent from Sebastian Lague’s Slime-Simulation; the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from The Well (Ohana et al., NeurIPS 2024); and the ciliate microswimmer from Liu, Costello & Kanso (Nat. Commun. 2025).\nBiology is not a single graph.\nA graph fixes one kind of node and one kind of edge — particles and the forces between them, cells and their contacts, neurons and synapses, molecular species and reactions. Each existing framework commits to one such graph and models that layer alone. But a living system is several of these at once, nested inside one another: particles make up cells, and cells make up tissues and populations. And every level may be coupled to continuous fields — a morphogen gradient, a pressure field, a chemical signal — that the discrete entities both shape and read. Choose any single graph and you capture one slice — the couplings between slices, where much of the biology lives, fall outside it.\nRather than building another domain-specific simulator, Plexus introduces a common representation based on hierarchical sets, continuous fields, and a small collection of operators acting between them. Cells contain particles and metabolites. State moves through just four operators — lateral (within a set), aggregate (upward), broadcast (downward), and exchange (between sets and fields). Complex simulations emerge from composing a few primitive operations."
   },
   {
     "objectID": "index.html#a-language-and-a-calculus-two-layers-that-never-touch",
     "href": "index.html#a-language-and-a-calculus-two-layers-that-never-touch",
-    "title": "The abstraction",
+    "title": "Plexus",
     "section": "A language and a calculus — two layers that never touch",
     "text": "A language and a calculus — two layers that never touch\nPlexus is two things at once, kept strictly apart:\n\na language — a small, declarative specification (spec.yaml) that names the sets, fields, operators, and schedule of a system. This is what a living system is.\na calculus — the registered operators and the engine that composes and integrates them. A simulation is a composition of operators, declared as a Schedule; in math terms, one tick is the composition \\(\\Phi = \\mathcal{O}_n \\circ \\cdots \\circ \\mathcal{O}_1\\), iterated as \\(x_{t+1}=\\Phi(x_t)\\) and kept differentiable throughout. This is how it evolves.\n\nBoth layers are built from explicit, named primitives. And because those primitives are explicit and differentiable, the same language serves prediction, inverse inference, and the optimization of biological designs alike.\nThe two meet at exactly one place — the validated spec — and never touch directly. The code owns everything below the spec: the registered operators and the engine that runs them. The language owns everything above it: the spec that names the sets, fields, operators, and schedule of a system.\nThis separation becomes important the moment the framework is connected to an LLM. The LLM works only in the language layer — it reads, edits, and generates the spec — and never touches the codebase: it never writes engine code, and the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.\nThe practical payoff: a new behaviour is a new sentence in the language, not a new program. A short prompt becomes a running, differentiable simulation with no code written —\n\nPrompt — “100 cells; the soft ones secrete a chemical and climb it, so they clump together; the stiff ones ignore it.”\n\nthe LLM compiles it to a specification:\nname: aggregate\nsets:\n  cell: {n: 100, types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}}\n  particle: {parent: cell, per_parent: 100, radius: 0.02}\nfields:\n  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}\noperators:\n  - {op: secrete, at: \"cell[type=soft]\", to: chemical, rate: 1.0}    # only soft cells make it\n  - {op: sense,   at: \"cell[type=soft]\", from: chemical, gain: 150}  # only soft cells follow it\n  - {op: mpm,     at: particle, n_grid: 128, a_max: 800, drag: 4}\nschedule: [aggregate, secrete, chemical.diffuse, sense, mpm]\nand the engine resolves each op against the registry and runs it — producing the aggregate result shown below. No operator was written; the selector cell[type=soft] did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the LLM ↔︎ registry page."
   },
   {
     "objectID": "index.html#what-it-looks-like",
     "href": "index.html#what-it-looks-like",
-    "title": "The abstraction",
+    "title": "Plexus",
     "section": "What it looks like",
     "text": "What it looks like\nQualitatively different dynamical systems expressed within the same language. Each simulation is constructed from the same primitives—sets, fields, operators, and schedules—yet gives rise to distinct collective behaviours spanning flocking, morphogenesis, fluid mechanics, reaction–diffusion, and active matter.\n\n\n  flocking — boids move as one from local rules\n  networks — a self-organizing Physarum web\n  competition — six-species rock–paper–scissors spirals\n  fields — a Gray–Scott reaction–diffusion pattern\n\nAnd because every simulation is differentiable, biological designs can be optimized. Below, a foraging colony in a maze is tuned by a UCB algorithm — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.\n\n\n\n\n\n\n\n\n\n\n\n\n\nThe same recipe scales to harder navigation — a porous pillar field and a walled maze, each crossed by a self-generated attractant gradient and tuned by the same optimizer. Each is shown from its starting point to the optimized colony (see Simulations for the full runs):"
   },
   {
     "objectID": "index.html#read-the-blueprint",
     "href": "index.html#read-the-blueprint",
-    "title": "The abstraction",
+    "title": "Plexus",
     "section": "Read the blueprint",
-    "text": "Read the blueprint\nThis site distils a working prototype into a single blueprint, in three parts:\n\nThe abstraction — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.\nLLM ↔︎ registry — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.\nSimulations — ten distinct simulations, an emergent ant-trail model, and a maze-foraging colony optimized end-to-end.\n\nA static version with full schematics and glossary is in paper/plexus.pdf.\n\n\nPlexus is built from two kinds of object — sets and fields — and a small collection of operators that move information, force, state, or membership between them. A model is a schedule: an ordered composition of operators, iterated over time. Those four words — sets, fields, operators, schedules — are the whole vocabulary, and they are the missing primitive: the place where particle mechanics, cellular interaction, neural dynamics, and reaction networks all become the same kind of thing."
+    "text": "Read the blueprint\nThis site distils a working prototype into a single blueprint, in three parts:\n\nThe abstraction — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.\nLLM ↔︎ registry — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.\nSimulations — ten distinct simulations, an emergent ant-trail model, and a maze-foraging colony optimized end-to-end.\n\nA static version with full schematics and glossary is in paper/plexus.pdf."
   },
   {
     "objectID": "library/diffuse.html",
@@ -46,14 +46,7 @@
     "href": "library/diffuse.html#mechanism",
     "title": "diffuse",
     "section": "Mechanism",
-    "text": "Mechanism\nA per-channel 3x3 box-blur lerp: c &lt;- (1-w)c + wmean_3x3(c), with w = saturate( rate*dt). mean_3x3(c) - c is a discrete Laplacian, so this is one explicit step of dc/dt = D nabla^2 c (the shader’s Diffuse, edge-clamped). Writes the field in place; returns {}."
-  },
-  {
-    "objectID": "library/diffuse.html#equation",
-    "href": "library/diffuse.html#equation",
-    "title": "diffuse",
-    "section": "Equation",
-    "text": "Equation\n\\[\nc \\;\\leftarrow\\; (1-w)\\,c \\;+\\; w\\,\\overline{c}_{3\\times3},\n\\qquad w=\\operatorname{sat}(\\text{rate}\\cdot\\Delta t)\n\\] \\(\\overline{c}_{3\\times3}-c\\) is a discrete Laplacian, so this is one explicit step of \\(\\partial_t c = D\\,\\nabla^2 c\\) (3×3 in 2D, 3×3×3 in 3D)."
+    "text": "Mechanism\nA per-channel 3x3 box-blur lerp: c &lt;- (1-w)c + wmean_3x3(c), with w = saturate( rate*dt). mean_3x3(c) - c is a discrete Laplacian, so this is one explicit step of dc/dt = D nabla^2 c (the shader’s Diffuse, edge-clamped). Writes the field in place; returns {}.\n\\[\nc \\;\\leftarrow\\; (1-w)\\,c \\;+\\; w\\,\\overline{c}_{3\\times3},\n\\qquad w=\\operatorname{sat}(\\text{rate}\\cdot\\Delta t)\n\\] \\(\\overline{c}_{3\\times3}-c\\) is a discrete Laplacian, so this is one explicit step of \\(\\partial_t c = D\\,\\nabla^2 c\\) (3×3 in 2D, 3×3×3 in 3D)."
   },
   {
     "objectID": "library/diffuse.html#parameters",
@@ -263,14 +256,7 @@
     "href": "library/separation.html#mechanism",
     "title": "separation",
     "section": "Mechanism",
-    "text": "Mechanism\nAvoid crowding at short range: -a3 * w^s_i * mean_j (pos_j - pos_i)/|d_ij|^2, with the per-receiver weight w^s the type’s named separation property. The 1/|d|^2 relies on the radius graph’s min_radius so coincident neighbours don’t blow up. One of the three rules whose deltas the engine sums to make a flock; see also cohesion, alignment."
-  },
-  {
-    "objectID": "library/separation.html#equation",
-    "href": "library/separation.html#equation",
-    "title": "separation",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf a_i \\;=\\; -\\,a_3\\,w^s_i\\,\n\\Big\\langle \\frac{\\mathbf x_j-\\mathbf x_i}{\\lVert\\mathbf x_j-\\mathbf x_i\\rVert^{2}}\\Big\\rangle_{j\\in\\mathcal N(i)}\n\\] The boids anti-crowding rule: push away from close neighbours, weighted by \\(1/\\lVert d\\rVert^{2}\\). The graph’s min_radius keeps coincident neighbours finite."
+    "text": "Mechanism\nAvoid crowding at short range: -a3 * w^s_i * mean_j (pos_j - pos_i)/|d_ij|^2, with the per-receiver weight w^s the type’s named separation property. The 1/|d|^2 relies on the radius graph’s min_radius so coincident neighbours don’t blow up. One of the three rules whose deltas the engine sums to make a flock; see also cohesion, alignment.\n\\[\n\\mathbf a_i \\;=\\; -\\,a_3\\,w^s_i\\,\n\\Big\\langle \\frac{\\mathbf x_j-\\mathbf x_i}{\\lVert\\mathbf x_j-\\mathbf x_i\\rVert^{2}}\\Big\\rangle_{j\\in\\mathcal N(i)}\n\\] The boids anti-crowding rule: push away from close neighbours, weighted by \\(1/\\lVert d\\rVert^{2}\\). The graph’s min_radius keeps coincident neighbours finite."
   },
   {
     "objectID": "library/separation.html#parameters",
@@ -326,14 +312,7 @@
     "href": "library/sense.html#mechanism",
     "title": "sense",
     "section": "Mechanism",
-    "text": "Mechanism\nEach agent reads the field at three sensors (ahead-left / ahead / ahead-right), each a windowed, species-weighted sum (own channel +1, other channels cross), then turns its heading toward the strongest reading (Lague’s 4-branch steer, scaled by a random strength). Reads per-agent sensor parameters the engine broadcast from types. Mutates cell.heading in place; returns {}."
-  },
-  {
-    "objectID": "library/sense.html#equation",
-    "href": "library/sense.html#equation",
-    "title": "sense",
-    "section": "Equation",
-    "text": "Equation\n\\[\nS_k = \\!\\!\\sum_{\\mathbf p\\in W_k}\\!\\Big(c_{\\text{own}}(\\mathbf p) + \\kappa\\!\\!\\sum_{s\\ne\\text{own}}\\!\\! c_s(\\mathbf p)\\Big),\n\\quad k\\in\\{L,C,R\\};\n\\qquad\n\\theta_i \\leftarrow \\theta_i + \\Delta\\theta\\cdot\\operatorname*{arg\\,turn}_k S_k\n\\] Reads the field in three windows \\(W_k\\) (ahead-left / ahead / ahead-right), each a species-weighted sum (own channel \\(+1\\), others \\(\\kappa\\) = cross), and turns the heading toward the strongest (Lague’s 4-branch steer)."
+    "text": "Mechanism\nEach agent reads the field at three sensors (ahead-left / ahead / ahead-right), each a windowed, species-weighted sum (own channel +1, other channels cross), then turns its heading toward the strongest reading (Lague’s 4-branch steer, scaled by a random strength). Reads per-agent sensor parameters the engine broadcast from types. Mutates cell.heading in place; returns {}.\n\\[\nS_k = \\!\\!\\sum_{\\mathbf p\\in W_k}\\!\\Big(c_{\\text{own}}(\\mathbf p) + \\kappa\\!\\!\\sum_{s\\ne\\text{own}}\\!\\! c_s(\\mathbf p)\\Big),\n\\quad k\\in\\{L,C,R\\};\n\\qquad\n\\theta_i \\leftarrow \\theta_i + \\Delta\\theta\\cdot\\operatorname*{arg\\,turn}_k S_k\n\\] Reads the field in three windows \\(W_k\\) (ahead-left / ahead / ahead-right), each a species-weighted sum (own channel \\(+1\\), others \\(\\kappa\\) = cross), and turns the heading toward the strongest (Lague’s 4-branch steer)."
   },
   {
     "objectID": "library/sense.html#parameters",
@@ -389,14 +368,7 @@
     "href": "library/pulse_to_active_stress.html#mechanism",
     "title": "pulse_to_active_stress",
     "section": "Mechanism",
-    "text": "Mechanism\nThe mechanical alternative to pulse_to_contraction (the FORCE half). Instead of injecting a per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and elastically recoils -&gt; short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS\nsigma_active(x) = - amplitude * a(x) * n(x) n(x)^T      (n = unit contraction axis)\nonto the side-channel H.active_stress (the same H.part_accel idiom). The MLS-MPM p2g scatter ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at the boundary – coordinated shortening / shear (the “direction map = contraction AXIS” reading), not a pointwise push. This is the standard cardiac active-stress formulation.\nkind=exchange, PREDICTION=None (the stress is consumed by the MPM substep, never engine- integrated). forward() returns NO delta ({}) – it only sets the H.active_stress side-channel, which p2g reads via getattr(H, \"active_stress\", None) (default off: absent -&gt; pure elastic)."
-  },
-  {
-    "objectID": "library/pulse_to_active_stress.html#equation",
-    "href": "library/pulse_to_active_stress.html#equation",
-    "title": "pulse_to_active_stress",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\boldsymbol\\sigma_{\\text{active}}(\\mathbf x) \\;=\\;\n-\\,A\\,a(\\mathbf x)\\,\\mathbf n(\\mathbf x)\\,\\mathbf n(\\mathbf x)^{\\!\\top},\n\\qquad \\lVert\\mathbf n\\rVert=1\n\\] Activation \\(a\\) becomes a rank-1 contractile stress along the unit axis \\(\\mathbf n\\) (\\(A\\) = amplitude). p2g adds it to the elastic stress, so tissue feels its divergence: a patch under uniform \\(-A\\,\\mathbf n\\mathbf n^{\\!\\top}\\) shortens along \\(\\mathbf n\\)."
+    "text": "Mechanism\nThe mechanical alternative to pulse_to_contraction (the FORCE half). Instead of injecting a per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and elastically recoils -&gt; short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS\nonto the side-channel H.active_stress (the same H.part_accel idiom). The MLS-MPM p2g scatter ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at the boundary – coordinated shortening / shear (the “direction map = contraction AXIS” reading), not a pointwise push. This is the standard cardiac active-stress formulation.\nkind=exchange, PREDICTION=None (the stress is consumed by the MPM substep, never engine- integrated). forward() returns NO delta ({}) – it only sets the H.active_stress side-channel, which p2g reads via getattr(H, \"active_stress\", None) (default off: absent -&gt; pure elastic).\n\\[\n\\boldsymbol\\sigma_{\\text{active}}(\\mathbf x) \\;=\\;\n-\\,A\\,a(\\mathbf x)\\,\\mathbf n(\\mathbf x)\\,\\mathbf n(\\mathbf x)^{\\!\\top},\n\\qquad \\lVert\\mathbf n\\rVert=1\n\\] Activation \\(a\\) becomes a rank-1 contractile stress along the unit axis \\(\\mathbf n\\) (\\(A\\) = amplitude). p2g adds it to the elastic stress, so tissue feels its divergence: a patch under uniform \\(-A\\,\\mathbf n\\mathbf n^{\\!\\top}\\) shortens along \\(\\mathbf n\\)."
   },
   {
     "objectID": "library/pulse_to_active_stress.html#parameters",
@@ -452,14 +424,7 @@
     "href": "library/playback.html#mechanism",
     "title": "playback",
     "section": "Mechanism",
-    "text": "Mechanism\nplayback operator that advances it frame by frame.\nSome fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded movie becomes a time-varying scalar field over the domain. The field is pure state (it holds the video buffer and the current grid); playback sets the grid to the current tick’s frame (a field self-update, returns {}). A coupling operator such as chemotaxis then drives the particles from it – the same set&lt;-&gt;field Exchange the slime trail used, but the field is supplied rather than deposited.\nThis is the Plexus form of ParticleGraph’s node_value_map: video_bisons.tif."
-  },
-  {
-    "objectID": "library/playback.html#equation",
-    "href": "library/playback.html#equation",
-    "title": "playback",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\phi(\\cdot,\\,t) \\;=\\; V\\big[\\,t \\bmod N_{\\text{frames}}\\,\\big]\n\\] Prescribes the field from a recorded movie: the grid is set to the current tick’s frame. A coupling op (e.g. chemotaxis) then drives particles from it."
+    "text": "Mechanism\nplayback operator that advances it frame by frame.\nSome fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded movie becomes a time-varying scalar field over the domain. The field is pure state (it holds the video buffer and the current grid); playback sets the grid to the current tick’s frame (a field self-update, returns {}). A coupling operator such as chemotaxis then drives the particles from it – the same set&lt;-&gt;field Exchange the slime trail used, but the field is supplied rather than deposited.\nThis is the Plexus form of ParticleGraph’s node_value_map: video_bisons.tif.\n\\[\n\\phi(\\cdot,\\,t) \\;=\\; V\\big[\\,t \\bmod N_{\\text{frames}}\\,\\big]\n\\] Prescribes the field from a recorded movie: the grid is set to the current tick’s frame. A coupling op (e.g. chemotaxis) then drives particles from it."
   },
   {
     "objectID": "library/playback.html#minimal-spec",
@@ -529,14 +494,7 @@
     "href": "library/p2g.html#mechanism",
     "title": "p2g",
     "section": "Mechanism",
-    "text": "Mechanism\nComputes the fixed-corotated stress (with snow hardening from Jp) -&gt; affine momentum matrix, applies the external body force + Stokes drag to the local velocity, then scatters mass, momentum and the liquid colour field onto the background grid via the quadratic B-spline weights. Writes the mpm_grid field; returns {}. Step 2 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics)."
-  },
-  {
-    "objectID": "library/p2g.html#equation",
-    "href": "library/p2g.html#equation",
-    "title": "p2g",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\boldsymbol\\sigma = 2\\mu(\\mathbf F-\\mathbf R)\\mathbf F^{\\!\\top} + \\lambda(J-1)J\\,\\mathbf I,\n\\qquad\n\\mathbf Q = -\\frac{4\\,\\Delta t}{\\Delta x^{2}}\\,V\\,\\boldsymbol\\sigma + m\\,\\mathbf C\n\\] \\[\nm_g \\mathrel{+}= \\sum_i w_{ig}\\,m_i,\n\\qquad\n\\mathbf p_g \\mathrel{+}= \\sum_i w_{ig}\\big(m_i\\mathbf v_i + \\mathbf Q_i(\\mathbf x_g-\\mathbf x_i)\\big)\n\\] The fixed-corotated stress (\\(\\mathbf R\\) = polar rotation of \\(\\mathbf F\\)) forms the affine momentum matrix \\(\\mathbf Q\\), scattered to the grid by the quadratic B-spline weights \\(w_{ig}\\). Step 2 of the MLS-MPM decomposition."
+    "text": "Mechanism\nComputes the fixed-corotated stress (with snow hardening from Jp) -&gt; affine momentum matrix, applies the external body force + Stokes drag to the local velocity, then scatters mass, momentum and the liquid colour field onto the background grid via the quadratic B-spline weights. Writes the mpm_grid field; returns {}. Step 2 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics).\n\\[\n\\boldsymbol\\sigma = 2\\mu(\\mathbf F-\\mathbf R)\\mathbf F^{\\!\\top} + \\lambda(J-1)J\\,\\mathbf I,\n\\qquad\n\\mathbf Q = -\\frac{4\\,\\Delta t}{\\Delta x^{2}}\\,V\\,\\boldsymbol\\sigma + m\\,\\mathbf C\n\\] \\[\nm_g \\mathrel{+}= \\sum_i w_{ig}\\,m_i,\n\\qquad\n\\mathbf p_g \\mathrel{+}= \\sum_i w_{ig}\\big(m_i\\mathbf v_i + \\mathbf Q_i(\\mathbf x_g-\\mathbf x_i)\\big)\n\\] The fixed-corotated stress (\\(\\mathbf R\\) = polar rotation of \\(\\mathbf F\\)) forms the affine momentum matrix \\(\\mathbf Q\\), scattered to the grid by the quadratic B-spline weights \\(w_{ig}\\). Step 2 of the MLS-MPM decomposition."
   },
   {
     "objectID": "library/p2g.html#parameters",
@@ -732,14 +690,7 @@
     "href": "library/gravity.html#mechanism",
     "title": "gravity",
     "section": "Mechanism",
-    "text": "Mechanism\nApplies the same acceleration to every selected cell and RETURNS it as a delta {cell: a}. In an MPM scene the cell is a derived aggregate (its position is the centroid of its particles), so the engine does not integrate it; instead the mls_mpm_mechanics operator reads the cell’s accumulated delta and feeds it into the substep as the external body force a_ext. So gravity is an ordinary operator – it does not touch pos/vel, it just contributes a force.\nThe bounce of a dropped soft body is NOT a force here: it is the emergent elastic response when the body compresses against the reflective floor (grid velocity into a wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer youngs -&gt; livelier bounce; drag on the mpm operator sets how fast it decays.\nDefault direction is -y (down). Override gx/gy for an incline or sideways pull (e.g. a tilted-gravity slosh)."
-  },
-  {
-    "objectID": "library/gravity.html#equation",
-    "href": "library/gravity.html#equation",
-    "title": "gravity",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf a_{\\text{ext}} \\;=\\; \\mathbf g \\qquad (\\text{default } \\mathbf g=(0,-g_y))\n\\] A uniform body acceleration returned as a cell delta; in an MPM scene the substep reads it as the external body force rather than the engine integrating it."
+    "text": "Mechanism\nApplies the same acceleration to every selected cell and RETURNS it as a delta {cell: a}. In an MPM scene the cell is a derived aggregate (its position is the centroid of its particles), so the engine does not integrate it; instead the mls_mpm_mechanics operator reads the cell’s accumulated delta and feeds it into the substep as the external body force a_ext. So gravity is an ordinary operator – it does not touch pos/vel, it just contributes a force.\nThe bounce of a dropped soft body is NOT a force here: it is the emergent elastic response when the body compresses against the reflective floor (grid velocity into a wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer youngs -&gt; livelier bounce; drag on the mpm operator sets how fast it decays.\nDefault direction is -y (down). Override gx/gy for an incline or sideways pull (e.g. a tilted-gravity slosh).\n\\[\n\\mathbf a_{\\text{ext}} \\;=\\; \\mathbf g \\qquad (\\text{default } \\mathbf g=(0,-g_y))\n\\] A uniform body acceleration returned as a cell delta; in an MPM scene the substep reads it as the external body force rather than the engine integrating it."
   },
   {
     "objectID": "library/gravity.html#parameters",
@@ -795,14 +746,7 @@
     "href": "library/drag.html#mechanism",
     "title": "drag",
     "section": "Mechanism",
-    "text": "Mechanism\nA drag force opposes velocity: acc = -k * vel. Modelling friction as an operator (rather than a damping field baked into the integrator) keeps the integrator generic and lets drag compose in the schedule with the other forces. It is a second-derivative contribution (an acceleration), so it lives on sets integrated with prediction: second_derivative (e.g. alongside boids)."
-  },
-  {
-    "objectID": "library/drag.html#equation",
-    "href": "library/drag.html#equation",
-    "title": "drag",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf a_i \\;=\\; -\\,k\\,\\mathbf v_i\n\\] Viscous friction as an acceleration (\\(k\\) = drag coefficient). A force in the schedule, not an integrator knob, so it composes with the other second-derivative laws."
+    "text": "Mechanism\nA drag force opposes velocity: acc = -k * vel. Modelling friction as an operator (rather than a damping field baked into the integrator) keeps the integrator generic and lets drag compose in the schedule with the other forces. It is a second-derivative contribution (an acceleration), so it lives on sets integrated with prediction: second_derivative (e.g. alongside boids).\n\\[\n\\mathbf a_i \\;=\\; -\\,k\\,\\mathbf v_i\n\\] Viscous friction as an acceleration (\\(k\\) = drag coefficient). A force in the schedule, not an integrator knob, so it composes with the other second-derivative laws."
   },
   {
     "objectID": "library/drag.html#parameters",
@@ -851,14 +795,7 @@
     "href": "library/decay.html#mechanism",
     "title": "decay",
     "section": "Mechanism",
-    "text": "Mechanism\nc &lt;- max(0, c - k*dt). Without decay the deposited trail would only accumulate; decay is what lets unused filaments fade so the network coarsens (stigmergy). Writes the field in place; returns {}."
-  },
-  {
-    "objectID": "library/decay.html#equation",
-    "href": "library/decay.html#equation",
-    "title": "decay",
-    "section": "Equation",
-    "text": "Equation\n\\[\nc \\;\\leftarrow\\; \\max\\!\\big(0,\\; c - k\\,\\Delta t\\big)\n\\] Linear evaporation of a scalar field at rate \\(k\\) — the sink that lets stigmergic trails fade so the network coarsens. The companion of deposit / diffuse."
+    "text": "Mechanism\nc &lt;- max(0, c - k*dt). Without decay the deposited trail would only accumulate; decay is what lets unused filaments fade so the network coarsens (stigmergy). Writes the field in place; returns {}.\n\\[\nc \\;\\leftarrow\\; \\max\\!\\big(0,\\; c - k\\,\\Delta t\\big)\n\\] Linear evaporation of a scalar field at rate \\(k\\) — the sink that lets stigmergic trails fade so the network coarsens. The companion of deposit / diffuse."
   },
   {
     "objectID": "library/decay.html#parameters",
@@ -907,14 +844,7 @@
     "href": "library/chemotaxis.html#mechanism",
     "title": "chemotaxis",
     "section": "Mechanism",
-    "text": "Mechanism\nThe Keller-Segel coupling: each particle gets a velocity gain * grad(field) sampled at its position (gain&lt;0 to flee). A field-&gt;set Exchange that returns a first-derivative velocity delta – the ENGINE integrates it, and it simply sums with any other velocity the particle has (e.g. attraction_repulsion), the framework’s “deltas add” rule. The field may be deposited (slime), reaction-diffused, or prescribed from a video."
-  },
-  {
-    "objectID": "library/chemotaxis.html#equation",
-    "href": "library/chemotaxis.html#equation",
-    "title": "chemotaxis",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\dot{\\mathbf x}_i \\;=\\; g\\,\\nabla\\phi(\\mathbf x_i)\n\\] The Keller–Segel coupling: climb (or, for \\(g&lt;0\\), flee) the gradient of field \\(\\phi\\) sampled at the particle. A first-derivative velocity that simply sums with any other."
+    "text": "Mechanism\nThe Keller-Segel coupling: each particle gets a velocity gain * grad(field) sampled at its position (gain&lt;0 to flee). A field-&gt;set Exchange that returns a first-derivative velocity delta – the ENGINE integrates it, and it simply sums with any other velocity the particle has (e.g. attraction_repulsion), the framework’s “deltas add” rule. The field may be deposited (slime), reaction-diffused, or prescribed from a video.\n\\[\n\\dot{\\mathbf x}_i \\;=\\; g\\,\\nabla\\phi(\\mathbf x_i)\n\\] The Keller–Segel coupling: climb (or, for \\(g&lt;0\\), flee) the gradient of field \\(\\phi\\) sampled at the particle. A first-derivative velocity that simply sums with any other."
   },
   {
     "objectID": "library/chemotaxis.html#parameters",
@@ -970,14 +900,7 @@
     "href": "library/broadcast.html#mechanism",
     "title": "broadcast",
     "section": "Mechanism",
-    "text": "Mechanism\nThe containment lift: each child gets a velocity delta stiffness * (parent_pos - child_pos) – pulled toward its parent’s (e.g. aggregated centroid) position, so a cell holds its particles together. Unlike aggregate (a derived readout that writes the parent), this RETURNS a delta on the children that the engine integrates."
-  },
-  {
-    "objectID": "library/broadcast.html#equation",
-    "href": "library/broadcast.html#equation",
-    "title": "broadcast",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\dot{\\mathbf x}_i \\;=\\; k\\,\\big(\\mathbf x_{P(i)}-\\mathbf x_i\\big)\n\\] The containment lift: each child is pulled toward its parent \\(P(i)\\)’s position with stiffness \\(k\\) — the down-the-hierarchy dual of aggregate."
+    "text": "Mechanism\nThe containment lift: each child gets a velocity delta stiffness * (parent_pos - child_pos) – pulled toward its parent’s (e.g. aggregated centroid) position, so a cell holds its particles together. Unlike aggregate (a derived readout that writes the parent), this RETURNS a delta on the children that the engine integrates.\n\\[\n\\dot{\\mathbf x}_i \\;=\\; k\\,\\big(\\mathbf x_{P(i)}-\\mathbf x_i\\big)\n\\] The containment lift: each child is pulled toward its parent \\(P(i)\\)’s position with stiffness \\(k\\) — the down-the-hierarchy dual of aggregate."
   },
   {
     "objectID": "library/broadcast.html#parameters",
@@ -1068,14 +991,7 @@
     "href": "library/alignment.html#mechanism",
     "title": "alignment",
     "section": "Mechanism",
-    "text": "Mechanism\nMatch neighbours’ velocity: a2 * w^a_i * mean_j (vel_j - vel_i), with the per-receiver weight w^a the type’s named alignment property. One of the three rules whose deltas the engine sums to make a flock; see also cohesion, separation."
-  },
-  {
-    "objectID": "library/alignment.html#equation",
-    "href": "library/alignment.html#equation",
-    "title": "alignment",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf a_i \\;=\\; a_2\\,w^a_i\\,\\big\\langle \\mathbf v_j-\\mathbf v_i\\big\\rangle_{j\\in\\mathcal N(i)}\n\\] The boids velocity-matching rule: steer toward the mean neighbour velocity. \\(w^a_i\\) is the receiver type’s alignment weight; \\(\\langle\\cdot\\rangle\\) is the mean over neighbours."
+    "text": "Mechanism\nMatch neighbours’ velocity: a2 * w^a_i * mean_j (vel_j - vel_i), with the per-receiver weight w^a the type’s named alignment property. One of the three rules whose deltas the engine sums to make a flock; see also cohesion, separation.\n\\[\n\\mathbf a_i \\;=\\; a_2\\,w^a_i\\,\\big\\langle \\mathbf v_j-\\mathbf v_i\\big\\rangle_{j\\in\\mathcal N(i)}\n\\] The boids velocity-matching rule: steer toward the mean neighbour velocity. \\(w^a_i\\) is the receiver type’s alignment weight; \\(\\langle\\cdot\\rangle\\) is the mean over neighbours."
   },
   {
     "objectID": "library/alignment.html#parameters",
@@ -1131,14 +1047,7 @@
     "href": "library/advance_3d.html#mechanism",
     "title": "advance_3d",
     "section": "Mechanism",
-    "text": "Mechanism\nThe 3D counterpart of advance: where the 2D agent carries a scalar heading angle and moves along (cos h, sin h), the 3D agent carries a unit heading VECTOR and moves along it: v_i = move_speed_i * heading_i. First-derivative law (emits a velocity; the ENGINE integrates the position). Purely propulsion – wall reflection is the separate bounce_3d operator, so this stays one concern."
-  },
-  {
-    "objectID": "library/advance_3d.html#equation",
-    "href": "library/advance_3d.html#equation",
-    "title": "advance_3d",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\dot{\\mathbf x}_i \\;=\\; s_i\\,\\hat{\\mathbf h}_i,\\qquad \\lVert\\hat{\\mathbf h}_i\\rVert=1\n\\] The 3D form: the heading is a unit vector \\(\\hat{\\mathbf h}_i\\) rather than an angle."
+    "text": "Mechanism\nThe 3D counterpart of advance: where the 2D agent carries a scalar heading angle and moves along (cos h, sin h), the 3D agent carries a unit heading VECTOR and moves along it: v_i = move_speed_i * heading_i. First-derivative law (emits a velocity; the ENGINE integrates the position). Purely propulsion – wall reflection is the separate bounce_3d operator, so this stays one concern.\n\\[\n\\dot{\\mathbf x}_i \\;=\\; s_i\\,\\hat{\\mathbf h}_i,\\qquad \\lVert\\hat{\\mathbf h}_i\\rVert=1\n\\] The 3D form: the heading is a unit vector \\(\\hat{\\mathbf h}_i\\) rather than an angle."
   },
   {
     "objectID": "library/advance_3d.html#minimal-spec",
@@ -1180,14 +1089,7 @@
     "href": "library/Coulomb.html#mechanism",
     "title": "Coulomb",
     "section": "Mechanism",
-    "text": "Mechanism\nA Lateral, second-derivative operator over a neighbour graph (the Plexus port of ParticleGraph’s PDE_E). For a receiver particle i of charge q_i, summed over its neighbours j (the edges left by a rewire op such as radius_graph):\na_i = Σ_j  -q_i q_j (pos_j - pos_i) / |d_ij|^3                  (an acceleration)\ni.e. Coulomb’s law a = q_i q_j r / |r|^3 with the sign convention that LIKE charges (q_i q_j &gt; 0) repel and OPPOSITE charges attract. Per-type charge comes from the spec’s types: block; aggregation is add (the physical superposition of forces, NOT a mean). Second-derivative law: returns an acceleration the engine integrates (v += dt·a; x += dt·v). Dimension-generic (SUPPORTED_DIMS [2,3]) – the law reads D = pos.shape[-1], so the same operator runs in 2D and 3D.\nMessage passing on Level.edge_index (O(E)); the radius_graph’s min_radius keeps |d| off zero so the 1/|d|^3 stays finite (optionally bounded by clamp)."
-  },
-  {
-    "objectID": "library/Coulomb.html#equation",
-    "href": "library/Coulomb.html#equation",
-    "title": "Coulomb",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\ddot{\\mathbf x}_i \\;=\\; \\sum_{j\\in\\mathcal N(i)} -\\,q_i q_j\\,\n\\frac{\\mathbf x_j-\\mathbf x_i}{\\lVert\\mathbf x_j-\\mathbf x_i\\rVert^{3}}\n\\] The inverse-square law with superposition (aggr: add). Like charges \\(q_iq_j&gt;0\\) repel, opposite charges attract; \\(\\mathcal N(i)\\) are the edges a rewire leaves."
+    "text": "Mechanism\nA Lateral, second-derivative operator over a neighbour graph (the Plexus port of ParticleGraph’s PDE_E). For a receiver particle i of charge q_i, summed over its neighbours j (the edges left by a rewire op such as radius_graph):\ni.e. Coulomb’s law a = q_i q_j r / |r|^3 with the sign convention that LIKE charges (q_i q_j &gt; 0) repel and OPPOSITE charges attract. Per-type charge comes from the spec’s types: block; aggregation is add (the physical superposition of forces, NOT a mean). Second-derivative law: returns an acceleration the engine integrates. Dimension-generic (SUPPORTED_DIMS [2,3]) – the law reads D = pos.shape[-1], so the same operator runs in 2D and 3D.\nMessage passing on Level.edge_index (O(E)); the radius_graph’s min_radius keeps |d| off zero so the 1/|d|^3 stays finite (optionally bounded by clamp).\n\\[\n\\ddot{\\mathbf x}_i \\;=\\; \\sum_{j\\in\\mathcal N(i)} -\\,q_i q_j\\,\n\\frac{\\mathbf x_j-\\mathbf x_i}{\\lVert\\mathbf x_j-\\mathbf x_i\\rVert^{3}}\n\\] The inverse-square law with superposition (aggr: add). Like charges \\(q_iq_j&gt;0\\) repel, opposite charges attract; \\(\\mathcal N(i)\\) are the edges a rewire leaves."
   },
   {
     "objectID": "library/Coulomb.html#parameters",
@@ -1348,14 +1250,7 @@
     "href": "library/advance.html#mechanism",
     "title": "advance",
     "section": "Mechanism",
-    "text": "Mechanism\nA first-derivative dynamics operator: it returns a velocity delta v_i = move_speed_i * (cos h_i, sin h_i) and lets the ENGINE integrate the position (pos += dt * v), exactly like attraction_repulsion returns a dpos. It does NOT touch pos, and it is purely propulsion – domain/obstacle reflection is a separate bounce operator (run before advance), so this stays one concern.\nRenamed from the prototype motility (it is the slime “move” step)."
-  },
-  {
-    "objectID": "library/advance.html#equation",
-    "href": "library/advance.html#equation",
-    "title": "advance",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\dot{\\mathbf x}_i \\;=\\; s_i\\,(\\cos\\theta_i,\\ \\sin\\theta_i)\n\\] Self-propulsion at speed \\(s_i\\) (move_speed) along the scalar heading \\(\\theta_i\\); the engine integrates the position (\\(\\mathbf x \\mathrel{+}= \\Delta t\\,\\dot{\\mathbf x}\\))."
+    "text": "Mechanism\nA first-derivative dynamics operator: it returns a velocity delta v_i = move_speed_i * (cos h_i, sin h_i) and lets the ENGINE integrate the position, exactly like attraction_repulsion returns a dpos. It does NOT touch pos, and it is purely propulsion – domain/obstacle reflection is a separate bounce operator (run before advance), so this stays one concern.\nRenamed from the prototype motility (it is the slime “move” step).\n\\[\n\\dot{\\mathbf x}_i \\;=\\; s_i\\,(\\cos\\theta_i,\\ \\sin\\theta_i)\n\\] Self-propulsion at speed \\(s_i\\) (move_speed) along the scalar heading \\(\\theta_i\\); the engine integrates the position (\\(\\mathbf x \\mathrel{+}= \\Delta t\\,\\dot{\\mathbf x}\\))."
   },
   {
     "objectID": "library/advance.html#minimal-spec",
@@ -1397,14 +1292,7 @@
     "href": "library/aggregate.html#mechanism",
     "title": "aggregate",
     "section": "Mechanism",
-    "text": "Mechanism\nThe centroid reduction: a parent’s position is the occupancy-weighted mean of its children’s positions (a cell’s position = the centroid of its particles). This is a DERIVED readout, not an integrated force, so it writes the parent’s position directly and declares MAY_MUTATE_INTEGRATED_STATE to opt out of the integration guard; returns {}."
-  },
-  {
-    "objectID": "library/aggregate.html#equation",
-    "href": "library/aggregate.html#equation",
-    "title": "aggregate",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf x_P \\;=\\; \\frac{\\sum_{i\\in P} o_i\\,\\mathbf x_i}{\\sum_{i\\in P} o_i}\n\\] The occupancy-weighted centroid of a parent \\(P\\)’s children (\\(o_i\\) = occupancy). A derived readout written straight onto the parent, not an integrated force."
+    "text": "Mechanism\nThe centroid reduction: a parent’s position is the occupancy-weighted mean of its children’s positions (a cell’s position = the centroid of its particles). This is a DERIVED readout, not an integrated force, so it writes the parent’s position directly and declares MAY_MUTATE_INTEGRATED_STATE to opt out of the integration guard; returns {}.\n\\[\n\\mathbf x_P \\;=\\; \\frac{\\sum_{i\\in P} o_i\\,\\mathbf x_i}{\\sum_{i\\in P} o_i}\n\\] The occupancy-weighted centroid of a parent \\(P\\)’s children (\\(o_i\\) = occupancy). A derived readout written straight onto the parent, not an integrated force."
   },
   {
     "objectID": "library/aggregate.html#minimal-spec",
@@ -1446,14 +1334,7 @@
     "href": "library/apply_material_map.html#mechanism",
     "title": "apply_material_map",
     "section": "Mechanism",
-    "text": "Mechanism\nthe field -&gt; set operator that writes per-particle MATERIAL parameters from it.\nThis is the Plexus way to give a tissue a heterogeneous, image-defined material: an image (TIFF/PNG) becomes a scalar field over the domain (image field), and apply_material_map samples it at each particle and turns the intensity into a per-particle parameter – Young’s modulus E_i -&gt; Lame mu_i, la_i (target: youngs), or any named per-particle buffer (e.g. a future per-particle contraction gain). It is NOT a force: it sets the material the MLS-MPM stress law (mpm_strain / p2g) then reads, so a stiffness map breaks the contraction’s symmetry WITHOUT changing MPM physics.\nfields:  {stiffness_map: {frame: image, source: material/map.tif}}\nops:     {op: apply_material_map, at: mpm_particle, from: stiffness_map,\n          target: youngs, min: 20, max: 200}\nAnisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress law – a later step; this does the scalar case the current fixed-corotated MPM supports."
-  },
-  {
-    "objectID": "library/apply_material_map.html#equation",
-    "href": "library/apply_material_map.html#equation",
-    "title": "apply_material_map",
-    "section": "Equation",
-    "text": "Equation\n\\[\nE_i \\;=\\; E_{\\min} + m(\\mathbf x_i)\\,(E_{\\max}-E_{\\min}),\n\\qquad (\\mu_i,\\lambda_i) = \\mathrm{Lam\\acute e}(E_i)\n\\] Bilinearly samples the image field \\(m\\in[0,1]\\) at each particle and maps it to a per-particle Young’s modulus \\(E_i\\), then to the Lamé buffers the MPM stress law reads. Not a force — it sets the material, breaking symmetry without changing MPM physics."
+    "text": "Mechanism\nthe field -&gt; set operator that writes per-particle MATERIAL parameters from it.\nThis is the Plexus way to give a tissue a heterogeneous, image-defined material: an image (TIFF/PNG) becomes a scalar field over the domain (image field), and apply_material_map samples it at each particle and turns the intensity into a per-particle parameter – Young’s modulus E_i -&gt; Lame mu_i, la_i (target: youngs), or any named per-particle buffer (e.g. a future per-particle contraction gain). It is NOT a force: it sets the material the MLS-MPM stress law (mpm_strain / p2g) then reads, so a stiffness map breaks the contraction’s symmetry WITHOUT changing MPM physics.\nfields:  {stiffness_map: {frame: image, source: material/map.tif}}\nops:     {op: apply_material_map, at: mpm_particle, from: stiffness_map,\n          target: youngs, min: 20, max: 200}\nAnisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress law – a later step; this does the scalar case the current fixed-corotated MPM supports.\n\\[\nE_i \\;=\\; E_{\\min} + m(\\mathbf x_i)\\,(E_{\\max}-E_{\\min}),\n\\qquad (\\mu_i,\\lambda_i) = \\mathrm{Lam\\acute e}(E_i)\n\\] Bilinearly samples the image field \\(m\\in[0,1]\\) at each particle and maps it to a per-particle Young’s modulus \\(E_i\\), then to the Lamé buffers the MPM stress law reads. Not a force — it sets the material, breaking symmetry without changing MPM physics."
   },
   {
     "objectID": "library/apply_material_map.html#parameters",
@@ -1579,14 +1460,7 @@
     "href": "library/cohesion.html#mechanism",
     "title": "cohesion",
     "section": "Mechanism",
-    "text": "Mechanism\nSteer toward the local centre of mass: the mean offset to neighbours, a1 * w^c_i * mean_j (pos_j - pos_i), with the per-receiver weight w^c the type’s named cohesion property. One of the three rules whose deltas the engine sums to make a flock; see also alignment, separation."
-  },
-  {
-    "objectID": "library/cohesion.html#equation",
-    "href": "library/cohesion.html#equation",
-    "title": "cohesion",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf a_i \\;=\\; a_1\\,w^c_i\\,\\big\\langle \\mathbf x_j-\\mathbf x_i\\big\\rangle_{j\\in\\mathcal N(i)}\n\\] The boids centring rule: steer toward the local centre of mass (mean offset to neighbours). \\(w^c_i\\) is the receiver type’s cohesion weight."
+    "text": "Mechanism\nSteer toward the local centre of mass: the mean offset to neighbours, a1 * w^c_i * mean_j (pos_j - pos_i), with the per-receiver weight w^c the type’s named cohesion property. One of the three rules whose deltas the engine sums to make a flock; see also alignment, separation.\n\\[\n\\mathbf a_i \\;=\\; a_1\\,w^c_i\\,\\big\\langle \\mathbf x_j-\\mathbf x_i\\big\\rangle_{j\\in\\mathcal N(i)}\n\\] The boids centring rule: steer toward the local centre of mass (mean offset to neighbours). \\(w^c_i\\) is the receiver type’s cohesion weight."
   },
   {
     "objectID": "library/cohesion.html#parameters",
@@ -1642,14 +1516,7 @@
     "href": "library/deposit.html#mechanism",
     "title": "deposit",
     "section": "Mechanism",
-    "text": "Mechanism\nThe stigmergy write: agent i adds amount*dt to channel node_type[i] (its own species) at the pixel under its position, clamped to 1 (the shader’s min(1,...)). This is the only place the agents imprint the trail they then sense."
-  },
-  {
-    "objectID": "library/deposit.html#equation",
-    "href": "library/deposit.html#equation",
-    "title": "deposit",
-    "section": "Equation",
-    "text": "Equation\n\\[\nc_{s}\\big(\\mathrm{pix}(\\mathbf x_i)\\big) \\;\\leftarrow\\;\n\\min\\!\\Big(1,\\; c_{s}\\big(\\mathrm{pix}(\\mathbf x_i)\\big) + a\\,\\Delta t\\Big),\n\\qquad s=\\text{type}(i)\n\\] Each agent adds \\(a\\,\\Delta t\\) (amount) to its own species channel \\(s\\) at the pixel under its position, clamped to 1 — the only place agents imprint the trail."
+    "text": "Mechanism\nThe stigmergy write: agent i adds amount*dt to channel node_type[i] (its own species) at the pixel under its position, clamped to 1 (the shader’s min(1,...)). This is the only place the agents imprint the trail they then sense.\n\\[\nc_{s}\\big(\\mathrm{pix}(\\mathbf x_i)\\big) \\;\\leftarrow\\;\n\\min\\!\\Big(1,\\; c_{s}\\big(\\mathrm{pix}(\\mathbf x_i)\\big) + a\\,\\Delta t\\Big),\n\\qquad s=\\text{type}(i)\n\\] Each agent adds \\(a\\,\\Delta t\\) (amount) to its own species channel \\(s\\) at the pixel under its position, clamped to 1 — the only place agents imprint the trail."
   },
   {
     "objectID": "library/deposit.html#parameters",
@@ -1698,14 +1565,7 @@
     "href": "library/g2p.html#mechanism",
     "title": "g2p",
     "section": "Mechanism",
-    "text": "Mechanism\nGathers the grid velocity back onto particles (new velocity + new affine matrix C), applies the inelastic wall-contact restitution and the CFL velocity cap, then advects the particle positions. Recomputes the B-spline weights from the (pre-advection) positions so they match p2g exactly. Advection is integrated state, so this opts out of the engine guard (MAY_MUTATE_INTEGRATED_STATE) – the substep loop owns it, like the oracle. Step 4 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics)."
-  },
-  {
-    "objectID": "library/g2p.html#equation",
-    "href": "library/g2p.html#equation",
-    "title": "g2p",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf v_i = \\sum_g w_{ig}\\,\\mathbf v_g,\n\\qquad\n\\mathbf C_i = \\frac{4}{\\Delta x^{2}}\\sum_g w_{ig}\\,\\mathbf v_g\\,(\\mathbf x_g-\\mathbf x_i)^{\\!\\top},\n\\qquad\n\\mathbf x_i \\mathrel{+}= \\Delta t\\,\\mathbf v_i\n\\] Gathers grid velocity back to particles (new velocity + affine matrix \\(\\mathbf C\\)), applies wall restitution and the CFL cap, then advects. Step 4 of the MLS-MPM decomposition."
+    "text": "Mechanism\nGathers the grid velocity back onto particles (new velocity + new affine matrix C), applies the inelastic wall-contact restitution and the CFL velocity cap, then advects the particle positions. Recomputes the B-spline weights from the (pre-advection) positions so they match p2g exactly. Advection is integrated state, so this opts out of the engine guard (MAY_MUTATE_INTEGRATED_STATE) – the substep loop owns it, like the oracle. Step 4 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics).\n\\[\n\\mathbf v_i = \\sum_g w_{ig}\\,\\mathbf v_g,\n\\qquad\n\\mathbf C_i = \\frac{4}{\\Delta x^{2}}\\sum_g w_{ig}\\,\\mathbf v_g\\,(\\mathbf x_g-\\mathbf x_i)^{\\!\\top},\n\\qquad\n\\mathbf x_i \\mathrel{+}= \\Delta t\\,\\mathbf v_i\n\\] Gathers grid velocity back to particles (new velocity + affine matrix \\(\\mathbf C\\)), applies wall restitution and the CFL cap, then advects. Step 4 of the MLS-MPM decomposition."
   },
   {
     "objectID": "library/g2p.html#parameters",
@@ -1845,14 +1705,7 @@
     "href": "library/mpm_drag.html#mechanism",
     "title": "mpm_drag",
     "section": "Mechanism",
-    "text": "Mechanism\nacc = -k * vel, returned as a particle-level delta the engine sums into H.delta(mpm_particle); the MLS-MPM p2g scatter consumes it as a body force (a_ext += H.delta(particle)). PREDICTION=None: the engine does not integrate the particle set (g2p owns advection), so the drag enters mechanics only through the substep – exactly like the contraction force. This is the composable-operator form of friction (plexus.tex Part IV: “friction is the drag operator, not a knob in the integrator”); it replaces p2g’s built-in drag param, so set p2g drag: 0 and add mpm_drag to the schedule instead. Large k -&gt; the overdamped (quasi-static, tissue) regime where the sheet creeps to a/k and relaxes without ringing."
-  },
-  {
-    "objectID": "library/mpm_drag.html#equation",
-    "href": "library/mpm_drag.html#equation",
-    "title": "mpm_drag",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf a_i = -\\,k\\,\\mathbf v_i\n\\qquad\\longrightarrow\\qquad\n\\mathbf a_{\\text{ext}} \\mathrel{+}= \\mathbf a_i\n\\] Viscous body drag as a particle delta that p2g consumes as a body force (not an integrator knob). Large \\(k\\) gives the overdamped, tissue-like regime that creeps to \\(\\mathbf a/k\\) without ringing. Replaces p2g’s built-in drag."
+    "text": "Mechanism\nacc = -k * vel, returned as a particle-level delta the engine sums into H.delta(mpm_particle); the MLS-MPM p2g scatter consumes it as a body force (a_ext += H.delta(particle)). PREDICTION=None: the engine does not integrate the particle set (g2p owns advection), so the drag enters mechanics only through the substep – exactly like the contraction force. This is the composable-operator form of friction (plexus.tex Part IV: “friction is the drag operator, not a knob in the integrator”); it replaces p2g’s built-in drag param, so set p2g drag: 0 and add mpm_drag to the schedule instead. Large k -&gt; the overdamped (quasi-static, tissue) regime where the sheet creeps to a/k and relaxes without ringing.\n\\[\n\\mathbf a_i = -\\,k\\,\\mathbf v_i\n\\qquad\\longrightarrow\\qquad\n\\mathbf a_{\\text{ext}} \\mathrel{+}= \\mathbf a_i\n\\] Viscous body drag as a particle delta that p2g consumes as a body force (not an integrator knob). Large \\(k\\) gives the overdamped, tissue-like regime that creeps to \\(\\mathbf a/k\\) without ringing. Replaces p2g’s built-in drag."
   },
   {
     "objectID": "library/mpm_drag.html#parameters",
@@ -1908,14 +1761,7 @@
     "href": "library/mpm_grid_update.html#mechanism",
     "title": "mpm_grid_update",
     "section": "Mechanism",
-    "text": "Mechanism\nGrid velocity v = momentum / mass, plus the continuum surface force (CSF) from the liquid colour field and the boundary conditions: reflective domain walls, obstacle friction, and the interior wall mask (rasterized once from general: obstacles:). A pure field -&gt; field operator; returns {}. Step 3 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics)."
-  },
-  {
-    "objectID": "library/mpm_grid_update.html#equation",
-    "href": "library/mpm_grid_update.html#equation",
-    "title": "mpm_grid_update",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf v_g = \\frac{\\mathbf p_g}{m_g},\n\\qquad\n\\mathbf v_g \\mathrel{+}= \\Delta t\\,\\mathbf f^{\\,\\text{CSF}}_g,\n\\qquad\n\\mathbf v_g \\leftarrow \\mathrm{BC}(\\mathbf v_g)\n\\] Grid momentum \\(\\to\\) velocity, plus the continuum surface force (CSF) from the liquid colour field, then boundary conditions: reflective walls, obstacle friction, interior mask. A pure field \\(\\to\\) field solve. Step 3 of the MLS-MPM decomposition."
+    "text": "Mechanism\nGrid velocity v = momentum / mass, plus the continuum surface force (CSF) from the liquid colour field and the boundary conditions: reflective domain walls, obstacle friction, and the interior wall mask (rasterized once from general: obstacles:). A pure field -&gt; field operator; returns {}. Step 3 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics).\n\\[\n\\mathbf v_g = \\frac{\\mathbf p_g}{m_g},\n\\qquad\n\\mathbf v_g \\mathrel{+}= \\Delta t\\,\\mathbf f^{\\,\\text{CSF}}_g,\n\\qquad\n\\mathbf v_g \\leftarrow \\mathrm{BC}(\\mathbf v_g)\n\\] Grid momentum \\(\\to\\) velocity, plus the continuum surface force (CSF) from the liquid colour field, then boundary conditions: reflective walls, obstacle friction, interior mask. A pure field \\(\\to\\) field solve. Step 3 of the MLS-MPM decomposition."
   },
   {
     "objectID": "library/mpm_grid_update.html#parameters",
@@ -1971,14 +1817,7 @@
     "href": "library/mpm_strain.html#mechanism",
     "title": "mpm_strain",
     "section": "Mechanism",
-    "text": "Mechanism\nF &lt;- (I + dt C) F, then the per-material correction: liquid drops shape memory (F := sqrt(J) I), snow clamps the singular values of F and hardens via the plastic ratio Jp. Writes the aux buffers F / Jp in place; returns {}. Step 1 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics)."
-  },
-  {
-    "objectID": "library/mpm_strain.html#equation",
-    "href": "library/mpm_strain.html#equation",
-    "title": "mpm_strain",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf F \\;\\leftarrow\\; (\\mathbf I + \\Delta t\\,\\mathbf C)\\,\\mathbf F\n\\qquad\\text{(liquid: } \\mathbf F\\leftarrow J^{1/d}\\mathbf I,\\ J=\\det\\mathbf F\\text{)}\n\\] Advances the deformation gradient from the affine velocity \\(\\mathbf C\\), then applies the material correction: liquids drop shape memory, snow clamps the singular values of \\(\\mathbf F\\) and hardens via the plastic ratio \\(J_p\\). Step 1 of the MLS-MPM decomposition."
+    "text": "Mechanism\nF &lt;- (I + dt C) F, then the per-material correction: liquid drops shape memory (F := sqrt(J) I), snow clamps the singular values of F and hardens via the plastic ratio Jp. Writes the aux buffers F / Jp in place; returns {}. Step 1 of the decomposed MLS-MPM (oracle: mls_mpm_mechanics).\n\\[\n\\mathbf F \\;\\leftarrow\\; (\\mathbf I + \\Delta t\\,\\mathbf C)\\,\\mathbf F\n\\qquad\\text{(liquid: } \\mathbf F\\leftarrow J^{1/d}\\mathbf I,\\ J=\\det\\mathbf F\\text{)}\n\\] Advances the deformation gradient from the affine velocity \\(\\mathbf C\\), then applies the material correction: liquids drop shape memory, snow clamps the singular values of \\(\\mathbf F\\) and hardens via the plastic ratio \\(J_p\\). Step 1 of the MLS-MPM decomposition."
   },
   {
     "objectID": "library/mpm_strain.html#parameters",
@@ -2034,14 +1873,7 @@
     "href": "library/pacemaker.html#mechanism",
     "title": "pacemaker",
     "section": "Mechanism",
-    "text": "Mechanism\nThe temporal half of an active-stimulus decomposition (clock -&gt; activation field -&gt; contraction -&gt; mechanics). It owns ONLY timing: it emits a scalar p(t) in [0,1] on a fixed period and writes it to H.signals[name] – a scalar side-channel (the same pattern as H.part_accel) that any downstream operator reads by name. It knows nothing about space or mechanics, so one pacemaker can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or a secretion; pacemaker_A/pacemaker_B with different period/phase make a multi-site pacing graph.\np(t) is a smooth raised bump of width duration, once per period, offset by phase (all in OUTER ticks, i.e. H.frame):\ns = (frame + phase) mod period;   p = sin(pi * s / duration)  if s &lt; duration else 0\nSet period &gt;= n_frames for a one-shot pulse. kind=field (emits no set delta); its at: is only a scheduling anchor (any declared field) – it mutates only H.signals."
-  },
-  {
-    "objectID": "library/pacemaker.html#equation",
-    "href": "library/pacemaker.html#equation",
-    "title": "pacemaker",
-    "section": "Equation",
-    "text": "Equation\n\\[\np(t) \\;=\\;\n\\begin{cases}\n\\sin\\!\\big(\\pi\\, s/\\tau_d\\big) & s&lt;\\tau_d\\\\[2pt]\n0 & \\text{otherwise}\n\\end{cases},\n\\qquad s=(t+\\varphi)\\bmod T\n\\] A smooth raised bump of width \\(\\tau_d\\) (duration) once per period \\(T\\), offset by phase \\(\\varphi\\), in outer ticks \\(t\\). Written to H.signals[name] for downstream ops."
+    "text": "Mechanism\nThe temporal half of an active-stimulus decomposition (clock -&gt; activation field -&gt; contraction -&gt; mechanics). It owns ONLY timing: it emits a scalar p(t) in [0,1] on a fixed period and writes it to H.signals[name] – a scalar side-channel (the same pattern as H.part_accel) that any downstream operator reads by name. It knows nothing about space or mechanics, so one pacemaker can later drive a FitzHugh-Nagumo activation, a calcium transient, a contraction, or a secretion; pacemaker_A/pacemaker_B with different period/phase make a multi-site pacing graph.\np(t) is a smooth raised bump of width duration, once per period, offset by phase (all in OUTER ticks, i.e. H.frame):\nSet period &gt;= n_frames for a one-shot pulse. kind=field (emits no set delta); its at: is only a scheduling anchor (any declared field) – it mutates only H.signals.\n\\[\np(t) \\;=\\;\n\\begin{cases}\n\\sin\\!\\big(\\pi\\, s/\\tau_d\\big) & s&lt;\\tau_d\\\\[2pt]\n0 & \\text{otherwise}\n\\end{cases},\n\\qquad s=(t+\\varphi)\\bmod T\n\\] A smooth raised bump of width \\(\\tau_d\\) (duration) once per period \\(T\\), offset by phase \\(\\varphi\\), in outer ticks \\(t\\). Written to H.signals[name] for downstream ops."
   },
   {
     "objectID": "library/pacemaker.html#parameters",
@@ -2097,14 +1929,7 @@
     "href": "library/phase_delay_pulse.html#mechanism",
     "title": "phase_delay_pulse",
     "section": "Mechanism",
-    "text": "Mechanism\nThe spatial generalization of the (pacemaker -&gt; pulse_stimulus) pair. Instead of one GLOBAL clock p(t) painted with a fixed spatial profile, every pixel runs the SAME pulse waveform but offset by a per-pixel delay read from a map:\na(x, y, t) = pulse( t - tau(x, y) ),     tau(x, y) = max_delay * delay_map(x, y)\nso a region with a larger tau contracts LATER. A spatial delay GRADIENT (e.g. tau = max_delay * x, or tau ~ atan2(y-.5, x-.5)) makes neighbouring regions fire in sequence – a travelling activation wave. Under an elastic tissue (with an active-stress or contraction operator downstream) that timing gradient turns into curved / rotating motion – the substrate for rotary, cardiac-like trajectories. The delay map is an image field (a TIFF, exactly like a stiffness map), so it is analytic now and learnable later.\nThe pulse is the same smooth raised bump as pacemaker (so force&lt;-&gt;stress&lt;-&gt;wave is a clean swap), evaluated per pixel at its own local time t - tau:\ns = (t - tau + phase) mod period;   pulse = sin(pi * s / duration)  if s &lt; duration else 0\nkind=field: writes the activation grid named by at: in place and returns {}. It SUBSUMES pacemaker+pulse_stimulus – it owns both WHEN (per pixel) and WHERE (via the map) – so schedule it in their place. Downstream pulse_to_active_stress / pulse_to_contraction read the delayed activation field exactly as before."
-  },
-  {
-    "objectID": "library/phase_delay_pulse.html#equation",
-    "href": "library/phase_delay_pulse.html#equation",
-    "title": "phase_delay_pulse",
-    "section": "Equation",
-    "text": "Equation\n\\[\na(\\mathbf x,t) \\;=\\; \\mathrm{pulse}\\big(t-\\tau(\\mathbf x)\\big),\n\\qquad \\tau(\\mathbf x)=\\tau_{\\max}\\,m(\\mathbf x),\\quad m(\\mathbf x)\\in[0,1]\n\\] \\[\n\\mathrm{pulse}(t') \\;=\\;\n\\begin{cases}\n\\sin\\!\\big(\\pi\\, s/\\tau_d\\big) & s&lt;\\tau_d\\\\[2pt]\n0 & \\text{otherwise}\n\\end{cases},\n\\qquad s=(t'+\\varphi)\\bmod T\n\\] The same smooth bump as pacemaker (width \\(\\tau_d\\) = duration, period \\(T\\), phase \\(\\varphi\\)), evaluated per pixel at its own local time \\(t-\\tau\\). The delay map \\(m\\) is an image field; \\(\\tau_{\\max}\\) (max_delay) is the delay where the map saturates. So pacemaker is the special case \\(\\tau\\equiv 0\\), and a linear \\(m\\) (e.g. \\(m=x\\)) gives a plane wave, a radial \\(m\\) a target wave."
+    "text": "Mechanism\nThe spatial generalization of the (pacemaker -&gt; pulse_stimulus) pair. Instead of one GLOBAL clock p(t) painted with a fixed spatial profile, every pixel runs the SAME pulse waveform but offset by a per-pixel delay read from a map:\na(x, y, t) = pulse( t - tau(x, y) ),     tau(x, y) = max_delay * delay_map(x, y)\nso a region with a larger tau contracts LATER. A spatial delay GRADIENT (e.g. tau = max_delay * x, or tau ~ atan2(y-.5, x-.5)) makes neighbouring regions fire in sequence – a travelling activation wave. Under an elastic tissue (with an active-stress or contraction operator downstream) that timing gradient turns into curved / rotating motion – the substrate for rotary, cardiac-like trajectories. The delay map is an image field (a TIFF, exactly like a stiffness map), so it is analytic now and learnable later.\nThe pulse is the same smooth raised bump as pacemaker (so force&lt;-&gt;stress&lt;-&gt;wave is a clean swap), evaluated per pixel at its own local time t - tau:\nkind=field: writes the activation grid named by at: in place and returns {}. It SUBSUMES pacemaker+pulse_stimulus – it owns both WHEN (per pixel) and WHERE (via the map) – so schedule it in their place. Downstream pulse_to_active_stress / pulse_to_contraction read the delayed activation field exactly as before.\n\\[\na(\\mathbf x,t) \\;=\\; \\mathrm{pulse}\\big(t-\\tau(\\mathbf x)\\big),\n\\qquad \\tau(\\mathbf x)=\\tau_{\\max}\\,m(\\mathbf x),\\quad m(\\mathbf x)\\in[0,1]\n\\] \\[\n\\mathrm{pulse}(t') \\;=\\;\n\\begin{cases}\n\\sin\\!\\big(\\pi\\, s/\\tau_d\\big) & s&lt;\\tau_d\\\\[2pt]\n0 & \\text{otherwise}\n\\end{cases},\n\\qquad s=(t'+\\varphi)\\bmod T\n\\] The same smooth bump as pacemaker (width \\(\\tau_d\\) = duration, period \\(T\\), phase \\(\\varphi\\)), evaluated per pixel at its own local time \\(t-\\tau\\). The delay map \\(m\\) is an image field; \\(\\tau_{\\max}\\) (max_delay) is the delay where the map saturates. So pacemaker is the special case \\(\\tau\\equiv 0\\), and a linear \\(m\\) (e.g. \\(m=x\\)) gives a plane wave, a radial \\(m\\) a target wave."
   },
   {
     "objectID": "library/phase_delay_pulse.html#parameters",
@@ -2181,14 +2006,7 @@
     "href": "library/pulse_stimulus.html#mechanism",
     "title": "pulse_stimulus",
     "section": "Mechanism",
-    "text": "Mechanism\nReads the scalar clock p(t) from H.signals[clock] (written by a pacemaker) and writes a Gaussian activation bump, centred at center with width radius, into the scalar field named by at::\na(x, t) = p(t) * exp( -||x - x0||^2 / (2 * sigma^2) ),    sigma = radius\nIt owns WHERE the stimulus is – not WHEN (the pacemaker) nor the mechanical effect (pulse_to_contraction). kind=field: writes the field grid in place, returns {}. With no pacemaker run before it (the key is absent from H.signals) p(t) defaults to 0, so the field is blank – schedule the pacemaker first."
-  },
-  {
-    "objectID": "library/pulse_stimulus.html#equation",
-    "href": "library/pulse_stimulus.html#equation",
-    "title": "pulse_stimulus",
-    "section": "Equation",
-    "text": "Equation\n\\[\na(\\mathbf x,t) \\;=\\; p(t)\\,\\exp\\!\\Big(-\\tfrac{\\lVert\\mathbf x-\\mathbf x_0\\rVert^{2}}{2\\sigma^{2}}\\Big),\n\\qquad \\sigma=\\text{radius}\n\\] Paints the clock \\(p(t)\\) (from a pacemaker) as a Gaussian bump centred at \\(\\mathbf x_0\\). Owns where the stimulus is — not when (the pacemaker) nor its mechanical effect."
+    "text": "Mechanism\nReads the scalar clock p(t) from H.signals[clock] (written by a pacemaker) and writes a Gaussian activation bump, centred at center with width radius, into the scalar field named by at::\nIt owns WHERE the stimulus is – not WHEN (the pacemaker) nor the mechanical effect (pulse_to_contraction). kind=field: writes the field grid in place, returns {}. With no pacemaker run before it (the key is absent from H.signals) p(t) defaults to 0, so the field is blank – schedule the pacemaker first.\n\\[\na(\\mathbf x,t) \\;=\\; p(t)\\,\\exp\\!\\Big(-\\tfrac{\\lVert\\mathbf x-\\mathbf x_0\\rVert^{2}}{2\\sigma^{2}}\\Big),\n\\qquad \\sigma=\\text{radius}\n\\] Paints the clock \\(p(t)\\) (from a pacemaker) as a Gaussian bump centred at \\(\\mathbf x_0\\). Owns where the stimulus is — not when (the pacemaker) nor its mechanical effect."
   },
   {
     "objectID": "library/pulse_stimulus.html#parameters",
@@ -2244,14 +2062,7 @@
     "href": "library/radius_graph.html#mechanism",
     "title": "radius_graph",
     "section": "Mechanism",
-    "text": "Mechanism\nA rewire operator rebuilds the within-set relation E each tick so it tracks the live configuration, then emits no delta – lateral operators (interaction, springs, …) read the edges it leaves on the Level. Separating “who interacts” (rewire) from “how they interact” (lateral) is what lets a dense pairwise law become O(E) message passing."
-  },
-  {
-    "objectID": "library/radius_graph.html#equation",
-    "href": "library/radius_graph.html#equation",
-    "title": "radius_graph",
-    "section": "Equation",
-    "text": "Equation\n\\[\nE \\;=\\; \\big\\{\\,(i,j)\\;:\\; r_{\\min} \\le \\lVert\\mathbf x_i-\\mathbf x_j\\rVert &lt; r\\,\\big\\}\n\\] Rebuilds the neighbour relation each tick: an edge for every pair within radius \\(r\\) (and beyond an optional min_radius floor). Emits no delta — lateral ops read these edges."
+    "text": "Mechanism\nA rewire operator rebuilds the within-set relation E each tick so it tracks the live configuration, then emits no delta – lateral operators (interaction, springs, …) read the edges it leaves on the Level. Separating “who interacts” (rewire) from “how they interact” (lateral) is what lets a dense pairwise law become O(E) message passing.\n\\[\nE \\;=\\; \\big\\{\\,(i,j)\\;:\\; r_{\\min} \\le \\lVert\\mathbf x_i-\\mathbf x_j\\rVert &lt; r\\,\\big\\}\n\\] Rebuilds the neighbour relation each tick: an edge for every pair within radius \\(r\\) (and beyond an optional min_radius floor). Emits no delta — lateral ops read these edges."
   },
   {
     "objectID": "library/radius_graph.html#parameters",
@@ -2300,14 +2111,7 @@
     "href": "library/sense_3d.html#mechanism",
     "title": "sense_3d",
     "section": "Mechanism",
-    "text": "Mechanism\nThe 3D counterpart of sense. Lague’s 2D Physarum agent reads three coplanar sensors (ahead-left / ahead / ahead-right) and turns its scalar heading toward the strongest. In 3D the heading is a unit VECTOR, so the three sensors become a CONE: one centre sensor along the heading h, plus a ring of K sensors tilted by the sensor_angle around h (using an orthonormal basis (u, v) perpendicular to h). Each sensor is a windowed, species-weighted trail read (own channel +1, others cross). If the centre is strongest the agent goes straight; otherwise it rotates h toward the winning ring direction (toward that direction’s component perpendicular to h, scaled by a random strength up to turn_speed), then renormalises. Mutates cell.heading (the [N,3] vector) in place; returns {}."
-  },
-  {
-    "objectID": "library/sense_3d.html#equation",
-    "href": "library/sense_3d.html#equation",
-    "title": "sense_3d",
-    "section": "Equation",
-    "text": "Equation\n\\[\nS_k = \\!\\!\\sum_{\\mathbf p\\in W_k}\\!\\Big(c_{\\text{own}}(\\mathbf p) + \\kappa\\!\\!\\sum_{s\\ne\\text{own}}\\!\\! c_s(\\mathbf p)\\Big),\n\\quad k\\in\\{C\\}\\cup\\text{ring};\n\\qquad\n\\hat{\\mathbf h}_i \\leftarrow \\mathrm{normalize}\\big(\\hat{\\mathbf h}_i + \\omega\\,\\mathbf r_{k^\\star}\\big)\n\\] The 3D form: one centre sensor along \\(\\hat{\\mathbf h}\\) plus a ring of \\(K\\) sensors tilted by sensor_angle. If a ring direction \\(k^\\star\\) wins, rotate \\(\\hat{\\mathbf h}\\) toward its perpendicular component (up to turn_speed \\(\\omega\\)) and renormalise."
+    "text": "Mechanism\nThe 3D counterpart of sense. Lague’s 2D Physarum agent reads three coplanar sensors (ahead-left / ahead / ahead-right) and turns its scalar heading toward the strongest. In 3D the heading is a unit VECTOR, so the three sensors become a CONE: one centre sensor along the heading h, plus a ring of K sensors tilted by the sensor_angle around h (using an orthonormal basis (u, v) perpendicular to h). Each sensor is a windowed, species-weighted trail read (own channel +1, others cross). If the centre is strongest the agent goes straight; otherwise it rotates h toward the winning ring direction (toward that direction’s component perpendicular to h, scaled by a random strength up to turn_speed), then renormalises. Mutates cell.heading (the [N,3] vector) in place; returns {}.\n\\[\nS_k = \\!\\!\\sum_{\\mathbf p\\in W_k}\\!\\Big(c_{\\text{own}}(\\mathbf p) + \\kappa\\!\\!\\sum_{s\\ne\\text{own}}\\!\\! c_s(\\mathbf p)\\Big),\n\\quad k\\in\\{C\\}\\cup\\text{ring};\n\\qquad\n\\hat{\\mathbf h}_i \\leftarrow \\mathrm{normalize}\\big(\\hat{\\mathbf h}_i + \\omega\\,\\mathbf r_{k^\\star}\\big)\n\\] The 3D form: one centre sensor along \\(\\hat{\\mathbf h}\\) plus a ring of \\(K\\) sensors tilted by sensor_angle. If a ring direction \\(k^\\star\\) wins, rotate \\(\\hat{\\mathbf h}\\) toward its perpendicular component (up to turn_speed \\(\\omega\\)) and renormalise."
   },
   {
     "objectID": "library/sense_3d.html#parameters",
@@ -2405,14 +2209,7 @@
     "href": "library/attraction_repulsion.html#mechanism",
     "title": "attraction_repulsion",
     "section": "Mechanism",
-    "text": "Mechanism\nA Lateral operator over a neighbour graph. For a receiver particle i of type t, summed over its neighbours j (the edges left by a rewire operator such as radius_graph):\nf(r) = p1 * exp(-r^(2 p2) / 2σ²)  -  p3 * exp(-r^(2 p4) / 2σ²)      (a length)\ndpos_i = Σ_j  f(r_ij) * (pos_j - pos_i)                            (a velocity)\nwith p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first Gaussian is the long-range pull, the second the short-range push; their balance gives type-specific phases (clusters, networks, lattices). First-derivative law: returns a velocity (set prediction: first_derivative).\nThis is message passing on Level.edge_index (O(E), scales to 1e4-1e5 nodes), not a dense O(N^2) matrix. Per-type parameters come from the spec’s types: block (each type carries p), assembled by the engine into Level.type_params."
-  },
-  {
-    "objectID": "library/attraction_repulsion.html#equation",
-    "href": "library/attraction_repulsion.html#equation",
-    "title": "attraction_repulsion",
-    "section": "Equation",
-    "text": "Equation\n\\[\nf(r) \\;=\\; p_1\\,e^{-r^{2p_2}/2\\sigma^2} \\;-\\; p_3\\,e^{-r^{2p_4}/2\\sigma^2},\n\\qquad\n\\dot{\\mathbf{x}}_i \\;=\\; \\sum_{j\\in\\mathcal{N}(i)} f(r_{ij})\\,(\\mathbf{x}_j-\\mathbf{x}_i)\n\\] with \\(\\mathbf p=[p_1,p_2,p_3,p_4]\\) the receiver type’s parameters and \\(\\sigma\\) a global width. The first term is the long-range pull, the second the short-range push."
+    "text": "Mechanism\nA Lateral operator over a neighbour graph. For a receiver particle i of type t, summed over its neighbours j (the edges left by a rewire operator such as radius_graph):\nwith p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first Gaussian is the long-range pull, the second the short-range push; their balance gives type-specific phases (clusters, networks, lattices). First-derivative law: returns a velocity (set prediction: first_derivative).\nThis is message passing on Level.edge_index (O(E), scales to 1e4-1e5 nodes), not a dense O(N^2) matrix. Per-type parameters come from the spec’s types: block (each type carries p), assembled by the engine into Level.type_params.\n\\[\nf(r) \\;=\\; p_1\\,e^{-r^{2p_2}/2\\sigma^2} \\;-\\; p_3\\,e^{-r^{2p_4}/2\\sigma^2},\n\\qquad\n\\dot{\\mathbf{x}}_i \\;=\\; \\sum_{j\\in\\mathcal{N}(i)} f(r_{ij})\\,(\\mathbf{x}_j-\\mathbf{x}_i)\n\\] with \\(\\mathbf p=[p_1,p_2,p_3,p_4]\\) the receiver type’s parameters and \\(\\sigma\\) a global width. The first term is the long-range pull, the second the short-range push."
   },
   {
     "objectID": "library/attraction_repulsion.html#parameters",
@@ -2496,14 +2293,7 @@
     "href": "library/pulse_to_contraction.html#mechanism",
     "title": "pulse_to_contraction",
     "section": "Mechanism",
-    "text": "Mechanism\nReads the activation field a(x,t) (the from: field) and converts its gradient into a per-particle body force, RETURNED as a particle delta. The engine sums it (with any mpm_drag delta) into H.delta(mpm_particle), which the MLS-MPM p2g scatter consumes as the body force (p2g: a_ext += H.delta(particle)) – the per-particle counterpart of the parent-delta path that carries gravity. For a Gaussian activation bump grad(a) points toward the centre, so\nF_i = sign * amplitude * grad(a)(x_i)          sign = +1 (inward) / -1 (outward)\ncontracts (mode: inward) or expands (mode: outward) the sheet. It owns only the mechanical mapping – not WHEN (pacemaker) nor WHERE (pulse_stimulus).\nkind=exchange (field -&gt; set); PREDICTION=None, so the engine never integrates the particle set (g2p owns advection) – the force enters mechanics only through the MPM substep. The engine’s zero_delta resets the delta each outer tick, and the substep loop reads that constant body force on each of its iterations."
-  },
-  {
-    "objectID": "library/pulse_to_contraction.html#equation",
-    "href": "library/pulse_to_contraction.html#equation",
-    "title": "pulse_to_contraction",
-    "section": "Equation",
-    "text": "Equation\n\\[\n\\mathbf F_i \\;=\\;\n\\begin{cases}\n\\pm\\,\\text{amplitude}\\,\\nabla a(\\mathbf x_i) & \\text{gradient mode (inward / outward)}\\\\[4pt]\n\\text{amplitude}\\,a(\\mathbf x_i)\\,\\mathbf d(\\mathbf x_i) & \\text{directional mode}\n\\end{cases}\n\\] In gradient mode the force points along \\(\\pm\\nabla a\\) (contract / expand); in directional mode a unit vector-field \\(\\mathbf d\\) sets the orientation and \\(a\\) sets the magnitude."
+    "text": "Mechanism\nReads the activation field a(x,t) (the from: field) and converts its gradient into a per-particle body force, RETURNED as a particle delta. The engine sums it (with any mpm_drag delta) into H.delta(mpm_particle), which the MLS-MPM p2g scatter consumes as the body force (p2g: a_ext += H.delta(particle)) – the per-particle counterpart of the parent-delta path that carries gravity. For a Gaussian activation bump grad(a) points toward the centre, so\ncontracts (mode: inward) or expands (mode: outward) the sheet. It owns only the mechanical mapping – not WHEN (pacemaker) nor WHERE (pulse_stimulus).\nkind=exchange (field -&gt; set); PREDICTION=None, so the engine never integrates the particle set (g2p owns advection) – the force enters mechanics only through the MPM substep. The engine’s zero_delta resets the delta each outer tick, and the substep loop reads that constant body force on each of its iterations.\n\\[\n\\mathbf F_i \\;=\\;\n\\begin{cases}\n\\pm\\,\\text{amplitude}\\,\\nabla a(\\mathbf x_i) & \\text{gradient mode (inward / outward)}\\\\[4pt]\n\\text{amplitude}\\,a(\\mathbf x_i)\\,\\mathbf d(\\mathbf x_i) & \\text{directional mode}\n\\end{cases}\n\\] In gradient mode the force points along \\(\\pm\\nabla a\\) (contract / expand); in directional mode a unit vector-field \\(\\mathbf d\\) sets the orientation and \\(a\\) sets the magnitude."
   },
   {
     "objectID": "library/pulse_to_contraction.html#parameters",
@@ -2567,47 +2357,5 @@
     "title": "pulse_to_contraction",
     "section": "Source",
     "text": "Source\nsrc/plexus/operators/pulse_to_contraction.py — the registered operator.\n\"\"\"pulse_to_contraction -- the FORCE half: activation field -&gt; per-particle MPM force.\n\nReads the activation field a(x,t) (the `from:` field) and converts its gradient into\na per-particle body force, RETURNED as a particle delta. The engine sums it (with any\n`mpm_drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes\nas the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counterpart\nof the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)\npoints toward the centre, so\n\n    F_i = sign * amplitude * grad(a)(x_i)          sign = +1 (inward) / -1 (outward)\n\ncontracts (mode: inward) or expands (mode: outward) the sheet. It owns only the\nmechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).\n\n`kind=exchange` (field -&gt; set); `PREDICTION=None`, so the engine never integrates the\nparticle set (g2p owns advection) -- the force enters mechanics only through the MPM\nsubstep. The engine's `zero_delta` resets the delta each outer tick, and the substep\nloop reads that constant body force on each of its iterations.\n\"\"\"\nfrom __future__ import annotations\n\nimport torch\nimport torch.nn.functional as Fnn\n\nfrom plexus.models.base import Exchange\nfrom plexus.models.registry import register_operator\n\n\n@register_operator(\"pulse_to_contraction\", level=\"particle\", kind=\"exchange\")\nclass PulseToContraction(Exchange):\n    PREDICTION = None                         # force is consumed by the MPM substep, not engine-integrated\n    REQUIRES_PARAMS = [\"from\"]                # the activation field to read\n    MECHANISM_TAGS = [\"active_contraction\", \"field_gradient_force\", \"directed_active_stress\"]\n    PARAM_ROLES = {\"amplitude\": \"contraction_strength\", \"mode\": \"gradient_or_directional\"}\n\n    def __init__(self, params, device=\"cpu\"):\n        super().__init__(params, device)\n        self.field_name = params.get(\"from\")\n        self.amplitude = float(params.get(\"amplitude\", 50.0))\n        self.channel = int(params.get(\"channel\", 0))\n        self.mode = str(params.get(\"mode\", \"inward\"))\n        # gradient modes (inward/outward): direction = +/- grad(activation). directional:\n        # direction = a unit-vector field, magnitude = the (uniform) activation value.\n        self.sign = {\"inward\": 1.0, \"outward\": -1.0}.get(self.mode, 1.0)\n        self.direction_from = params.get(\"direction_from\")\n        if self.mode == \"directional\" and self.direction_from is None:\n            raise ValueError(\"pulse_to_contraction mode: directional needs `direction_from:` \"\n                             \"(a vector_grid field giving the contraction direction)\")\n        self.at = params.get(\"_at\", \"particle\")\n\n    def _sample(self, field_grid, pos, W):\n        \"\"\"Bilinear-sample a `[C, nx, ny]` field at particle positions -&gt; `[N, C]`.\"\"\"\n        gxn = (pos[:, 0] / W) * 2 - 1\n        gyn = (pos[:, 1] / 1.0) * 2 - 1\n        grid = torch.stack([gyn, gxn], -1)[None, None]              # grid_sample expects (x=ny, y=nx)\n        return Fnn.grid_sample(field_grid[None], grid, mode=\"bilinear\",\n                               padding_mode=\"border\", align_corners=True)[0, :, 0].t()\n\n    def forward(self, H, mask=None):\n        lvl = H.level(self.at)\n        pos = lvl.get(\"pos\")\n        fld = H.fields[self.field_name]\n        W = float(getattr(H, \"world_width\", 1.0))\n\n        if self.mode == \"directional\":\n            # F_i = amplitude * a(x_i) * d(x_i): uniform activation sets WHEN/how much,\n            # the vector field sets WHERE to push (the active-stress orientation map).\n            a = self._sample(fld.grid[self.channel:self.channel + 1], pos, W)[:, 0]   # [N]\n            d = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2]\n            d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)\n            acc = self.amplitude * a[:, None] * d\n        else:\n            # gradient mode: direction = +/- grad(activation), bilinear-sampled (chemotaxis idiom).\n            g = fld.grid[self.channel]                                  # [nx, ny]\n            pad = \"circular\" if getattr(H, \"periodic\", False) else \"replicate\"\n            gp = Fnn.pad(g[None, None], (1, 1, 1, 1), mode=pad)[0, 0]\n            gx = (gp[2:, 1:-1] - gp[:-2, 1:-1]) * 0.5 * (fld.nx / W)    # d a/d x\n            gy = (gp[1:-1, 2:] - gp[1:-1, :-2]) * 0.5 * fld.ny          # d a/d y\n            grad = torch.stack([gx, gy], 0)                            # [2, nx, ny]\n            acc = self.sign * self.amplitude * self._sample(grad, pos, W)  # inward for sign&gt;0\n\n        acc = acc * lvl.occ[:, None]\n        if mask is not None:\n            acc = acc * mask[:, None].float()\n        # return a per-particle force delta; the engine sums it (with mpm_drag's) into\n        # H.delta(mpm_particle), which p2g consumes as the MPM body force. PREDICTION=None,\n        # so the engine never integrates the particle set (g2p owns advection).\n        return {self.at: acc}"
-  },
-  {
-    "objectID": "index.html#sets-and-fields",
-    "href": "index.html#sets-and-fields",
-    "title": "The abstraction",
-    "section": "Sets and fields",
-    "text": "Sets and fields\nPlexus has two objects.\nA set is a discrete collection of elements of one kind: particles, cells, nuclei, metabolites, organisms. More precisely, a set is a collection of elements with the same state schema and the same admissible operators — every element carries the same state variables (position, velocity, concentration, …) and the same operators may act on it.\nA field is a continuous quantity defined on a grid: a chemical concentration, an activation level, a stiffness map, a pressure, a substrate signal. (Formally, \\(f:\\Omega\\to\\mathbb{R}^q\\) over a domain \\(\\Omega\\).)\nOperators move state between these objects, and a model is a scheduled composition of them. Fields are not contained by sets and do not contain them; a set and a field meet only through an exchange operator — secretion, sensing, particle–grid transfer, field sampling."
-  },
-  {
-    "objectID": "index.html#sets-and-types",
-    "href": "index.html#sets-and-types",
-    "title": "The abstraction",
-    "section": "Sets and types",
-    "text": "Sets and types\nA new kind of object is a new set. The same object with different parameters is a new type inside that set:\nnew kind of object       → new set\nsame object, new params   → new type inside that set\nIn a spec, types: means parameter variants inside one set. Soft and stiff cells are two types of the same cell set: they share the same state variables and the same operators, and differ only in a parameter (here Young’s modulus). A nucleus, by contrast, is a different set — it has its own state and its own operators.\nsets:\n  cell:\n    n: 100\n    types:\n      soft:  {fraction: 0.5, youngs: 40}\n      stiff: {fraction: 0.5, youngs: 200}\n\n  nucleus:\n    parent: cell\n    per_parent: 1\n\n  membrane_particle:\n    parent: cell\n    per_parent: 64\n\ncell, nucleus, and membrane_particle are different sets — different state, different operators.\nsoft and stiff are types inside cell — same state and operators; only the parameters differ.\n\nKeeping the two apart keeps operators simple: an operator names the one set it acts on (at: nucleus) and never branches on a role flag at run time. A type is handled by a per-element parameter lookup, not by a separate code path."
-  },
-  {
-    "objectID": "index.html#the-containment-graph",
-    "href": "index.html#the-containment-graph",
-    "title": "The abstraction",
-    "section": "The containment graph",
-    "text": "The containment graph\nSets may contain other sets through parent maps. A nucleus belongs to a cell; a membrane particle belongs to a cell; a metabolite belongs to a cell. Each parent map,\n\\[\\pi_{\\alpha\\to\\beta} : S_\\alpha \\longrightarrow S_\\beta,\\]\nassigns every element of one set to the element of another that contains it. These maps form a containment graph, not a fixed scale ladder: a set may have several child sets at once, and a cell is assembled from all of them.\nSo a cell is not one fibre. It is a bundle of fibres. The fibre of a parent map over an element \\(b\\) is everything that maps to it — \\(\\pi_{\\alpha\\to\\beta}^{-1}(b)=\\{x : \\pi_{\\alpha\\to\\beta}(x)=b\\}\\); the fibre of \\(\\pi_{\\text{membrane}\\to\\text{cell}}\\) over a cell \\(c\\) is the membrane particles of \\(c\\). The cell is the union of all its child fibres — membrane particles, cytoplasmic particles, nucleus, metabolites — each a distinct set mapping to the same parent.\n\n\n\nContainment across scales: each parent map \\(\\pi\\) sends an element to the one that contains it. A cell is a bundle of fibres — here its particles and metabolites; in general also its membrane, nucleus, and other child sets.\n\n\nFormally the container is a directed acyclic graph (sets are nodes, parent maps are directed edges, no cycles); the familiar \\(S_0\\to S_1\\to S_2\\) scale ladder is just the chain-shaped special case. Each set carries its own state schema and operators, so adding structure is adding a set and a parent map — never an engine change. (For the formally inclined: this is the many-sorted, or typed, discipline an ECS or a relational database already uses — one sort per set, joined by maps.)\nThe distinction between a new set and a new type can be read straight off a table:\n\n\n\n\n\n\n\n\n\nDifferent sets (\\(S_\\alpha\\))\nTypes within one set (\\(\\tau\\))\n\n\n\n\nexample\nmembrane vs nucleus vs metabolite\nsoft cell vs stiff cell\n\n\ndiffer in\nstate space + operators\nonly parameter values\n\n\nin the spec\nseparate sets: with parent:\na types: block inside one set\n\n\ndispatch\nby name (at: nucleus)\nper-row lookup \\(p[\\tau(i)]\\)"
-  },
-  {
-    "objectID": "index.html#operators",
-    "href": "index.html#operators",
-    "title": "The abstraction",
-    "section": "Operators",
-    "text": "Operators\nA GNN is an operator \\(\\mathcal{O}\\) dispatched by the relation it acts on. An operator changes exactly one of the three things the container holds: the state on the nodes, the relations between them, or the entities themselves. Four dynamics operators move state along a fixed structure, one per relation the container admits. Rewire changes the relations — the edge set \\(E\\), which nodes interact. Divide and Die change the entities — the node set \\(|S_k|\\), which nodes exist. Those last three return no state delta. The four dynamics operators:\n\\[\n\\begin{aligned}\n\\textbf{Lateral}\\quad   & \\mathcal{O}_E,\\ E\\subseteq S_k\\times S_k\n  && \\text{(ODE interaction } + \\text{ graph Laplacian)}\\\\\n\\textbf{Aggregate}\\ \\uparrow\\quad & \\textstyle\\sum_{\\pi}: S_k \\to S_{k+1}\n  && \\text{(reduction over fibres of } \\pi)\\\\\n\\textbf{Broadcast}\\ \\downarrow\\quad & \\pi^{*}: S_{k+1}\\to S_k\n  && \\text{(lift along } \\pi)\\\\\n\\textbf{Exchange}\\quad  & \\text{push},\\ \\text{pull}: S_k \\leftrightarrow F\n  && \\text{(set} \\leftrightarrow \\text{field; bipartite)}\n\\end{aligned}\n\\]\nTwo pieces of notation: \\(S_k\\times S_k\\) is the set of all node pairs, so an edge set \\(E\\subseteq S_k\\times S_k\\) is simply a graph on \\(S_k\\) — which nodes interact (e.g. neighbours within a cutoff radius, or a fixed connectome). The two halves of a field coupling are push (\\(S_k\\to F\\), which writes object state into the field) and pull (\\(F\\to S_k\\), which reads it back).\nLateral \\(\\mathcal{O}_E\\). Message passing within one scale along the edges \\(E\\). It carries the within-scale physics: pairwise interactions (forces, adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities over the edges. Examples: particle–particle elasticity, cell–cell flocking or adhesion, neuron–neuron signal propagation.\nAggregate \\(\\textstyle\\sum_\\pi\\) (up). Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.\nBroadcast \\(\\pi^{*}\\) (down). The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map \\(\\pi\\).\nExchange (push / pull). Couples a set to a field: push deposits/secretes object state into the field (set → field), pull samples/senses the field back onto the objects (field → set). The relation is bipartite (objects \\(\\leftrightarrow\\) grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.\nRewire \\(\\mathcal{R}\\) (relations). Rewire changes the relation \\(E\\subseteq S_k\\times S_k\\) on which the lateral operators act — which nodes are neighbours — and returns no state delta. A geometric relation is rebuilt every tick from the live configuration (a radius graph: all pairs within a cutoff; or a \\(k\\)-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a fixed relation (a connectome) is built once and never rewired. Rewire is of a different nature from the other five: it neither moves state nor changes who exists — it maintains the scaffold the dynamics run on. Separating who interacts (Rewire) from how they interact (Lateral) also turns a dense \\(O(N^2)\\) force law into \\(O(|E|)\\) message passing.\nDivide and Die (entities). The dynamics operators move state and Rewire moves relations, both while the node set stays fixed; living matter also rewrites its own membership. Divide \\(\\mathcal{B}: x \\mapsto \\{x',x''\\}\\) (proliferation) and Die \\(\\mathcal{D}: x \\mapsto \\varnothing\\) (apoptosis / efflux) are the only operators that change the entities themselves — the cardinality \\(|S_k|\\). For a living system they are as primordial as the four dynamics operators: a tissue is defined as much by the cells it makes and loses as by how they move. Everything else assumes the cells it acts on already exist.\n\n\n\nThe operators, grouped by what they change. The first four are dynamics — they move state along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment \\(\\pi\\); Exchange to/from a field). The last three return no state delta: Rewire changes the relations — the edge set \\(E\\), which nodes interact (a radius graph rebuilt each tick, dashed cutoff); Divide and Die change the entities — the node set \\(|S_k|\\), on a fixed buffer with per-element occupancy \\(w\\).\n\n\n\nDifferentiating division and death\nChanging \\(|S_k|\\) is the one move that resists automatic differentiation: it alters a tensor’s shape, and “does this cell divide?” is a discrete event with no useful gradient. Plexus keeps differentiable with a continuous-occupancy formulation. Rather than resize, hold a fixed buffer of \\(N_{\\max}\\) slots and give every element a mass \\(w_i\\in[0,1]\\):\n\nDie decays \\(w_i\\to 0\\) — the slot goes dormant, not deleted.\nDivide activates a dormant slot, copies the mother’s state with a small perturbation, and splits the mass \\(w\\to(\\tfrac{w}{2},\\tfrac{w}{2})\\).\n\nEvery operator then honours \\(w\\): Aggregate becomes a mass-weighted reduction \\(\\left(\\sum_i w_i x_i\\right)/\\sum_i w_i\\), Lateral weights each message by \\(w_j\\), and so on — so the boolean selector mask is just the \\(\\{0,1\\}\\) special case of \\(w\\). The trajectory between events is now smooth in \\(w\\), so gradients flow on a fixed-shape tensor (and torch.compile still applies).\nThe one genuinely non-differentiable part — the integer decision of when to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division policy; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death rates; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the use both recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.\nSets, fields, and these operators are the entire vocabulary. The wager of Plexus is that this is enough to describe a complex living system — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields."
-  },
-  {
-    "objectID": "index.html#dynamics-a-schedule",
-    "href": "index.html#dynamics-a-schedule",
-    "title": "The abstraction",
-    "section": "Dynamics: a schedule",
-    "text": "Dynamics: a schedule\nA simulation is a multi-rate composition of operators, declared as a Schedule. In math terms, one tick is the composition\n\\[\\Phi=\\mathcal{O}_n\\circ\\cdots\\circ\\mathcal{O}_1,\\]\nand the dynamics is its iteration \\(x_{t+1}=\\Phi(x_t)\\) — a discrete flow. Multi-rate means the operators need not all fire on every tick: a slow process (diffusion, cell division) can be scheduled to act once every \\(k\\) ticks, while a fast one (mechanics) runs every tick, so a single Schedule interleaves dynamics that evolve on different time scales. Each operator is pure: instead of editing the state in place, it only returns its contribution — a delta \\(\\Delta_i\\) (a time-derivative term) for the sets it touches. The schedule sums the deltas acting on each set and integrates once per tick.\nAn operator declares the order of its delta, since a time-derivative can be of position or of velocity. A first-order (overdamped) operator returns a velocity, integrated \\(x_{t+1}=x_t+\\Delta t\\sum_i\\Delta_i\\); a second-order (inertial) operator returns an acceleration, integrated \\(v_{t+1}=v_t+\\Delta t\\sum_i\\Delta_i,\\ x_{t+1}=x_t+\\Delta t\\,v_{t+1}\\). The order is a fixed property of each operator (PREDICTION): attraction–repulsion is first order, boids flocking is second; all operators on one set must agree, so the set integrates as a single order. Friction in the inertial case is itself an operator (a drag delta \\(-\\kappa v\\)), not a special term in the integrator.\nTwo consequences follow: several operators may act on the same set in one tick (their deltas simply add — none overwrites another), and because nothing is mutated in place, gradients flow through the sums and the integrator, so the whole rollout stays differentiable. The LLM searches over schedules and operator parameterizations — one well-defined action space instead of per-domain code."
-  },
-  {
-    "objectID": "index.html#glossary",
-    "href": "index.html#glossary",
-    "title": "The abstraction",
-    "section": "Glossary",
-    "text": "Glossary\n\n\n\n\n\n\n\n\n\nConcept\nSet/operator term\nSymbol\nCode\n\n\n\n\ncollection of like nodes\nset (level)\n\\(S_k\\)\nLevel\n\n\na single node\nelement\n\\(x\\in S_k\\)\nrow of Level.state\n\n\nlearnable per-node code\nembedding\n\\(a_i\\)\nLevel.embedding\n\n\ncontainment\npartition\n\\(\\pi_k\\!:\\!S_k\\!\\to\\!S_{k+1}\\)\nLevel.parent\n\n\nwithin-set links\nrelation\n\\(E\\subseteq S_k\\times S_k\\)\nLevel.edge_index\n\n\ncontinuum quantity\nfield\n\\(f:\\Omega\\to\\mathbb{R}^c\\)\nField\n\n\ndynamics (GNN)\noperator: ODE+Laplacian\n\\(\\mathcal{O}\\)\nOperator\n\n\nwithin-set op\nlateral\n\\(\\mathcal{O}_E\\)\nLateral\n\n\nup op\nreduction over fibres\n\\(\\sum_\\pi\\)\nAggregate\n\n\ndown op\nlift\n\\(\\pi^{*}\\)\nBroadcast\n\n\nset \\(\\leftrightarrow\\) field op\ntransfer\npush / pull\nExchange\n\n\nrebuild the relation\nrelations: rewire\n\\(\\mathcal{R}\\!:\\,\\to\\!E\\)\nRewire\n\n\nmake an element\nentities: division\n\\(\\mathcal{B}:x\\!\\mapsto\\!\\{x',x''\\}\\)\nDivide\n\n\nremove an element\nentities: death\n\\(\\mathcal{D}:x\\!\\mapsto\\!\\varnothing\\)\nDie\n\n\nper-element occupancy\noccupancy\n\\(w_i\\in[0,1]\\)\nLevel.occ\n\n\nthe container\nhierarchy\n\\((S_\\bullet,F_\\bullet,\\pi_\\bullet)\\)\nHierarchy\n\n\nthe model\ncomposition of ops\n\\(\\mathcal{O}_n\\!\\circ\\!\\cdots\\!\\circ\\!\\mathcal{O}_1\\)\nSchedule"
   }
 ]

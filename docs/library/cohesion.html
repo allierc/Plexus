@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -284,9 +283,6 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>Steer toward the local centre of mass: the mean offset to neighbours, <code>a1 * w^c_i * mean_j (pos_j - pos_i)</code>, with the per-receiver weight <code>w^c</code> the type’s named <code>cohesion</code> property. One of the three rules whose deltas the engine sums to make a flock; see also alignment, separation.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 \mathbf a_i \;=\; a_1\,w^c_i\,\big\langle \mathbf x_j-\mathbf x_i\big\rangle_{j\in\mathcal N(i)}
 \]</span> The boids centring rule: steer toward the local centre of mass (mean offset to neighbours). <span class="math inline">\(w^c_i\)</span> is the receiver type’s <code>cohesion</code> weight.</p>

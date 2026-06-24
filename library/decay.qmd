@@ -46,8 +46,6 @@ c <- max(0, c - k*dt). Without decay the deposited trail would only accumulate;
 decay is what lets unused filaments fade so the network coarsens (stigmergy).
 Writes the field in place; returns {}.
 
-## Equation
-
 $$
 c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)
 $$

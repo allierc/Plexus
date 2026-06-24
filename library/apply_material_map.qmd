@@ -59,8 +59,6 @@ so a stiffness map breaks the contraction's symmetry WITHOUT changing MPM physic
 Anisotropy (E_x != E_y, fibre angle) would need a tensor map + an anisotropic stress
 law -- a later step; this does the scalar case the current fixed-corotated MPM supports.
 
-## Equation
-
 $$
 E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
 \qquad (\mu_i,\lambda_i) = \mathrm{Lam\acute e}(E_i)

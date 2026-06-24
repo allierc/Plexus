@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#typical-schedules" id="toc-typical-schedules" class="nav-link" data-scroll-target="#typical-schedules">Typical schedules</a></li>
@@ -287,9 +286,6 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>A per-channel 3x3 box-blur lerp: c &lt;- (1-w)<em>c + w</em>mean_3x3(c), with w = saturate( rate*dt). mean_3x3(c) - c is a discrete Laplacian, so this is one explicit step of dc/dt = D nabla^2 c (the shader’s <code>Diffuse</code>, edge-clamped). Writes the field in place; returns {}.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 \qquad w=\operatorname{sat}(\text{rate}\cdot\Delta t)

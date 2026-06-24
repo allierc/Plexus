@@ -46,9 +46,6 @@ A Lateral operator over a neighbour graph. For a receiver particle i of type t,
 summed over its neighbours j (the edges left by a `rewire` operator such as
 `radius_graph`):
 
-    f(r) = p1 * exp(-r^(2 p2) / 2σ²)  -  p3 * exp(-r^(2 p4) / 2σ²)      (a length)
-    dpos_i = Σ_j  f(r_ij) * (pos_j - pos_i)                            (a velocity)
-
 with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
 Gaussian is the long-range pull, the second the short-range push; their balance
 gives type-specific phases (clusters, networks, lattices). First-derivative law:
@@ -57,8 +54,6 @@ returns a velocity (set `prediction: first_derivative`).
 This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
 a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
 (each type carries `p`), assembled by the engine into `Level.type_params`.
-
-## Equation
 
 $$
 f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},

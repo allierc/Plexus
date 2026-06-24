@@ -48,8 +48,6 @@ velocity delta -- the ENGINE integrates it, and it simply sums with any other ve
 the particle has (e.g. attraction_repulsion), the framework's "deltas add" rule. The
 field may be deposited (slime), reaction-diffused, or prescribed from a video.
 
-## Equation
-
 $$
 \dot{\mathbf x}_i \;=\; g\,\nabla\phi(\mathbf x_i)
 $$

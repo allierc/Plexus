@@ -46,8 +46,6 @@ Match neighbours' velocity: `a2 * w^a_i * mean_j (vel_j - vel_i)`, with the
 per-receiver weight `w^a` the type's named `alignment` property. One of the three
 rules whose deltas the engine sums to make a flock; see also cohesion, separation.
 
-## Equation
-
 $$
 \mathbf a_i \;=\; a_2\,w^a_i\,\big\langle \mathbf v_j-\mathbf v_i\big\rangle_{j\in\mathcal N(i)}
 $$

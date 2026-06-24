@@ -468,6 +468,34 @@ def first_sentence(doc: str) -> str:
     return line[:1].upper() + line[1:] if line else ""
 
 
+# --- prose cleanup: strip unreadable ASCII display-math from docstrings -------- #
+# The canonical maths live in the LaTeX `equation` (ENRICH); the Mechanism prose
+# should refer to it, not repeat an ASCII version. We drop *indented* display
+# equations (but keep indented YAML snippets / pipeline lists) and inline
+# integrator notes like "(v += dt*a; x += dt*v)".
+_MATH_SIG = re.compile(r"[Σ∑²·×⊗≈→√∇]|\bexp\(|\bsin\(|\bcos\(|\bgrad\(|\bmod\b|\bsqrt\b|\^")
+_NONMATH = re.compile(r"[{}\[\]]|->|\b\w+:\s|::")          # yaml / pipeline / tag markers
+
+
+def _is_ascii_math(ln: str) -> bool:
+    if len(ln) - len(ln.lstrip()) < 4:                    # only indented "display" lines
+        return False
+    s = ln.strip()
+    if not s or _NONMATH.search(s):                       # blank, or yaml/pipeline -> keep
+        return False
+    if _MATH_SIG.search(s):
+        return True
+    return bool(re.search(r"\b\w[\w]*\s*=\s*\S", s) and re.search(r"[*/^+]", s))
+
+
+def clean_prose(text: str) -> str:
+    """Drop ASCII display-equation lines and inline `(... += ...)` integrator notes."""
+    kept = [ln for ln in (text or "").split("\n") if not _is_ascii_math(ln)]
+    text = "\n".join(kept)
+    text = re.sub(r"\s*\([^()]*\+=[^()]*\)", "", text)    # inline integrator parentheticals
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
 def parse_params(cls) -> list[dict]:
     """Param rows: required keys, PARAM_ROLES, and defaults parsed from __init__."""
     required = list(getattr(cls, "REQUIRES_PARAMS", []) or [])
@@ -572,16 +600,12 @@ def render_operator_page(name: str, cls) -> str:
         out.append("- **Transitional** &mdash; wraps a mature multi-mechanism subsystem (fenced; scheduled for decomposition).")
     out.append("")
 
-    # Mechanism
+    # Mechanism (prose + the canonical LaTeX equation, one section)
     out.append("## Mechanism")
     out.append("")
-    out.append(body if body else "_See source below._")
+    out.append(clean_prose(body) if body else "_See source below._")
     out.append("")
-
-    # Equation
     if e.get("equation"):
-        out.append("## Equation")
-        out.append("")
         out.append(e["equation"])
         out.append("")
 
@@ -690,7 +714,7 @@ def render_field_page(name: str, cls) -> str:
     couples = getattr(cls, "COUPLES_TO", None)
     doc = inspect.getdoc(inspect.getmodule(cls)) or inspect.getdoc(cls) or ""
     purpose = first_sentence(doc)
-    body = "\n".join(doc.split("\n")[1:]).strip()
+    body = clean_prose("\n".join(doc.split("\n")[1:]).strip())
     out = ["---", f'title: "{name}"']
     if purpose:
         out.append(f'subtitle: "{purpose}"')
@@ -711,7 +735,7 @@ def render_field_page(name: str, cls) -> str:
 
 def render_set_page(name: str, cls) -> str:
     level = getattr(cls, "LEVEL", None)
-    doc = inspect.getdoc(cls) or ""
+    doc = clean_prose(inspect.getdoc(cls) or "")
     purpose = first_sentence(doc)
     schema = getattr(cls, "state_schema", None) or getattr(cls, "STATE_SCHEMA", None)
     out = ["---", f'title: "{name}"']

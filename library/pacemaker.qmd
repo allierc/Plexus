@@ -54,12 +54,8 @@ multi-site pacing graph.
 p(t) is a smooth raised bump of width `duration`, once per `period`, offset by
 `phase` (all in OUTER ticks, i.e. `H.frame`):
 
-    s = (frame + phase) mod period;   p = sin(pi * s / duration)  if s < duration else 0
-
 Set `period >= n_frames` for a one-shot pulse. `kind=field` (emits no set delta); its
 `at:` is only a scheduling anchor (any declared field) -- it mutates only `H.signals`.
-
-## Equation
 
 $$
 p(t) \;=\;

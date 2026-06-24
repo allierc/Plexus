@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -284,9 +283,6 @@ window.Quarto = {
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>Avoid crowding at short range: <code>-a3 * w^s_i * mean_j (pos_j - pos_i)/|d_ij|^2</code>, with the per-receiver weight <code>w^s</code> the type’s named <code>separation</code> property. The 1/|d|^2 relies on the radius graph’s <code>min_radius</code> so coincident neighbours don’t blow up. One of the three rules whose deltas the engine sums to make a flock; see also cohesion, alignment.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
 <p><span class="math display">\[
 \mathbf a_i \;=\; -\,a_3\,w^s_i\,
 \Big\langle \frac{\mathbf x_j-\mathbf x_i}{\lVert\mathbf x_j-\mathbf x_i\rVert^{2}}\Big\rangle_{j\in\mathcal N(i)}

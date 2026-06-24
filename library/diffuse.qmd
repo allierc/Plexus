@@ -47,8 +47,6 @@ rate*dt). mean_3x3(c) - c is a discrete Laplacian, so this is one explicit step 
 dc/dt = D nabla^2 c (the shader's `Diffuse`, edge-clamped). Writes the field in
 place; returns {}.
 
-## Equation
-
 $$
 c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 \qquad w=\operatorname{sat}(\text{rate}\cdot\Delta t)
