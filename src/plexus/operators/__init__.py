@@ -22,12 +22,9 @@ from . import scalar_field          # noqa: F401  registers the `grid` scalar fi
 from . import deposit               # noqa: F401  set -> field
 from . import diffuse               # noqa: F401  field -> field
 from . import decay                 # noqa: F401  field -> field
-from . import sense                 # noqa: F401  field -> set (turn heading)
-from . import advance               # noqa: F401  set -> self-propelled move
-from . import bounce                # noqa: F401  set -> wall/obstacle reflection (re-head)
-from . import sense_3d              # noqa: F401  field -> set, 3D cone sensing (vector heading)
-from . import advance_3d            # noqa: F401  set -> self-propelled move along a 3D heading
-from . import bounce_3d             # noqa: F401  set -> 3D wall reflection (re-head)
+from . import sense                 # noqa: F401  field -> set, sensor-fan steering (2D/3D, vector heading)
+from . import advance               # noqa: F401  set -> self-propelled move (2D/3D, vector heading)
+from . import bounce                # noqa: F401  set -> wall/obstacle reflection (2D/3D specular re-head)
 from . import video_field           # noqa: F401  registers the `video` field + playback
 from . import chemotaxis            # noqa: F401  field -> set gradient coupling
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
@@ -51,7 +48,6 @@ from . import g2p                   # noqa: F401  mpm_grid -> particle    (gathe
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "cohesion", "alignment", "separation", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
-           "sense_3d", "advance_3d", "bounce_3d",
            "video_field", "chemotaxis", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_drag", "material_map", "mpm",

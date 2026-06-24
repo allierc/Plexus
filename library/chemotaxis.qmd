@@ -76,7 +76,7 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`sense_3d`](sense_3d.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`apply_material_map`](apply_material_map.qmd).
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`apply_material_map`](apply_material_map.qmd), [`mls_mpm_mechanics`](mls_mpm_mechanics.qmd).
 
 ## Source
 

@@ -40,27 +40,32 @@ _DEFAULT_FIELD_COLORS = [
 
 
 def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
-    """Initial positions + headings for a self-propelled set (Lague's SpawnMode)."""
+    """Initial positions + headings for a self-propelled set (Lague's SpawnMode).
+
+    Heading is a [n, 2] unit VECTOR (the universal orientation representation, the
+    same [N, D] convention as `_spawn3d`), not a scalar angle -- so `advance`,
+    `bounce`, and `sense` are one dimension-generic operator each."""
     cx, cy = W / 2.0, 0.5
     if mode == "random":
         pos = torch.rand(n, 2, generator=rng, device=device); pos[:, 0] *= W
-        head = torch.rand(n, generator=rng, device=device) * 2 * math.pi
+        a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
     elif mode in ("point", "center"):
         pos = torch.stack([torch.full((n,), cx, device=device), torch.full((n,), cy, device=device)], 1)
         pos = pos + (torch.rand(n, 2, generator=rng, device=device) - 0.5) * 1e-3
-        head = torch.rand(n, generator=rng, device=device) * 2 * math.pi
+        a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
     elif mode == "disc":
         r = torch.sqrt(torch.rand(n, generator=rng, device=device)) * radius
         a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
         pos = torch.stack([cx + r * torch.cos(a), cy + r * torch.sin(a)], 1)
-        head = torch.rand(n, generator=rng, device=device) * 2 * math.pi
+        a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
     elif mode in ("ring_in", "ring_out"):
         a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
         pos = torch.stack([cx + radius * torch.cos(a), cy + radius * torch.sin(a)], 1)
-        head = (a + math.pi) if mode == "ring_in" else a
+        a = (a + math.pi) if mode == "ring_in" else a
     else:
         raise ValueError(f"unknown spawn mode {mode!r}")
     pos[:, 0] = pos[:, 0].clamp(0, W - 1e-6); pos[:, 1] = pos[:, 1].clamp(0, 1 - 1e-6)
+    head = torch.stack([torch.cos(a), torch.sin(a)], dim=1)        # [n, 2] unit heading
     return pos, head
 
 
@@ -249,9 +254,9 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         if head is not None:
-            # heading is a scalar angle (2D) or a unit vector [.,D] (3D); size the buffer to match
-            hbuf = (torch.zeros(buffer, device=device) if head.dim() == 1
-                    else torch.zeros(buffer, head.shape[1], device=device))
+            # heading is a unit VECTOR [., D] in every dimension (the universal
+            # orientation representation read by advance / bounce / sense).
+            hbuf = torch.zeros(buffer, head.shape[1], device=device)
             hbuf[:n] = head
             lvl.register_buffer("heading", hbuf)
         _assign_types(lvl, s, H, device)

@@ -1,10 +1,15 @@
 """advance -- set (lateral). Self-propulsion: move along the heading at speed.
 
 A first-derivative dynamics operator: it returns a velocity delta
-`v_i = move_speed_i * (cos h_i, sin h_i)` and lets the ENGINE integrate the
-position (`pos += dt * v`), exactly like attraction_repulsion returns a dpos.
-It does NOT touch `pos`, and it is purely propulsion -- domain/obstacle reflection
-is a separate `bounce` operator (run before advance), so this stays one concern.
+`v_i = move_speed_i * heading_i` and lets the ENGINE integrate the position
+(`pos += dt * v`), exactly like attraction_repulsion returns a dpos. It does NOT
+touch `pos`, and it is purely propulsion -- domain/obstacle reflection is a separate
+`bounce` operator (run before advance), so this stays one concern.
+
+Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
+every dimension, so `vel = speed * heading` is the same law in 2D and 3D -- no
+`cos/sin` special case. Replaces the old scalar-angle 2D law and the `advance_3d`
+counterpart with one operator.
 
 Renamed from the prototype `motility` (it is the slime "move" step).
 """
@@ -19,6 +24,7 @@ from plexus.models.registry import register_operator
 @register_operator("advance", level="cell", kind="lateral")
 class Advance(Lateral):
     PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates pos
+    SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_TYPE_PROPS = ["move_speed"]
 
     def __init__(self, params, device="cpu"):
@@ -29,8 +35,8 @@ class Advance(Lateral):
         lvl = H.level(self.at)
         dev = lvl.state.device
         N = lvl.n
-        h = lvl.heading
-        spd = lvl.move_speed
+        h = lvl.heading                                   # [N, D] unit heading vector
+        spd = lvl.move_speed                              # [N]
         m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
-        vel = spd[:, None] * torch.stack([torch.cos(h), torch.sin(h)], dim=1)
+        vel = spd[:, None] * h                            # move along the heading
         return {self.at: vel * m[:, None]}

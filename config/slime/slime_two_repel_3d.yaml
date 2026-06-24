@@ -1,5 +1,5 @@
 # 3D variant of slime_two_repel -- N-D scalar field + vector-heading agents
-# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+# (sense cone sensing / advance / bounce). Field res 80.
 general:
   name: slime_two_repel_3d
   seed: 0
@@ -47,21 +47,21 @@ operators:
 - op: decay
   at: chemical
   rate: 0.0015
-- op: sense_3d
+- op: sense
   at: cell
   from: chemical
   cross: -1.0
-- op: bounce_3d
+- op: bounce
   at: cell
-- op: advance_3d
+- op: advance
   at: cell
 schedule:
 - deposit
 - diffuse
 - decay
-- sense_3d
-- bounce_3d
-- advance_3d
+- sense
+- bounce
+- advance
 plotting:
   colors:
     a:

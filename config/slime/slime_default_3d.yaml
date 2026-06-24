@@ -1,5 +1,5 @@
 # 3D variant of slime_default -- N-D scalar field + vector-heading agents
-# (sense_3d cone sensing / advance_3d / bounce_3d). Field res 80.
+# (sense cone sensing / advance / bounce). Field res 80.
 general:
   name: slime_default_3d
   seed: 0
@@ -40,21 +40,21 @@ operators:
 - op: decay
   at: chemical
   rate: 0.0006
-- op: sense_3d
+- op: sense
   at: cell
   from: chemical
   cross: -1.0
-- op: bounce_3d
+- op: bounce
   at: cell
-- op: advance_3d
+- op: advance
   at: cell
 schedule:
 - deposit
 - diffuse
 - decay
-- sense_3d
-- bounce_3d
-- advance_3d
+- sense
+- bounce
+- advance
 plotting:
   colors:
     a:
@@ -72,22 +72,22 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of blue particles begins as a compact, roughly spherical mass. Over time,
-      the particles begin to disperse outward from the center, creating a more diffuse and irregular shape.
-      The outer edges of the cluster become increasingly sparse as individual particles move further away
-      from the core. By the final frame, the central mass remains visible but is surrounded by a much
-      larger, more scattered cloud of points.
-    objects: The scene contains a large collection of small, blue particles. These particles are initially
-      arranged in a dense, spherical topology at the center of the frame. As the simulation progresses,
-      the topology shifts from a solid cluster to a scattered, cloud-like distribution. The individual
-      particles are uniform in size and color, appearing as distinct points against a black background.
+    description: A dense, spherical cluster of green particles initially appears as a solid mass. Over
+      time, the cluster begins to fragment and expand outward into a more porous, web-like structure.
+      Long, thin filaments of particles extend from the central mass into the surrounding black space.
+      By the final frame, the central core has become highly irregular and sparse, with many isolated
+      particles scattered throughout the field.
+    objects: The primary object is a large, roughly spherical cluster of green particles. This cluster
+      transitions from a solid, compact topology to a complex, interconnected network of filaments and
+      voids. Numerous small, individual green particles are scattered around the main mass, appearing
+      as a sparse cloud. The filaments are thin and elongated, extending several times the radius of the
+      central core.
   movie_chemical:
-    description: A central green sphere remains stationary while a network of thin filaments grows outward
-      from its surface. These filaments initially appear as short, straight spikes before lengthening
-      and branching into complex, tangled structures. As time progresses, the filaments extend further
-      into the surrounding black space, becoming increasingly dense and irregular. The simulation concludes
-      with a large, web-like network of green fibers surrounding the core sphere.
-    objects: The primary object is a large, solid green sphere located at the center of the frame. Surrounding
-      this sphere is a set of thin, thread-like filaments that are also green in color. These filaments
-      are connected to the surface of the sphere and extend outward in various directions. The filaments
-      vary in length and complexity, forming a sprawling, interconnected network over time.
+    description: A single green spherical particle is initially shown in the center of a black background.
+      Over time, several thin, branch-like structures emerge from the surface of the sphere. These protrusions
+      extend outward in various directions, becoming more defined as the simulation progresses. The central
+      sphere remains relatively stable in size and position while the surrounding filaments grow.
+    objects: The primary object is a large, circular green sphere located in the center of the frame.
+      Several thin, elongated green filaments sprout from the sphere's perimeter. These filaments are
+      arranged in a radial pattern, extending into the surrounding black space. The sphere is significantly
+      larger than the individual filaments, which appear as delicate, thread-like structures.
