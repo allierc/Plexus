@@ -35,10 +35,10 @@
 \begin{scope}[shift={(96mm,0)},local bounding box=E]
   \node[n] (o1){}; \node[n,below=5mm of o1](o2){};
   \node[g,right=8mm of o1](g1){}; \node[g,below=0mm of g1](g2){};
-  \draw[a,transform canvas={yshift=0.6mm}] (o1)-- node[above,font=\tiny]{$\mathcal{S}$}(g1);
-  \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{$\mathcal{G}$}(o2);
+  \draw[a,transform canvas={yshift=0.6mm}] (o1)-- node[above,font=\tiny]{push}(g1);
+  \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{pull}(o2);
 \end{scope}
-\node[below=1mm of E,align=center]{\textbf{Exchange}\\$\mathcal{S},\mathcal{G}$};
+\node[below=1mm of E,align=center]{\textbf{Exchange}\\push / pull};
 % --- structure operators: Rewire (edges E), Divide / Die (node set |S|) ---
 \begin{scope}[shift={(128mm,2mm)},local bounding box=RW]
   \node[n] (rc){};
