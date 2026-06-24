@@ -22,8 +22,6 @@ website:
         text: Simulations
       - href: inverse.qmd
         text: Inverse problem
-      - href: building.qmd
-        text: Building Plexus
     tools:
       - icon: github
         href: https://github.com/allierc/Plexus
