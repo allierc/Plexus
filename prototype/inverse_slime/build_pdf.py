@@ -26,7 +26,7 @@ METHODS = [
     ("slime_gd", "grad-desc 4D (field+move)"),
     ("slime_recovered", "UCB (black-box)"),
 ]
-FRAMES = [0, 10, 20, 50, 200]                                 # real-time columns (t)
+FRAMES = [0, 5, 10, 20, 50, 100, 200]                         # real-time columns (t)
 TMAX = 200                                                    # max real time in a trajectory
 NCOL = len(FRAMES)
 

@@ -364,19 +364,19 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/slime_coarse_stream.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/slime_filaments_trail.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">slime_coarse_stream<span class="sim-spec"><pre># slime_coarse -- long sensor reach -&gt; few large transport cells (coarse network).
-general: {name: slime_coarse, seed: 0, n_frames: 400, record_every: 4, boundary: wall}
+      <span class="sim-name" tabindex="0">slime_filaments_trail<span class="sim-spec"><pre># slime_filaments -- narrow sensor cone + low turn -&gt; long, straight, branching filaments.
+general: {name: slime_filaments, seed: 0, n_frames: 450, record_every: 4, boundary: wall}
 sets:
   cell:
-    n: 12000
+    n: 13000
     spawn: disc
     spawn_radius: 0.3
     types:
-      a: {fraction: 1.0, move_speed: 0.008, turn_speed: 0.4, sensor_angle: 22, sensor_dist: 0.05, sensor_size: 2}
+      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
 fields:
-  trail: {frame: trail, res: 200, deposit: 0.9, decay: 0.008, diffuse: 0.4, couples_to: cell}
+  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.01, diffuse: 0.3, couples_to: cell}
 operators:
 - {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
 schedule: [slime, trail.diffuse]
@@ -385,7 +385,7 @@ plotting:
     a: [0.2, 0.95, 0.65]
   background: black
   gamma: 0.7</pre></span></span>
-      <span class="sim-cap">coarse network, streamline view</span>
+      <span class="sim-cap">filaments, trail-field view</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">

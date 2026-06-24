@@ -50,6 +50,10 @@ torch.backends.cudnn.benchmark = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = 128
 PI = float(np.pi)
+# Pulse duration is bounded to a SHARP range so the Gaussian activation actually turns OFF between
+# beats (period~50). A wide pulse (dur ~= period) is near-constant -> sustained radial contraction,
+# NOT the pulse->release->inertial-recoil that curves the trajectory into a LOOP (the atlas loops).
+DUR_LO, DUR_HI = 3.0, 14.0
 
 
 # --------------------------------------------------------------------------- #
@@ -216,7 +220,7 @@ def main():
     # GLOBAL fixed knobs (swept per slot, not differentiated -- like amplitude/drag in train.py)
     ap.add_argument("--amplitude", type=float, default=10.0, help="active-stress amplitude (FIXED knob; plan constrains 10-15)")
     ap.add_argument("--drag_k", type=float, default=30.0, help="overdamped drag k (FIXED knob)")
-    ap.add_argument("--dur0", type=float, default=50.0, help="initial pulse duration (frames, LEARNABLE)")
+    ap.add_argument("--dur0", type=float, default=8.0, help=f"initial pulse duration (frames, LEARNABLE, bounded [{DUR_LO:.0f},{DUR_HI:.0f}] -> sharp pulse)")
     ap.add_argument("--freeze_stiff", type=int, default=0, help="1 = do NOT learn stiffness params (atlas: ~inert)")
     ap.add_argument("--resume", default="")
     ap.add_argument("--tag", default="")
@@ -257,11 +261,12 @@ def main():
     f_wl, f_ang, f_amp, f_ph = P(args.fibre_wl), P(args.fibre_angle), P(args.fibre_amp), P(args.fibre_phase)
     g_wl, g_ph, g_lo, g_hi = P(args.gain_wl), P(args.gain_phase), P(args.gain_lo), P(args.gain_hi)
     s_wl, s_ph, s_lo, s_hi = P(args.stiff_wl), P(args.stiff_phase), P(args.stiff_lo), P(args.stiff_hi)
-    log_dur = P(np.log(args.dur0))
+    frac0 = min(max((args.dur0 - DUR_LO) / (DUR_HI - DUR_LO), 1e-3), 1 - 1e-3)   # init the bounded duration
+    raw_dur = P(np.log(frac0 / (1 - frac0)))                                     # dur = DUR_LO+(DUR_HI-DUR_LO)*sigmoid(raw_dur)
     fibre_params = [f_wl, f_ang, f_amp, f_ph]
     gain_params = [g_wl, g_ph, g_lo, g_hi]
     stiff_params = [] if args.freeze_stiff else [s_wl, s_ph, s_lo, s_hi]
-    learn = fibre_params + gain_params + stiff_params + [log_dur]
+    learn = fibre_params + gain_params + stiff_params + [raw_dur]
 
     # fixed per-slot mechanism knobs (swept by the plan -- not differentiated, exactly like train.py)
     ops = _ops_by_name(spec, str(dev))
@@ -331,7 +336,7 @@ def main():
                 for k, prm in sd["params"].items():
                     {"f_wl": f_wl, "f_ang": f_ang, "f_amp": f_amp, "f_ph": f_ph, "g_wl": g_wl, "g_ph": g_ph,
                      "g_lo": g_lo, "g_hi": g_hi, "s_wl": s_wl, "s_ph": s_ph, "s_lo": s_lo, "s_hi": s_hi,
-                     "log_dur": log_dur}[k].copy_(prm.to(dev))
+                     "raw_dur": raw_dur}[k].copy_(prm.to(dev))
             try:
                 start_iter = int(os.path.basename(path).split("_")[1].split(".")[0]) + 1
             except Exception:
@@ -344,7 +349,7 @@ def main():
         with torch.no_grad():
             reset_state(lvl, rest, dev)
         youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta = maps()
-        dur = torch.exp(log_dur)
+        dur = DUR_LO + (DUR_HI - DUR_LO) * torch.sigmoid(raw_dur)       # SHARP bounded pulse duration
         with torch.no_grad():                                              # warmup -> settle to the beat rhythm
             set_maps(H, lvl, youngs_p.detach(), dir_grid.detach(), gain_p.detach())
             for fr in range(start, onset):
@@ -389,7 +394,7 @@ def main():
             params_sd = {"f_wl": f_wl.detach(), "f_ang": f_ang.detach(), "f_amp": f_amp.detach(), "f_ph": f_ph.detach(),
                          "g_wl": g_wl.detach(), "g_ph": g_ph.detach(), "g_lo": g_lo.detach(), "g_hi": g_hi.detach(),
                          "s_wl": s_wl.detach(), "s_ph": s_ph.detach(), "s_lo": s_lo.detach(), "s_hi": s_hi.detach(),
-                         "log_dur": log_dur.detach()}
+                         "raw_dur": raw_dur.detach()}
             torch.save({"params": params_sd}, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:
                 pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} loss={loss.item():.3f} ampL={amp_loss.item():.3f} "
