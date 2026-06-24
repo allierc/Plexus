@@ -8,7 +8,7 @@ changes, so we invert the PARAMETERS, not free pixels.
 
 Learnables (gradient):
   FIBRE  (PRIMARY, the contraction-axis field n(x,y)):  fibre_wl · fibre_angle · fibre_amp · fibre_phase
-  GAIN   (SECONDARY, per-particle active-stress gain):  gain_wl · gain_phase · gain_lo · gain_hi
+  GAIN   (UNIFORM GLOBAL active-stress gain scalar -- the magnitude/size lever):  gain0
   STIFF  (LOW PRIORITY, per-particle youngs):           stiff_wl · stiff_phase · stiff_lo · stiff_hi
   GLOBAL:                                               pulse_duration (log_dur)
 Fixed per-slot knobs (swept by the loop, NOT differentiated -- exactly like amplitude/drag in
@@ -22,7 +22,7 @@ fit (R2 over interior MOVING nodes, boundary excluded) + an anti-collapse motion
 Run:
   PYTHONPATH=../../src python cardio_mpm_train2.py material/material_aniso_cardio --device cuda:0 \\
     --fibre_wl 40 --fibre_angle 0.6 --fibre_amp 1.0 --fibre_phase 0.7 \\
-    --gain_wl 26 --gain_phase 0.0 --gain_lo 0.4 --gain_hi 1.6 \\
+    --gain0 1.0 \\
     --stiff_wl 8 --stiff_phase 0.7 --stiff_lo 50 --stiff_hi 150 \\
     --amplitude 10 --drag_k 30 --dur0 50 --lr 1e-3 --n_iter 300
 """
@@ -41,6 +41,7 @@ from plexus.models.registry import get_operator
 from plexus.models.entities import _lame
 import plexus.engine as E
 import cardio_mpm_data as D
+from cardio_unet import UNet, load_image            # stiffness = UNet(microscope) -- registered identity (no flip)
 
 torch.use_deterministic_algorithms(False)
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -54,6 +55,10 @@ PI = float(np.pi)
 # beats (period~50). A wide pulse (dur ~= period) is near-constant -> sustained radial contraction,
 # NOT the pulse->release->inertial-recoil that curves the trajectory into a LOOP (the atlas loops).
 DUR_LO, DUR_HI = 3.0, 14.0
+# Gain is now a single UNIFORM GLOBAL learnable scalar (the gain checkerboard was inert for loop
+# morphology -- see gain_uniformity_sweep). It multiplies the active stress, so it is the learnable
+# MAGNITUDE/size lever (amplitude stays a fixed per-slot knob). Bounded positive.
+GAIN_LO, GAIN_HI = 0.1, 2.5
 
 
 # --------------------------------------------------------------------------- #
@@ -177,7 +182,16 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
         ax.add_collection(LineCollection(list(segs), colors=col, linewidths=1.3))
     ax.set_title(f"it {it}: sim red / real green (amp x{amp:.0f})", color="#ccc", fontsize=9)
     img(axs[0, 1], ym, "viridis", "stiffness (youngs)")
-    img(axs[0, 2], gm, "magma", "gain")
+    # fibre contraction-axis quiver (cos θ, sin θ) -- replaces the (uniform) gain panel
+    axq = axs[0, 2]; axq.set_facecolor("black"); axq.set_aspect("equal")
+    step = 7                                                              # subsample; lower = denser arrows
+    I, J = np.mgrid[0:RES:step, 0:RES:step]                              # I=row=y, J=col=x
+    U = dg[0, ::step, ::step]; V = dg[1, ::step, ::step]                 # cos θ (x-comp), sin θ (y-comp)
+    axq.quiver(J, I, U, V, np.hypot(U, V), cmap="twilight", pivot="mid",
+               angles="xy", scale_units="xy", scale=1.0 / (step * 0.85), # arrow ~step px (tune this for amplitude)
+               width=0.004, headwidth=0, headlength=0, headaxislength=0)  # headless -> axis lines (undirected)
+    axq.set_xlim(0, RES); axq.set_ylim(RES, 0); axq.set_xticks([]); axq.set_yticks([])
+    axq.set_title("fibre axis  quiver(cos θ, sin θ)", color="#ccc", fontsize=9)
     img(axs[1, 0], tm, "twilight", "fibre angle (rad)")
     img(axs[1, 1], dg[0], "RdBu", "fibre dx", vmin=-1, vmax=1)
     img(axs[1, 2], dg[1], "RdBu", "fibre dy", vmin=-1, vmax=1)
@@ -207,21 +221,18 @@ def main():
     ap.add_argument("--fibre_angle", type=float, default=0.6)
     ap.add_argument("--fibre_amp", type=float, default=1.0)
     ap.add_argument("--fibre_phase", type=float, default=0.7)
-    # GAIN (secondary)
-    ap.add_argument("--gain_wl", type=float, default=26.0)
-    ap.add_argument("--gain_phase", type=float, default=0.0)
-    ap.add_argument("--gain_lo", type=float, default=0.4)
-    ap.add_argument("--gain_hi", type=float, default=1.6)
-    # STIFF (low priority)
-    ap.add_argument("--stiff_wl", type=float, default=8.0)
-    ap.add_argument("--stiff_phase", type=float, default=0.7)
+    # GAIN (now a single UNIFORM GLOBAL learnable scalar -- the magnitude/size lever)
+    ap.add_argument("--gain0", type=float, default=1.0, help=f"initial uniform global gain (LEARNABLE, bounded [{GAIN_LO},{GAIN_HI}])")
+    # STIFF: UNet(microscope) -> youngs in [stiff_lo, stiff_hi] (the youngs RANGE stays fixed; the UNet learns the spatial pattern)
     ap.add_argument("--stiff_lo", type=float, default=50.0)
     ap.add_argument("--stiff_hi", type=float, default=150.0)
+    ap.add_argument("--learn", default="all",
+                    help="which group(s) to optimize this batch (partitioned sweeps): comma-list of "
+                         "{fibre,stiff,gain,dur} or 'all'. Frozen groups stay at their init.")
     # GLOBAL fixed knobs (swept per slot, not differentiated -- like amplitude/drag in train.py)
     ap.add_argument("--amplitude", type=float, default=10.0, help="active-stress amplitude (FIXED knob; plan constrains 10-15)")
     ap.add_argument("--drag_k", type=float, default=30.0, help="overdamped drag k (FIXED knob)")
     ap.add_argument("--dur0", type=float, default=8.0, help=f"initial pulse duration (frames, LEARNABLE, bounded [{DUR_LO:.0f},{DUR_HI:.0f}] -> sharp pulse)")
-    ap.add_argument("--freeze_stiff", type=int, default=0, help="1 = do NOT learn stiffness params (atlas: ~inert)")
     ap.add_argument("--resume", default="")
     ap.add_argument("--tag", default="")
     ap.add_argument("--outdir", default="")
@@ -258,15 +269,22 @@ def main():
     # --- learnable parametric pattern params (12) + pulse duration ---
     def P(v):
         return torch.nn.Parameter(torch.tensor(float(v), device=dev))
+    def _logit_init(v, lo, hi):
+        frac = min(max((v - lo) / (hi - lo), 1e-3), 1 - 1e-3)
+        return P(np.log(frac / (1 - frac)))
     f_wl, f_ang, f_amp, f_ph = P(args.fibre_wl), P(args.fibre_angle), P(args.fibre_amp), P(args.fibre_phase)
-    g_wl, g_ph, g_lo, g_hi = P(args.gain_wl), P(args.gain_phase), P(args.gain_lo), P(args.gain_hi)
-    s_wl, s_ph, s_lo, s_hi = P(args.stiff_wl), P(args.stiff_phase), P(args.stiff_lo), P(args.stiff_hi)
-    frac0 = min(max((args.dur0 - DUR_LO) / (DUR_HI - DUR_LO), 1e-3), 1 - 1e-3)   # init the bounded duration
-    raw_dur = P(np.log(frac0 / (1 - frac0)))                                     # dur = DUR_LO+(DUR_HI-DUR_LO)*sigmoid(raw_dur)
-    fibre_params = [f_wl, f_ang, f_amp, f_ph]
-    gain_params = [g_wl, g_ph, g_lo, g_hi]
-    stiff_params = [] if args.freeze_stiff else [s_wl, s_ph, s_lo, s_hi]
-    learn = fibre_params + gain_params + stiff_params + [raw_dur]
+    raw_g = _logit_init(args.gain0, GAIN_LO, GAIN_HI)                            # uniform global gain (bounded)
+    raw_dur = _logit_init(args.dur0, DUR_LO, DUR_HI)                             # dur = DUR_LO+(DUR_HI-DUR_LO)*sigmoid(raw_dur)
+    net = UNet(out=1).to(dev)                                                    # STIFF: microscope image -> stiffness pattern
+    ximg = load_image((RES, RES)).to(dev)[None, None]                           # [1,1,RES,RES] standardized, registered identity
+    s_lo, s_hi = float(args.stiff_lo), float(args.stiff_hi)                      # fixed youngs range; UNet learns the pattern
+    # partitioned learnable groups -- the loop sweeps ONE direction per batch, then combines ('all')
+    groups = {"fibre": [f_wl, f_ang, f_amp, f_ph], "stiff": list(net.parameters()), "gain": [raw_g], "dur": [raw_dur]}
+    sel = set(groups) if args.learn.strip() == "all" else {g.strip() for g in args.learn.split(",")}
+    learn = [p for g in groups for p in groups[g] if g in sel]
+    if "stiff" not in sel:
+        for prm in net.parameters():
+            prm.requires_grad_(False)                                           # frozen UNet -> stays at init
 
     # fixed per-slot mechanism knobs (swept by the plan -- not differentiated, exactly like train.py)
     ops = _ops_by_name(spec, str(dev))
@@ -291,15 +309,13 @@ def main():
         wl_f = f_wl.clamp(min=4.0)
         theta = PI * f_amp * aniso_field_torch(wl_f, f_ang, f_ph, dev)        # [RES,RES] angle map
         d = torch.stack([torch.cos(theta), torch.sin(theta)])                # [2,RES,RES] unit contraction axis
-        # GAIN: per-particle active-stress gain in [gain_lo, gain_hi]
-        gain01 = aniso_field_torch([26.0, g_wl.clamp(min=4.0)], torch.zeros((), device=dev), g_ph, dev)
-        lo, hi = g_lo.clamp(min=0.0), g_hi.clamp(min=0.05)
-        gain_map = lo + (hi - lo) * gain01                                   # [RES,RES]
-        gain_p = sample_to_particles(gain_map)                               # [N]
-        # STIFF: per-particle youngs in [stiff_lo, stiff_hi]
-        stiff01 = aniso_field_torch([s_wl.clamp(min=4.0), 26.0], torch.zeros((), device=dev), s_ph, dev)
-        slo, shi = s_lo.clamp(min=10.0), s_hi.clamp(min=20.0)
-        youngs_map = slo + (shi - slo) * stiff01                             # [RES,RES]
+        # GAIN: a single UNIFORM GLOBAL learnable scalar (no spatial structure -- inert per the sweep)
+        gain_g = GAIN_LO + (GAIN_HI - GAIN_LO) * torch.sigmoid(raw_g)        # scalar
+        gain_p = gain_g * torch.ones(rest.shape[0], device=dev)              # [N] uniform
+        gain_map = gain_g * torch.ones(RES, RES, device=dev)                 # [RES,RES] flat (for dashboard)
+        # STIFF: youngs pattern from the UNet on the microscope image (registered identity, same [y,x] layout)
+        stiff01 = torch.sigmoid(net(ximg)[0, 0])                             # [RES,RES] in [0,1]
+        youngs_map = s_lo + (s_hi - s_lo) * stiff01                          # [RES,RES] in [stiff_lo, stiff_hi]
         youngs_p = sample_to_particles(youngs_map)                           # [N]
         return youngs_p, youngs_map, gain_p, gain_map, d, theta
 
@@ -334,9 +350,10 @@ def main():
             sd = torch.load(path, map_location=dev)
             with torch.no_grad():
                 for k, prm in sd["params"].items():
-                    {"f_wl": f_wl, "f_ang": f_ang, "f_amp": f_amp, "f_ph": f_ph, "g_wl": g_wl, "g_ph": g_ph,
-                     "g_lo": g_lo, "g_hi": g_hi, "s_wl": s_wl, "s_ph": s_ph, "s_lo": s_lo, "s_hi": s_hi,
+                    {"f_wl": f_wl, "f_ang": f_ang, "f_amp": f_amp, "f_ph": f_ph, "raw_g": raw_g,
                      "raw_dur": raw_dur}[k].copy_(prm.to(dev))
+            if "net" in sd:
+                net.load_state_dict(sd["net"])
             try:
                 start_iter = int(os.path.basename(path).split("_")[1].split(".")[0]) + 1
             except Exception:
@@ -380,22 +397,20 @@ def main():
             opt.zero_grad()
         r2 = 1 - r2_loss.item()
         pbar.set_postfix_str(f"R2={r2:+.3f} ampL={amp_loss.item():.2f} dur={dur.item():.1f} "
-                             f"fwl={f_wl.item():.1f} fang={f_ang.item():.2f} gwl={g_wl.item():.1f} "
+                             f"fwl={f_wl.item():.1f} fang={f_ang.item():.2f} gain={gain_p.mean().item():.2f} "
                              f"yng[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}]")
         if it % args.ckpt_every == 0 or it == args.n_iter - 1:
             op_, chir_, size_ = morphology_row(sim_d.detach().cpu().numpy(), idx)
             info = (f"{spec.name} [PARAMETRIC active-stress]  it {it}/{args.n_iter}  R2={r2:+.3f}  "
                     f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}  dur={dur.item():.1f} amp={args.amplitude} "
                     f"drag={args.drag_k}\nfibre wl={f_wl.item():.1f} ang={f_ang.item():.2f} amp={f_amp.item():.2f} "
-                    f"ph={f_ph.item():.2f} | gain wl={g_wl.item():.1f} ph={g_ph.item():.2f} lo={g_lo.item():.2f} "
-                    f"hi={g_hi.item():.2f} | stiff wl={s_wl.item():.1f} ph={s_ph.item():.2f} lo={s_lo.item():.0f} hi={s_hi.item():.0f}")
+                    f"ph={f_ph.item():.2f} | gain(uniform)={gain_p.mean().item():.3f} | stiff(UNet) "
+                    f"youngs[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}] learn={args.learn}")
             render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta, dir_grid, outdir,
                         info=info, traj_amp=args.traj_amp)
             params_sd = {"f_wl": f_wl.detach(), "f_ang": f_ang.detach(), "f_amp": f_amp.detach(), "f_ph": f_ph.detach(),
-                         "g_wl": g_wl.detach(), "g_ph": g_ph.detach(), "g_lo": g_lo.detach(), "g_hi": g_hi.detach(),
-                         "s_wl": s_wl.detach(), "s_ph": s_ph.detach(), "s_lo": s_lo.detach(), "s_hi": s_hi.detach(),
-                         "raw_dur": raw_dur.detach()}
-            torch.save({"params": params_sd}, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
+                         "raw_g": raw_g.detach(), "raw_dur": raw_dur.detach()}
+            torch.save({"params": params_sd, "net": net.state_dict()}, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:
                 pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} loss={loss.item():.3f} ampL={amp_loss.item():.3f} "
                          f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e} dur={dur.item():.1f} "
