@@ -1,11 +1,78 @@
 {
   "train_script": "cardio_mpm_train.py",
+  "_phase": "PHASE 2 INVERSE BATCH 1 (fit real beat with fibre_wl40 pattern family). Previous batch 14 (Phase 1 forward atlas) identified fibre_wl40 as the morphology leader (open 0.262, aspect 0.35, angle 3.06 rad). Now inverse-train this pattern family on the REAL cardiomyocyte beat, learning the per-particle gain + direction fields via UNet. Parent=fibre_wl40 (batch 14 s0, the Phase-1 atlas winner). Sweep amplitude [10,15,7] (size lever, bounded by phase-1 findings) and drag [30,60,15] to find which point in the fibre_wl40 family best fits real per-node morphology (R² + loop-morphology loss: openness, axis-angle, size, chirality). Ablation amp0. Report: interior R² · loop metrics (openness/angle/size/chirality) · learned gain/direction coherence.",
   "configs": [
-    {"name": "parent_amp25",     "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "1e-3", "--substeps": "5", "--amplitude": "25", "--dur0": "30", "--w_amp": "0.3", "--mechanism": "force", "--max_delay": "0", "--rotary": "6.2832", "--rotary_field": "1", "--rotary_spread": "1.5708", "--drag_k": "180", "--ckpt_every": "50"}},
-    {"name": "amp30",            "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "1e-3", "--substeps": "5", "--amplitude": "30", "--dur0": "30", "--w_amp": "0.3", "--mechanism": "force", "--max_delay": "0", "--rotary": "6.2832", "--rotary_field": "1", "--rotary_spread": "1.5708", "--drag_k": "180", "--ckpt_every": "50"}},
-    {"name": "amp35",            "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "1e-3", "--substeps": "5", "--amplitude": "35", "--dur0": "30", "--w_amp": "0.3", "--mechanism": "force", "--max_delay": "0", "--rotary": "6.2832", "--rotary_field": "1", "--rotary_spread": "1.5708", "--drag_k": "180", "--ckpt_every": "50"}},
-    {"name": "spiral_amp25",     "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "1e-3", "--substeps": "5", "--amplitude": "25", "--dur0": "30", "--w_amp": "0.3", "--mechanism": "force", "--max_delay": "40", "--rotary": "6.2832", "--rotary_field": "1", "--rotary_spread": "1.5708", "--drag_k": "180", "--ckpt_every": "50"}},
-    {"name": "dur0_18",          "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "1e-3", "--substeps": "5", "--amplitude": "25", "--dur0": "18", "--w_amp": "0.3", "--mechanism": "force", "--max_delay": "0", "--rotary": "6.2832", "--rotary_field": "1", "--rotary_spread": "1.5708", "--drag_k": "180", "--ckpt_every": "50"}},
-    {"name": "rotary0_amp25",    "spec": "material/material_directional_cardio", "args": {"--n_iter": "400", "--lr": "1e-3", "--substeps": "5", "--amplitude": "25", "--dur0": "30", "--w_amp": "0.3", "--mechanism": "force", "--max_delay": "0", "--rotary": "0", "--rotary_field": "0", "--drag_k": "180", "--ckpt_every": "50"}}
+    {
+      "name": "fibre_wl40_parent",
+      "spec": "material_aniso_cardio",
+      "args": {
+        "--amplitude": "10",
+        "--drag_k": "30",
+        "--n_iter": "400",
+        "--lr": "1e-3",
+        "--substeps": "5",
+        "--mechanism": "stress"
+      }
+    },
+    {
+      "name": "amplitude15",
+      "spec": "material_aniso_cardio",
+      "args": {
+        "--amplitude": "15",
+        "--drag_k": "30",
+        "--n_iter": "400",
+        "--lr": "1e-3",
+        "--substeps": "5",
+        "--mechanism": "stress"
+      }
+    },
+    {
+      "name": "amplitude7",
+      "spec": "material_aniso_cardio",
+      "args": {
+        "--amplitude": "7",
+        "--drag_k": "30",
+        "--n_iter": "400",
+        "--lr": "1e-3",
+        "--substeps": "5",
+        "--mechanism": "stress"
+      }
+    },
+    {
+      "name": "drag60",
+      "spec": "material_aniso_cardio",
+      "args": {
+        "--amplitude": "10",
+        "--drag_k": "60",
+        "--n_iter": "400",
+        "--lr": "1e-3",
+        "--substeps": "5",
+        "--mechanism": "stress"
+      }
+    },
+    {
+      "name": "drag15",
+      "spec": "material_aniso_cardio",
+      "args": {
+        "--amplitude": "10",
+        "--drag_k": "15",
+        "--n_iter": "400",
+        "--lr": "1e-3",
+        "--substeps": "5",
+        "--mechanism": "stress"
+      }
+    },
+    {
+      "name": "amplitude0_abl",
+      "spec": "material_aniso_cardio",
+      "args": {
+        "--amplitude": "0",
+        "--drag_k": "30",
+        "--n_iter": "400",
+        "--lr": "1e-3",
+        "--substeps": "5",
+        "--mechanism": "stress"
+      }
+    }
   ]
 }

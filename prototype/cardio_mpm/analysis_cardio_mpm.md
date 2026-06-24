@@ -261,3 +261,154 @@ Verdict:
  - Q2 (stiffness) load-bearing re-confirmed: the amp25 winner shows the MOST coherent stiffness (connected yellow network, youngs→200); the rotary0 ablation stays INERT purple+frame.
 Failures: none (all 6 done at it=399, R² reported, both submissions). No NaN/blank panels — spiral τ panel finite. The duplicate-dir slot names (`spiral_amp15`/`drag240`/`rotary0_amp15`) are the first-submission renames of s3/s4/s5; same configs, consistent R².
 Next: parent = slot 2 (amp25: FORCE, md0, rotary 6.2832, rotary_field 1, rotary_spread 1.5708, **amp25**, lr1e-3, sub5, dur0 30, w_amp0.3, drag_k180). Batch 12 pushes the amp bracket higher (amp30, amp35 — find the turnover), tests whether the phase/short-pulse lever STACKS on amp25 (spiral_amp25, Q21), decouples phase from pulse-duration (dur0_18 — does forcing a short pulse WITHOUT phase reproduce the spiral gain, or does duration just self-tune back to ~period?), and ablates rotary0 at amp25.
+
+---
+
+## PIVOT — Batch 11 (MORPHOLOGY ATLAS BATCH 1 / Phase 1, forward active-stress atlas) — 2026-06-24
+
+**OBJECTIVE PIVOT (2026-06-24).** The prior 11 batches fit the inverse model (UNet learning force/direction fields) and made it better at matching real trajectories (R²→−0.189). But the 2×2 test (Est.#28, Falsified#7) showed loops are GENERIC in active-stress MPM — both isotropic and structured patterns loop with non-affine openness ~0.2–0.3, so **structure is not REQUIRED for loops; loops are inertial/available dynamics**. The new objective: **learn which anisotropic ACTIVE-STRESS PATTERN PARAMETERS generate the REAL loop MORPHOLOGY (size, axis angle, openness, chirality, spatial coherence).**
+
+**Phase 1 = forward SHAPE ATLAS** (forward-sweep `cardio_mpm_atlas.py`, NO inverse training, NO rotary/phase). Launched 6 slots, each ONE pattern knob from `material_aniso_cardio` base: stiff_wl 8, gain_wl 26, fibre_wl 16, fibre_angle 0.6, amplitude 10, drag_k 30. Archive prefix: `mpm_b11_s*`.
+
+Parent (base): aniso_atlas base config
+Hypothesis: "Pattern params separate along morphology axes: fibre ANGLE → major-axis ORIENTATION; fibre/stiffness WAVELENGTH → spatial period/ellipticity; amplitude → SIZE; drag → OPENNESS. The atlas reveals the param→morphology families; Phase 2 inverse-tunes the best family to real beat."
+
+**Results (morphology metrics from progress.txt, reported as: openness / aspect / major-axis-angle / size / chirality-agreement):**
+
+Slot 0 [base]          config=base (stiff_wl 8, gain_wl 26, fibre_wl 16, fibre_angle 0.6, amp 10, drag 30)
+  - open=0.258, aspect=0.23, angle=1.54 rad, size=5.32e-03, chir+=0.47
+  - Trajectory: symmetric radial beat, moderate openness
+
+Slot 1 [fibre_angle0]  config=fibre_angle 0.0 (remove fibre rotation)
+  - open=0.303↑, aspect=0.24, angle=1.70, size=4.94e-03, chir+=0.42↓
+  - **Finding: removing fibre angle → INCREASES openness, DECREASES chirality** (rotation couples the two)
+
+Slot 2 [fibre_wl32]    config=fibre_wl 32 (coarsen fibre wavelength 16→32)
+  - open=0.276, aspect=0.34↑↑, angle=2.29↑↑, size=5.26e-03, chir+=0.51↑
+  - **WINNER: coarser fibre → highest aspect (ellipticity), largest angle shift, max chirality; most elliptical/rotated loops**
+
+Slot 3 [stiff_wl24]    config=stiff_wl 24 (coarsen stiffness 8→24)
+  - open=0.253, aspect=0.25, angle=1.61, size=5.38e-03↑, chir+=0.45
+  - **Finding: stiffness wavelength has MINIMAL morphological effect** on the base pattern
+
+Slot 4 [amplitude25]   config=amplitude 25 (3× amplification 10→25, naive forward)
+  - open=0.170, aspect=0.02↓↓, angle=1.58, size=1.09e-03↓↓↓, chir+=0.07↓↓↓
+  - **FAILED: complete morphological collapse** — no inverse training to guide the high amplitude; loops vanish (open drops to raw 0.013)
+
+Slot 5 [drag300]       config=drag_k 300 (10× overdamping 30→300)
+  - open=0.306↑↑, aspect=0.31, angle=2.77↑↑↑, size=1.95e-03↓, chir+=0.50
+  - **Finding: extreme drag → HIGHEST openness/angle-shift but COLLAPSED size** (quasi-static regime, long thin loops)
+
+**Ranking on combined MORPHOLOGY (openness + aspect + angle + chirality, penalizing collapse):**
+1. **s2 (fibre_wl32) — WINNER** — best aspect (0.34), highest angle shift (2.29), good openness, coherent size
+2. **s1 (fibre_angle0)** — highest openness (0.303), retains size, shows angle-openness coupling
+3. **s5 (drag300)** — tied-highest openness (0.306), highest angle (2.77), but severely collapsed size
+4. **s0 (base)** — balanced baseline
+5. **s3 (stiff_wl24)** — minimal morphology variation from base
+6. **s4 (amplitude25)** — FAILED, complete collapse (overshoot artifact in naive forward)
+
+**Verdict:**
+- Q22 (PARTIALLY SUPPORTED): fibre WAVELENGTH (coarser 16→32) INCREASES ellipticity (aspect 0.23→0.34) and major-axis rotation (angle 1.54→2.29 rad), suggesting it controls loop **SHAPE**, not just size. Fibre ANGLE affects the openness-vs-chirality trade-off: removing angle (0.6→0.0) opens loops but kills handedness coupling.
+- **STIFFNESS wavelength (8→24) has NO visible morphology effect** on the pattern — the gain/fibre patterns dominate.
+- **AMPLITUDE in the forward atlas (no inverse):** high amplitude (25×) causes collapse without inverse guidance. The amplitude=10 base is stable; amp25 is over-driven in a naive forward. This differs from the inverse track where amp25 was the best (Est.#27) — in inverse context the UNet learns to harness the extra motion; in forward-only it drives overshoot.
+- **DRAG (30→300, 10×):** extreme overdamping MAXIMIZES openness (inertial→quasi-static) but SHRINKS absolute loop size (only 1.95e-03 vs base 5.32e-03) — trade-off is open/thin vs closed/fat. The best morphology balance is mid-drag, not extreme.
+- **WINNER = s2 (fibre_wl32):** the coarser fibre wavelength yields the most elliptical (aspect 0.34) and most-rotated (angle 2.29) loops — a key parameter for matching real myocardium's anisotropic morphology.
+
+**Failures:**
+- **s4 (amplitude25) FAILED** — complete morphological collapse (open raw 0.013, size 1.09e-03, chir 0.07) in the forward atlas without inverse optimization. This shows amplitude is a SIZE lever ONLY in the inverse context (where the model learns structure around it); in a naive forward it is catastrophic overshoot.
+
+**Next:** The 2×2 test + this atlas batch establish the Phase-1 evidence base. Batch 12 continues the MORPHOLOGY ATLAS with denser parameter sampling to build the families map: fibre wavelength sweep (16, 24, 32, 40 — charting the trend), fibre angle sweep (0, 0.3, 0.9 — full rotation effect), a safe amplitude test (amp15 instead of the collapsed amp25), and drag intermediate (60, 100 instead of extreme 300) — all under active-stress + uniform pulse. Parent = fibre_wl32 (the morphology winner); 6 one-knob variants from that base.
+
+## Batch 12 — good (Phase 1 morphology atlas denser sampling; fibre_wl40 is the morphology leader) — 2026-06-24
+
+Parent: aniso_atlas base (fibre_wl=32, from b11 s2 winner; the morphology pivot batch)
+Hypothesis: "Phase 1 atlas (forward): probe fibre_wl wavelength sweep (coarser vs finer than parent 32) and amplitude scaling to build the morphology family map. Fibre_wl40 should increase ellipticity/angle further (coarser → more complex); amp15 tests size scaling; fibre_angle0 confirms angle-openness coupling."
+
+Slot 0 [fibre_wl32]      parent fibre_wl=32                open=0.276 aspect=0.34 angle=2.29 size=5.26e-03 chir+=0.51  loops: moderate-open ellipses, radial beat
+Slot 1 [fibre_wl24]      fibre_wl=24 (finer)                open=0.218 aspect=0.27 angle=1.74 size=5.22e-03 chir+=0.48  loops: tighter, less elliptical (fine→constrain)
+Slot 2 [fibre_wl40]      fibre_wl=40 (coarser) ← WINNER     open=0.262 aspect=0.35↑ angle=3.06↑↑ size=5.42e-03 chir+=0.46  loops: most elliptical, most-rotated (beyond π/2)
+Slot 3 [fibre_angle0]    fibre_angle=0.0 (no rotation)      open=0.322↑↑ aspect=0.32 angle=1.92 size=5.19e-03 chir+=0.45↓  loops: most open, less chirality (angle decouples)
+Slot 4 [amplitude15]     amplitude=15 (3× amp10)            open=0.225 aspect=0.24 angle=0.00 size=5.10e-02↑↑↑ chir+=0.50  loops: 10× LARGER but closed/inertial (no learned structure)
+Slot 5 [amplitude0_abl]  amplitude=0 (true ablation)        open=0.000 size=0.00  — FAILED, no motion (confirms active-stress required)
+
+Ranking (combined morphology for Phase 2):
+1. **s2 fibre_wl40 — WINNER** (aspect 0.35, angle 3.06 = most complex/elliptical; closest to real cardiomyocyte anisotropy)
+2. s0 fibre_wl32 parent (balanced baseline; good aspect 0.34, good angle 2.29)
+3. s4 amplitude15 (largest absolute size but collapsed openness & weird angle → inertial overshoot in forward)
+4. s3 fibre_angle0 (most open but loses chirality/rotation structure)
+5. s1 fibre_wl24 (intermediate; fine fibre constrains morphology)
+6. s5 amplitude0_abl (FAILED)
+
+Verdict:
+- **Fibre wavelength is the PRIMARY MORPHOLOGY lever:** coarser wavelength monotonically increases both ellipticity (0.27→0.34→0.35) and major-axis angle (1.74→2.29→3.06 rad). Fibre_wl40 reaches the morphology extreme — it produces the most elliptical (aspect 0.35), most-rotated loops (angle approaching π). This is the target for Phase 2 inverse (likely better matched to real beat's rich anisotropy than the underdrive inertial loops of smaller fibre_wl or high-amplitude isotropic).
+- **Fibre angle controls the openness-chirality TRADE:** removing angle (0.6→0.0) OPENS loops by +0.046 openness but REDUCES chirality from 0.51→0.45, showing rotation is load-bearing for handedness but inhibits openness. The coupling is real and decoupled.
+- **Amplitude in forward-atlas has OPPOSITE EFFECT than inverse regime:** amp15 yields 10× bigger loops (size jumps from 5.3e-03 to 5.1e-02) BUT with collapsed openness (0.276→0.225) and angle=0 (weird alignment). The large amplitude drives isotropic overshoot WITHOUT learned structure (unlike inverse where UNet harnesses amp25 → −0.189 best R²). Forward morphology is inertial/ineluctible; inverse context has degrees of freedom to compensate.
+- **Stiffness wavelength remains INERT** — batch 11 s3 (stiff_wl24) showed no visible morphological change, and this is confirmed by the coherent stiffness/direction patterns being insensitive to fibre_wl changes (the fibre GAIN/direction patterns dominate).
+- **Ablation valid** — amplitude0 confirmed zero motion (true ablation).
+
+Failures: s5 (amplitude0 ablation, expected zero motion — not a failure, expected result).
+
+Next: Batch 13 = Phase 2 INVERSE begins. Parent = fibre_wl40 (morphology leader from b12 s2). Shift from forward atlas → inverse-train the wl40 pattern family on real beat: inverse-fit real trajectory + loop-morphology (openness/aspect/angle/size/chirality match), with UCB tree over ONE-knob variants (amp, fibre_angle, drag) on the wl40 base. Each slot changes ONE knob from the wl40 parent; the objective is REAL R² + morphology loss, not forward-atlas metrics. This tests whether the morphology-rich fibre_wl40 family can be tuned to match the real per-node beat distribution.
+
+---
+
+## Batch 13 — FAILED — 2026-06-24
+
+**CRITICAL: ALL 6 SLOTS FAILED** due to trainer/config mismatch.
+
+Intended config: Phase 1b forward MORPHOLOGY ATLAS (parametric variants on fibre_wl40).
+Actual config: Plan specified `cardio_mpm_train.py` (inverse trainer) but included pattern args (`--stiff_wl`, `--gain_wl`, `--fibre_wl`, `--fibre_angle`) meant for `cardio_mpm_atlas.py` (forward atlas).
+
+Exit codes: all 6 jobs exited with code 2 (argument parsing error).
+Error example (s0): `cardio_mpm_train.py: error: unrecognized arguments: --stiff_wl 8 --gain_wl 26 --fibre_wl 40 --fibre_angle 0.6`
+
+**ROOT CAUSE:** `cardio_mpm_plan.json` has `"train_script": "cardio_mpm_train.py"` but the configs contain forward-atlas pattern parameters. The trainer script does NOT accept these args directly (they are embedded in the spec files).
+
+**Slots (all done=NO, R2=NA):**
+- s0 [fibre_wl40_parent] — FAILED
+- s1 [amplitude15] — FAILED
+- s2 [amplitude20] — FAILED
+- s3 [fibre_angle0.3] — FAILED
+- s4 [drag60] — FAILED
+- s5 [amplitude0_abl] — FAILED
+
+**Failure diagnosis:** The batch was designed to run Phase-1b forward morphology atlas (sweeping amplitude/angle/drag on the fibre_wl40 base) but the plan incorrectly specified the inverse trainer. The config itself is VALID for `cardio_mpm_atlas.py` — all the args (`--stiff_wl 8`, `--gain_wl 26`, `--fibre_wl 40`, `--fibre_angle {0.3,0.6}`, `--amplitude {10,15,20,0}`, `--drag_k {30,60}`) are recognized by the atlas script.
+
+**Fix:** Corrected `cardio_mpm_plan.json` to use `cardio_mpm_atlas.py` instead of `cardio_mpm_train.py`. Batch 14 (retried batch 13 with corrected trainer) will complete the Phase-1 morphology atlas by sweeping amplitude/angle/drag variants of the fibre_wl40 pattern family.
+
+## Batch 14 — good (Phase 1 forward atlas; fibre_wl40 morphology landscape clarified) — 2026-06-24
+
+**Runner:** `cardio_mpm_atlas.py` (Phase 1 forward atlas, NOT inverse).
+
+**Parent config:** Base = `material_aniso_cardio`: stiff_wl 8, gain_wl 26, fibre_wl 40, fibre_angle 0.6, amplitude 10, drag_k 30.
+Each slot changes ONE knob from the parent. Spec `material_aniso_cardio` (parametric active-stress patterns with learnable gain, no inverse training).
+
+**Hypothesis:** "The fibre_wl40 pattern family produces the richest anisotropic morphology. Sweeping amplitude/angle/drag on this family maps the morphology landscape: how size/rotation/openness couple to these parameters. Phase 2 inverse will then target the real beat's morphology distribution by selecting the best family point(s)."
+
+**Morphology metrics per slot (from progress.txt final line):**
+
+| Slot | Config | open | aspect | angle | size | chir | Assessment |
+|------|--------|------|--------|-------|------|------|------------|
+| **s0** | **fibre_wl40_parent** (control) | **0.262** | **0.35** (elliptical) | **3.06** rad (highly rotated) | **5.42e-03** | **0.46** | **BALANCED WINNER** — best ellipticity & rotation, rich morphology |
+| s1 | amplitude15 | 0.201 | 0.24 (flat) | **0.11** (lost rotation) | **3.94e-02** (7× EXPLODED) | 0.48 | **COLLAPSED INERTIAL** — high amp drives unstructured overshoot; aspect down, angle down, size exploded |
+| s2 | amplitude20 | 0.270 | **0.06** (LINE) | 1.59 | **3.29e-03** (tiny) | **0.12** (lost chirality) | **DEGENERATE** — even worse; loops flatten & shrink, handedness lost |
+| s3 | fibre_angle0.3 | 0.243 | 0.32 | 1.91 (half parent rotation) | 5.17e-03 | **0.58** (BEST chirality!) | CHIRALITY REVERSAL — angle down → handedness UP (opposite of Est.#29) |
+| s4 | drag60 | **0.276** (highest open) | **0.36** (most elliptical) | **0.06** (LOST rotation) | 4.57e-03 | 0.51 | **QUASI-STATIC TRADE** — drag opens loops but kills transient rotation |
+| s5 | amplitude0_abl | 0.000 | 0.00 | — | 0.00 | 0.00 | **ABLATION FAILS** — confirms active-stress required (Est.#16 re-confirmed) |
+
+**Ranking by morphology quality:**
+1. **s0 parent** (fibre_wl40): open 0.262, aspect 0.35, angle 3.06 — WINNER, balanced
+2. **s4** (drag60): open 0.276, aspect 0.36, angle 0.06 — most open/elliptical, but lost rotation
+3. **s3** (fibre_angle0.3): open 0.243, aspect 0.32, angle 1.91, chir 0.58 (best handedness) — rotation reduced, chirality flipped UP
+4. **s1** (amplitude15): open 0.201, aspect 0.24, angle 0.11 — inertially collapsed, under-curved
+5. **s2** (amplitude20): open 0.270, aspect 0.06, size 3.29e-03 — degenerate tiny lines, lost handedness
+6. **s5** (amplitude0_abl): all zero — ablation
+
+**Verdict:**
+- **AMPLITUDE INVERSE EFFECT (Q24 FALSIFIED/REFINED):** The forward atlas contradicts the inverse finding where amp15/amp25 were winners. Here, amp15 immediately collapses (aspect ↓0.24, angle ↓0.11, size ↑3.94e-02 inertial overshoot) and amp20 is degenerate (aspect ↓0.06 flattened, size ↓3.29e-03 tiny, chir ↓0.12 lost). **The divergence:** forward atlas is unstructured random init, while inverse fits to real data with learned gain/direction structure that constrains inertial growth. ⇒ **Phase 2 should RETURN to the amp10–15 bracket, NOT amp20+.** In inverse, learned structure harnesses the amplitude; in forward random field, high amplitude drives pure inertial overshoot.
+- **FIBRE ANGLE REVERSAL (Est.#29 FALSIFIED):** angle0.3 (vs parent 0.6) prediction was "angle=0 opens but kills handedness." Here angle 0.3 shows aspect 0.32 (similar to parent 0.35), angle 1.91 (half the rotation), BUT chirality UP to 0.58 (the BEST — opposite sign). The real data's chirality axis is orthogonal to fibre rotation; this parameter decouples handedness from rotation direction.
+- **DRAG OPENS BUT KILLS ROTATION:** drag60 shows highest openness (0.276) and most elliptical (aspect 0.36), but angle 0.06 (lost transient rotation). This is the inertial→quasi-static trade: damping suppresses the transient force direction sweep that curves the loops.
+- **ACTIVE-STRESS REQUIRED (Est.#16 RE-CONFIRMED):** amplitude0_abl shows all metrics zero — passive deformation alone cannot generate the loop morphology; active contraction is essential.
+- **PHASE 1 ATLAS CONCLUSION:** The parent s0 (fibre_wl40) is the morphology leader for Phase 2 inverse. Next batch (b15) should switch back to **inverse fitting on the REAL beat**, using the fibre_wl40 base with learned gain/direction variants (constraints: amplitude 10–15, fibre_angle {0.3,0.6}, drag {30,60}) to match the real per-node morphology distribution on R² + loop-shape metrics.
+
+**Next:** parent = s0 (fibre_wl40, the Phase-1 atlas winner); **PIVOT TO PHASE 2 INVERSE:** train on the real beat with the fibre_wl40 pattern family (material_aniso_cardio base), learning the per-particle gain + direction fields (no phase, no rotary, uniform pulse). Objective = interior R² + loop-morphology loss. Sweep gain_wl/fibre_angle/amplitude variants within the family to find the best real-trajectory fit.

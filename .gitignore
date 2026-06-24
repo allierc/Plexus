@@ -30,3 +30,10 @@ papers/
 VLLM/gemma-4-12B-it/
 VLLM/*.log
 VLLM/LTX-Video/
+
+# cardio_mpm: generated per-run specs + transient loop artifacts
+config/material/material_atlas_*.yaml
+config/material/material_looptest_*.yaml
+prototype/cardio_mpm/loop_logs/
+prototype/cardio_mpm/*_loop_state.json
+prototype/cardio_mpm/*_loop2_state.json

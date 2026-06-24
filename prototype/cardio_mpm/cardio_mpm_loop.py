@@ -34,7 +34,7 @@ NODE = os.environ.get("CARDIO_NODE", "a100")
 QUEUE = os.environ.get("CARDIO_QUEUE", f"gpu_{NODE}")
 NCPUS = os.environ.get("CARDIO_NCPUS", "8")
 WALL_MIN = int(os.environ.get("CARDIO_WALL_MIN", "600"))
-POLL_SEC = int(os.environ.get("CARDIO_POLL_SEC", "300"))
+POLL_SEC = int(os.environ.get("CARDIO_POLL_SEC", "60"))
 TIMEOUT_MIN = float(os.environ.get("CLAUDE_TIMEOUT_MIN", "40"))
 LOCAL_GPUS = [g for g in os.environ.get("CARDIO_LOCAL_GPUS", "0,1").split(",") if g != ""]
 
@@ -76,10 +76,12 @@ def run_claude(prompt, label):
 def _slots(batch):
     """cardio_mpm_plan.json -> per-slot dicts. Each config: {name, spec, args:{--flag: val}}."""
     plan = json.load(open(PLAN))
+    train_script = plan.get("train_script", TRAIN)          # morphology pivot: atlas runner via the plan
     out = []
     for s, cfg in enumerate(plan["configs"][:6]):
         arch = f"mpm_b{batch:02d}_s{s}_{cfg['name']}"
         out.append({"slot": s, "name": cfg["name"], "spec": cfg["spec"], "args": dict(cfg.get("args", {})),
+                    "train_script": cfg.get("train_script", train_script),
                     "arch": arch, "dir": os.path.join("archive", arch),
                     "log": os.path.join(LOGDIR, f"{arch}.out")})
     return out
@@ -108,7 +110,7 @@ def _ssh(remote_cmd, retries=1):
 
 
 def _train_cmd(job, device):
-    return (f"{TRAIN} {job['spec']} --device {device} --outdir {job['dir']} {_argstr(job)}")
+    return (f"{job.get('train_script', TRAIN)} {job['spec']} --device {device} --outdir {job['dir']} {_argstr(job)}")
 
 
 def _job_script(job):
@@ -265,17 +267,19 @@ Read (follow ALL of the instruction):
 The result directories (Read the images -- trajectory morphology is the primary evidence):
 {listing}
 
-Steps (do ALL):
+CRITICAL: You MUST automatically update {LEDGER} and {ANALYSIS} and rewrite {PLAN} (do not wait for user input).
+
+Steps (do ALL, AUTO-UPDATE the files as you go):
 1. Per slot: Read its last `checkpoints/dashboard_*.png` (panels: sim-red/real-green trajectories,
    learned stiffness, direction dx, direction dy, and -- when --max_delay>0 -- the learned phase-delay
    tau(x,y) map in frames) and its final interior R2 (progress.txt / the job
    log `done -> (R2=...)`) + `config.json`. Note in {ANALYSIS}: does red superpose on green? what
-   stiffness/direction STRUCTURE did the UNet learn? the R2. RANK on R2.
-2. Update {LEDGER}: Established Principles / Falsified Hypotheses / Open Questions, each tied to the
+   stiffness/direction STRUCTURE did the learned maps show? the R2. RANK on R2.
+2. EDIT {LEDGER}: update Established Principles / Falsified Hypotheses / Open Questions, each tied to the
    slot(s) that show it. A clean falsification is a success.
-3. Append a dated batch section to {ANALYSIS}: the configs, R2s, the winner, the reasoning.
-4. Rewrite {PLAN} for the next batch (<=6 one-knob-from-parent configs incl. an ABLATION; you MAY
-   edit cardio_mpm_train.py / a spec to add a mechanism). Reflect the current best as the parent.
+3. EDIT {ANALYSIS}: append a dated batch {batch} section: the configs, R2s, the winner, the reasoning.
+4. EDIT {PLAN}: rewrite for the next batch (<=6 one-knob-from-parent configs incl. an ABLATION; you MAY
+   edit cardio_mpm_atlas.py / a spec to add a mechanism). Reflect the current best as the parent.
 A slot with `done=NO` / R2=na FAILED -- say so and design around it, do not invent results."""
 
 

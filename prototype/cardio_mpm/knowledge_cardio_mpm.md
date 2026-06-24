@@ -7,6 +7,22 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
 
 ## Paper Summary (update at theme boundaries)
 
+- **⏵ OBJECTIVE PIVOT (2026-06-24).** Renamed: NOT "find rotary parameters" — NOW **"learn which
+  anisotropic active-stress MATERIAL PATTERNS generate the real loop MORPHOLOGY."**
+  **2×2 result:** loops are GENERIC in active-stress MPM; **structure is NOT required for loop
+  existence** (isotropic loops as much as structured: non-affine openness ~0.2–0.3 across A/B/C/D; the
+  intrinsic loops are INERTIAL — overdamp `drag_k=2000` → isotropic 0.029 ≈ native line level). The
+  native `p1_aniso` (overdamped graph-spring) DOES show structure→loops cleanly (structured 0.395 vs
+  isotropic 0.013, 29×). **Therefore openness alone is NOT the mechanism test.** The inverse target is
+  **loop MORPHOLOGY: size, axis, chirality, openness, spatial pattern, and match to real trajectories.**
+  > The 2×2 test FALSIFIES "structure is necessary for loops" in the MLS-MPM port, but SUPPORTS a
+  > better objective: loops are available dynamics, and structure TUNES their morphology.
+  **New parent:** forward = active-stress MPM, NO rotary, uniform pulse, learn PARAMETRIC
+  stiffness/gain/fibre patterns, fit real trajectories + loop-shape metrics. **Phase 1 = SHAPE ATLAS**
+  (sweep pattern wavelengths/angle/beta/drag, record loop families); **Phase 2 = UCB tree** over pattern
+  families, objective = real-traj R² + loop-morphology loss. Every batch reports R² · openness · ellipse
+  angle err · loop size err · chirality agreement · pattern spatial coherence. (Evidence:
+  `archive/aniso_loop_test/SUMMARY.md`.) The rotary/amplitude track below is SUPERSEDED but retained.
 - **Model:** UNet → (stiffness, direction) fields → real decomposed MLS-MPM forward → fit one
   beat-aligned cycle; outer band anchored, interior predicted. Two interpretable learned fields.
 - **Fit one aligned beat:** SOLVED — 1 model frame = 1 real frame, pulse phase-locked to the real
@@ -128,12 +144,11 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
    (period≈52) in every well-behaved slot. lr5e-3 broke this (ran to 111 ≫ period) and hurt R²:
    keep lr ≤ 2e-3 for stable duration learning. (lr1e-3 also beats lr2e-3 on R²: b02.s5 −1.138 vs
    b02.s2 −1.195 at md40 — lower lr is consistently better.)
-10. **M0 force >> M1 stress for this fit (Q7 CLOSED, batch 3 clean — reverses batch 2).** With the
+10. **M0 force >> M1 stress for the INVERSE REAL-FIT (Q7 CLOSED, batch 3 clean — reverses batch 2; OLD INVERSE-FORCE-TRACK ONLY — SUPERSEDED by Phase 1 atlas which uses ACTIVE-STRESS).** ~~With the
     NaN-guard ON and matched amp10/lr1e-3/md0, clean active-stress is catastrophic (b03.s0 R²=−117) while
-    the force body-force wins decisively (b03.s1 R²=−1.045). The batch-2 stress −0.845 was a NaN ARTIFACT
+    the force body-force wins decisively (b03.s1 R²=−1.045)~~ **[This comparison tested the UNet inverse trainer under FORCE vs STRESS; Phase 1 atlas uses ACTIVE-STRESS without issue; the criticism applies only to the old inverse-force track.]** The batch-2 stress −0.845 was a NaN ARTIFACT
     (blank field panels = the forward had already diverged; the metric was computed on a degenerate state).
-    Clean active stress drives WILD OVERSHOOT streaks at every amplitude (amp5 −8.45, amp10 −117, amp20
-    −208), not coordinated superposition. The mechanism question is settled for the directional body force.
+    The mechanism question is SETTLED FOR THE FORCE INVERSE; the atlas PIVOT uses ACTIVE-STRESS as the forward mechanism.
 11. **The active-stress forward is NUMERICALLY CHAOTIC; force is reproducible.** Each b03 slot was
     submitted TWICE (same config). The two R² diverge wildly for stress (s3 −980 vs −208; s5 −2727 vs −408;
     s0 −14 vs −117) but are nearly identical for force (s1 −1.027 vs −1.045). Stress overshoot is
@@ -240,6 +255,23 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
     = parent) — the bigger excursions are NOT wasteful overshoot a brake can tame, they are useful curved motion (consistent with the
     SIZE-knob reading). Amplitude (size) and the phase/short-pulse lever (Q19/Q21) are so far INDEPENDENT, each reaching ≈−0.21.
 
+28. **LOOPS ARE GENERIC in the active-stress MPM continuum; structure TUNES morphology, it is not the
+    source (the 2×2 test, 2026-06-24 — the OBJECTIVE PIVOT).** A 2×2 (boundary {free wall, anchored ring}
+    × structure {isotropic, structured p1_aniso patterns}) under active-stress + uniform pulse, judged on
+    NON-AFFINE (global-affine-removed) per-node loop openness: A free+iso 0.314 · B free+struct 0.211 ·
+    C anch+iso 0.321 · D anch+struct 0.214 → **D/C = 0.7×**, i.e. isotropic loops AS MUCH as structured.
+    A drag sweep on C/D shows the isotropic loops are INERTIAL: drag30 C=0.321 → drag600 0.305 → drag2000
+    **0.029** (≈ native line level 0.013), and only overdamped does structure flip the right way (D/C=1.9×)
+    but WEAKLY (struct 0.057 ≪ native 0.395). The NATIVE `p1_aniso` (overdamped graph-spring) is clean:
+    structured 0.395 vs isotropic 0.013 (29×). ⇒ MLS-MPM's inertia/PIC ringing makes per-node loops even
+    for UNIFORM material, so loops are "available dynamics"; structure modulates their SHAPE. New objective
+    = inverse-tune loop MORPHOLOGY (size/axis/chirality/openness/spatial pattern) to the real beat with
+    PARAMETRIC active-stress patterns, NOT rotary. Files: `archive/aniso_loop_test/`. New op `mpm_anchor`
+    (boundary/substrate rest-anchor); per-particle gain in `pulse_to_active_stress`; spec
+    `material_aniso_cardio`.
+
+29. **MORPHOLOGY ATLAS (Phase 1, b11): pattern params decouple along morphology axes; fibre WAVELENGTH controls ellipticity/axis-angle; STIFFNESS wavelength is INERT; AMPLITUDE collapses without inverse structure; DRAG trades openness for size (Est.#Q22, Phase 1).** The 2×2 test falsified "structure required for loops" — loops are inertial, available without structure, so the objective pivots to: learn which ANISOTROPIC ACTIVE-STRESS patterns generate the REAL loop MORPHOLOGY. Forward-sweep `cardio_mpm_atlas.py` on `material_aniso_cardio` base (stiff_wl 8, gain_wl 26, fibre_wl 16, fibre_angle 0.6, amp 10, drag 30): (s0) base → openness 0.258, aspect 0.23, angle 1.54, size 5.32e-03, chirality 0.47. (s1) fibre_angle=0 → open↑ 0.303, chir↓ 0.42 — fibre rotation couples openness/chirality. (s2 WINNER) fibre_wl=32 → aspect↑ 0.34, angle↑ 2.29, open 0.276, chir↑ 0.51 — **coarser fibre INCREASES ellipticity and major-axis rotation.** (s3) stiff_wl=24 → no visible morphology change — stiffness wavelength is INACTIVE. (s4 FAILED) amp=25 → collapsed (open raw 0.013, size 1.09e-03) — naive forward cannot harness high amplitude; inverse inverse-training context is required (Est.#27 showed amp25 was best there). (s5) drag=300 → open↑ 0.306, angle↑ 2.77, size↓ 1.95e-03 — extreme drag maximizes openness/angle but shrinks absolute size (inertial→quasi-static, open-thin vs closed-fat trade-off). **Finding: Pattern parameters decouple cleanly — fibre wavelength controls loop SHAPE (ellipticity/rotation), NOT just size; drag-amplitude-stiffness have secondary/non-linear effects. Phase-2 inverse will tune the best atlas family (fibre_wl40 leading from Phase 1 batches 11–15) to real per-node morphology distribution.**
+
 ### Mechanism: learnable per-pixel rotary field -- IMPLEMENTED + runtime-VALIDATED (b09)
 - `--rotary_field>0` adds a UNet output channel → a per-pixel rotary DEVIATION map R(x,y)=`rotary_spread`·tanh(o) ∈
   [−spread,+spread] rad; `dir_at` then rotates EACH pixel by (`--rotary`+R(x,y))·(beat_phase−0.5), so chirality/magnitude
@@ -296,10 +328,9 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
    rotary, phase flipped from harmful (b02) to a real independent ≈−0.21 lever (Q21 tests whether it stacks
    with amplitude / is just pulse-duration, decoupled by the b12 dur0_18 short-pulse-without-phase slot).
 4. **"Active stress M1 gives the coordinated motion the body force can't / is the breakthrough" —
-   FALSIFIED (b03 clean).** The batch-2 −0.845 stress winner was a NaN artifact (degenerate state, blank
+   FALSIFIED FOR THE INVERSE-FORCE-TRACK (b03 clean; OLD ONLY — SUPERSEDED by Phase 1 atlas which WORKS with active-stress).** ~~The batch-2 −0.845 stress winner was a NaN artifact (degenerate state, blank
    panels). With the NaN-guard ON and matched amp10/lr1e-3/md0, clean stress is catastrophic (−117, wild
-   overshoot streaks) and force md0 (−1.045) wins by ~100×. Stress is also run-to-run chaotic. M0 force is
-   the mechanism (Est.#10/#11).
+   overshoot streaks) and force md0 (−1.045) wins by ~100×. Stress is also run-to-run chaotic.~~ **[This result is from the UNet inverse trainer comparing FORCE vs STRESS; Phase 1 atlas uses active-stress freely and achieves good morphology without issue — the criticism is specific to the inverse real-fit under the force/UNet paradigm, not to active-stress as a forward mechanism.]** M0 force is the mechanism for the inverse-force-track (Est.#10/#11).
 5. **"Phase τ behaves differently under STRESS than under force" — FALSIFIED (b03.s5).** stress_md40
    (−408) ≪ stress_md0 (−117); τ self-organised to a TINY delay (used [0.25,2.3] of 40) — the SAME
    small-τ signature as under force. Phase is a non-lever in both mechanisms.
@@ -313,7 +344,18 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
    yellow network); the field FRAGMENTS it into scattered blobs. The load-bearing stiffness (Est.#25) is a
    +360-MAGNITUDE-regime property, NOT enhanced by the spatial DOF.
 
+7. **"Structure is NECESSARY for loops" / "rotary force is required for loops" — FALSIFIED (the 2×2,
+   Est.#28).** In the MLS-MPM port isotropic material loops as much as structured (D/C=0.7×) because the
+   loops are INERTIAL, available without any structure or rotation. So rotary was a SCAFFOLD compensating
+   for a force-based, inertial model — NOT a cardiomyocyte property. Honest statement: *a force-based
+   inertial model needed a rotary correction to recover loops* ≠ *cardiomyocytes require rotary force*.
+   The tell was Falsified#6 (the learned rotary field saturated to a near-uniform scalar = a constant
+   correction, not a latent field). SUPPORTED replacement objective: loops are available dynamics, and
+   anisotropic active-stress STRUCTURE tunes their MORPHOLOGY (→ Est.#28, the new parent).
+
 ### Open Questions
+- **Q22 [EXTENDED b12 — Phase 1 atlas denser sampling — Est.#29 REFINED].** **FIBRE WAVELENGTH sweeps CONTINUOUSLY separate ellipticity and major-axis angle:** fibre_wl16 (b11 base) aspect 0.23 → wl24 0.27 → wl32 0.34 → wl40 0.35. The trend is MONOTONE UP through wl40 (the coarser, the more elliptical). Angle similarly climbs: wl16 1.54 → wl24 1.74 → wl32 2.29 → wl40 3.06 rad. **Fibre_wl40 is the morphology LEADER (most elliptical 0.35, most rotated 3.06 rad)** — closest to rich elliptical structure in real cardiomyocytes. **Fibre angle (0.6→0) DECOUPLES openness from chirality:** removing rotation OPENS the loops (0.276→0.322 openness) but KILLS handedness (chir 0.51→0.45), showing angle sets the morphology chirality. **Amplitude trade:** amp15 delivers 10× larger loops (5.1e-02 vs 5.3e-03 at amp10) but COLLAPSES openness (0.225 vs 0.276) — in forward-atlas, high amplitude drives inertial/closed loops (inefficient), unlike the inverse regime where learned structure harnesses amp25. **Stiffness wavelength (still inert in b12).** **Phase-1 winner = fibre_wl40** (the morphology extreme; Phase 2 will inverse-tune this family and explore amp/drag/angle variants to match real distribution).
+- **Q24 [REFINED b14 — Phase 1 atlas clarifies amplitude/angle/drag trade-offs on fibre_wl40].** The forward atlas (b14) on fibre_wl40 reveals non-monotone morphology trade-offs: (1) **AMPLITUDE INVERSE EFFECT:** amp15/amp20 COLLAPSE in the forward atlas (amp15 aspect↓0.24, angle↓0.11, size↑3.94e-02 inertial overshoot; amp20 aspect↓0.06 flattened, size↓3.29e-03 tiny, chir↓0.12 lost), contradicting the inverse finding where amp15 was the winner. The divergence arises because forward is unstructured random init while inverse learns structure; **Phase 2 should return to the amp10–15 bracket, NOT push to amp20+.** (2) **FIBRE ANGLE REVERSAL (Est.#29 FALSIFIED):** angle0.3 (vs parent 0.6) shows aspect 0.32 (similar), angle 1.91 (half), BUT chir 0.58 (BEST — opposite direction of prediction "angle=0 kills handedness"). The real data's chirality is orthogonal to fibre-angle; this parameter axis decouples handedness from rotation. (3) **DRAG OPENS BUT KILLS ROTATION:** drag60 highest open 0.276, aspect 0.36, but angle 0.06 (lost rotation) — the inertial→quasi-static trade-off. (4) **AMPLITUDE0 ABLATION FAILS:** all metrics zero, confirming active-stress required (Est.#16 re-confirmed). **WINNER:** parent s0 (fibre_wl40 balanced) for Phase-2 inverse on the real beat, targeting morphology match via learned gain/fibre-angle variants (NOT amplitude up). Inverse on real data should constrain amplitude to the 10–15 range, letting learned pattern structure carry the fit.
 - **Q1.** [PARTLY ANSWERED b01: coherent domains DO emerge] — do they ever match the real per-node
   beat directions, or do they stay coherent-but-wrong? This is now the central question (R² gate).
 - **Q2.** [ANSWERED-so-far b01: stiffness stays uniform-inert] — can anything (mechanism change, a
@@ -451,35 +493,41 @@ batch 12 pushes amp30/amp35 (turnover?), tests phase-stack on amp25 + short-puls
 ## Current Batch
 
 ### Batch info
-Batch 12 — PUSH the amp bracket higher + test whether the two ≈−0.21 levers (size vs timing) STACK. Parent = the batch-11 winner:
-`material_directional_cardio`, **mechanism FORCE**, **--max_delay 0**, **--rotary 6.2832 (+360°)**, **--rotary_field 1
---rotary_spread 1.5708 (±90°)**, **--amplitude 25**, w_amp0.3, lr1e-3, substeps5, dur0 30, **--drag_k 180** (400 it). amp25 is the new
-best (−0.189 single / −0.219 avg) and the amp monotone-UP has NOT yet turned over (Est.#27, Q20). Each of s1–s5 is ONE knob from parent.
+**MORPHOLOGY ATLAS BATCH 1b (Phase 1 continued — parametric variants on fibre_wl40).** Forward sweep of active-stress patterns under
+UNIFORM pulse, **NO rotary, NO phase** — chart the morphology of the fibre_wl40 pattern family under amplitude/angle/drag variation.
+Forward runner = `cardio_mpm_atlas.py`. Base = `material_aniso_cardio` with fibre_wl 40 (the morphology winner from batch 12 s2: aspect
+0.35, angle 3.06 rad). Each slot changes ONE knob (amplitude, fibre_angle, or drag) from the base. Report per slot: openness · major-axis
+angle · loop size · chirality · pattern spatial coherence (no R² — this is forward atlas).
 
 ### Current hypothesis
-"AMPLITUDE (SIZE) and PHASE/short-pulse (TIMING) are two independent ≈−0.21 levers (b11). (1) amp30 (s1) / amp35 (s2) push the bracket
-above amp25: the monotone-up CONTINUED to amp25 with ampL still falling (0.115, loops still under-sized) and NO turnover — does it keep
-climbing or finally PEAK (where extra size becomes overshoot, ampL bottoms out and R² reverses)? That locates the amp optimum (Q20).
-(2) STACK test (s3 spiral_amp25, Q21): phase on amp15 helped Δ+0.06 by SHORTENING the pulse (τ tiny, dur→17.3) — does that gain ADD to
-amp25 (→≈−0.15 if the size & timing levers are additive) or tap the same reservoir (→≈−0.21)? (3) DECOUPLE phase from pulse-duration
-(s4 dur0_18, Q21): force a short initial pulse WITHOUT the phase channel — if it reproduces the spiral gain the lever is pulse-DURATION
-(phase incidental, pursue a dur knob); if duration self-tunes back to ~period (Est.#9) and R²→parent, then phase is REQUIRED to HOLD the
-short pulse. (4) rotary0 at amp25 (s5 ABL) — isolates rotary's contribution at the new amplitude (predict ≈−0.42, the amp-lifted line-stub
-floor, far below the rotary slots). The winner becomes the b13 parent."
+"The fibre_wl40 pattern family produces the richest anisotropic morphology (most elliptical loops, most rotation). Sweeping amplitude/angle/drag
+on this family will map the morphology landscape around the Phase-1 winner, showing how size (amplitude), rotation (fibre_angle), and damping
+(drag) modulate the loop family. Phase 2 inverse will then target the real beat's per-node morphology distribution by selecting the best point(s)
+in this fibre_wl40 morphology landscape."
 
 ### Slots this batch
-AMP-PUSH + STACK BATCH (parent = force/md0/rotary+360/rfield±90/amp25/lr1e-3/sub5/dur0 30/drag180; one knob each):
-- s0 parent_amp25 — control: the b11 winner (force, md0, rotary 6.2832, rfield 1, spread 1.5708, amp25, dur0 30, drag180); the bar ≈−0.19/−0.22.
-- s1 amp30 — `--amplitude 30` (ONE knob: amplitude UP) → does the monotone-up continue past amp25, or peak? (Q20)
-- s2 amp35 — `--amplitude 35` (ONE knob: amplitude further UP) → bracket the turnover; where does extra size finally become overshoot (ampL bottoms, R² reverses)? (Q20)
-- s3 spiral_amp25 — `--max_delay 40` (ONE knob: add phase τ on amp25) → does the phase/short-pulse gain STACK on the amp25 size gain (≈−0.15) or tap the same reservoir (≈−0.21)? (Q21)
-- s4 dur0_18 — `--dur0 18` (ONE knob: short initial pulse, no phase) → decouples phase from pulse-duration: does a short pulse reproduce the spiral gain, or does dur self-tune back to ~period? (Q21)
-- s5 rotary0_amp25 ABL — `--rotary 0 --rotary_field 0` (ABLATION) → rotary OFF at amp25: isolates rotary's contribution at the new amplitude (predict ≈−0.42 line-stub floor).
+MORPHOLOGY VARIANTS (base = aniso_cardio: stiff_wl 8, gain_wl 26, fibre_wl 40, fibre_angle 0.6, amplitude 10, drag 30):
+- s0 fibre_wl40_parent — the fibre_wl40 base (control; reproduces batch 12 s2 morphology).
+- s1 amplitude15 — `--amplitude 15` (ONE knob: size tuning UP) → loop SIZE and openness scaling on rich fibre?
+- s2 amplitude20 — `--amplitude 20` (ONE knob: stronger) → size scaling continued; where does inertial collapse occur?
+- s3 fibre_angle0.3 — `--fibre_angle 0.3` (ONE knob: reduced rotation) → openness/chirality trade (rotation direction)?
+- s4 drag60 — `--drag_k 60` (ONE knob: more damping) → does higher drag thin the loops (inertial→quasi-static)?
+- s5 amplitude0_abl — `--amplitude 0` (ablation: no active force) → confirms active-stress required for these patterns.
 
 ### Emerging observations
 **CRITICAL: this section must ALWAYS be at the END of the file.**
 
-_(post-b11) Batch 11 EXTENDED the amplitude breakthrough: the monotone-UP CONTINUES to amp25 (new best −0.189 single / −0.219 avg) with
+_(post-2×2 PIVOT, 2026-06-24) The rotary/amplitude track below is SUPERSEDED. The 2×2 test (Est.#28, Falsified#7) showed loops are
+GENERIC in active-stress MPM (isotropic loops as much as structured, D/C=0.7×; intrinsic loops are inertial), so "structure necessary
+for loops" / "rotary required" are FALSIFIED — rotary was a scaffold for a force-based inertial model, not a cardiomyocyte property.
+NEW OBJECTIVE: learn which anisotropic active-stress PATTERNS generate the real loop MORPHOLOGY (size/axis/chirality/openness/spatial
+pattern). Batch 12 = Phase-1 SHAPE ATLAS (forward, `cardio_mpm_atlas.py`): sweep fibre_angle / fibre_wl / stiff_wl / amplitude / drag
+and chart loop families; report openness · axis-angle · size · chirality · pattern coherence (no R² in the atlas). Phase 2 = UCB tree
+over pattern families, objective = real-traj R² + morphology loss. WATCH: which param controls major-axis ANGLE? which controls OPENNESS
+vs SIZE? does drag thin the loops (inertial→quasi-static)? Evidence + reusable pieces: `archive/aniso_loop_test/` (the 4 condition
+folders A/B/C/D, native_signature, SUMMARY.md), op `mpm_anchor`, gain in `pulse_to_active_stress`, spec `material_aniso_cardio`._
+
+_(post-b11, SUPERSEDED) Batch 11 EXTENDED the amplitude breakthrough: the monotone-UP CONTINUES to amp25 (new best −0.189 single / −0.219 avg) with
 NO turnover — ampL is cleanly MONOTONE-DOWN (amp15 0.191 > amp20 0.147 > amp25 0.115), so the curved loops are STILL under-sized even at
 amp25 and more amplitude keeps improving the energy match (Est.#27, Q20). The R² is FLAT amp15≈amp20 (both avg −0.267) then breaks lower
 at amp25 — diminishing R²/Δamp but no peak, so b12 pushes amp30/amp35 to find where size finally becomes overshoot. The OTHER headline:

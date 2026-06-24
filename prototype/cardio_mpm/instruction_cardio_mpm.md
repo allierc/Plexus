@@ -11,25 +11,69 @@ each job's dashboard**, **rank on the interior R²**, update `knowledge_cardio_m
 deliverable) + `analysis_cardio_mpm.md`, and rewrite the plan for the next batch (you MAY edit the
 trainer or a spec to add a mechanism). R² adjudicates hypotheses — it is never the sole objective.
 
+## ⏵ ACTIVE OBJECTIVE (2026-06-24 pivot — supersedes the rotary / amplitude track)
+
+**Renamed objective.** NOT "find rotary parameters." NOW: **learn which anisotropic active-stress
+MATERIAL PATTERNS generate the real loop MORPHOLOGY.**
+
+**The 2×2 test result — STOP treating `D≫C` as the goal.** Loops are GENERIC in the active-stress
+MLS-MPM continuum: the isotropic (uniform) runs loop just as much as the structured ones (non-affine
+openness ~0.2–0.3 across A/B/C/D), because the intrinsic loops are **INERTIAL** (overdamping `drag_k=2000`
+collapses isotropic to 0.029 ≈ the native line level). The native `p1_aniso` engine (overdamped
+graph-spring) DOES show structure→loops cleanly (structured **0.395** vs isotropic **0.013**, 29×).
+
+> **The 2×2 test falsifies "structure is necessary for loops" in the MLS-MPM port, but supports a
+> better objective: loops are available dynamics, and structure TUNES their morphology.**
+
+So **openness alone is NOT the mechanism test.** The inverse target is **loop MORPHOLOGY** — size,
+major-axis angle, chirality, openness, spatial pattern — matched to the real per-node trajectories.
+
+**New parent (the loop's control from here on):**
+- forward = **active-stress MPM** (`--mechanism stress`); **NO rotary, NO phase**; **uniform pulse**.
+- learn **PARAMETRIC stiffness / gain / fibre PATTERNS** (lo/hi · wavelength · angle · phase — `p1_aniso`
+  style). A UNet pixel field is too coarse for the fibre texture AND free to fake loops via the inertial
+  artifact — so parameterise the patterns, do not free-paint pixels.
+- fit **real trajectories + loop-shape metrics** (below), with a per-particle **gain** map
+  (`apply_material_map target=gain`, consumed by `pulse_to_active_stress`).
+
+**Every batch MUST now report, per slot (NOT just R²):**
+`R²` · **loop openness** · **ellipse major-axis angle error** · **loop size error** · **chirality
+agreement** · **spatial coherence** of the learned stiffness/gain/fibre pattern. Rank on the COMBINED
+morphology match, not R² alone.
+
+**Two phases:**
+- **Phase 1 — SHAPE ATLAS (do this FIRST, NOT an immediate real fit).** Forward-sweep the pattern params
+  (stiffness wavelength · gain wavelength · fibre wavelength · fibre angle · beta/amplitude · drag) and
+  record WHICH loop FAMILIES appear (size / axis / chirality / openness). Build the param→morphology map.
+- **Phase 2 — UCB tree over pattern families.** Objective = real-trajectory R² + loop-morphology loss;
+  search the pattern families that best reproduce the real beat.
+
+The 2×2 evidence + reusable pieces live in `archive/aniso_loop_test/` (SUMMARY.md, native_signature, the
+2×2) and the `mpm_anchor` operator + `material_aniso_cardio` spec + per-particle gain in
+`pulse_to_active_stress`.
+
 ## The model (what's learned vs fixed)
 
-Forward = `pacemaker → pulse_stimulus → apply_material_map → pulse_to_contraction(directional) →
-mpm_drag → [mpm_strain → p2g → mpm_grid_update → g2p]×substeps`, on a 128² elastic sheet filling
-[0.15,0.85]². The MPM is a **stable elastic limit cycle** (points return to rest; the quiescent
-state is reproducible after one cycle), so the trainer warms up `no_grad` past one cycle, then
-backprops **one full beat** (onset→next onset). The outer band is **Dirichlet-anchored to the real
-data**; the loss is the **honest motion-normalised interior R²/NRMSE** (boundary excluded).
+**Current forward** = `pacemaker → UNIFORM activation → parametric stiffness/gain/fibre maps →
+pulse_to_active_stress → mpm_drag → [mpm_strain → p2g → mpm_grid_update → g2p]×substeps`, on a 128²
+elastic sheet filling [0.15,0.85]². **The learned variables are PATTERN PARAMETERS** (lo/hi · wavelength
+· angle · phase for stiffness, gain, fibre), **NOT free pixel UNet fields. The primary outputs are loop
+MORPHOLOGY metrics, with R² used only in Phase 2.** NO rotary, NO phase delay, NO directional body force.
 
-**Learned (UNet output):**
-- **stiffness field** s(x,y) → per-particle `youngs` → Lamé μ,λ (how hard each point resists).
-- **direction field** d(x,y) → the active-stress orientation (`mode: directional`, F = amplitude·a(t)·d).
-- **phase-delay field** τ(x,y) ∈ [0,`--max_delay`] frames (UNet 4th channel, **only when `--max_delay>0`**) →
-  the activation becomes a TRAVELLING wave a(x,y,t)=pulse(t−τ(x,y)), so regions fire in sequence (the
-  substrate for curved / rotary trajectories). `--max_delay=0` ⇒ a single global beat (original behaviour).
-- **pulse duration** (a learnable scalar, soft envelope).
+The MPM is a **stable elastic limit cycle** (points return to rest; the quiescent state is reproducible
+after one cycle). Phase 1 (atlas) is a forward run — record the loop family. Phase 2 (inverse) warms up
+`no_grad` past one cycle then backprops one full beat against R² + loop-morphology loss; the outer band is
+Dirichlet-anchored to the real data.
 
-**Fixed/given:** pulse **period + phase locked to the real beat** (timing aligned to data),
-amplitude, drag, the MPM physics. (Period ≈ 50 frames, 5 real beats.)
+**Learned (pattern parameters):**
+- **stiffness pattern** → per-particle `youngs` → Lamé μ,λ (lo/hi · wavelength · angle · phase).
+- **gain pattern** → per-particle contraction `gain` (consumed by `pulse_to_active_stress`).
+- **fibre pattern** → the active-stress contraction AXIS n(x,y) (`direction` field; wavelength · angle · phase).
+
+**Fixed/given:** **uniform global pulse** (period + phase ≈ the real beat), the MPM physics. (Period ≈ 50
+frames, 5 real beats.) **DEPRECATED — do NOT use:** UNet pixel fields, `pulse_to_contraction` directional
+force, `--rotary`/`--rotary_field`, `--max_delay`/phase. These are the superseded track; the morphology
+objective replaces them.
 
 ## What each job produces (`<dir> = archive/<arch>/`)
 
@@ -73,10 +117,13 @@ falsification is a success.
 
 ## Each batch — do ALL
 
-1. **Read every dashboard** (Read each `dashboard_<last>.png`): does red superpose on green? does the
-   loop close / match shape? what STRUCTURE did the UNet learn in stiffness / direction dx,dy?
-2. Record the **final R² per slot** (`progress.txt` / the job log `done -> (R2=…)`). **RANK on R²**
-   (→1 good; ≤0 = worse than predicting no motion → failed fit). `done=NO` / R2=na → FAILED slot.
+1. **Read every dashboard** (Read each `dashboard_<last>.png`): what loop FAMILY did this pattern make
+   (size / major-axis angle / chirality / openness)? what spatial structure is the stiffness/gain/fibre
+   pattern? (Phase 2: does red superpose on green / does the loop close + match shape?)
+2. Record **per slot the FULL morphology row**, not just R²: `R²` · loop openness · ellipse axis-angle
+   error · loop size error · chirality agreement · pattern spatial coherence. **RANK on the COMBINED
+   morphology match** (Phase 1: which params yield which loop families; Phase 2: real-traj R² + shape
+   loss). `done=NO` → FAILED slot.
 3. **Append a dated entry to `analysis_cardio_mpm.md`** (template below).
 4. **Update `knowledge_cardio_mpm.md`** (Established / Falsified / Open, each tied to slots).
 5. **Rewrite `cardio_mpm_plan.json`** for the next ≤6 (one-knob-from-parent incl. an ablation; you MAY
@@ -95,9 +142,12 @@ Failures: <slots with done=NO and the suspected cause>
 Next: parent=<config>; next batch probes <knob>.
 ```
 
-## Current objective
+## Current objective (see ⏵ ACTIVE OBJECTIVE above — this is the morphology pivot)
 
-Get the learned red loops to **superpose on the real green beat** (interior R² → positive, ideally
-→1) by learning a stiffness + direction field that reproduce the per-node beat. Open questions to
-seed the science: does a *coherent* direction field emerge or stay noisy? does stiffness structure
-match the tissue? what amplitude/drag/duration give a closed, correctly-sized loop without overshoot?
+**Learn which anisotropic active-stress material patterns generate the real loop morphology.** Phase 1
+is a forward **shape atlas**: sweep parametric stiffness/gain/fibre patterns (+ beta/drag) under
+active-stress + uniform pulse (NO rotary) and chart the loop families (size / axis / chirality /
+openness). Phase 2 inverse-fits the pattern family to the real beat on **R² + loop-morphology loss**.
+Open questions: which wavelength/angle controls major-axis ORIENTATION? which controls OPENNESS vs
+SIZE? what sets CHIRALITY (and is the real beat's chirality reproducible)? does a single pattern family
+match the real per-node morphology distribution, or is a mixture needed?
