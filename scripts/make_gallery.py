@@ -29,6 +29,9 @@ CURATED: dict[str, list[tuple[str, str, str, str]]] = {
         ("arbitrary_3", f"{GD}/attraction_repulsion/arbitrary_3/movie_particle.mp4",
          "config/attraction_repulsion/arbitrary_3.yaml",
          "3 types, 30k particles; per-type difference-of-Gaussians law (reproduces PDE_A)"),
+        ("arbitrary_3d", f"{GD}/attraction_repulsion/arbitrary_3d/movie_particle.mp4",
+         "config/attraction_repulsion/arbitrary_3d.yaml",
+         "the same 3-type force law in 3D — the dimension contract (dim: 3, periodic box)"),
         ("boids_16", f"{GD}/boids/boids_16/movie_particle.mp4",
          "config/boids/boids_16.yaml",
          "16 types of boid; cohesion/alignment/separation (reproduces PDE_B)"),
@@ -112,7 +115,15 @@ def transcode(src: str, dst: str, slow: float = 1.0) -> bool:
 
 
 def card(name: str, mp4: str, spec_path: str, caption: str) -> str:
-    spec = html.escape(open(spec_path).read().rstrip()) if os.path.exists(spec_path) else "(spec not found)"
+    if os.path.exists(spec_path):
+        raw = open(spec_path).read()
+        for marker in ("\n# --- auto: video descriptions", "\ndescriptions:"):  # drop VLM blurb
+            i = raw.find(marker)
+            if i != -1:
+                raw = raw[:i]
+        spec = html.escape(raw.rstrip())
+    else:
+        spec = "(spec not found)"
     return f"""  <figure class="sim-card">
     <video src="{mp4}" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>

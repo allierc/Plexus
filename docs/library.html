@@ -70,35 +70,6 @@ ul.task-list li input[type="checkbox"] {
 }</script>
 <style>html{ scroll-behavior: smooth; }</style>
 
-  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
-
-<script type="text/javascript">
-const typesetMath = (el) => {
-  if (window.MathJax) {
-    // MathJax Typeset
-    window.MathJax.typeset([el]);
-  } else if (window.katex) {
-    // KaTeX Render
-    var mathElements = el.getElementsByClassName("math");
-    var macros = [];
-    for (var i = 0; i < mathElements.length; i++) {
-      var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN") {
-        window.katex.render(texText.data, mathElements[i], {
-          displayMode: mathElements[i].classList.contains('display'),
-          throwOnError: false,
-          macros: macros,
-          fleqn: false
-        });
-      }
-    }
-  }
-}
-window.Quarto = {
-  typesetMath
-};
-</script>
 
 </head>
 
@@ -131,10 +102,29 @@ window.Quarto = {
     <a class="nav-link" href="./methodology.html"> 
 <span class="menu-text">LLM ↔︎ registry</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link active" href="./library.html" aria-current="page"> 
-<span class="menu-text">Library</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="./library.html">
+ <span class="dropdown-text">Overview</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="./experiment.html"> 
 <span class="menu-text">Simulations</span></a>
@@ -156,24 +146,8 @@ window.Quarto = {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
-   
-  <ul>
-  <li><a href="#operators" id="toc-operators" class="nav-link active" data-scroll-target="#operators">Operators</a>
-  <ul class="collapse">
-  <li><a href="#lateral-mathcalo_e" id="toc-lateral-mathcalo_e" class="nav-link" data-scroll-target="#lateral-mathcalo_e"><img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym"><span class="math inline">\(\mathcal{O}_E\)</span></span></a></li>
-  <li><a href="#aggregate-textstylesum_pi" id="toc-aggregate-textstylesum_pi" class="nav-link" data-scroll-target="#aggregate-textstylesum_pi"><img class="kind-h" src="figures/icons/aggregate.png"> Aggregate <span class="kind-sym"><span class="math inline">\(\textstyle\sum_\pi\)</span></span></a></li>
-  <li><a href="#broadcast-pi" id="toc-broadcast-pi" class="nav-link" data-scroll-target="#broadcast-pi"><img class="kind-h" src="figures/icons/broadcast.png"> Broadcast <span class="kind-sym"><span class="math inline">\(\pi^*\)</span></span></a></li>
-  <li><a href="#exchange-mathcalsmathcalg" id="toc-exchange-mathcalsmathcalg" class="nav-link" data-scroll-target="#exchange-mathcalsmathcalg"><img class="kind-h" src="figures/icons/exchange.png"> Exchange <span class="kind-sym"><span class="math inline">\(\mathcal{S},\mathcal{G}\)</span></span></a></li>
-  <li><a href="#field-partial_tphi" id="toc-field-partial_tphi" class="nav-link" data-scroll-target="#field-partial_tphi"><img class="kind-h" src="figures/icons/field.png"> Field <span class="kind-sym"><span class="math inline">\(\partial_t\phi\)</span></span></a></li>
-  <li><a href="#rewire-mathcalre" id="toc-rewire-mathcalre" class="nav-link" data-scroll-target="#rewire-mathcalre"><img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym"><span class="math inline">\(\mathcal{R}\!:E\)</span></span></a></li>
-  </ul></li>
-  <li><a href="#sets" id="toc-sets" class="nav-link" data-scroll-target="#sets">Sets</a></li>
-  <li><a href="#fields" id="toc-fields" class="nav-link" data-scroll-target="#fields">Fields</a></li>
-  </ul>
-</nav>
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+        
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
@@ -198,7 +172,6 @@ window.Quarto = {
 </header>
 
 
-<p>The whole calculus is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>33 operators</strong> (41 primitives in all). Every simulation on this site is a schedule composed from this list — nothing else. Each entry below is introspected live from the registry, so the catalog never drifts from the code. The logo marks the operator <strong>kind</strong> in the visual language of <a href="./index.html">Figure 1</a> (<code>paper/fig_ops.tex</code>).</p>
 <style>
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
 .op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
@@ -216,67 +189,12 @@ window.Quarto = {
 .op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
 .op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
 </style>
-<section id="operators" class="level2">
-<h2 class="anchored" data-anchor-id="operators">Operators</h2>
-<section id="lateral-mathcalo_e" class="level3">
-<h3 class="anchored" data-anchor-id="lateral-mathcalo_e"><img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym"><span class="math inline">\(\mathcal{O}_E\)</span></span></h3>
-<p><em>Within-set interaction over a relation <span class="math inline">\(E\)</span>.</em></p>
+<p>The whole calculus is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>34 operators</strong> (42 primitives in all). Every simulation on this site is a schedule composed from this list — nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages — the two objects (<strong>sets</strong> and <strong>fields</strong>) and the <strong>operators</strong> that move state between them:</p>
 <div class="op-grid">
-<p><a class="op-card" href="library/Coulomb.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Coulomb</span><span class="op-card-sub">The electrostatic inverse-square law between charged particles.</span></span></a> <a class="op-card" href="library/advance.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">advance</span><span class="op-card-sub">Set (lateral). Self-propulsion: move along the heading at speed.</span></span></a> <a class="op-card" href="library/advance_3d.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">advance_3d</span><span class="op-card-sub">Set (lateral). Self-propulsion along a 3D heading vector.</span></span></a> <a class="op-card" href="library/alignment.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">alignment</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a> <a class="op-card" href="library/attraction_repulsion.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">attraction_repulsion</span><span class="op-card-sub">Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.</span></span></a> <a class="op-card" href="library/bounce.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">bounce</span><span class="op-card-sub">Set. Reflect a self-propelled agent off the domain walls / obstacles.</span></span></a> <a class="op-card" href="library/bounce_3d.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">bounce_3d</span><span class="op-card-sub">Set (lateral). Reflect a 3D agent’s heading off the domain walls.</span></span></a> <a class="op-card" href="library/cohesion.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">cohesion</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a> <a class="op-card" href="library/drag.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">drag</span><span class="op-card-sub">Viscous friction as a composable operator (not an integration knob).</span></span></a> <a class="op-card" href="library/gravity.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">gravity</span><span class="op-card-sub">A uniform body force at the cell level.</span></span></a> <a class="op-card" href="library/mpm_drag.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_drag</span><span class="op-card-sub">Viscous body drag for MLS-MPM particles (a force, not an integrator knob).</span></span></a> <a class="op-card" href="library/mpm_strain.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_strain</span><span class="op-card-sub">Mpm_strain (particle -&gt; particle): the MLS-MPM deformation-gradient + material update.</span></span></a> <a class="op-card" href="library/separation.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">separation</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a></p>
-</div>
-</section>
-<section id="aggregate-textstylesum_pi" class="level3">
-<h3 class="anchored" data-anchor-id="aggregate-textstylesum_pi"><img class="kind-h" src="figures/icons/aggregate.png"> Aggregate <span class="kind-sym"><span class="math inline">\(\textstyle\sum_\pi\)</span></span></h3>
-<p><em>Children → parent, up the containment <span class="math inline">\(\pi\)</span>.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/aggregate.html"><img src="figures/icons/aggregate.png" alt="aggregate"><span class="op-card-body"><span class="op-card-name">aggregate</span><span class="op-card-sub">Children -&gt; parent. Reduce a contained set onto its parent.</span></span></a></p>
-</div>
-</section>
-<section id="broadcast-pi" class="level3">
-<h3 class="anchored" data-anchor-id="broadcast-pi"><img class="kind-h" src="figures/icons/broadcast.png"> Broadcast <span class="kind-sym"><span class="math inline">\(\pi^*\)</span></span></h3>
-<p><em>Parent → children, down the containment <span class="math inline">\(\pi\)</span>.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/broadcast.html"><img src="figures/icons/broadcast.png" alt="broadcast"><span class="op-card-body"><span class="op-card-name">broadcast</span><span class="op-card-sub">Parent -&gt; children. Lift a parent quantity onto its children.</span></span></a></p>
-</div>
-</section>
-<section id="exchange-mathcalsmathcalg" class="level3">
-<h3 class="anchored" data-anchor-id="exchange-mathcalsmathcalg"><img class="kind-h" src="figures/icons/exchange.png"> Exchange <span class="kind-sym"><span class="math inline">\(\mathcal{S},\mathcal{G}\)</span></span></h3>
-<p><em>Set ↔︎ field push / pull.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/apply_material_map.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">apply_material_map</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus <code>apply_material_map</code>,</span></span></a> <a class="op-card" href="library/chemotaxis.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">chemotaxis</span><span class="op-card-sub">Set &lt;- field. Particles climb (or flee) a field’s gradient.</span></span></a> <a class="op-card" href="library/deposit.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">deposit</span><span class="op-card-sub">Set -&gt; field. Each agent adds to the field at its own pixel.</span></span></a> <a class="op-card" href="library/g2p.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">g2p</span><span class="op-card-sub">G2p (mpm_grid -&gt; particle): the MLS-MPM grid-to-particle gather + advection.</span></span></a> <a class="op-card" href="library/mls_mpm_mechanics.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">mls_mpm_mechanics</span><span class="op-card-sub">A FENCED TRANSITIONAL operator wrapping the MLS-MPM solver.</span></span></a> <a class="op-card" href="library/p2g.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">p2g</span><span class="op-card-sub">P2g (particle -&gt; mpm_grid): the MLS-MPM particle-to-grid scatter.</span></span></a> <a class="op-card" href="library/pulse_to_active_stress.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">pulse_to_active_stress</span><span class="op-card-sub">The STRESS half: activation field -&gt; per-particle active stress.</span></span></a> <a class="op-card" href="library/pulse_to_contraction.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">pulse_to_contraction</span><span class="op-card-sub">The FORCE half: activation field -&gt; per-particle MPM force.</span></span></a> <a class="op-card" href="library/sense.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense</span><span class="op-card-sub">Field -&gt; set. Sample the field at 3 sensors, turn the heading.</span></span></a> <a class="op-card" href="library/sense_3d.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense_3d</span><span class="op-card-sub">Field -&gt; set. Sample the field on a 3D sensor cone, steer the heading.</span></span></a></p>
-</div>
-</section>
-<section id="field-partial_tphi" class="level3">
-<h3 class="anchored" data-anchor-id="field-partial_tphi"><img class="kind-h" src="figures/icons/field.png"> Field <span class="kind-sym"><span class="math inline">\(\partial_t\phi\)</span></span></h3>
-<p><em>A field’s own self-dynamics.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/decay.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">decay</span><span class="op-card-sub">Field -&gt; field. Linear evaporation of a scalar field.</span></span></a> <a class="op-card" href="library/diffuse.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">diffuse</span><span class="op-card-sub">Field -&gt; field. One discrete diffusion step on a scalar field.</span></span></a> <a class="op-card" href="library/mpm_grid_update.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">mpm_grid_update</span><span class="op-card-sub">Mpm_grid_update (mpm_grid -&gt; mpm_grid): the MLS-MPM grid solve.</span></span></a> <a class="op-card" href="library/pacemaker.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">pacemaker</span><span class="op-card-sub">A clocked scalar SOURCE: a periodic activation signal p(t).</span></span></a> <a class="op-card" href="library/phase_delay_pulse.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">phase_delay_pulse</span><span class="op-card-sub">A clocked activation field with a SPATIAL phase delay tau(x,y).</span></span></a> <a class="op-card" href="library/playback.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">playback</span><span class="op-card-sub">A scalar field <em>prescribed</em> from an external video, plus the</span></span></a> <a class="op-card" href="library/pulse_stimulus.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">pulse_stimulus</span><span class="op-card-sub">The SPATIAL half of an active stimulus: paint an activation field.</span></span></a></p>
-</div>
-</section>
-<section id="rewire-mathcalre" class="level3">
-<h3 class="anchored" data-anchor-id="rewire-mathcalre"><img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym"><span class="math inline">\(\mathcal{R}\!:E\)</span></span></h3>
-<p><em>Rebuild the relation <span class="math inline">\(E\)</span> each tick.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/radius_graph.html"><img src="figures/icons/rewire.png" alt="rewire"><span class="op-card-body"><span class="op-card-name">radius_graph</span><span class="op-card-sub">Relation-building (rewire) operators: construct a Level’s <code>edge_index</code>.</span></span></a></p>
-</div>
-</section>
-</section>
-<section id="sets" class="level2">
-<h2 class="anchored" data-anchor-id="sets">Sets</h2>
-<p><em>Node kinds — the levels a hierarchy is built from.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/particle.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">particle</span><span class="op-card-sub">A point with position + velocity (the interacting-particle / boid leaf).</span></span></a> <a class="op-card" href="library/mpm_particle.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">mpm_particle</span><span class="op-card-sub">A material point for MLS-MPM: position + velocity PLUS the per-particle</span></span></a> <a class="op-card" href="library/cell.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">cell</span><span class="op-card-sub">A set of particles/molecules; its position is an aggregate of its children.</span></span></a></p>
-</div>
-</section>
-<section id="fields" class="level2">
-<h2 class="anchored" data-anchor-id="fields">Fields</h2>
-<p><em>Continuum discretizations — coupled to sets through <code>exchange</code> operators.</em></p>
-<div class="op-grid">
-<p><a class="op-card" href="library/grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">grid</span><span class="op-card-sub">A pure-state continuum: a C-channel scalar grid, NO behaviour.</span></span></a> <a class="op-card" href="library/image.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">image</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus <code>apply_material_map</code>,</span></span></a> <a class="op-card" href="library/mpm_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">mpm_grid</span><span class="op-card-sub">The Eulerian background grid FIELD + the shared transfer kernel for the</span></span></a> <a class="op-card" href="library/vector_grid.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">vector_grid</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus <code>apply_material_map</code>,</span></span></a> <a class="op-card" href="library/video.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">video</span><span class="op-card-sub">A scalar field <em>prescribed</em> from an external video, plus the</span></span></a></p>
+<p><a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds — the levels a hierarchy is built from.</span></span></a> <a class="op-card" href="library_fields.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">Fields</span><span class="op-card-sub">5 continuum discretizations — coupled to sets through exchange.</span></span></a> <a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">34 operators, grouped by kind — how state moves.</span></span></a></p>
 </div>
 
 
-</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

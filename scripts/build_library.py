@@ -40,6 +40,12 @@ KIND_INFO = {
     "rewire":     ("Rewire", r"$\mathcal{R}\!:E$", "rebuild the relation $E$ each tick"),
     "structural": ("Structural", r"$|S|$",         "change the node set (divide / die / spawn)"),
 }
+def kind_icon(kind):
+    """Icon filename for an operator KIND. The field-dynamics operator (dphi/dt)
+    gets its own glyph so it is not confused with the field data-structure icon."""
+    return "field_dyn" if kind == "field" else kind
+
+
 PREDICTION_GLOSS = {
     "first_derivative":  "returns a **velocity** &mdash; the engine integrates $x \\mathrel{+}= \\Delta t\\,\\delta$",
     "second_derivative": "returns an **acceleration** &mdash; $v \\mathrel{+}= \\Delta t\\,\\delta;\\ x \\mathrel{+}= \\Delta t\\,v$",
@@ -542,7 +548,7 @@ def render_operator_page(name: str, cls) -> str:
     out.append("")
     # header: kind glyph + lead
     out.append('::: {.op-head}')
-    out.append(f'![](../figures/icons/{kind}.png){{.op-logo}}')
+    out.append(f'![](../figures/icons/{kind_icon(kind)}.png){{.op-logo}}')
     out.append("")
     out.append(f"{badge(klabel.lower())} {badge('acts on: ' + str(level))}"
                + (f" {badge('prediction: ' + (pred or 'none'))}" if True else ""))
@@ -739,32 +745,57 @@ def card(name: str, cls, icon: str, sub: str) -> str:
             f'<span class="op-card-sub">{sub}</span></span></a>')
 
 
-def render_index() -> str:
-    ops = R._OPERATOR_REGISTRY
-    fields = R._FIELD_REGISTRY
-    sets = R._ENTITY_REGISTRY
+def _page_header(title, subtitle):
+    return ["---", f'title: "{title}"', f'subtitle: "{subtitle}"',
+            "resources:", "  - gallery/", "---", "", STYLE, ""]
+
+
+def _nav_card(href, icon, name, sub):
+    return (f'<a class="op-card" href="{href}">'
+            f'<img src="figures/icons/{icon}.png" alt="{icon}">'
+            f'<span class="op-card-body"><span class="op-card-name">{name}</span>'
+            f'<span class="op-card-sub">{sub}</span></span></a>')
+
+
+def render_landing() -> str:
+    """library.qmd &mdash; a short overview that links to the three sub-pages."""
+    ops, fields, sets = R._OPERATOR_REGISTRY, R._FIELD_REGISTRY, R._ENTITY_REGISTRY
     n = len(ops) + len(fields) + len(sets)
+    out = _page_header("Operator library",
+                       "Every set, field, and operator in Plexus &mdash; the validated registry to date")
+    out.append(f"The whole calculus is **{len(sets)} sets**, **{len(fields)} fields**, and "
+               f"**{len(ops)} operators** ({n} primitives in all). Every simulation on this site is a "
+               "schedule composed from this list &mdash; nothing else. The catalog is introspected "
+               "live from the registry, so it never drifts from the code. It is split into three "
+               "pages &mdash; the two objects (**sets** and **fields**) and the **operators** that "
+               "move state between them:")
+    out.append("")
+    out.append('::: {.op-grid}')
+    out.append(_nav_card("library_sets.html", "set", "Sets",
+                         f"{len(sets)} node kinds &mdash; the levels a hierarchy is built from."))
+    out.append(_nav_card("library_fields.html", "field", "Fields",
+                         f"{len(fields)} continuum discretizations &mdash; coupled to sets through exchange."))
+    out.append(_nav_card("library_operators.html", "lateral", "Operators",
+                         f"{len(ops)} operators, grouped by kind &mdash; how state moves."))
+    out.append(":::")
+    out.append("")
+    return "\n".join(out)
 
-    out = ["---", 'title: "Operator library"',
-           'subtitle: "Every set, field, and operator in Plexus &mdash; the validated registry to date"',
-           "resources:", "  - gallery/", "---", "",
-           f"The whole calculus is **{len(sets)} sets**, **{len(fields)} fields**, and "
-           f"**{len(ops)} operators** ({n} primitives in all). Every simulation on this site is a "
-           "schedule composed from this list &mdash; nothing else. Each entry below is introspected "
-           "live from the registry, so the catalog never drifts from the code. The logo marks the "
-           "operator **kind** in the visual language of [Figure 1](index.qmd) "
-           "(`paper/fig_ops.tex`).", "",
-           STYLE, ""]
 
-    # Operators grouped by kind
-    out.append("## Operators")
+def render_operators() -> str:
+    """library_operators.qmd &mdash; operators grouped by kind."""
+    ops = R._OPERATOR_REGISTRY
+    out = _page_header("Operators",
+                       "How state moves &mdash; grouped by kind, in the visual language of Figure 1")
+    out.append("The logo marks the operator **kind** in the visual language of "
+               "[Figure 1](index.qmd) (`paper/fig_ops.tex`).")
     out.append("")
     for kind in KIND_ORDER:
-        members = sorted(n for n, c in ops.items() if getattr(c, "KIND", None) == kind)
+        members = sorted(nm for nm, c in ops.items() if getattr(c, "KIND", None) == kind)
         if not members:
             continue
         klabel, ksym, kgloss = KIND_INFO[kind]
-        out.append(f'### <img class="kind-h" src="figures/icons/{kind}.png"> {klabel} '
+        out.append(f'## <img class="kind-h" src="figures/icons/{kind_icon(kind)}.png"> {klabel} '
                    f'<span class="kind-sym">{ksym}</span>')
         out.append("")
         out.append(f"*{kgloss[0].upper() + kgloss[1:]}.*")
@@ -774,27 +805,30 @@ def render_index() -> str:
             c = ops[nm]
             sub = first_sentence(inspect.getdoc(inspect.getmodule(c)) or inspect.getdoc(c) or "") \
                 or f"{kind} @ {getattr(c, 'LEVEL', '')}"
-            out.append(card(nm, c, kind, sub))
+            out.append(card(nm, c, kind_icon(kind), sub))
         out.append(":::")
         out.append("")
+    return "\n".join(out)
 
-    # Sets
-    out.append("## Sets")
-    out.append("")
-    out.append("*Node kinds &mdash; the levels a hierarchy is built from.*")
-    out.append("")
+
+def render_sets() -> str:
+    """library_sets.qmd &mdash; the node kinds."""
+    sets = R._ENTITY_REGISTRY
+    out = _page_header("Sets", "Node kinds &mdash; the levels a hierarchy is built from")
     out.append('::: {.op-grid}')
     for nm in sorted(sets, key=lambda x: getattr(sets[x], "LEVEL", 0)):
         c = sets[nm]
         out.append(card(nm, c, "set", first_sentence(inspect.getdoc(c) or "")))
     out.append(":::")
     out.append("")
+    return "\n".join(out)
 
-    # Fields
-    out.append("## Fields")
-    out.append("")
-    out.append("*Continuum discretizations &mdash; coupled to sets through `exchange` operators.*")
-    out.append("")
+
+def render_fields() -> str:
+    """library_fields.qmd &mdash; the continuum discretizations."""
+    fields = R._FIELD_REGISTRY
+    out = _page_header("Fields",
+                       "Continuum discretizations &mdash; coupled to sets through `exchange` operators")
     out.append('::: {.op-grid}')
     for nm in sorted(fields):
         c = fields[nm]
@@ -842,10 +876,14 @@ def main():
     for name, cls in R._ENTITY_REGISTRY.items():
         with open(os.path.join(LIBDIR, f"{name}.qmd"), "w") as f:
             f.write(render_set_page(name, cls).replace(":::\n\n## Role", ":::\n\n" + STYLE + "\n## Role", 1))
-    with open(os.path.join(ROOT, "library.qmd"), "w") as f:
-        f.write(render_index())
+    for fname, renderer in [("library.qmd", render_landing),
+                            ("library_operators.qmd", render_operators),
+                            ("library_fields.qmd", render_fields),
+                            ("library_sets.qmd", render_sets)]:
+        with open(os.path.join(ROOT, fname), "w") as f:
+            f.write(renderer())
     total = len(R._OPERATOR_REGISTRY) + len(R._FIELD_REGISTRY) + len(R._ENTITY_REGISTRY)
-    print(f"wrote library.qmd + {total} detail pages "
+    print(f"wrote library.qmd + 3 sub-pages + {total} detail pages "
           f"({len(R._OPERATOR_REGISTRY)} ops, {len(R._FIELD_REGISTRY)} fields, {len(R._ENTITY_REGISTRY)} sets)")
 
 

@@ -165,10 +165,29 @@ window.Quarto = {
     <a class="nav-link" href="../methodology.html"> 
 <span class="menu-text">LLM ↔︎ registry</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="../library.html"> 
-<span class="menu-text">Library</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library.html">
+ <span class="dropdown-text">Overview</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="../experiment.html"> 
 <span class="menu-text">Simulations</span></a>
@@ -392,16 +411,19 @@ window.Quarto = {
 <span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> <span class="va">self</span>._sample(H.fields[<span class="va">self</span>.direction_from].grid, pos, W)              <span class="co"># [N, 2] contraction axis</span></span>
 <span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> n <span class="op">/</span> n.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)                        <span class="co"># unit</span></span>
 <span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>        gate <span class="op">=</span> (a <span class="op">*</span> lvl.occ).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">0.0</span>)                                       <span class="co"># only inactive=0 particles off</span></span>
-<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>            gate <span class="op">=</span> gate <span class="op">*</span> mask.<span class="bu">float</span>()</span>
-<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>        nn <span class="op">=</span> n[:, :, <span class="va">None</span>] <span class="op">*</span> n[:, <span class="va">None</span>, :]                                        <span class="co"># [N, 2, 2]  n n^T</span></span>
-<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the</span></span>
-<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>        <span class="co"># elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this</span></span>
-<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>        <span class="co"># sign is fixed empirically so axis n =&gt; contraction ALONG n, see active_stress_test.)</span></span>
-<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>        sigma <span class="op">=</span> (<span class="va">self</span>.amplitude <span class="op">*</span> gate)[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> nn                        <span class="co"># +A a n n^T</span></span>
-<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># side-channel for p2g (same idiom as H.part_accel); overwritten each frame, read every substep.</span></span>
-<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>        H.active_stress <span class="op">=</span> sigma</span>
-<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}                                                                 <span class="co"># no body-force delta</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        gain <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="st">"gain"</span>, <span class="va">None</span>)                                         <span class="co"># optional per-particle gain map</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> gain <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:                                                      <span class="co"># (apply_material_map target=gain)</span></span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>            gate <span class="op">=</span> gate <span class="op">*</span> gain                                                    <span class="co"># spatially-structured contraction gain</span></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>            gate <span class="op">=</span> gate <span class="op">*</span> mask.<span class="bu">float</span>()</span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>        nn <span class="op">=</span> n[:, :, <span class="va">None</span>] <span class="op">*</span> n[:, <span class="va">None</span>, :]                                        <span class="co"># [N, 2, 2]  n n^T</span></span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the</span></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>        <span class="co"># sign is fixed empirically so axis n =&gt; contraction ALONG n, see active_stress_test.)</span></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>        sigma <span class="op">=</span> (<span class="va">self</span>.amplitude <span class="op">*</span> gate)[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> nn                        <span class="co"># +A a n n^T</span></span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>        <span class="co"># side-channel for p2g (same idiom as H.part_accel); overwritten each frame, read every substep.</span></span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>        H.active_stress <span class="op">=</span> sigma</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}                                                                 <span class="co"># no body-force delta</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

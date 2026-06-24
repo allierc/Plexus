@@ -102,10 +102,29 @@ ul.task-list li input[type="checkbox"] {
     <a class="nav-link" href="./methodology.html"> 
 <span class="menu-text">LLM ↔︎ registry</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./library.html"> 
-<span class="menu-text">Library</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="./library.html">
+ <span class="dropdown-text">Overview</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link active" href="./experiment.html" aria-current="page"> 
 <span class="menu-text">Simulations</span></a>
@@ -228,6 +247,43 @@ plotting:                      # render STYLE (read by plexus.plot; engine ignor
   colormap: tab10
   point_size: 2.0</pre></span></span>
       <span class="sim-cap">3 types, 30k particles; per-type difference-of-Gaussians law (reproduces PDE_A)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/arbitrary_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">arbitrary_3d<span class="sim-spec"><pre># arbitrary_3d -- the FIRST 3D Plexus spec: attraction_repulsion in a 3D periodic box.
+# Exercises the dimension contract (general.dim: 3, world: [1,1,1]); the engine builds
+# pos/vel as 3-vectors, radius_graph + attraction_repulsion run dimension-generically
+# (SUPPORTED_DIMS=[2,3]). Same per-type force law as the 2D arbitrary_3.
+general:
+  name: arbitrary_3d
+  seed: 0
+  n_frames: 200
+  dt: 0.1
+  boundary: periodic
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+sets:
+  particle:
+    n: 8000
+    types:
+      t0: { fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615] }
+      t1: { fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055] }
+      t2: { fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579] }
+fields: {}
+operators:
+  # 3D retune: neighbour counts scale by VOLUME, so the Gaussian width must be ~ the
+  # mean spacing n^(-1/3) ~ 0.05 (not the 2D 0.005). sigma/spacing ~ 0.7 (as in 2D)
+  # gives strong clustering (61% nn-distance drop vs 11% at sigma 0.01).
+  - { op: radius_graph, at: particle, radius: 0.12 }
+  - { op: attraction_repulsion, at: particle, sigma: 0.035 }
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 2.0</pre></span></span>
+      <span class="sim-cap">the same 3-type force law in 3D — the dimension contract (dim: 3, periodic box)</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">

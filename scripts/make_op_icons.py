@@ -92,6 +92,14 @@ def draw_field(ax):
     field(ax, 0.50, 0.50, w=0.46, h=0.46)
 
 
+def draw_field_dyn(ax):
+    # the field, plus a red self-update arc (the operator acting in time: dphi/dt)
+    field(ax, 0.50, 0.46, w=0.46, h=0.46)
+    ax.add_patch(FancyArrowPatch((0.33, 0.62), (0.67, 0.62),
+                                 connectionstyle="arc3,rad=-0.85", arrowstyle="-|>",
+                                 mutation_scale=10, color=COP, lw=2.4, zorder=6))
+
+
 def draw_rewire(ax):
     rc = (0.34, 0.50)
     ax.add_patch(Circle(rc, 0.34, fill=False, edgecolor=CGRAY, lw=1.4,
@@ -122,8 +130,8 @@ def draw_set(ax):
 
 ICONS = {
     "lateral": draw_lateral, "aggregate": draw_aggregate, "broadcast": draw_broadcast,
-    "exchange": draw_exchange, "field": draw_field, "rewire": draw_rewire,
-    "structural": draw_structural, "set": draw_set,
+    "exchange": draw_exchange, "field": draw_field, "field_dyn": draw_field_dyn,
+    "rewire": draw_rewire, "structural": draw_structural, "set": draw_set,
 }
 
 
@@ -135,7 +143,7 @@ def main():
                     bbox_inches="tight", pad_inches=0.02)
         plt.close(fig)
     # contact sheet for a quick visual check
-    fig, axes = plt.subplots(2, 4, figsize=(8, 4), dpi=110)
+    fig, axes = plt.subplots(3, 3, figsize=(6, 6), dpi=110)
     for ax, (name, fn) in zip(axes.ravel(), ICONS.items()):
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
         fn(ax); ax.set_title(name, fontsize=11)

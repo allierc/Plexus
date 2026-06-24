@@ -4,7 +4,7 @@ subtitle: "Field -> field. One discrete diffusion step on a scalar field."
 ---
 
 ::: {.op-head}
-![](../figures/icons/field.png){.op-logo}
+![](../figures/icons/field_dyn.png){.op-logo}
 
 [`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
 
