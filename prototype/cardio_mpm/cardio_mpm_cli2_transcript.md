@@ -94,3 +94,99 @@ The only axes deferred to batch 2 are gain_phase, fibre_phase, and gain_lo/gain_
 ================================================================================
 ## START -- 2026-06-24 12:11:55
 ================================================================================
+Now I have the full picture. Let me review the plan against the knowledge ledger.
+
+## Plan Review
+
+The seed `cardio_mpm_plan2.json` has 6 configs, all `--learn fibre`, one-knob-from-parent:
+
+| Slot | Name | ONE knob changed | Rationale |
+|------|------|-------------------|-----------|
+| s0 | `fibre_parent` | control | fibre_wl40 base (Phase 1 winner, Est.#29) |
+| s1 | `fibre_angle_0.3` | fibre_angle 0.6→0.3 | chirality/rotation (Q24: angle0.3 had BEST chir 0.58) |
+| s2 | `fibre_angle_0.9` | fibre_angle 0.6→0.9 | bracket angle upward |
+| s3 | `fibre_wl_28` | fibre_wl 40→28 | bracket wl downward (finer = less elliptical per Est.#29) |
+| s4 | `fibre_wl_52` | fibre_wl 40→52 | bracket wl upward (even coarser than atlas winner) |
+| s5 | `fibre_amp_1.5` | fibre_amp 1.0→1.5 | angular contrast up (θ spans [0,1.5π] vs [0,π]) |
+
+**Checklist against the ledger:**
+- amplitude=10, drag_k=30: matches the Q24 recommendation ("constrain amplitude to 10-15, let pattern structure carry the fit")
+- dur0=8: within the sharp [3,14] bound, good starting point (avoids the near-constant problem)
+- fibre_wl=40 parent: the Phase 1 morphology leader (Est.#29, Q22)
+- gain0=1.0, stiff_lo/hi=50/150: sensible defaults; frozen under `--learn fibre`
+- All 6 slots: one-knob-from-parent design, clean isolation
+
+**What's covered:** The 3 most mechanistically important fibre axes — wl (controls ellipticity/axis-angle, Est.#29), angle (controls chirality, Q24), amp (angular contrast range). The 4th param (fibre_phase=0.7) is not explicitly swept, but since it's in the learnable `fibre` group, the optimizer will learn the best phase for each init config — starting phase is less likely to gate convergence than wl/angle/amp.
+
+**What I'd consider changing:** A fibre_amp_0.5 downward bracket (less angular contrast, θ spans [0,0.5π]) could be informative, but at the cost of dropping a slot. The current upward-only bracket (1.0→1.5) is the more interesting direction since the atlas showed wl40 already had the richest morphology — more contrast could push it further. The plan is already at the 6-slot limit.
+
+**Verdict: The plan is well-designed. I would NOT rewrite it.** The parent + 5 one-knob variants cleanly span the fibre parameter space around the Phase 1 winner, with amplitude/drag/gain/duration frozen at atlas-validated values. The `--learn fibre` partition isolates the fibre lever. No changes needed.
+
+Ready to launch on your signal.
+
+
+================================================================================
+## BATCH 1 -- 2026-06-24 12:58:22
+================================================================================
+All three files updated. Here's the summary:
+
+---
+
+**Phase-2 Batch 1 [learn=fibre] — COMPLETE**
+
+**Ranking by interior R²:**
+| Rank | Slot | Config | R² | ampL |
+|------|------|--------|-----|------|
+| 1 | **s5** | **fibre_amp=1.5** | **-5.448** | 0.315 |
+| 2 | s3 | fibre_wl=28 | -8.267 | 1.132 |
+| 3 | s1 | fibre_angle=0.3 | -10.005 | 1.452 |
+| 4 | s0 | parent (control) | -14.451 | 2.907 |
+| 5 | s2 | fibre_angle=0.9 | -17.029 | 3.838 |
+| 6 | s4 | fibre_wl=52 | -21.213 | 5.071 |
+
+**Key findings (Est.#30):**
+- **All R² deeply negative** — fibre alone (4 scalars) at amp=10/drag=30/dur=8 is far from fitting. The other levers are needed.
+- **fibre_amp is THE critical param** — the parent COLLAPSED fibre_amp from 1.0→0.01 (optimizer kills anisotropy because it generates wrong-direction overshoot). Only the 1.5 init survived (→1.52) and won.
+- **Finer fibre_wl helps the inverse** (wl=28 > wl=40 > wl=52), opposite of the forward atlas ranking.
+- **Under-driven is better** — s5 has lowest ampL (0.315) and best R². At dur=8 (frozen, far below period ~50), overshoot direction dominates.
+
+**Batch 2 plan written** → `--learn stiff`. Freezes fibre at s5's converged values, sweeps stiffness range (wide/soft/uniform ablation), tests finer fibre (wl=28) + stiff, and amplitude=12 to address under-driving. Q25 opened.
+
+
+================================================================================
+## BATCH 2 -- 2026-06-24 13:52:20
+================================================================================
+All files updated. Here's the summary:
+
+---
+
+## Phase-2 Batch 2 Results [learn=stiff]
+
+**RANKING** (interior R²):
+| Rank | Slot | Config | R² | ampL |
+|------|------|--------|-----|------|
+| 1 | **s3 stiff_on_wl28** | wl28 fibre + stiff [50,150] | **−5.181** | 0.431 |
+| 2 | s5 uniform_abl | stiff [100,100] (uniform) | −6.477 | 0.507 |
+| 3 | s1 stiff_wide | stiff [20,250] | −6.619 | 0.764 |
+| 4 | s0 stiff_parent | stiff [50,150] on wl40 | −7.426 | 0.801 |
+| 5 | s4 stiff_amp12 | stiff [50,150] amp=12 | −9.737 | 1.442 |
+| 6 | s2 stiff_soft | stiff [20,80] | −25.039 | 7.278 |
+
+**HEADLINES:**
+- **s3 is the new Phase-2 best** (−5.181 > b1's −5.448) — finer wl28 fibre + stiffness helps
+- **Spatial stiffness HURTS on wl40** — the uniform ablation beats the spatial parent (−6.48 > −7.43). The UNet pattern is net-harmful
+- **Soft stiffness is catastrophic** — [20,80] can't resist contraction (ampL=7.3, massive overshoot)
+- **amp=12 hurts at dur=8** — more amplitude at short duty cycle = more overshoot
+- **All R² still deeply negative** — dur=8 frozen confirmed as root cause (Est.#31, Q25 closed)
+
+**User input acknowledged:** dur should be co-learned with each lever. Reflected in batch 3 plan.
+
+**Batch 3 plan** [learn=X,dur — dur co-learning]:
+- s0 `dur_only` — isolate dur's contribution from the −5.45 base
+- s1 `fibre_dur` — revisit fibre with dur unfrozen (wl40 base)
+- s2 `stiff_dur` — revisit stiff with dur unfrozen
+- s3 `gain_dur` — advance partition to gain + dur
+- s4 `fibre_dur_wl28` — the b2 winner fibre base + dur co-learning
+- s5 `all_combine` — early full combine (fibre+stiff+gain+dur)
+
+This should tell us whether the deeply-negative regime breaks once the pulse can self-tune (Q26).

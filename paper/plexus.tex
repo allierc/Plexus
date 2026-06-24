@@ -58,395 +58,32 @@ lessons that follow for how to construct the repository.
 \part*{Part I --- The abstraction}
 \addcontentsline{toc}{section}{Part I --- The abstraction}
 
-\section{The idea}
-
-Plexus is a language for building living simulations.
-
-Rather than starting from a particular domain --- cells, tissues, neural
-networks, particle systems, reaction--diffusion equations, or active matter ---
-Plexus starts from a small vocabulary that can describe all of them.
-
-The vocabulary contains only four concepts:
-
-[
-\boxed{
-\text{Sets}
-\qquad
-\text{Fields}
-\qquad
-\text{Operators}
-\qquad
-\text{Schedules}
-}
-]
-
-Everything in Plexus is built from these four objects.
-
-A simulation is therefore not a special-purpose program. It is a composition of
-operators acting on sets and fields according to a schedule.
-
-The wager of Plexus is that a surprisingly large fraction of biology can be
-expressed in this language.
-
-\section{Sets}
-
-A set is a collection of discrete elements.
-
-Examples include:
-
-\begin{itemize}
-\item particles,
-\item cells,
-\item nuclei,
-\item metabolites,
-\item organisms,
-\item populations.
-\end{itemize}
-
-Every element of a set shares the same state schema and the same admissible
-operators.
-
-For example, a cell set might contain
-
-[
-(\text{position},;\text{velocity},;\text{polarity})
-]
-
-for every cell.
-
-A metabolite set might contain
-
-[
-(\text{concentration})
-]
-
-for every metabolite.
-
-The important point is that a set represents a single kind of object.
-
-\subsection*{Containment}
-
-Sets may contain other sets.
-
-For example:
-
-[
-\text{particle}
-\rightarrow
-\text{cell}
-\rightarrow
-\text{organism}
-]
-
-or
-
-[
-\text{metabolite}
-\rightarrow
-\text{cell}.
-]
-
-This relation is represented by a parent map
-
-[
-\pi :
-\text{child}
-\rightarrow
-\text{parent}.
-]
-
-Together these maps form a containment graph.
-
-A cell therefore does not need to be a special object in the engine. It can be
-represented as a parent containing particles, nuclei, metabolites, or any other
-child sets.
-
-\begin{lstlisting}[style=yaml]
-sets:
-cell:
-n: 100
-
-membrane_particle:
-parent: cell
-per_parent: 64
-
-nucleus:
-parent: cell
-per_parent: 1
-
-metabolite:
-parent: cell
-per_parent: 50
-\end{lstlisting}
-
-The engine does not know what a cell is.
-
-It only knows sets and containment maps.
-
-\subsection*{Types}
-
-A set may contain several parameter variants called types.
-
-For example:
-
-\begin{lstlisting}[style=yaml]
-sets:
-cell:
-n: 100
-types:
-soft:
-fraction: 0.5
-youngs: 20
-
-```
-  stiff:
-    fraction: 0.5
-    youngs: 200
-```
-
-\end{lstlisting}
-
-The rule is simple:
-
-\begin{itemize}
-\item Different state or different operators $\rightarrow$ new set.
-\item Same state and operators, different parameters $\rightarrow$ type.
-\end{itemize}
-
-For example:
-
-\begin{center}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{lll}
-\toprule
-Object A & Object B & Representation \
-\midrule
-cell vs nucleus & different dynamics & two sets \
-cell vs metabolite & different dynamics & two sets \
-soft cell vs stiff cell & same dynamics & two types \
-\bottomrule
-\end{tabular}
-\end{center}
-
-\section{Fields}
-
-A field is a continuous quantity defined on a grid.
-
-Examples include:
-
-\begin{itemize}
-\item chemical concentration,
-\item pressure,
-\item activation,
-\item stiffness,
-\item extracellular signal,
-\item substrate properties.
-\end{itemize}
-
-A field is not part of the containment graph.
-
-Cells do not contain fields and fields do not contain cells.
-
-Instead, fields communicate with sets through operators.
-
-\begin{lstlisting}[style=yaml]
-fields:
-chemical:
-frame: grid
-res: 128
-diffusion: 0.1
-decay: 0.01
-\end{lstlisting}
-
-The same field abstraction can represent a morphogen, a pheromone, a pressure
-field, or an activation wave.
-
-\section{Operators}
-
-Operators are the verbs of Plexus.
-
-They move information, force, state, or membership through the system.
-
-There are seven operator families.
-
-\begin{center}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{lll}
-\toprule
-Operator & Relation & Purpose \
-\midrule
-Lateral & set $\leftrightarrow$ set & interaction within one set \
-Aggregate & child $\rightarrow$ parent & summarize upward \
-Broadcast & parent $\rightarrow$ child & copy downward \
-Exchange & set $\leftrightarrow$ field & push / pull \
-Rewire & relations & change neighbours \
-Divide & entities & create elements \
-Die & entities & remove elements \
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection*{Lateral}
-
-Interactions inside one set.
-
-Examples:
-
-\begin{itemize}
-\item attraction,
-\item repulsion,
-\item adhesion,
-\item flocking,
-\item signalling,
-\item graph diffusion.
-\end{itemize}
-
-\subsection*{Aggregate}
-
-Moves information upward.
-
-Examples:
-
-\begin{itemize}
-\item particle centroid $\rightarrow$ cell position,
-\item metabolite totals $\rightarrow$ cell state.
-\end{itemize}
-
-\subsection*{Broadcast}
-
-Moves information downward.
-
-Examples:
-
-\begin{itemize}
-\item cell polarity $\rightarrow$ particles,
-\item cell force $\rightarrow$ particles.
-\end{itemize}
-
-\subsection*{Exchange}
-
-Couples sets and fields.
-
-We use the language:
-
-[
-\text{Push}
-:
-\text{set}
-\rightarrow
-\text{field}
-]
-
-[
-\text{Pull}
-:
-\text{field}
-\rightarrow
-\text{set}.
-]
-
-Examples:
-
-\begin{itemize}
-\item secretion = push,
-\item sensing = pull,
-\item particle-to-grid = push,
-\item grid-to-particle = pull.
-\end{itemize}
-
-\subsection*{Rewire}
-
-Changes who interacts with whom.
-
-Examples:
-
-\begin{itemize}
-\item radius graph,
-\item nearest-neighbour graph,
-\item membrane graph.
-\end{itemize}
-
-\subsection*{Divide and Die}
-
-Change which elements exist.
-
-Together they make growth, proliferation, and death first-class operations.
-
-\section{Schedules}
-
-A simulation is a schedule of operators.
-
-\begin{lstlisting}[style=yaml]
-schedule:
-
-* aggregate
-* sense
-* motility
-* secrete
-* diffuse
-  \end{lstlisting}
-
-Each operator contributes a change.
-
-The schedule composes these changes and advances the system one step.
-
-Different operators may run at different rates. Fast mechanics can run every
-tick while slower processes such as diffusion, growth, or division run less
-frequently.
-
-The schedule therefore defines the dynamics of the system.
-
-\section{Summary}
-
-Plexus is built from four concepts:
-
-\begin{itemize}
-\item Sets store discrete objects.
-\item Fields store continuous quantities.
-\item Operators transform them.
-\item Schedules compose operators through time.
-\end{itemize}
-
-Everything else --- tissues, morphogenesis, active matter, neural systems,
-metabolism, reaction--diffusion systems, growth, and death --- emerges from
-combinations of these primitives.
-
-
-\part*{Part I --- The abstraction}
-\addcontentsline{toc}{section}{Part I --- The abstraction}
-
-\section{Two entities: typed sets and fields}
+\section{Two entities: sets and fields}
 \label{sec:entities}
 
-The container is built from two kinds of object: \textbf{typed sets} and
-\textbf{fields}. A typed set $S_\alpha$ is a discrete collection of entities of one
-biological \emph{sort}: membrane particles, cytoplasmic particles, nuclei,
-metabolites, cells, populations, or organisms (Fig.~\ref{fig:hier}). Each sort has
-its own state schema and its own admissible operators.
+The container is built from two kinds of object: \textbf{sets} and \textbf{fields}.
+A \textbf{set} $S_k$ is a discrete collection of like elements at one scale ---
+particles, cells, populations, organisms, or the compartments inside a cell:
+membrane particles, cytoplasm, nuclei, and metabolites (Fig.~\ref{fig:hier}). Every
+element of a set shares the same state schema and the same operators, and a set is
+stored as batched tensors --- never one object per element.
 
-Typed sets are connected by \textbf{parent maps}
+Sets are linked by \textbf{containment}. A parent map
 \[
-  \pi_{\alpha\to\beta}: S_\alpha \longrightarrow S_\beta,
+  \pi : S_k \longrightarrow S_{k+1}
 \]
-which assign each entity of sort $\alpha$ to the entity of sort $\beta$ that
-contains it. The \emph{fibre} of such a map over an entity $b\in S_\beta$ is its
-preimage --- everything that maps to $b$:
-\[
-  \pi_{\alpha\to\beta}^{-1}(b)=\{\,x\in S_\alpha : \pi_{\alpha\to\beta}(x)=b\,\}.
-\]
-The fibre of $\pi_{\text{particle}\to\text{cell}}$ over a cell $c$ is thus the set
-of particles inside $c$. A cell is not a single such fibre, however, but a
-\emph{bundle of fibres}: membrane particles, cytoplasmic particles, nuclei,
-metabolites, and other child sets all map to the same parent cell, and the cell is
-the union of those fibres. The next section makes this containment graph precise.
+sends each element to the parent that contains it --- a particle to its cell, a
+cell to its population. A cell is therefore not a single object but the collection
+of everything that maps to it: its particles, nucleus, metabolites, and any other
+child sets. Stacked across scales, these maps form the \emph{containment graph} of
+the next section.
 
-A \textbf{field} $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its
-own grid --- morphogen concentration, pressure, substrate stiffness, or
-extracellular chemical concentration. Fields are \emph{not} part of the containment
-graph: they do not contain cells, and cells do not contain fields. Instead, each
-field is coupled to one or more typed sets through \emph{exchange} operators ---
-secretion, sensing, particle--grid transfer, or field sampling
-(Section~\ref{sec:operators}).
+A \textbf{field} $f:\Omega\to\mathbb{R}^c$ is a continuous quantity defined on its
+own grid --- morphogen concentration, pressure, substrate stiffness, or an
+extracellular chemical. Fields are \emph{not} part of the containment graph: they
+do not contain cells, and cells do not contain fields. Instead, each field is
+coupled to one or more sets through \emph{exchange} operators --- secretion,
+sensing, particle--grid transfer, or field sampling (Section~\ref{sec:operators}).
 
 \begin{figure}[h]
 \centering
@@ -467,87 +104,69 @@ secretion, sensing, particle--grid transfer, or field sampling
 \draw[cont] (cell) -- node[right,font=\scriptsize,pos=0.5]{$\pi_1$} (pop);
 \draw[cont] (pop)  -- node[right,font=\scriptsize,pos=0.5]{$\pi_2$} (org);
 \end{tikzpicture}
-\caption{Containment across scales: each parent map $\pi$ sends an entity to the one
-that contains it. A cell is a \emph{bundle} of fibres --- here its particles and
-metabolites; in general also its membrane, nucleus, and other child sets
-(Section~\ref{sec:graph}).}
+\caption{Containment across scales: each parent map $\pi$ sends an element to the
+one that contains it. A cell is the collection of everything that maps to it ---
+here its particles and metabolites; in general also its membrane, nucleus, and
+other child sets (Section~\ref{sec:graph}).}
 \label{fig:hier}
 \end{figure}
 
-\section{A typed containment graph}
+\section{Containment: a graph of sets}
 \label{sec:graph}
 
-Section~\ref{sec:entities} named entities by their sort and joined them with parent
-maps. Two ideas make that precise, and they are what keep the code free of
-branching: the sets form a \emph{family} indexed by sort, and the parent maps form
-a \emph{graph} rather than a chain.
+Section~\ref{sec:entities} named the sets and joined them with parent maps. Two
+points make the container precise, and they are what keep the engine free of
+branching.
 
-\paragraph{A family of typed sets.} Rather than one set $S_0$ with a type function
-$\tau:S_0\to\{\text{membrane},\text{nucleus},\dots\}$, we take a family
-\[
-  S=\{\,S_\alpha\,\}_{\alpha\in A},
-\]
-one set per \emph{sort}, each carrying its own state schema, operators, and fields.
-The two are equivalent as sets --- the fibres $\tau^{-1}(\alpha)$ \emph{are} the
-$S_\alpha$ --- but the family is the computationally honest presentation: a single
-set with a type label forces every operator to branch on $\tau$ at run time (the
-spaghetti), whereas a family lets each operator declare \emph{one} sort statically
-(\code{at: nucleus}) and never branch. This is many-sorted set theory, the typed
-discipline an ECS or a relational database already uses.
+\paragraph{One set per kind of object.} Rather than a single set whose elements
+carry a label saying what each one is --- which forces every operator to ask
+``what am I looking at?'' at run time --- we keep \emph{one set per kind}: membrane
+particles, nuclei, metabolites, and cells are separate sets, each with its own
+state schema, operators, and fields. An operator then names the one set it acts on
+(\code{at: nucleus}) and never branches. This is the same discipline an
+entity--component system or a relational database already uses.
 
-\paragraph{Joined by containment maps.} The sorts are joined by parent maps,
-declared by naming the parent,
+\paragraph{Joined by containment maps.} The sets are joined by parent maps,
+declared simply by naming the parent,
 \[
-  \pi_{\alpha\to\beta} : S_\alpha \longrightarrow S_\beta,
+  \pi : S_k \longrightarrow S_{k+1},
 \]
-assigning every entity of sort $\alpha$ to a parent of sort $\beta$. A parent may
-have many children, so a cell is not one fibre but a \textbf{bundle of fibres},
-\[
-  \mathrm{Cell}(c)=\Big\{\, \pi_{\alpha\to\mathrm{cell}}^{-1}(c) \;:\; \alpha\in\mathrm{children}(\mathrm{cell}) \,\Big\}.
-\]
-The container is therefore a \emph{typed containment graph} --- a \textbf{DAG}
-(directed acyclic graph: the sorts are nodes, the parent maps are directed edges,
-and containment never cycles), shown in Fig.~\ref{fig:graph}; a DAG rather than a
-tree because a parent has \emph{many} children. Categorically it is a diagram of
-sets --- a functor from the containment graph (the shape) into $\mathbf{Set}$ ---
-and the old $S_0\to S_1\to S_2$ was just the chain-shaped case. Nothing leaves set
-theory; the \emph{shape} generalizes from a ladder to a graph. The shift from
-``level $k$ contains level $k{-}1$'' to ``sort $A$ is contained by sort $B$'' is
-what keeps the code clean: the engine needs only \code{Level.parent} (the index
-map) and \code{Level.parent\_name} (the edge); new biological structure is a new
+which send every element to the parent that contains it. A parent may have many
+children, so containment is a \textbf{graph}, not a chain: one cell gathers several
+child sets at once (Fig.~\ref{fig:graph}). The engine needs only two things ---
+\code{Level.parent} (which parent each element has) and \code{Level.parent\_name}
+(which set that parent belongs to) --- so new biological structure is just a new
 set and a parent map, never an engine change.
 
-\paragraph{A new set, or a new type?} The type function $\tau$ does not disappear;
-it is demoted. It no longer distinguishes \emph{kinds} --- it parameterizes a
-\emph{subpopulation of one kind}. Two groups that differ in state space or
-operators are different \emph{sorts} (separate sets); two groups that share both
-and differ only in parameter values are \emph{types within one set} (the $\tau$
-colouring, our \code{types:} block). Table~\ref{tab:sorts} is the rule, and it is
-the structural form of the category discipline of Section~\ref{sec:category}: a new
-\emph{kind} is a new set, a parametric \emph{variant} is a new type.
+\paragraph{A new set, or a new type?} The rule (Table~\ref{tab:sorts}): two groups
+that differ in \emph{state or operators} are \emph{different sets}; two groups that
+share both and differ only in \emph{parameter values} are \emph{types within one
+set} --- the \code{types:} block. A cell and a nucleus have different state and
+dynamics, so they are different sets; a soft cell and a stiff cell differ only in
+stiffness, so they are two types of the single cell set.
 
 \begin{table}[h]
 \centering\footnotesize
 \renewcommand{\arraystretch}{1.3}
 \begin{tabular}{@{}l p{5.1cm} p{5.1cm}@{}}
 \toprule
- & \textbf{Different sorts} (typed sets $S_\alpha$) & \textbf{Types within one sort} (the $\tau$ colouring) \\
+ & \textbf{Different sets} & \textbf{Types within one set} \\
 \midrule
 example     & membrane vs.\ nucleus vs.\ metabolite      & soft cell vs.\ stiff cell \\
 differ in   & state space $+$ operators                  & only parameter values \\
 in the spec & separate \code{sets:} with \code{parent:}   & a \code{types:} block inside one set \\
-dispatch    & by name (\code{at: nucleus})               & per-row param lookup $p[\tau(i)]$ \\
+dispatch    & by name (\code{at: nucleus})               & per-element parameter lookup \\
 \bottomrule
 \end{tabular}
 \caption{When to declare a new set versus a new type: a different \emph{kind}
-(state space or dynamics) $\Rightarrow$ a new sort; a parametric \emph{variant}
+(state space or dynamics) $\Rightarrow$ a new set; a parametric \emph{variant}
 $\Rightarrow$ a type within a set.}
 \label{tab:sorts}
 \end{table}
 
-Keeping operators typed is the payoff: \code{membrane\_tension} acts on
-\code{membrane\_particle}, \code{metabolism} on \code{metabolite},
-\code{gene\_regulation} on \code{nucleus}, and Exchange operators connect
+Keeping each operator attached to its own set is the payoff: \code{membrane\_tension}
+acts on \code{membrane\_particle}, \code{metabolism} on \code{metabolite}, and
+\code{gene\_regulation} on \code{nucleus}, while Exchange operators connect
 compartments explicitly (nucleus\,$\leftrightarrow$\,cytoplasm,
 membrane\,$\leftrightarrow$\,extracellular field) --- never one mega-operator
 branching on a role flag.
@@ -566,16 +185,16 @@ branching on a role flag.
 \node[leaf] (met) at (5.7,-2.0) {metabolite};
 \draw[cont] (mem) -- (cell); \draw[cont] (cyt) -- (cell);
 \draw[cont] (nuc) -- (cell); \draw[cont] (met) -- (cell);
-\node[cset,font=\scriptsize] at (-2.5,-1.05) {$\pi_{A\to\mathrm{cell}}$};
+\node[cset,font=\scriptsize] at (-2.5,-1.05) {$\pi$};
 \end{tikzpicture}
-\caption{A typed containment graph: one parent set (\code{cell}) with several child
-sets, each its own type with its own parent map $\pi_{A\to\mathrm{cell}}$. The cell
-entity is the bundle of these fibres --- not a bag of one kind of particle. A new
-compartment is a new row in the spec (Listing~\ref{lst:cell}), not an engine edit.}
+\caption{A containment graph: one parent set (\code{cell}) with several child
+sets, each with its own parent map. The cell is the collection of these children
+--- not a bag of one kind of particle. A new compartment is a new row in the spec
+(Listing~\ref{lst:cell}), not an engine edit.}
 \label{fig:graph}
 \end{figure}
 
-\begin{lstlisting}[style=yaml,caption={A cell as a bundle of child sets: each compartment is its own typed set with a parent map.},label=lst:cell]
+\begin{lstlisting}[style=yaml,caption={A cell as a collection of child sets: each compartment is its own set with a parent map.},label=lst:cell]
 sets:
   cell:               {n: 100}
   membrane_particle:  {parent: cell, per_parent: 64,  role: membrane}
@@ -600,7 +219,7 @@ exist. Those last three return no state delta. The four dynamics operators:
 \textbf{Lateral}\quad   & \mathcal{O}_E,\ E\subseteq S_k\times S_k
   &&\text{(ODE interaction $+$ graph Laplacian)}\\
 \textbf{Aggregate}\ \uparrow\quad & \textstyle\sum_{\pi}: S_k \to S_{k+1}
-  &&\text{(reduction over fibres of $\pi$)}\\
+  &&\text{(reduction over children of $\pi$)}\\
 \textbf{Broadcast}\ \downarrow\quad & \pi^{*}: S_{k+1}\to S_k
   &&\text{(lift along $\pi$)}\\
 \textbf{Exchange}\quad  & \mathcal{S},\mathcal{G}: S_k \leftrightarrow F
@@ -620,13 +239,13 @@ adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities
 over the edges. Examples: particle--particle elasticity, cell--cell flocking or
 adhesion, neuron--neuron signal propagation.
 
-\paragraph{Aggregate $\textstyle\sum_\pi$ (up).} Pools each parent's fibre into one
-quantity --- a cell's position is the mean of its particles, its metabolic state the
+\paragraph{Aggregate $\textstyle\sum_\pi$ (up).} Pools each parent's children into
+one quantity --- a cell's position is the mean of its particles, its metabolic state the
 sum over its molecules. This is how fine-scale dynamics are summarised into, and so
 move, the coarser object above.
 
 \paragraph{Broadcast $\pi^{*}$ (down).} The adjoint of Aggregate: it copies a
-parent's state to every child in its fibre, so a decision taken at the cell level
+parent's state to each of its children, so a decision taken at the cell level
 (a body force, a polarity, a signalling output) is applied identically to all of
 that cell's particles. Aggregate and Broadcast are a matched up/down pair on the
 same map $\pi$.
@@ -689,10 +308,10 @@ Everything else assumes the cells it acts on already exist.
 \begin{scope}[shift={(96mm,0)},local bounding box=E]
   \node[n] (o1){}; \node[n,below=5mm of o1](o2){};
   \node[g,right=8mm of o1](g1){}; \node[g,below=0mm of g1](g2){};
-  \draw[a,transform canvas={yshift=0.6mm}] (o1)-- node[above,font=\tiny]{$\mathcal{S}$}(g1);
-  \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{$\mathcal{G}$}(o2);
+  \draw[a,transform canvas={yshift=0.6mm}] (o1)-- node[above,font=\tiny]{push}(g1);
+  \draw[a,cfield,transform canvas={yshift=-0.6mm}] (g2)-- node[below,font=\tiny]{pull}(o2);
 \end{scope}
-\node[below=1mm of E,align=center]{\textbf{Exchange}\\$\mathcal{S},\mathcal{G}$};
+\node[below=1mm of E,align=center]{\textbf{Exchange}\\push\,/\,pull};
 % --- structure operators (rewire the edges E, change the node set |S|) ---
 \begin{scope}[shift={(128mm,2mm)},local bounding box=RW]
   \node[n] (rc){};
@@ -792,15 +411,15 @@ of per-domain code.
 \toprule
 \textbf{Concept} & \textbf{Set/operator term} & \textbf{Symbol} & \textbf{Code} \\
 \midrule
-collection of like nodes & set (a sort)         & $S_\alpha$                  & \code{Level} \\
+collection of like nodes & set (a level)        & $S_k$                       & \code{Level} \\
 a single node            & element              & $x\in S_k$                  & row of \code{Level.state} \\
 learnable per-node code  & embedding            & $a_i$                       & \code{Level.embedding} \\
-containment              & parent map (by name) & $\pi_{A\to B}\!:\!S_A\!\to\!S_B$& \code{.parent}, \code{.parent\_name} \\
+containment              & parent map           & $\pi_k\!:\!S_k\!\to\!S_{k+1}$& \code{.parent}, \code{.parent\_name} \\
 within-set links         & relation             & $E\subseteq S_k\times S_k$  & \code{Level.edge\_index} \\
 continuum quantity       & field                & $f:\Omega\to\mathbb{R}^c$   & \code{Field} \\
 dynamics (GNN)           & operator: ODE+Laplacian & $\mathcal{O}$            & \code{Operator} \\
 within-set op            & lateral              & $\mathcal{O}_E$             & \code{Lateral} \\
-up op                    & reduction over fibres& $\sum_\pi$                  & \code{Aggregate} \\
+up op                    & reduction over children& $\sum_\pi$                & \code{Aggregate} \\
 down op                  & lift                 & $\pi^{*}$                   & \code{Broadcast} \\
 set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \code{Exchange} \\
 rebuild the relation     & relations: rewire    & $\mathcal{R}\!:\,\to\!E$     & \code{Rewire} \\
@@ -943,8 +562,8 @@ operator name         & run that operator this tick                  & \code{sen
 \code{colormap}, \code{point\_size}, \code{background} & how the sets are drawn & \code{background: black}\\
 \bottomrule
 \end{tabular}
-\caption{The simulation language. Each block is a category with its own home in
-the spec (Section~\ref{sec:category}): \code{general:} is the world and clock,
+\caption{The simulation language. Each block has its own home in
+the spec: \code{general:} is the world and clock,
 \code{sets:} are the entities, \code{operators:} the dynamics, \code{schedule:}
 the composition, \code{plotting:} the style. Integration is implicit (each set is
 integrated once at the end of a tick), so there is no \code{integrate} token.}
@@ -1069,9 +688,10 @@ structure), it follows fixed rules; the most useful:
       subpopulation and lets two behaviours coexist.
 \end{enumerate}
 
-Throughout, the mapping respects the categories of Section~\ref{sec:category}: a
-\emph{behaviour} becomes an operator, a \emph{kind of node} a type, the
-\emph{space} the \code{general:} block --- never the reverse.
+Throughout, the mapping respects the set/field/operator split of
+Section~\ref{sec:graph}: a \emph{behaviour} becomes an operator, a \emph{kind of
+node} a set (or a type within one), the \emph{space} the \code{general:} block ---
+never the reverse.
 
 \section{A spread of simulations from one registry}
 
@@ -1713,7 +1333,7 @@ Mathlib & Operator registry & reusable library of primitives \\
 
 Several rows deserve explanation.
 
-A typed set in Plexus plays a role similar to a type in Lean. Just as Lean
+A set in Plexus plays a role similar to a type in Lean. Just as Lean
 distinguishes natural numbers from matrices or groups, Plexus distinguishes cells,
 particles, metabolites, nuclei, and fields. Operators declare which kinds of
 objects they act upon, exactly as functions declare their input types.
