@@ -1,5 +1,5 @@
 ---
-title: "The inverse problem"
+title: "The slime inverse problem"
 subtitle: "Recovering the generating spec from a simulation"
 ---
 
