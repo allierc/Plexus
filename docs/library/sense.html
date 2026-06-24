@@ -230,7 +230,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">sense</h1>
-<p class="subtitle lead">Field -&gt; set. Sample the field at 3 sensors, turn the heading.</p>
+<p class="subtitle lead">Field -&gt; set. Sample the field on a sensor fan around the heading, steer.</p>
 </div>
 
 
@@ -250,7 +250,7 @@ window.Quarto = {
 <div class="op-head">
 <p><img src="../figures/icons/exchange.png" class="op-logo img-fluid"></p>
 <p><span class="op-badge"><code>exchange</code></span> <span class="op-badge"><code>acts on: cell</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
-<p>Field -&gt; set. Sample the field at 3 sensors, turn the heading.</p>
+<p>Field -&gt; set. Sample the field on a sensor fan around the heading, steer.</p>
 </div>
 <style>
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
@@ -277,18 +277,24 @@ window.Quarto = {
 <li><strong>Reads</strong> — <code>from</code>, <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>, <code>sensor_size</code> (per-type props: <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>, <code>sensor_size</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
-<li><strong>Dimensions</strong> — 2D.</li>
+<li><strong>Dimensions</strong> — 2D, 3D.</li>
 </ul>
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>Each agent reads the field at three sensors (ahead-left / ahead / ahead-right), each a windowed, species-weighted sum (own channel +1, other channels <code>cross</code>), then turns its heading toward the strongest reading (Lague’s 4-branch steer, scaled by a random strength). Reads per-agent sensor parameters the engine broadcast from <code>types</code>. Mutates <code>cell.heading</code> in place; returns {}.</p>
+<p>The Physarum/Jones sensing rule, written once for any dimension (the dimension contract). Each agent reads the field at a CENTRE sensor along its heading plus a fan of sensors tilted by <code>sensor_angle</code> around it, then steers toward the strongest: if the centre wins it goes straight, otherwise it rotates its heading toward the winning sensor by a random amount up to <code>turn_speed</code>.</p>
+<p>The only dimensional specialisation is how the tilted sensor directions are generated around the heading – everything else (the windowed species-weighted read, the steer, the occupancy mask) is identical:</p>
+<ul>
+<li>2D: the plane perpendicular to the heading is a line, so the fan is the two sensors ahead-left / ahead-right (K = 2 ring + centre = 3 sensors, Lague’s fan).</li>
+<li>3D: the perpendicular plane is 2D, so the fan is a RING of <code>_RING</code> sensors around the heading cone (K = _RING + centre = 7 sensors).</li>
+</ul>
+<p><code>heading</code> is a unit VECTOR [N, D] in every dimension. Replaces the old scalar-angle 2D <code>sense</code> and the <code>sense_3d</code> cone counterpart with one operator. Reads per-agent sensor parameters the engine broadcast from <code>types</code>. Mutates <code>cell.heading</code> in place; returns {}.</p>
 <p><span class="math display">\[
 S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\sum_{s\ne\text{own}}\!\! c_s(\mathbf p)\Big),
-\quad k\in\{L,C,R\};
+\quad k\in\{C\}\cup\text{fan};
 \qquad
-\theta_i \leftarrow \theta_i + \Delta\theta\cdot\operatorname*{arg\,turn}_k S_k
-\]</span> Reads the field in three windows <span class="math inline">\(W_k\)</span> (ahead-left / ahead / ahead-right), each a species-weighted sum (own channel <span class="math inline">\(+1\)</span>, others <span class="math inline">\(\kappa\)</span> = <code>cross</code>), and turns the heading toward the strongest (Lague’s 4-branch steer).</p>
+\hat{\mathbf h}_i \leftarrow \mathrm{normalize}\big(\hat{\mathbf h}_i + \omega\,\mathbf r_{k^\star}\big)
+\]</span> Dimension-generic Physarum sensing: a centre sensor along <span class="math inline">\(\hat{\mathbf h}\)</span> plus a fan tilted by <code>sensor_angle</code> – two sensors (ahead-left / ahead-right) in 2D, a ring of <span class="math inline">\(K\)</span> in 3D. Each window <span class="math inline">\(W_k\)</span> is a species-weighted sum (own channel <span class="math inline">\(+1\)</span>, others <span class="math inline">\(\kappa\)</span> = <code>cross</code>). If a fan direction <span class="math inline">\(k^\star\)</span> beats the centre, rotate <span class="math inline">\(\hat{\mathbf h}\)</span> toward it (up to <code>turn_speed</code> <span class="math inline">\(\omega\)</span>) and renormalise.</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
@@ -326,104 +332,156 @@ S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\s
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>exchange</strong> operators: <a href="../library/deposit.html"><code>deposit</code></a>, <a href="../library/sense_3d.html"><code>sense_3d</code></a>, <a href="../library/chemotaxis.html"><code>chemotaxis</code></a>, <a href="../library/pulse_to_contraction.html"><code>pulse_to_contraction</code></a>, <a href="../library/pulse_to_active_stress.html"><code>pulse_to_active_stress</code></a>, <a href="../library/apply_material_map.html"><code>apply_material_map</code></a>.</p>
+<p>Other <strong>exchange</strong> operators: <a href="../library/deposit.html"><code>deposit</code></a>, <a href="../library/chemotaxis.html"><code>chemotaxis</code></a>, <a href="../library/pulse_to_contraction.html"><code>pulse_to_contraction</code></a>, <a href="../library/pulse_to_active_stress.html"><code>pulse_to_active_stress</code></a>, <a href="../library/apply_material_map.html"><code>apply_material_map</code></a>, <a href="../library/mls_mpm_mechanics.html"><code>mls_mpm_mechanics</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
 <p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/sense.py"><code>src/plexus/operators/sense.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""sense -- field -&gt; set. Sample the field at 3 sensors, turn the heading.</span></span>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""sense -- field -&gt; set. Sample the field on a sensor fan around the heading, steer.</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">Each agent reads the field at three sensors (ahead-left / ahead / ahead-right),</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">each a windowed, species-weighted sum (own channel +1, other channels `cross`),</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">then turns its heading toward the strongest reading (Lague's 4-branch steer, scaled</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">by a random strength). Reads per-agent sensor parameters the engine broadcast from</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">`types`. Mutates `cell.heading` in place; returns {}.</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Exchange</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">The Physarum/Jones sensing rule, written once for any dimension (the dimension</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">contract). Each agent reads the field at a CENTRE sensor along its heading plus a</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">fan of sensors tilted by `sensor_angle` around it, then steers toward the strongest:</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">if the centre wins it goes straight, otherwise it rotates its heading toward the</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">winning sensor by a random amount up to `turn_speed`.</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">The only dimensional specialisation is how the tilted sensor directions are</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">generated around the heading -- everything else (the windowed species-weighted</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">read, the steer, the occupancy mask) is identical:</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">* 2D: the plane perpendicular to the heading is a line, so the fan is the two</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">  sensors ahead-left / ahead-right (K = 2 ring + centre = 3 sensors, Lague's fan).</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">* 3D: the perpendicular plane is 2D, so the fan is a RING of `_RING` sensors around</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">  the heading cone (K = _RING + centre = 7 sensors).</span></span>
 <span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _sense_at(fld, pos, heading, angle_off, sensor_dist, sensor_size, weights):</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Windowed, species-weighted trail read at one sensor (field-&gt;scalar per agent).</span></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co">    Sum over a (2k+1)^2 window around the sensor centre of dot(weights, grid[:,x,y]);</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="co">    per-agent `sensor_size` masks offsets outside each agent's own window.</span></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> heading <span class="op">+</span> angle_off</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    cx, cy <span class="op">=</span> fld.pix(pos[:, <span class="dv">0</span>] <span class="op">+</span> torch.cos(a) <span class="op">*</span> sensor_dist,</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>                     pos[:, <span class="dv">1</span>] <span class="op">+</span> torch.sin(a) <span class="op">*</span> sensor_dist)</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    N <span class="op">=</span> pos.shape[<span class="dv">0</span>]</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    out <span class="op">=</span> pos.new_zeros(N)</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    g <span class="op">=</span> fld.grid                                          <span class="co"># [C, nx, ny]</span></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    ks <span class="op">=</span> <span class="bu">int</span>(sensor_size.<span class="bu">max</span>().item()) <span class="cf">if</span> torch.is_tensor(sensor_size) <span class="cf">else</span> <span class="bu">int</span>(sensor_size)</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    ssz <span class="op">=</span> (sensor_size <span class="cf">if</span> torch.is_tensor(sensor_size)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>           <span class="cf">else</span> torch.full((N,), <span class="bu">float</span>(sensor_size), device<span class="op">=</span>pos.device))</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> ox <span class="kw">in</span> <span class="bu">range</span>(<span class="op">-</span>ks, ks <span class="op">+</span> <span class="dv">1</span>):</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        px <span class="op">=</span> (cx <span class="op">+</span> ox).clamp(<span class="dv">0</span>, fld.nx <span class="op">-</span> <span class="dv">1</span>)</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> oy <span class="kw">in</span> <span class="bu">range</span>(<span class="op">-</span>ks, ks <span class="op">+</span> <span class="dv">1</span>):</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>            py <span class="op">=</span> (cy <span class="op">+</span> oy).clamp(<span class="dv">0</span>, fld.ny <span class="op">-</span> <span class="dv">1</span>)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>            inwin <span class="op">=</span> ((<span class="bu">abs</span>(ox) <span class="op">&lt;=</span> ssz) <span class="op">&amp;</span> (<span class="bu">abs</span>(oy) <span class="op">&lt;=</span> ssz)).<span class="bu">float</span>()</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>            vals <span class="op">=</span> g[:, px, py].t()                       <span class="co"># [N, C]</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>            out <span class="op">=</span> out <span class="op">+</span> (weights <span class="op">*</span> vals).<span class="bu">sum</span>(<span class="dv">1</span>) <span class="op">*</span> inwin</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> out</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"sense"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Sense(Exchange):</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"from"</span>]</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>    REQUIRES_TYPE_PROPS <span class="op">=</span> [<span class="st">"turn_speed"</span>, <span class="st">"sensor_angle"</span>, <span class="st">"sensor_dist"</span>, <span class="st">"sensor_size"</span>]</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"trail_following"</span>, <span class="st">"stigmergy"</span>, <span class="st">"physarum_sensing"</span>]</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    MORPHOLOGY_PRIOR <span class="op">=</span> [<span class="st">"filaments"</span>, <span class="st">"transport_network"</span>]</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"cross"</span>: <span class="st">"inter_species_coupling_sign"</span>}</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">`heading` is a unit VECTOR [N, D] in every dimension. Replaces the old scalar-angle</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">2D `sense` and the `sense_3d` cone counterpart with one operator. Reads per-agent</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co">sensor parameters the engine broadcast from `types`. Mutates `cell.heading` in</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co">place; returns {}.</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> itertools</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Exchange</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>_RING <span class="op">=</span> <span class="dv">6</span>                                                  <span class="co"># 3D sensors around the heading axis</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _perp_basis(h):</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""D-1 orthonormal unit vectors spanning the plane perpendicular to each heading</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="co">    h [N, D]. In 2D the perpendicular is unique; in 3D we build two (robust to h ~</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="co">    +/-z by falling back to a different reference there)."""</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    D <span class="op">=</span> h.shape[<span class="dv">1</span>]</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> [torch.stack([<span class="op">-</span>h[:, <span class="dv">1</span>], h[:, <span class="dv">0</span>]], dim<span class="op">=</span><span class="dv">1</span>)]   <span class="co"># the unique perpendicular</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    ref <span class="op">=</span> h.new_tensor([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>]).expand_as(h)</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    u <span class="op">=</span> torch.cross(h, ref, dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>    small <span class="op">=</span> u.norm(dim<span class="op">=</span><span class="dv">1</span>) <span class="op">&lt;</span> <span class="fl">1e-4</span>                            <span class="co"># h nearly parallel to z</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>    ref2 <span class="op">=</span> h.new_tensor([<span class="fl">0.0</span>, <span class="fl">1.0</span>, <span class="fl">0.0</span>]).expand_as(h)</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>    u <span class="op">=</span> torch.where(small[:, <span class="va">None</span>], torch.cross(h, ref2, dim<span class="op">=</span><span class="dv">1</span>), u)</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    u <span class="op">=</span> u <span class="op">/</span> u.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    v <span class="op">=</span> torch.cross(h, u, dim<span class="op">=</span><span class="dv">1</span>)                            <span class="co"># (h, u, v) orthonormal</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [u, v]</span>
 <span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"from"</span>)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cross <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"cross"</span>, <span class="op">-</span><span class="fl">1.0</span>))    <span class="co"># sense weight on OTHER species' channels</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"cell"</span>)</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        N <span class="op">=</span> lvl.n</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.state[:, :<span class="dv">2</span>]</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        h <span class="op">=</span> lvl.heading</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        C <span class="op">=</span> fld.C</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        nt <span class="op">=</span> lvl.node_type</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _ring_dirs(h, ca, sa):</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""The tilted sensor directions around the heading: `cos(ang)*h + sin(ang)*r` for</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a><span class="co">    each unit r in the perpendicular plane. 2D -&gt; {ahead-left, ahead-right}; 3D -&gt; a</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="co">    ring of `_RING` directions. Returns a list of [N, D] unit vectors."""</span></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>    D <span class="op">=</span> h.shape[<span class="dv">1</span>]</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>    basis <span class="op">=</span> _perp_basis(h)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        rs <span class="op">=</span> [basis[<span class="dv">0</span>], <span class="op">-</span>basis[<span class="dv">0</span>]]                         <span class="co"># left / right</span></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        u, v <span class="op">=</span> basis</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        rs <span class="op">=</span> [math.cos(<span class="fl">2.0</span> <span class="op">*</span> math.pi <span class="op">*</span> k <span class="op">/</span> _RING) <span class="op">*</span> u <span class="op">+</span> math.sin(<span class="fl">2.0</span> <span class="op">*</span> math.pi <span class="op">*</span> k <span class="op">/</span> _RING) <span class="op">*</span> v</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>              <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(_RING)]</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [ca <span class="op">*</span> h <span class="op">+</span> sa <span class="op">*</span> r <span class="cf">for</span> r <span class="kw">in</span> rs]</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        ts <span class="op">=</span> lvl.turn_speed</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        ang <span class="op">=</span> lvl.sensor_angle <span class="op">*</span> (math.pi <span class="op">/</span> <span class="fl">180.0</span>)        <span class="co"># SpeciesSettings is in degrees</span></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        sd <span class="op">=</span> lvl.sensor_dist</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        ssz <span class="op">=</span> lvl.sensor_size</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="co"># senseWeight: +1 on own channel, `cross` on the others</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        w <span class="op">=</span> torch.full((N, C), <span class="va">self</span>.cross, device<span class="op">=</span>dev)</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        w[torch.arange(N, device<span class="op">=</span>dev), nt] <span class="op">=</span> <span class="fl">1.0</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        wF <span class="op">=</span> _sense_at(fld, pos, h, <span class="fl">0.0</span>, sd, ssz, w)</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        wL <span class="op">=</span> _sense_at(fld, pos, h, ang, sd, ssz, w)</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        wR <span class="op">=</span> _sense_at(fld, pos, h, <span class="op">-</span>ang, sd, ssz, w)</span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>        rnd <span class="op">=</span> torch.rand(N, generator<span class="op">=</span>H.rng, device<span class="op">=</span>dev)</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        straight <span class="op">=</span> (wF <span class="op">&gt;</span> wL) <span class="op">&amp;</span> (wF <span class="op">&gt;</span> wR)</span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        randturn <span class="op">=</span> (wF <span class="op">&lt;</span> wL) <span class="op">&amp;</span> (wF <span class="op">&lt;</span> wR)</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        turn <span class="op">=</span> torch.where(</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>            straight, torch.zeros_like(h),</span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>            torch.where(randturn, (rnd <span class="op">-</span> <span class="fl">0.5</span>) <span class="op">*</span> <span class="fl">2.0</span> <span class="op">*</span> ts,</span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>            torch.where(wR <span class="op">&gt;</span> wL, <span class="op">-</span>rnd <span class="op">*</span> ts,</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>            torch.where(wL <span class="op">&gt;</span> wR, rnd <span class="op">*</span> ts, torch.zeros_like(h)))))</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> h <span class="op">+</span> turn</span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> (mask.<span class="bu">float</span>() <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> torch.ones(N, device<span class="op">=</span>dev)) <span class="op">*</span> lvl.occ</span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> m <span class="op">&gt;</span> <span class="dv">0</span>                                       <span class="co"># only live, selected agents turn</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>        lvl.heading <span class="op">=</span> torch.where(keep, new_h, h)</span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _read(fld, centers, weights, ssz):</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Windowed, species-weighted trail read at one D-dim sensor (field-&gt;scalar/agent).</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a><span class="co">    Sums dot(weights, grid[:, *window]) over a (2k+1)^D voxel window around each</span></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a><span class="co">    sensor centre [N, D]; per-agent `ssz` masks offsets outside that agent's own</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a><span class="co">    window (the 2D `sensor_size` semantics, generalised to N-D)."""</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>    D <span class="op">=</span> centers.shape[<span class="dv">1</span>]</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>    gidx <span class="op">=</span> fld.pix(<span class="op">*</span>[centers[:, k] <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D)])     <span class="co"># D-tuple of [N] index tensors</span></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>    g <span class="op">=</span> fld.grid                                           <span class="co"># [C, *shape]</span></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>    N <span class="op">=</span> centers.shape[<span class="dv">0</span>]</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>    out <span class="op">=</span> centers.new_zeros(N)</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>    ssz <span class="op">=</span> ssz <span class="cf">if</span> torch.is_tensor(ssz) <span class="cf">else</span> centers.new_full((N,), <span class="bu">float</span>(ssz))</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>    ks <span class="op">=</span> <span class="bu">int</span>(ssz.<span class="bu">max</span>().item())</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>    shape <span class="op">=</span> fld.shape</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> off <span class="kw">in</span> itertools.product(<span class="bu">range</span>(<span class="op">-</span>ks, ks <span class="op">+</span> <span class="dv">1</span>), repeat<span class="op">=</span>D):</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        idx <span class="op">=</span> <span class="bu">tuple</span>((gidx[k] <span class="op">+</span> off[k]).clamp(<span class="dv">0</span>, shape[k] <span class="op">-</span> <span class="dv">1</span>) <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D))</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        inwin <span class="op">=</span> torch.ones(N, dtype<span class="op">=</span>torch.<span class="bu">bool</span>, device<span class="op">=</span>centers.device)</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> o <span class="kw">in</span> off:</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>            inwin <span class="op">=</span> inwin <span class="op">&amp;</span> (<span class="bu">abs</span>(o) <span class="op">&lt;=</span> ssz)</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        vals <span class="op">=</span> g[(<span class="bu">slice</span>(<span class="va">None</span>),) <span class="op">+</span> idx].t()                 <span class="co"># [N, C]</span></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        out <span class="op">=</span> out <span class="op">+</span> (weights <span class="op">*</span> vals).<span class="bu">sum</span>(<span class="dv">1</span>) <span class="op">*</span> inwin.<span class="bu">float</span>()</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> out</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"sense"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Sense(Exchange):</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                      <span class="co"># dimension-generic (heading is a [N,D] unit vector)</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"from"</span>]</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>    REQUIRES_TYPE_PROPS <span class="op">=</span> [<span class="st">"turn_speed"</span>, <span class="st">"sensor_angle"</span>, <span class="st">"sensor_dist"</span>, <span class="st">"sensor_size"</span>]</span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"trail_following"</span>, <span class="st">"stigmergy"</span>, <span class="st">"physarum_sensing"</span>]</span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>    MORPHOLOGY_PRIOR <span class="op">=</span> [<span class="st">"filaments"</span>, <span class="st">"transport_network"</span>]</span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"cross"</span>: <span class="st">"inter_species_coupling_sign"</span>}</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"from"</span>)</span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cross <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"cross"</span>, <span class="op">-</span><span class="fl">1.0</span>))      <span class="co"># sense weight on OTHER species' channels</span></span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"cell"</span>)</span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>        N <span class="op">=</span> lvl.n</span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)                               <span class="co"># [N, D]</span></span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>        h <span class="op">=</span> lvl.heading                                    <span class="co"># [N, D] unit heading</span></span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>        C <span class="op">=</span> fld.C</span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>        nt <span class="op">=</span> lvl.node_type</span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>        ts <span class="op">=</span> lvl.turn_speed                                <span class="co"># [N]</span></span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>        ang <span class="op">=</span> lvl.sensor_angle <span class="op">*</span> (math.pi <span class="op">/</span> <span class="fl">180.0</span>)         <span class="co"># SpeciesSettings in degrees -&gt; rad [N]</span></span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>        sd <span class="op">=</span> lvl.sensor_dist[:, <span class="va">None</span>]                      <span class="co"># [N, 1]</span></span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>        ssz <span class="op">=</span> lvl.sensor_size                              <span class="co"># [N] per-agent window half-width</span></span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>        ca, sa <span class="op">=</span> torch.cos(ang)[:, <span class="va">None</span>], torch.sin(ang)[:, <span class="va">None</span>]</span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>        <span class="co"># senseWeight: +1 on own channel, `cross` on the others</span></span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>        w <span class="op">=</span> torch.full((N, C), <span class="va">self</span>.cross, device<span class="op">=</span>dev)</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>        w[torch.arange(N, device<span class="op">=</span>dev), nt] <span class="op">=</span> <span class="fl">1.0</span></span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>        centre <span class="op">=</span> _read(fld, pos <span class="op">+</span> h <span class="op">*</span> sd, w, ssz)          <span class="co"># [N] sensor straight ahead</span></span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>        dirs <span class="op">=</span> _ring_dirs(h, ca, sa)                       <span class="co"># list of [N, D] tilted directions</span></span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>        ring <span class="op">=</span> torch.stack([_read(fld, pos <span class="op">+</span> d <span class="op">*</span> sd, w, ssz) <span class="cf">for</span> d <span class="kw">in</span> dirs], dim<span class="op">=</span><span class="dv">1</span>)   <span class="co"># [N, K]</span></span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>        stacked <span class="op">=</span> torch.stack(dirs, dim<span class="op">=</span><span class="dv">1</span>)                 <span class="co"># [N, K, D]</span></span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>        best_val, best_idx <span class="op">=</span> ring.<span class="bu">max</span>(<span class="dv">1</span>)                   <span class="co"># strongest fan sensor</span></span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>        target <span class="op">=</span> stacked[torch.arange(N, device<span class="op">=</span>dev), best_idx]        <span class="co"># [N, D]</span></span>
+<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a>        straight <span class="op">=</span> centre <span class="op">&gt;=</span> best_val                      <span class="co"># centre wins -&gt; keep heading</span></span>
+<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a>        theta <span class="op">=</span> (torch.rand(N, generator<span class="op">=</span>H.rng, device<span class="op">=</span>dev) <span class="op">*</span> ts)[:, <span class="va">None</span>]            <span class="co"># turn angle &lt;= turn_speed</span></span>
+<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a>        t_perp <span class="op">=</span> target <span class="op">-</span> (target <span class="op">*</span> h).<span class="bu">sum</span>(<span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>) <span class="op">*</span> h         <span class="co"># toward target, perp to h</span></span>
+<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a>        t_perp <span class="op">=</span> t_perp <span class="op">/</span> t_perp.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>        turned <span class="op">=</span> torch.cos(theta) <span class="op">*</span> h <span class="op">+</span> torch.sin(theta) <span class="op">*</span> t_perp      <span class="co"># rotate h by theta toward target</span></span>
+<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> torch.where(straight[:, <span class="va">None</span>], h, turned)</span>
+<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> new_h <span class="op">/</span> new_h.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>        m <span class="op">=</span> (mask.<span class="bu">float</span>() <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> torch.ones(N, device<span class="op">=</span>dev)) <span class="op">*</span> lvl.occ</span>
+<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> (m <span class="op">&gt;</span> <span class="dv">0</span>)[:, <span class="va">None</span>]                            <span class="co"># only live, selected agents turn</span></span>
+<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a>        lvl.heading <span class="op">=</span> torch.where(keep, new_h, h)</span>
+<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
