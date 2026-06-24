@@ -25,7 +25,7 @@ forces between them, cells and their contacts, neurons and synapses,
 molecular species and reactions. Each existing framework commits to one such
 graph and models that layer alone. But a living system is several of these at once, nested inside one
 another: particles make up cells, and cells make up tissues and populations.
-And every level is coupled to continuous fields — a morphogen gradient, a
+And every level may be coupled to continuous fields — a morphogen gradient, a
 pressure field, a chemical signal — that the discrete entities both shape and
 read. Choose any single graph and you capture one slice — the couplings
 *between* slices, where much of the biology lives, fall outside it.
@@ -38,7 +38,7 @@ set), **aggregate** (upward), **broadcast** (downward), and **exchange** (betwee
 sets and fields). Complex simulations emerge from composing a few primitive
 operations.
 
-![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* scatters ($\mathcal{S}$) to and gathers ($\mathcal{G}$) from a field.](figures/fig_ops.png){width=70% fig-align="center"}
+![The four operators. *Lateral* acts within a set; *Aggregate* and *Broadcast* move across containment $\pi$; *Exchange* pushes ($\mathcal{S}$) to and pulls ($\mathcal{G}$) from a field.](figures/fig_ops.png){width=70% fig-align="center"}
 
 ## A language *and* a calculus — two layers that never touch
 
@@ -48,21 +48,25 @@ Plexus is two things at once, kept strictly apart:
   the sets, fields, operators, and schedule of a system. This is *what* a living
   system is.
 - a **calculus** — the registered operators and the engine that composes and
-  integrates them. A simulation is a multi-rate composition of operators,
+  integrates them. A simulation is a composition of operators,
   declared as a `Schedule`; in math terms, one tick is the composition
   $\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$, iterated as
   $x_{t+1}=\Phi(x_t)$ and kept differentiable throughout. This is *how* it
   evolves.
 
-Both layers are built from **explicit, named primitives** — not the latent
-variables a world model learns for prediction. And because those primitives are
-explicit *and* differentiable, the same language serves prediction, inverse
-inference, and the optimization of biological designs alike.
+Both layers are built from **explicit, named primitives**. And because those
+primitives are explicit *and* differentiable, the same language serves
+prediction, inverse inference, and the optimization of biological designs alike.
 
 The two meet at exactly one place — the validated spec — and **never touch
-directly**. The LLM owns everything *above* the spec (intent → specification);
-the code owns everything *below* it (the operators). The LLM never writes engine
-code; the engine never sees natural language. The spec is the contract between
+directly**. The code owns everything *below* the spec: the registered operators
+and the engine that runs them. The language owns everything *above* it: the spec
+that names the sets, fields, operators, and schedule of a system.
+
+This separation becomes important the moment the framework is connected to an
+**LLM**. The LLM works only in the language layer — it reads, edits, and
+generates the spec — and never touches the codebase: it never writes engine code,
+and the engine never sees natural language. The spec is the contract between
 them: small, typed, and human-auditable.
 
 The practical payoff: a new behaviour is a new sentence in the language, not a

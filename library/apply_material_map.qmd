@@ -33,7 +33,7 @@ A static image FIELD read from a TIFF, plus `apply_material_map`,
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field scatter / gather.
+- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field push / pull.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `from`, `target`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

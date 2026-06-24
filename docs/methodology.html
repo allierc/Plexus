@@ -231,7 +231,7 @@ window.Quarto = {
 </header>
 
 
-<p>The prototype’s purpose was not the tissue physics but figuring out <em>how an LLM should drive a registry of low-level operators</em>. The answer is a strict two-layer split that meets only at one declarative, validated file — the <strong>spec</strong> (<code>spec.yaml</code>). In effect this is a small domain-specific language: the spec is the <em>source</em>, the registered operators are the <em>primitives</em>, and the engine is the <em>interpreter</em>.</p>
+<p>An LLM should never write engine code, and the engine should never read natural language. The whole methodology follows from holding those two apart and letting them meet at exactly one place: a declarative, validated file — the <strong>spec</strong> (<code>spec.yaml</code>). Everything <em>above</em> the spec is language — intent turned into a specification; everything <em>below</em> it is code — the registered operators and the engine that runs them. The spec is the contract between them, and it behaves like a small domain-specific language: the spec is the <em>source</em>, the registered operators are the <em>primitives</em>, and the engine is the <em>interpreter</em>.</p>
 <section id="two-layers-and-the-contract-between-them" class="level2">
 <h2 class="anchored" data-anchor-id="two-layers-and-the-contract-between-them">Two layers and the contract between them</h2>
 <div class="cell" data-layout-align="default">

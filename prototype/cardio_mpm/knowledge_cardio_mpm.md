@@ -53,7 +53,19 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
 
 ## Knowledge Base
 
-### Comparison Table
+### Comparison Table — Phase 2 (PARAMETRIC INVERSE, real-beat interior R², `cardio_mpm_train2.py`)
+| Batch.slot | Config (one knob from parent) | learn | R2 | open | chir+ | size | note |
+| ---------- | ----------------------------- | ----- | -- | ---- | ----- | ---- | ---- |
+| **p2_b01.s5** | **fibre_amp 1.5 (WINNER; amp→1.52)** | fibre | **−5.45** | 0.258 | 0.61 | 1.46e-3 | least overshoot (ampL 0.315); high fibre_amp survives |
+| p2_b01.s3 | fibre_wl 28 (finer) | fibre | −8.27 | 0.295 | 0.53 | 1.81e-3 | finer wl helps the INVERSE (opposite of forward atlas) |
+| p2_b01.s1 | fibre_angle 0.3 | fibre | −10.01 | 0.265 | 0.67 | 1.97e-3 | lower angle helps |
+| p2_b01.s0 | fibre_parent (fibre_amp 1.0) | fibre | −14.45 | 0.255 | 0.59 | 2.35e-3 | optimizer COLLAPSES fibre_amp→0.01 |
+| p2_b01.s2 | fibre_angle 0.9 | fibre | −17.03 | 0.264 | 0.64 | 2.55e-3 | higher angle hurts |
+| p2_b01.s4 | fibre_wl 52 (coarser) | fibre | −21.21 | 0.320 | 0.70 | 3.05e-3 | WORST; coarse wl hurts the inverse |
+
+_Phase-2 regime note: all R² deeply negative — fibre alone (4 scalars) at amp10/drag30/**dur8 frozen** (16% duty) can't fit; batches 2–4 add stiff(UNet)/gain/dur, then combine (Est.#30, Q25)._
+
+### Comparison Table — Phase 1 / rotary track (forward atlas + old UNet-force inverse)
 | Batch.slot | Config | R2 | red-on-green | stiffness | direction |
 | ---------- | ------ | -- | ------------ | --------- | --------- |
 | init.ref   | directional_cardio, amp25 (pre-fix) | −34087 | no (overshoot) | ~uniform | noisy |
@@ -270,7 +282,9 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
     (boundary/substrate rest-anchor); per-particle gain in `pulse_to_active_stress`; spec
     `material_aniso_cardio`.
 
-29. **MORPHOLOGY ATLAS (Phase 1, b11): pattern params decouple along morphology axes; fibre WAVELENGTH controls ellipticity/axis-angle; STIFFNESS wavelength is INERT; AMPLITUDE collapses without inverse structure; DRAG trades openness for size (Est.#Q22, Phase 1).** The 2×2 test falsified "structure required for loops" — loops are inertial, available without structure, so the objective pivots to: learn which ANISOTROPIC ACTIVE-STRESS patterns generate the REAL loop MORPHOLOGY. Forward-sweep `cardio_mpm_atlas.py` on `material_aniso_cardio` base (stiff_wl 8, gain_wl 26, fibre_wl 16, fibre_angle 0.6, amp 10, drag 30): (s0) base → openness 0.258, aspect 0.23, angle 1.54, size 5.32e-03, chirality 0.47. (s1) fibre_angle=0 → open↑ 0.303, chir↓ 0.42 — fibre rotation couples openness/chirality. (s2 WINNER) fibre_wl=32 → aspect↑ 0.34, angle↑ 2.29, open 0.276, chir↑ 0.51 — **coarser fibre INCREASES ellipticity and major-axis rotation.** (s3) stiff_wl=24 → no visible morphology change — stiffness wavelength is INACTIVE. (s4 FAILED) amp=25 → collapsed (open raw 0.013, size 1.09e-03) — naive forward cannot harness high amplitude; inverse inverse-training context is required (Est.#27 showed amp25 was best there). (s5) drag=300 → open↑ 0.306, angle↑ 2.77, size↓ 1.95e-03 — extreme drag maximizes openness/angle but shrinks absolute size (inertial→quasi-static, open-thin vs closed-fat trade-off). **Finding: Pattern parameters decouple cleanly — fibre wavelength controls loop SHAPE (ellipticity/rotation), NOT just size; drag-amplitude-stiffness have secondary/non-linear effects. Phase-2 inverse will tune the best atlas family (fibre_wl40 leading from Phase 1 batches 11–15) to real per-node morphology distribution.**
+29. **MORPHOLOGY ATLAS (Phase 1, b11): pattern params decouple along morphology axes; fibre WAVELENGTH controls ellipticity/axis-angle; STIFFNESS wavelength is INERT; AMPLITUDE collapses without inverse structure; DRAG trades openness for size (Est.#Q22, Phase 1). [FORWARD ATLAS ONLY — Phase 2 inverse shows DIFFERENT ranking, see Est.#30.]** The 2×2 test falsified "structure required for loops" — loops are inertial, available without structure, so the objective pivots to: learn which ANISOTROPIC ACTIVE-STRESS patterns generate the REAL loop MORPHOLOGY. Forward-sweep `cardio_mpm_atlas.py` on `material_aniso_cardio` base (stiff_wl 8, gain_wl 26, fibre_wl 16, fibre_angle 0.6, amp 10, drag 30): (s0) base → openness 0.258, aspect 0.23, angle 1.54, size 5.32e-03, chirality 0.47. (s1) fibre_angle=0 → open↑ 0.303, chir↓ 0.42 — fibre rotation couples openness/chirality. (s2 WINNER) fibre_wl=32 → aspect↑ 0.34, angle↑ 2.29, open 0.276, chir↑ 0.51 — **coarser fibre INCREASES ellipticity and major-axis rotation.** (s3) stiff_wl=24 → no visible morphology change — stiffness wavelength is INACTIVE. (s4 FAILED) amp=25 → collapsed (open raw 0.013, size 1.09e-03) — naive forward cannot harness high amplitude; inverse inverse-training context is required (Est.#27 showed amp25 was best there). (s5) drag=300 → open↑ 0.306, angle↑ 2.77, size↓ 1.95e-03 — extreme drag maximizes openness/angle but shrinks absolute size (inertial→quasi-static, open-thin vs closed-fat trade-off). **Finding: Pattern parameters decouple cleanly — fibre wavelength controls loop SHAPE (ellipticity/rotation), NOT just size; drag-amplitude-stiffness have secondary/non-linear effects. Phase-2 inverse will tune the best atlas family (fibre_wl40 leading from Phase 1 batches 11–15) to real per-node morphology distribution.**
+
+30. **PARAMETRIC INVERSE (Phase 2 b1, learn=fibre): fibre_amp is the CRITICAL fibre param — the optimizer KILLS it at default init; only HIGH init (1.5) survives AND wins. All R² deeply negative (−5 to −21) — fibre alone (4 scalars) at amp=10/drag=30/dur=8 is far from fitting the real beat; the other levers (stiff UNet, gain, dur) are needed.** The Phase-2 parametric inverse (REAL-beat fit with `cardio_mpm_train2.py`, learn=fibre, 300 iterations) shows: (a) the fibre_amp=1.0 parent COLLAPSES amp to 0.01 (the optimizer zeroes out fibre structure because at these settings anisotropy HURTS by generating wrong-direction overshoot), R²=−14.5. Only fibre_amp=1.5 init SURVIVES (converges to 1.52) and wins (R²=−5.45), because the higher-amplitude fibre pattern creates a denser interference lattice in the active stress that constrains motion (ampL=0.315, UNDER-driven = smallest overshoot). (b) fibre_wl is a SLOW gradient lever (moves <0.5 in 300 iterations), so init placement matters: wl=28 (finer, R²=−8.3) > wl=40 (R²=−14.5, but confounded by amp collapse) > wl=52 (coarser, R²=−21.2, WORST). Finer wavelength helps the inverse by providing more spatial resolution, even though the forward atlas found coarser wl=40 most elliptical. (c) Lower fibre_angle helps: 0.3 (−10.0) > 0.6 (−14.5) > 0.9 (−17.0), though confounded by amp survival. (d) The REGIME is deeply negative because dur=8 (frozen, learn=fibre) is far below the period (~50) → 16% duty cycle → violent kick → inertial ringing → wrong-direction overshoot. The other levers (stiff, gain, dur) are needed to close the gap. (Evidence: archive/p2_b01_s0–s5.)
 
 ### Mechanism: learnable per-pixel rotary field -- IMPLEMENTED + runtime-VALIDATED (b09)
 - `--rotary_field>0` adds a UNet output channel → a per-pixel rotary DEVIATION map R(x,y)=`rotary_spread`·tanh(o) ∈
@@ -425,46 +439,35 @@ falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from th
   if additive) or tap the same reservoir (→≈−0.21)? (b) dur0_18 — does forcing a SHORT pulse WITHOUT phase reproduce the spiral gain
   (⇒ the lever is pulse-DURATION, phase incidental), or does duration just self-tune back to ~period (⇒ phase is REQUIRED to hold the
   short pulse, Est.#9)? This decouples phase from pulse-duration and tells whether to pursue a duration knob or the phase channel.
+- **Q25.** [NEW Phase-2 b2 — does UNet stiffness improve R² in the PARAMETRIC inverse?] Phase-2 b1 (learn=fibre) established the
+  fibre baseline (R²=−5.448, s5 winner with fibre_amp=1.5). Batch 2 freezes fibre at s5's converged values and learns stiffness
+  (UNet→youngs pattern). Questions: (a) does stiffness learning lower R² from the −5.45 baseline? (b) does the stiffness RANGE
+  (stiff_lo/stiff_hi) matter — wide vs narrow? (c) does finer fibre (wl=28 from s3) combine better with stiffness? (d) does
+  slightly more amplitude (12 vs 10) address the under-driving (ampL=0.315)? Ablation = uniform stiffness (stiff_lo=stiff_hi=100).
 
 ---
 
 ## Previous Batch Summaries
 **RULE: keep the last 4, oldest→newest, before `## Current Batch`.**
 
-**Batch 8 (2026-06-24, FORCE rotary magnitude + chirality, parent force/md0/rotary+180/amp10/lr1e-3/sub5/drag180; archive
-prefix mpm_b07_*):** swept rotary {+270,+360,−180,−270} (magnitude×handedness), ablation rotary0. s0/s1 ran once, s2–s5 dup
-(consistent). Ranking: s2 +360 (−0.351, WINNER, best honest of ALL batches) > s1 +270 (−0.357) > s0 +180 (−0.400, reproduces
-b07 −0.394) > s3 −180 (−0.450) > s5 rotary0 (−0.459, = b06 drag180) > s4 −270 (−0.494). HEADLINES: (1) Q17 CLOSED — the
-positive-rotary optimum is a PLATEAU at ≈+270–360° (monotone continues past π but saturates, +270→+360 Δ+0.006 = noise; NO
-turnover even at a full turn). (2) CHIRALITY decisive, gap WIDENS with magnitude (+270 −0.357 vs −270 −0.494); the WRONG-handed
-side is flat-then-HARMFUL — −180 ≈ rotary0, but −270 drops BELOW rotary-off ⇒ the gain is genuine correct-sense elliptical
-tracing, not "any motion" (rotary0 & −270 BOTH highest ampL 0.381 yet worst R²; Est.#8). (3) Q2 STIFFNESS now LOAD-BEARING
-(Falsified#2 revised) — the +270/+360 winners show the MOST coherent stiffness of any batch (connected yellow network,
-youngs→180–200) while rotary0 stays inert purple+frame. → Est.#25. New parent = FORCE/drag180/rotary+360; batch 9 GOES SPATIAL
-with the new `--rotary_field` (learnable per-pixel rotary deviation), scalar +360 as control, rotary0 as ablation.
+**Phase 1 Atlas Batch 1b (2026-06-24, MORPHOLOGY ATLAS — parametric variants on fibre_wl40, forward atlas NOT inverse):** Forward
+sweep of active-stress patterns under uniform pulse, no rotary, no phase. Base = material_aniso_cardio with fibre_wl 40. Ranking by
+morphology: s0 parent (open 0.262, aspect 0.35, angle 3.06) > s4 drag60 (most open/elliptical but lost rotation) > s3 angle0.3 (best
+chirality 0.58) > s1 amp15 (inertially collapsed) > s2 amp20 (degenerate) > s5 amp0 (ablation, all zero). HEADLINES: (1) Amplitude
+COLLAPSES in forward atlas (amp15/20 → degenerate), contradicting inverse where learned structure harnesses high amp. (2) Fibre angle
+reversal: angle0.3 chirality UP to 0.58 (opposite prediction). (3) Drag opens but kills rotation. (4) Parent s0 = balanced morphology
+winner for Phase-2 inverse.
 
-**Batch 9 (2026-06-24, GO SPATIAL — the new `--rotary_field` learnable per-pixel rotary deviation, parent force/md0/rotary+360/
-rotary_field0/amp10/lr1e-3/sub5/drag180; archive prefix mpm_b08_*):** s0 scalar +360 control (field OFF), s1/s2/s3 swept the
-per-pixel deviation spread {±180,±90,±360} around the +360 base, s4 a PURE field from a 0 base (±360), s5 rotary0 ablation. All 6
-dup-submitted (consistent). Ranking: s2 ±90 (−0.341, WINNER, best honest of ALL batches but only Δ+0.012 over control) > s0 scalar
-(−0.353, reproduces b08 +360 −0.351) > s1 ±180 (−0.388) > s4 pure-0base (−0.457) > s3 ±360 (−0.462) > s5 rotary0 (−0.464, = b06/b07/
-b08 rotary0). HEADLINES: (1) Q18 CLOSED — spatial rotary is a NEAR-DEAD lever (Est.#26): R² MONOTONE in spread, only TIGHT ±90 edges
-the scalar (Δ+0.012 ≈ noise) and every wider spread HURTS; ±360 collapses to the ablation (locally flipped-chirality islands cancel
-area). (2) The field does NOT learn spatial fiber rotation — it SATURATES to +spread, a near-UNIFORM positive magnitude NUDGE (eff
-~+450° at ±90), consistent with the +plateau still rising a hair past +360. (3) The +360 scalar base is a NEEDED PRIOR (Falsified#6):
-from a 0 base the field stays BALANCED/zero-mean and collapses to rotary0 — the UNet cannot bootstrap chirality from zero. (4) The
-spatial field does NOT amplify stiffness (Falsified#6) — the SCALAR control has the MOST coherent stiffness; the field fragments it;
-Est.#25's load-bearing stiffness is a +360-magnitude-regime property. (5) The new code ran CLEAN (no NaN/blank field panels) — now
-runtime-VALIDATED. ⇒ ROTARY (scalar+spatial) EXHAUSTED, fit stuck ≈−0.34. New parent = FORCE/drag180/rfield_b360_s90; batch 10 PIVOTS
-to NEW levers: PHASE-ON-ROTARY (re-test b02-falsified phase WITH the ellipse → spiral wave, Q19) + AMPLITUDE RE-OPEN (Q20), a spread→0
-check (±45), and the rotary0 ablation.
-
-**Batch 10 (2026-06-24, PIVOT OFF rotary — AMPLITUDE RE-OPEN + PHASE-ON-ROTARY, parent force/md0/rotary+360/rfield±90/amp10/lr1e-3/
-sub5/drag180; archive prefix mpm_b09_*):** s0 control (b09 winner), s1 spiral_md40 (phase ON rotary), s2 amp15 / s3 amp7 (amplitude
-bracket), s4 spread45 (±45 field→scalar), s5 rotary0 ablation. All 6 ran once. Ranking: s2 amp15 (−0.261, WINNER, best honest of ALL
-batches) > s1 spiral_md40 (−0.325) > s4 spread45 (−0.345) > s0 parent (−0.354, reproduces b09 −0.341) > s3 amp7 (−0.437) > s5 rotary0
-(−0.461, = the pinned floor). HEADLINES: (1) Q20 ANSWERED-YES, the BREAKTHROUGH (Est.#27) — amplitude is MONOTONE UP in the rotary
-regime (amp7 −0.437 < amp10 −0.354 < amp15 −0.261, Δ+0.08), OVERTURNING the pre-rotary amp-monotone-DOWN (Est.#6 was an overshoot-regime
+**Phase 2 Batch 1 (2026-06-24, PARAMETRIC INVERSE learn=fibre, parent material_aniso_cardio fibre_wl40/angle0.6/amp1.0/phase0.7,
+amp=10, drag=30, dur0=8; archive prefix p2_b01_*):** Swept fibre init params: s0 parent (control), s1 fibre_angle=0.3, s2
+fibre_angle=0.9, s3 fibre_wl=28, s4 fibre_wl=52, s5 fibre_amp=1.5. All 6 ran 300 iterations. Ranking: s5 fibre_amp=1.5 (R²=−5.448,
+WINNER) > s3 wl=28 (−8.267) > s1 angle=0.3 (−10.005) > s0 parent (−14.451) > s2 angle=0.9 (−17.029) > s4 wl=52 (−21.213). HEADLINES:
+(1) ALL R² deeply negative (−5 to −21) — fibre alone (4 scalars) far from fitting the real beat at amp=10/drag=30/dur=8 (Est.#30).
+(2) fibre_amp is THE critical fibre param: the parent COLLAPSED fibre_amp from 1.0→0.01 (optimizer zeroes fibre structure = anisotropy
+HURTS at these settings); only s5 (init 1.5→1.52) survived AND won. (3) fibre_wl is a SLOW gradient lever (barely moves from init);
+finer wl=28 beats coarser wl=40/52 in the inverse (opposite of forward atlas). (4) ampL inversely correlated: s5 ampL=0.315 (under-driven)
+= best R²; s4 ampL=5.071 (5× over-driven) = worst. (5) dur=8 frozen far below period ~50 → violent kick → inertial ringing. New parent
+= s5 converged fibre (wl=40.2, angle=0.72, amp=1.52, phase=1.53); batch 2 advances to --learn stiff (Q25).
 artifact): curvature made the loops efficient but UNDER-SIZED, so more amplitude grows them onto green; amp15 has the LOWEST ampL (0.182,
 best energy match) AND best R² (re-couples R² with energy, unlike the overshoot regime). (2) Q19 — phase ON rotary SIGN-FLIPS vs b02
 (md40 −0.325 mildly BEATS the parent, no longer HURTS) BUT τ STAYS TINY (used [0.31,9.9]/40, same b02 signature) and dur collapsed to
@@ -493,55 +496,34 @@ batch 12 pushes amp30/amp35 (turnover?), tests phase-stack on amp25 + short-puls
 ## Current Batch
 
 ### Batch info
-**MORPHOLOGY ATLAS BATCH 1b (Phase 1 continued — parametric variants on fibre_wl40).** Forward sweep of active-stress patterns under
-UNIFORM pulse, **NO rotary, NO phase** — chart the morphology of the fibre_wl40 pattern family under amplitude/angle/drag variation.
-Forward runner = `cardio_mpm_atlas.py`. Base = `material_aniso_cardio` with fibre_wl 40 (the morphology winner from batch 12 s2: aspect
-0.35, angle 3.06 rad). Each slot changes ONE knob (amplitude, fibre_angle, or drag) from the base. Report per slot: openness · major-axis
-angle · loop size · chirality · pattern spatial coherence (no R² — this is forward atlas).
+**PHASE 2 BATCH 2 [learn=stiff] — PARAMETRIC INVERSE.** The UNet learns the stiffness spatial pattern from the microscope image
+while fibre params are FROZEN at the Phase-2 b1 winner's converged values (s5: fibre_wl=40.2, fibre_angle=0.72, fibre_amp=1.52,
+fibre_phase=1.53). Runner = `cardio_mpm_train2.py`. Sweep: stiffness range variants (stiff_lo/stiff_hi), alternative fibre base
+(s3 wl=28), amplitude variant (amp=12 to address under-driving), and ablation (uniform stiffness = no spatial variation).
 
 ### Current hypothesis
-"The fibre_wl40 pattern family produces the richest anisotropic morphology (most elliptical loops, most rotation). Sweeping amplitude/angle/drag
-on this family will map the morphology landscape around the Phase-1 winner, showing how size (amplitude), rotation (fibre_angle), and damping
-(drag) modulate the loop family. Phase 2 inverse will then target the real beat's per-node morphology distribution by selecting the best point(s)
-in this fibre_wl40 morphology landscape."
+"The UNet-derived microscope stiffness pattern will improve R² from the fibre-only baseline (−5.448). The microscope image encodes
+real structural variation (cell boundaries, cytoskeleton density) that should create a spatially-varying youngs modulus field making
+the anisotropic contraction pattern more physically accurate. A wider stiffness range gives the UNet more expressiveness; amplitude=12
+may help the under-driven winner (ampL=0.315)."
 
 ### Slots this batch
-MORPHOLOGY VARIANTS (base = aniso_cardio: stiff_wl 8, gain_wl 26, fibre_wl 40, fibre_angle 0.6, amplitude 10, drag 30):
-- s0 fibre_wl40_parent — the fibre_wl40 base (control; reproduces batch 12 s2 morphology).
-- s1 amplitude15 — `--amplitude 15` (ONE knob: size tuning UP) → loop SIZE and openness scaling on rich fibre?
-- s2 amplitude20 — `--amplitude 20` (ONE knob: stronger) → size scaling continued; where does inertial collapse occur?
-- s3 fibre_angle0.3 — `--fibre_angle 0.3` (ONE knob: reduced rotation) → openness/chirality trade (rotation direction)?
-- s4 drag60 — `--drag_k 60` (ONE knob: more damping) → does higher drag thin the loops (inertial→quasi-static)?
-- s5 amplitude0_abl — `--amplitude 0` (ablation: no active force) → confirms active-stress required for these patterns.
+STIFFNESS SWEEP (fibre frozen at s5 winner converged values unless noted; base = material_aniso_cardio, amp=10, drag=30, dur0=8):
+- s0 stiff_parent — stiff [50,150], learn=stiff (CONTROL: does stiff learning improve R² from −5.448 fibre-only baseline?)
+- s1 stiff_wide — stiff [20,250], learn=stiff (ONE knob: wider range → more expressiveness for the UNet)
+- s2 stiff_soft — stiff [20,80], learn=stiff (ONE knob: softer regime → different elastic response)
+- s3 stiff_on_wl28 — fibre from b1 s3 (wl=28.1, angle=0.69, amp=0.34, phase=0.71), stiff [50,150], learn=stiff (test: does finer fibre + stiff combine better?)
+- s4 stiff_amp12 — amplitude=12, stiff [50,150], learn=stiff (ONE knob: address under-driving ampL=0.315)
+- s5 stiff_uniform_abl — stiff [100,100], learn=stiff (ABLATION: no spatial stiff variation → tests whether SPATIAL pattern matters vs just uniform elasticity)
 
 ### Emerging observations
 **CRITICAL: this section must ALWAYS be at the END of the file.**
 
-_(post-2×2 PIVOT, 2026-06-24) The rotary/amplitude track below is SUPERSEDED. The 2×2 test (Est.#28, Falsified#7) showed loops are
-GENERIC in active-stress MPM (isotropic loops as much as structured, D/C=0.7×; intrinsic loops are inertial), so "structure necessary
-for loops" / "rotary required" are FALSIFIED — rotary was a scaffold for a force-based inertial model, not a cardiomyocyte property.
-NEW OBJECTIVE: learn which anisotropic active-stress PATTERNS generate the real loop MORPHOLOGY (size/axis/chirality/openness/spatial
-pattern). Batch 12 = Phase-1 SHAPE ATLAS (forward, `cardio_mpm_atlas.py`): sweep fibre_angle / fibre_wl / stiff_wl / amplitude / drag
-and chart loop families; report openness · axis-angle · size · chirality · pattern coherence (no R² in the atlas). Phase 2 = UCB tree
-over pattern families, objective = real-traj R² + morphology loss. WATCH: which param controls major-axis ANGLE? which controls OPENNESS
-vs SIZE? does drag thin the loops (inertial→quasi-static)? Evidence + reusable pieces: `archive/aniso_loop_test/` (the 4 condition
-folders A/B/C/D, native_signature, SUMMARY.md), op `mpm_anchor`, gain in `pulse_to_active_stress`, spec `material_aniso_cardio`._
-
-_(post-b11, SUPERSEDED) Batch 11 EXTENDED the amplitude breakthrough: the monotone-UP CONTINUES to amp25 (new best −0.189 single / −0.219 avg) with
-NO turnover — ampL is cleanly MONOTONE-DOWN (amp15 0.191 > amp20 0.147 > amp25 0.115), so the curved loops are STILL under-sized even at
-amp25 and more amplitude keeps improving the energy match (Est.#27, Q20). The R² is FLAT amp15≈amp20 (both avg −0.267) then breaks lower
-at amp25 — diminishing R²/Δamp but no peak, so b12 pushes amp30/amp35 to find where size finally becomes overshoot. The OTHER headline:
-a SECOND independent lever surfaced — PHASE on amp15 (spiral_md40 −0.208 avg) helps as much as amp25 (Δ+0.06 over the parent) BUT via the
-SAME confound as b10 — τ stays TINY (used [0.32,9.9]/40), dur COLLAPSES to 17.3, ampL RISES to 0.215 → it is a SHORTER-PULSE effect, NOT a
-travelling/spiral wave (Falsified#3 re-confirmed; the spiral mechanic is still unsupported). So size (amplitude) and timing (pulse-shape)
-each reach ≈−0.21 from the −0.267 parent; whether they STACK on amp25 is the central b12 question (Q21), with dur0_18 added to decouple
-phase from pulse-duration (does a short pulse help WITHOUT the phase channel, or does duration self-tune back to ~period per Est.#9?).
-Two clean negatives this batch: (a) DRAG STILL saturated at amp15 — drag240 (−0.267) = parent exactly, FALSIFYING "higher amp re-opens
-drag" (the extra motion is useful curvature, not overshoot a brake can tame; Q12 re-closed). (b) ROTARY still essential — rotary0_amp15
-(−0.417) sits ≈0.15–0.20 below the rotary slots; NB the prediction "amp15 rotary0 WORSE than the amp10 floor −0.461" was FALSIFIED, it is
-slightly BETTER (−0.417), so the line-stub floor itself rises a hair with amplitude. The amp25 winner shows the MOST coherent stiffness
-(yellow network, youngs→200; Est.#25 load-bearing). DUP submission this batch (s0/s1/s2 twice in-dir, s3/s4/s5 in renamed dup dirs) —
-authoritative R² = the in-dir final run, pair as variance (Δ0.02–0.06, force reproducible); no NaN/blank panels. WATCH b12: (1) does
-amp30/amp35 keep climbing (still under-driven) or PEAK (ampL bottoms, R² reverses = amp optimum found)? (2) does spiral_amp25 STACK
-(≈−0.15) or saturate (≈−0.21)? (3) does dur0_18 hold the short pulse + help, or self-tune back to ~period? (4) rotary0_amp25 ≈−0.42 as
-predicted? Distrust any blank/NaN τ panel (b02 artifact); use the job-log `done ->` R² (live progress.txt can be stale)._
+_(Phase 2 b1, 2026-06-24) Phase-2 PARAMETRIC inverse first batch: learn=fibre only (4 scalars). ALL R² deeply negative (−5 to −21)
+— fibre alone at amp=10/drag=30/dur=8 is far from fitting the real beat (Est.#30). The CRITICAL finding: fibre_amp is the decisive
+fibre param. The parent (fibre_amp=1.0) COLLAPSED amp to 0.01 (the optimizer kills fibre structure because anisotropy HURTS at these
+settings); only the fibre_amp=1.5 init SURVIVED (→1.52) and won (R²=−5.448, ampL=0.315 under-driven = smallest overshoot). Finer
+fibre_wl=28 was second-best (R²=−8.267). Coarser wl=52 was worst (R²=−21.2, ampL=5.1 massive overshoot). The forward-atlas morphology
+ranking (wl=40 best) does NOT predict the inverse ranking — more spatial resolution helps the parametric fit. fibre_wl is a SLOW
+gradient lever (<0.5 movement in 300 iterations), so init placement matters. WATCH batch 2: does UNet stiffness close the gap from
+−5.45? does amplitude=12 help the under-driven winner? does the microscope image encode useful structural information?_

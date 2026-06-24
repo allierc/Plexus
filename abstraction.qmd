@@ -1,94 +1,114 @@
 ---
 title: "The abstraction"
-subtitle: "Hierarchical sets, fields, and operators"
+subtitle: "Sets, fields, operators, and schedules"
 ---
 
-The container is built from two kinds of object — **sets** and **fields** — and
-a small algebra of **operators** that move state between them. This is the
-missing primitive: the place where particle mechanics, cellular interaction,
-neural dynamics, and reaction networks all become the same kind of thing.
+Plexus is built from two kinds of object — **sets** and **fields** — and a small
+collection of **operators** that move information, force, state, or membership
+between them. A model is a **schedule**: an ordered composition of operators,
+iterated over time. Those four words — *sets, fields, operators, schedules* — are
+the whole vocabulary, and they are the missing primitive: the place where particle
+mechanics, cellular interaction, neural dynamics, and reaction networks all become
+the same kind of thing.
 
-## Two entities: typed sets and fields
+## Sets and fields
 
-A **typed set** $S_\alpha$ is a discrete collection of entities of one biological
-*sort*: membrane particles, cytoplasmic particles, nuclei, metabolites, cells,
-populations, or organisms. Each sort has its own state schema and its own
-admissible operators. Typed sets are connected by **parent maps**
+Plexus has two objects.
+
+A **set** is a discrete collection of elements of one kind: particles, cells,
+nuclei, metabolites, organisms. More precisely, *a set is a collection of elements
+with the same state schema and the same admissible operators* — every element
+carries the same state variables (position, velocity, concentration, …) and the
+same operators may act on it.
+
+A **field** is a continuous quantity defined on a grid: a chemical concentration,
+an activation level, a stiffness map, a pressure, a substrate signal. (Formally,
+$f:\Omega\to\mathbb{R}^q$ over a domain $\Omega$.)
+
+Operators move state between these objects, and a model is a scheduled composition
+of them. Fields are *not* contained by sets and do not contain them; a set and a
+field meet only through an **exchange** operator — secretion, sensing,
+particle–grid transfer, field sampling.
+
+## Sets and types
+
+A *new kind of object* is a new **set**. The *same object with different
+parameters* is a new **type** inside that set:
+
+```text
+new kind of object       → new set
+same object, new params   → new type inside that set
+```
+
+In a spec, `types:` means parameter variants inside one set. Soft and stiff cells
+are two **types** of the same `cell` set: they share the same state variables and
+the same operators, and differ only in a parameter (here Young's modulus). A
+nucleus, by contrast, is a different **set** — it has its own state and its own
+operators.
+
+```yaml
+sets:
+  cell:
+    n: 100
+    types:
+      soft:  {fraction: 0.5, youngs: 40}
+      stiff: {fraction: 0.5, youngs: 200}
+
+  nucleus:
+    parent: cell
+    per_parent: 1
+
+  membrane_particle:
+    parent: cell
+    per_parent: 64
+```
+
+* `cell`, `nucleus`, and `membrane_particle` are different **sets** — different
+  state, different operators.
+* `soft` and `stiff` are **types** inside `cell` — same state and operators; only
+  the parameters differ.
+
+Keeping the two apart keeps operators simple: an operator names the one set it
+acts on (`at: nucleus`) and never branches on a role flag at run time. A type is
+handled by a per-element parameter lookup, not by a separate code path.
+
+## The containment graph
+
+Sets may contain other sets through **parent maps**. A nucleus belongs to a cell;
+a membrane particle belongs to a cell; a metabolite belongs to a cell. Each parent
+map,
 
 $$\pi_{\alpha\to\beta} : S_\alpha \longrightarrow S_\beta,$$
 
-which assign each entity of sort $\alpha$ to the entity of sort $\beta$ that
-contains it. The *fibre* of such a map over an entity $b\in S_\beta$ is its
-preimage — everything that maps to $b$,
-$\pi_{\alpha\to\beta}^{-1}(b)=\{x\in S_\alpha : \pi_{\alpha\to\beta}(x)=b\}$; the
-fibre of $\pi_{\text{particle}\to\text{cell}}$ over a cell $c$ is the particles
-inside $c$. A cell is not a single such fibre, however, but a *bundle of fibres*:
-membrane particles, cytoplasmic particles, nuclei, metabolites, and other child
-sets all map to the same parent cell, and the cell is the union of those fibres.
-The next section makes this containment graph precise.
+assigns every element of one set to the element of another that contains it. These
+maps form a **containment graph**, not a fixed scale ladder: a set may have several
+child sets at once, and a cell is assembled from all of them.
 
-![Containment across scales: each parent map $\pi$ sends an entity to the one that contains it. A cell is a *bundle* of fibres — here its particles and metabolites; in general also its membrane, nucleus, and other child sets.](figures/fig_hier.png){width=58%}
+So a cell is **not one fibre**. It is a *bundle of fibres*. The *fibre* of a parent
+map over an element $b$ is everything that maps to it —
+$\pi_{\alpha\to\beta}^{-1}(b)=\{x : \pi_{\alpha\to\beta}(x)=b\}$; the fibre of
+$\pi_{\text{membrane}\to\text{cell}}$ over a cell $c$ is the membrane particles of
+$c$. The cell is the union of *all* its child fibres — membrane particles,
+cytoplasmic particles, nucleus, metabolites — each a distinct set mapping to the
+same parent.
 
-A **field** $f:\Omega\to\mathbb{R}^q$ is a continuous quantity defined on its own
-grid — morphogen concentration, pressure, substrate stiffness, or extracellular
-chemical concentration. Fields are *not* part of the containment graph: they do not
-contain cells, and cells do not contain fields. Instead, each field is coupled to
-one or more typed sets through **exchange** operators — secretion, sensing,
-particle–grid transfer, or field sampling.
+![Containment across scales: each parent map $\pi$ sends an element to the one that contains it. A cell is a *bundle* of fibres — here its particles and metabolites; in general also its membrane, nucleus, and other child sets.](figures/fig_hier.png){width=58%}
 
-## A typed containment graph
+Formally the container is a directed acyclic graph (sets are nodes, parent maps are
+directed edges, no cycles); the familiar $S_0\to S_1\to S_2$ scale ladder is just
+the chain-shaped special case. Each set carries its own state schema and operators,
+so adding structure is adding a set and a parent map — never an engine change.
+(For the formally inclined: this is the many-sorted, or *typed*, discipline an ECS
+or a relational database already uses — one sort per set, joined by maps.)
 
-Above we named entities by their sort and joined them with parent maps; here is the
-formalism. Two ideas make it precise, and they are what keep the code free of
-branching: the sets form a *family* indexed by sort, and the parent maps form a
-*graph* rather than a chain.
+The distinction between a new set and a new type can be read straight off a table:
 
-**A family of typed sets.** Rather than one set $S_0$ with a type function
-$\tau:S_0\to\{\text{membrane},\dots\}$, we take a family
-$S=\{S_\alpha\}_{\alpha\in A}$, one set per *sort*, each with its own state schema,
-operators, and fields. The two are equivalent as sets (the fibres
-$\tau^{-1}(\alpha)$ *are* the $S_\alpha$), but the family is the honest one: a
-single set with a type label forces every operator to branch on $\tau$ at run time
-(the spaghetti), whereas a family lets each operator declare *one* sort statically
-(`at: nucleus`) and never branch. This is many-sorted set theory — the typed
-discipline an ECS or a database already uses.
-
-**Joined by containment maps.** The sorts are joined by parent maps
-$\pi_{\alpha\to\beta}: S_\alpha \to S_\beta$, so a cell is not one fibre but a
-**bundle of fibres**,
-$\mathrm{Cell}(c)=\{\,\pi_{\alpha\to\mathrm{cell}}^{-1}(c) : \alpha\in\mathrm{children}(\mathrm{cell})\,\}$.
-The container is a *typed containment graph* — a **DAG** (directed acyclic graph:
-sorts are nodes, parent maps directed edges, no cycles) — not a fixed scale ladder.
-Categorically it is a diagram of sets (a functor from the containment graph into
-$\mathbf{Set}$); the old $S_0\to S_1\to S_2$ was just the chain-shaped case. Nothing
-leaves set theory; the *shape* generalizes from a ladder to a graph. The engine
-needs only `Level.parent` and `Level.parent_name`; new structure is a new set and a
-parent map, never an engine change.
-
-**A new set, or a new type?** The type function $\tau$ does not disappear — it is
-demoted: it no longer distinguishes *kinds*, it parameterizes a *subpopulation of
-one kind*. Two groups that differ in state space or operators are different *sorts*
-(separate sets); two that share both and differ only in parameters are *types
-within one set* (the $\tau$ colouring — the `types:` block).
-
-| | **Different sorts** ($S_\alpha$) | **Types within one sort** ($\tau$) |
+| | **Different sets** ($S_\alpha$) | **Types within one set** ($\tau$) |
 |---|---|---|
 | example | membrane vs nucleus vs metabolite | soft cell vs stiff cell |
 | differ in | state space + operators | only parameter values |
 | in the spec | separate `sets:` with `parent:` | a `types:` block inside one set |
 | dispatch | by name (`at: nucleus`) | per-row lookup $p[\tau(i)]$ |
-
-A new *kind* is a new set; a parametric *variant* is a new type — keeping operators
-typed, never one mega-operator branching on a role flag:
-
-``` yaml
-sets:
-  cell:               {n: 100}
-  membrane_particle:  {parent: cell, per_parent: 64,  role: membrane}
-  cytoplasm_particle: {parent: cell, per_parent: 200, role: cytoplasm}
-  nucleus:            {parent: cell, per_parent: 1,   role: nucleus}
-  metabolite:         {parent: cell, per_parent: 50,  role: metabolite}
-```
 
 ## Operators
 
@@ -110,16 +130,16 @@ $$
 \textbf{Broadcast}\ \downarrow\quad & \pi^{*}: S_{k+1}\to S_k
   && \text{(lift along } \pi)\\
 \textbf{Exchange}\quad  & \mathcal{S},\mathcal{G}: S_k \leftrightarrow F
-  && \text{(scatter / gather; bipartite)}
+  && \text{(push / pull; bipartite)}
 \end{aligned}
 $$
 
 Two pieces of notation: $S_k\times S_k$ is the set of all node *pairs*, so an
 edge set $E\subseteq S_k\times S_k$ is simply a graph on $S_k$ — which nodes
 interact (e.g. neighbours within a cutoff radius, or a fixed connectome). And
-$\mathcal{S},\mathcal{G}$ are the two halves of a field coupling: *scatter*
-$\mathcal{S}:S_k\to F$ writes object state into the field, while *gather*
-$\mathcal{G}:F\to S_k$ reads it back.
+$\mathcal{S},\mathcal{G}$ are the two halves of a field coupling: *push*
+$\mathcal{S}:S_k\to F$ writes object state into the field (set → field), while
+*pull* $\mathcal{G}:F\to S_k$ reads it back (field → set).
 
 **Lateral $\mathcal{O}_E$.** Message passing *within* one scale along the edges
 $E$. It carries the within-scale physics: pairwise interactions (forces,
@@ -138,11 +158,11 @@ force, a polarity, a signalling output) is applied identically to all of that
 cell's particles. Aggregate and Broadcast are a matched up/down pair on the same
 map $\pi$.
 
-**Exchange $\mathcal{S},\mathcal{G}$.** Couples a set to a field: scatter
-$\mathcal{S}$ deposits/secretes object state into the field, gather $\mathcal{G}$
-samples/senses the field back onto the objects. The relation is bipartite
-(objects $\leftrightarrow$ grid); it is exactly the MPM particle–grid transfer
-(P2G/G2P) and chemotactic secretion/sensing.
+**Exchange $\mathcal{S},\mathcal{G}$.** Couples a set to a field: *push*
+$\mathcal{S}$ deposits/secretes object state into the field (set → field), *pull*
+$\mathcal{G}$ samples/senses the field back onto the objects (field → set). The
+relation is bipartite (objects $\leftrightarrow$ grid); it is exactly the MPM
+particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.
 
 **Rewire $\mathcal{R}$ (relations).** Rewire changes the *relation*
 $E\subseteq S_k\times S_k$ on which the lateral operators act — *which* nodes are

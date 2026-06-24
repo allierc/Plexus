@@ -3,12 +3,14 @@ title: "The LLM ↔ registry methodology"
 subtitle: "Two layers, one contract, a small declarative language"
 ---
 
-The prototype's purpose was not the tissue physics but figuring out *how an LLM
-should drive a registry of low-level operators*. The answer is a strict two-layer
-split that meets only at one declarative, validated file — the **spec**
-(`spec.yaml`). In effect this is a small domain-specific language: the spec is the
-*source*, the registered operators are the *primitives*, and the engine is the
-*interpreter*.
+An LLM should never write engine code, and the engine should never read natural
+language. The whole methodology follows from holding those two apart and letting
+them meet at exactly one place: a declarative, validated file — the **spec**
+(`spec.yaml`). Everything *above* the spec is language — intent turned into a
+specification; everything *below* it is code — the registered operators and the
+engine that runs them. The spec is the contract between them, and it behaves like
+a small domain-specific language: the spec is the *source*, the registered
+operators are the *primitives*, and the engine is the *interpreter*.
 
 ## Two layers and the contract between them
 

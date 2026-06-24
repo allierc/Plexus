@@ -412,3 +412,50 @@ Each slot changes ONE knob from the parent. Spec `material_aniso_cardio` (parame
 - **PHASE 1 ATLAS CONCLUSION:** The parent s0 (fibre_wl40) is the morphology leader for Phase 2 inverse. Next batch (b15) should switch back to **inverse fitting on the REAL beat**, using the fibre_wl40 base with learned gain/direction variants (constraints: amplitude 10–15, fibre_angle {0.3,0.6}, drag {30,60}) to match the real per-node morphology distribution on R² + loop-shape metrics.
 
 **Next:** parent = s0 (fibre_wl40, the Phase-1 atlas winner); **PIVOT TO PHASE 2 INVERSE:** train on the real beat with the fibre_wl40 pattern family (material_aniso_cardio base), learning the per-particle gain + direction fields (no phase, no rotary, uniform pulse). Objective = interior R² + loop-morphology loss. Sweep gain_wl/fibre_angle/amplitude variants within the family to find the best real-trajectory fit.
+
+---
+
+## Phase2 Batch 1 [learn=fibre] — 2026-06-24
+
+**Runner:** `cardio_mpm_train2.py` (Phase 2 PARAMETRIC inverse fit on the REAL beat).
+
+**Parent config (s0):** Base = `material_aniso_cardio`: fibre_wl 40, fibre_angle 0.6, fibre_amp 1.0, fibre_phase 0.7, gain0 1.0, stiff [50,150], amplitude 10, drag_k 30, dur0 8, learn=fibre. 300 iterations. Outer band Dirichlet-anchored; interior free; metric = interior R² (motion-normalised, boundary excluded).
+
+**Hypothesis:** "Sweeping fibre init params (angle, wavelength, amplitude) with --learn fibre isolates which fibre family best matches the real beat's trajectory shape. Fibre_wl40 (the Phase-1 atlas winner) is the expected leader; lower angle and finer wavelength may help by increasing spatial resolution for gradient-based tuning."
+
+**Results per slot (from progress.txt final line + dashboard header converged params):**
+
+| Slot | Config (ONE knob from parent) | R2 | ampL | open | chir | size | Converged fibre (wl/angle/amp/phase) | red-on-green |
+|------|------|-----|------|------|------|------|------|------|
+| **s5** | **fibre_amp=1.5** (init fibre amplitude UP) | **-5.448** | **0.315** | 0.258 | 0.61 | 1.46e-03 | 40.2 / 0.72 / **1.52** / 1.53 | smallest red loops, best contained; still OFF green (overshoot direction wrong) but LEAST overshoot |
+| s3 | fibre_wl=28 (finer wavelength) | -8.267 | 1.132 | 0.295 | 0.53 | 1.81e-03 | 28.1 / 0.69 / **0.34** / 0.71 | red loops smaller, better contained than parent; closer to green; finer fibre stripes |
+| s1 | fibre_angle=0.3 (less rotation) | -10.005 | 1.452 | 0.265 | 0.67 | 1.97e-03 | 40.3 / 0.35 / 1.00 / 1.01 | red loops overshoot green moderately; best chirality (0.67) |
+| s0 | **fibre_parent** (control) | -14.451 | 2.907 | 0.255 | 0.59 | 2.35e-03 | 40.3 / 0.30 / **0.01**(!) / 1.50 | red MUCH bigger than green; large overshoot arcs; fibre_amp COLLAPSED to ~0 |
+| s2 | fibre_angle=0.9 (more rotation) | -17.029 | 3.838 | 0.264 | 0.64 | 2.55e-03 | 40.4 / 0.80 / 0.84 / 0.75 | red very large; significant overshoot; more vertical stripes in fibre pattern |
+| s4 | fibre_wl=52 (coarser wavelength) | -21.213 | 5.071 | 0.320 | 0.70 | 3.05e-03 | 51.8 / 0.59 / 0.90 / 1.50 | red MASSIVE (5× energy), worst; coarse fibre pattern can't constrain motion |
+
+**Ranking by interior R² (higher = better):**
+1. **s5 fibre_amp_1.5** (R²=-5.448, WINNER)
+2. s3 fibre_wl_28 (R²=-8.267)
+3. s1 fibre_angle_0.3 (R²=-10.005)
+4. s0 fibre_parent (R²=-14.451)
+5. s2 fibre_angle_0.9 (R²=-17.029)
+6. s4 fibre_wl_52 (R²=-21.213)
+
+**Winner: s5 (fibre_amp=1.5, R²=-5.448)**. Best R² AND best morphology containment (smallest loops, lowest ampL=0.315). BUT all R² are deeply negative — fibre alone (4 scalars) at amp=10/drag=30/dur=8 is far from fitting the real beat. The other levers (stiff UNet, gain, duration) are needed.
+
+**Key findings:**
+
+1. **fibre_amp is THE critical fibre parameter.** In s0 (parent), the optimizer COLLAPSED fibre_amp from 1.0→0.01, effectively KILLING fibre structure — the anisotropic pattern at default settings HURTS the fit (generates overshoot in wrong directions). Only s5 (init 1.5→converged 1.52) KEPT amp high AND won. High fibre_amp creates a denser interference pattern in the active stress that naturally CONSTRAINS motion → less overshoot → better R². The dashboard shows s5's fibre dx/dy as a tight diamond lattice with more nodes of destructive interference per unit area.
+
+2. **fibre_wl is a SLOW gradient lever** — it barely moves from init in all slots (±0.4 in 300 iterations). Init placement matters: wl=28 (s3, finer) beats wl=40 (s0, parent) beats wl=52 (s4, coarser). The forward-atlas winner (wl=40, most elliptical) is NOT the inverse winner — more spatial resolution helps the parametric fit. BUT wl=28 with default fibre_amp=1.0 still partially collapses amp to 0.34.
+
+3. **Fibre angle is anti-correlated with R²**: angle=0.3 (s1, -10.005) > angle=0.6 (s0, -14.451) > angle=0.9 (s2, -17.029). Lower rotation → less overshoot. BUT the s0 result is confounded by fibre_amp collapse (0.01); s1 maintained fibre_amp=1.0. The angle→R² relationship may partly reflect amp survival.
+
+4. **ampL inversely correlated with R²**: s5 (ampL=0.315, under-driven) → best R². s4 (ampL=5.071, 5× over-driven) → worst R². At these settings (no rotary, amp=10, drag=30, dur=8), the active stress generates too much motion in wrong directions → LESS motion = BETTER. This echoes the Phase-1 finding that overshoot direction (not magnitude) gates R².
+
+5. **dur=8 is FROZEN (learn=fibre only) and far below the period (~50).** The old inverse (Phase 1) found dur converges to ~47-53. At dur=8, the pulse is very short → sharp contraction spike → inertial ringing. This likely explains the poor R² regime: a 8-frame pulse at period 50 is a 16% duty cycle → violent kick → ring → overshoot.
+
+**Verdict:** SUPPORTED — fibre params DO differentiate R² (4× range, -5 to -21), confirming the parametric inverse is sensitive to fibre init. FALSIFIED — the Phase-1 forward-atlas morphology winner (wl=40, angle=0.6, fibre_amp=1.0) is NOT the inverse winner; the optimizer kills its fibre_amp. The live finding is that HIGH fibre_amp (1.5) is needed for the fibre pattern to SURVIVE gradient descent and contribute positively.
+
+**Next:** Batch 2 = `--learn stiff`. Freeze fibre at s5's converged values (wl=40.2, angle=0.72, amp=1.52, phase=1.53). Sweep stiffness range variants (stiff_lo/stiff_hi) and test whether the UNet-derived microscope stiffness pattern improves R² from the fibre-only baseline. Include one slot with s3's converged fibre (wl=28) to test whether finer fibre + stiff learning helps, and an amplitude=12 slot to address the under-driving (ampL=0.315). Ablation = uniform stiffness (stiff_lo=stiff_hi=100) to test whether SPATIAL stiffness variation matters.

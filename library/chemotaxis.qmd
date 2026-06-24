@@ -33,7 +33,7 @@ Set <- field. Particles climb (or flee) a field's gradient.
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field scatter / gather.
+- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field push / pull.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; returns a **velocity** &mdash; the engine integrates $x \mathrel{+}= \Delta t\,\delta$.
