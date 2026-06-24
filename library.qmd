@@ -68,7 +68,7 @@ The whole calculus is **3 sets**, **5 fields**, and **33 operators** (41 primiti
 
 ### <img class="kind-h" src="figures/icons/exchange.png"> Exchange <span class="kind-sym">$\mathcal{S},\mathcal{G}$</span>
 
-*Set &harr; field scatter / gather.*
+*Set &harr; field push / pull.*
 
 ::: {.op-grid}
 <a class="op-card" href="library/apply_material_map.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">apply_material_map</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus `apply_material_map`,</span></span></a>

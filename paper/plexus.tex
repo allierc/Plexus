@@ -58,6 +58,363 @@ lessons that follow for how to construct the repository.
 \part*{Part I --- The abstraction}
 \addcontentsline{toc}{section}{Part I --- The abstraction}
 
+\section{The idea}
+
+Plexus is a language for building living simulations.
+
+Rather than starting from a particular domain --- cells, tissues, neural
+networks, particle systems, reaction--diffusion equations, or active matter ---
+Plexus starts from a small vocabulary that can describe all of them.
+
+The vocabulary contains only four concepts:
+
+[
+\boxed{
+\text{Sets}
+\qquad
+\text{Fields}
+\qquad
+\text{Operators}
+\qquad
+\text{Schedules}
+}
+]
+
+Everything in Plexus is built from these four objects.
+
+A simulation is therefore not a special-purpose program. It is a composition of
+operators acting on sets and fields according to a schedule.
+
+The wager of Plexus is that a surprisingly large fraction of biology can be
+expressed in this language.
+
+\section{Sets}
+
+A set is a collection of discrete elements.
+
+Examples include:
+
+\begin{itemize}
+\item particles,
+\item cells,
+\item nuclei,
+\item metabolites,
+\item organisms,
+\item populations.
+\end{itemize}
+
+Every element of a set shares the same state schema and the same admissible
+operators.
+
+For example, a cell set might contain
+
+[
+(\text{position},;\text{velocity},;\text{polarity})
+]
+
+for every cell.
+
+A metabolite set might contain
+
+[
+(\text{concentration})
+]
+
+for every metabolite.
+
+The important point is that a set represents a single kind of object.
+
+\subsection*{Containment}
+
+Sets may contain other sets.
+
+For example:
+
+[
+\text{particle}
+\rightarrow
+\text{cell}
+\rightarrow
+\text{organism}
+]
+
+or
+
+[
+\text{metabolite}
+\rightarrow
+\text{cell}.
+]
+
+This relation is represented by a parent map
+
+[
+\pi :
+\text{child}
+\rightarrow
+\text{parent}.
+]
+
+Together these maps form a containment graph.
+
+A cell therefore does not need to be a special object in the engine. It can be
+represented as a parent containing particles, nuclei, metabolites, or any other
+child sets.
+
+\begin{lstlisting}[style=yaml]
+sets:
+cell:
+n: 100
+
+membrane_particle:
+parent: cell
+per_parent: 64
+
+nucleus:
+parent: cell
+per_parent: 1
+
+metabolite:
+parent: cell
+per_parent: 50
+\end{lstlisting}
+
+The engine does not know what a cell is.
+
+It only knows sets and containment maps.
+
+\subsection*{Types}
+
+A set may contain several parameter variants called types.
+
+For example:
+
+\begin{lstlisting}[style=yaml]
+sets:
+cell:
+n: 100
+types:
+soft:
+fraction: 0.5
+youngs: 20
+
+```
+  stiff:
+    fraction: 0.5
+    youngs: 200
+```
+
+\end{lstlisting}
+
+The rule is simple:
+
+\begin{itemize}
+\item Different state or different operators $\rightarrow$ new set.
+\item Same state and operators, different parameters $\rightarrow$ type.
+\end{itemize}
+
+For example:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lll}
+\toprule
+Object A & Object B & Representation \
+\midrule
+cell vs nucleus & different dynamics & two sets \
+cell vs metabolite & different dynamics & two sets \
+soft cell vs stiff cell & same dynamics & two types \
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Fields}
+
+A field is a continuous quantity defined on a grid.
+
+Examples include:
+
+\begin{itemize}
+\item chemical concentration,
+\item pressure,
+\item activation,
+\item stiffness,
+\item extracellular signal,
+\item substrate properties.
+\end{itemize}
+
+A field is not part of the containment graph.
+
+Cells do not contain fields and fields do not contain cells.
+
+Instead, fields communicate with sets through operators.
+
+\begin{lstlisting}[style=yaml]
+fields:
+chemical:
+frame: grid
+res: 128
+diffusion: 0.1
+decay: 0.01
+\end{lstlisting}
+
+The same field abstraction can represent a morphogen, a pheromone, a pressure
+field, or an activation wave.
+
+\section{Operators}
+
+Operators are the verbs of Plexus.
+
+They move information, force, state, or membership through the system.
+
+There are seven operator families.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lll}
+\toprule
+Operator & Relation & Purpose \
+\midrule
+Lateral & set $\leftrightarrow$ set & interaction within one set \
+Aggregate & child $\rightarrow$ parent & summarize upward \
+Broadcast & parent $\rightarrow$ child & copy downward \
+Exchange & set $\leftrightarrow$ field & push / pull \
+Rewire & relations & change neighbours \
+Divide & entities & create elements \
+Die & entities & remove elements \
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Lateral}
+
+Interactions inside one set.
+
+Examples:
+
+\begin{itemize}
+\item attraction,
+\item repulsion,
+\item adhesion,
+\item flocking,
+\item signalling,
+\item graph diffusion.
+\end{itemize}
+
+\subsection*{Aggregate}
+
+Moves information upward.
+
+Examples:
+
+\begin{itemize}
+\item particle centroid $\rightarrow$ cell position,
+\item metabolite totals $\rightarrow$ cell state.
+\end{itemize}
+
+\subsection*{Broadcast}
+
+Moves information downward.
+
+Examples:
+
+\begin{itemize}
+\item cell polarity $\rightarrow$ particles,
+\item cell force $\rightarrow$ particles.
+\end{itemize}
+
+\subsection*{Exchange}
+
+Couples sets and fields.
+
+We use the language:
+
+[
+\text{Push}
+:
+\text{set}
+\rightarrow
+\text{field}
+]
+
+[
+\text{Pull}
+:
+\text{field}
+\rightarrow
+\text{set}.
+]
+
+Examples:
+
+\begin{itemize}
+\item secretion = push,
+\item sensing = pull,
+\item particle-to-grid = push,
+\item grid-to-particle = pull.
+\end{itemize}
+
+\subsection*{Rewire}
+
+Changes who interacts with whom.
+
+Examples:
+
+\begin{itemize}
+\item radius graph,
+\item nearest-neighbour graph,
+\item membrane graph.
+\end{itemize}
+
+\subsection*{Divide and Die}
+
+Change which elements exist.
+
+Together they make growth, proliferation, and death first-class operations.
+
+\section{Schedules}
+
+A simulation is a schedule of operators.
+
+\begin{lstlisting}[style=yaml]
+schedule:
+
+* aggregate
+* sense
+* motility
+* secrete
+* diffuse
+  \end{lstlisting}
+
+Each operator contributes a change.
+
+The schedule composes these changes and advances the system one step.
+
+Different operators may run at different rates. Fast mechanics can run every
+tick while slower processes such as diffusion, growth, or division run less
+frequently.
+
+The schedule therefore defines the dynamics of the system.
+
+\section{Summary}
+
+Plexus is built from four concepts:
+
+\begin{itemize}
+\item Sets store discrete objects.
+\item Fields store continuous quantities.
+\item Operators transform them.
+\item Schedules compose operators through time.
+\end{itemize}
+
+Everything else --- tissues, morphogenesis, active matter, neural systems,
+metabolism, reaction--diffusion systems, growth, and death --- emerges from
+combinations of these primitives.
+
+
+\part*{Part I --- The abstraction}
+\addcontentsline{toc}{section}{Part I --- The abstraction}
+
 \section{Two entities: typed sets and fields}
 \label{sec:entities}
 

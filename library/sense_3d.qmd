@@ -33,7 +33,7 @@ Field -> set. Sample the field on a 3D sensor cone, steer the heading.
 
 ## Role in Plexus
 
-- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field scatter / gather.
+- **Kind** &mdash; $\mathcal{S},\mathcal{G}$ **Exchange**: set &harr; field push / pull.
 - **Acts on** &mdash; `cell` (the level the operator runs at).
 - **Reads** &mdash; `from`, `turn_speed`, `sensor_angle`, `sensor_dist`, `sensor_size`  (per-type props: `turn_speed`, `sensor_angle`, `sensor_dist`, `sensor_size`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.

@@ -35,7 +35,7 @@ A pure-state continuum: a C-channel scalar grid, NO behaviour.
 
 - **Frame** &mdash; `grid` (how the continuum is discretized).
 - **Couples to** &mdash; any set, via an `exchange` operator.
-- **Used by** &mdash; `exchange` operators (scatter / gather) and `field` self-dynamics.
+- **Used by** &mdash; `exchange` operators (push / pull) and `field` self-dynamics.
 
 ## Description
 

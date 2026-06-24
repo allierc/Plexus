@@ -226,6 +226,11 @@ def main():
     # STIFF: UNet(microscope) -> youngs in [stiff_lo, stiff_hi] (the youngs RANGE stays fixed; the UNet learns the spatial pattern)
     ap.add_argument("--stiff_lo", type=float, default=50.0)
     ap.add_argument("--stiff_hi", type=float, default=150.0)
+    ap.add_argument("--unet_fibre", type=int, default=0,
+                    help="1 = the UNet ALSO predicts a fibre-angle DEVIATION dθ(x,y) ADDED on top of the "
+                         "parametric fibre angle (microscope spatial detail over the smooth parametric base)")
+    ap.add_argument("--fibre_dev", type=float, default=1.5708,
+                    help="max |dθ| (rad) for the UNet fibre deviation (tanh-bounded); default π/2")
     ap.add_argument("--learn", default="all",
                     help="which group(s) to optimize this batch (partitioned sweeps): comma-list of "
                          "{fibre,stiff,gain,dur} or 'all'. Frozen groups stay at their init.")
@@ -275,7 +280,7 @@ def main():
     f_wl, f_ang, f_amp, f_ph = P(args.fibre_wl), P(args.fibre_angle), P(args.fibre_amp), P(args.fibre_phase)
     raw_g = _logit_init(args.gain0, GAIN_LO, GAIN_HI)                            # uniform global gain (bounded)
     raw_dur = _logit_init(args.dur0, DUR_LO, DUR_HI)                             # dur = DUR_LO+(DUR_HI-DUR_LO)*sigmoid(raw_dur)
-    net = UNet(out=1).to(dev)                                                    # STIFF: microscope image -> stiffness pattern
+    net = UNet(out=1 + int(args.unet_fibre)).to(dev)                             # ch0: stiffness; ch1 (opt): fibre-angle deviation
     ximg = load_image((RES, RES)).to(dev)[None, None]                           # [1,1,RES,RES] standardized, registered identity
     s_lo, s_hi = float(args.stiff_lo), float(args.stiff_hi)                      # fixed youngs range; UNet learns the pattern
     # partitioned learnable groups -- the loop sweeps ONE direction per batch, then combines ('all')
@@ -305,16 +310,19 @@ def main():
                                                padding_mode="border", align_corners=True)[0, 0, 0]
 
     def maps():
-        # FIBRE: contraction-axis angle theta(x,y) = pi * fibre_amp * aniso(fibre_wl, fibre_angle, fibre_phase)
+        uout = net(ximg)[0]                                                  # [out,RES,RES] one UNet pass (registered identity)
+        # FIBRE: parametric angle + OPTIONAL UNet deviation dθ(x,y) added on top (microscope spatial detail)
         wl_f = f_wl.clamp(min=4.0)
-        theta = PI * f_amp * aniso_field_torch(wl_f, f_ang, f_ph, dev)        # [RES,RES] angle map
+        theta = PI * f_amp * aniso_field_torch(wl_f, f_ang, f_ph, dev)        # [RES,RES] parametric angle
+        if args.unet_fibre:
+            theta = theta + args.fibre_dev * torch.tanh(uout[1])             # + bounded UNet deviation
         d = torch.stack([torch.cos(theta), torch.sin(theta)])                # [2,RES,RES] unit contraction axis
         # GAIN: a single UNIFORM GLOBAL learnable scalar (no spatial structure -- inert per the sweep)
         gain_g = GAIN_LO + (GAIN_HI - GAIN_LO) * torch.sigmoid(raw_g)        # scalar
         gain_p = gain_g * torch.ones(rest.shape[0], device=dev)              # [N] uniform
         gain_map = gain_g * torch.ones(RES, RES, device=dev)                 # [RES,RES] flat (for dashboard)
-        # STIFF: youngs pattern from the UNet on the microscope image (registered identity, same [y,x] layout)
-        stiff01 = torch.sigmoid(net(ximg)[0, 0])                             # [RES,RES] in [0,1]
+        # STIFF: youngs pattern from the UNet (channel 0) on the microscope image
+        stiff01 = torch.sigmoid(uout[0])                                     # [RES,RES] in [0,1]
         youngs_map = s_lo + (s_hi - s_lo) * stiff01                          # [RES,RES] in [stiff_lo, stiff_hi]
         youngs_p = sample_to_particles(youngs_map)                           # [N]
         return youngs_p, youngs_map, gain_p, gain_map, d, theta

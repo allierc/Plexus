@@ -35,7 +35,7 @@ The Eulerian background grid FIELD + the shared transfer kernel for the
 
 - **Frame** &mdash; `None` (how the continuum is discretized).
 - **Couples to** &mdash; any set, via an `exchange` operator.
-- **Used by** &mdash; `exchange` operators (scatter / gather) and `field` self-dynamics.
+- **Used by** &mdash; `exchange` operators (push / pull) and `field` self-dynamics.
 
 ## Description
 
