@@ -71,9 +71,8 @@ def fig_evolution():
                              facecolor="white", squeeze=False)
     for r, ((folder, label), ch) in enumerate(zip(rows, chans)):
         build_pdf.draw_row(axes[r], folder, label, ch)
-    fr = np.linspace(0, 200, build_pdf.NCOL).astype(int)
     for c in range(build_pdf.NCOL):
-        axes[0][c].set_title(f"t={fr[c]}", fontsize=8)
+        axes[0][c].set_title(f"t={build_pdf.FRAMES[c]}", fontsize=8)
     fig.suptitle("ground truth vs recovered (position loss) -- topologically matched, not pixel-identical",
                  fontsize=11, y=0.995)
     fig.tight_layout(rect=[0, 0, 1, 0.97]); fig.savefig(os.path.join(FIG, "fig_evolution.pdf")); plt.close(fig)

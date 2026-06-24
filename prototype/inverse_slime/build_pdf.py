@@ -26,7 +26,14 @@ METHODS = [
     ("slime_gd", "grad-desc 4D (field+move)"),
     ("slime_recovered", "UCB (black-box)"),
 ]
-NCOL = 5
+FRAMES = [0, 10, 20, 50, 200]                                 # real-time columns (t)
+TMAX = 200                                                    # max real time in a trajectory
+NCOL = len(FRAMES)
+
+
+def frame_indices(n):
+    """Map the real-time FRAMES to indices of an array with `n` saved frames spanning 0..TMAX."""
+    return [int(round(t * (n - 1) / TMAX)) for t in FRAMES]
 
 
 def have(folder):
@@ -43,7 +50,7 @@ def draw_row(axes_row, folder, label, channel):
     multitype = nt is not None and int(nt.max()) > 0
     arr = np.asarray(d["cell__pos"]) if channel == "cell" else np.asarray(d["chemical__grid"])
     vmax = float(arr.max() ** 0.7) if channel != "cell" else 0
-    fr = np.linspace(0, arr.shape[0] - 1, NCOL).astype(int)
+    fr = frame_indices(arr.shape[0])
     for c, t in enumerate(fr):
         ax = axes_row[c]
         if channel == "cell":
@@ -78,9 +85,8 @@ def page(pdf, channel, methods):
                 axes[r][c].axis("off")
             axes[r][0].text(0.0, 0.5, f"{label}\n(not generated yet)", fontsize=8)
     # column-time titles on the top row
-    fr = np.linspace(0, 200, NCOL).astype(int)
     for c in range(NCOL):
-        axes[0][c].set_title(f"t={fr[c]}", fontsize=8)
+        axes[0][c].set_title(f"t={FRAMES[c]}", fontsize=8)
     fig.tight_layout(rect=[0, 0, 1, 0.97]); pdf.savefig(fig); plt.close(fig)
 
 
@@ -96,9 +102,8 @@ def target_page(pdf, channel, ti):
     fig.suptitle(f"{ch} -- target {ti}: GT vs position-loss recovery", fontsize=13, y=0.99)
     for r, (folder, label) in enumerate(rows):
         draw_row(axes[r], folder, label, channel)
-    fr = np.linspace(0, 200, NCOL).astype(int)
     for c in range(NCOL):
-        axes[0][c].set_title(f"t={fr[c]}", fontsize=8)
+        axes[0][c].set_title(f"t={FRAMES[c]}", fontsize=8)
     fig.tight_layout(rect=[0, 0, 1, 0.97]); pdf.savefig(fig); plt.close(fig)
     return True
 
@@ -185,9 +190,8 @@ def main():
                     fig.suptitle(f"{cn} -- {lab} slime: GT vs recovery (cross identifiable)", fontsize=13, y=0.99)
                     for r, (folder, label) in enumerate(rows):
                         draw_row(axes[r], folder, label, ch)
-                    frr = np.linspace(0, 200, NCOL).astype(int)
                     for cc in range(NCOL):
-                        axes[0][cc].set_title(f"t={frr[cc]}", fontsize=8)
+                        axes[0][cc].set_title(f"t={FRAMES[cc]}", fontsize=8)
                     fig.tight_layout(rect=[0, 0, 1, 0.97]); pdf.savefig(fig); plt.close(fig); npages += 1
     print("wrote", OUT, "-- pages:", npages)
 

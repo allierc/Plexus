@@ -157,7 +157,7 @@ colony (see [Simulations](experiment.qmd) for the full runs):
 
 ## Read the blueprint
 
-This site distils a working prototype into a single blueprint, in four parts:
+This site distils a working prototype into a single blueprint, in three parts:
 
 - **[The abstraction](abstraction.qmd)** — the missing primitive: a hierarchical
   graph container stated in the language of sets, fields, and four operators.
@@ -165,8 +165,6 @@ This site distils a working prototype into a single blueprint, in four parts:
   declarative language that lets an LLM drive a registry of operators.
 - **[Simulations](experiment.qmd)** — ten distinct simulations, an emergent
   ant-trail model, and a maze-foraging colony optimized end-to-end.
-- **[Building Plexus](building.qmd)** — the proposed repository methodology and
-  the invariants that hold the line.
 
 A static version with full schematics and glossary is in
 [`paper/plexus.pdf`](paper/plexus.pdf).

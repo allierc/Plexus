@@ -25,9 +25,8 @@ def page_fig(rows, channel, title):
     fig.suptitle(title, fontsize=12, y=0.99)
     for r, (folder, label) in enumerate(rows):
         B.draw_row(axes[r], folder, label, channel)
-    fr = np.linspace(0, 200, NCOL).astype(int)
     for c in range(NCOL):
-        axes[0][c].set_title(f"t={fr[c]}", fontsize=8)
+        axes[0][c].set_title(f"t={B.FRAMES[c]}", fontsize=8)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     return fig
 
