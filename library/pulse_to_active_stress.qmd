@@ -164,6 +164,9 @@ class PulseToActiveStress(Exchange):
         n = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2] contraction axis
         n = n / n.norm(dim=1, keepdim=True).clamp(min=1e-9)                        # unit
         gate = (a * lvl.occ).clamp(min=0.0)                                       # only inactive=0 particles off
+        gain = getattr(lvl, "gain", None)                                         # optional per-particle gain map
+        if gain is not None:                                                      # (apply_material_map target=gain)
+            gate = gate * gain                                                    # spatially-structured contraction gain
         if mask is not None:
             gate = gate * mask.float()
         nn = n[:, :, None] * n[:, None, :]                                        # [N, 2, 2]  n n^T

@@ -1,0 +1,105 @@
+---
+title: "Operators"
+subtitle: "How state moves &mdash; grouped by kind, in the visual language of Figure 1"
+resources:
+  - gallery/
+---
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+
+The logo marks the operator **kind** in the visual language of [Figure 1](index.qmd) (`paper/fig_ops.tex`).
+
+## <img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym">$\mathcal{O}_E$</span>
+
+*Within-set interaction over a relation $E$.*
+
+::: {.op-grid}
+<a class="op-card" href="library/Coulomb.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Coulomb</span><span class="op-card-sub">The electrostatic inverse-square law between charged particles.</span></span></a>
+<a class="op-card" href="library/advance.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">advance</span><span class="op-card-sub">Set (lateral). Self-propulsion: move along the heading at speed.</span></span></a>
+<a class="op-card" href="library/advance_3d.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">advance_3d</span><span class="op-card-sub">Set (lateral). Self-propulsion along a 3D heading vector.</span></span></a>
+<a class="op-card" href="library/alignment.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">alignment</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a>
+<a class="op-card" href="library/attraction_repulsion.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">attraction_repulsion</span><span class="op-card-sub">Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.</span></span></a>
+<a class="op-card" href="library/bounce.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">bounce</span><span class="op-card-sub">Set. Reflect a self-propelled agent off the domain walls / obstacles.</span></span></a>
+<a class="op-card" href="library/bounce_3d.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">bounce_3d</span><span class="op-card-sub">Set (lateral). Reflect a 3D agent's heading off the domain walls.</span></span></a>
+<a class="op-card" href="library/cohesion.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">cohesion</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a>
+<a class="op-card" href="library/drag.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">drag</span><span class="op-card-sub">Viscous friction as a composable operator (not an integration knob).</span></span></a>
+<a class="op-card" href="library/gravity.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">gravity</span><span class="op-card-sub">A uniform body force at the cell level.</span></span></a>
+<a class="op-card" href="library/mpm_anchor.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_anchor</span><span class="op-card-sub">A substrate/boundary rest-anchor body force for MLS-MPM particles.</span></span></a>
+<a class="op-card" href="library/mpm_drag.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_drag</span><span class="op-card-sub">Viscous body drag for MLS-MPM particles (a force, not an integrator knob).</span></span></a>
+<a class="op-card" href="library/mpm_strain.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">mpm_strain</span><span class="op-card-sub">Mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material update.</span></span></a>
+<a class="op-card" href="library/separation.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">separation</span><span class="op-card-sub">A boids steering rule (Lateral, second-derivative).</span></span></a>
+:::
+
+## <img class="kind-h" src="figures/icons/aggregate.png"> Aggregate <span class="kind-sym">$\textstyle\sum_\pi$</span>
+
+*Children &rarr; parent, up the containment $\pi$.*
+
+::: {.op-grid}
+<a class="op-card" href="library/aggregate.html"><img src="figures/icons/aggregate.png" alt="aggregate"><span class="op-card-body"><span class="op-card-name">aggregate</span><span class="op-card-sub">Children -> parent. Reduce a contained set onto its parent.</span></span></a>
+:::
+
+## <img class="kind-h" src="figures/icons/broadcast.png"> Broadcast <span class="kind-sym">$\pi^*$</span>
+
+*Parent &rarr; children, down the containment $\pi$.*
+
+::: {.op-grid}
+<a class="op-card" href="library/broadcast.html"><img src="figures/icons/broadcast.png" alt="broadcast"><span class="op-card-body"><span class="op-card-name">broadcast</span><span class="op-card-sub">Parent -> children. Lift a parent quantity onto its children.</span></span></a>
+:::
+
+## <img class="kind-h" src="figures/icons/exchange.png"> Exchange <span class="kind-sym">push / pull</span>
+
+*Set &harr; field.*
+
+::: {.op-grid}
+<a class="op-card" href="library/apply_material_map.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">apply_material_map</span><span class="op-card-sub">A static image FIELD read from a TIFF, plus `apply_material_map`,</span></span></a>
+<a class="op-card" href="library/chemotaxis.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">chemotaxis</span><span class="op-card-sub">Set <- field. Particles climb (or flee) a field's gradient.</span></span></a>
+<a class="op-card" href="library/deposit.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">deposit</span><span class="op-card-sub">Set -> field. Each agent adds to the field at its own pixel.</span></span></a>
+<a class="op-card" href="library/g2p.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">g2p</span><span class="op-card-sub">G2p (mpm_grid -> particle): the MLS-MPM grid-to-particle gather + advection.</span></span></a>
+<a class="op-card" href="library/mls_mpm_mechanics.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">mls_mpm_mechanics</span><span class="op-card-sub">A FENCED TRANSITIONAL operator wrapping the MLS-MPM solver.</span></span></a>
+<a class="op-card" href="library/p2g.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">p2g</span><span class="op-card-sub">P2g (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter.</span></span></a>
+<a class="op-card" href="library/pulse_to_active_stress.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">pulse_to_active_stress</span><span class="op-card-sub">The STRESS half: activation field -> per-particle active stress.</span></span></a>
+<a class="op-card" href="library/pulse_to_contraction.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">pulse_to_contraction</span><span class="op-card-sub">The FORCE half: activation field -> per-particle MPM force.</span></span></a>
+<a class="op-card" href="library/sense.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense</span><span class="op-card-sub">Field -> set. Sample the field at 3 sensors, turn the heading.</span></span></a>
+<a class="op-card" href="library/sense_3d.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense_3d</span><span class="op-card-sub">Field -> set. Sample the field on a 3D sensor cone, steer the heading.</span></span></a>
+:::
+
+## <img class="kind-h" src="figures/icons/field_dyn.png"> Field <span class="kind-sym">$\partial_t\phi$</span>
+
+*A field's own self-dynamics.*
+
+::: {.op-grid}
+<a class="op-card" href="library/decay.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">decay</span><span class="op-card-sub">Field -> field. Linear evaporation of a scalar field.</span></span></a>
+<a class="op-card" href="library/diffuse.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">diffuse</span><span class="op-card-sub">Field -> field. One discrete diffusion step on a scalar field.</span></span></a>
+<a class="op-card" href="library/mpm_grid_update.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">mpm_grid_update</span><span class="op-card-sub">Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.</span></span></a>
+<a class="op-card" href="library/pacemaker.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">pacemaker</span><span class="op-card-sub">A clocked scalar SOURCE: a periodic activation signal p(t).</span></span></a>
+<a class="op-card" href="library/phase_delay_pulse.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">phase_delay_pulse</span><span class="op-card-sub">A clocked activation field with a SPATIAL phase delay tau(x,y).</span></span></a>
+<a class="op-card" href="library/playback.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">playback</span><span class="op-card-sub">A scalar field *prescribed* from an external video, plus the</span></span></a>
+<a class="op-card" href="library/pulse_stimulus.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">pulse_stimulus</span><span class="op-card-sub">The SPATIAL half of an active stimulus: paint an activation field.</span></span></a>
+:::
+
+## <img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym">$\mathcal{R}\!:E$</span>
+
+*Rebuild the relation $E$ each tick.*
+
+::: {.op-grid}
+<a class="op-card" href="library/radius_graph.html"><img src="figures/icons/rewire.png" alt="rewire"><span class="op-card-body"><span class="op-card-name">radius_graph</span><span class="op-card-sub">Relation-building (rewire) operators: construct a Level's `edge_index`.</span></span></a>
+:::

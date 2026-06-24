@@ -165,10 +165,29 @@ window.Quarto = {
     <a class="nav-link" href="../methodology.html"> 
 <span class="menu-text">LLM ↔︎ registry</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="../library.html"> 
-<span class="menu-text">Library</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library.html">
+ <span class="dropdown-text">Overview</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="../experiment.html"> 
 <span class="menu-text">Simulations</span></a>
@@ -233,7 +252,7 @@ window.Quarto = {
 
 
 <div class="op-head">
-<p><img src="../figures/icons/field.png" class="op-logo img-fluid"></p>
+<p><img src="../figures/icons/field_dyn.png" class="op-logo img-fluid"></p>
 <p><span class="op-badge"><code>field</code></span> <span class="op-badge"><code>acts on: field</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
 <p>One explicit step of isotropic diffusion on a scalar field — a per-channel 3×3 box-blur lerp that is exactly one forward-Euler step of <span class="math inline">\(\partial_t c = D\,\nabla^2 c\)</span> with edge-clamped boundaries. It mutates the field in place and returns nothing; it is the spreading half of every reaction–diffusion and stigmergy schedule.</p>
 </div>

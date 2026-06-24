@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>mpm_drag – Plexus</title>
+<title>mpm_anchor – Plexus</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -216,7 +216,6 @@ window.Quarto = {
   <ul>
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#equation" id="toc-equation" class="nav-link" data-scroll-target="#equation">Equation</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
   <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
@@ -230,8 +229,8 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">mpm_drag</h1>
-<p class="subtitle lead">Viscous body drag for MLS-MPM particles (a force, not an integrator knob).</p>
+<h1 class="title">mpm_anchor</h1>
+<p class="subtitle lead">A substrate/boundary rest-anchor body force for MLS-MPM particles.</p>
 </div>
 
 
@@ -251,7 +250,7 @@ window.Quarto = {
 <div class="op-head">
 <p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
 <p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
-<p>Viscous body drag for MLS-MPM particles (a force, not an integrator knob).</p>
+<p>A substrate/boundary rest-anchor body force for MLS-MPM particles.</p>
 </div>
 <style>
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
@@ -283,15 +282,8 @@ window.Quarto = {
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>acc = -k * vel, returned as a particle-level delta the engine sums into H.delta(mpm_particle); the MLS-MPM <code>p2g</code> scatter consumes it as a body force (a_ext += H.delta(particle)). <code>PREDICTION=None</code>: the engine does not integrate the particle set (g2p owns advection), so the drag enters mechanics only through the substep – exactly like the contraction force. This is the composable-operator form of friction (plexus.tex Part IV: “friction is the <code>drag</code> operator, not a knob in the integrator”); it replaces <code>p2g</code>’s built-in <code>drag</code> param, so set <code>p2g drag: 0</code> and add <code>mpm_drag</code> to the schedule instead. Large k -&gt; the overdamped (quasi-static, tissue) regime where the sheet creeps to a/k and relaxes without ringing.</p>
-</section>
-<section id="equation" class="level2">
-<h2 class="anchored" data-anchor-id="equation">Equation</h2>
-<p><span class="math display">\[
-\mathbf a_i = -\,k\,\mathbf v_i
-\qquad\longrightarrow\qquad
-\mathbf a_{\text{ext}} \mathrel{+}= \mathbf a_i
-\]</span> Viscous body drag as a particle delta that <code>p2g</code> consumes as a body force (not an integrator knob). Large <span class="math inline">\(k\)</span> gives the overdamped, tissue-like regime that creeps to <span class="math inline">\(\mathbf a/k\)</span> without ringing. Replaces <code>p2g</code>’s built-in <code>drag</code>.</p>
+<p>acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle) and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward their REST positions – the cultured-sheet “attached substrate” of the cardio prototype (p1_aniso’s <code>k_anchor</code>). <code>mode: boundary</code> (default) anchors only the outer RING of the tissue (width <code>ring</code> in world units), pinning the edges so the sheet cannot globally breathe/translate while the interior moves freely – the condition that exposes whether LOCAL loops come from material structure rather than a global mode. <code>mode: substrate</code> anchors EVERY particle (global self-relaxation, as p1_aniso).</p>
+<p><code>PREDICTION=None</code>: not engine-integrated; enters mechanics only through the MPM substep body force. Rest positions are captured on the first call (frame 0 = the undeformed sheet).</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
@@ -306,8 +298,18 @@ window.Quarto = {
 <tbody>
 <tr class="odd">
 <td><code>k</code></td>
-<td>drag_coefficient</td>
+<td>anchor_stiffness</td>
 <td><strong>required</strong></td>
+</tr>
+<tr class="even">
+<td><code>ring</code></td>
+<td>boundary_width</td>
+<td>0.04</td>
+</tr>
+<tr class="odd">
+<td><code>mode</code></td>
+<td>anchor_extent</td>
+<td>“boundary”</td>
 </tr>
 </tbody>
 </table>
@@ -315,11 +317,11 @@ window.Quarto = {
 <section id="minimal-spec" class="level2">
 <h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
 <div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm_drag</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">k</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm_anchor</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">k</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
-<p><strong>Mechanism</strong> — <span class="op-badge"><code>viscous_drag</code></span> <span class="op-badge"><code>overdamped</code></span></p>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>substrate_anchor</code></span> <span class="op-badge"><code>boundary_condition</code></span> <span class="op-badge"><code>rest_restoring</code></span></p>
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
@@ -327,46 +329,63 @@ window.Quarto = {
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
-<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_drag.py"><code>src/plexus/operators/mpm_drag.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""mpm_drag -- viscous body drag for MLS-MPM particles (a force, not an integrator knob).</span></span>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/mpm_anchor.py"><code>src/plexus/operators/mpm_anchor.py</code></a> — the registered operator.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""mpm_anchor -- a substrate/boundary rest-anchor body force for MLS-MPM particles.</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">acc = -k * vel, returned as a particle-level delta the engine sums into</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">H.delta(mpm_particle); the MLS-MPM `p2g` scatter consumes it as a body force</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">(a_ext += H.delta(particle)). `PREDICTION=None`: the engine does not integrate the</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">particle set (g2p owns advection), so the drag enters mechanics only through the</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">substep -- exactly like the contraction force. This is the composable-operator form of</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">friction (plexus.tex Part IV: "friction is the `drag` operator, not a knob in the</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">integrator"); it replaces `p2g`'s built-in `drag` param, so set `p2g drag: 0` and add</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">`mpm_drag` to the schedule instead. Large k -&gt; the overdamped (quasi-static, tissue)</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">regime where the sheet creeps to a/k and relaxes without ringing.</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle)</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">their REST positions -- the cultured-sheet "attached substrate" of the cardio prototype (p1_aniso's</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">`k_anchor`). `mode: boundary` (default) anchors only the outer RING of the tissue (width `ring` in</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">world units), pinning the edges so the sheet cannot globally breathe/translate while the interior</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">moves freely -- the condition that exposes whether LOCAL loops come from material structure rather</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">than a global mode. `mode: substrate` anchors EVERY particle (global self-relaxation, as p1_aniso).</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">`PREDICTION=None`: not engine-integrated; enters mechanics only through the MPM substep body force.</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">Rest positions are captured on the first call (frame 0 = the undeformed sheet).</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mpm_drag"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MPMDrag(Lateral):</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    PREDICTION <span class="op">=</span> <span class="va">None</span>                 <span class="co"># consumed by the MPM substep as a body force, not engine-integrated</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"k"</span>]</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"viscous_drag"</span>, <span class="st">"overdamped"</span>]</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"k"</span>: <span class="st">"drag_coefficient"</span>}</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.k <span class="op">=</span> <span class="bu">float</span>(params[<span class="st">"k"</span>])</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> <span class="op">-</span><span class="va">self</span>.k <span class="op">*</span> lvl.get(<span class="st">"vel"</span>) <span class="op">*</span> lvl.occ[:, <span class="va">None</span>]           <span class="co"># -k v: opposes the particle velocity</span></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>            acc <span class="op">=</span> acc <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: acc}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mpm_anchor"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MPMAnchor(Lateral):</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    PREDICTION <span class="op">=</span> <span class="va">None</span>                 <span class="co"># consumed by the MPM substep as a body force, not engine-integrated</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"k"</span>]</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"substrate_anchor"</span>, <span class="st">"boundary_condition"</span>, <span class="st">"rest_restoring"</span>]</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"k"</span>: <span class="st">"anchor_stiffness"</span>, <span class="st">"ring"</span>: <span class="st">"boundary_width"</span>, <span class="st">"mode"</span>: <span class="st">"anchor_extent"</span>}</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.k <span class="op">=</span> <span class="bu">float</span>(params[<span class="st">"k"</span>])</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.mode <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"mode"</span>, <span class="st">"boundary"</span>))       <span class="co"># "boundary" ring | "substrate" all</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ring <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"ring"</span>, <span class="fl">0.04</span>))           <span class="co"># ring width (world units) for mode=boundary</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._rest <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._sel <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _init(<span class="va">self</span>, lvl):</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._rest <span class="op">=</span> lvl.get(<span class="st">"pos"</span>).clone()                   <span class="co"># undeformed sheet (frame 0)</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.mode <span class="op">==</span> <span class="st">"substrate"</span>:</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._sel <span class="op">=</span> torch.ones(<span class="va">self</span>._rest.shape[<span class="dv">0</span>], dtype<span class="op">=</span>torch.<span class="bu">bool</span>, device<span class="op">=</span><span class="va">self</span>._rest.device)</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                 <span class="co"># outer ring of the tissue's rest extent</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>            lo <span class="op">=</span> <span class="va">self</span>._rest.<span class="bu">min</span>(<span class="dv">0</span>).values</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>            hi <span class="op">=</span> <span class="va">self</span>._rest.<span class="bu">max</span>(<span class="dv">0</span>).values</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>            near <span class="op">=</span> ((<span class="va">self</span>._rest <span class="op">-</span> lo) <span class="op">&lt;</span> <span class="va">self</span>.ring) <span class="op">|</span> ((hi <span class="op">-</span> <span class="va">self</span>._rest) <span class="op">&lt;</span> <span class="va">self</span>.ring)   <span class="co"># [N,2]</span></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._sel <span class="op">=</span> near.<span class="bu">any</span>(dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>._rest <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._init(lvl)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> <span class="va">self</span>.k <span class="op">*</span> (<span class="va">self</span>._rest <span class="op">-</span> lvl.get(<span class="st">"pos"</span>)) <span class="op">*</span> (<span class="va">self</span>._sel <span class="op">*</span> lvl.occ)[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>            acc <span class="op">=</span> acc <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: acc}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

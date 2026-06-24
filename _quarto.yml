@@ -16,8 +16,16 @@ website:
         text: The abstraction
       - href: methodology.qmd
         text: LLM ↔ registry
-      - href: library.qmd
-        text: Library
+      - text: Library
+        menu:
+          - href: library.qmd
+            text: Overview
+          - href: library_sets.qmd
+            text: Sets
+          - href: library_fields.qmd
+            text: Fields
+          - href: library_operators.qmd
+            text: Operators
       - href: experiment.qmd
         text: Simulations
       - href: inverse.qmd
