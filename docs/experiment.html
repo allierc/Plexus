@@ -364,28 +364,28 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/slime_filaments_trail.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/slime_labyrinth.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">slime_filaments_trail<span class="sim-spec"><pre># slime_filaments -- narrow sensor cone + low turn -&gt; long, straight, branching filaments.
-general: {name: slime_filaments, seed: 0, n_frames: 450, record_every: 4, boundary: wall}
+      <span class="sim-name" tabindex="0">slime_labyrinth<span class="sim-spec"><pre># slime_labyrinth -- uniform spawn + low turn + low decay + wide cone -&gt; a space-filling
+# Turing maze of evenly spaced corridors (distinct from the radial filament colony).
+general: {name: slime_labyrinth, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
 sets:
   cell:
-    n: 13000
-    spawn: disc
-    spawn_radius: 0.3
+    n: 16000
+    spawn: random
     types:
-      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 30, sensor_dist: 0.03, sensor_size: 1}
 fields:
-  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.01, diffuse: 0.3, couples_to: cell}
+  trail: {frame: trail, res: 240, deposit: 0.7, decay: 0.045, diffuse: 0.26, couples_to: cell}
 operators:
 - {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
 schedule: [slime, trail.diffuse]
 plotting:
   colors:
-    a: [0.2, 0.95, 0.65]
+    a: [0.35, 0.8, 1.0]
   background: black
   gamma: 0.7</pre></span></span>
-      <span class="sim-cap">filaments, trail-field view</span>
+      <span class="sim-cap">uniform seed + high decay → a persistent space-filling labyrinth</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
