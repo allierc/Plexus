@@ -32,3 +32,17 @@ plotting:
     q_n3: [0.5, 0.5, 0.5]
   splat_size: 1.9
   splat_res: 820
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cluster of particles that remains relatively stationary
+      in the center of the frame. Over time, the particles exhibit subtle internal movements and fluctuations
+      in their spatial distribution. The overall shape of the cluster maintains a roughly diamond-like
+      orientation throughout the sequence. There is no significant expansion or contraction of the group,
+      indicating a stable equilibrium or a bounded system.
+    objects: 'The scene contains three distinct sets of small, point-like particles: red, grey, and blue.
+      These particles are densely packed together in a central cluster, forming a complex, overlapping
+      topology. The red particles are distributed throughout the core, while the grey particles appear
+      more numerous and form the primary bulk of the cluster. The blue particles are the least frequent
+      and are scattered sparsely among the other two colors.'

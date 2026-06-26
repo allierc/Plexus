@@ -36,3 +36,40 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: 'The video shows a black background with a gray square that changes its position.
+
+      Initially, the gray square is located in the top right corner of the frame.
+
+      As time progresses, the square moves diagonally towards the bottom left.
+
+      Finally, the square settles in the bottom right corner of the frame.'
+    objects: 'The scene contains a single gray square object.
+
+      The square is solid gray in color and has a uniform size.
+
+      It is positioned against a solid black background.
+
+      The square''s position changes relative to the frame''s corners over time.'
+  movie_cell:
+    description: The simulation shows a dense collection of blue particles distributed within a square
+      boundary. Over the course of the video, the particles undergo subtle stochastic fluctuations in
+      their positions. The overall density and spatial distribution of the blue field remain constant
+      throughout the sequence. There is no discernible global motion or large-scale structural evolution
+      in the system.
+    objects: The scene contains a large number of small, blue, irregularly shaped particles. These particles
+      are arranged in a high-density, disordered distribution that fills a square area. Each individual
+      particle is roughly uniform in size and color. The particles are not connected to one another, forming
+      a granular, point-like field.
+  movie_mpm_particle:
+    description: The simulation shows a static distribution of blue particles within a square boundary.
+      There is no visible movement or evolution of the particles across the four keyframes. The spatial
+      arrangement of the dots remains constant throughout the sequence. The overall density and pattern
+      of the field do not change over time.
+    objects: The scene contains a large number of small, blue dots scattered across a white background.
+      These particles are arranged in a stochastic, non-uniform distribution within a square frame. Each
+      individual dot is tiny and appears as a single pixel or a small cluster of pixels. The dots are
+      disconnected from one another, forming a granular field rather than a continuous structure.

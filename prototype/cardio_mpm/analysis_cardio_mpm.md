@@ -1829,35 +1829,50 @@ Q39 opened.)
 ## Current Batch
 
 ### Batch info
-**PHASE 2 BATCH 13 [learn=gain,dur — PIN CONVERGED DEPTH N\* + GAIN-INIT SWEEP] — PARAMETRIC INVERSE.**
-Parent: b12.s0 (R²=−0.999, 2400 iter, dur_hi=30, learn=gain,dur, fibre FROZEN at b4.s1 values, stiff=[100,100], gain0=0.854).
-Batch 12 showed the depth monotone continues (Δ per doubling 1200→2400=0.412, NOT converged) and that gain init=0.7 is a new lever
-(Δ=0.201 at 1200it). The model is 2 learnable scalars (gain + dur). Runner = `cardio_mpm_train2.py`.
+**LOOPSCORE BATCH 1 [BASELINE + RE-TEST R²-ERA CLOSURES] — 2026-06-26**
+Parent: archive p2_b14_s1 (gain0=0.5, learn=fibre,gain,dur, 2400it, fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41,
+stiff=[100,100] uniform, amp=10, drag=30, dur0=14, dur_hi=30). **LS=0.589, LS_SD=0.080** — the LoopScore baseline.
+
+This is the FIRST batch under the LoopScore objective. The archive p2_b14 runs established a baseline:
+- Best: s1 gain0=0.5 co-learn → LS=0.589, SD=0.080, chir+=0.69 (best uniformity + chirality)
+- The 5 non-catastrophic slots cluster tightly: LS 0.567–0.589 (spread only 0.022)
+- SIREN fibre (s2, omega=5) was CATASTROPHIC: LS=0.079, ampL=9.49 (massive overshoot)
+- Deeper optimization (s0, 3600it at gain0=0.854) was WORSE than 2400it (LS=0.567 < 0.589)
+- amp=12, drag=60, dur_hi=40 all within noise of baseline
+
+Surprise (from archive baseline): "Deeper optimization (3600it) DEGRADED LoopScore relative to 2400it (0.567 vs 0.589).
+Under R², depth was monotonically beneficial. The LoopScore landscape may be fundamentally different — overfitting the
+loss doesn't improve the clamped score, or the optimizer overshoots past the LS optimum."
+
+Observation: "The tight clustering (LS 0.567–0.589) suggests the 2-scalar model (gain+dur) may be near its expressiveness
+ceiling — spatial fields (stiffness, fibre) are needed to break through. But SIREN fibre was catastrophic, and SIREN
+stiffness is untested under LoopScore."
 
 ### Current hypothesis
-"The optimizer has NOT converged at 2400 iter (Δ per doubling=0.412 >> 0.05), so deeper runs (3600, 4800) should continue the
-monotone — eventually bracketing N\* where Δ per doubling < 0.05. Meanwhile, gain0=0.7 beat 0.854 by Δ=0.201 at 1200it — if
-this advantage transfers to 2400+ depth, it is a free +0.2 lift. A gain-init sweep (0.5, 0.7) at 2400it + deeper runs at 0.7
-should find the best combination of depth × gain-init. Fibre co-learning is CLOSED (gap widening with depth)."
+"Spatial stiffness was INERT under R² (SIREN converged to uniform, no gradient signal). Under LoopScore — which penalizes
+per-node loop morphology — a coarse SIREN stiffness field (omega=5, range 50–150) may carry gradient signal because LS
+measures node-by-node shape disagreement: softer regions need bigger loops, stiffer regions smaller, enabling spatially-tuned
+morphology that R² couldn't drive. This is the highest-priority R²-era closure to re-test."
 
 ### Slots this batch
-PIN DEPTH N\* + GAIN-INIT SWEEP (base = b12.s0, stiff=[100,100], dur_hi=30, amp=10, drag=30, fibre FROZEN, material_aniso_cardio):
-- s0 iter3600 — gain,dur (fibre FROZEN), 3600 iters, gain0=0.854 (continue depth push — Δ from 2400→3600?)
-- s1 iter4800 — gain,dur (fibre FROZEN), 4800 iters, gain0=0.854 (bracket N\*: if Δ(2400→4800)<0.05 per doubling, N\*≈2400)
-- s2 iter2400_gain07 — gain,dur (fibre FROZEN), 2400 iters, gain0=0.7 (does gain-init advantage transfer to depth? Q39)
-- s3 iter3600_gain07 — gain,dur (fibre FROZEN), 3600 iters, gain0=0.7 (combine best init with deeper opt)
-- s4 iter2400_gain05 — gain,dur (fibre FROZEN), 2400 iters, gain0=0.5 (sweep gain init lower — monotone or turnover?)
-- s5 iter2400_gain10_abl — gain,dur (fibre FROZEN), 2400 iters, gain0=1.0 (ABLATION: is warm-start STILL critical at 2400it?)
+BASELINE + RE-TEST R²-ERA CLOSURES (parent = archive s1: gain0=0.5, learn=fibre,gain,dur, 2400it, stiff=[100,100],
+fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, amp=10, drag=30, dur0=14, dur_hi=30):
+
+- s0 b1_control (CONTROL) — exact parent reproduction: gain0=0.5, learn=fibre,gain,dur, n_iter=2400
+- s1 b1_frozen (EXPLOIT) — fibre FROZEN, learn=gain,dur only: does co-learn help or hurt under LS? (R²-era: hurt at depth)
+- s2 b1_depth3600 (EXPLOIT) — n_iter=3600 at gain0=0.5: does depth help at the better gain init?
+- s3 b1_stiff_coarse (EXPLOIT) — add SIREN stiffness (stiff_src=siren, siren_omega=5, stiff_lo=50, stiff_hi=150),
+  learn=fibre,gain,dur,stiff: re-test stiffness under LS with coarse field
+- s4 b1_gain03 (EXPLORE) — gain0=0.3: push gain lower — is LS-vs-gain monotone or does it turn over?
+- s5 b1_amp12_g05 (EXPLORE) — amplitude=12, gain0=0.5: test amp×gain interaction under LS (archive tested amp12 at gain0=0.854)
 
 ### Emerging observations
 **CRITICAL: this section must ALWAYS be at the END of the file.**
 
-_(Phase 2 b12, 2026-06-25) OPTIMIZATION DEPTH 2400it — FIRST R² crossing −1.0 (b12.s0, −0.999). The depth monotone continues
-but is DECELERATING: Δ per doubling drops from 0.747 (600→1200) to 0.412 (1200→2400). NOT converged per Δ<0.05 criterion —
-need 3600/4800 to pin N\*. SURPRISE: gain init=0.7 (b12.s5, −1.210 at 1200it) BEATS default 0.854 (−1.411) by Δ=0.201 — a
-previously unsuspected lever. This changes the parent going forward: if the advantage holds at depth, gain0=0.7 is the new
-default. Fibre co-learn gap WIDENS with depth (0.026→0.064) — co-learning is closed. Amplitude >10 re-confirmed harmful at
-1200it depth (amp12 −1.746, amp15 −2.380). The two live levers are DEPTH (continue pushing) and GAIN INIT (sweep downward)._
+_(LoopScore Batch 1, 2026-06-26) FIRST BATCH under LoopScore. Archive baseline established at LS=0.589 (gain0=0.5,
+fibre+gain+dur co-learn, 2400it). Key prior: under R², spatial fields (SIREN stiffness, SIREN fibre) were dead/harmful —
+both tagged provisional@R²→LS. The LoopScore per-node objective may provide different gradient signal for spatial variation.
+The tight LS clustering (0.567–0.589) in the archive suggests the scalar model may be at its expressiveness ceiling._
 
 
 </details>

@@ -37,3 +37,26 @@ schedule:
   - pulse_to_contraction
   - mpm_drag
   - {substep: 10, dt: 2.0e-4, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a dense field of blue particles distributed within a square boundary.
+      Over time, the particles undergo a subtle redistribution, shifting slightly in position while maintaining
+      a high overall density. The distribution remains relatively uniform throughout the sequence, with
+      no significant clustering or large-scale movement. The final frame shows a nearly identical state
+      to the initial frame, indicating a steady-state or highly localized fluctuation.
+    objects: The scene contains a large number of small, blue particles. These particles are arranged
+      in a dense, stochastic distribution that fills a square area. Each individual particle is tiny and
+      appears as a single pixel or a small cluster of pixels. The particles are not connected to one another,
+      forming a granular, cloud-like texture.
+  movie_mpm_particle:
+    description: The simulation shows a large collection of blue particles distributed within a square
+      boundary. Over time, the particles exhibit a subtle shift in their spatial distribution, moving
+      from a relatively uniform state toward a more concentrated pattern. A slight increase in density
+      is visible in the central region as the simulation progresses. The overall movement appears stochastic,
+      with individual particles shifting positions while maintaining a general global structure.
+    objects: The scene contains thousands of small, blue, point-like particles. These particles are arranged
+      in a dense, two-dimensional field that fills a square area. They are not connected to one another,
+      appearing as independent agents or points in a continuous field. The size of each individual particle
+      is uniform and very small relative to the overall dimensions of the square.

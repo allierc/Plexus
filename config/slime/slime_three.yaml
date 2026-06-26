@@ -29,23 +29,24 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a complex system of particles moving in fluid-like, undulating patterns.
-      Over time, the paths of the particles shift and morph, creating a sense of continuous flow. The
-      different colored streams appear to interact, occasionally merging or diverging as they navigate
-      the space. The overall motion is smooth and organic, resembling the movement of currents or biological
-      structures.
-    objects: The scene contains three distinct sets of particles colored orange, green, and blue. These
-      particles are arranged in elongated, curvilinear paths that form intricate, interconnected networks
-      across the frame. Each set of particles consists of small, individual dots that maintain a consistent
-      density along their respective trajectories. The paths vary in size and complexity, with some forming
-      tight loops and others stretching across the entire field of view.
+    description: The simulation begins with a dense, uniform distribution of multicolored particles across
+      the entire frame. Over time, these particles begin to organize into distinct, flowing filaments
+      and swirling patterns. The filaments move and morph, creating a dynamic network of interconnected
+      paths. By the final frame, the particles have formed complex, looping structures that resemble fluid
+      flow or biological networks.
+    objects: The scene contains thousands of tiny, individual particles in red, green, and blue colors.
+      These particles are arranged into elongated, thread-like filaments that curve and loop throughout
+      the space. The filaments vary in length and curvature, forming a dense, interconnected web-like
+      topology. The overall size of the individual particles is very small, while the collective structures
+      they form span the entire image.
   movie_chemical:
-    description: The simulation shows a complex network of intertwined, undulating filaments evolving
-      over time. These filaments appear to move with a fluid-like motion, shifting and overlapping as
-      they traverse the space. The overall structure maintains a high degree of entanglement throughout
-      the sequence. There is no significant change in the global density or the overall pattern of the
-      network.
-    objects: The scene contains three distinct sets of filaments colored red, green, and blue. These filaments
-      are long, continuous, and highly curved, forming a dense, tangled web. They are distributed uniformly
-      across the entire frame, overlapping and weaving through one another. Each filament has a similar
-      thickness and length, creating a homogeneous texture of intertwined lines.
+    description: The simulation shows a dense network of undulating, thread-like structures moving in
+      a fluid, continuous motion. These filaments appear to shift and sway slightly while maintaining
+      their overall interconnected web-like configuration. The movement is smooth and rhythmic, suggesting
+      a dynamic field or a complex system of interacting agents. Over the sequence, the patterns evolve
+      with subtle changes in curvature and position without breaking their structural integrity.
+    objects: The scene contains numerous long, thin filaments that are intertwined to form a complex,
+      non-linear network. These structures are colored in distinct shades of vibrant red, bright green,
+      and cool blue. Each filament is of a similar thickness and length, creating a uniform texture across
+      the entire frame. The objects are densely packed and overlap frequently, creating a multi-layered,
+      three-dimensional appearance against a black background.

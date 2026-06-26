@@ -1,0 +1,39 @@
+# genC_fixed_red_elastic_ball -- corrected after reading the A/B captions (intent check):
+#   * RED: MPM bodies are coloured by parent cell via the `colormap`; Set1(0) is red, so
+#     a SINGLE body renders red (plotting.colors is ignored for node_type-less MPM sets);
+#   * ONE elastic body (n=1) so it drops as a coherent mass and DRAPES over the ball,
+#     instead of two separate bars tumbling/rotating;
+#   * soft elastic (youngs 70) so the deformation is visible (the "elastic" intent);
+#   * falls under gravity onto the fixed rigid ball (circular obstacle).
+# Remaining known gap: no star seeder exists -> the body is a square block, not a star.
+general:
+  name: genC_fixed_red_elastic_ball
+  seed: 0
+  n_frames: 500
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.5, 0.30, 0.12]              # fixed rigid ball
+sets:
+  body:
+    n: 1
+    start: [0.5, 0.80, 0.5, 0.80]
+    types:
+      jelly: {fraction: 1.0, youngs: 70, block: [0.39, 0.70, 0.61, 0.92], layers: [{frac: 1.0, youngs: 70, material: elastic}]}
+  mpm_particle: {parent: body, per_parent: 7000, radius: 0.12, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+operators:
+- {op: aggregate, at: body}
+- {op: gravity, at: body, g: 11.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.15, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 0.0, wall_damp: 0.5, wall_contact: 0.06}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1.0e9}
+schedule:
+- aggregate
+- gravity
+- {substep: 18, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  colormap: Set1                    # Set1(0) = red -> the single body renders red
+  background: white

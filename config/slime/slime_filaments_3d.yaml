@@ -72,22 +72,23 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of blue particles begins as a compact, roughly spherical shape. Over
-      time, the cluster expands outward while simultaneously transitioning into a more defined, diamond-shaped
-      geometric structure. The particles maintain a high density in the center while becoming more sparse
-      at the outer edges. By the final frame, the distribution has stabilized into a large, faceted crystalline-like
-      volume.
-    objects: The scene contains a large collection of individual blue particles. These particles are arranged
-      in a three-dimensional cloud that evolves from a sphere into a diamond-shaped polyhedron. Each individual
-      particle is very small and appears as a single pixel or point of light. The overall color of the
-      entire set is a consistent medium blue against a black background.
+    description: A dense cluster of green particles begins as a compact, roughly spherical mass. Over
+      time, the particles begin to disperse outward from the center, creating a more diffuse and irregular
+      shape. The expansion is non-uniform, with some particles forming elongated filaments or streaks
+      while others scatter randomly. By the final frame, the central core remains visible but is surrounded
+      by a much larger, more chaotic cloud of scattered points.
+    objects: The primary objects are thousands of small, individual green particles. These particles are
+      initially arranged in a high-density, spherical topology at the center of the frame. As the simulation
+      progresses, the topology shifts from a solid-like cluster to a sparse, branching network of points.
+      The particles maintain a consistent small size and vibrant green color throughout the entire sequence.
   movie_chemical:
-    description: A green, spherical cloud of particles initially appears in the center of a black void.
-      As time progresses, the cloud rapidly expands and begins to take on a distinct, sharp-edged cubic
-      shape. The cubic structure continues to grow and rotate slightly while maintaining its defined geometric
-      boundaries. By the final frame, the green mass has filled a large portion of the space as a well-defined,
-      rotating cube.
-    objects: The primary object is a dense collection of green particles forming a single continuous mass.
-      It starts as a small, roughly spherical cluster with fuzzy, irregular edges. It then transforms
-      into a large, solid cube with sharp vertices and flat faces. The object remains a uniform green
-      color throughout the entire transformation and expansion.
+    description: A single green spherical particle is initially shown in the center of a black background.
+      Over time, numerous thin, thread-like filaments begin to sprout outward from the surface of the
+      sphere. These filaments grow longer and more complex, creating a fuzzy, starburst-like appearance
+      around the central core. By the final frame, the sphere is almost entirely enveloped by a dense
+      network of these radiating green structures.
+    objects: The primary object is a large, solid green sphere located in the center of the frame. Surrounding
+      this sphere is a set of thin, elongated filaments that radiate outward in all directions. These
+      filaments are the same green color as the central sphere and vary in length and thickness. The overall
+      structure forms a complex, symmetrical topology where the filaments appear to be anchored to the
+      surface of the central body.

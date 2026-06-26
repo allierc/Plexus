@@ -27,25 +27,24 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense collection of blue particles initially forms a large, roughly circular cluster
-      in the center of a black field. Over time, the particles begin to organize into distinct, linear
-      filaments that radiate outward from the center. These filaments gradually lengthen and branch out,
-      creating a complex, web-like network across the entire frame. By the final frame, the original central
-      cluster has largely dissipated into a highly interconnected, sprawling structure of interconnected
-      lines.
-    objects: The primary objects are small, bright blue dots that represent individual particles or agents.
-      These particles are arranged in a dynamic topology, transitioning from a concentrated circular mass
-      to a sprawling, radial network of filaments. The filaments are composed of these dots connected
-      in linear paths that branch and intersect as they expand. The overall size of the structure grows
-      from a localized central region to fill the entire visual field.
+    description: A large number of cyan particles are initially distributed in a dense, roughly spherical
+      cluster against a black background. Over time, these particles begin to organize into distinct,
+      elongated filaments that radiate outward from the center. A prominent circular boundary forms, with
+      many filaments crossing through its interior and extending beyond its perimeter. The simulation
+      concludes with a complex network of interconnected paths and scattered points, maintaining the overall
+      spherical symmetry.
+    objects: The primary objects are thousands of tiny cyan dots that represent individual particles or
+      data points. These particles are arranged into a dense central mass that gradually transitions into
+      a web-like topology of curved lines. A large, circular ring of high particle density defines a central
+      region where many filaments intersect. The filaments vary in length and curvature, extending from
+      the core to the edges of the frame in a radial pattern.
   movie_chemical:
-    description: A dense cluster of particles initially appears as a faint, speckled sphere against a
-      black background. Over time, the sphere becomes more defined and begins to emit long, fibrous filaments
-      that radiate outward. These filaments grow increasingly thick and bright, eventually filling the
-      entire frame with a complex web of interconnected lines. By the final frame, the central sphere
-      is almost entirely obscured by the dense, overlapping network of cyan fibers.
-    objects: The primary object is a spherical cluster of small, cyan-colored particles located in the
-      center of the frame. Radiating from this sphere are numerous long, thin filaments that extend toward
-      the edges of the image. These filaments are interconnected, forming a dense, web-like topology that
-      covers the background. The color of all elements remains a consistent cyan, while the size of the
-      filaments increases as they move away from the center.
+    description: A dense cluster of green particles initially forms a spherical shape against a black
+      background. Over time, the particles begin to organize into a complex, interconnected network of
+      filaments. These filaments extend outward from the central sphere, creating a radial, web-like structure.
+      The final frames show a highly structured, glowing orb with long, thread-like tendrils reaching
+      toward the edges of the frame.
+    objects: The primary objects are thousands of small, cyan-colored particles. These particles are arranged
+      in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
+      are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
+      is large relative to the frame, occupying most of the central space with radiating extensions.

@@ -43,3 +43,32 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: The video shows a black screen with no visible movement or changes. There are no particles,
+      agents, or fields evolving over time. The scene remains static and completely dark throughout the
+      entire duration. No scientific simulation is occurring in this sequence.
+    objects: There are no objects present in the scene. The entire frame is a uniform black color. There
+      is no topology or arrangement to describe as the space is empty. The size of any potential objects
+      is zero as they do not exist.
+  movie_cell:
+    description: A dense field of blue particles occupies a square domain and remains largely stationary
+      throughout the sequence. In the center of the field, a small white void begins to emerge and expand
+      slightly. This white region grows into a more complex, irregular shape as the simulation progresses.
+      By the final frame, the white void has reached its maximum size while the surrounding blue particles
+      maintain their distribution.
+    objects: The scene contains a large collection of small, blue particles distributed uniformly across
+      a square area. These particles are densely packed, creating a textured, granular appearance. A white
+      void, representing the absence of particles, appears in the center of the blue field. This white
+      region is irregular in shape and increases in size over the course of the video.
+  movie_mpm_particle:
+    description: A large collection of blue particles is distributed uniformly across a white square field.
+      Over time, a small void or gap begins to form and expand in the center of the particle distribution.
+      This central void grows larger and more irregular as the simulation progresses. By the final frame,
+      the void has reached its maximum size, creating a distinct empty space amidst the blue dots.
+    objects: The scene contains thousands of small, blue, circular particles. These particles are arranged
+      in a dense, stochastic distribution that fills a square area. The particles are uniform in size
+      and color throughout the entire simulation. A central void emerges as a negative space, characterized
+      by the absence of particles in the middle of the field.

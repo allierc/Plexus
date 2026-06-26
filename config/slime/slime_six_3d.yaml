@@ -127,25 +127,24 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic cloud of multicolored particles distributed
-      in a diamond-shaped volume. As time progresses, the particles begin to organize into distinct, elongated
-      filaments or strands. These strands weave through the volume, creating a complex network of interconnected
-      paths. By the final frame, the structure has evolved into a highly organized, tangled web of continuous
-      trajectories.
-    objects: The scene contains thousands of small, point-like particles in various colors including red,
-      orange, green, blue, and purple. These particles are initially arranged in a stochastic, high-density
-      distribution within a bounded space. Over time, they form continuous, thread-like filaments that
-      exhibit a complex, intertwined topology. Each filament maintains a consistent color, representing
-      a specific path or agent trajectory within the simulation.
+    description: The simulation begins with a dense, chaotic cloud of multi-colored particles filling
+      a diamond-shaped volume. As time progresses, the particles begin to organize into distinct, winding
+      filaments or paths. These filaments weave through the space, creating a complex network of interconnected
+      trajectories. By the final frame, the structure has transitioned from a random distribution to a
+      highly organized, tangled web of continuous lines.
+    objects: The scene contains thousands of small, circular particles that are densely packed in the
+      center. These particles are colored in a variety of hues, including orange, purple, green, and blue.
+      Over time, the particles align to form elongated, thread-like filaments that maintain their individual
+      colors. The overall topology evolves from a stochastic point cloud into a complex, interconnected
+      network of curved paths.
   movie_chemical:
-    description: The simulation begins with a dense cloud of discrete, multi-colored particles scattered
-      in a roughly diamond-shaped volume. Over time, these particles begin to elongate and connect, transforming
-      into a complex network of intertwined filaments. As the simulation progresses, the filaments become
-      more distinct and defined, weaving through one another to form a dense, tangled web. By the final
-      frame, the structure has evolved into a highly complex, three-dimensional mesh of continuous, overlapping
-      strands.
-    objects: The scene contains a large collection of multi-colored filaments that are densely interconnected
-      in a tangled, non-linear topology. These objects transition from small, point-like particles to
-      long, continuous strands that occupy a significant portion of the central volume. The color palette
-      is diverse, featuring distinct strands of magenta, cyan, yellow, and orange. The filaments vary
-      slightly in thickness but maintain a consistent, thread-like appearance as they weave together.
+    description: The simulation begins with a collection of discrete, multi-colored points distributed
+      in a roughly spherical cluster. Over time, these points begin to elongate and connect, transforming
+      into a dense network of intertwined filaments. As the simulation progresses, the filaments become
+      more defined and occupy a larger volume, forming a complex, tangled web. By the final frame, the
+      structure has evolved into a highly intricate, three-dimensional mesh of continuous fibers.
+    objects: The scene contains a large number of small, multi-colored particles that transition into
+      elongated, thread-like filaments. These objects are arranged in a dense, overlapping, and non-linear
+      topology that fills a central volume. The color palette is diverse, featuring shades of orange,
+      purple, green, and blue distributed throughout the cluster. The size of the individual elements
+      increases significantly as they evolve from point-like dots into long, continuous strands.

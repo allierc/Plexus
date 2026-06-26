@@ -1,0 +1,2 @@
+loss=0.9441
+{"iter": 2, "g": 9.0, "frames": 520, "rad": 0.065, "ppc": 1000, "you_jelly": 80.0, "you_snow": 120.0, "st": 6.0, "drag": 0.4, "seed": 0, "note": "iter2 target1: tuned st/drag", "device": "cuda:0"}

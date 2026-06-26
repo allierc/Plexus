@@ -26,7 +26,8 @@ from . import sense                 # noqa: F401  field -> set, sensor-fan steer
 from . import advance               # noqa: F401  set -> self-propelled move (2D/3D, vector heading)
 from . import bounce                # noqa: F401  set -> wall/obstacle reflection (2D/3D specular re-head)
 from . import video_field           # noqa: F401  registers the `video` field + playback
-from . import chemotaxis            # noqa: F401  field -> set gradient coupling
+from . import chemotaxis            # noqa: F401  field -> set gradient coupling (1st order)
+from . import chemo_force           # noqa: F401  field -> set gradient body force (2nd order, composes with boids)
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
 # active-stimulus decomposition (clock -> activation field -> contraction -> MPM):
 from . import pacemaker             # noqa: F401  periodic scalar clock p(t) -> H.signals (field)
@@ -48,7 +49,7 @@ from . import g2p                   # noqa: F401  mpm_grid -> particle    (gathe
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "cohesion", "alignment", "separation", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
-           "video_field", "chemotaxis", "gravity",
+           "video_field", "chemotaxis", "chemo_force", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_drag", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p"]

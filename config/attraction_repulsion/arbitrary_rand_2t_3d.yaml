@@ -17,3 +17,17 @@ plotting:
   background: black
   colormap: tab10
   splat_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cloud of particles that remains relatively stable in its
+      overall spatial distribution. There is a subtle, continuous shifting of individual points as they
+      fluctuate within the central cluster. The orange and blue particles appear to intermingle without
+      significant segregation or large-scale movement. The overall shape of the diamond-like formation
+      persists throughout the entire sequence.
+    objects: The scene contains two distinct sets of small, point-like particles colored orange and blue.
+      These particles are arranged in a dense, roughly diamond-shaped cluster against a black background.
+      Each individual particle is uniform in size and appears as a single pixel or small dot. The two
+      colors are distributed homogeneously, overlapping and mixing throughout the entire volume of the
+      cluster.

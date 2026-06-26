@@ -19,10 +19,10 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 
 ## Current best result
 
-- **Under LoopScore (the new objective):** to be (re)established in the next batches — read the kept
-  `archive/p2_b14_*` harmonic runs for the current LS baseline before designing batch 1.
-- **Under R² (old objective, diagnostic now):** best interior R² = **−0.999** (2400 it, fibre FROZEN,
-  gain+dur only, stiff uniform, amp10). The R² fit was STILL improving at 2400 it (not converged).
+- **Under LoopScore:** **LS = 0.589 ± 0.080** (archive p2_b14_s1: gain0=0.5, learn=fibre,gain,dur,
+  2400it, stiff uniform [100,100], amp=10, drag=30, dur→30). Best chirality (chir+=0.69) and best
+  uniformity (SD=0.080) of all archive slots. R²=−1.649 (diagnostic).
+- **Under R² (diagnostic only):** best R² = −0.999 (2400 it, fibre frozen, gain+dur only, amp10).
 
 ## Established mechanisms  `[mechanism]` — causal, regime-conditional
 
@@ -43,14 +43,16 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 
 ## Optimization facts  `[optimization@<regime>]` — depth-dependent, never promote to mechanism
 
-- **NEVER TRUST OPTIMIZATION STATE.** Optimization depth is itself an experimental variable. Many R²-era
-  conclusions FLIPPED purely because training continued (e.g. fibre co-learning helped at 600 it, became
-  harmful at 1200–2400 it). The R² fit was not converged even at 2400 it (depth monotone: 600→−2.158,
-  1200→−1.411, 1800→−1.113, 2400→−0.999; Δ/doubling still ~0.41). **Do not conclude "the mechanism doesn't
-  work" when the truth may be "the optimizer hasn't discovered it yet"** — only after approximate
-  convergence in that regime.
-- Warm-start / init of the learned scalars (e.g. gain init) measurably shifted the R² result — an optimizer
-  property, re-checkable under LoopScore.
+- **NEVER TRUST OPTIMIZATION STATE.** Many R²-era conclusions FLIPPED purely because training continued.
+  **Do not conclude "the mechanism doesn't work" when the truth may be "the optimizer hasn't discovered it
+  yet"** — only after approximate convergence in that regime.
+- Under R², depth was monotonically beneficial (600→−2.158, 1200→−1.411, 1800→−1.113, 2400→−0.999; not
+  converged). **Under LoopScore, 3600it DEGRADED LS (0.567) vs 2400it (0.589)** at gain0=0.854 — the LS
+  landscape may differ: the unbounded training loss keeps decreasing but the clamped LS score can overshoot.
+  `[optimization@LoopScore, 2400–3600it, gain0=0.854]`. NEEDS re-test at gain0=0.5.
+- Gain init is a lever under BOTH objectives: gain0=0.5 > gain0=0.854 under LoopScore (LS 0.589 vs 0.567
+  at 2400it); gain0=0.7 > 0.854 under R² (Δ=0.201 at 1200it). Lower gain reduces overshoot →
+  better-calibrated loops. `[optimization@LoopScore+R², 2400it]`.
 
 ## Engineering facts  `[engineering]` — stable, almost never revisit
 
@@ -86,14 +88,16 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 
 ## Open questions
 
-- **Re-evaluate every `provisional@R²→LS` claim under LoopScore.** Which mechanisms that looked dead under R²
-  improve LoopScore (especially while degrading R² — that is a success)?
-- Does a COARSE free SIREN stiffness / fibre field lift LoopScore (the R²-era closure may be a wavelength
-  artifact — see the coarse-region rule)?
-- What sets loop CHIRALITY, OPENNESS, and major-AXIS angle under LoopScore — which lever controls each?
-- Pin the converged optimization depth under LoopScore before trusting any mechanism verdict.
-- Multiscale LoopScore (`K∈{1,2,4,8}` weighted) — would separating global ellipse from local wiggle sharpen
-  the objective?
+- **Re-evaluate `provisional@R²→LS` claims** — especially spatial stiffness (INERT@R²) and fibre co-learn
+  (HARMFUL@R² at depth). SIREN fibre is now CATASTROPHIC under LS too (archive s2; ampL=9.49) — likely
+  closed, but stiffness is untested.
+- Does COARSE SIREN stiffness (omega=5, range 50–150) lift LoopScore? The per-node objective may provide
+  gradient signal that the global R² couldn't. **Batch 1 tests this.**
+- Is the gain-init monotone continuing below 0.5, or does it turn over? **Batch 1 tests gain0=0.3.**
+- Does fibre co-learn help or hurt under LoopScore at gain0=0.5? (R²-era: hurt at depth.) **Batch 1 tests.**
+- Pin converged optimization depth under LoopScore (3600it degraded at gain0=0.854; untested at gain0=0.5).
+- What sets loop CHIRALITY, OPENNESS, major-AXIS angle — which lever controls each?
+- Multiscale LoopScore (`K∈{1,2,4,8}` weighted) — future option.
 
 ---
 
@@ -104,11 +108,20 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 - **Parametric active-stress inverse (Phase 2, R²):** gain+dur are the load-bearing scalars; spatial
   stiffness/fibre (UNet & SIREN) closed under R²; depth monotone to R²=−0.999 at 2400 it, not converged.
 - **Objective shift (2026-06-26):** R² → LoopScore; ledger distilled; prior conclusions → provisional.
+- **LoopScore baseline (2026-06-26, archive p2_b14):** LS=0.589 at gain0=0.5, co-learn, 2400it. Tight
+  clustering (0.567–0.589). SIREN fibre catastrophic. Depth degrades LS. Scalar model near ceiling.
 
 ---
 
 ## Current theme
 ### Current hypothesis
+"Spatial stiffness (SIREN, coarse omega=5) may carry LoopScore gradient signal that R² couldn't provide — the
+per-node loop-morphology penalty creates a spatially-resolved learning signal for regional stiffness variation."
 ### Iterations this theme
+- Batch 1: baseline reproduction + re-test stiffness, fibre co-learn, gain monotonicity, depth under LS.
 ### Emerging observations
+- LoopScore baseline established: LS=0.589±0.080 (gain0=0.5, co-learn, 2400it).
+- Tight clustering of archive slots (LS 0.567–0.589) suggests scalar model near ceiling.
+- SIREN fibre confirmed CATASTROPHIC under LS (consistent with R²-era).
+- Depth behavior DIFFERS from R²: 3600it worse than 2400it under LS (at gain0=0.854).
 **CRITICAL: this section must ALWAYS be at the END of the file.**

@@ -36,3 +36,33 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: A vertical white gradient bar shifts from the left side of the frame toward the right.
+      The bar maintains a consistent width and intensity as it moves across the black background. By the
+      final frame, the white gradient has moved almost entirely out of view to the right. The motion is
+      smooth and linear, representing a steady translation of a field or object.
+    objects: The primary object is a vertical white gradient bar with soft, blurred edges. It is positioned
+      against a solid black background that fills the entire frame. The bar is large, occupying approximately
+      one-third of the horizontal space at its peak. The color transitions smoothly from pure white in
+      the center to black at the outer boundaries.
+  movie_cell:
+    description: The simulation shows a static distribution of blue particles within a square boundary.
+      There is no observable movement or evolution of the particles across the provided keyframes. The
+      spatial arrangement of the blue dots remains constant throughout the sequence. The overall density
+      and pattern of the field do not change over time.
+    objects: The scene contains a large number of small, blue circular particles. These particles are
+      arranged in a dense, stochastic distribution that fills a square area. The particles are disconnected
+      from one another, forming a granular texture. Each individual particle is uniform in size and color,
+      creating a consistent blue field.
+  movie_mpm_particle:
+    description: The simulation shows a dense field of blue particles distributed uniformly across a square
+      domain. Over the course of the video, the particles exhibit a high-frequency, stochastic jittering
+      motion. There is no discernible global flow or large-scale structural evolution in the distribution.
+      The overall density and spatial occupancy of the particles remain constant throughout the sequence.
+    objects: The scene contains a large number of small, individual blue dots. These particles are arranged
+      in a random, non-connected distribution across the entire frame. Each particle is approximately
+      the same size and maintains a consistent blue hue. The particles do not form clusters or chains,
+      appearing as a homogeneous point cloud.

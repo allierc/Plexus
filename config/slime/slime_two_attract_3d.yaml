@@ -83,21 +83,24 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, cloud-like distribution of orange and blue particles.
-      Over time, these particles begin to organize into distinct, elongated filamentary structures. These
-      filaments weave through the space, forming a complex, interconnected network of paths. By the final
-      frame, the network has become highly defined, showing clear branching and looping patterns.
-    objects: The scene contains two sets of small, point-like particles colored orange and blue. Initially,
-      the particles are arranged in a disorganized, high-density cluster. As the simulation progresses,
-      they align into thin, continuous lines that resemble neural pathways or vascular networks. These
-      filaments are interconnected, forming a complex topology of overlapping and branching strands.
+    description: The simulation shows a collection of particles forming elongated, worm-like structures
+      that move and shift over time. These structures appear to be interconnected or overlapping, creating
+      a complex, tangled network. As the video progresses, the individual strands undergo subtle deformations
+      and reorientations within the bounded space. The overall density of the network remains relatively
+      constant, with the strands weaving through one another.
+    objects: The scene contains two distinct sets of particles, colored in shades of red and green. These
+      particles are arranged into long, continuous, and winding filaments that resemble polymer chains
+      or biological fibers. Each filament is composed of many small, discrete points that maintain a consistent
+      spacing to form a coherent line. The structures are distributed throughout a central cluster, exhibiting
+      a high degree of entanglement and overlapping topology.
   movie_chemical:
-    description: The simulation begins with a dense, chaotic cloud of red and green particles. Over time,
-      these particles begin to coalesce and organize into distinct, elongated filamentary structures.
-      As the simulation progresses, the filaments become more defined and move in a coordinated, fluid-like
-      motion. By the final frame, the system has transitioned from a disordered state to a structured
-      network of intertwined strands.
-    objects: 'The scene contains two primary sets of objects: red and green filaments. These filaments
-      are long, thin, and highly curved, resembling tangled threads or polymer chains. They are densely
-      packed in the center of the frame and become sparser toward the edges. The filaments are interconnected
-      in a complex, overlapping network that occupies a roughly diamond-shaped volume.'
+    description: The simulation shows a dense cluster of intertwined, worm-like filaments in a state of
+      constant motion. Over time, the filaments undergo subtle conformational changes, shifting and twisting
+      within the bounded volume. The overall density of the cluster remains relatively stable as the individual
+      strands fluctuate. The motion appears stochastic, suggesting a dynamic equilibrium or a diffusion-like
+      process within the group.
+    objects: The scene contains numerous elongated, curvilinear filaments that are highly entangled with
+      one another. These objects are primarily colored in shades of muted green and reddish-brown, creating
+      a multi-colored mesh. Each filament has a consistent, medium thickness and varies in length, forming
+      a complex, three-dimensional network. The objects are concentrated in a central diamond-shaped region
+      against a solid black background.
