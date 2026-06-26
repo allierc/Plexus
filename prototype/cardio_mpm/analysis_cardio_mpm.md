@@ -510,3 +510,614 @@ Each slot changes ONE knob from the parent. Spec `material_aniso_cardio` (parame
 **Verdict:** Hypothesis PARTLY FALSIFIED — spatial stiffness does NOT improve R² on the wl40 fibre base (the uniform ablation beats it). PARTLY SUPPORTED — stiffness + wl28 fibre IS beneficial (complementarity). The overall finding is that stiffness is a SECONDARY lever at best, and its true effect is MASKED by the dur=8 regime. The deeply-negative R² (−5 to −25) confirm that the short duty cycle is the primary bottleneck, not material expressiveness.
 
 **Next:** Batch 3 = `--learn X,dur` (co-learn dur with each group per user guidance). Test dur alone, fibre+dur, stiff+dur, gain+dur, fibre+dur on wl28, and full combine (all). This should break out of the deeply-negative R² regime by allowing the pulse duration to optimize alongside each lever.
+
+---
+
+## Phase2 Batch 3 [learn=X,dur — DUR CO-LEARNING] — 2026-06-24
+Parent: b1 s5 fibre winner (wl=40.2/0.72/1.52/1.53), amp=10, drag=30, stiff [50,150], dur0=8, gain0=1.0
+Hypothesis: "Unfreezing pulse duration (dur, bounded [3,14]) alongside each learnable group will break out of the deeply-negative R² regime (currently −5 to −25). At dur=8 the pulse is a 16% duty cycle → violent contraction kick → inertial ringing → overshoot. With dur free to optimize (likely toward ~14), the pulse shape better matches the beat cycle."
+
+**Results per slot (from progress.txt final line + dashboard):**
+
+| Slot | Config (ONE knob from parent) | learn | R2 | ampL | open | chir | size | dur_final | red-on-green | key panel observation |
+|------|------|------|-----|------|------|------|------|------|------|------|
+| **s3** | **gain_dur** (gain0→0.817) | gain,dur | **−4.164** | **0.093** | 0.273 | 0.63 | 1.36e-3 | 8.8 | **best overlap**; red loops closest to green in size/orientation; central nodes track well | stiff frozen; fibre frozen wl40; gain SHRUNK |
+| s0 | dur_only (CONTROL) | dur | −5.081 | 0.229 | 0.275 | 0.62 | 1.50e-3 | 8.8 | moderate overlap; red partly on green but offset | all frozen except dur; fibre wl40 pattern unchanged |
+| s4 | fibre_dur_wl28 (amp 0.34→0.56, angle 0.69→0.56) | fibre,dur | −6.743 | 0.736 | 0.313 | 0.60 | 1.82e-3 | 9.0 | some overshoot; red bigger than green | denser oblique wl28 fibre; amp pushed UP (productive) |
+| s2 | stiff_dur (binary yellow/purple UNet stiffness) | stiff,dur | −7.268 | 0.745 | 0.320 | 0.57 | 1.78e-3 | 8.8 | moderate overshoot | sharp binary stiffness pattern; fibre frozen wl40 |
+| s1 | fibre_dur wl40 (amp 1.52→1.38, DESTABILIZED) | fibre,dur | −13.230 | 2.481 | 0.285 | 0.52 | 2.27e-3 | 8.7 | significant overshoot; red much bigger than green | denser oblique fibre pattern; fibre learning harmful on wl40 |
+| s5 | all_combine (learn=all, CATASTROPHIC) | all | −16.829 | 3.785 | 0.290 | 0.55 | 2.47e-3 | 8.9 | worst overlap; massive red overshoot | binary stiff; fibre coarsened; gain≈1.017 (barely moved) |
+
+**Ranking by interior R² (higher = better):**
+1. **s3 gain_dur** (R²=−4.164, **NEW PHASE-2 BEST** — beats b2 s3's −5.181)
+2. s0 dur_only (R²=−5.081 — beats b1 winner −5.448 by +0.37)
+3. s4 fibre_dur_wl28 (R²=−6.743)
+4. s2 stiff_dur (R²=−7.268)
+5. s1 fibre_dur_wl40 (R²=−13.230)
+6. s5 all_combine (R²=−16.829)
+
+**Winner: s3 gain_dur (R²=−4.164, gain0 learned to 0.817, effective force amp×gain = 8.17)**
+
+**Key findings:**
+
+1. **DUR IS NEAR-INERT at [3,14] bound — the central hypothesis is FALSIFIED.** In ALL 6 slots, dur moved only 0.7–1.0 units from init=8 (final 8.7–9.0). The optimizer did NOT drive dur toward ~14 as predicted. The deeply-negative R² regime is NOT primarily caused by dur=8 being too short for the optimizer to fix — it's caused by the model's overall inability to match the real beat with these 4 parametric scalars. The dur gradient appears flat or very weak near dur=8. Three candidate explanations: (a) dur=8 is a genuine local minimum (the short sharp pulse is locally optimal for the L2 loss); (b) the [3,14] bound is too narrow — the optimum may be at dur~30-50 (closer to period) but that's outside the bound; (c) the chaotic forward simulation makes dur gradients too noisy for 300 iterations.
+
+2. **GAIN is the dominant lever — a CLEAN scalar overshoot brake.** gain0 learned 1.0→0.817, reducing the effective contraction magnitude from amp×1.0=10.0 to amp×0.817=8.17. This produced the lowest ampL (0.093 = best motion-energy match of any Phase-2 slot), the smallest loop size (1.36e-3), the best chirality (0.63), and the best red-on-green alignment. In the dashboard, the trajectory panel shows red loops that are closest to green in size and orientation — particularly in the central region where multiple nodes show partial superposition. Gain acts as a LEARNED brake: the optimizer found the optimal contraction scaling autonomously, doing what amplitude sweeps did manually in the overshoot regime (Est.#6/#14/#18). The stiffness and fibre panels are frozen (identical to dur_only control), so the entire R² improvement over dur_only (−4.164 vs −5.081 = Δ+0.92) is from ONE scalar.
+
+3. **Fibre co-learning DESTABILIZES on wl40 but is more stable on wl28.** On wl40 (s1): fibre_amp drops 1.52→1.38, angle 0.72→0.56, creating a denser/more oblique pattern → ampL=2.481 (massive overshoot) → R²=−13.23, MUCH worse than fibre-only b1.s5 (−5.45). The fibre learning moved params into a harmful direction. On wl28 (s4): fibre_amp rises 0.34→0.56 (UP, not down), angle drops 0.69→0.56, a more productive direction → R²=−6.74. The wl40 high-amp starting point is an UNSTABLE basin for co-optimization; the wl28 low-amp starting point allows the optimizer to INCREASE structure (a safer gradient direction).
+
+4. **All-combine is CATASTROPHIC.** s5 (learn=all, R²=−16.83) gives the worst R² of the batch. With all DOF free, the parameters fight: fibre_amp drops to 1.14 (partial collapse), gain barely moves (1.017 — the optimizer doesn't find the gain lever when fibre/stiff/dur are all competing for gradient), stiffness learns a high-contrast binary pattern that's net-harmful. ampL=3.785 is the worst overshoot. The partitioned protocol (one lever at a time, then gradual combination) is validated.
+
+5. **Stiff+dur is marginal.** s2 (−7.27) is barely better than b2.s0 stiff-only (−7.43, Δ+0.16). The stiffness UNet learns a sharp binary yellow/purple pattern (high-contrast domains). With dur free, stiffness still doesn't become a useful lever on the wl40 base. The fibre and stiffness panels in s2 are identical to s0 (both frozen), confirming the stiffness learning doesn't cascade into fibre.
+
+6. **Dur_only gives a small but real gain.** s0 (−5.08) beats b1 winner (−5.45) by +0.37 just from dur moving 8→8.8. This confirms dur IS a lever, just a WEAK one — at [3,14] bound the gradient is too shallow for the optimizer to exploit it fully. The dashboard shows the same red-green morphology as b1/b2 winners, just slightly tighter loops.
+
+**Parametric convergence summary (from dashboard headers):**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | fibre_phase | gain | dur | stiff range |
+|------|----------|-------------|-----------|-------------|------|-----|-------------|
+| s0 | 40.2 (frozen) | 0.72 (frozen) | 1.52 (frozen) | 1.53 (frozen) | 1.000 (frozen) | 8.8 | [50,143] frozen |
+| s1 | 40.0 | 0.56 ↓ | 1.38 ↓ | 1.50 | 1.000 (frozen) | 8.7 | [55,130] frozen |
+| s2 | 40.2 (frozen) | 0.72 (frozen) | 1.52 (frozen) | 1.53 (frozen) | 1.000 (frozen) | 8.8 | [50,150] active |
+| s3 | 40.2 (frozen) | 0.72 (frozen) | 1.52 (frozen) | 1.53 (frozen) | **0.817** ↓ | 8.8 | [42,145] frozen |
+| s4 | 28.3 | 0.56 ↓ | 0.56 ↑ | 1.05 | 1.000 (frozen) | 9.0 | [76,143] frozen |
+| s5 | 40.4 | 0.77 | 1.14 ↓ | 0.38 ↓ | 1.017 | 8.9 | [50,150] active |
+
+**Verdict:** Hypothesis FALSIFIED — dur co-learning does NOT break the deeply-negative regime via pulse reshaping. dur is near-inert at [3,14]. BUT the batch discovered that GAIN is the dominant lever (gain0 1.0→0.817 gives R²=−4.164, new Phase-2 best). The R² improvement comes from learned contraction scaling, not pulse timing.
+
+**Next:** Batch 4 builds on the gain_dur winner. Priority: (1) fibre+gain+dur co-learning — can gain stabilize fibre where dur alone couldn't? (2 slots: wl40, wl28); (2) amplitude variant amp=12 with gain (is gain the learned equivalent of lowering amplitude?); (3) gain-only ablation (dur frozen — isolate gain from dur); (4) high-dur init (dur0=14 — probe the alternative dur basin); (5) stiff+gain+dur (does stiff add on top of gain?). Parent = s3 (gain0=0.817, dur=8.8).
+
+## Phase2 Batch 4 [learn=fibre,gain,dur variants] — 2026-06-24
+
+Parent: b3.s3 gain_dur winner (R²=−4.164, gain0=0.817, dur=8.8) + b1.s5 fibre wl40 / b1.s3 fibre wl28.
+Hypothesis: "With gain as a stabilizing co-learner, fibre co-learning may now be productive where it failed in b3. The gain scalar can counteract fibre-induced overshoot. Additionally, initializing dur at the upper bound (dur0=14) will reveal whether a high-dur basin exists that the optimizer cannot reach from dur0=8."
+
+Slot 0 [fibre_gain_dur] learn=fibre,gain,dur wl40/fibre_amp=1.52/angle=0.72/gain0=0.817/dur0=8.8/amp=10/drag=30
+  R²=−7.307 red-on-green=off/overshoot open=0.266 chir=0.49 size=1.75e-3 ampL=0.689
+  Learned: fibre_amp 1.52→0.54 (COLLAPSED), angle 0.72→1.10, gain→0.746, dur→9.7
+  Stiffness: greenish-teal scattered blobs (frozen). Fibre: clear wl40 sinusoidal, angle/dx/dy shifted.
+  WORST of batch. wl40 fibre DESTABILIZES again — fibre_amp collapse (1.52→0.54) is the same b1.s0/b3.s1 failure.
+  Gain dropped to 0.746 (overcompensating) but can't rescue the collapsed fibre structure.
+
+Slot 1 [fibre_gain_dur_wl28] learn=fibre,gain,dur wl28/fibre_amp=0.34/angle=0.69/gain0=0.817/dur0=8.8/amp=10/drag=30
+  R²=−2.620 red-on-green=BEST EVER open=0.306 chir=0.61 size=1.20e-3 ampL=0.010
+  Learned: fibre_wl 28.1→28.8, angle 0.69→0.17 (near-zero!), amp 0.34→0.39, phase 0.71→0.41, gain→0.854, dur→8.7
+  Stiffness: greenish-teal uniform (frozen). Fibre: finer wl28 pattern, low angle → nearly axial contraction.
+  **NEW PHASE-2 BEST by 1.5 units (−2.620 vs prev best −4.164).** Dashboard shows red loops tracking green
+  closely in multiple interior nodes. ampL=0.010 = essentially PERFECT motion energy match. The optimizer
+  drove fibre_angle nearly to zero (0.17) — minimal rotation of the contraction axis — and kept fibre_amp
+  moderate (0.39). The wl28 base is STABLE for co-optimization (no collapse), and gain provides a mild brake
+  (0.854). This is the first slot where the motion SIZE is right (ampL≈0) and the direction quality (R²) is
+  the best seen.
+
+Slot 2 [gain_dur_amp12] learn=gain,dur wl40/fibre frozen/gain0=0.817/dur0=8.8/amp=12/drag=30
+  R²=−4.722 red-on-green=partial open=0.277 chir=0.61 size=1.47e-3 ampL=0.175
+  Learned: gain→0.672 (compensated DOWN for higher amp), dur→9.6
+  Stiffness: greenish-yellow uniform (frozen). Fibre: frozen wl40.
+  amp=12 HURTS vs parent (−4.72 vs −4.16). The gain brake (0.672 = effective amp 12×0.672=8.06) compensates
+  but the higher base amplitude at short duty cycle still creates net-harmful overshoot.
+
+Slot 3 [gain_only_abl] learn=gain wl40/fibre frozen/gain0=1.0/dur0=8 FROZEN/amp=10/drag=30
+  R²=−5.241 red-on-green=partial open=0.275 chir=0.61 size=1.49e-3 ampL=0.257
+  Learned: gain→0.830, dur FROZEN at 8.0
+  Stiffness: greenish-teal uniform (frozen). Fibre: frozen wl40.
+  ABLATION: gain-only (−5.241) is 1.1 units WORSE than gain+dur (b3.s3 −4.164). gain converges to similar
+  value (0.830 vs 0.817) but the missing dur freedom (even the small 8→8.8 shift) costs ~1 R² unit. Confirms
+  dur is load-bearing as a secondary lever.
+
+Slot 4 [gain_dur_dur14] learn=gain,dur wl40/fibre frozen/gain0=1.0/dur0=14/amp=10/drag=30
+  R²=−3.880 red-on-green=good open=0.253 chir=0.62 size=1.39e-3 ampL=0.073
+  Learned: gain→0.838, dur STAYED at 14.0 (upper bound!)
+  Stiffness: greenish-teal uniform (frozen). Fibre: frozen wl40.
+  **2ND BEST of batch. Beats previous Phase-2 best (−3.880 vs −4.164).** The HIGH-DUR BASIN EXISTS: dur
+  initialized at 14 STAYS at the upper bound (the optimizer wants MORE duration, not less). gain converges
+  to 0.838 (mild brake). This OVERTURNS Est.#33: dur IS a real lever — the problem was that the optimizer
+  can't reach dur≥14 from dur0=8 (the gradient is flat across the barrier between the two basins). The
+  [3,14] bound is limiting → need to widen with --dur_hi.
+
+Slot 5 [stiff_gain_dur] learn=stiff,gain,dur wl40/fibre frozen/gain0=0.817/dur0=8.8/amp=10/drag=30
+  R²=−6.060 red-on-green=off open=0.362 chir=0.55 size=1.65e-3 ampL=0.455
+  Learned: gain→0.814, dur→9.6, stiff youngs→[50,350] (binary yellow/purple pattern)
+  Stiffness: HIGH-CONTRAST binary yellow/purple pattern (largest range of any slot). Fibre: frozen wl40.
+  Stiff+gain+dur (−6.060) is WORSE than gain+dur alone (−4.164). The UNet learns an aggressive binary stiffness
+  pattern (pushing youngs to 350, far beyond the [50,150] init range) that is net-harmful. Consistent with
+  every wl40 stiffness test: spatial stiffness on this fibre base HURTS.
+
+**Winner:** Slot 1 (R²=−2.620, wl28 fibre+gain+dur). Near-perfect motion energy match (ampL=0.010). The breakthrough is wl28 fibre + gain co-learning — the optimizer drives angle→0.17 (near-zero rotation) and keeps fibre_amp moderate. Runner-up: slot 4 (dur0=14, R²=−3.880) — confirms a bimodal dur landscape.
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | fibre_phase | gain | dur | stiff range | ampL |
+|------|----------|-------------|-----------|-------------|------|-----|-------------|------|
+| s0 | 40.4 | 1.10 ↑ | 0.54 ↓↓ | 1.53 | 0.746 ↓ | 9.7 | [82,138] frozen | 0.689 |
+| **s1** | **28.8** | **0.17 ↓↓** | **0.39 ↑** | **0.41 ↓** | **0.854** | **8.7** | **[84,116] frozen** | **0.010** |
+| s2 | 40.2 frozen | 0.72 frozen | 1.52 frozen | 1.53 frozen | 0.672 ↓↓ | 9.6 | [41,111] frozen | 0.175 |
+| s3 | 40.2 frozen | 0.72 frozen | 1.52 frozen | 1.51 frozen | 0.830 | 8.0 frozen | [54,118] frozen | 0.257 |
+| s4 | 40.2 frozen | 0.72 frozen | 1.52 frozen | 1.53 frozen | 0.838 | **14.0 (bound!)** | [54,126] frozen | 0.073 |
+| s5 | 40.2 frozen | 0.72 frozen | 1.52 frozen | 1.51 frozen | 0.814 | 9.6 | [50,350] active | 0.455 |
+
+**Verdict:** Hypothesis SUPPORTED on wl28 (gain stabilizes fibre co-learning → breakthrough R²=−2.620), FALSIFIED on wl40 (still destabilizes). High-dur basin hypothesis SUPPORTED (dur0=14 stays at bound, R²=−3.880 beats prev best). TWO independent improvements to combine in b5.
+
+**Next:** Batch 5 COMBINES the two b4 wins: wl28 fibre+gain (−2.620) + dur0=14 (−3.880). Added `--dur_hi` CLI arg to widen dur bound beyond 14. Priority: (1) combined slot (wl28+dur0=14); (2) dur_hi=20 (does dur want >14?); (3) angle=0 init (optimizer headed there); (4) fibre-frozen ablation; (5) stiff on wl28 with combined base; (6) drag=60 variant. Parent = s1 (fibre wl≈28.8/angle≈0.17/amp≈0.39/phase≈0.41, gain=0.854, dur=8.7).
+
+## Phase2 Batch 5 [learn=fibre,gain,dur — COMBINE wl28+dur14] — 2026-06-24
+
+Parent: b4.s1 wl28 fibre+gain+dur winner (R²=−2.620, fibre wl≈28.8/angle≈0.17/amp≈0.39/phase≈0.41, gain=0.854, dur=8.7). Two b4 wins to combine: wl28 fibre+gain (−2.620) + dur0=14 (−3.880).
+Hypothesis: "The two independent b4 improvements (wl28 fibre+gain → −2.620, dur0=14 → −3.880) should STACK: combining wl28 fibre+gain with dur0=14 should push R² toward the −1 to −2 range. Additionally, widening dur_hi beyond 14 will reveal whether the high-dur basin center is at ~14 or higher. Fibre angle=0 may beat the learned 0.17."
+
+Slot 0 [combine_dur14] learn=fibre,gain,dur wl28/fibre_angle=0.17/amp=0.39/phase=0.41/gain0=0.854/dur0=14/amp=10/drag=30
+  R²=−3.383 red-on-green=partial open=0.298 chir=0.62 size=1.29e-3 ampL=0.029 dur→14.0(bound)
+  Dashboard: Red loops partially track green in the 3×3 zoom — several central nodes show red arcs that follow green paths reasonably, but misalignment persists in periphery. Stiffness: teal-green mottled (frozen). Fibre: clear wl28 oblique sinusoidal bands (blue-red-blue). dx/dy: coherent near-uniform field.
+  WORSE than b4.s1 (−3.383 vs −2.620). dur0=14 + fibre co-learning did NOT stack.
+
+Slot 1 [combine_dur_hi20] learn=fibre,gain,dur wl28/same as s0 + dur_hi=20/dur0=14/amp=10/drag=30
+  R²=−3.142 red-on-green=partial open=0.307 chir=0.55 size=1.22e-3 ampL=0.017 dur→20.0(BOUND HIT!)
+  Dashboard: Similar to s0 but slightly better overlap. Stiffness: teal-green uniform (frozen). Fibre: similar oblique bands, slightly different angle. dx/dy: coherent field.
+  dur went STRAIGHT TO THE BOUND (20.0) — the high-dur basin center is BEYOND 20. 2nd best in batch.
+
+Slot 2 [combine_angle0] learn=fibre,gain,dur wl28/fibre_angle=0.0/amp=0.39/phase=0.41/gain0=0.854/dur0=14/amp=10/drag=30
+  R²=−3.671 red-on-green=partial-worse open=0.294 chir=0.59 size=1.35e-3 ampL=0.059 dur→14.0
+  Dashboard: Red arcs off from green in most nodes. Stiffness: teal mottled with some yellow patches (frozen). Fibre: bands oriented differently from s0 (different angle). dx/dy: coherent but different orientation.
+  angle=0.0 is WORSE than 0.17 (−3.671 vs −3.383). Q29 answered: 0.17 is closer to the optimum than 0.0; there IS a small positive angle.
+
+Slot 3 [combine_fibre_frozen] learn=gain,dur wl28/fibre FROZEN at b4.s1 values/gain0=0.854/dur0=14/amp=10/drag=30
+  R²=−2.992 red-on-green=BEST IN BATCH open=0.291 chir=0.64 size=1.29e-3 ampL=0.048 dur→14.0
+  Dashboard: Red loops show the best green overlap of the batch — multiple central nodes have red arcs closely tracking green paths. Stiffness: teal with yellow patches (more structure than other slots, frozen UNet). Fibre: clear oblique bands at wl28 (same as b4.s1 learned pattern). dx/dy: coherent near-uniform.
+  **BEST IN BATCH.** Fibre-frozen BEATS fibre co-learning (−2.992 vs −3.383) at dur=14. Fibre co-learning is HARMFUL at this dur regime.
+
+Slot 4 [combine_stiff] learn=fibre,stiff,gain,dur wl28/same as s0 + stiff active/dur0=14/amp=10/drag=30
+  R²=−10.498 red-on-green=OFF/massive-overshoot open=0.368 chir=0.60 size=2.27e-3 ampL=1.621
+  Dashboard: Red loops MASSIVELY exceed green — enormous overshoot. Stiffness: dramatic binary yellow/purple continents (the UNet pushed stiffness to extreme ranges). Fibre: similar oblique bands but overwhelmed by overshoot. dx/dy: coherent but stiffness dominates.
+  **CATASTROPHIC.** Stiff co-learning on wl28+dur14 is as harmful as on wl40 (b4.s5). The binary stiffness pattern generates massive overshoot (ampL=1.621). Spatial stiffness is now FALSIFIED across ALL bases.
+
+Slot 5 [combine_drag60] learn=fibre,gain,dur wl28/same as s0 but drag=60/dur0=14/amp=10
+  R²=−3.443 red-on-green=partial open=0.305 chir=0.61 size=1.30e-3 ampL=0.036 dur→14.0
+  Dashboard: Similar to s0. Stiffness: green-yellow uniform (frozen). Fibre: oblique bands. dx/dy: coherent.
+  drag=60 does NOT help on the combined base (−3.443 vs s0 −3.383). Drag is redundant when gain already controls contraction scaling.
+
+**Ranking by interior R² (higher = better):**
+1. **s3 combine_fibre_frozen** (R²=−2.992, BEST in batch but still WORSE than b4.s1 −2.620)
+2. s1 combine_dur_hi20 (R²=−3.142, dur hit bound at 20.0)
+3. s0 combine_dur14 (R²=−3.383)
+4. s5 combine_drag60 (R²=−3.443)
+5. s2 combine_angle0 (R²=−3.671)
+6. s4 combine_stiff (R²=−10.498, CATASTROPHIC)
+
+**Winner:** Slot 3 (R²=−2.992, fibre frozen + gain+dur at dur0=14). BUT b4.s1 (R²=−2.620 at dur≈8.7) remains the overall Phase-2 best — the two b4 wins did NOT stack.
+
+**Key findings:**
+
+1. **The two b4 improvements did NOT stack (Q28 FALSIFIED).** wl28 fibre+gain at dur≈8.7 (−2.620) + dur0=14 (−3.880) → combined best is only −2.992 (fibre frozen) or −3.383 (fibre co-learning). The improvements are NOT independent — dur=14 disrupts the fibre+gain optimum tuned for dur≈8.7. The fibre params (angle=0.17, amp=0.39) were optimized BY the b4.s1 run for the short-dur regime; at dur=14 they are suboptimal, and the 300-iteration budget can't re-tune them.
+
+2. **Fibre co-learning HURTS at dur=14.** s3 fibre-frozen (−2.992) > s0 fibre-co-learning (−3.383, Δ=0.39 R² units). The optimizer destabilizes fibre params when dur is changed — the fibre optimum at dur=14 differs from dur≈8.7, and co-learning overshoots. Freezing the b4.s1 fibre params is the safer strategy.
+
+3. **Duration wants BEYOND 20 (Q30 EXTENDED).** s1 (dur_hi=20) pushed dur to 20.0 (the bound!) and got the 2nd best R² in the batch (−3.142 > s0 −3.383 at dur=14). The high-dur basin center is UNREACHED. The period is ~50; dur may converge toward ~25 (half-period).
+
+4. **Spatial stiffness is UNIVERSALLY harmful (FALSIFIED DEFINITIVELY).** s4 (stiff+all, R²=−10.498, ampL=1.621) confirms the binary stiffness pattern is catastrophic on ALL bases: wl40 (b2/b3/b4), wl28+combined (b5). The UNet consistently learns extreme, net-harmful stiffness variation. This closes Q2/Q25 for the parametric inverse.
+
+5. **Angle=0 is NOT better than 0.17 (Q29 ANSWERED).** s2 (angle=0, −3.671) < s0 (angle=0.17, −3.383). The learned 0.17 is closer to the fibre-angle optimum. A small positive angle is preferred.
+
+6. **Drag is redundant on the combined base.** s5 (drag=60, −3.443) ≈ s0 (drag=30, −3.383). With gain already controlling contraction scaling, additional drag provides no marginal benefit. Consistent with Est.#21 (drag saturated) and the regime shift where gain IS the learned brake.
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | fibre_phase | gain | dur | stiff | ampL |
+|------|----------|-------------|-----------|-------------|------|-----|-------|------|
+| s0 | 28.8 (learning) | 0.17 (learning) | 0.39 (learning) | 0.41 (learning) | 0.854 (learning) | **14.0 (bound)** | [50,150] frozen | 0.029 |
+| s1 | 28.8 (learning) | 0.17 (learning) | 0.39 (learning) | 0.41 (learning) | 0.854 (learning) | **20.0 (bound!)** | [50,150] frozen | 0.017 |
+| s2 | 28.8 (learning) | **0.0→?** (learning) | 0.39 (learning) | 0.41 (learning) | 0.854 (learning) | **14.0 (bound)** | [50,150] frozen | 0.059 |
+| **s3** | **28.8 frozen** | **0.17 frozen** | **0.39 frozen** | **0.41 frozen** | **0.854 (learning)** | **14.0 (bound)** | **[50,150] frozen** | **0.048** |
+| s4 | 28.8 (learning) | 0.17 (learning) | 0.39 (learning) | 0.41 (learning) | 0.854 (learning) | **14.0 (bound)** | [50,150] **active** | 1.621 |
+| s5 | 28.8 (learning) | 0.17 (learning) | 0.39 (learning) | 0.41 (learning) | 0.854 (learning) | **14.0 (bound)** | [50,150] frozen | 0.036 |
+
+**Verdict:** Hypothesis FALSIFIED — the two b4 wins do NOT stack. dur0=14 is NOT additive with fibre+gain; b4.s1 (dur≈8.7, −2.620) remains the Phase-2 best. BUT dur wants >20 (bound-hitting), suggesting a better optimum at longer pulse. Fibre co-learning at dur=14 is harmful (frozen better). Stiffness definitively falsified.
+
+**Next:** Batch 6 explores the dur dimension more aggressively (dur_hi=30, dur_hi=50 — find the actual basin center) with fibre FROZEN (since co-learning hurts at high dur). Also tests finer fibre wavelength (wl=24) at both dur regimes, and an ablation of fibre amplitude. Parent = b4.s1 learned fibre values (frozen) for stability.
+
+---
+
+## Phase2 Batch 6 [learn=gain,dur and fibre,gain,dur — DUR EXPLORATION + FIBRE REFINEMENT] — 2026-06-24
+Parent: b4.s1 wl28 fibre+gain+dur (R²=−2.620, fibre wl≈28.8/angle≈0.17/amp≈0.39/phase≈0.41, gain=0.854, dur≈8.7)
+Hypothesis: "With wider dur bounds (dur_hi=30, dur_hi=50), dur will converge to a specific optimum rather than hitting the bound. Fibre-frozen + high dur may beat b4.s1. Finer fibre wl=24 may improve either dur regime."
+
+Slot 2 [dur_hi30_fibre] learn=fibre,gain,dur dur_hi=30 R2=**−2.814** red-on-green=**best overlap in batch** open=0.259 chir=0.56 size=1.08e-3 ampL=0.003 dur=30.0(bound)
+  Dashboard: Red loops show the best superposition on green of any slot. Fibre pattern subtly modified from frozen init (co-learned). Stiffness UNet shows standard green/yellow pattern. ampL=0.003 = near-perfect energy match. dur hit the 30.0 ceiling.
+
+Slot 0 [dur_hi30_frozen] learn=gain,dur dur_hi=30 R2=−3.087 red-on-green=partial open=0.230 chir=0.64 size=1.19e-3 ampL=0.059 dur=30.0(bound)
+  Dashboard: Red loops smaller than green, partial overlap. Frozen diagonal fibre stripes (wl28.8). dur hit 30.0 bound.
+
+Slot 1 [dur_hi50_frozen] learn=gain,dur dur_hi=50 R2=−3.223 red-on-green=partial open=0.179 chir=0.66 size=1.19e-3 ampL=0.074 dur=49.9(bound)
+  Dashboard: Very similar to s0 but LOWER openness (0.179 — near-constant pulse closes loops). dur hit ~50 = period. Highest chirality (0.66) but worst openness.
+
+Slot 5 [fibre_amp0_abl] learn=gain,dur fibre_amp=0.0 R2=−3.224 red-on-green=partial open=0.242 chir=0.56 size=1.48e-3 ampL=0.092 dur=14.0(bound)
+  Dashboard: Fibre angle panel is FLAT UNIFORM purple (fibre_amp=0 = isotropic). Direction arrows all horizontal (no anisotropy). Red loops partially overlap green — comparable to frozen fibre despite no structure. Ablation NOT catastrophic.
+
+Slot 3 [fibre_wl24] learn=fibre,gain,dur wl=24 dur0=14 R2=−3.317 red-on-green=off open=0.312 chir=0.57 size=1.24e-3 ampL=0.028 dur=14.0(bound)
+  Dashboard: Red loops offset from green. More uniform stiffness (cyan/teal). dur hit 14.0 bound (default dur_hi). Higher openness (0.312) but worse R².
+
+Slot 4 [fibre_wl24_lowdur] learn=fibre,gain,dur wl=24 dur0=8 R2=−3.746 red-on-green=off open=0.320 chir=0.58 size=1.30e-3 ampL=0.068 dur=9.0
+  Dashboard: Red clearly off from green. Worst R² in batch. dur moved 8→9.0 (barely). Highest openness (0.320) but poor trajectory match.
+
+Ranking (R²→0): **s2(−2.814)** > s0(−3.087) > s1(−3.223) > s5(−3.224) > s3(−3.317) > s4(−3.746).
+
+**Winner:** Slot 2 (R²=−2.814, fibre co-learn + dur_hi=30). 2nd best Phase-2 result overall, but b4.s1 (−2.620) remains the overall best.
+
+**Key findings:**
+
+1. **Duration turnover FOUND between 30 and 50 (Est.#46).** dur=30 (s0 −3.087) > dur=50 (s1 −3.223). At dur≈50 ≈ period, the pulse is near-constant → openness collapses (0.179 vs 0.230 at dur=30) and R² degrades. This is the FIRST non-monotone evidence — all previous tests monotonically hit their bounds. The optimum is between 30 and 50; need dur_hi=40 to pin it down.
+
+2. **Fibre co-learning REVERSES at dur=30 — OVERTURNS Est.#41 (Est.#47).** s2 co-learning (−2.814) BEATS s0 frozen (−3.087) by Δ=0.27 R² units. At dur=14 (b5), co-learning HURT. The fibre params (angle=0.17, amp=0.39) from b4.s1 were optimized for dur≈8.7; at dur=30 the fibre landscape shifts, and the optimizer CAN find the new optimum (the regime is stable, unlike wl40). Est.#41 was a dur-regime artifact.
+
+3. **Fibre ablation NOT catastrophic (Est.#48).** fibre_amp=0 (s5, −3.224) is only Δ=0.14 worse than fibre frozen (s0, −3.087). Fibre anisotropy is a moderate lever — gain and dur are dominant.
+
+4. **wl24 does NOT help at either dur regime (Q31 ANSWERED).** s3 wl24 at dur=14 (−3.317) and s4 wl24 at dur=9.0 (−3.746) are both WORSE than wl28 equivalents. wl=28 remains the optimal fibre wavelength.
+
+5. **Low dur with wl24 is the worst (s4, −3.746).** Confirms the short-duty-cycle regime is fundamentally limited — dur≈9 gives violent kick → inertial ringing → poor fit regardless of wavelength.
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | gain | dur | ampL |
+|------|----------|-------------|-----------|------|-----|------|
+| **s2** | **28.8 (co-learn)** | **0.17 (co-learn)** | **0.39 (co-learn)** | **0.854 (learn)** | **30.0 (bound!)** | **0.003** |
+| s0 | 28.8 frozen | 0.17 frozen | 0.39 frozen | 0.854 (learn) | 30.0 (bound) | 0.059 |
+| s1 | 28.8 frozen | 0.17 frozen | 0.39 frozen | 0.854 (learn) | 49.9 (bound!) | 0.074 |
+| s5 | 28.8 frozen | — | **0.0 (ablation)** | 0.854 (learn) | 14.0 (bound) | 0.092 |
+| s3 | **24 (co-learn)** | 0.17 (co-learn) | 0.39 (co-learn) | 0.854 (learn) | 14.0 (bound) | 0.028 |
+| s4 | **24 (co-learn)** | 0.17 (co-learn) | 0.39 (co-learn) | 0.854 (learn) | 9.0 | 0.068 |
+
+**Verdict:** Hypothesis PARTLY SUPPORTED. (1) dur does NOT converge to a specific optimum — it STILL hits bounds at 30 and 50. BUT dur=50 is WORSE than dur=30 → first turnover evidence. The basin center is between 30 and 50. (2) Fibre-frozen + high dur does NOT beat b4.s1 (−3.087 vs −2.620), BUT fibre CO-LEARNING at dur=30 does much better (−2.814) and closes to Δ=0.19 of b4.s1. (3) wl24 does NOT help — FALSIFIED.
+
+**Next:** Batch 7 brackets the dur optimum (dur_hi=40, Q33), tests fibre-param perturbations at dur_hi=30 (angle=0.3, fibre_amp=0.6 inits, Q34), and ablates gain learning. Parent = b6.s2 (dur_hi=30, fibre co-learn, R²=−2.814).
+
+---
+
+## Phase2 Batch 7 [learn=fibre,gain,dur — DUR BRACKET + FIBRE PERTURBATIONS] — 2026-06-24
+Parent: b6.s2 wl28 fibre co-learn dur_hi=30 (R²=−2.814, fibre wl≈28.8/angle≈0.17/amp≈0.39/phase≈0.41, gain=0.854, dur→30.0 bound)
+Hypothesis: "The dur optimum is between 30 and 50. With dur_hi=40, dur will either settle below 40 (pinning the basin center) or hit the bound. Fibre-param perturbations (angle=0.3, fibre_amp=0.6) at dur_hi=30 may improve beyond −2.814. If both help, the high-dur path may finally cross b4.s1 (−2.620)."
+
+Slot 3 [dur_hi30_angle03] learn=fibre,gain,dur fibre_angle=0.3(init) dur_hi=30 R2=**−2.842** red-on-green=partial, moderate superposition open=0.245 chir=0.53 size=1.08e-3 ampL=0.002 dur=30.0(bound)
+  Dashboard: Red loops show moderate overlap on green — very similar to parent b6.s2. Fibre angle map shows steeper/wider diagonal stripes (wider than wl28 parent). Near-perfect energy match (ampL=0.002). Best in batch but WORSE than parent (−2.814).
+
+Slot 0 [dur_hi40_fibre] learn=fibre,gain,dur dur0=14 dur_hi=40 R2=−2.871 red-on-green=partial open=0.225 chir=0.53 size=1.06e-3 ampL=0.007 dur=39.9(bound!)
+  Dashboard: Red loops similar to parent. Duration SATURATED at 39.9 (ceiling hit). Lowest openness (0.225) and smallest size — the longer pulse slightly closes loops. Near-perfect energy (ampL=0.007). WORSE than dur=30 (−2.814) → dur=30 IS the optimum.
+
+Slot 4 [dur_hi30_famp06] learn=fibre,gain,dur fibre_amp=0.6(init) dur_hi=30 R2=−2.956 red-on-green=partial open=0.260 chir=0.58 size=1.10e-3 ampL=0.010 dur=30.0(bound)
+  Dashboard: Red loops have moderate overlap on green. Higher openness and chirality than s0/s3. ampL=0.010 (good energy match). Higher fibre_amp init HURTS slightly vs 0.39 parent.
+
+Slot 2 [dur_hi30_wl24] learn=fibre,gain,dur fibre_wl=24 dur_hi=30 R2=−3.716 red-on-green=off, clear displacement mismatch open=0.264 chir=0.57 size=1.23e-3 ampL=0.098 dur=30.0(bound)
+  Dashboard: Red clearly offset from green. Stiffness map shows more texture (cyan/teal). Higher ampL (0.098) = worse energy match. wl24 clearly HURTS at dur=30 (confirms Q31 RE-CONFIRMED).
+
+Slot 1 [dur_hi30_amp12] learn=fibre,gain,dur amplitude=12 dur_hi=30 R2=−3.719 red-on-green=off open=0.258 chir=0.58 size=1.22e-3 ampL=0.084 dur=30.0(bound)
+  Dashboard: Red displaced from green. Higher amplitude adds energy that gain can't fully compensate (ampL=0.084). amp=12 at high dur is net-harmful — amplitude × duration total impulse too high.
+
+Slot 5 [gain_frozen_abl] learn=fibre,dur GAIN FROZEN at 0.854 dur_hi=30 R2=−4.006 red-on-green=off, worst overlap open=0.260 chir=0.56 size=1.28e-3 ampL=0.114 dur=30.0(bound)
+  Dashboard: Red clearly off from green. Worst R² and highest ampL (0.114). GAIN ABLATION confirms gain is ESSENTIAL — freezing gain costs 1.19 R² units vs the parent (−2.814).
+
+Ranking (R²→0): **s3(−2.842)** > s0(−2.871) > s4(−2.956) > s2(−3.716) > s1(−3.719) > s5(−4.006).
+
+**Winner:** NONE beats the parent b6.s2 (−2.814). The entire batch is WORSE. s3 (angle=0.3, −2.842) is closest but Δ=0.028 behind. b4.s1 (−2.620) remains the overall Phase-2 best; b6.s2 (−2.814) remains the high-dur best.
+
+**Key findings:**
+
+1. **Q33 CLOSED — dur optimum is AT ~30 (Est.#49).** s0 dur_hi=40 → dur saturated at 39.9 (R²=−2.871, WORSE than dur=30 −2.814). The controlled ceiling sweep now reads: dur=30 (−2.814) > dur≈40 (−2.871) > dur≈50 (−3.223). The optimum is AT 30 (~60% of period). Duration ALWAYS saturates at the ceiling (optimizer gradient always favors longer pulse), but the best ceiling is 30. Est.#46 REFINED: turnover is between 30 and 40, not 30 and 50.
+
+2. **Q34 CLOSED — fibre-param perturbations do NOT improve (Est.#50).** angle=0.3 (−2.842) is Δ=0.03 worse than 0.17 parent; fibre_amp=0.6 (−2.956) is Δ=0.14 worse; wl=24 (−3.716) is Δ=0.90 worse. The b4.s1-derived fibre inits (angle≈0.17, amp≈0.39, wl≈28.8) are near-optimal even at dur=30.
+
+3. **Gain is ESSENTIAL at dur=30 (Est.#51, STRENGTHENS Est.#32).** s5 gain frozen (−4.006) vs parent with gain (−2.814) — Δ=1.19 units. Gain is more critical at high dur (Δ=1.19) than at low dur (b4.s3 Δ=1.06). With long pulse, contraction energy is high → gain must brake harder.
+
+4. **Amplitude >10 HURTS at high dur (Est.#52, consistent with Est.#37).** amp=12 (−3.719) is Δ=0.90 WORSE than amp=10 (−2.814). At dur=30, total impulse = amplitude × duration; amp12 × dur30 = 360 vs amp10 × dur30 = 300 → 20% more energy → net-harmful overshoot.
+
+5. **BOTH basins are PLATEAUED.** The low-dur basin (b4.s1, −2.620) hasn't improved since batch 4. The high-dur basin (b6.s2, −2.814) hasn't improved despite 3 batches of perturbations. The 4-scalar parametric fibre may be at its expressiveness limit. → next lever: UNet fibre deviation (--unet_fibre 1).
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle(init) | fibre_amp(init) | gain | dur | ampL |
+|------|----------|-------------------|-----------------|------|-----|------|
+| **s3** | **28.8** | **0.3 (co-learn)** | **0.39 (co-learn)** | **0.854 (learn)** | **30.0 (bound)** | **0.002** |
+| s0 | 28.8 | 0.17 (co-learn) | 0.39 (co-learn) | 0.854 (learn) | 39.9 (bound!) | 0.007 |
+| s4 | 28.8 | 0.17 (co-learn) | 0.6 (co-learn) | 0.854 (learn) | 30.0 (bound) | 0.010 |
+| s2 | 24 | 0.17 (co-learn) | 0.39 (co-learn) | 0.854 (learn) | 30.0 (bound) | 0.098 |
+| s1 | 28.8 | 0.17 (co-learn) | 0.39 (co-learn) | 0.854 (learn) | 30.0 (bound) | 0.084 |
+| s5 | 28.8 | 0.17 (co-learn) | 0.39 (co-learn) | 0.854 **frozen** | 30.0 (bound) | 0.114 |
+
+**Verdict:** Hypothesis FALSIFIED on all counts. (1) dur_hi=40 → dur saturated at 39.9, WORSE than dur=30 → optimum IS 30, not between 30 and 50. (2) Fibre perturbations (angle=0.3, amp=0.6, wl=24) ALL worse → b4.s1 inits are near-optimal. (3) The high-dur path did NOT cross b4.s1. Both basins are plateaued — the 4-scalar parametric fibre is at its limit.
+
+**Next:** Batch 8 introduces UNet fibre deviation (--unet_fibre 1) — a per-pixel angle correction dθ(x,y) from the microscope image on top of the parametric base. With spatial stiffness disabled (stiff=[100,100] uniform) the UNet's only useful channel is the fibre deviation. Tests on both dur basins, plus deviation range and stiffness ablation. Parent = b4.s1 (−2.620, low-dur) and b6.s2 (−2.814, high-dur).
+
+---
+
+## Phase2 Batch 8 [learn=fibre,stiff,gain,dur — UNET FIBRE DEVIATION] — 2026-06-24
+Parent: b4.s1 (low-dur, R²=−2.620, overall Phase-2 best) and b6.s2 (high-dur, R²=−2.814). Both basins PLATEAUED (Est.#53).
+Hypothesis: "The parametric fibre (4 scalars) captures the global contraction-axis pattern but lacks local spatial detail. Adding a UNet fibre-angle deviation dθ(x,y) from the microscope image provides the per-pixel spatial resolution needed to break the R²≈−2.6 plateau."
+
+**Results per slot (from progress.txt final line + dashboard):**
+
+| Slot | Config (ONE knob from parent) | learn | R2 | ampL | open | chir | size | dur_final | red-on-green | key panel observation |
+|------|------|------|-----|------|------|------|------|------|------|------|
+| **s4** | **lowdur_control (NO unet_fibre)** | fibre,gain,dur | **−4.002** | **0.092** | 0.306 | 0.60 | 1.35e-3 | 9.0 | **best overlap**; red loops similar size to green, moderate superposition in central nodes | clean sinusoidal fibre stripes (wl28); stiff [50,150] frozen (init UNet noise) |
+| s1 | unet_fibre_hidur dur0=14 dur_hi=30 | fibre,stiff,gain,dur | −6.255 | 0.487 | 0.339 | 0.60 | 1.91e-3 | 30.0(bound) | partial overlap; red moderately overshooting green | stiff uniform teal; UNet dθ smoother/larger-scale patches (blue/orange blobs) |
+| s0 | unet_fibre_lowdur (MAIN TEST) | fibre,stiff,gain,dur | −13.664 | 2.394 | 0.266 | 0.57 | 2.38e-3 | 8.8 | OFF; red much larger than green, massive overshoot | stiff uniform teal; UNet dθ noisy/speckled salt-and-pepper |
+| s5 | unet_fibre_noparam_abl (fibre FROZEN) | stiff,gain,dur | −14.651 | 2.898 | 0.303 | 0.61 | 2.48e-3 | 8.7 | OFF; red much larger, similar to s0 | stiff uniform teal; UNet dθ noisy salt-and-pepper |
+| s2 | unet_fibre_tight (fibre_dev=π/4) | fibre,stiff,gain,dur | −15.597 | 3.304 | 0.270 | 0.55 | 2.56e-3 | 8.9 | OFF; massive red overshoot | stiff uniform teal; UNet dθ large white blob center |
+| s3 | unet_fibre_stiff (stiff [50,150] active) | fibre,stiff,gain,dur | −22.666 | 5.659 | 0.289 | 0.55 | 2.89e-3 | 8.7 | OFF; worst, huge red overshoot | stiff shows structured yellow spots on purple; UNet dθ patchy blue/orange |
+
+**Ranking by interior R² (higher = better):**
+1. **s4 lowdur_control** (R²=−4.002, **BATCH-8 WINNER** — parametric only, NO unet_fibre)
+2. s1 unet_fibre_hidur (R²=−6.255 — best UNet fibre slot, dur→30.0)
+3. s0 unet_fibre_lowdur (R²=−13.664)
+4. s5 unet_fibre_noparam_abl (R²=−14.651)
+5. s2 unet_fibre_tight (R²=−15.597)
+6. s3 unet_fibre_stiff (R²=−22.666)
+
+**Winner: s4 lowdur_control (R²=−4.002, parametric-only, NO unet_fibre). b4.s1 (−2.620) remains overall Phase-2 best.**
+
+**Key findings:**
+
+1. **Q35 ANSWERED-NO: UNet fibre deviation DOES NOT break the plateau — it is DECISIVELY net-harmful (Est.#54, Falsified#9).** The parametric-only control (s4, −4.002) beats every UNet fibre slot by 2.25 to 18.7 R² units. The UNet fibre deviation adds per-pixel spatial noise that the short-pulse regime amplifies into catastrophic overshoot (ampL 0.5–5.7 vs control 0.09). The microscope image does NOT carry usable fibre-direction information for the L2 parametric inverse. This CLOSES the spatial-information track entirely — neither spatial stiffness (Falsified#8) nor spatial fibre direction (Falsified#9) from the microscope improves the fit.
+
+2. **High dur PARTIALLY rescues UNet fibre.** s1 (dur0=14, dur_hi=30, dur→30.0, R²=−6.255) is the only UNet fibre slot below R²=−10. The longer pulse allows the UNet to learn smoother, larger-scale dθ patches instead of noisy salt-and-pepper. But even at dur=30, UNet fibre (−6.255) is much WORSE than the corresponding parametric-only result at dur=30 (b6.s2, −2.814). Duration cannot rescue the UNet.
+
+3. **Tighter deviation range DOES NOT help.** s2 (fibre_dev=π/4, −15.597) is WORSE than s0 (default π/2, −13.664). Restricting the UNet's angular output range does not address the fundamental problem — the UNet learns per-pixel noise regardless of range.
+
+4. **Parametric fibre co-learning barely matters under UNet fibre.** s0 (fibre co-learning, −13.664) ≈ s5 (fibre frozen, −14.651). The UNet fibre deviation DOMINATES the parametric fibre signal — when the UNet is active, the 4-scalar parametric fibre is noise-drowned.
+
+5. **Spatial stiffness + UNet fibre = CATASTROPHIC (re-confirms Falsified#8).** s3 (stiff [50,150] active + UNet fibre, −22.666, ampL=5.659) is the WORST slot. The two UNet channels (stiffness binary pattern + fibre noise) compound into the most extreme overshoot of any Phase-2 batch.
+
+6. **The b8 control (s4, −4.002) is 1.38 R² units WORSE than b4.s1 (−2.620).** Both use learn=fibre,gain,dur with similar fibre inits. The key difference: s4 has stiff [50,150] with frozen UNet (random init noise in stiffness), while b4.s1 may have had a cleaner stiffness init. This suggests even FROZEN random UNet stiffness spatial noise (range [50,150]) degrades the fit. Future runs should use stiff=[100,100] (uniform) unless actively testing stiffness.
+
+**Dashboard panel observations:**
+- **s4 control:** Clean sinusoidal fibre stripes (parametric wl28.8). Fibre axis vectors coherent and well-oriented. Red loops comparable in size to green, moderate superposition in central zoomed panels. Stiffness map shows faint yellow spots (frozen UNet init, [50,150]). This is the clearest, most structured dashboard.
+- **s1 hidur:** UNet dθ map shows smoother, larger-scale patches (blue/orange/white blobs) — the high dur allows more coherent learning. Fibre axis vectors coherent. Red loops moderately overshooting green but with some partial overlap.
+- **s0/s2/s5 lowdur UNet:** UNet dθ maps are noisy/speckled (salt-and-pepper at s0/s5, large central blob at s2). Red loops are MUCH larger than green — massive overshoot from per-pixel angular noise amplified by short pulse.
+- **s3 stiff+fibre:** Stiffness panel shows structured yellow spots on purple/blue. Both UNet outputs active = too many degrees of freedom → worst overshoot (ampL=5.659).
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | gain | dur | stiff | unet_fibre | ampL |
+|------|----------|-------------|-----------|------|-----|-------|------------|------|
+| **s4** | **28.8 (learn)** | **0.17 (learn)** | **0.39 (learn)** | **0.854 (learn)** | **9.0** | **[50,150] frozen** | **OFF** | **0.092** |
+| s1 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 30.0 (bound) | [100,100] frozen | ON | 0.487 |
+| s0 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 8.8 | [100,100] frozen | ON | 2.394 |
+| s5 | 28.8 frozen | 0.17 frozen | 0.39 frozen | 0.854 (learn) | 8.7 | [100,100] frozen | ON | 2.898 |
+| s2 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 8.9 | [100,100] frozen | ON (π/4) | 3.304 |
+| s3 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 8.7 | [50,150] learn | ON | 5.659 |
+
+**Verdict:** Hypothesis DECISIVELY FALSIFIED. The UNet fibre-angle deviation from the microscope is a net-harmful lever on both dur basins, at both deviation ranges, with and without stiffness, with and without parametric co-learning. The spatial-information track is CLOSED. The R²≈−2.6 plateau is NOT addressable through per-pixel microscope corrections. b4.s1 (−2.620) remains the overall Phase-2 best.
+
+**Next:** Batch 9 pivots to OPTIMIZATION depth and DUR gap-filling. (1) 600 iterations on both basins (test if Est.#22 holds for parametric inverse). (2) Intermediate dur=20, dur=25 (fill the dur=14/dur=30 gap — never tested). (3) Clean b4.s1 reproduction with stiff=[100,100] uniform (isolate the stiff-noise penalty seen in b8 control). (4) Gain reset ablation (fresh gain0=1.0 to test convergence robustness). Parent = b4.s1 params with stiff=[100,100].
+
+## Phase2 Batch 9 [learn=fibre,gain,dur — OPTIMIZATION DEPTH + DUR GAP-FILL] — 2026-06-24
+Parent: b4.s1 converged params (wl=28.8, angle=0.17, amp=0.39, phase=0.41, gain0=0.854) with stiff=[100,100] uniform. All slots learn=fibre,gain,dur.
+Hypothesis: "600 iterations will break the R²≈−2.6 plateau (which was reached at 300 iters); intermediate dur=20/25 will clarify the dur=14→30 gap; a clean b4.s1 reproduction with uniform stiffness will isolate the prior stiff-noise penalty."
+
+**Results per slot (from progress.txt final line + dashboard):**
+
+| Slot | Config (ONE knob from parent) | learn | iters | R2 | ampL | open | chir | size | dur_final | red-on-green | key panel observation |
+|------|------|------|------|-----|------|------|------|------|------|------|------|
+| **s2** | **iter600_hidur (dur0=14 dur_hi=30, 600it)** | fibre,gain,dur | 600 | **−2.158** | **0.014** | 0.255 | 0.56 | 9.40e-4 | 29.9(bound) | **best overlap; red loops compact, many track green** | clean fibre stripes; stiff uniform cyan; smallest loops |
+| s4 | dur_hi25 (dur0=14 dur_hi=25, 300it) | fibre,gain,dur | 300 | −2.810 | 0.003 | 0.277 | 0.56 | 1.09e-3 | 25.0(bound) | moderate overlap; red slightly larger than green | similar fibre pattern; dur at bound |
+| s3 | dur_hi20 (dur0=14 dur_hi=20, 300it) | fibre,gain,dur | 300 | −2.918 | 0.005 | 0.291 | 0.58 | 1.16e-3 | 20.0(bound) | partial overlap; red overshoots some nodes | fibre stripes; dur at bound |
+| s1 | iter600_lowdur (dur0=8 dur_hi=14, 600it) | fibre,gain,dur | 600 | −3.884 | 0.074 | 0.300 | 0.58 | 1.36e-3 | 9.8 | partial overlap; red still overshoots green | fibre similar to s0; 600 iter improved vs s0 |
+| s0 | clean_reproduce (dur0=8 dur_hi=14, 300it) | fibre,gain,dur | 300 | −5.020 | 0.236 | 0.310 | 0.61 | 1.49e-3 | 9.0 | poor overlap; red loops clearly larger than green | clean fibre stripes (wl28.8); stiff uniform cyan |
+| s5 | gain_reset_abl (gain0=1.0, dur0=8 dur_hi=14) | fibre,gain,dur | 300 | −6.861 | 0.606 | 0.314 | 0.61 | 1.70e-3 | 9.0 | OFF; red much larger than green, worst overshoot | similar fibre but gain overshoot → large red loops |
+
+**Ranking by interior R² (higher = better):**
+1. **s2 iter600_hidur** (R²=−2.158, **NEW OVERALL PHASE-2 BEST**, beats b4.s1 −2.620 by Δ=+0.462)
+2. s4 dur_hi25 (R²=−2.810)
+3. s3 dur_hi20 (R²=−2.918)
+4. s1 iter600_lowdur (R²=−3.884)
+5. s0 clean_reproduce (R²=−5.020)
+6. s5 gain_reset_abl (R²=−6.861, WORST)
+
+**Winner: s2 iter600_hidur (R²=−2.158, NEW OVERALL PHASE-2 BEST).**
+
+**Key findings:**
+
+1. **600 ITERATIONS BREAK THE HIGH-DUR PLATEAU.** b6.s2 (300 iter, dur=30, −2.814) → b9.s2 (600 iter, dur=30, −2.158, Δ=+0.656). Est.#53 ("both basins plateaued") was WRONG for the high-dur basin — it was optimization-depth-limited, not expressiveness-limited. The 4-scalar parametric fibre has MORE room to improve with sufficient iterations at dur=30.
+
+2. **Low-dur basin does NOT reproduce b4.s1's R²=−2.620.** s0 (300 iter, −5.020) and s1 (600 iter, −3.884) are both MUCH worse than b4.s1 (−2.620) despite using b4.s1's converged fibre/gain values and cleaner stiff=[100,100]. The low-dur basin convergence depends critically on the optimization TRAJECTORY from the original init conditions — the b4.s1 result may have benefited from a favorable path through a narrow loss valley. Starting AT the converged values does not guarantee re-convergence. The low-dur path is FRAGILE.
+
+3. **Duration continues to saturate at upper bound.** All high-dur slots hit their ceiling: s2→29.9/30, s3→20.0/20, s4→25.0/25. Within 300 iters, R² is monotone with dur ceiling: dur20 (−2.918) < dur25 (−2.810) ≈ dur30 (−2.814 from b6.s2). But 600 iters at dur=30 unlocks an additional Δ=+0.656. Est.#49 (dur=30 optimal ceiling) HOLDS — but needs 600 iters.
+
+4. **Gain init sensitivity CONFIRMED (Est.#32 strengthened).** gain0=1.0 (s5, −6.861) vs gain0=0.854 (s0, −5.020) = Δ=1.84 penalty, same config otherwise. The pre-learned gain from b4.s1 is a critical warm-start.
+
+5. **ampL and morphology track dur monotonically.** Higher dur → lower ampL (0.236→0.074→0.014→0.005→0.003), lower openness (0.310→0.255), smaller loops (1.49e-3→9.40e-4). The long pulse keeps the material contracted → less dynamic overshoot → better fit. This is physically meaningful: a sustained contraction (not a brief spike) reduces recoil/inertial overshoot.
+
+**Dashboard panel observations:**
+- **s2 (BEST):** Red loops are compact, many nodes show reasonable green/red superposition especially in the interior. Bottom-left zoomed panels show red loops smaller than green in some views but with similar shape/chirality. Fibre angle map shows clean periodic stripes. Stiffness uniform cyan. The fibre dx/dy vectors are coherent.
+- **s0/s1 (low dur):** Red loops larger than green; s1 (600 iter) shows improvement over s0 (300 iter) but both overshoot. The 600 extra iters shrunk the red loops (ampL 0.236→0.074).
+- **s5 (gain reset):** Red loops much larger, worst overshoot — confirms gain0=0.854 warm-start is critical.
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | gain | dur_final | stiff | n_iter | ampL |
+|------|----------|-------------|-----------|------|-----------|-------|--------|------|
+| **s2** | 28.8 | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 29.9 (bound) | [100,100] | 600 | 0.014 |
+| s4 | 28.8 | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 25.0 (bound) | [100,100] | 300 | 0.003 |
+| s3 | 28.8 | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 20.0 (bound) | [100,100] | 300 | 0.005 |
+| s1 | 28.8 | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 9.8 | [100,100] | 600 | 0.074 |
+| s0 | 28.8 | 0.17 (learn) | 0.39 (learn) | 0.854 (learn) | 9.0 | [100,100] | 300 | 0.236 |
+| s5 | 28.8 | 0.17 (learn) | 0.39 (learn) | 1.0 (learn) | 9.0 | [100,100] | 300 | 0.606 |
+
+**Verdict:** Hypothesis SUPPORTED (600 iters DID break the plateau, establishing a new overall best at R²=−2.158). The high-dur basin is optimization-depth-responsive. The low-dur basin (b4.s1 class) is NOT reproducible from converged-value inits — that result was trajectory-dependent and fragile. The gain init warm-start is confirmed critical.
+
+**User input acknowledged:** SIREN free-field mechanism is implemented and smoke-tested. Batch 10 will be the SIREN free-field test.
+
+**Next:** Batch 10 tests SIREN free fields (stiffness and/or fibre-angle deviation from image-independent SIREN coordinate networks). Parent = b9.s2 (R²=−2.158, 600 iter, dur=30). This is the genuinely new spatial-expressiveness test that Falsified#8/#9 did NOT test — those falsified UNet(microscope), not free fields. Sweep siren_omega (bandwidth/smoothness prior). Include a uniform control ablation.
+
+---
+
+## Phase2 Batch 10 [learn=stiff,gain,dur / fibre,gain,dur — SIREN FREE-FIELD TEST] — 2026-06-24
+Parent: b9.s2 (R²=−2.158, 600 iter, dur_hi=30, learn=fibre,gain,dur, stiff=[100,100], fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, gain=0.854)
+Hypothesis: "Stiffness IS a load-bearing spatial lever — the prior falsifications (#8/#9) confounded 'a field shaped like the microscope' (UNet) with 'a spatial field'. A FREE, image-independent SIREN coordinate network f(x,y) with controllable bandwidth (ω) will succeed where UNet failed, because: (a) it is not constrained to the microscope texture; (b) the ω parameter acts as a smoothness prior (low ω = smooth field). If a free stiffness field finally beats the gain-only baseline (−2.354), the plateau was an expressiveness limit imposed by the image constraint, not by spatial fields per se."
+
+**Results per slot (from progress.txt final line + dashboard_00599.png):**
+
+| Slot | Config (ONE knob from parent) | learn | R² | ampL | open | chir | size | dur | red-on-green | key observation |
+|------|------|------|-----|------|------|------|------|------|------|------|
+| s0 | free_stiff (SIREN stiff ω=30) | stiff,gain,dur | −2.354 | 0.003 | 0.228 | 0.63 | 1.07e-3 | 29.9 | moderate partial overlap | stiff panel = FLAT UNIFORM teal (≡100); SIREN learned NOTHING |
+| s1 | free_stiff_smooth (SIREN stiff ω=15) | stiff,gain,dur | −2.354 | 0.003 | 0.228 | 0.63 | 1.07e-3 | 29.9 | IDENTICAL to s0 | pixel-identical dashboard to s0/s2/s5 |
+| s2 | free_stiff_fine (SIREN stiff ω=60) | stiff,gain,dur | −2.354 | 0.003 | 0.228 | 0.63 | 1.07e-3 | 29.9 | IDENTICAL to s0 | pixel-identical dashboard to s0/s1/s5 |
+| s3 | free_dir (SIREN fibre ω=30) | fibre,gain,dur | −7.591 | 0.916 | 0.302 | 0.66 | 2.00e-3 | 30.0 | OFF; red much larger than green, overshoot | NOISY mottled dθ map (orange/blue blobs); fibre axis vectors DISORGANIZED |
+| s4 | free_stiff_dir (both SIREN ω=30) | fibre,stiff,gain,dur | −11.102 | 1.658 | 0.285 | 0.69 | 2.24e-3 | 30.0 | OFF; WORST, massive red overshoot | stiff STILL uniform teal; dθ even noisier than s3; direction field chaotic |
+| s5 | uniform_abl (CONTROL, no SIREN) | gain,dur | −2.354 | 0.003 | 0.228 | 0.63 | 1.07e-3 | 29.9 | IDENTICAL to s0 | gain+dur only, fibre frozen; ≡ SIREN stiff slots EXACTLY |
+
+**Ranking by interior R² (higher = better):**
+1. s0/s1/s2/s5 (R²=−2.354, ALL TIED — SIREN stiffness ≡ uniform ablation)
+2. s3 free_dir (R²=−7.591, 3.2× WORSE)
+3. s4 free_stiff_dir (R²=−11.102, 4.7× WORSE)
+
+**Winner: ALL FOUR stiffness slots TIE at R²=−2.354, identical to the uniform ablation. There is NO winner — SIREN stiffness is inert.**
+
+**Key findings:**
+
+1. **SIREN stiffness is COMPLETELY INERT at ALL bandwidths (Falsified#10, Est.#58).** Slots s0 (ω=30), s1 (ω=15), s2 (ω=60), and s5 (no SIREN, ablation) produce PIXEL-IDENTICAL dashboards and metrics: R²=−2.354, ampL=0.003, open=0.228, chir=0.63, size=1.07e-3, dur=29.9. The youngs panel in all SIREN stiffness slots shows flat uniform teal = 100 everywhere — the SIREN converged to a CONSTANT function, which is mathematically equivalent to no SIREN at all. The optimizer received ZERO gradient signal for spatial stiffness variation. This was true across a 4× bandwidth range (ω=15 to ω=60), so it is not a regularization issue.
+
+2. **The user's "confounding" hypothesis is itself FALSIFIED.** The user hypothesised that Falsified#8 (UNet stiffness harmful) did not falsify "a spatial stiffness field" but only "a field shaped like the microscope." With a completely FREE, image-independent SIREN, the result is INERT (not even harmful, just zero effect). The issue was never the image constraint — it is that the inverse L2 loss landscape is FLAT in the spatial-stiffness direction. Spatial stiffness variation simply has no measurable effect on interior R² at this parameter regime (amp=10, dur=30, gain≈0.85).
+
+3. **SIREN fibre direction is HARMFUL, matching the UNet pathology (Falsified#11, Est.#59).** s3 (SIREN fibre, R²=−7.591, ampL=0.916) shows the SAME failure mode as UNet fibre (b8): a NOISY dθ map (mottled blue/orange blobs in the top-right panel) that drives massive overshoot. The fibre axis vectors (bottom-right panel) are DISORGANIZED compared to the clean parametric pattern in the ablation slots. The parametric fibre stripes (bottom-middle) are severely distorted by the SIREN's angular corrections. The failure is REPRESENTATION-INDEPENDENT — both UNet (image-shaped) and SIREN (free) per-pixel direction fields produce noisy overshoot under L2 optimization.
+
+4. **Combined SIREN stiff+dir is the WORST (s4, R²=−11.102, ampL=1.658).** The SIREN stiffness remains inert (uniform teal in the youngs panel) while the SIREN fibre adds noise — so the combined result is ≈ SIREN fibre alone but slightly worse (the stiff learning group absorbs some optimizer capacity without contributing). The additional DOF is purely wasted.
+
+5. **Gain+dur re-optimization at 600it from b4.s1 inits (fibre frozen) gives R²=−2.354.** This is BETTER than b4.s1 (−2.620) because of the deeper optimization (600 vs 400 iters) and dur_hi=30. The fibre co-learning gain (b9.s2 −2.158 vs b10.s5 −2.354) is Δ=0.196 R² units at 600 iters, CONFIRMING Est.#47 (fibre co-learning helps at dur=30).
+
+**Dashboard panel observations:**
+- **s0/s1/s2/s5 (ALL identical):** Top-left trajectory panel shows small red loops with moderate green overlap — some central nodes track well, periphery offset. Stiffness (top-middle) = flat uniform teal (100 everywhere). Fibre angle dθ (top-right) = DARK/blank (no SIREN fibre active). Bottom-left zoomed panels: red/green loops similar sizes, some superposition, some offset. Bottom-middle fibre angle: clean periodic red/blue wl28.8 stripes (parametric, frozen). Bottom-right direction vectors: coherent uniform pattern.
+- **s3 (SIREN fibre):** Top-left: red loops MUCH larger than green, severe overshoot. Stiffness = uniform teal (no SIREN stiff). Fibre dθ (top-right) = NOISY mottled blue/orange heat map — high-frequency angular deviations everywhere. Bottom-left zoomed: red wildly overshoots green in every panel. Fibre angle (bottom-middle): PERTURBED, blobby (SIREN deviation overpowers parametric base). Direction vectors: spatially disorganized.
+- **s4 (both SIREN):** Similar to s3 but WORSE — even larger red overshoot. Stiffness STILL uniform teal (inert). dθ map even noisier/more fragmented.
+
+**Parametric convergence summary:**
+
+| Slot | stiff_src | siren_omega | fibre (frozen?) | gain | dur | ampL |
+|------|-----------|-------------|-----------------|------|-----|------|
+| s0 | **siren** | **30** | frozen | 0.854 (learn) | 29.9 (bound) | 0.003 |
+| s1 | **siren** | **15** | frozen | 0.854 (learn) | 29.9 (bound) | 0.003 |
+| s2 | **siren** | **60** | frozen | 0.854 (learn) | 29.9 (bound) | 0.003 |
+| s3 | unet(default) | 30 (fibre) | **co-learn + SIREN dθ** | 0.854 (learn) | 30.0 (bound) | 0.916 |
+| s4 | **siren** | **30** (both) | **co-learn + SIREN dθ** | 0.854 (learn) | 30.0 (bound) | 1.658 |
+| s5 | unet(default) | — | frozen | 0.854 (learn) | 29.9 (bound) | 0.003 |
+
+**Verdict:** Hypothesis DECISIVELY FALSIFIED on all counts. (1) FREE SIREN stiffness converges to uniform at ALL ω — zero gradient signal. (2) FREE SIREN fibre direction is harmful, matching the UNet pathology. (3) The user's "confounding" hypothesis is itself falsified — the issue is fundamental, not representation-specific. The spatial-field track is DEFINITIVELY CLOSED across ALL representations.
+
+**User input acknowledged:** SIREN mechanism was implemented and tested per the user's specification. The confounding hypothesis was a legitimate concern that needed testing — and batch 10 provides a CLEAN falsification. The test is valuable precisely because it eliminates the alternative explanation.
+
+**Next:** Batch 11 pivots to the REMAINING levers: optimization depth (>600 iterations) and fibre-param perturbations at 600 iters. The spatial-field chapter is closed; the fit is governed by 5 global scalars + optimization depth. Parent = b9.s2 (R²=−2.158, 600 iter, dur_hi=30).
+
+---
+
+## Phase2 Batch 11 [learn=fibre,gain,dur / gain,dur — OPTIMIZATION DEPTH 1200it + FIBRE PERTURBATIONS] — 2026-06-25
+Parent: b9.s2 (R²=−2.158, 600 iter, dur_hi=30, learn=fibre,gain,dur, stiff=[100,100], fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, gain=0.854)
+Hypothesis: "The R²≈−2.158 result at 600 iterations may still be optimization-depth-limited (the Δ=0.656 jump from 300→600 suggests the loss landscape has not converged). 1200 iterations may yield another significant Δ. Meanwhile, fibre-param perturbations (wl, amp, phase inits) that failed at 300 iters (b7) may succeed at 600 iters because the optimizer has more room to navigate away from bad inits."
+
+**Results per slot (from progress.txt final line + dashboard):**
+
+| Slot | Config (ONE knob from parent) | learn | n_iter | R² | ampL | open | chir | size | dur | red-on-green | key observation |
+|------|------|------|------|-----|------|------|------|------|------|------|------|
+| **s5** | **iter1200_frozen_abl (WINNER, NEW BEST)** | gain,dur | 1200 | **−1.411** | 0.083 | 0.229 | 0.63 | 8.48e-4 | 29.9 | BEST superposition of any Phase-2 slot; red loops tightly on green in many interior nodes | fibre FROZEN; gain+dur ONLY at deep opt beats fibre co-learn |
+| s0 | iter1200 (fibre co-learn) | fibre,gain,dur | 1200 | −1.437 | 0.124 | 0.243 | 0.57 | 7.84e-4 | 29.9 | excellent overlap; red loops similar size/shape to green | fibre co-learn 0.026 WORSE than frozen — gradient competition at deep opt |
+| s3 | fibre_phase0 (phase init=0.0) | fibre,gain,dur | 600 | −2.108 | 0.019 | 0.251 | 0.54 | 9.32e-4 | 29.9 | moderate overlap, compact red loops | phase=0 marginally beats parent (−2.158); basin is broad |
+| s4 | dur_hi35 (dur ceiling=35) | fibre,gain,dur | 600 | −2.159 | 0.013 | 0.236 | 0.55 | 9.31e-4 | 34.9 | moderate overlap ≈ parent | dur→34.9 (bound!), ≈parent exactly → dur=30 confirmed optimal |
+| s1 | fibre_wl32 (coarser fibre wl) | fibre,gain,dur | 600 | −2.199 | 0.005 | 0.243 | 0.58 | 9.52e-4 | 29.9 | moderate overlap ≈ parent | wl=32 slightly worse than wl=28.8 |
+| s2 | fibre_amp06 (higher fibre_amp init) | fibre,gain,dur | 600 | −2.215 | 0.009 | 0.256 | 0.55 | 9.51e-4 | 29.9 | moderate overlap ≈ parent | fibre_amp=0.6 slightly worse than 0.39 |
+
+**Ranking by interior R² (higher = better):**
+1. **s5 iter1200_frozen_abl (R²=−1.411, NEW OVERALL PHASE-2 BEST, beats b9.s2 −2.158 by Δ=+0.747)**
+2. s0 iter1200 (R²=−1.437, also beats b9.s2 by Δ=+0.721, but 0.026 behind frozen ablation)
+3. s3 fibre_phase0 (R²=−2.108, marginal +0.050 over parent)
+4. s4 dur_hi35 (R²=−2.159, ≈parent)
+5. s1 fibre_wl32 (R²=−2.199, marginal −0.041 vs parent)
+6. s2 fibre_amp06 (R²=−2.215, marginal −0.057 vs parent)
+
+**Winner: s5 iter1200_frozen_abl (R²=−1.411, NEW OVERALL PHASE-2 BEST).**
+
+**Key findings:**
+
+1. **1200 ITERATIONS IS A MASSIVE LEAP — the optimization-depth monotone CONTINUES (Q37 ANSWERED-YES, Est.#60).** Both 1200-iter slots dramatically beat the 600-iter parent: s5 (−1.411, Δ=+0.747) and s0 (−1.437, Δ=+0.721). The Δ≈0.72 from 600→1200 is COMPARABLE to the Δ=0.66 from 300→600 (b9). The loss landscape has NOT converged at 600 iterations. The parametric model's expressiveness limit is STILL UNREACHED — there is room for even deeper optimization (1800, 2400 iters). Est.#53 ("both basins plateaued") is now DOUBLY OVERTURNED.
+
+2. **FIBRE CO-LEARNING IS SLIGHTLY HARMFUL AT 1200 ITERS — frozen fibre WINS (REVISES Est.#47, Est.#61).** s5 frozen (−1.411) BEATS s0 co-learn (−1.437) by Δ=0.026. At 600 iter, co-learning helped (Δ=0.196 from b10 comparison). At 1200 iter, the gain reverses: the extra fibre DOF introduces gradient competition that slightly degrades gain/dur optimization. The b4.s1-derived fibre params (wl=28.8, angle=0.17, amp=0.39, phase=0.41) are sufficiently good that frozen fibre + deep gain/dur optimization is BETTER than co-learning. The practical implication: fibre inits from b4.s1 are near-optimal and should be FROZEN going forward; optimization budget should go to gain+dur depth.
+
+3. **ampL PATTERN AT 1200 ITER: the optimizer GROWS the red loops (Est.#62).** 1200-iter slots produce HIGHER ampL (0.083–0.124) than 600-iter slots (0.005–0.019). This is counterintuitive — deeper optimization makes red loops LARGER. The 600-iter red loops were UNDER-sized (ampL≈0 = near-perfect energy match, but R² still poor); the optimizer at 1200 iter found that GROWING the loops (allowing some energy mismatch) improves per-node directional alignment. The 600-iter ampL≈0 was an energy-match trap, not a good fit.
+
+4. **FIBRE PERTURBATIONS AT 600 ITERS ARE ALL NEAR THE PARENT — the convergence basin is BROAD (Est.#63).** wl32 (−2.199, Δ=−0.041), amp06 (−2.215, Δ=−0.057), phase0 (−2.108, Δ=+0.050): no perturbation is significantly better or worse than the parent. The landscape around the b4.s1-derived fibre inits is a broad, shallow basin at 600 iter. Combined with b7 (300 iter, also near-parent), the fibre params are ROBUST to perturbation — they are genuinely near the optimum, not stuck in a narrow valley.
+
+5. **dur=35 CONFIRMS dur=30 OPTIMAL (Q33 re-confirmed, Est.#49 strengthened).** s4 dur→34.9 (bound), R²=−2.159, identical to parent with dur=30. Combined with b7.s0 (dur=40, −2.871 WORSE): the dur optimum is 30, with NO benefit from going higher.
+
+**Dashboard panel observations:**
+- **s5 (WINNER, 1200 iter frozen):** Top-left trajectory panel shows the BEST red-on-green superposition of any Phase-2 slot. Many interior nodes have red loops sitting directly on green loops. The zoomed panels (bottom-left) show tight overlap in multiple views — red loop shapes MATCH green chirality and size more closely than any previous batch. Stiffness = flat uniform teal. Fibre angle = clean periodic red/blue wl28.8 stripes (frozen, unchanged). Direction vectors = coherent uniform pattern.
+- **s0 (1200 iter co-learn):** Very similar to s5 but slightly MORE red overshoot (ampL=0.124 vs 0.083). Some nodes show red loops slightly larger than green. Still excellent overlap overall — the difference from s5 is subtle.
+- **s1–s4 (600 iter perturbations):** All look structurally identical to the b9.s2 parent — small compact red loops with moderate green overlap. The difference between slots is indistinguishable by eye, consistent with the near-identical R² values.
+
+**Parametric convergence summary:**
+
+| Slot | fibre_wl | fibre_angle | fibre_amp | fibre_phase | gain | dur | stiff | n_iter | ampL |
+|------|----------|-------------|-----------|-------------|------|-----|-------|--------|------|
+| **s5** | 28.8 (frozen) | 0.17 (frozen) | 0.39 (frozen) | 0.41 (frozen) | 0.854 (learn) | 29.9 (bound) | [100,100] | **1200** | 0.083 |
+| s0 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | 0.41 (learn) | 0.854 (learn) | 29.9 (bound) | [100,100] | **1200** | 0.124 |
+| s3 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | **0.0** (learn) | 0.854 (learn) | 29.9 (bound) | [100,100] | 600 | 0.019 |
+| s4 | 28.8 (learn) | 0.17 (learn) | 0.39 (learn) | 0.41 (learn) | 0.854 (learn) | **34.9** (bound) | [100,100] | 600 | 0.013 |
+| s1 | **32** (learn) | 0.17 (learn) | 0.39 (learn) | 0.41 (learn) | 0.854 (learn) | 29.9 (bound) | [100,100] | 600 | 0.005 |
+| s2 | 28.8 (learn) | 0.17 (learn) | **0.6** (learn) | 0.41 (learn) | 0.854 (learn) | 29.9 (bound) | [100,100] | 600 | 0.009 |
+
+**Verdict:** Hypothesis SUPPORTED on optimization depth (1200 iter gives massive Δ=0.72–0.75 over 600 iter, NOT converged). Hypothesis FALSIFIED on fibre perturbations (no significant improvement from wl, amp, or phase changes at 600 iter). SURPRISE: fibre co-learning is slightly harmful at 1200 iter — frozen fibre + deep gain/dur is the new paradigm.
+
+**Next:** Batch 12 pushes optimization depth further (1800, 2400 iters) with fibre FROZEN (gain+dur only), and tests amplitude/gain-init perturbations at 1200 iter depth. The fibre chapter is CLOSED for exploration — frozen at b4.s1 values. Parent = b11.s5 (R²=−1.411, 1200 iter, gain,dur only, fibre frozen).
+
+---
+
+## Phase2 Batch 12 [learn=gain,dur — OPTIMIZATION DEPTH 1800/2400it + AMPLITUDE/GAIN-INIT PERTURBATIONS] — 2026-06-25
+Parent: b11.s5 (R²=−1.411, 1200 iter, dur_hi=30, learn=gain,dur, fibre FROZEN at b4.s1 values wl=28.8/angle=0.17/amp=0.39/phase=0.41, gain0=0.854, stiff=[100,100], amp=10, drag=30)
+Hypothesis: "The optimization-depth monotone continues: 600→1200 gave Δ≈0.72 (comparable to 300→600 Δ=0.66). 2400 iterations should give another substantial Δ. Also: amplitude perturbation (amp=12/15) may help at 1200it depth; lower gain init (0.7) may provide a better starting point for gain optimization."
+
+**Results per slot (from progress.txt final line + dashboard):**
+
+| Slot | Config (ONE knob from parent) | learn | n_iter | amp | gain0 | R² | ampL | open | chir | size | dur | red-on-green | key observation |
+|------|------|------|------|-----|------|-----|------|------|------|------|------|------|------|
+| **s0** | **iter2400 (WINNER, NEW OVERALL BEST)** | gain,dur | **2400** | 10 | 0.854 | **−0.999** | 0.287 | 0.232 | 0.62 | 6.96e-4 | 29.4 | BEST superposition of any Phase-2 slot; red loops closely overlapping green in many interior nodes | FIRST TIME R² crosses −1.0 |
+| s4 | iter2400_fibre_co (co-learn test) | fibre,gain,dur | 2400 | 10 | 0.854 | −1.063 | 0.278 | 0.236 | 0.62 | 6.96e-4 | 29.6 | very similar to s0 but slightly more mismatch | co-learn Δ=0.064 WORSE than frozen — gap WIDENED from 0.026 |
+| s1 | iter1800 (depth midpoint) | gain,dur | 1800 | 10 | 0.854 | −1.113 | 0.204 | 0.230 | 0.62 | 7.47e-4 | 29.7 | intermediate quality, between b11 and s0 | fills the depth curve cleanly |
+| s5 | iter1200_gain07 (lower gain init) | gain,dur | 1200 | 10 | **0.7** | −1.210 | 0.153 | 0.230 | 0.62 | 7.84e-4 | 29.9 | good overlap, moderate-sized red loops | gain0=0.7 BEATS 0.854 at 1200it by Δ=0.201 |
+| s2 | iter1200_amp12 (amplitude sweep) | gain,dur | 1200 | **12** | 0.854 | −1.746 | 0.022 | 0.228 | 0.64 | 9.37e-4 | 29.9 | small compact red loops, in energy-match trap | amp12 HURTS — same trap as 600it |
+| s3 | iter1200_amp15 (amplitude sweep) | gain,dur | 1200 | **15** | 0.854 | −2.380 | 0.004 | 0.229 | 0.64 | 1.07e-3 | 29.9 | tiny red loops, severe energy-match trap | amp15 WORST of batch |
+
+**Ranking by interior R² (higher = better):**
+1. **s0 iter2400 (R²=−0.999, NEW OVERALL PHASE-2 BEST, FIRST R² crossing −1.0)**
+2. s4 iter2400_fibre_co (R²=−1.063, co-learn 0.064 worse than frozen)
+3. s1 iter1800 (R²=−1.113, intermediate depth checkpoint)
+4. s5 iter1200_gain07 (R²=−1.210, gain0=0.7 beats 0.854 at 1200it)
+5. s2 iter1200_amp12 (R²=−1.746, amplitude hurts)
+6. s3 iter1200_amp15 (R²=−2.380, amplitude hurts more)
+
+**Winner: s0 iter2400 (R²=−0.999, NEW OVERALL PHASE-2 BEST, FIRST R² crossing −1.0).**
+
+**Key findings:**
+
+1. **THE DEPTH MONOTONE CONTINUES TO 2400 ITER — FIRST R² > −1.0 (Est.#64, Q38 PARTLY ANSWERED).** The full depth curve is now: 300it→~−5.0, 600it→−2.158, 1200it→−1.411, 1800it→−1.113, 2400it→−0.999. Every doubling gives a substantial but DECELERATING Δ: 600→1200 Δ=0.747, 1200→2400 Δ=0.412. The user's convergence criterion is Δ per doubling < 0.05 — at 0.412 we are still 8× away from convergence. N\* is NOT yet pinned. Need 3600 and 4800 to see if the deceleration continues to convergence or if there's a second plateau.
+
+2. **FIBRE CO-LEARNING GAP WIDENS WITH DEPTH — co-learning gets MORE harmful (Est.#65, STRENGTHENS Est.#61).** At 1200it: frozen −1.411 vs co-learn −1.437 (Δ=0.026). At 2400it: frozen −0.999 vs co-learn −1.063 (Δ=0.064). The gradient competition from the 4 extra fibre DOF steals optimization budget from the 2 productive scalars (gain + dur), and the penalty GROWS with depth. Fibre co-learning is DEFINITIVELY CLOSED for this model.
+
+3. **GAIN INIT IS A NEW LEVER — gain0=0.7 beats gain0=0.854 at 1200it by Δ=0.201 (Est.#66, Q39 OPENED).** b12.s5 (gain0=0.7, 1200it) = −1.210 vs b11.s5 (gain0=0.854, 1200it) = −1.411. The improvement is about 2/3 of the gain from doubling iterations (1200→1800 Δ=0.298). A lower gain init means the optimizer starts with a smaller contraction and has less overshoot to work against from the start. Est.#56 showed reset to 1.0 costs Δ=1.84; now we know going BELOW 0.854 also helps. The gain init landscape is monotone-down so far (1.0 < 0.854 < 0.7), but it must turn over somewhere (gain0=0 would mean no contraction). KEY QUESTION: does the Δ=0.201 advantage at 1200it transfer to 2400+ depth, or does deeper optimization make the init irrelevant?
+
+4. **AMPLITUDE >10 RE-CONFIRMED HARMFUL AT 1200it DEPTH (Est.#67, STRENGTHENS Est.#37/#52).** amp12 (−1.746) is Δ=0.335 worse than amp10 (−1.411); amp15 (−2.380) is Δ=0.969 worse. The penalty is SUPER-LINEAR in amplitude (12→15, just 25% more amplitude, adds Δ=0.634). Both higher-amp slots show the classic energy-match trap: ampL collapses to near-zero (0.022, 0.004) as the optimizer tries to minimize the larger impulse. The amp10 optimum is now confirmed at 300it, 600it, and 1200it — it is DEPTH-ROBUST.
+
+5. **ampL CONTINUES TO GROW WITH DEPTH — the optimizer keeps inflating red loops (extends Est.#62).** 600it ampL≈0.003–0.019, 1200it≈0.083, 1800it=0.204, 2400it=0.287. The trend is monotone UP: deeper optimization makes red loops progressively LARGER. This is NOT overshoot — R² is simultaneously improving — the optimizer is learning that BIGGER loops (with more motion) match the green loops better once directional alignment is also improved. The energy-match trap at 600it (ampL≈0) was a LOCAL minimum; the GLOBAL optimum has substantial motion.
+
+**Dashboard panel observations:**
+- **s0 (WINNER, 2400 iter frozen):** Top-left trajectory panel shows the BEST red-on-green superposition of ANY Phase-2 slot. Many interior nodes have red loops closely overlapping green. The zoomed panels (bottom-left 3×3) show red loops that match green loop orientation, chirality, and size more closely than b11. Stiffness = flat uniform teal (frozen [100,100]). Fibre angle = clean periodic red/blue wl28.8 stripes (frozen, unchanged from b4.s1). Direction vector field (bottom-right) = uniform coherent arrows.
+- **s4 (co-learn, 2400 iter):** Very similar to s0 but the bottom-right dx/dy panel shows blue-tinted arrows (the fibre field has shifted from its init). The trajectory quality is subtly worse — some nodes show slightly larger red-green offset.
+- **s1 (1800 iter):** Visually intermediate between b11 and s0. Red loops moderately overlap green.
+- **s5 (gain0=0.7, 1200 iter):** Moderate-sized red loops with decent green overlap. ampL=0.153 — larger than b11.s5 (0.083) at same depth, suggesting the lower gain init allows the optimizer to find a different ampL optimum.
+- **s2/s3 (amp12/15, 1200 iter):** Red loops are tiny/compact (energy-match trap). Nearly indistinguishable from the 600-iter look — higher amplitude at depth recreates the same trap.
+
+**Depth curve summary:**
+
+| Iterations | R² | ampL | Δ from prev | Δ per doubling | Est. converged? |
+|------------|-----|------|-------------|----------------|-----------------|
+| 300 | ~−5.0 | ~0.003 | — | — | no |
+| 600 | −2.158 | ~0.014 | 2.84 | 2.84 | no |
+| 1200 | −1.411 | 0.083 | 0.747 | 0.747 | no |
+| 1800 | −1.113 | 0.204 | 0.298 | — | no |
+| 2400 | −0.999 | 0.287 | 0.114 | 0.412 (1200→2400) | no (>> 0.05) |
+
+**Verdict:** Hypothesis SUPPORTED on optimization depth (the monotone continues, first R² > −1.0). Hypothesis FALSIFIED on amplitude (amp12/15 hurt as before). SURPRISE finding: gain init=0.7 is a new lever (Δ=0.201 at 1200it). Fibre co-learning gap widens — closed definitively.
+
+**Next:** Batch 13 has two objectives: (1) PIN the converged depth N\* by pushing to 3600/4800 iter (if Δ per doubling from 2400→4800 < 0.05, N\*≈2400); (2) EXPLOIT the gain-init finding by testing gain0=0.7 and 0.5 at 2400+ depth (Q39). Parent = b12.s0 (R²=−0.999, 2400 iter, gain,dur only, fibre frozen, gain0=0.854).

@@ -2,105 +2,117 @@
   "train_script": "cardio_mpm_train2.py",
   "configs": [
     {
-      "name": "dur_only",
+      "name": "iter3600",
       "spec": "material/material_aniso_cardio",
       "args": {
-        "--fibre_wl": "40.2",
-        "--fibre_angle": "0.72",
-        "--fibre_amp": "1.52",
-        "--fibre_phase": "1.53",
-        "--gain0": "1.0",
-        "--stiff_lo": "50",
-        "--stiff_hi": "150",
+        "--fibre_wl": "28.8",
+        "--fibre_angle": "0.17",
+        "--fibre_amp": "0.39",
+        "--fibre_phase": "0.41",
+        "--gain0": "0.854",
+        "--stiff_lo": "100",
+        "--stiff_hi": "100",
         "--amplitude": "10",
         "--drag_k": "30",
-        "--dur0": "8",
-        "--learn": "dur"
-      }
-    },
-    {
-      "name": "fibre_dur",
-      "spec": "material/material_aniso_cardio",
-      "args": {
-        "--fibre_wl": "40.2",
-        "--fibre_angle": "0.72",
-        "--fibre_amp": "1.52",
-        "--fibre_phase": "1.53",
-        "--gain0": "1.0",
-        "--stiff_lo": "50",
-        "--stiff_hi": "150",
-        "--amplitude": "10",
-        "--drag_k": "30",
-        "--dur0": "8",
-        "--learn": "fibre,dur"
-      }
-    },
-    {
-      "name": "stiff_dur",
-      "spec": "material/material_aniso_cardio",
-      "args": {
-        "--fibre_wl": "40.2",
-        "--fibre_angle": "0.72",
-        "--fibre_amp": "1.52",
-        "--fibre_phase": "1.53",
-        "--gain0": "1.0",
-        "--stiff_lo": "50",
-        "--stiff_hi": "150",
-        "--amplitude": "10",
-        "--drag_k": "30",
-        "--dur0": "8",
-        "--learn": "stiff,dur"
-      }
-    },
-    {
-      "name": "gain_dur",
-      "spec": "material/material_aniso_cardio",
-      "args": {
-        "--fibre_wl": "40.2",
-        "--fibre_angle": "0.72",
-        "--fibre_amp": "1.52",
-        "--fibre_phase": "1.53",
-        "--gain0": "1.0",
-        "--stiff_lo": "50",
-        "--stiff_hi": "150",
-        "--amplitude": "10",
-        "--drag_k": "30",
-        "--dur0": "8",
+        "--dur0": "14",
+        "--dur_hi": "30",
+        "--n_iter": "3600",
         "--learn": "gain,dur"
       }
     },
     {
-      "name": "fibre_dur_wl28",
+      "name": "iter4800",
       "spec": "material/material_aniso_cardio",
       "args": {
-        "--fibre_wl": "28.1",
-        "--fibre_angle": "0.69",
-        "--fibre_amp": "0.34",
-        "--fibre_phase": "0.71",
-        "--gain0": "1.0",
-        "--stiff_lo": "50",
-        "--stiff_hi": "150",
+        "--fibre_wl": "28.8",
+        "--fibre_angle": "0.17",
+        "--fibre_amp": "0.39",
+        "--fibre_phase": "0.41",
+        "--gain0": "0.854",
+        "--stiff_lo": "100",
+        "--stiff_hi": "100",
         "--amplitude": "10",
         "--drag_k": "30",
-        "--dur0": "8",
-        "--learn": "fibre,dur"
+        "--dur0": "14",
+        "--dur_hi": "30",
+        "--n_iter": "4800",
+        "--learn": "gain,dur"
       }
     },
     {
-      "name": "all_combine",
+      "name": "iter2400_gain07",
       "spec": "material/material_aniso_cardio",
       "args": {
-        "--fibre_wl": "40.2",
-        "--fibre_angle": "0.72",
-        "--fibre_amp": "1.52",
-        "--fibre_phase": "1.53",
-        "--gain0": "1.0",
-        "--stiff_lo": "50",
-        "--stiff_hi": "150",
+        "--fibre_wl": "28.8",
+        "--fibre_angle": "0.17",
+        "--fibre_amp": "0.39",
+        "--fibre_phase": "0.41",
+        "--gain0": "0.7",
+        "--stiff_lo": "100",
+        "--stiff_hi": "100",
         "--amplitude": "10",
         "--drag_k": "30",
-        "--dur0": "8",
-        "--learn": "all"
+        "--dur0": "14",
+        "--dur_hi": "30",
+        "--n_iter": "2400",
+        "--learn": "gain,dur"
+      }
+    },
+    {
+      "name": "iter3600_gain07",
+      "spec": "material/material_aniso_cardio",
+      "args": {
+        "--fibre_wl": "28.8",
+        "--fibre_angle": "0.17",
+        "--fibre_amp": "0.39",
+        "--fibre_phase": "0.41",
+        "--gain0": "0.7",
+        "--stiff_lo": "100",
+        "--stiff_hi": "100",
+        "--amplitude": "10",
+        "--drag_k": "30",
+        "--dur0": "14",
+        "--dur_hi": "30",
+        "--n_iter": "3600",
+        "--learn": "gain,dur"
+      }
+    },
+    {
+      "name": "iter2400_gain05",
+      "spec": "material/material_aniso_cardio",
+      "args": {
+        "--fibre_wl": "28.8",
+        "--fibre_angle": "0.17",
+        "--fibre_amp": "0.39",
+        "--fibre_phase": "0.41",
+        "--gain0": "0.5",
+        "--stiff_lo": "100",
+        "--stiff_hi": "100",
+        "--amplitude": "10",
+        "--drag_k": "30",
+        "--dur0": "14",
+        "--dur_hi": "30",
+        "--n_iter": "2400",
+        "--learn": "gain,dur"
+      }
+    },
+    {
+      "name": "iter2400_gain10_abl",
+      "spec": "material/material_aniso_cardio",
+      "args": {
+        "--fibre_wl": "28.8",
+        "--fibre_angle": "0.17",
+        "--fibre_amp": "0.39",
+        "--fibre_phase": "0.41",
+        "--gain0": "1.0",
+        "--stiff_lo": "100",
+        "--stiff_hi": "100",
+        "--amplitude": "10",
+        "--drag_k": "30",
+        "--dur0": "14",
+        "--dur_hi": "30",
+        "--n_iter": "2400",
+        "--learn": "gain,dur"
       }
     }
   ]

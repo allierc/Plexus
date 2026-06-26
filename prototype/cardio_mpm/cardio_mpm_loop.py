@@ -155,10 +155,22 @@ def _bjobs_states(jids):
     return states
 
 
+def _colorize_hrm(text):
+    """Color the Hrm=<score> token green/yellow/red (morphology score, 1=perfect)."""
+    def repl(m):
+        try:
+            v = float(m.group(1))
+        except ValueError:
+            return f"\033[31m{m.group(0)}\033[0m"                 # nan -> red
+        c = "\033[32m" if v >= 0.85 else "\033[33m" if v >= 0.60 else "\033[31m"  # green / yellow / red
+        return f"{c}{m.group(0)}\033[0m"
+    return re.sub(r"Hrm=([+-]?(?:[0-9.]+|nan))", repl, text)
+
+
 def _read_progress(job):
     p = os.path.join(job["dir"], "progress.txt")
     try:
-        return open(p).read().strip() if os.path.exists(p) else ""
+        return _colorize_hrm(open(p).read().strip()) if os.path.exists(p) else ""
     except OSError:
         return ""
 
