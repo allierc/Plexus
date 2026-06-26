@@ -41,3 +41,24 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, square-shaped cluster of blue particles. Over time,
+      the entire cluster undergoes a slight clockwise rotation. The internal distribution of the particles
+      remains relatively stable throughout the sequence. The overall shape and density of the blue field
+      do not change significantly.
+    objects: The scene contains a single large, square-shaped cluster of particles. The particles are
+      a consistent medium blue color against a white background. They are arranged in a dense, stochastic
+      distribution that fills the square area. Each individual particle is small and irregular in shape,
+      creating a textured appearance.
+  movie_mpm_particle:
+    description: The simulation shows a large collection of blue particles distributed within a square
+      boundary. Over time, the entire square region undergoes a slight clockwise rotation. The density
+      and distribution of the particles remain constant throughout the sequence. The background remains
+      a solid white color as the shape rotates.
+    objects: The scene contains thousands of small, blue dots representing individual particles. These
+      particles are arranged in a dense, stochastic distribution across a square area. The particles are
+      uniform in size and color, appearing as a fine mist or noise. The overall shape is a large, slightly
+      tilted square composed of these discrete points.

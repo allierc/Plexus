@@ -20,3 +20,16 @@ plotting:
   background: black
   colormap: tab10
   splat_size: 1.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cloud of particles contained within a diamond-shaped boundary.
+      Over the course of the video, the particles exhibit high-frequency jitter and local fluctuations
+      in position. The overall distribution of the particles remains statistically stationary throughout
+      the sequence. There is no visible global drift or large-scale structural evolution in the particle
+      cloud.
+    objects: The scene contains thousands of small, point-like particles distributed in a three-dimensional
+      volume. These particles are arranged in a dense, stochastic cluster that fills a diamond-shaped
+      region. The particles are multi-colored, featuring a mix of red, blue, green, and yellow hues. Each
+      individual particle is uniform in size and appears as a single pixel or small dot.

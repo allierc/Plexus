@@ -1,0 +1,2 @@
+loss=0.9465
+{"iter": 1, "g": 9.0, "frames": 500, "rad": 0.065, "ppc": 900, "you_jelly": 90.0, "you_snow": 120.0, "st": 8.0, "drag": 0.3, "seed": 0, "note": "first attempt: 3x3 grid water/jelly/snow fall"}

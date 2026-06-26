@@ -23,3 +23,16 @@ plotting:
   background: black
   colormap: tab10
   splat_size: 1.4
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cloud of multi-colored particles contained within a diamond-shaped
+      boundary. Over time, the particles exhibit a subtle, fluid-like shifting and swirling motion within
+      the volume. The overall density of the cluster remains constant as the particles redistribute their
+      positions. The animation concludes with the same steady-state distribution of points across the
+      geometric space.
+    objects: The scene contains thousands of small, individual points representing discrete particles.
+      These particles are arranged in a dense, three-dimensional cluster that forms a diamond shape. The
+      color palette consists of a mix of red, blue, green, and yellow dots. Each particle is uniform in
+      size and maintains a relatively consistent spacing from its neighbors.

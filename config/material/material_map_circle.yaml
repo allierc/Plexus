@@ -41,3 +41,32 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: A single greyish-white circular blob appears in the center of a black background. The
+      blob remains stationary and maintains its shape throughout the duration of the video. There is no
+      movement, expansion, or contraction of the object over time. The scene remains static with no changes
+      in lighting or environment.
+    objects: The scene contains a single circular object located in the center of the frame. The object
+      is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black
+      background. The object is isolated and does not interact with any other elements.
+  movie_cell:
+    description: The simulation shows a static distribution of blue particles within a square boundary.
+      There is no observable movement or evolution of the particles across the provided keyframes. The
+      spatial arrangement of the blue clusters remains constant throughout the sequence. The overall density
+      and pattern of the field do not change over time.
+    objects: The scene contains a large collection of small, blue particles. These particles are arranged
+      in a dense, stochastic distribution that fills a square area. The individual particles are irregular
+      in shape and vary slightly in size. The blue color is uniform across all particles against a plain
+      white background.
+  movie_mpm_particle:
+    description: The simulation shows a large collection of blue particles distributed within a square
+      boundary. Over the course of the video, the particles undergo subtle spatial shifts and local rearrangements.
+      The overall density of the distribution remains constant throughout the entire sequence. There is
+      no significant global movement or large-scale structural change observed.
+    objects: The scene contains thousands of small, individual blue dots. These particles are arranged
+      in a stochastic, non-uniform distribution across a white background. Each particle is roughly the
+      same size and maintains a distinct, point-like appearance. The particles are not connected to one
+      another, forming a discrete point cloud.

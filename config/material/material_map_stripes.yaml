@@ -41,3 +41,25 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a uniform distribution of blue particles within a square boundary.
+      Over time, a subtle inward migration occurs, causing the density of the particles to increase toward
+      the center. This central concentration creates a darker, more opaque core while the edges remain
+      relatively sparse. The overall distribution maintains a stochastic, noise-like texture throughout
+      the entire duration.
+    objects: The scene contains a large collection of small, blue particles. These particles are arranged
+      in a roughly square formation with irregular, jagged edges. The individual particles are tiny and
+      appear as discrete points of color. They are densely packed in the center and more loosely distributed
+      toward the periphery.
+  movie_mpm_particle:
+    description: The simulation begins with a uniform distribution of blue particles across a square domain.
+      Over time, the particles begin to cluster toward the center of the space. This central concentration
+      becomes increasingly dense as the simulation progresses. By the final frame, a distinct, high-density
+      core is visible amidst a sparser surrounding field.
+    objects: The scene contains a large number of small, individual blue particles. These particles are
+      initially arranged in a random, homogeneous distribution. As time passes, they form a dense, roughly
+      circular cluster in the center. The particles maintain their small size and blue color throughout
+      the entire evolution.

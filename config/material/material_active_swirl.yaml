@@ -43,3 +43,31 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: The video shows a black screen with no visible movement or changes. There are no particles,
+      agents, or fields evolving over time. The scene remains static and completely dark throughout the
+      entire duration. No scientific simulation is occurring in this sequence.
+    objects: There are no objects present in the scene. The entire frame is a uniform black color. There
+      is no topology or arrangement to describe as the space is empty. The size of any potential objects
+      is zero as they do not exist.
+  movie_cell:
+    description: The simulation shows a dense collection of blue particles contained within a square boundary.
+      Over the course of the video, the particles undergo subtle stochastic fluctuations in their positions.
+      The overall density and distribution of the blue field remain constant throughout the sequence.
+      There is no significant macroscopic movement or structural change observed in the system.
+    objects: The scene contains a large number of small, blue particles. These particles are arranged
+      in a dense, disordered distribution that fills a square area. Each individual particle is tiny and
+      appears as a single pixel or a small cluster of pixels. The particles are not connected to one another,
+      forming a granular and homogeneous field.
+  movie_mpm_particle:
+    description: The simulation shows a dense field of blue particles distributed uniformly across a square
+      domain. Over time, the particles exhibit very subtle fluctuations in their spatial distribution.
+      The overall density and pattern of the field remain nearly constant throughout the sequence. There
+      is no significant movement, clustering, or large-scale evolution of the particles.
+    objects: The scene contains a large number of small, individual blue dots. These particles are arranged
+      in a stochastic, non-connected distribution across the entire frame. Each particle is uniform in
+      size and color, appearing as a distinct point of light. The particles are bounded within a square
+      area, maintaining a consistent spatial occupancy.

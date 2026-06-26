@@ -37,23 +37,22 @@ plotting:
 descriptions:
   movie_cell:
     description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
-      across a black background. Over time, the particles begin to organize into distinct, flowing filaments
-      and swirling patterns. These structures evolve into complex, interconnected networks of curved lines
-      that move and shift across the frame. By the final frame, the particles have formed highly defined,
-      coherent trajectories that resemble fluid dynamics or magnetic field lines.
-    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
-      green, blue, orange, and purple. Initially, these objects are arranged in a stochastic, disordered
-      distribution with no clear spatial correlation. As the simulation progresses, the objects align
-      into elongated, continuous filaments that form loops and vortices. These filaments maintain their
-      distinct colors, allowing for the visualization of different flow paths or agent behaviors within
-      the system.
+      across a black background. Over time, the particles begin to organize into distinct, flowing streams
+      that move in undulating, wave-like patterns. These streams gradually become more defined, forming
+      intricate, intertwined loops and winding paths. By the final frame, the particles have settled into
+      a complex network of coherent, swirling trajectories that fill the entire space.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including yellow,
+      cyan, magenta, and orange. These particles are initially arranged in a stochastic, disordered state
+      with no clear spatial correlation. As the simulation progresses, they form elongated, continuous
+      filaments that exhibit a fluid-like topology. The filaments are characterized by smooth, curved
+      geometries and varying densities, creating a sense of dynamic flow.
   movie_chemical:
-    description: The simulation shows a dense network of intertwined, thread-like filaments evolving in
-      a complex, chaotic manner. Over time, the filaments shift and undulate, maintaining a high degree
-      of entanglement throughout the space. The movement appears fluid and continuous, with no significant
-      change in the overall density of the network. The filaments constantly weave over and under one
-      another, creating a dynamic, three-dimensional web of motion.
-    objects: The scene consists of numerous long, thin filaments that are highly curved and intertwined.
-      These filaments are colored in a variety of hues, including cyan, magenta, yellow, and blue. They
-      are arranged in a dense, stochastic network that fills the entire frame uniformly. Each filament
-      is of a similar scale and length, creating a homogeneous texture of overlapping lines.
+    description: The simulation shows a dense network of colorful, undulating lines moving across a black
+      background. Over time, the lines shift and flow in a fluid, organic motion, creating a sense of
+      constant, rhythmic turbulence. The paths of the lines appear to weave in and out of each other,
+      maintaining a consistent density throughout the frame. The overall effect is a dynamic, abstract
+      visualization of complex, interconnected trajectories.
+    objects: The scene consists of numerous thin, continuous lines that are intertwined and overlapping.
+      These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
+      a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
+      and are distributed evenly across the entire field of view.

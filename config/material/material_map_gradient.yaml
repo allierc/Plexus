@@ -41,3 +41,24 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a dense field of blue particles contained within a square boundary.
+      Over the course of the video, the particles undergo subtle stochastic fluctuations in their positions.
+      The overall density and distribution of the blue field remain constant throughout the sequence.
+      There is no significant macroscopic movement or structural change in the aggregate.
+    objects: The scene contains a large number of small, blue, irregularly shaped particles. These particles
+      are densely packed together to form a continuous, textured square. The particles are distributed
+      uniformly across the two-dimensional plane of the square. The blue color is consistent across all
+      particles, contrasting against the white background.
+  movie_mpm_particle:
+    description: The video shows a static distribution of blue particles within a square boundary. There
+      is no visible movement or evolution of the particles across the four keyframes. The spatial arrangement
+      of the dots remains constant throughout the sequence. The simulation appears to be in a steady state
+      or represents a single snapshot of a random field.
+    objects: The scene contains a large number of small, blue dots distributed across a white background.
+      These particles are arranged in a stochastic, non-uniform pattern that fills a square area. Each
+      individual dot is tiny and uniform in size and color. The dots are not connected to one another,
+      forming a discrete point cloud.

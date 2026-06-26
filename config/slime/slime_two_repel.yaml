@@ -28,24 +28,21 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation shows a dynamic system of orange and blue particles moving in a fluid-like
-      motion. Over time, the particles form intricate, winding paths that resemble streamlines or flow
-      patterns. The structures appear to shift and evolve, with some areas showing high concentration
-      and others showing sparse distribution. The overall motion suggests a complex, interconnected field
-      of movement across the entire frame.
-    objects: 'The scene contains two primary sets of objects: orange and blue particles. These particles
-      are arranged in long, continuous, and winding filaments that curve and loop across the black background.
-      Each particle is a small, uniform dot, creating a granular texture within the larger flow structures.
-      The orange and blue filaments often run parallel to or intertwine with each other, forming a complex
-      network of paths.'
+    description: The simulation shows a collection of particles moving in complex, swirling patterns across
+      a black background. Over time, the particles form elongated, winding filaments that appear to flow
+      and interact with one another. The motion is fluid and organic, with some paths looping back on
+      themselves while others stretch across the frame. The overall structure remains dynamic, with the
+      filaments constantly shifting and evolving their shapes.
+    objects: The scene contains two distinct sets of particles, one colored in a vibrant cyan and the
+      other in a reddish-pink. These particles are arranged into long, continuous, and winding filaments
+      that resemble fluid streamlines or biological structures. Each filament is composed of many small,
+      individual dots that maintain a consistent density along the paths. The filaments vary in length
+      and curvature, weaving through the space in a complex, interconnected topology.
   movie_chemical:
-    description: The simulation begins with a dense, chaotic network of intertwined red and cyan filaments.
-      Over time, these filaments undergo a continuous, fluid-like deformation as they shift and undulate
-      across the frame. The overall structure maintains its interconnected complexity while the individual
-      paths of the lines evolve dynamically. By the final frame, the network has shifted into a new configuration
-      of winding, overlapping curves.
-    objects: 'The scene contains two primary sets of objects: red filaments and cyan filaments. These
-      filaments are arranged in a complex, non-linear topology, forming a dense web of interconnected
-      loops and curves. Each filament is relatively thin and uniform in width, spanning across the entire
-      field of view. The red and cyan lines are interwoven, creating a high-contrast, multi-layered network
-      against a black background.'
+    description: The video shows a static image of intertwined, winding lines. There is no movement or
+      evolution between the four keyframes provided. The lines remain in the same positions throughout
+      the sequence. The scene represents a steady state of a complex network.
+    objects: The scene contains two sets of continuous, thread-like lines. One set is colored in a vibrant
+      cyan-green, while the other is a deep pinkish-red. These lines are highly convoluted and intertwined,
+      forming a dense, tangled network across the black background. Each line is of a similar thickness
+      and occupies a significant portion of the frame.

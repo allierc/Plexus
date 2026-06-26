@@ -29,10 +29,14 @@ class MPMDrag(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.k = float(params["k"])
+        self.after = int(params.get("after", 0))          # gate: off until frame >= after (phased damping)
+        self.before = int(params.get("before", 1 << 30))  # gate: off once frame >= before
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
+        if not (self.after <= int(getattr(H, "frame", 0)) < self.before):
+            return {self.at: torch.zeros_like(lvl.get("vel"))}      # outside the active window -> no drag
         acc = -self.k * lvl.get("vel") * lvl.occ[:, None]           # -k v: opposes the particle velocity
         if mask is not None:
             acc = acc * mask[:, None].float()

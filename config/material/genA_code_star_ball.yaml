@@ -1,0 +1,62 @@
+# genA_code_star_ball -- authored from SOURCE CODE knowledge only (operators + schema),
+# no reference to existing example configs. Intent: a red elastic star falls under
+# gravity onto a fixed rigid ball.
+#   * red elastic "star": a "+"-cross of two elastic blocks (best non-round shape the
+#     block seeder allows), material: elastic, coloured red;
+#   * falling: gravity (gy < 0);
+#   * fixed rigid ball: a circular obstacle [cx,cy,r] (static zero-velocity in MPM).
+# MLS-MPM via the decomposed operators (mpm_strain -> p2g -> mpm_grid_update -> g2p).
+general:
+  name: genA_code_star_ball
+  seed: 0
+  n_frames: 400
+  dt: 1.0
+  boundary: wall
+  obstacles:
+  - [0.5, 0.30, 0.12]              # fixed rigid ball
+sets:
+  star:
+    n: 2
+    start: [0.5, 0.82, 0.5, 0.82]
+    types:
+      bar_v: {fraction: 0.5, youngs: 100, block: [0.47, 0.70, 0.53, 0.96], layers: [{frac: 1.0, youngs: 100, material: elastic}]}
+      bar_h: {fraction: 0.5, youngs: 100, block: [0.39, 0.80, 0.61, 0.86], layers: [{frac: 1.0, youngs: 100, material: elastic}]}
+  mpm_particle: {parent: star, per_parent: 4000, radius: 0.12, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+operators:
+- {op: aggregate, at: star}
+- {op: gravity, at: star, gy: -10.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.2, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 0.0, wall_damp: 0.5, wall_contact: 0.06}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1.0e9}
+schedule:
+- aggregate
+- gravity
+- {substep: 18, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  colors: {bar_v: [0.9, 0.12, 0.12], bar_h: [0.9, 0.12, 0.12]}
+  background: white
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: The blue vertical bar and orange horizontal bar start in a perpendicular orientation.
+      Over time, the blue bar rotates clockwise while the orange bar rotates counter-clockwise. The two
+      bars eventually cross each other at an angle. The grey circle remains stationary at the bottom of
+      the frame throughout the entire sequence.
+    objects: The scene contains a blue vertical bar with a textured, grainy appearance. An orange horizontal
+      bar of similar size and texture intersects the blue bar. A large, solid grey circle is positioned
+      below the intersecting bars. The bars and the circle are centered horizontally within the white
+      background.
+  movie_star:
+    description: The blue vertical bar and orange horizontal bar start in a perpendicular cross configuration
+      above a grey circle. Over time, the blue bar rotates clockwise while the orange bar rotates counter-clockwise.
+      The two bars gradually move closer to each other and toward the grey circle. By the final frame,
+      the bars have rotated significantly and are positioned diagonally over the top of the circle.
+    objects: The scene contains a blue vertical bar, an orange horizontal bar, and a grey circle. The
+      blue and orange bars are initially arranged as a cross shape, while the grey circle is positioned
+      below them. The blue bar is a medium-sized vertical rectangle, and the orange bar is a medium-sized
+      horizontal rectangle. The grey circle is a large, solid-colored sphere located at the bottom of
+      the frame.

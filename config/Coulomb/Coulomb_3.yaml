@@ -25,3 +25,15 @@ plotting:
     q_p1: [0, 0.5, 0.75]
     q_n1: [1, 0, 0]
   point_size: 9.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored dots on a black background. There is no
+      movement or change in the position of the particles across the four frames. The distribution of
+      the dots remains constant throughout the entire duration. The scene represents a steady-state distribution
+      of discrete points.
+    objects: The scene contains three distinct sets of small, circular dots. One set consists of white
+      dots, another of red dots, and the third of blue dots. These dots are distributed randomly across
+      the entire frame without any specific geometric arrangement or connection. Each dot is uniform in
+      size and maintains a consistent appearance throughout the sequence.

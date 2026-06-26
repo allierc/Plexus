@@ -37,11 +37,15 @@ class GravityOperator(Lateral):
         self.g = float(params.get("g", 10.0))            # magnitude (world units / time^2)
         self.gx = float(params.get("gx", 0.0))           # x-component (default 0)
         self.gy = float(params.get("gy", -self.g))       # y-component (default -g: down)
+        self.after = int(params.get("after", 0))         # gate: off until frame >= after (phased gravity)
+        self.before = int(params.get("before", 1 << 30)) # gate: off once frame >= before
 
     def forward(self, H, mask=None):
         cell = H.level(self.at)
         dev = cell.state.device
         accel = torch.zeros(cell.n, 2, device=dev)
+        if not (self.after <= int(getattr(H, "frame", 0)) < self.before):
+            return {cell.name: accel}                    # outside the active window -> no body force
         accel[:, 0] = self.gx
         accel[:, 1] = self.gy
         if mask is not None:

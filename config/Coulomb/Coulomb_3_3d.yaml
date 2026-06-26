@@ -26,3 +26,15 @@ plotting:
     q_n1: [1, 0, 0]
   splat_size: 1.9
   splat_res: 820
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: A dense cluster of particles is centered in a black void. Over time, the cluster expands
+      outward as the particles move away from the center. The expansion appears relatively uniform, with
+      the overall shape maintaining a roughly circular or diamond-like distribution. By the final frame,
+      the particles are more dispersed than they were at the beginning.
+    objects: 'The scene contains a large number of small, point-like particles. These particles are colored
+      in three distinct shades: white, red, and blue. They are arranged in a dense, stochastic cluster
+      that lacks a rigid geometric structure. Each individual particle is uniform in size and appears
+      as a single pixel or small dot.'

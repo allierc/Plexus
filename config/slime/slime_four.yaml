@@ -32,24 +32,23 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The simulation begins with a dense, chaotic distribution of multi-colored particles scattered
-      across a black background. Over time, the particles begin to organize into distinct, winding filaments
-      and swirling patterns. These structures evolve and shift, with some filaments lengthening while
-      others curve and loop into complex shapes. By the final frame, the particles have formed a highly
-      structured network of interconnected, flowing paths.
-    objects: The scene contains thousands of tiny, point-like particles in red, green, blue, and orange.
-      These particles are arranged in long, continuous, and sinuous filaments that weave across the entire
-      frame. The filaments exhibit a complex topology of loops, curves, and branching paths that resemble
-      fluid flow or magnetic field lines. Each individual particle is uniform in size, but their collective
-      arrangement creates large-scale, dynamic structures.
+    description: The simulation shows a collection of multi-colored particles moving in complex, fluid-like
+      trajectories across a black background. Over time, the particles form elongated, winding filaments
+      that twist and curve like smoke or flowing water. These filaments appear to interact and weave around
+      one another, maintaining distinct paths while filling the space. The overall motion is continuous
+      and smooth, creating a dynamic, organic pattern of flowing lines.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
+      yellow, green, and blue. These particles are organized into long, continuous, thread-like structures
+      that curve and loop throughout the frame. The filaments are densely packed in some areas and more
+      sparse in others, creating a sense of depth and flow. Each individual particle is very small, but
+      their collective arrangement forms large, sweeping paths that dominate the visual field.
   movie_chemical:
-    description: The simulation shows a complex network of intertwined, undulating lines that remain relatively
-      static in their overall structure. The lines exhibit subtle, fluid-like oscillations and slight
-      shifts in their curvature over the duration of the sequence. There is no significant migration or
-      large-scale deformation of the network, suggesting a steady-state dynamic. The visual effect is
-      one of a shimmering, organic web of energy or flow.
-    objects: The scene consists of numerous thin, continuous lines that are densely packed and interwoven
-      across the entire frame. These lines are colored in a repeating palette of cyan, magenta, yellow,
-      and blue. They form a chaotic, non-linear topology characterized by frequent loops, knots, and overlapping
-      paths. Each individual line is of a uniform, small thickness, creating a high-frequency texture
-      against the black background.
+    description: The simulation shows a complex network of colorful, undulating lines moving across a
+      black background. These lines appear to flow and twist in a fluid-like motion, maintaining their
+      continuous paths throughout the sequence. The movement is smooth and organic, with the lines weaving
+      over and under one another. Over time, the overall pattern remains stable while the individual curves
+      shift and evolve dynamically.
+    objects: The scene contains numerous thin, continuous lines that form a dense, tangled web. These
+      lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
+      uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
+      in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.

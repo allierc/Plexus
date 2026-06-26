@@ -41,3 +41,24 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a static distribution of blue particles within a square boundary.
+      There is no observable movement or evolution of the particles across the provided keyframes. The
+      spatial arrangement of the blue dots remains constant throughout the sequence. The overall density
+      and pattern of the field do not change over time.
+    objects: The scene contains a large number of small, blue particles. These particles are arranged
+      in a dense, stochastic distribution that fills a square area. The particles are disconnected from
+      one another, forming a granular texture. Each individual particle is uniform in size and color,
+      creating a consistent blue field.
+  movie_mpm_particle:
+    description: The video shows a static distribution of blue particles within a square boundary. There
+      is no visible movement or evolution of the particles across the four frames. The spatial arrangement
+      of the dots remains constant throughout the sequence. The simulation appears to be a steady-state
+      representation of a random point process.
+    objects: The scene contains a large number of small, blue circular particles. These particles are
+      distributed randomly across a white background, forming a dense, uniform field. They are not connected
+      to one another and maintain a consistent size throughout the video. The overall arrangement is bounded
+      by a square shape, creating a discrete point cloud.

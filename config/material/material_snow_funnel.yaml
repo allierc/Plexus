@@ -37,3 +37,25 @@ schedule:
 - substep: 20
   dt: 0.0001875
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A blue circular particle is initially centered within a white rectangular frame. The
+      particle then undergoes a rapid transformation, stretching vertically into a series of blue segments.
+      These segments appear to move downward while the white frame remains stationary. Finally, the blue
+      shapes settle into a fragmented, vertical column at the bottom of the frame.
+    objects: The scene contains a large white rectangular frame that serves as the background. A blue
+      circular particle is the primary dynamic object in the first frame. In subsequent frames, this particle
+      transforms into multiple smaller blue rectangular segments. These blue segments are arranged vertically
+      and decrease in size as they move toward the bottom.
+  movie_mpm_particle:
+    description: A large circular cluster of blue particles is initially centered in a white rectangular
+      area. The cluster then rapidly disintegrates and moves downward into a narrower white channel. As
+      it descends, the particles spread out and form a dense, horizontal band across the channel. Finally,
+      the particles continue to fall, settling into a smaller, concentrated mass at the bottom of the
+      channel.
+    objects: The scene contains a large, circular cluster of blue particles at the top. A white rectangular
+      background provides a container for the initial particle distribution. A narrower white channel
+      is positioned below the rectangle to guide the falling particles. The blue particles are small,
+      individual points that aggregate into larger, distinct shapes as they move.

@@ -72,21 +72,19 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A dense cluster of blue particles begins as a relatively smooth, spherical mass. Over
-      time, the cluster becomes increasingly irregular and develops jagged, protruding edges. The internal
-      structure of the mass appears to fragment and become more porous as the simulation progresses. By
-      the final frame, the cluster has transformed into a highly complex, asymmetrical shape with significant
-      internal voids.
-    objects: The primary object is a large, central cluster composed of thousands of small blue particles.
-      These particles are densely packed in the core but become more sparse toward the outer boundaries.
-      The cluster maintains a roughly circular topology that gradually deforms into a more irregular,
-      fractal-like geometry. Scattered individual blue dots appear around the main mass, representing
-      outliers or ejected particles from the main body.
+    description: A cluster of blue particles begins as a dense, roughly spherical mass. Over time, the
+      cluster undergoes a process of expansion and fragmentation. Individual particles and small sub-clusters
+      break away from the main body, moving outward into the surrounding space. By the final frame, the
+      central mass has become more porous and irregular as the surrounding cloud of particles grows larger.
+    objects: The primary object is a large, irregular cluster of blue particles. These particles are arranged
+      in a dense, roughly spherical topology with a porous internal structure. The color of the particles
+      is a consistent muted blue against a solid black background. The size of the cluster is large relative
+      to the frame, while the individual particles are very small and point-like.
   movie_chemical:
     description: A single blue spherical cluster remains stationary in the center of a black void. The
-      cluster maintains a consistent shape and size throughout the entire sequence. There is no visible
-      movement, expansion, or contraction of the object over time. The simulation shows a static state
-      of a single particle or field.
-    objects: The scene contains a single, large, spherical cluster of blue particles. It is positioned
-      centrally against a solid black background. The cluster has a rough, textured surface composed of
-      many smaller points. Its size and color remain constant across all frames of the simulation.
+      cluster exhibits a slightly irregular, textured surface that appears to fluctuate subtly. There
+      is no significant change in the overall size or position of the object across the frames. The simulation
+      shows a stable, static state of a single particle or aggregate.
+    objects: The scene contains a single, large, roughly spherical cluster. It is colored in a uniform
+      shade of muted blue. The object has a porous or granular texture, giving it a non-smooth appearance.
+      It is isolated in the center of a completely black, featureless background.

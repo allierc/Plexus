@@ -36,3 +36,32 @@ sets:
         fraction: 1.0
         youngs: 80
   mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: A white, wedge-shaped field of light originates from a central point and rotates clockwise.
+      The field maintains a constant angular width as it sweeps across the black background. The motion
+      is smooth and continuous, creating a fan-like effect. The rotation completes a significant portion
+      of a full circle over the duration of the sequence.
+    objects: The scene contains a single, wedge-shaped field of light. This field is white with a gradient
+      that fades toward its outer edges. It is anchored at a single vertex point in the center of the
+      frame. The field occupies a large portion of the screen as it rotates.
+  movie_cell:
+    description: The simulation shows a dense collection of blue particles contained within a square boundary.
+      Over time, the particles undergo subtle spatial rearrangements while maintaining a relatively uniform
+      distribution. The overall density of the blue field remains constant throughout the sequence. There
+      is no significant migration or clustering, indicating a state of equilibrium or high-frequency jitter.
+    objects: The scene contains a large number of small, blue, irregularly shaped particles. These particles
+      are densely packed together to form a nearly continuous textured field. They are arranged in a roughly
+      square formation with jagged, porous edges. Each individual particle is tiny relative to the overall
+      dimensions of the square area.
+  movie_mpm_particle:
+    description: The simulation shows a large collection of blue particles distributed across a square
+      field. Over time, the particles exhibit a subtle, uniform shifting in their spatial distribution.
+      The overall density of the points remains constant throughout the sequence. There is no significant
+      clustering or large-scale movement of the particles.
+    objects: The scene contains thousands of small, blue dots representing individual particles. These
+      particles are arranged in a stochastic, non-connected distribution across the entire frame. Each
+      particle is roughly the same size and maintains a consistent blue hue. The particles are bounded
+      within a square area, creating a dense, speckled texture.

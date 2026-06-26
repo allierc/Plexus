@@ -1,0 +1,2 @@
+loss=0.8684
+{"iter": 6, "g": 9.0, "frames": 520, "rad": 0.065, "ppc": 1000, "you_jelly": 80.0, "you_snow": 120.0, "st": 14.0, "drag": 0.45, "seed": 4, "note": "seed sweep s=4, tighter water", "device": "cuda:0"}
