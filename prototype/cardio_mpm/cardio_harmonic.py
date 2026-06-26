@@ -50,7 +50,7 @@ def _rel(num, den, eps=1e-12):
     return num / (den + eps)
 
 
-def _pernode_terms(sim_d, real_d, mov, K=4, floor=0.05):
+def _pernode_terms(sim_d, real_d, mov, K=4, floor=0.02):
     """PER-NODE relative feature errors. Returns (mag, area, orient), each a [M] vector over nodes.
 
     CRITICAL: each node is normalised by ITS OWN real harmonic energy -- so a wrong loop on any node
@@ -65,40 +65,53 @@ def _pernode_terms(sim_d, real_d, mov, K=4, floor=0.05):
     E = (dr["mag_p"] ** 2 + dr["mag_m"] ** 2).sum(0)                  # [M] per-node real energy
     gE = E.mean().clamp(min=1e-12)                                    # global scale for the floors
     fa = (floor * gE) ** 2
+    # RAW per-node relative errors r = error/signal (UNBOUNDED). r=0 perfect; r=1 means the sim got
+    # NOTHING right (e.g. a stub / zero motion: error == signal); r>1 is actively wrong (overshoot,
+    # opposite phase). NOT bounded by r/(1+r) -- that mapped r=1 -> 0.5, so a stub that misses the loop
+    # scored ~0.5 ("looks ok"). The score 1-r (clamped below) maps a stub to ~0, overshoot to <0.
     mag = ((ds["mag_p"] - dr["mag_p"]) ** 2 + (ds["mag_m"] - dr["mag_m"]) ** 2).sum(0) / (E + floor * gE)
     area = ((ds["area"] - dr["area"]) ** 2).sum(0) / ((dr["area"] ** 2).sum(0) + fa)
     orient = (ds["prod"] - dr["prod"]).abs().pow(2).sum(0) / (dr["prod"].abs().pow(2).sum(0) + fa)
-    return mag, area, orient                                         # each [M]
+    return mag, area, orient                                        # each [M], unbounded >=0
 
 
 def harmonic_pernode_loss(sim_d, real_d, mov, K=4, w_mag=1.0, w_area=3.0, w_orient=1.0):
-    """[M] per-node morphology loss (0 = perfect). w_area>w_mag emphasises the SIGNED-AREA
-    (chirality x openness) term -- the loop-defining structure R² is blind to."""
+    """[M] per-node relative error r (0 = perfect loop match; ~1 = sim got nothing right; >1 = overshoot).
+    w_area>w_mag emphasises the SIGNED-AREA (chirality x openness) term -- the loop-defining structure R²
+    is blind to. UNBOUNDED -> used as the training loss so overshoot keeps a strong correcting gradient."""
     mag, area, orient = _pernode_terms(sim_d, real_d, mov, K)
     return (w_mag * mag + w_area * area + w_orient * orient) / (w_mag + w_area + w_orient)
 
 
 def harmonic_terms(sim_d, real_d, mov, K=4):
-    """Scalar (node-MEANED) per-term errors -- for the montage."""
+    """Scalar (node-MEANED) per-term relative errors -- diagnostic."""
     mag, area, orient = _pernode_terms(sim_d, real_d, mov, K)
     return mag.mean(), area.mean(), orient.mean()
 
 
 def harmonic_loss(sim_d, real_d, mov, K=4, **w):
-    """Differentiable morphology loss to MINIMISE = MEAN over nodes of the per-node loss."""
+    """Differentiable training loss to MINIMISE = MEAN over nodes of the per-node relative error r
+    (unbounded; gives overshoot a strong correcting gradient)."""
     return harmonic_pernode_loss(sim_d, real_d, mov, K, **w).mean()
 
 
+def _pernode_score(sim_d, real_d, mov, K=4, **w):
+    """[M] per-node LoopScore SCORE = clamp(1 - r, -1, 1): R²-like. 1=perfect, 0=sim got nothing right
+    (stub/zero), <0=overshoot, -1=floor. Clamped so outliers don't blow up the reported mean/SD."""
+    r = harmonic_pernode_loss(sim_d, real_d, mov, K, **w)
+    return (1.0 - r).clamp(-1.0, 1.0)
+
+
 def harmonic_score(sim_d, real_d, mov, K=4, **w):
-    """1 - mean per-node loss; 'higher=better, 1=perfect' like R² (can go negative)."""
-    return float(1.0 - harmonic_loss(sim_d, real_d, mov, K, **w))
+    """Single-loop LoopScore score (the montage / dashboard per-panel value)."""
+    return float(_pernode_score(sim_d, real_d, mov, K, **w).mean())
 
 
 def harmonic_stats(sim_d, real_d, mov, K=4, **w):
-    """(mean, sd) of the per-node Hrm score across nodes. MEAN = the objective (how well loops match);
-    SD = how UNIFORM the match is (high SD -> some nodes good, some terrible). Both for reporting."""
-    hrm = 1.0 - harmonic_pernode_loss(sim_d, real_d, mov, K, **w)    # [M] per-node score
-    return float(hrm.mean()), float(hrm.std())
+    """(mean, sd) of the per-node LoopScore score for REPORTING. MEAN = objective (how well loops match,
+    1=perfect, 0=no better than zero motion, <0=overshoot); SD = cross-node uniformity."""
+    s = _pernode_score(sim_d, real_d, mov, K, **w)
+    return float(s.mean()), float(s.std())
 
 
 def fundamental_ellipse(disp, n=64):

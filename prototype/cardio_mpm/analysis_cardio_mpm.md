@@ -1,9 +1,14 @@
 # Cardio-MPM Loop — Running Analysis
 
+> **⏵ OBJECTIVE SHIFT (2026-06-26): success is now LoopScore (LS), R² is diagnostic only.** This log is
+> append-only and cumulative — earlier batches (R²-objective) are KEPT as the record of how understanding
+> evolved; they are reinterpreted, not erased. The metric once written `Hrm` is the same object now called
+> **LoopScore (LS)** (logs print `LS=`/`LS_SD=`). Continue appending dated Phase-3 sections below.
+
 Per-batch analysis written by the agent-in-the-loop. Each batch: the parallel `cardio_mpm_train.py`
-jobs, their final interior **R²**, the dashboard read (red-on-green superposition, learned stiffness +
-direction dx/dy structure), the winner, and the reasoning for the next `cardio_mpm_plan.json`. Durable
-claims distilled here live in `knowledge_cardio_mpm.md`.
+jobs, their final **LoopScore (LS)** (+ R² as a diagnostic), the dashboard read (red-on-green
+superposition, learned stiffness + direction structure), the winner, and the reasoning for the next slots.
+Durable claims distilled here live in `knowledge_cardio_mpm.md`.
 
 Seed batch 1 (parent `material_directional_cardio`, lr 2e-3, substeps 5, amplitude 15, dur0 30,
 w_amp 0.3) probes the **anti-collapse term**: w_amp {0 (ablation), 0.3, 1.0}, plus one-knob amplitude

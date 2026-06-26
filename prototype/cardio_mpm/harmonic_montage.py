@@ -2,16 +2,16 @@
 interior R² fails. Produces 3 PNGs in this directory:
 
   harmonic_montage_1_generated.png  -- 10x10 generated zoo: 10 trajectory TOPOLOGIES (rows) x 10
-       perturbations (cols). Each cell prints R² and Harm; the value is GREEN when the metric's
+       perturbations (cols). Each cell prints R² and LoopScore; the value is GREEN when the metric's
        verdict matches the ground-truth (shape-preserving vs shape-broken), RED when it is FOOLED.
-       At a glance: Harm is green across the grid; R² goes red in the offset/time-shift columns
+       At a glance: LoopScore is green across the grid; R² goes red in the offset/time-shift columns
        (says BAD when shape is fine) and the radial-dominated columns (says GOOD when the loop is wrong).
   harmonic_montage_2_gt_descriptor.png -- the real 10x10 GT beat loops (green) with the harmonic
        FUNDAMENTAL ellipse (orange) overlaid; titled with chirality and signed area -> the descriptor
        reads real morphology spatially.
   harmonic_montage_3_gt_radial_fooled.png -- the trainer's actual failure on the REAL field: each red
        sim loop is the real loop COLLAPSED toward its radial line (loop/area removed). R² barely
-       notices (stays high), Harm catches it (drops). Per-cell + aggregate.
+       notices (stays high), LoopScore catches it (drops). Per-cell + aggregate.
 """
 import os, sys
 import numpy as np
@@ -73,31 +73,39 @@ def _cell_metrics(real, sim):
     return H.interior_r2(s, r, MOV1), H.harmonic_score(s, r, MOV1)
 
 
+# dark palette (black background montages)
+BG, TXT, GREEN, RED, ORANGE = "black", "#dddddd", "#33dd33", "#ff5555", "#ffaa33"
+
+def _dark(ax):
+    ax.set_facecolor(BG); ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_color("#333333")
+
+
 def montage1():
     nR, nC = len(TOPOS), len(PERTS)
-    fig, axs = plt.subplots(nR, nC, figsize=(2.05 * nC, 2.15 * nR), facecolor="white")
+    fig, axs = plt.subplots(nR, nC, figsize=(2.05 * nC, 2.15 * nR), facecolor=BG)
     for i, (tname, gen) in enumerate(TOPOS):
         base = gen()
         for j, pname in enumerate(PERTS):
-            ax = axs[i, j]; ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
+            ax = axs[i, j]; ax.set_aspect("equal"); _dark(ax)
             real, sim, broken = perturb(pname, base)
             r2, hm = _cell_metrics(real, sim)
-            ax.plot(*torch.cat([real, real[:1]]).T, color="#22aa22", lw=1.6)
-            ax.plot(*torch.cat([sim, sim[:1]]).T, color="#dd2222", lw=1.1, alpha=0.9)
+            ax.plot(*torch.cat([real, real[:1]]).T, color=GREEN, lw=1.6)
+            ax.plot(*torch.cat([sim, sim[:1]]).T, color=RED, lw=1.1, alpha=0.9)
             good = not broken                                    # ground-truth: should the metric say GOOD?
-            def col(v): return "#157f15" if (v > 0.5) == good else "#cc0000"   # green if verdict correct, red if fooled
-            ax.set_title(f"R²={r2:+.2f}  H={hm:+.2f}", fontsize=7)
-            ax.text(0.02, 0.98, f"R²", color=col(r2), fontsize=7, fontweight="bold", ha="left", va="top", transform=ax.transAxes)
-            ax.text(0.20, 0.98, f"H", color=col(hm), fontsize=7, fontweight="bold", ha="left", va="top", transform=ax.transAxes)
-            if i == 0: ax.set_xlabel("")
-            if j == 0: ax.set_ylabel(tname, fontsize=8)
-            if i == nR - 1: ax.annotate(pname, (0.5, -0.16), xycoords="axes fraction", ha="center", va="top", fontsize=7, rotation=20)
-    fig.suptitle("Harmonic loop-loss vs interior R²  —  generated topology zoo (green=real, red=sim)\n"
+            def col(v): return "#33dd33" if (v > 0.5) == good else "#ff5555"   # green if verdict correct, red if fooled
+            ax.set_title(f"R²={r2:+.2f}  LS={hm:+.2f}", fontsize=13, color="white", fontweight="bold")
+            ax.text(0.02, 0.98, "R²", color=col(r2), fontsize=9, fontweight="bold", ha="left", va="top", transform=ax.transAxes)
+            ax.text(0.22, 0.98, "LS", color=col(hm), fontsize=9, fontweight="bold", ha="left", va="top", transform=ax.transAxes)
+            if j == 0: ax.set_ylabel(tname, fontsize=8, color=TXT)
+            if i == nR - 1: ax.annotate(pname, (0.5, -0.16), xycoords="axes fraction", ha="center", va="top", fontsize=7, rotation=20, color=TXT)
+    fig.suptitle("LoopScore (loop morphology) vs interior R²  —  generated topology zoo (green=real, red=sim)\n"
                  "metric label GREEN = verdict correct, RED = FOOLED.  R² fails on offset/time-shift (shape fine) "
-                 "and radial:* (loop wrong); H is correct throughout.", fontsize=12, y=0.995)
+                 "and radial:* (loop wrong); LoopScore is correct throughout.", fontsize=12, y=0.995, color=TXT)
     fig.tight_layout(rect=[0, 0.01, 1, 0.97])
     p = os.path.join(HERE, "harmonic_montage_1_generated.png")
-    fig.savefig(p, dpi=110, facecolor="white", bbox_inches="tight"); plt.close(fig); print("wrote", p)
+    fig.savefig(p, dpi=110, facecolor=BG, bbox_inches="tight"); plt.close(fig); print("wrote", p)
 
 
 # --------------------------------------------------------------------------- GT 10x10 loops
@@ -114,27 +122,27 @@ def load_gt_loops():
 
 
 def _grid10(beat, redfn, title, fname, descr=False):
-    fig, axs = plt.subplots(10, 10, figsize=(20, 20.6), facecolor="white")
+    fig, axs = plt.subplots(10, 10, figsize=(20, 20.6), facecolor=BG)
     r2s, hms = [], []
     for k in range(100):
-        ax = axs[k // 10, k % 10]; ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
+        ax = axs[k // 10, k % 10]; ax.set_aspect("equal"); _dark(ax)
         real = beat[:, k]                                        # [G,2]
-        ax.plot(*torch.cat([real, real[:1]]).T, color="#22aa22", lw=1.4)
+        ax.plot(*torch.cat([real, real[:1]]).T, color=GREEN, lw=1.4)
         if descr:
             area = float((H.harmonic_descriptor(real[:, None, :], 4)["area"]).sum())
             ell = H.fundamental_ellipse(real)
-            ax.plot(*torch.cat([ell, ell[:1]]).T, color="#ee8800", lw=1.0, alpha=0.85)
-            ax.set_title(f"{'CCW' if area>0 else 'CW'}  S={area:+.1e}", fontsize=6)
+            ax.plot(*torch.cat([ell, ell[:1]]).T, color=ORANGE, lw=1.0, alpha=0.9)
+            ax.set_title(f"{'CCW' if area>0 else 'CW'}  S={area:+.1e}", fontsize=9, color="white", fontweight="bold")
         else:
             sim = redfn(real)
-            ax.plot(*torch.cat([sim, sim[:1]]).T, color="#dd2222", lw=1.0, alpha=0.9)
+            ax.plot(*torch.cat([sim, sim[:1]]).T, color=RED, lw=1.0, alpha=0.9)
             r2, hm = _cell_metrics(real, sim); r2s.append(r2); hms.append(hm)
-            ax.set_title(f"R²={r2:+.2f} H={hm:+.2f}", fontsize=6)
+            ax.set_title(f"R²={r2:+.2f} LS={hm:+.2f}", fontsize=13, color="white", fontweight="bold")
     if not descr:
-        title += f"\naggregate over 100 nodes:  R²={np.mean(r2s):+.3f}   Harm={np.mean(hms):+.3f}"
-    fig.suptitle(title, fontsize=14, y=0.997)
+        title += f"\naggregate over 100 nodes:  R²={np.mean(r2s):+.3f}   LoopScore={np.mean(hms):+.3f}"
+    fig.suptitle(title, fontsize=14, y=0.997, color=TXT)
     fig.tight_layout(rect=[0, 0, 1, 0.975])
-    p = os.path.join(HERE, fname); fig.savefig(p, dpi=95, facecolor="white", bbox_inches="tight"); plt.close(fig); print("wrote", p)
+    p = os.path.join(HERE, fname); fig.savefig(p, dpi=95, facecolor=BG, bbox_inches="tight"); plt.close(fig); print("wrote", p)
 
 
 def mistimed(real):
@@ -154,5 +162,5 @@ if __name__ == "__main__":
             "harmonic_montage_2_gt_descriptor.png", descr=True)
     _grid10(beat, mistimed, "Real 10x10 GT loops (green) vs a SHAPE-PRESERVING mistimed+displaced sim (red): "
             "same loop, wrong timing/placement.\nThe morphology is correct, so the ideal metric should say GOOD "
-            "-- R² is FOOLED LOW (punishes timing/placement), Harm correctly stays HIGH.",
+            "-- R² is FOOLED LOW (punishes timing/placement), LoopScore correctly stays HIGH.",
             "harmonic_montage_3_gt_timing_fooled.png", descr=False)
