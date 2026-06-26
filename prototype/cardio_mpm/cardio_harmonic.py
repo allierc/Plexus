@@ -24,6 +24,7 @@ All three feature groups are invariant to a global time-shift of the beat (c_{+k
 c_{-k}->c_{-k}e^{+iwkT}: magnitudes, S, and the product c_{+k}c_{-k} are all unchanged) and to loop
 POSITION (k>=1 drops the DC term). So shape is judged as shape, not timing or placement.
 """
+import math
 import torch
 
 
@@ -132,3 +133,60 @@ def interior_r2(sim_d, real_d, mov):
     res = ((s - r) ** 2).sum()
     tot = ((r - r.mean(0, keepdim=True)) ** 2).sum().clamp(min=1e-12)
     return float(1.0 - res / tot)
+
+
+# --------------------------------------------------------------------------- #
+#  RESIDUAL DECOMPOSITION -- "where does the best model LOSE LoopScore?"
+#  Sensitivity (above) = what LS rewards. This = the remaining error of a real fit, attributed to
+#  morphology dimensions. For each node we correct the SIM's fundamental ellipse (c_{+1}, c_{-1})
+#  TOWARD the real along ONE dimension at a time and measure the LS recovered (DeltaLS). The dimension
+#  whose correction recovers the most LS is the mechanism the model is missing.
+# --------------------------------------------------------------------------- #
+def _reconstruct(c0, cp, cm, G):
+    """c0 [M] complex DC, cp/cm [K,M] complex -> displacement [G,M,2]."""
+    K = cp.shape[0]
+    w = (2 * math.pi / G) * torch.arange(G, dtype=torch.float32, device=cp.device)   # [G]
+    z = c0[None].to(torch.complex64).expand(G, -1).clone()
+    for k in range(1, K + 1):
+        z = z + cp[k - 1][None] * torch.exp(1j * w[:, None] * k) + cm[k - 1][None] * torch.exp(-1j * w[:, None] * k)
+    return torch.stack([z.real, z.imag], -1)
+
+
+def loopscore_residual(sim_d, real_d, mov, K=4):
+    """Returns (base_LS, {dimension: DeltaLS}) attributing the LS gap of sim vs real to morphology
+    dimensions: size, openness/aspect, chirality, orientation, and shape-detail (higher harmonics)."""
+    s = sim_d[:, mov] if mov is not None else sim_d
+    r = real_d[:, mov] if mov is not None else real_d
+    G = s.shape[0]; eps = 1e-9
+    zs = s[..., 0] + 1j * s[..., 1]; zr = r[..., 0] + 1j * r[..., 1]
+    Zs = torch.fft.fft(zs, dim=0) / G; Zr = torch.fft.fft(zr, dim=0) / G
+    c0s = Zs[0]
+    cps = Zs[1:K + 1].clone(); cms = torch.flip(Zs[G - K:G], dims=[0]).clone()
+    cpr = Zr[1:K + 1]; cmr = torch.flip(Zr[G - K:G], dims=[0])
+    allmov = torch.ones(s.shape[1], dtype=torch.bool, device=s.device)
+    base = harmonic_score(s, r, allmov, K=K)
+    # fundamental params (k=1)
+    ap, am = cps[0].abs(), cms[0].abs(); a_s = ap + am; b_s = (ap - am).abs(); ch_s = torch.sign(ap - am)
+    php, phm = torch.angle(cps[0]), torch.angle(cms[0]); th_s = (php + phm) / 2
+    rp, rm = cpr[0].abs(), cmr[0].abs(); a_r = rp + rm; b_r = (rp - rm).abs(); ch_r = torch.sign(rp - rm)
+    th_r = (torch.angle(cpr[0]) + torch.angle(cmr[0])) / 2
+
+    def ls_with(cp1, cm1, hi_real=False):
+        cp, cm = cps.clone(), cms.clone()
+        cp[0], cm[0] = cp1, cm1
+        if hi_real:
+            cp[1:], cm[1:] = cpr[1:], cmr[1:]
+        return harmonic_score(_reconstruct(c0s, cp, cm, G), r, allmov, K=K)
+
+    f = a_r / (a_s + eps)                                                       # size: scale magnitudes
+    rot = torch.exp(1j * (th_r - th_s))                                         # orientation: rotate fundamental
+    bn = (b_r / (a_r + eps)) * a_s                                              # aspect: match aspect ratio, keep size
+    asp_p = (a_s + ch_s * bn) / 2; asp_m = (a_s - ch_s * bn) / 2
+    swap = (ch_s != ch_r).float()                                              # chirality: swap |c+|,|c-| if sign differs
+    chp = ap * (1 - swap) + am * swap; chm = am * (1 - swap) + ap * swap
+    d = {"size":            ls_with(cps[0] * f, cms[0] * f) - base,
+         "orientation":     ls_with(cps[0] * rot, cms[0] * rot) - base,
+         "openness/aspect": ls_with(asp_p * torch.exp(1j * php), asp_m * torch.exp(1j * phm)) - base,
+         "chirality":       ls_with(chp * torch.exp(1j * php), chm * torch.exp(1j * phm)) - base,
+         "shape-detail(k>=2)": ls_with(cps[0], cms[0], hi_real=True) - base}
+    return base, d

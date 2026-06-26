@@ -73,6 +73,23 @@ correcting gradient); the REPORTED LS is the CLAMPED score mean±SD (outliers ca
 move together. `--loss harmonic` is the default (omit the flag); set `--loss r2` only for an occasional
 diagnostic control.
 
+**STRUCTURAL OPEN QUESTION (high priority — answer this early; it is not parameter-centric).**
+*Which morphology dimensions does LoopScore actually reward, and how strongly?* Candidates: loop **size**,
+**openness**, **chirality**, **ellipse aspect ratio**, **axis orientation**, **temporal phase**, **loop
+position**. You currently know LS rewards "better loops" — but not which axes dominate. Knowing the ranking
+turns observation into mechanism: instead of "gain0=0.5 beats 0.854", you can say *"gain0=0.5 wins because it
+shrinks loop SIZE, the dimension LS is most sensitive to in this regime."*
+  - *A-priori, from the math:* the signed-area term is weighted ×3, so LS should reward **chirality +
+    openness + size** most; **size/aspect** and **axis orientation** enter at ×1; and by construction LS is
+    **invariant to loop position and to a global temporal-phase shift** (those should score ≈0 sensitivity).
+  - *Measure it empirically (once, regime-robust):* take the real GT loops, perturb ONE dimension at a time
+    by a controlled amount (scale size; squash the minor axis = aspect/openness; scale/flip the signed area =
+    chirality; rotate = orientation; time-shift = phase; translate = position) and record ΔLS for each →
+    a SENSITIVITY RANKING. (A `make_loopscore_sensitivity.py` diagnostic — analogous to the topology-zoo
+    montage — produces this table/montage.)
+  - Tag the result **[engineering]** (it characterises the metric, not the model; regime-robust, rarely
+    re-tested) — but it UNDERWRITES every `[mechanism]` claim about why a parameter helped.
+
 ## The model — what is learned vs fixed
 
 Forward = `pacemaker → uniform activation pulse → parametric stiffness/gain/fibre fields →
@@ -244,6 +261,18 @@ converge to? A slot with `done=NO` / `LS=na` FAILED — say so, design around it
 5. Read the previous batch's **dashboards** (the primary evidence).
 6. Read the previous batch's **progress** (final `LS`/`LS_SD`/`R2` from `progress.txt` or the job log
    `done -> (... LS=...)` + `config.json`). Rank on LoopScore.
+6b. **Run the RESIDUAL DECOMPOSITION on EVERY slot** (not just the best). For each slot, re-run its config
+   with `--resume <slot_dir>/checkpoints/<last model_*.pt> --eval_decompose <slot_dir>/residual.png` (pass the
+   slot's own args; it does ONE forward, no training). This attributes the slot's remaining LS gap to
+   morphology dimensions — **size · openness/aspect · chirality · orientation · shape-detail(k≥2)** — as
+   `ΔLS recovered by correcting that dimension toward GT`.
+   *Interpret:* the **tallest positive bar is the MISSING MECHANISM** (correcting it would recover the most
+   LS); a bar at **≈0 or negative means that dimension is already solved** — do NOT keep tuning it. This is
+   distinct from the metric's *sensitivity* (importance): decomposition tells you the *remaining error*.
+   *Use:* (a) record each slot's top-1/top-2 bottleneck dimension(s) in the ledger row; (b) design the NEXT
+   batch to target the dominant bottleneck across slots with a MECHANISM, not a parameter sweep of an
+   already-solved dimension (e.g. bottleneck = orientation/chirality/shape-detail → a spatially-varying
+   direction field; bottleneck = size → gain/amplitude). The bottleneck axis, not the next knob, sets the agenda.
 7. **Identify the biggest SURPRISE** (and the systematic failure) — see the method cycle.
 8. **Generate ONE predictive hypothesis.**
 9. **Design ≤6 experiments** — one variable per slot; keep both pressures (default ≈ 3 exploit · 2 explore ·

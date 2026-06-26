@@ -204,6 +204,32 @@ def morphology_row(sim_d, idx):
     return op, chir, size
 
 
+def render_residual_decomposition(sim_d, real_d, mov, outpath, K, name=""):
+    """Where does THIS model lose LoopScore? Bar chart of LS recovered by correcting the sim toward the
+    real along each morphology dimension (size/openness/chirality/orientation/shape-detail). The tallest
+    bar = the mechanism the model is missing. Prints the % breakdown too."""
+    import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
+    base, d = HARM.loopscore_residual(sim_d, real_d, mov, K=K)
+    items = sorted(d.items(), key=lambda kv: -kv[1])
+    tot = sum(max(v, 0.0) for _, v in items) or 1e-9
+    names = [k for k, _ in items]; dls = [v for _, v in items]; pct = [100 * max(v, 0) / tot for v in dls]
+    fig, ax = plt.subplots(figsize=(9, 5), facecolor="black"); ax.set_facecolor("black")
+    bars = ax.barh(range(len(names))[::-1], dls, color="#66ccff")
+    for i, (v, p) in enumerate(zip(dls, pct)):
+        ax.text(v + 0.005, (len(names) - 1 - i), f"  +{v:.3f}  ({p:.0f}%)", va="center", color="white", fontsize=10, fontweight="bold")
+    ax.set_yticks(range(len(names))[::-1]); ax.set_yticklabels(names, color="white", fontsize=11)
+    ax.set_xlabel("ΔLoopScore recovered by correcting this dimension toward GT", color="#ccc", fontsize=10)
+    ax.tick_params(colors="#aaa"); [sp.set_color("#444") for sp in ax.spines.values()]
+    ax.set_title(f"Residual decomposition — {name}\nbase LoopScore = {base:+.3f}   (tallest bar = the missing mechanism)",
+                 color="white", fontsize=12)
+    fig.tight_layout()
+    os.makedirs(os.path.dirname(outpath) or ".", exist_ok=True)
+    fig.savefig(outpath, dpi=120, facecolor="black", bbox_inches="tight"); plt.close(fig)
+    print(f"  residual decomposition -> {outpath}  (base LS={base:+.3f})", flush=True)
+    for n, v in items:
+        print(f"    fix {n:20s}  ΔLS={v:+.3f}  ({100*max(v,0)/tot:.0f}% of recoverable)", flush=True)
+
+
 def render_eval_montage(rest, idx, sim_d, real_d, mov, outpath, K, amp, name=""):
     """10x10 montage: GT (green) vs LEARNED (red) per dashboard node, with per-node LoopScore; black bg.
     Aggregate LoopScore(mean±sd) + R² in the title. For evaluating a trained checkpoint against the GT loops."""
@@ -391,6 +417,8 @@ def main():
     ap.add_argument("--smoke", type=int, default=0)
     ap.add_argument("--eval_montage", default="", help="EVAL ONLY: with --resume <ckpt>, run ONE forward and save a "
                     "10x10 GT(green)-vs-LEARNED(red) montage with per-node LoopScore to this path, then exit (no training)")
+    ap.add_argument("--eval_decompose", default="", help="EVAL ONLY: with --resume <ckpt>, run ONE forward and save a "
+                    "RESIDUAL-DECOMPOSITION bar chart (which morphology dimension the model loses LoopScore on) to this path")
     args = ap.parse_args()
     if args.smoke:
         args.n_iter, args.warmup, args.grad, args.substeps = 2, 12, 12, 4
@@ -549,7 +577,7 @@ def main():
                 start_iter = 0
             print(f"  resumed from {path} (start_iter={start_iter})", flush=True)
 
-    if args.eval_montage:                                              # EVAL: one forward from the loaded ckpt -> montage, exit
+    if args.eval_montage or args.eval_decompose:                       # EVAL: one forward from the loaded ckpt, then exit
         with torch.no_grad():
             reset_state(lvl, rest, dev)
             youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta, theta_dev = maps()
@@ -567,7 +595,10 @@ def main():
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
                 sim.append(lvl.state[:, pa:pb])
             sim_d = torch.stack(sim); sim_d = sim_d - sim_d[0:1]
-        render_eval_montage(rest, idx, sim_d, real_d, mov, args.eval_montage, args.harm_K, args.traj_amp, spec.name)
+        if args.eval_montage:
+            render_eval_montage(rest, idx, sim_d, real_d, mov, args.eval_montage, args.harm_K, args.traj_amp, spec.name)
+        if args.eval_decompose:
+            render_residual_decomposition(sim_d, real_d, mov, args.eval_decompose, args.harm_K, spec.name)
         return
 
     pbar = tqdm(range(start_iter, args.n_iter), ncols=180, desc=spec.name)
