@@ -42,6 +42,7 @@ from plexus.models.entities import _lame
 import plexus.engine as E
 import cardio_mpm_data as D
 from cardio_unet import UNet, load_image            # stiffness = UNet(microscope) -- registered identity (no flip)
+import cardio_harmonic as HARM                       # morphology-aligned loop loss (--loss harmonic)
 
 torch.use_deterministic_algorithms(False)
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -76,6 +77,52 @@ def aniso_field_torch(wl, angle, phase, dev):
     f = (torch.cos(2 * PI * xr / wx + phase) * torch.cos(2 * PI * yr / wy + 0.5 * phase)
          + 0.5 * torch.cos(2 * PI * (xr / wx + yr / wy) + phase))
     return (f - f.min()) / (f.max() - f.min() + 1e-9)
+
+
+# --------------------------------------------------------------------------- #
+#  SIREN coordinate network (sinusoidal representation), VENDORED self-contained from
+#  connectome-gnn-cx/src/connectome_gnn/models/Siren_Network.py (the cameraman-fit Siren),
+#  itself adapted from https://github.com/vsitzmann/siren. Used here as an image-INDEPENDENT
+#  spatial field f(x,y) -> [out] for stiffness / fibre direction: decouples the learned field
+#  from the microscope image (unlike UNet(image), net-harmful -- ledger Falsified#8/#9), so the
+#  optimizer is FREE to place structure anywhere; `omega_0` is the frequency/bandwidth knob
+#  (lower -> smoother field = the smoothness prior that replaces the image constraint).
+# --------------------------------------------------------------------------- #
+class SineLayer(torch.nn.Module):
+    def __init__(self, in_features, out_features, bias=True, is_first=False, omega_0=30):
+        super().__init__()
+        self.omega_0 = omega_0; self.is_first = is_first; self.in_features = in_features
+        self.linear = torch.nn.Linear(in_features, out_features, bias=bias)
+        with torch.no_grad():
+            if is_first:
+                self.linear.weight.uniform_(-1 / in_features, 1 / in_features)
+            else:
+                b = np.sqrt(6 / in_features) / omega_0
+                self.linear.weight.uniform_(-b, b)
+
+    def forward(self, x):
+        return torch.sin(self.omega_0 * self.linear(x))
+
+
+class Siren(torch.nn.Module):
+    def __init__(self, in_features, hidden_features, hidden_layers, out_features,
+                 outermost_linear=True, first_omega_0=30., hidden_omega_0=30.):
+        super().__init__()
+        net = [SineLayer(in_features, hidden_features, is_first=True, omega_0=first_omega_0)]
+        for _ in range(hidden_layers):
+            net.append(SineLayer(hidden_features, hidden_features, is_first=False, omega_0=hidden_omega_0))
+        if outermost_linear:
+            fin = torch.nn.Linear(hidden_features, out_features)
+            with torch.no_grad():
+                b = np.sqrt(6 / hidden_features) / hidden_omega_0
+                fin.weight.uniform_(-b, b)
+            net.append(fin)
+        else:
+            net.append(SineLayer(hidden_features, out_features, is_first=False, omega_0=hidden_omega_0))
+        self.net = torch.nn.Sequential(*net)
+
+    def forward(self, coords):                                   # coords [P,2] in [0,1] -> [P,out]
+        return self.net(coords)
 
 
 # --------------------------------------------------------------------------- #
@@ -158,15 +205,20 @@ def morphology_row(sim_d, idx):
 
 
 def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, dir_grid, outdir,
-                info="", traj_amp=10.0):
-    """Dashboard: trajectories (sim red / real green) | stiffness | gain ; fibre-angle | dir dx | dir dy."""
+                info="", traj_amp=10.0, theta_dev=None):
+    """Dashboard:
+       top:    trajectories (sim red / real green) | stiffness | UNet fibre-angle dθ (blank if --unet_fibre=0)
+       bottom: ZOOM 3x3 per-node loops (sim red / real green) | fibre angle | fibre-axis quiver
+       (fibre dx/dy panels and the green suptitle are dropped)."""
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
     rest = rest.detach().cpu().numpy(); sim_d = sim_d.detach().cpu().numpy(); real_d = real_d.detach().cpu().numpy()
-    ym = youngs_map.detach().cpu().numpy(); gm = gain_map.detach().cpu().numpy()
+    ym = youngs_map.detach().cpu().numpy()
     tm = theta_map.detach().cpu().numpy(); dg = dir_grid.detach().cpu().numpy()
+    td = theta_dev.detach().cpu().numpy() if theta_dev is not None else None
     amp = float(traj_amp)
-    fig, axs = plt.subplots(2, 3, figsize=(22, 14), facecolor="black")
+    fig = plt.figure(figsize=(22, 14), facecolor="black")
+    gs = fig.add_gridspec(2, 3, hspace=0.18, wspace=0.18)
     Rr = rest[idx][None] + amp * real_d[:, idx]; Asim = rest[idx][None] + amp * sim_d[:, idx]
 
     def img(ax, m, cmap, title, **kw):
@@ -175,15 +227,59 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
         cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
 
-    ax = axs[0, 0]; ax.set_facecolor("black"); ax.set_aspect("equal")
+    # [0,0] all-node trajectory overlay (little loops at rest positions)
+    ax = fig.add_subplot(gs[0, 0]); ax.set_facecolor("black"); ax.set_aspect("equal")
     ax.set_xlim(0.1, 0.9); ax.set_ylim(0.9, 0.1); ax.axis("off")
     for Xc, col in ((Rr, (0.2, 1.0, 0.2, 0.7)), (Asim, (1.0, 0.0, 0.0, 0.85))):
         segs = np.stack([Xc[:-1], Xc[1:]], 2).transpose(1, 0, 2, 3).reshape(-1, 2, 2)
         ax.add_collection(LineCollection(list(segs), colors=col, linewidths=1.3))
     ax.set_title(f"it {it}: sim red / real green (amp x{amp:.0f})", color="#ccc", fontsize=9)
-    img(axs[0, 1], ym, "viridis", "stiffness (youngs)")
-    # fibre contraction-axis quiver (cos θ, sin θ) -- replaces the (uniform) gain panel
-    axq = axs[0, 2]; axq.set_facecolor("black"); axq.set_aspect("equal")
+
+    # [0,1] learned stiffness
+    img(fig.add_subplot(gs[0, 1]), ym, "viridis", "stiffness (youngs)")
+
+    # [0,2] learned fibre-angle deviation dθ(x,y) -- blank panel when no deviation field is active
+    ax02 = fig.add_subplot(gs[0, 2]); ax02.set_facecolor("black")
+    if td is not None:
+        mx = float(np.abs(td).max()) + 1e-6
+        im = ax02.imshow(td.T, origin="lower", cmap="twilight", vmin=-mx, vmax=mx)
+        ax02.set_title("fibre angle dθ (rad)", color="#ccc", fontsize=9)
+        cb = fig.colorbar(im, ax=ax02, fraction=0.046, pad=0.04)
+        cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
+    else:
+        ax02.set_title("fibre angle dθ (off)", color="#666", fontsize=9)
+    ax02.set_xticks([]); ax02.set_yticks([])
+
+    # [1,0] ZOOM: 3x3 grid of individual node loops (sim red / real green), per-cell autoscaled
+    gz = gs[1, 0].subgridspec(3, 3, hspace=0.12, wspace=0.12)
+    ng = int(round(len(idx) ** 0.5))                                     # dashboard nodes are an ng x ng grid
+    rc = [int(round(ng * f)) for f in (0.25, 0.5, 0.75)]                 # sample rows/cols at 1/4, 1/2, 3/4
+    ksel = [min(r, ng - 1) * ng + min(c, ng - 1) for r in rc for c in rc]
+    for cell, k in enumerate(ksel):
+        azr, azc = divmod(cell, 3)
+        az = fig.add_subplot(gz[azr, azc]); az.set_facecolor("black"); az.set_aspect("equal")
+        nd = idx[min(k, len(idx) - 1)]
+        rl = amp * real_d[:, nd]; sl = amp * sim_d[:, nd]
+        az.plot(rl[:, 0], rl[:, 1], color=(0.2, 1.0, 0.2, 0.9), lw=1.1)
+        az.plot(sl[:, 0], sl[:, 1], color=(1.0, 0.0, 0.0, 0.9), lw=1.1)
+        allp = np.concatenate([rl, sl], 0)
+        c0 = (allp.min(0) + allp.max(0)) / 2; rad = (allp.max(0) - allp.min(0)).max() / 2 * 1.2 + 1e-4
+        az.set_xlim(c0[0] - rad, c0[0] + rad); az.set_ylim(c0[1] + rad, c0[1] - rad)  # invert y
+        az.set_xticks([]); az.set_yticks([])
+        hrm = HARM.harmonic_score(torch.tensor(sim_d[:, nd:nd + 1]),                 # per-node Hrm for this loop
+                                  torch.tensor(real_d[:, nd:nd + 1]), torch.ones(1, dtype=torch.bool))
+        az.text(0.04, 0.96, f"H={hrm:+.2f}", transform=az.transAxes, fontsize=5,
+                color="#88ccff", ha="left", va="top")
+        for sp in az.spines.values():
+            sp.set_color("#333")
+        if cell == 1:
+            az.set_title("zoom 3x3: sim red / real green", color="#ccc", fontsize=9)
+
+    # [1,1] fibre angle field
+    img(fig.add_subplot(gs[1, 1]), tm, "twilight", "fibre angle (rad)")
+
+    # [1,2] fibre contraction-axis quiver (cos θ, sin θ)
+    axq = fig.add_subplot(gs[1, 2]); axq.set_facecolor("black"); axq.set_aspect("equal")
     step = 7                                                              # subsample; lower = denser arrows
     I, J = np.mgrid[0:RES:step, 0:RES:step]                              # I=row=y, J=col=x
     U = dg[0, ::step, ::step]; V = dg[1, ::step, ::step]                 # cos θ (x-comp), sin θ (y-comp)
@@ -192,10 +288,7 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
                width=0.004, headwidth=0, headlength=0, headaxislength=0)  # headless -> axis lines (undirected)
     axq.set_xlim(0, RES); axq.set_ylim(RES, 0); axq.set_xticks([]); axq.set_yticks([])
     axq.set_title("fibre axis  quiver(cos θ, sin θ)", color="#ccc", fontsize=9)
-    img(axs[1, 0], tm, "twilight", "fibre angle (rad)")
-    img(axs[1, 1], dg[0], "RdBu", "fibre dx", vmin=-1, vmax=1)
-    img(axs[1, 2], dg[1], "RdBu", "fibre dy", vmin=-1, vmax=1)
-    fig.suptitle(info, color="#9f9", fontsize=11)
+
     ck = os.path.join(outdir, "checkpoints"); os.makedirs(ck, exist_ok=True)
     fig.savefig(os.path.join(ck, f"dashboard_{it:05d}.png"), dpi=110, facecolor="black", bbox_inches="tight")
     plt.close(fig)
@@ -216,6 +309,13 @@ def main():
     ap.add_argument("--ckpt_every", type=int, default=50)
     ap.add_argument("--traj_amp", type=float, default=10.0)
     ap.add_argument("--w_amp", type=float, default=0.3, help="anti-collapse motion-energy match weight (0=off)")
+    # LOSS choice: r2 (frame-locked displacement, legacy) | harmonic (per-node loop morphology) | r2+harmonic
+    ap.add_argument("--loss", default="r2", choices=["r2", "harmonic", "r2+harmonic"],
+                    help="training objective: 'r2'=legacy frame-locked interior R²; 'harmonic'=per-node "
+                         "elliptic-Fourier loop-morphology loss (chirality/openness/axis, position+timing "
+                         "invariant); 'r2+harmonic'=sum. R² is ALWAYS reported for comparison.")
+    ap.add_argument("--harm_K", type=int, default=4, help="number of Fourier harmonics in the loop loss")
+    ap.add_argument("--w_harm", type=float, default=1.0, help="weight on the harmonic loss in 'r2+harmonic'")
     # FIBRE (primary)
     ap.add_argument("--fibre_wl", type=float, default=40.0)
     ap.add_argument("--fibre_angle", type=float, default=0.6)
@@ -230,7 +330,19 @@ def main():
                     help="1 = the UNet ALSO predicts a fibre-angle DEVIATION dθ(x,y) ADDED on top of the "
                          "parametric fibre angle (microscope spatial detail over the smooth parametric base)")
     ap.add_argument("--fibre_dev", type=float, default=1.5708,
-                    help="max |dθ| (rad) for the UNet fibre deviation (tanh-bounded); default π/2")
+                    help="max |dθ| (rad) for the fibre-angle deviation (tanh-bounded); default π/2")
+    # IMAGE-INDEPENDENT spatial fields: a SIREN coordinate net f(x,y) replaces UNet(microscope)
+    ap.add_argument("--stiff_src", default="unet", choices=["unet", "siren"],
+                    help="source of the spatial stiffness field: 'unet' = UNet(microscope image) [legacy, "
+                         "net-harmful Falsified#8]; 'siren' = image-INDEPENDENT SIREN f(x,y) (FREE field)")
+    ap.add_argument("--siren_fibre", type=int, default=0,
+                    help="1 = add an image-INDEPENDENT SIREN fibre-angle deviation dθ(x,y) on top of the "
+                         "parametric base (free direction field; preferred over the microscope --unet_fibre)")
+    ap.add_argument("--siren_omega", type=float, default=30.0,
+                    help="SIREN omega_0 (frequency/bandwidth knob; lower=smoother field = the smoothness prior "
+                         "that replaces the image constraint; cameraman used 220 for fine detail)")
+    ap.add_argument("--siren_hidden", type=int, default=256, help="SIREN hidden width")
+    ap.add_argument("--siren_layers", type=int, default=3, help="SIREN hidden layers")
     ap.add_argument("--learn", default="all",
                     help="which group(s) to optimize this batch (partitioned sweeps): comma-list of "
                          "{fibre,stiff,gain,dur} or 'all'. Frozen groups stay at their init.")
@@ -238,6 +350,7 @@ def main():
     ap.add_argument("--amplitude", type=float, default=10.0, help="active-stress amplitude (FIXED knob; plan constrains 10-15)")
     ap.add_argument("--drag_k", type=float, default=30.0, help="overdamped drag k (FIXED knob)")
     ap.add_argument("--dur0", type=float, default=8.0, help=f"initial pulse duration (frames, LEARNABLE, bounded [{DUR_LO:.0f},{DUR_HI:.0f}] -> sharp pulse)")
+    ap.add_argument("--dur_hi", type=float, default=DUR_HI, help=f"upper bound for learnable pulse duration (default {DUR_HI:.0f}; raise to explore longer pulses)")
     ap.add_argument("--resume", default="")
     ap.add_argument("--tag", default="")
     ap.add_argument("--outdir", default="")
@@ -280,16 +393,36 @@ def main():
     f_wl, f_ang, f_amp, f_ph = P(args.fibre_wl), P(args.fibre_angle), P(args.fibre_amp), P(args.fibre_phase)
     raw_g = _logit_init(args.gain0, GAIN_LO, GAIN_HI)                            # uniform global gain (bounded)
     raw_dur = _logit_init(args.dur0, DUR_LO, DUR_HI)                             # dur = DUR_LO+(DUR_HI-DUR_LO)*sigmoid(raw_dur)
-    net = UNet(out=1 + int(args.unet_fibre)).to(dev)                             # ch0: stiffness; ch1 (opt): fibre-angle deviation
-    ximg = load_image((RES, RES)).to(dev)[None, None]                           # [1,1,RES,RES] standardized, registered identity
-    s_lo, s_hi = float(args.stiff_lo), float(args.stiff_hi)                      # fixed youngs range; UNet learns the pattern
-    # partitioned learnable groups -- the loop sweeps ONE direction per batch, then combines ('all')
-    groups = {"fibre": [f_wl, f_ang, f_amp, f_ph], "stiff": list(net.parameters()), "gain": [raw_g], "dur": [raw_dur]}
+    s_lo, s_hi = float(args.stiff_lo), float(args.stiff_hi)                      # fixed youngs range; the field learns the pattern
+    # microscope UNet -- built ONLY for the channels still sourced from the image (legacy paths)
+    uch, nuo = {}, 0
+    if args.stiff_src == "unet":
+        uch["stiff"] = nuo; nuo += 1
+    if args.unet_fibre and not args.siren_fibre:
+        uch["fibre"] = nuo; nuo += 1
+    net = UNet(out=nuo).to(dev) if nuo > 0 else None
+    ximg = load_image((RES, RES)).to(dev)[None, None] if net is not None else None   # [1,1,RES,RES] registered identity
+    # image-INDEPENDENT SIREN fields (decoupled from the microscope; omega_0 band-limits them)
+    sk = dict(in_features=2, hidden_features=args.siren_hidden, hidden_layers=args.siren_layers, out_features=1,
+              outermost_linear=True, first_omega_0=args.siren_omega, hidden_omega_0=args.siren_omega)
+    stiff_siren = Siren(**sk).to(dev) if args.stiff_src == "siren" else None
+    fibre_siren = Siren(**sk).to(dev) if args.siren_fibre else None
+    # coordinate grid for the SIREN fields (matches aniso_field_torch row=y / col=x convention)
+    _ar01 = torch.linspace(0, 1, RES, device=dev)
+    _yy, _xx = torch.meshgrid(_ar01, _ar01, indexing="ij")
+    field_coords = torch.stack([_xx.reshape(-1), _yy.reshape(-1)], -1)          # [(RES*RES),2] = (x,y)
+    # partitioned learnable groups -- stiffness fields (UNet and/or stiff SIREN) under 'stiff';
+    # fibre SIREN under 'fibre' (the legacy image-UNet, monolithic, stays wholly under 'stiff')
+    stiff_params = (list(net.parameters()) if net is not None else []) \
+                 + (list(stiff_siren.parameters()) if stiff_siren is not None else [])
+    fibre_params = [f_wl, f_ang, f_amp, f_ph] + (list(fibre_siren.parameters()) if fibre_siren is not None else [])
+    groups = {"fibre": fibre_params, "stiff": stiff_params, "gain": [raw_g], "dur": [raw_dur]}
     sel = set(groups) if args.learn.strip() == "all" else {g.strip() for g in args.learn.split(",")}
     learn = [p for g in groups for p in groups[g] if g in sel]
-    if "stiff" not in sel:
-        for prm in net.parameters():
-            prm.requires_grad_(False)                                           # frozen UNet -> stays at init
+    for mod, grp in ((net, "stiff"), (stiff_siren, "stiff"), (fibre_siren, "fibre")):
+        if mod is not None and grp not in sel:
+            for prm in mod.parameters():
+                prm.requires_grad_(False)                                       # frozen field -> stays at init
 
     # fixed per-slot mechanism knobs (swept by the plan -- not differentiated, exactly like train.py)
     ops = _ops_by_name(spec, str(dev))
@@ -310,22 +443,30 @@ def main():
                                                padding_mode="border", align_corners=True)[0, 0, 0]
 
     def maps():
-        uout = net(ximg)[0]                                                  # [out,RES,RES] one UNet pass (registered identity)
-        # FIBRE: parametric angle + OPTIONAL UNet deviation dθ(x,y) added on top (microscope spatial detail)
+        uout = net(ximg)[0] if net is not None else None                     # [nuo,RES,RES] microscope UNet (legacy paths only)
+        # FIBRE: parametric angle + OPTIONAL deviation dθ(x,y) (image-INDEPENDENT SIREN, or legacy microscope UNet)
         wl_f = f_wl.clamp(min=4.0)
         theta = PI * f_amp * aniso_field_torch(wl_f, f_ang, f_ph, dev)        # [RES,RES] parametric angle
-        if args.unet_fibre:
-            theta = theta + args.fibre_dev * torch.tanh(uout[1])             # + bounded UNet deviation
+        theta_dev = None
+        if fibre_siren is not None:
+            theta_dev = args.fibre_dev * torch.tanh(fibre_siren(field_coords)[:, 0].reshape(RES, RES))
+            theta = theta + theta_dev                                        # + FREE coordinate-field detail
+        elif args.unet_fibre:
+            theta_dev = args.fibre_dev * torch.tanh(uout[uch["fibre"]])      # bounded microscope deviation (legacy)
+            theta = theta + theta_dev
         d = torch.stack([torch.cos(theta), torch.sin(theta)])                # [2,RES,RES] unit contraction axis
-        # GAIN: a single UNIFORM GLOBAL learnable scalar (no spatial structure -- inert per the sweep)
+        # GAIN: a single UNIFORM GLOBAL learnable scalar (the GLOBAL size lever)
         gain_g = GAIN_LO + (GAIN_HI - GAIN_LO) * torch.sigmoid(raw_g)        # scalar
         gain_p = gain_g * torch.ones(rest.shape[0], device=dev)              # [N] uniform
         gain_map = gain_g * torch.ones(RES, RES, device=dev)                 # [RES,RES] flat (for dashboard)
-        # STIFF: youngs pattern from the UNet (channel 0) on the microscope image
-        stiff01 = torch.sigmoid(uout[0])                                     # [RES,RES] in [0,1]
+        # STIFF: youngs pattern -- image-INDEPENDENT SIREN f(x,y), or legacy microscope UNet (the per-region size lever)
+        if stiff_siren is not None:
+            stiff01 = torch.sigmoid(stiff_siren(field_coords)[:, 0].reshape(RES, RES))  # FREE field in [0,1]
+        else:
+            stiff01 = torch.sigmoid(uout[uch["stiff"]])                      # [RES,RES] in [0,1]
         youngs_map = s_lo + (s_hi - s_lo) * stiff01                          # [RES,RES] in [stiff_lo, stiff_hi]
         youngs_p = sample_to_particles(youngs_map)                           # [N]
-        return youngs_p, youngs_map, gain_p, gain_map, d, theta
+        return youngs_p, youngs_map, gain_p, gain_map, d, theta, theta_dev
 
     # interior MOVING mask over the FIT BEAT (real motion > 10% of max), boundary excluded
     beat = real_disp[onset:onset + grad_len] - real_disp[onset]
@@ -360,8 +501,12 @@ def main():
                 for k, prm in sd["params"].items():
                     {"f_wl": f_wl, "f_ang": f_ang, "f_amp": f_amp, "f_ph": f_ph, "raw_g": raw_g,
                      "raw_dur": raw_dur}[k].copy_(prm.to(dev))
-            if "net" in sd:
+            if "net" in sd and net is not None:
                 net.load_state_dict(sd["net"])
+            if "stiff_siren" in sd and stiff_siren is not None:
+                stiff_siren.load_state_dict(sd["stiff_siren"])
+            if "fibre_siren" in sd and fibre_siren is not None:
+                fibre_siren.load_state_dict(sd["fibre_siren"])
             try:
                 start_iter = int(os.path.basename(path).split("_")[1].split(".")[0]) + 1
             except Exception:
@@ -373,8 +518,9 @@ def main():
     for it in pbar:
         with torch.no_grad():
             reset_state(lvl, rest, dev)
-        youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta = maps()
-        dur = DUR_LO + (DUR_HI - DUR_LO) * torch.sigmoid(raw_dur)       # SHARP bounded pulse duration
+        youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta, theta_dev = maps()
+        dur_hi = args.dur_hi                                              # per-slot upper bound (default DUR_HI=14)
+        dur = DUR_LO + (dur_hi - DUR_LO) * torch.sigmoid(raw_dur)       # SHARP bounded pulse duration
         with torch.no_grad():                                              # warmup -> settle to the beat rhythm
             set_maps(H, lvl, youngs_p.detach(), dir_grid.detach(), gain_p.detach())
             for fr in range(start, onset):
@@ -396,34 +542,55 @@ def main():
         e_sim = (sim_d[:, mov] ** 2).sum().clamp(min=1e-12)
         e_real = (real_d[:, mov] ** 2).sum().clamp(min=1e-12)
         amp_loss = (e_sim.sqrt() - e_real.sqrt()) ** 2 / e_real
-        loss = r2_loss + args.w_amp * amp_loss
+        # per-node morphology loss -> MEAN is the objective, SD reports cross-node uniformity
+        if args.loss == "r2":                                          # Hrm reported as a diagnostic (no grad)
+            with torch.no_grad():
+                _pn = HARM.harmonic_pernode_loss(sim_d, real_d, mov, K=args.harm_K)
+            harm_r2, harm_sd = 1.0 - _pn.mean().item(), _pn.std().item()
+            loss = r2_loss + args.w_amp * amp_loss
+        else:
+            _pn = HARM.harmonic_pernode_loss(sim_d, real_d, mov, K=args.harm_K)
+            harm_loss = _pn.mean()
+            harm_r2, harm_sd = 1.0 - harm_loss.item(), _pn.detach().std().item()
+            if args.loss == "harmonic":
+                loss = harm_loss + args.w_amp * amp_loss               # keep the anti-collapse energy anchor
+            else:                                                      # r2+harmonic
+                loss = r2_loss + args.w_harm * harm_loss + args.w_amp * amp_loss
         opt.zero_grad(); loss.backward()
         gnorm = torch.nn.utils.clip_grad_norm_(learn, 1.0)
         if torch.isfinite(gnorm):
             opt.step()
         else:
             opt.zero_grad()
-        r2 = 1 - r2_loss.item()
-        pbar.set_postfix_str(f"R2={r2:+.3f} ampL={amp_loss.item():.2f} dur={dur.item():.1f} "
+        r2 = 1 - r2_loss.item()                                        # harm_r2/harm_sd set in the loss block (always real)
+        pbar.set_postfix_str(f"R2={r2:+.3f} Hrm={harm_r2:+.3f}±{harm_sd:.3f} ampL={amp_loss.item():.2f} dur={dur.item():.1f} "
                              f"fwl={f_wl.item():.1f} fang={f_ang.item():.2f} gain={gain_p.mean().item():.2f} "
                              f"yng[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}]")
         if it % args.ckpt_every == 0 or it == args.n_iter - 1:
             op_, chir_, size_ = morphology_row(sim_d.detach().cpu().numpy(), idx)
+            dh_tag = f" dur_hi={args.dur_hi:.0f}" if args.dur_hi != DUR_HI else ""
             info = (f"{spec.name} [PARAMETRIC active-stress]  it {it}/{args.n_iter}  R2={r2:+.3f}  "
-                    f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}  dur={dur.item():.1f} amp={args.amplitude} "
+                    f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}  dur={dur.item():.1f}{dh_tag} amp={args.amplitude} "
                     f"drag={args.drag_k}\nfibre wl={f_wl.item():.1f} ang={f_ang.item():.2f} amp={f_amp.item():.2f} "
-                    f"ph={f_ph.item():.2f} | gain(uniform)={gain_p.mean().item():.3f} | stiff(UNet) "
-                    f"youngs[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}] learn={args.learn}")
+                    f"ph={f_ph.item():.2f} | gain(uniform)={gain_p.mean().item():.3f} | "
+                    f"stiff({'SIREN' if args.stiff_src == 'siren' else 'UNet'}) "
+                    f"youngs[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}]"
+                    f"{' fibreSIREN' if args.siren_fibre else ''} learn={args.learn}")
             render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta, dir_grid, outdir,
-                        info=info, traj_amp=args.traj_amp)
+                        info=info, traj_amp=args.traj_amp, theta_dev=theta_dev)
             params_sd = {"f_wl": f_wl.detach(), "f_ang": f_ang.detach(), "f_amp": f_amp.detach(), "f_ph": f_ph.detach(),
                          "raw_g": raw_g.detach(), "raw_dur": raw_dur.detach()}
-            torch.save({"params": params_sd, "net": net.state_dict()}, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
+            sd_save = {"params": params_sd}
+            if net is not None: sd_save["net"] = net.state_dict()
+            if stiff_siren is not None: sd_save["stiff_siren"] = stiff_siren.state_dict()
+            if fibre_siren is not None: sd_save["fibre_siren"] = fibre_siren.state_dict()
+            torch.save(sd_save, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:
-                pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} loss={loss.item():.3f} ampL={amp_loss.item():.3f} "
-                         f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e} dur={dur.item():.1f} "
-                         f"amp={args.amplitude} drag={args.drag_k}")
-    print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f})", flush=True)
+                pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} Hrm={harm_r2:+.3f} HrmSD={harm_sd:.3f} "
+                         f"loss={loss.item():.3f} ampL={amp_loss.item():.3f} open={op_:.3f} chir+={chir_:.2f} "
+                         f"size={size_:.2e} dur={dur.item():.1f} amp={args.amplitude} drag={args.drag_k} objective={args.loss}")
+    _hm, _hsd = HARM.harmonic_stats(sim_d, real_d, mov, K=args.harm_K)
+    print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f} Hrm={_hm:+.3f} HrmSD={_hsd:.3f} objective={args.loss})", flush=True)
 
 
 if __name__ == "__main__":
