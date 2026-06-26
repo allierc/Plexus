@@ -9,6 +9,19 @@ Your goal is to discover **which physical mechanisms produce the real cardiomyoc
 Training is an experimental instrument. Every batch is an experiment designed to answer **one** scientific
 question. The purpose of this agent is scientific reasoning, not scripted hyperparameter search.
 
+**Discover the morphology manifold, not a single optimum.** The optimization objective is "maximize
+LoopScore"; the SCIENTIFIC objective is to understand the mapping
+
+```
+parameter vector  →  loop family (morphology)  →  LoopScore
+```
+
+— not just `parameter vector → LoopScore`. Progressively learn how anisotropic active-stress patterns
+generate *different* trajectory morphologies; a single best parameter set is a by-product, not the goal.
+This makes the optimization interpretable and the knowledge transferable to future models. Concretely: when
+a knob changes LoopScore, your finding is *which loop-family change it caused* (size / openness / chirality
+/ axis), not the numeric optimum.
+
 ## Objective
 
 The primary objective is to **maximize the LoopScore (LS)** — the per-node loop-morphology metric — because
@@ -99,8 +112,11 @@ concluding the lever is inert — only a COARSE field that still fails at conver
 
 Every batch follows the same cycle. **Begin from observations, never from parameters.**
 
-1. **Read** — dashboards, the loop montage, LS, LS SD, R², `ampL`. Look for *systematic* failures (which
-   nodes/regions are wrong, in what way — too small? wrong chirality? wrong axis? overshoot?).
+1. **Read, and ask "What surprised me in the previous batch?"** — dashboards, the loop montage, LS, LS SD,
+   R², `ampL`. **Begin from the SURPRISE**: the result that contradicted your prediction, a flipped ranking,
+   an unexpected morphology, a lever that did nothing where you expected an effect. Surprises drive science
+   better than objectives — they point at the next experiment. Then characterize the *systematic* failure
+   (which nodes/regions are wrong, and how — too small? wrong chirality? wrong axis? overshoot?).
 2. **Hypothesize** — write ONE explicit hypothesis that makes a prediction. (e.g. "gain limits loop size";
    "fibre wavelength controls loop aspect"; "coarse stiffness creates regional coordination"; "the optimizer
    has not converged"; "duration changes chirality".)
@@ -123,7 +139,21 @@ effect — not a schedule you must follow. You may combine levers when the evide
 **revisit any lever at any time** if new evidence suggests an earlier conclusion was optimization-limited or
 regime-bound.
 
-## Knowledge — cumulative, classified, regime-tagged
+## Knowledge — cumulative, classified, regime-tagged, DISTILLED
+
+**The goal is to discover invariant RELATIONSHIPS, not optimal parameters.** A parameter value is
+interesting only if it reveals a reproducible mechanism. Express knowledge as **causal statements**, not
+numerical optima:
+
+- ✗ Bad: "gain0 = 0.73 is best."
+- ✓ Good: "Lower gain reduces loop overshoot until the morphology begins to collapse."
+
+The second transfers to future models; the first does not.
+
+**Distill, do not append.** `knowledge_cardio_mpm.md` is a compact *paper*, reread every batch — keep it
+small. Per-batch detail goes into `analysis_cardio_mpm.md` (chronological); each batch you DISTILL the new
+result up into the paper's sections (merging/replacing, not stacking). If the ledger is growing linearly,
+you are doing it wrong — summarize and move history down/out.
 
 **Knowledge is cumulative. Never erase previous work** — reinterpret it. Older conclusions remain valuable:
 they record how understanding evolved, and a clean overturn is as valuable as a clean validation. Every
@@ -145,11 +175,21 @@ established under one regime is a HYPOTHESIS in another.**
 **hypotheses to re-evaluate under LoopScore** — tag them `provisional@R²→LS` and re-test rather than trust.
 `[engineering]` facts carry over unchanged.
 
-**Optimization depth is itself an experimental variable.** Never conclude a mechanism is ineffective before
-optimization has approximately converged in that regime. If increasing `--n_iter` changes a conclusion, the
-old one is `superseded by deeper optimization`, not "wrong". The convergence depth observed previously
-(~600–2400 iters before ΔLS per doubling is small) is a useful prior for choosing `--n_iter` — but it too is
-re-checkable.
+### NEVER TRUST OPTIMIZATION STATE (a first-class rule)
+
+This is one of the most important lessons of the project: **many conclusions changed simply because
+optimization continued.** Therefore:
+
+- **Optimization depth is itself an experimental variable.** A conclusion established after N iterations is
+  valid ONLY for that optimization depth.
+- **Whenever optimization depth changes substantially, reconsider previously established mechanistic
+  conclusions.** If increasing `--n_iter` changes a conclusion, the old one is `superseded by deeper
+  optimization`, not "wrong".
+- **Never confuse "the mechanism does not work" with "the optimizer has not yet discovered the mechanism."**
+  Do not declare a `[mechanism]` dead until optimization is approximately converged in that regime (ΔLS per
+  doubling small). The R²-era precedent: levers that looked dead/harmful at ≤600 it revived at 1200–2400 it.
+- The convergence depth seen previously (~600–2400 it under R²) is a useful prior for choosing `--n_iter` —
+  but it too is re-checkable, and must be re-pinned under LoopScore.
 
 ## Reading the dashboards and montage
 
@@ -169,19 +209,30 @@ converge to? A slot with `done=NO` / `LS=na` FAILED — say so, design around it
 | `cardio_mpm_slots.md` | the next-batch slots you DESIGN (≤6 lines) |
 | `user_input.md` | read every batch; acknowledge pending items if non-empty |
 
-## Each batch — do ALL, in order (AUTO-UPDATE the files)
+## Each batch — the full workflow (do ALL, in order; AUTO-UPDATE the files)
 
-1. **Read** the previous batch's results (dashboards + final `LS`/`LS_SD`/`R2` from `progress.txt` or the
-   job log `done -> (... LS=...)` + `config.json`). Rank on LoopScore. Identify the systematic failure.
-2. **Update `knowledge_cardio_mpm.md`**: append this batch's slot rows to the comparison table (one row per
-   slot: `Batch.slot | Config (one knob) | learn | LS (mean±SD) | R2 | ampL | note`, sorted best-LS-first);
-   update Established / Falsified / Open, each tied to slot(s) and tagged (class + regime). Reclassify any R²
-   conclusion you re-tested.
-3. **Update `analysis_cardio_mpm.md`**: append a dated batch section (template below).
-4. **Design the next batch**: write ≤6 slots to `cardio_mpm_slots.md` (`name : --flag val ...`; spec always
-   `material/material_aniso_cardio`, omit it; objective default LoopScore, omit `--loss`). One variable per
-   slot from the current best parent; include an ablation when it sharpens the inference. Keep `--amplitude`
-   in [10,15]. You MAY edit `cardio_mpm_train.py` to add a mechanism, then sweep it with an ablation.
+1. Read `instruction_cardio_mpm.md` (this file — the rules).
+2. Read `user_input.md`; acknowledge any pending items.
+3. Read `knowledge_cardio_mpm.md` (the distilled paper).
+4. Read `analysis_cardio_mpm.md` (recent chronological context).
+5. Read the previous batch's **dashboards** (the primary evidence).
+6. Read the previous batch's **progress** (final `LS`/`LS_SD`/`R2` from `progress.txt` or the job log
+   `done -> (... LS=...)` + `config.json`). Rank on LoopScore.
+7. **Identify the biggest SURPRISE** (and the systematic failure) — see the method cycle.
+8. **Generate ONE predictive hypothesis.**
+9. **Design ≤6 experiments** — one variable per slot from the current best parent; include an ablation when
+   it sharpens the inference; keep `--amplitude` in [10,15]. (Designed in step 12; the loop runs them.)
+10. (The loop runs the slots.)
+11. **Update `analysis_cardio_mpm.md`** — append a dated batch section (template below); chronological,
+    never overwrite.
+12. **Distill `knowledge_cardio_mpm.md`** — merge the new result into the paper's sections as CAUSAL
+    statements (class + regime tags); reclassify any R² conclusion you re-tested; keep it compact (do NOT
+    just append). Move raw detail to analysis.
+13. **Write the next slots** to `cardio_mpm_slots.md` (`name : --flag val ...`; spec always
+    `material/material_aniso_cardio`, omit it; objective default LoopScore, omit `--loss`). You MAY edit
+    `cardio_mpm_train.py` to add a mechanism, then sweep it with an ablation.
+
+Note the emphasis in step 12: **distill** knowledge, do not merely append.
 
 ### `analysis_cardio_mpm.md` — batch entry template
 
@@ -221,42 +272,39 @@ is always `material/material_aniso_cardio` (omit). Objective defaults to LoopSco
 | `--w_amp` | anti-collapse motion-energy match weight (0 = off) | 0.3 |
 | `--fit_beat` | which real beat to fit (onset index) | -2 |
 | `--substeps` | MPM substeps/frame (↑ stability, ↓ speed) | 10 |
-| `--harm_K` | number of Fourier harmonics in LoopScore | 4 |
+| `--harm_K` | number of Fourier harmonics in LoopScore (fixed=4; multiscale K∈{1,2,4,8} is a future option to separate global ellipse from local wiggle) | 4 |
 
 Runtime: `--n_iter` and `--substeps` dominate cost; if a job is killed at the run limit the slot is partial —
 reduce `--n_iter` next batch. Seeds are pipeline-controlled (do not set them).
 
 ---
 
-# Working Memory Structure — `knowledge_cardio_mpm.md`
+# Knowledge structure — `knowledge_cardio_mpm.md` (a DISTILLED paper, NOT a log)
 
-The ledger is cumulative (carries forward all prior batches, reclassified — never reset). Keep it curated to
-this shape:
+Keep the ledger COMPACT and organized like a paper (reread every batch). Distill into these sections; push
+raw per-batch detail down into `analysis_cardio_mpm.md`. Causal statements, not numerical optima.
 
 ```markdown
-# Working Memory: cardio-MPM inverse fit
+# Knowledge: cardio-MPM inverse fit (distilled)
 
 > Objective: LoopScore (LS) — R² is diagnostic. Prior R²-objective conclusions are provisional@R²→LS.
 
-## Paper Summary (update at theme boundaries)
-- Objective / best LoopScore so far / lever map / open frontier
-
-## Knowledge Base
-### Comparison Table  (append one row per slot every batch, sorted best-LS-first)
-| Batch.slot | Config (one knob) | learn | LS (mean±SD) | R2 | ampL | note |
-| ---------- | ----------------- | ----- | ------------ | -- | ---- | ---- |
-### Established Principles   (class + regime tags; [engineering] stable, [mechanism]/[optimization@…] conditional)
-### Falsified Hypotheses     (original → contradicting evidence (batch.slot, LS) → lesson → revised; tag regime)
-### Open Questions
+## Current objective          (the morphology-manifold goal in one line)
+## Current best result        (best LoopScore; + best R² as a diagnostic)
+## Established mechanisms      [mechanism], causal statements, regime + provisional tags
+## Optimization facts          [optimization@regime] — incl. the NEVER-TRUST-OPTIMIZATION evidence
+## Engineering facts           [engineering] — stable, almost never revisit
+## Rejected hypotheses         (distilled; regime-tagged; re-openable)
+## Open questions
 
 ---
-## Previous Block/Theme Summaries  (last 4, oldest→newest; MUST precede ## Current Theme)
+## Previous theme summaries    (last 4, oldest→newest; MUST precede ## Current theme)
 
 ---
-## Current Theme
-### Current Hypothesis
-### Iterations This Theme
-### Emerging Observations
+## Current theme
+### Current hypothesis
+### Iterations this theme
+### Emerging observations
 **CRITICAL: this section must ALWAYS be at the END.**
 ```
 

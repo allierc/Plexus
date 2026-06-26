@@ -88,13 +88,16 @@ batch is ONE experiment answering ONE question.
 
 OBJECTIVE: maximize the LoopScore (LS) -- per-node loop-morphology (mean = objective, LS_SD = uniformity). It is the
 trainer's DEFAULT `--loss` (omit the flag). R² is now a DIAGNOSTIC ONLY: a mechanism that improves LoopScore while
-degrading R² is a SUCCESS. Rank slots by LS, then LS_SD, then morphology, then R².
+degrading R² is a SUCCESS. Rank slots by LS, then LS_SD, then morphology, then R². The SCIENTIFIC goal is to map
+parameters -> loop family -> LoopScore (discover the morphology manifold), not just find one optimum.
 
 AUTONOMY: there is NO predetermined roadmap of levers. Use the current knowledge to decide the next experiment.
-Begin from OBSERVATIONS (the systematic failure), form ONE predictive hypothesis, then design the SMALLEST experiment
-that distinguishes the live explanations. You may revisit ANY lever if evidence suggests an earlier conclusion was
-optimization-limited or regime-bound. Keep stiffness/direction fields COARSE (low --siren_omega, larger --fibre_wl):
-a too-short wavelength is inert -- coarsen before concluding a lever doesn't matter.
+START BY ASKING "what SURPRISED me in the previous batch?" (a flipped ranking, an unexpected morphology, a lever that
+did nothing) -- surprises drive the next experiment better than the objective. Then form ONE predictive hypothesis and
+design the SMALLEST experiment that distinguishes the live explanations. You may revisit ANY lever if evidence suggests
+an earlier conclusion was optimization-limited or regime-bound (NEVER confuse "mechanism doesn't work" with "optimizer
+hasn't found it yet"). Keep stiffness/direction fields COARSE (low --siren_omega, larger --fibre_wl): a too-short
+wavelength is inert -- coarsen before concluding a lever doesn't matter.
 
 Your MEMORY (read EVERY batch):
   instruction (the RULES / method): {L.INSTR}
@@ -106,11 +109,13 @@ Your MEMORY (read EVERY batch):
 
 Do ALL of the following, in order, AUTO-UPDATING the files:
 {step1}
-2. EDIT {L.LEDGER}: append this batch's slot rows to the comparison table (sorted best-LS-first); update Established /
-   Falsified / Open, each tied to slot(s) and tagged by CLASS ([engineering] stable / [mechanism] / [optimization@regime])
-   AND regime (loss=LoopScore, @<N>it, dur/amp/parent). Never a bare FALSIFIED/CLOSED. Reclassify any prior R² conclusion
-   you re-tested. A clean falsification OR a clean overturn is a success.
-3. EDIT {L.ANALYSIS} (human log): append a dated Batch {batch} section (observation, hypothesis, slots, LS/LS_SD/R2, winner, verdict).
+2. EDIT {L.ANALYSIS} (chronological human log): append a dated Batch {batch} section (the biggest SURPRISE, the
+   hypothesis, the per-slot rows LS/LS_SD/R2/ampL/morphology, the winner, the verdict). Raw detail lives HERE.
+3. DISTILL {L.LEDGER} (the compact paper -- do NOT just append): merge this batch's finding into Established mechanisms /
+   Optimization facts / Rejected hypotheses / Open questions as CAUSAL statements (not numerical optima), tagged by CLASS
+   ([engineering] stable / [mechanism] / [optimization@regime]) AND regime (loss=LoopScore, @<N>it, dur/amp/parent). Never a
+   bare FALSIFIED/CLOSED. Reclassify any prior R² conclusion you re-tested. Keep it COMPACT. A clean falsification OR a clean
+   overturn is a success.
 4. DESIGN this batch: write <=6 slots to `{L.PLAN}` (one line per slot: `name : --flag val ...`). spec is always
    {SPEC} (omit it); objective defaults to LoopScore (omit --loss). Each slot changes EXACTLY ONE variable from the
    parent (causal inference); include an ablation when it sharpens the inference. Keep amplitude in [10,15].
