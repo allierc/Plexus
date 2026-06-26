@@ -139,6 +139,32 @@ effect — not a schedule you must follow. You may combine levers when the evide
 **revisit any lever at any time** if new evidence suggests an earlier conclusion was optimization-limited or
 regime-bound.
 
+## Exploration vs optimization — keep both pressures every batch
+
+**Never stop optimizing — alternate exploitation and exploration.** The agent balances two goals:
+
+- **Optimization (exploit)** — improve LoopScore from the current best parent.
+- **Exploration (explore)** — map the morphology manifold and discover new loop families.
+
+Do NOT run only local refinements around the current winner. Do NOT run only broad exploratory sweeps. Each
+batch should usually contain **both**:
+
+- **exploit slots** — variants expected to improve the current best LoopScore.
+- **explore slots** — variants expected to reveal a DIFFERENT morphology family, even if LoopScore may drop.
+- **control / ablation slots** — needed for causal interpretation.
+
+**Useful default split (of ≤6 slots): 3 exploit · 2 explore · 1 control/ablation.** Adjust when the
+evidence demands it, but keep enough exploration pressure to avoid going blind around a local optimum.
+
+**Exploration slots succeed if they teach a new causal relationship — even when their LoopScore is worse.**
+So report **two winners** each batch:
+
+- **Best optimizer slot** — highest LoopScore.
+- **Best scientific slot** — most informative morphology/mechanism (what new relationship it revealed).
+
+**A batch is successful if it improves LoopScore OR improves the morphology map.** The rule is not "stop
+optimizing" — it is *optimize locally while preserving enough exploration pressure to avoid becoming blind.*
+
 ## Knowledge — cumulative, classified, regime-tagged, DISTILLED
 
 **The goal is to discover invariant RELATIONSHIPS, not optimal parameters.** A parameter value is
@@ -220,8 +246,9 @@ converge to? A slot with `done=NO` / `LS=na` FAILED — say so, design around it
    `done -> (... LS=...)` + `config.json`). Rank on LoopScore.
 7. **Identify the biggest SURPRISE** (and the systematic failure) — see the method cycle.
 8. **Generate ONE predictive hypothesis.**
-9. **Design ≤6 experiments** — one variable per slot from the current best parent; include an ablation when
-   it sharpens the inference; keep `--amplitude` in [10,15]. (Designed in step 12; the loop runs them.)
+9. **Design ≤6 experiments** — one variable per slot; keep both pressures (default ≈ 3 exploit · 2 explore ·
+   1 control/ablation, see Exploration vs optimization); keep `--amplitude` in [10,15]. (Written in step 13;
+   the loop runs them.)
 10. (The loop runs the slots.)
 11. **Update `analysis_cardio_mpm.md`** — append a dated batch section (template below); chronological,
     never overwrite.
@@ -239,12 +266,15 @@ Note the emphasis in step 12: **distill** knowledge, do not merely append.
 ```
 ## Batch N — YYYY-MM-DD
 Parent: slot 0 = <one-line config>
+Surprise (from the previous batch): "..."
 Observation (the systematic failure that motivated this batch): "..."
 Hypothesis (one, predictive): "..."
-Slot k [name] <the ONE variable> LS=<mean±SD> R2=… red-on-green=<superpose/off> open=… chir=… size=… ampL=…
+Slot k [name] role=<exploit/explore/control> <the ONE variable> LS=<mean±SD> R2=… red-on-green=<superpose/off> open=… chir=… size=… ampL=…
 … slots …
-Winner: slot k (LoopScore; note LS SD + morphology)
+Best optimizer slot: slot k (highest LoopScore; note LS SD + morphology)
+Best scientific slot: slot j (most informative — the new causal relationship it revealed, even if LS worse)
 Verdict: <supported / falsified / overturned / inconclusive>  (class + regime tag)
+Batch outcome: <improved LoopScore | improved morphology map | both>
 Next: parent=<config>; the open question the next batch will probe.
 ```
 
