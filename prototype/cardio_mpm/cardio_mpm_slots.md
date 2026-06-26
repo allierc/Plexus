@@ -2,7 +2,8 @@
 # Format (one slot per line):   <slot_name> : <args>
 #   - spec is ALWAYS material/material_aniso_cardio (do not repeat it)
 #   - objective defaults to LoopScore (omit --loss; set it only for an occasional r2 diagnostic)
-#   - each slot changes EXACTLY ONE variable from the current best parent; include an ablation
+#   - each slot changes EXACTLY ONE variable from the current best parent
+#   - keep BOTH pressures: default ~3 exploit (improve LS) · 2 explore (new morphology family) · 1 control/ablation
 #   - keep stiffness/direction COARSE (low --siren_omega, larger --fibre_wl); amplitude in [10,15]
 #
 # No slots yet — the agent designs Batch 1 from the open frontier in knowledge_cardio_mpm.md

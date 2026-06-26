@@ -118,7 +118,10 @@ Do ALL of the following, in order, AUTO-UPDATING the files:
    overturn is a success.
 4. DESIGN this batch: write <=6 slots to `{L.PLAN}` (one line per slot: `name : --flag val ...`). spec is always
    {SPEC} (omit it); objective defaults to LoopScore (omit --loss). Each slot changes EXACTLY ONE variable from the
-   parent (causal inference); include an ablation when it sharpens the inference. Keep amplitude in [10,15].
+   parent (causal inference). Keep BOTH pressures -- default split ~3 EXPLOIT (improve LS from the best parent) ·
+   2 EXPLORE (reveal a DIFFERENT morphology family, even if LS may drop) · 1 CONTROL/ABLATION. Report TWO winners:
+   best optimizer slot (highest LS) AND best scientific slot (most informative morphology/mechanism). A batch
+   succeeds if it improves LS OR improves the morphology map. Keep amplitude in [10,15].
 You MAY edit cardio_mpm_train.py to add a mechanism. A slot with done=NO / LS=na FAILED -- design around it."""
 
 
