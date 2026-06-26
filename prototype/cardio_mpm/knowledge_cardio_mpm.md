@@ -1,9 +1,28 @@
 # Working Memory: cardio-MPM inverse fit
 
+> ## ⏵⏵ OBJECTIVE SHIFT (2026-06-26): success is now **LoopScore (LS)**, R² is diagnostic only
+>
+> The objective function changed — from interior **R²** to the **LoopScore (LS)** loop-morphology
+> metric (per-node elliptic-Fourier loop similarity; mean = objective, 1 = perfect). **This does NOT
+> erase anything below.** Knowledge is cumulative and reinterpreted, never deleted.
+>
+> **Reclassify, do not discard.** Every conclusion below remains valuable as the record of how
+> understanding evolved. But:
+> - **`[engineering]`** facts (MPM implementation, active-stress sign convention, NaN guards, time
+>   alignment, parser correctness) are **STABLE** — carry them forward as-is.
+> - **`[mechanism]`** and **`[optimization@…]`** conclusions that were established **under the R²
+>   objective become HYPOTHESES to re-evaluate under LoopScore.** A claim derived under one objective
+>   is, in the new objective, a hypothesis — not a settled fact. Tag such entries `provisional@R²→LS`.
+> - **A mechanism that improves LoopScore while degrading R² is a SUCCESS.** LoopScore defines success;
+>   R² is now only a diagnostic. Do not reject a mechanism because R² dropped.
+>
+> Naming: the metric historically written `Hrm`/`HrmSD` is the same object now called **LoopScore (LS)**
+> / **LoopScore SD**; logs/progress.txt print `LS=` / `LS_SD=`. Older entries may still say `Hrm`.
+
 The DELIVERABLE is this ledger — defensible claims about which **stiffness + direction fields** and
 knobs make the MLS-MPM model reproduce the real cardiomyocyte beat (red loops superposing on green).
-Interior R² (motion-normalised, boundary excluded) adjudicates; it is never the goal. A clean
-falsification is a success. Read + update EVERY batch. Seeded 2026-06-23 from the forward+inverse build.
+**LoopScore (LS)** adjudicates; R² is diagnostic. A clean falsification — or a clean overturn under the
+new objective — is a success. Read + update EVERY batch. Seeded 2026-06-23 from the forward+inverse build.
 
 ## Paper Summary (update at theme boundaries)
 
