@@ -158,7 +158,7 @@ class Advect(FieldUpdate):
 # --------------------------------------------------------------------------- #
 @register_operator("neighbour_graph", level="particle", kind="rewire")
 class NeighbourGraph(Rewire):
-    """Proximity graph each tick (validated as `radius_graph`). Port: geometry.radius_edges."""
+    """Proximity graph each tick (validated as `radius_graph`). Port: geometry.edges_radius_blockwise."""
 
 @register_operator("membrane_ring", level="particle", kind="rewire")
 class MembraneRing(Rewire):
