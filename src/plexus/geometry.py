@@ -24,6 +24,8 @@ def minimum_image(d: torch.Tensor, periodic: bool, world=1.0) -> torch.Tensor:
         dy = d[..., 1] - torch.round(d[..., 1])
         return torch.stack([dx, dy], dim=-1)
     W = torch.as_tensor(world, device=d.device, dtype=d.dtype)   # [D] per-axis box size
+    if bool((W == 1).all()):                                      # unit box: skip the /W and *W passes
+        return d - torch.round(d)                                #   (two fewer full-tensor kernels)
     return d - W * torch.round(d / W)
 
 
@@ -46,40 +48,49 @@ def neighbour_mean(pos, occ, edge_index, periodic, world, msg_fn) -> torch.Tenso
     return (acc / deg.clamp(min=1.0)[:, None]) * occ[:, None]
 
 
-def radius_edges(
+def edges_radius_blockwise(
     pos: torch.Tensor,
     occ: torch.Tensor,
     r_min: float,
     r_max: float,
     periodic: bool = False,
-    world_width: float = 1.0,
+    world_width=1.0,
     block: int = 2048,
 ) -> torch.Tensor:
     """Bidirectional edge_index [2, E] for live pairs with `r_min < dist < r_max`,
     built blockwise so the O(N^2) distance matrix is never materialised (scales to
     1e4-1e5 nodes). Row 0 = receiver i, row 1 = neighbour j; every pair appears in
-    both directions. Cf. ParticleGraph edges_radius_blockwise.
+    both directions. Ported from ParticleGraph's edges_radius_blockwise.
+
+    The occupancy filter runs ONCE over the surviving edge list (O(E),
+    `live[row] & live[col]`) rather than as two `[B, N]` boolean reductions inside
+    the block loop -- the live/live mask only ever drops pairs touching a dormant
+    node, so the post-loop filter gives the identical edge set at lower cost.
+    Boundary handling goes through `minimum_image` (periodic 2D/3D, free; scalar or
+    per-axis world all supported).
     """
     device = pos.device
     N = pos.shape[0]
     min2, max2 = r_min * r_min, r_max * r_max
-    live = occ > 0
     jidx = torch.arange(N, device=device)[None, :]          # [1, N]
 
     rows, cols = [], []
     for i0 in range(0, N, block):
         i1 = min(i0 + block, N)
-        d = pos[i0:i1, None, :] - pos[None, :, :]           # [B, N, 2]
-        d = minimum_image(d, periodic, world_width)
+        d = minimum_image(pos[i0:i1, None, :] - pos[None, :, :], periodic, world_width)
         dist2 = (d * d).sum(-1)                              # [B, N]
         gi = torch.arange(i0, i1, device=device)[:, None]   # [B, 1] global i
-        m = (dist2 > min2) & (dist2 < max2) & (jidx > gi)    # radius rule, upper triangle (count each pair once)
-        m = m & live[i0:i1, None] & live[None, :]            # only between live nodes
+        m = (dist2 > min2) & (dist2 < max2) & (jidx > gi)    # radius rule + upper triangle (count each pair once)
         ii, jj = m.nonzero(as_tuple=True)
         rows.append(ii + i0); cols.append(jj)
         del d, dist2, m
 
     row = torch.cat(rows) if rows else torch.empty(0, dtype=torch.long, device=device)
     col = torch.cat(cols) if cols else torch.empty(0, dtype=torch.long, device=device)
+
+    live = occ > 0                                          # drop pairs touching a dormant node
+    keep = live[row] & live[col]                            # O(E), once over the edge list
+    row, col = row[keep], col[keep]
+
     eij = torch.stack([row, col], 0)                        # [2, E_half]  (i, j) with j > i
     return torch.cat([eij, eij.flip(0)], 1).contiguous()    # mirror -> both directions

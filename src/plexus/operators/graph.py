@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from plexus.models.base import Rewire
 from plexus.models.registry import register_operator
-from plexus.geometry import radius_edges
+from plexus.geometry import edges_radius_blockwise
 
 
 @register_operator("radius_graph", level="particle", kind="rewire")
@@ -30,7 +30,7 @@ class RadiusGraph(Rewire):
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        lvl.edge_index = radius_edges(
+        lvl.edge_index = edges_radius_blockwise(
             lvl.get("pos"), lvl.occ, self.r_min, self.r_max,
             periodic=getattr(H, "periodic", False),
             world_width=getattr(H, "world_size", getattr(H, "world_width", 1.0)), block=self.block,
