@@ -1,4 +1,4 @@
-"""self_propel -- Vicsek active-matter self-propulsion.
+"""cruise -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`).
 
 Drive each particle toward a constant cruising speed v0 and inject orientation
 noise. Paired with `alignment` (neighbour velocity alignment) over a `radius_graph`,
@@ -24,8 +24,8 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("self_propel", level="particle", kind="lateral")
-class SelfPropel(Lateral):
+@register_operator("cruise", level="particle", kind="lateral")
+class Cruise(Lateral):
     PREDICTION = "second_derivative"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic
     REQUIRES_PARAMS = ["v0"]

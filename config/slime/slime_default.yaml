@@ -1,7 +1,7 @@
 # slime_default -- one species, the canonical Physarum transport network.
 # The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
 # field: deposit (set->field) | diffuse, decay (field->field) | sense (field->set,
-# turns the heading) | advance (self-propelled move). Agents spawn in a central disc;
+# turns the heading) | glide (self-propelled move). Agents spawn in a central disc;
 # stigmergy grows a self-reinforcing, coarsening network.
 general: {name: slime_default, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
 sets:
@@ -19,8 +19,8 @@ operators:
 - {op: decay,   at: chemical,            rate: 0.0006}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
-- {op: advance, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, advance]
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
 plotting:
   colors: {a: [0.2, 0.95, 0.65]}
   background: black

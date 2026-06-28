@@ -8,7 +8,7 @@ interaction at the heart of the Vicsek model of active matter and of boids:
     acc_i = a * (sum_j w_ij (vel_j - vel_i)) / (sum_j w_ij)
 
 NOMINAL -- Vicsek (`gate: none`, `per_type: false`): every radius neighbour counts
-equally (w_ij = 1). Paired with `self_propel` over a `radius_graph` this is the
+equally (w_ij = 1). Paired with `cruise` over a `radius_graph` this is the
 metric Vicsek model, whose polar order undergoes the noise-driven flocking
 transition (flock <-> disorder, with bands/swirls in between).
 
@@ -22,7 +22,7 @@ discontinuity as neighbours drift in and out of range.
 
 Second-derivative law (an acceleration): the engine integrates vel += dt*acc,
 pos += dt*vel. No 1/|d|^2 term, so it needs no `min_radius` and composes cleanly
-with `self_propel`, `cohesion`, `separation`, `drag`.
+with `cruise`, `cohesion`, `separation`, `drag`.
 
 Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet, PRL 75 (1995) (active matter);
 Reynolds, SIGGRAPH 1987 (boids); the active-matter Vicsek generator in The Well

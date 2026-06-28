@@ -53,20 +53,20 @@ descriptions:
       is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black
       background. The object is isolated and does not interact with any other elements.
   movie_cell:
-    description: The simulation shows a static distribution of blue particles within a square boundary.
-      There is no observable movement or evolution of the particles across the provided keyframes. The
-      spatial arrangement of the blue clusters remains constant throughout the sequence. The overall density
-      and pattern of the field do not change over time.
-    objects: The scene contains a large collection of small, blue particles. These particles are arranged
-      in a dense, stochastic distribution that fills a square area. The individual particles are irregular
-      in shape and vary slightly in size. The blue color is uniform across all particles against a plain
-      white background.
+    description: The simulation shows a dense collection of blue particles contained within a square boundary.
+      Over the course of the video, the particles undergo rapid, stochastic fluctuations in position.
+      The overall density and distribution of the blue field remain constant throughout the sequence.
+      There is no discernible macroscopic motion or structural evolution in the aggregate.
+    objects: The scene contains a large number of small, individual blue particles. These particles are
+      arranged in a high-density, disordered distribution that fills a square area. Each particle is roughly
+      uniform in size and maintains a consistent blue color. The particles are not connected to one another,
+      forming a granular, fluid-like field.
   movie_mpm_particle:
     description: The simulation shows a large collection of blue particles distributed within a square
-      boundary. Over the course of the video, the particles undergo subtle spatial shifts and local rearrangements.
-      The overall density of the distribution remains constant throughout the entire sequence. There is
-      no significant global movement or large-scale structural change observed.
+      boundary. Over time, the particles undergo a subtle transformation in their spatial distribution.
+      The overall density of the points remains relatively constant throughout the sequence. The movement
+      appears to be a stochastic fluctuation or a very slow diffusion process.
     objects: The scene contains thousands of small, individual blue dots. These particles are arranged
-      in a stochastic, non-uniform distribution across a white background. Each particle is roughly the
-      same size and maintains a distinct, point-like appearance. The particles are not connected to one
-      another, forming a discrete point cloud.
+      in a dense, random distribution across a white background. Each dot is roughly the same size and
+      maintains a uniform color. The particles are not connected to one another, forming a discrete point
+      cloud.

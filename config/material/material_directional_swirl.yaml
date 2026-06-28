@@ -44,21 +44,26 @@ sets:
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
+  movie_activation:
+    description: The video shows a black screen with no visible movement or changes. There are no particles,
+      agents, or fields evolving over time. The scene remains static and completely dark throughout the
+      entire duration. No scientific simulation is occurring in this sequence.
+    objects: There are no objects present in the scene. The entire frame is a uniform black color. There
+      is no topology or arrangement to describe as the space is empty. The size of any potential objects
+      is zero as they do not exist.
   movie_cell:
-    description: The simulation begins with a dense, square-shaped cluster of blue particles. Over time,
-      the entire cluster undergoes a slight clockwise rotation. The internal distribution of the particles
-      remains relatively stable throughout the sequence. The overall shape and density of the blue field
-      do not change significantly.
-    objects: The scene contains a single large, square-shaped cluster of particles. The particles are
-      a consistent medium blue color against a white background. They are arranged in a dense, stochastic
-      distribution that fills the square area. Each individual particle is small and irregular in shape,
-      creating a textured appearance.
+    description: The blue particles are initially arranged in a perfectly square formation. Over time,
+      the square begins to rotate clockwise around its center. The rotation continues steadily throughout
+      the duration of the sequence. By the final frame, the square has completed a significant portion
+      of a full turn.
+    objects: The scene contains a large collection of small blue particles. These particles are densely
+      packed together to form a single, cohesive square shape. The color of the particles is a consistent
+      medium blue against a white background. The overall size of the square remains constant as it rotates.
   movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed within a square
-      boundary. Over time, the entire square region undergoes a slight clockwise rotation. The density
-      and distribution of the particles remain constant throughout the sequence. The background remains
-      a solid white color as the shape rotates.
-    objects: The scene contains thousands of small, blue dots representing individual particles. These
-      particles are arranged in a dense, stochastic distribution across a square area. The particles are
-      uniform in size and color, appearing as a fine mist or noise. The overall shape is a large, slightly
-      tilted square composed of these discrete points.
+    description: The video shows a large collection of blue particles distributed within a square boundary.
+      Over time, the entire set of particles undergoes a subtle rotation around its center. The distribution
+      of the particles remains relatively uniform throughout the sequence. The overall shape of the cluster
+      maintains its integrity while tilting slightly.
+    objects: The scene contains thousands of small, individual blue dots. These particles are arranged
+      in a dense, roughly square-shaped cluster. Each dot is uniform in size and color, creating a speckled
+      texture. The particles are not connected but are packed closely together to form a coherent field.

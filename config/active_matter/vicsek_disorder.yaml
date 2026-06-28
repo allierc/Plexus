@@ -1,4 +1,4 @@
-# vicsek_disorder -- Vicsek active matter (radius_graph + alignment + self_propel): high noise -> disorder (phi->0)
+# vicsek_disorder -- Vicsek active matter (radius_graph + alignment + cruise): high noise -> disorder (phi->0)
 # Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
 # The Well (Ohana et al., NeurIPS 2024). Disordered gas.
 general: {name: vicsek_disorder, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
@@ -10,8 +10,8 @@ fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.05}
   - {op: alignment,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
-  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.015, chirality: 0.0}
-schedule: [radius_graph, alignment, self_propel]
+  - {op: cruise,  at: particle, v0: 0.005, noise: 0.015, chirality: 0.0}
+schedule: [radius_graph, alignment, cruise]
 plotting:
   background: black
   marker: triangle

@@ -44,15 +44,22 @@ sets:
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
+  movie_activation:
+    description: The video shows a black screen with no visible movement or changes. There are no particles,
+      agents, or fields evolving over time. The scene remains static and completely dark throughout the
+      entire duration. No scientific simulation is occurring in this sequence.
+    objects: There are no objects present in the scene. The entire frame is a uniform black color. There
+      is no topology or arrangement to describe as the space is empty. The size of any potential objects
+      is zero as they do not exist.
   movie_cell:
     description: The simulation shows a static distribution of blue particles within a square boundary.
       There is no observable movement or evolution of the particles across the provided keyframes. The
-      spatial arrangement of the blue clusters remains constant throughout the sequence. The overall density
+      spatial arrangement of the blue dots remains constant throughout the sequence. The overall density
       and pattern of the field do not change over time.
-    objects: The scene contains a large number of small, irregularly shaped blue particles. These particles
-      are densely packed to form a textured, speckled square field. The objects are distributed randomly
-      across the white background, maintaining a consistent overall shape. Each individual particle is
-      minute in size compared to the total area of the blue square.
+    objects: The scene contains a large number of small, blue particles. These particles are arranged
+      in a dense, stochastic distribution that fills a square area. Each individual particle is roughly
+      the same size and appears as a distinct dot. The particles are not connected to one another, forming
+      a granular, cloud-like topology.
   movie_mpm_particle:
     description: The video shows a static distribution of blue particles within a square frame. There
       is no visible movement or evolution of the particles across the four keyframes. The spatial arrangement
@@ -60,5 +67,5 @@ descriptions:
       or represents a single snapshot of a random field.
     objects: The scene contains a large number of small, blue dots distributed across a white background.
       These particles are arranged in a stochastic, non-uniform pattern that fills a square area. Each
-      individual dot is roughly the same size and maintains a consistent color. There are no visible connections
-      or topological structures between the individual points.
+      individual dot is tiny and appears as a single pixel or a small cluster of pixels. There are no
+      visible connections or topological structures between the individual particles.

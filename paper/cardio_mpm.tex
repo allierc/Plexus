@@ -1,0 +1,116 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage[T1]{fontenc}
+\usepackage{parskip}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Knowledge-First Inverse Modelling:\\ Mechanism Discovery over Parameter Optimization\\[4pt]
+\large A cardiomyocyte active-stress MPM case study in Plexus}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Modern differentiable simulators make parameter optimization easy. They do not make mechanism discovery easy. In many inverse-modelling problems the natural objective is to find the parameter vector that best fits the data. This parameter-optimization view treats the simulator as a black box: propose parameters, run the model, compute a score, move toward a better score. It is efficient when the forward model is already correct, but it becomes misleading when the model is incomplete: a better score may only mean the optimizer has found a compensating artifact, not that the model has captured the mechanism. A knowledge-first strategy uses optimization differently. Each batch is not only a step toward a better fit; it is an experiment designed to learn how the system works. Parameters are mechanistic levers, a failed run is useful when it falsifies a hypothesis, and a successful run is useful only when its improvement can be explained in terms of morphology, dynamics, or physical coupling. The objective is therefore not just $\theta^* = \arg\min_\theta \mathcal{L}(\theta)$ but the construction of a map
+\[
+\theta \;\longrightarrow\; \text{mechanism} \;\longrightarrow\; \text{morphology} \;\longrightarrow\; \text{fit}.
+\]
+We make this concrete on the inverse problem of fitting real cardiomyocyte tissue motion with a differentiable active-stress material-point-method (MPM) model built from registered Plexus operators, scored by loop \emph{morphology} (the LoopScore metric) rather than framewise displacement. After many batches the deliverable is not a single optimum but a set of mechanistic constraints on what the forward model must look like. The central claim: \textbf{each mechanistic insight removes an entire class of incorrect models}, and a fit that plateaus despite continued optimization is read not as an optimization failure but as evidence that the forward model is missing a genuine physical ingredient~--- with the accumulated knowledge naming which ingredient to add next.
+\end{abstract}
+
+\section*{Two ways to use an optimizer}
+
+\textbf{Parameter optimization} asks: \emph{which parameters improve the score?} It produces optima.
+
+\textbf{Knowledge-first search} asks: \emph{which mechanisms explain why the score changes?} It produces reusable understanding.
+
+The first is the right tool once the forward model is trusted. The second is the right tool while the model itself is still in question~--- which is the usual situation in biophysical modelling, and exactly the situation here.
+
+This distinction matters most exactly when optimization stalls. When the score stops improving despite continued training and small architectural changes, the parameter-optimization view sees a disappointing plateau; the knowledge-first view reads the \emph{same} plateau as a measurement~--- evidence that the forward model is missing a genuine physical ingredient, not that the optimizer has failed. That re-reading is only available if each run has been treated as an experiment. The rest of this paper is about how to do that, and what it buys.
+
+\section*{The forward model: an active-stress MPM in Plexus}
+
+The simulator is not a black box; it is a transparent composition of registered Plexus operators on a $128^2$ elastic sheet:
+\[
+\begin{aligned}
+&\text{pacemaker}\;\to\;\text{activation pulse}\;\to\;\text{parametric stiffness / gain / fibre fields}\\[2pt]
+&\qquad\to\;\code{pulse\_to\_active\_stress}\;\to\;\code{mpm\_drag}\\[2pt]
+&\qquad\to\;\big[\,\code{mpm\_strain}\to\code{p2g}\to\code{mpm\_grid\_update}\to\code{g2p}\,\big]^{\times\,\text{substeps}} .
+\end{aligned}
+\]
+The bracketed cycle is the decomposed MLS-MPM; active stress enters as a contraction \emph{along} the learned fibre axis. What matters methodologically is not the numerics but that every learned quantity is a \emph{named physical lever}: a global gain scalar (loop size), a coarse stiffness field (local amplitude), a fibre field~--- a smooth parametric base for the global architecture plus an optional \emph{bounded} SIREN residual for local remodeling (axis / chirality)~--- and a pulse duration that switches off between beats, so the tissue contracts, releases, and recoils into a loop. Because each lever is a physical quantity rather than an opaque weight, a change in the score can be \emph{attributed} to a mechanism. The model is interpretable by construction~--- the precondition for everything that follows.
+
+\section*{The objective: loop morphology, not framewise fit}
+
+The scientific object is the \emph{trajectory loop} each tissue node traces over a beat, not its instantaneous displacement. We therefore optimize \textbf{LoopScore (LS)}: per node, write the beat as a closed curve $z(t)=dx(t)+i\,dy(t)$, take its low-order (elliptic-)Fourier descriptor, drop the position (DC) term, and compare \emph{shapes}. The descriptor separates size/aspect, a signed area
+\[
+S=\sum_k\!\big(|c_{+k}|^2-|c_{-k}|^2\big)\quad(\text{chirality}\times\text{openness}\times\text{size}),
+\]
+and an axis-orientation phase. By construction LS is invariant to where the loop sits and when the beat starts~--- so it scores the loop \emph{morphology}, the deliverable, and is blind to bulk translation and pulse timing. Crucially, $R^2$ (framewise fit) cannot see $S$: a degenerate line has $|c_{+k}|=|c_{-k}|\Rightarrow S=0$, yet a real loop has $S\neq 0$. We therefore demote $R^2$ to a \emph{diagnostic} and adopt the rule:
+
+\begin{quote}
+A mechanism that improves LoopScore while degrading $R^2$ is a \textbf{success}. LoopScore defines success; $R^2$ is now only a diagnostic.
+\end{quote}
+
+A one-time, GT-perturbation sensitivity sweep tells us \emph{which} morphology axes LS rewards: chirality $\approx$ size $\gg$ axis orientation $>$ openness, with temporal phase and position at zero (confirming the designed invariances). This ranking is tagged \textbf{[engineering]}~--- it characterises the metric, not the tissue~--- but it underwrites every claim about why a parameter helped.
+
+\section*{The knowledge-first loop}
+
+The central shift is this: \textbf{the optimizer is no longer the object of the research; it is an instrument for designing falsifiable experiments on the forward model.} Most differentiable-simulator work treats gradients as a way to estimate parameters. Here gradients are a way to discover which mechanisms are missing. Each batch is a controlled experiment, run on the same fixed cycle:
+
+\begin{enumerate}\itemsep2pt
+\item \textbf{Begin from the surprise.} Read the dashboards and the per-node loop montage (green~=~real, red~=~sim); start from the result that contradicted the prediction~--- a flipped ranking, an unexpected morphology, a lever that did nothing~--- not from the parameters.
+\item \textbf{Hypothesize} one statement that makes a prediction (``gain limits loop size''; ``coarse stiffness creates regional coordination'').
+\item \textbf{Design} $\le 6$ slots, each changing \emph{exactly one} variable from the parent (causal inference, not a sweep), with a control and, when it sharpens the inference, an ablation.
+\item \textbf{Run, interpret, distill.} Rank by LS (then cross-node spread LS\,SD, then morphology, then $R^2$); record whether the result supported or falsified the hypothesis.
+\end{enumerate}
+
+Three disciplines make the accumulated knowledge trustworthy rather than anecdotal:
+
+\textbf{Two pressures every batch.} The loop never runs only local refinements (exploit) nor only broad sweeps (explore). A default split (3~exploit $\cdot$ 2~explore $\cdot$ 1~control) keeps enough exploration pressure to map the morphology manifold and avoid going blind around a local optimum. It reports \emph{two} winners: the best optimizer slot (highest LS) and the best \emph{scientific} slot (the new causal relationship revealed, even if its LS is worse).
+
+\textbf{Classified, regime-tagged, distilled knowledge.} Every result updates exactly one of three classes~--- \textbf{[engineering]} (implementation correctness; stable), \textbf{[mechanism]} (claims about the biology/model; always conditional on the regime), \textbf{[optimization@regime]} (claims about convergence). Every conclusion carries the regime it was established in (optimization depth, loss function, parent config). A conclusion established in one regime is a \emph{hypothesis} in another. The ledger is a compact \emph{paper} that is re-distilled each batch, not a growing log.
+
+\textbf{Never trust optimization state.} The single most repeated lesson of the project is that conclusions flipped simply because training continued: levers that looked dead at $\le 600$ iterations revived at 1200--2400. Optimization depth is therefore itself an experimental variable, and ``the mechanism does not work'' must never be confused with ``the optimizer has not yet discovered the mechanism.'' A residual decomposition run on \emph{every} slot attributes its remaining LS gap to morphology dimensions (size, openness, chirality, orientation, shape detail); the tallest positive bar is the \emph{missing mechanism}, and a bar near zero means that dimension is already solved~--- so the bottleneck axis, not the next knob, sets the agenda.
+
+\section*{What the loop has learned}
+
+After many batches the output is not a parameter table but a progressively constrained understanding of the forward model.
+
+\begin{itemize}\itemsep3pt
+\item \textbf{Loops are an intrinsic property of active-stress mechanics.} An elastic sheet driven by cyclic active stress naturally produces closed particle trajectories. Spatial organization does not create loops; it changes their morphology. This eliminated the need for explicit rotary forces and redirected the project toward understanding how material structure shapes existing dynamics.
+
+\item \textbf{Different parameters control different aspects of loop morphology.} The optimization progressively separated the roles of the learned quantities. Global gain primarily controls loop size, stiffness modulates the local amplitude of deformation, and the fibre field determines the preferred contraction orientation and therefore chirality and axis. Rather than acting redundantly, the parameters became increasingly interpretable.
+
+\item \textbf{Loop morphology, not displacement, is the appropriate objective.} Framewise agreement ($R^2$) cannot distinguish a degenerate back-and-forth motion from a genuine closed loop. Optimizing LoopScore instead revealed that the dominant morphology dimensions are chirality and size, whereas position and temporal phase are essentially irrelevant. This changed not only the loss function but the scientific questions that could be asked.
+
+\item \textbf{The remaining error is structural, not random.} The largest residual is consistently a single catastrophic node, and its position moves with the fibre initialization~--- so the failure is not a defect at one tissue location but an interaction between fibre organization and stiffness. The optimizer is exposing a limitation of the current representation, not a local accident.
+
+\item \textbf{Global organization and local variation should be represented separately.} Allowing a neural field to invent an arbitrary fibre architecture proved unstable; the evidence points toward a hierarchical representation~--- a smooth parametric field for the global organization, plus a bounded residual that supplies only small local corrections. The open question is no longer \emph{whether} local variation helps, but \emph{how much} local freedom can be admitted before the representation stops being physically meaningful.
+\end{itemize}
+
+Taken together, these observations do not identify a single optimal parameter vector. They progressively restrict the space of plausible forward models: each validated mechanism removes an entire family of incorrect models and makes the next experiment more informative than the last.
+
+One may ask whether thirty-three optimization batches should simply have identified the correct parameter vector. If the forward model were already complete, the answer would likely be yes. Instead, the optimization repeatedly revealed that the dominant limitation was not the parameter values but the model itself: entire classes of mechanism were proposed, tested, and rejected, while others emerged as necessary to explain the observations. The principal output of the optimization was therefore not a better parameter set but a progressively constrained understanding of the forward model.
+
+This is the distinction the cardiomyocyte project has uncovered. \textbf{Parameter optimization assumes that the correct model already exists; knowledge-first inverse modelling asks whether the model itself is correct.} In this view a plateau is not merely a failure to optimize further: it is evidence that the current model has reached the limit of its explanatory power, and that further progress requires extending the forward model rather than continuing to tune its existing parameters.
+
+\section*{The plateau as evidence of a missing mechanism}
+
+In this project the signal is concrete. The best LoopScore has settled near $\mathrm{LS}\approx 0.15$ and reproduces there across runs and small architectural changes. With the current forward model approximately converged, that stable ceiling is exactly the measurement described above~--- not a failed optimization, but evidence that the model is missing a genuine physical ingredient: a richer active-stress representation, electromechanical coupling, or true local fibre variation.
+
+And the accumulated, classified knowledge does not merely declare the plateau; it \emph{names the next ingredient}. The residual decomposition points at the dominant unsolved morphology axis; the sensitivity ranking says which axes can move the score at all; the falsified-hypothesis ledger rules out the mechanisms already shown not to help in this regime. The single largest available gain is known (eliminating the one catastrophic node would lift mean LS from $\sim 0.15$ to $\sim 0.26$), and it is attributed to a specific, testable expressiveness limit of the \emph{parametric} fibre base. So the next experiment is a \emph{mechanism}, not a blind addition of capacity: a \emph{bounded SIREN residual} layered on the smooth parametric base~--- the parametric field keeping the global organization while the SIREN supplies only small local corrections where a node needs them. This residual formulation mirrors how tissue is actually organised~--- a global fibre architecture with local remodeling, rather than arbitrary per-pixel orientation~--- and is the regime the next batches are designed to test. The earlier, \emph{unconstrained} SIREN ($\pm\pi/2$) is excluded by the ledger; the \emph{bounded-residual} SIREN is a different, untested hypothesis.
+
+\section*{Principle}
+
+A standard optimizer, after the same number of runs, would hand back a slightly better parameter set and little else. The knowledge-first loop hands back a structured understanding of the system: which mechanisms exist, what each one controls, which whole families of models are excluded, which metric axis is the bottleneck, and~--- when the score stops moving~--- which missing physical ingredient is the most plausible thing to add next. Better fits become a \emph{consequence} of better understanding, rather than the only measure of progress.
+
+Nothing in this argument is specific to cardiomyocytes. The case study is one interpretable forward model; the method~--- treat each gradient-based run as a falsifiable experiment, classify and regime-tag what it teaches, and read a plateau as a missing mechanism~--- applies to any model built from named, composable operators. Morphogenesis, slime-mould transport, active matter, and other Plexus models built from interpretable operators are the same kind of problem: a differentiable simulator whose value, while the model is still in question, is less the optimum it reaches than the mechanisms it lets you discover.
+
+\end{document}

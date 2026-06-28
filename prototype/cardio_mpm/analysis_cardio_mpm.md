@@ -1866,13 +1866,750 @@ fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, amp=10, drag=30, dur0=14, dur_hi=3
 - s4 b1_gain03 (EXPLORE) — gain0=0.3: push gain lower — is LS-vs-gain monotone or does it turn over?
 - s5 b1_amp12_g05 (EXPLORE) — amplitude=12, gain0=0.5: test amp×gain interaction under LS (archive tested amp12 at gain0=0.854)
 
-### Emerging observations
+### Emerging observations — Batch 1 RESULTS
 **CRITICAL: this section must ALWAYS be at the END of the file.**
 
-_(LoopScore Batch 1, 2026-06-26) FIRST BATCH under LoopScore. Archive baseline established at LS=0.589 (gain0=0.5,
-fibre+gain+dur co-learn, 2400it). Key prior: under R², spatial fields (SIREN stiffness, SIREN fibre) were dead/harmful —
-both tagged provisional@R²→LS. The LoopScore per-node objective may provide different gradient signal for spatial variation.
-The tight LS clustering (0.567–0.589) in the archive suggests the scalar model may be at its expressiveness ceiling._
+_(LoopScore Batch 1, 2026-06-26) FIRST BATCH under LoopScore. Archive baseline was LS=0.589 under OLD metric._
 
+---
+
+## Batch 1 results — 2026-06-26 (Phase 3, LoopScore objective)
+
+Parent: s0 = archive p2_b14_s1 (gain0=0.5, learn=fibre,gain,dur, 2400it, stiff=[100,100], amp=10, drag=30,
+fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, dur0=14, dur_hi=30)
+
+### CRITICAL ENGINEERING FINDING: LoopScore metric was FIXED between archive and Batch 1
+
+The commit `3dc8188` ("LoopScore metric fixes") lowered the energy floor from 0.05→0.02 and changed the
+per-node score to `clamp(1-r, -1, 1)`. The old metric inflated scores for nodes with thin/small real loops
+(a stub scored ~0.5 under the old floor). **The archive LS=0.589 was computed with the BUGGY metric; the
+corrected baseline is LS≈0.12.** All prior LS values are incomparable with corrected-metric values.
+
+The sensitivity analysis (`make_loopscore_sensitivity.py`) was also added, confirming:
+**chirality (1.97) ≈ size (1.96) >> axis orientation (0.77) > openness/aspect (0.62) >> temporal phase = position = 0**.
+
+### Surprise
+The LS=0.589 baseline was an artifact of a lenient energy floor — the corrected metric shows LS≈0.12, a 5×
+drop. This means the scalar model is NOT near its ceiling; it's near the FLOOR (LS≈0 = "no loop recovered").
+The model is barely producing recognizable loops under the corrected metric.
+
+### Systematic failure (from dashboards)
+1. Red (sim) loops are TOO SMALL relative to green (real) across all nodes — SIZE is the dominant mismatch.
+2. Several nodes per slot have strongly negative LS (−0.4 to −1.0) — wrong CHIRALITY or overshoot.
+3. Duration saturates at dur_hi=30 in ALL slots — the optimizer wants longer pulses but hits the bound.
+4. Stiffness uniform in all scalar slots; the SIREN stiffness slot (s3) converged to a dramatic binary
+   (high/low) pattern — the first spatial signal ever seen in stiffness.
+
+### Per-slot results (ranked by LS)
+
+| Rank | Slot | Role | Variable | LS | LS_SD | R² | ampL | open | chir+ | size |
+|------|------|------|----------|-----|-------|-----|------|------|-------|------|
+| 1 | s3 stiff_coarse | exploit | +stiff SIREN ω=5 [50,150] | **0.133** | 0.197 | −1.075 | 0.164 | 0.177 | 0.67 | 8.61e-4 |
+| 2 | s2 depth3600 | exploit | n_iter 2400→3600 | 0.120 | 0.210 | −1.240 | 0.319 | 0.199 | 0.59 | 7.08e-4 |
+| 3 | s0 control | control | (parent reproduction) | 0.119 | 0.212 | −1.244 | 0.316 | 0.199 | 0.58 | 7.10e-4 |
+| 4 | s4 gain03 | explore | gain0 0.5→0.3 | 0.119 | **0.152** | −0.912 | 0.284 | 0.216 | 0.65 | 7.41e-4 |
+| 5 | s5 amp12 | explore | amp 10→12 | 0.118 | 0.217 | −1.255 | 0.309 | 0.200 | 0.59 | 7.14e-4 |
+| 6 | s1 frozen | exploit | fibre frozen | 0.088 | 0.229 | −0.921 | 0.372 | 0.230 | 0.62 | 6.50e-4 |
+
+### Per-slot morphology (from dashboards, 3×3 zoom per-node LS)
+
+**s0 control:** per-node LS = {−0.55, +0.08, +0.16, +0.10, +0.03, +0.13, +0.00, +0.42, +0.14}. Red
+loops generally too small. Best node LS=+0.42 (partial overlap). Worst node LS=−0.55 (wrong chirality +
+too small).
+
+**s1 frozen:** per-node LS = {−0.40, +0.07, +0.11, +0.10, +0.01, −0.30, +0.03, +0.26, +0.30}. Worst
+overall. Freezing fibre produces higher ampL (0.372 = overshoot) and more negative outliers. Fibre
+co-learning is load-bearing.
+
+**s2 depth3600:** per-node LS = {−0.53, +0.08, +0.16, +0.10, +0.03, +0.14, +0.00, +0.42, +0.13}.
+Essentially identical to s0 control — 1200 extra iterations add nothing. Model converged at 2400it.
+
+**s3 stiff_coarse:** per-node LS = {−0.24, +0.04, +0.30, +0.05, +0.03, **−1.00**, +0.11, +0.01, +0.09}.
+The SIREN stiffness field converged to a dramatic binary pattern (yellow=high stiffness ~150, purple=low
+~50). One node hit LS=−1.00 (catastrophic — likely extreme overshoot in a soft region). Lower ampL (0.164)
+than control. Higher chirality (0.67 vs 0.58). The binary stiffness pattern is acting as a regional SIZE
+lever: soft regions produce bigger loops.
+
+**s4 gain03:** per-node LS = {+0.07, +0.06, +0.17, +0.06, +0.03, −0.91, +0.10, +0.06, +0.04}. Best
+uniformity (SD=0.152). The lower gain reduces extreme overshoot at most nodes (no −0.5 outliers) but
+creates a new catastrophic node at LS=−0.91. Higher chirality (0.65) and openness (0.216).
+
+**s5 amp12:** per-node LS = {−0.57, +0.08, +0.16, +0.10, +0.03, +0.13, −0.01, +0.43, +0.15}. Nearly
+identical to s0 — amplitude 10→12 is inert at this regime.
+
+### Best optimizer slot: s3 stiff_coarse (LS=0.133)
+Coarse SIREN stiffness is the first spatial mechanism to improve LS under the corrected metric. The binary
+stiffness pattern shows the optimizer is learning regional amplitude modulation via material compliance.
+
+### Best scientific slot: s3 stiff_coarse
+OVERTURNS the R²-era closure ("stiffness is inert"): under LoopScore, the per-node gradient provides
+spatial signal that drives stiffness learning. The stiffness field acts as a SIZE lever (soft=bigger loops).
+Additionally: the sensitivity analysis establishes that **chirality and size are the two dominant LS
+dimensions** (each ~2.0 sensitivity, 2.5× orientation, 3× openness).
+
+### Verdict
+- "Stiffness is inert under LS" — **OVERTURNED**. Coarse SIREN stiffness is ACTIVE and improves LS.
+  `[mechanism@LoopScore, 2400it, omega=5, stiff 50-150]`.
+- "Fibre co-learn hurts under LS" — **FALSIFIED**. Freezing fibre HURTS (LS 0.088 vs 0.119).
+  `[mechanism@LoopScore, 2400it]`.
+- "Depth helps under LS at gain0=0.5" — **FALSIFIED**. 3600it ≈ 2400it. Converged.
+  `[optimization@LoopScore, 2400-3600it, gain0=0.5]`.
+- "gain0=0.3 improves LS" — **NEUTRAL** on mean, but best uniformity (SD 0.152).
+  `[optimization@LoopScore, gain0=0.3]`.
+- "amp 10→12 helps" — **NEUTRAL**. `[optimization@LoopScore]`.
+
+### Batch outcome: improved morphology map (stiffness alive; sensitivity ranking established)
+
+### Next
+The corrected metric reveals the model is barely producing loops (LS≈0.12). The dominant bottleneck
+appears to be SIZE (red loops too small) with chirality errors at specific nodes. Duration saturating at
+dur_hi=30 in all slots suggests the optimizer wants more pulse energy. Batch 2 will: (1) exploit the
+stiffness finding (vary omega, combine with dur_hi increase), (2) test whether raising dur_hi unlocks
+larger loops, (3) explore wider stiffness range.
+
+Parent for Batch 2: s3_stiff_coarse (LS=0.133, best under corrected metric).
+
+---
+
+## Batch 2 design — 2026-06-26
+
+### Surprise (from Batch 1)
+The corrected LoopScore metric reveals the model is at LS≈0.12, not 0.589 — barely above "no loop
+recovered" (LS=0). The biggest surprise is that SIREN stiffness is ACTIVE (overturning R²-era closure)
+and that duration saturates at dur_hi=30 in EVERY slot.
+
+### Observation (systematic failure)
+SIZE mismatch dominates: sim loops too small everywhere. Duration hitting dur_hi bound in all slots
+suggests the optimizer is energy-starved — it wants a longer pulse to drive bigger loops, but hits the
+ceiling. The sensitivity analysis shows SIZE and CHIRALITY are the two most rewarded dimensions.
+
+### Hypothesis
+"The pulse-duration upper bound (dur_hi=30) is a binding constraint that limits loop SIZE. Raising dur_hi
+will allow the optimizer to produce longer pulses → more contraction energy → bigger loops → improved LS.
+The stiffness field provides an additional SIZE lever (soft regions → bigger loops) that synergizes with
+more pulse energy."
 
 </details>
+
+---
+
+## Batch 2 results — 2026-06-27
+
+Parent A (exploit): s3_stiff_coarse (LS=0.133, stiff [50,150], ω=5, gain0=0.5, 2400it)
+Parent B (explore/control): s0_control (LS=0.119, stiff=[100,100])
+Hypothesis: "dur_hi=30 is a binding constraint limiting loop SIZE; raising it + coarse stiffness can
+push LS well above 0.133."
+
+### Per-slot results (ranked by LS)
+
+| Rank | Slot | Name | Role | ONE variable | LS | LS_SD | R² | ampL | chir+ | dur | Morphology |
+|------|------|------|------|-------------|-----|-------|-----|------|-------|-----|------------|
+| 1 | s4 | b2_stiff_wide | exploit | stiff [30,200] | **0.152** | 0.216 | -1.272 | 0.084 | **0.74** | 29.9 | Most red loops track green shape; 1 node LS=-0.96 (soft-region overshoot); best chir+ |
+| 2 | s5 | b2_control_s3 | control | (=batch1 winner) | 0.136 | 0.194 | -1.064 | 0.164 | 0.70 | 29.8 | Reproduces batch 1; 1 node LS=-1.00; binary stiffness field |
+| 3 | s2 | b2_stiff_gain03 | exploit | gain0=0.3 | 0.134 | **0.182** | -1.028 | 0.197 | 0.67 | 30.0 | Best uniformity; slightly fewer catastrophic outliers but also fewer high-LS nodes |
+| 4 | s3 | b2_durhi40 | explore | dur_hi=40 (no stiff) | 0.117 | 0.203 | -1.340 | 0.256 | 0.59 | 40.0 | Duration hits 40; loops larger but less well-shaped; no catastrophic outlier |
+| 5 | s1 | b2_stiff_omega3 | explore | ω=3 (coarser stiff) | 0.116 | 0.223 | -1.225 | 0.306 | 0.48 | 30.0 | Coarser blobs; worst chir+; red loops smaller and misoriented |
+| 6 | s0 | b2_stiff_durhi40 | exploit | dur_hi=40 + stiff | **-0.070** | 0.468 | -2.252 | 0.020 | 0.45 | 40.0 | CATASTROPHIC — 2 nodes LS=-1.00; near-zero ampL; stiff+durhi40 interaction destroys fit |
+
+### Dashboard observations
+
+**s4 (stiff_wide, BEST):** Binary stiffness field (yellow high ~200, purple low ~30). Most red loops
+roughly track green shape and orientation; size still slightly small in most. One node (top-left) hits
+LS=-0.96 — massive red overshoot in a soft region. Best chirality (0.74), lowest ampL (0.084 = least
+overshoot for stiffness slots). Fibre angle: periodic sinusoidal pattern, quiver coherent.
+
+**s5 (control):** Reproduces batch 1 stiff_coarse well (LS=0.136 vs 0.133). Similar binary stiffness
+field. One catastrophic node LS=-1.00. Confirms result stability.
+
+**s0 (stiff+durhi40, CATASTROPHIC):** Duration goes to 40.0 (the new cap). With stiffness active,
+soft regions now receive enormous contraction energy → wild overshoot. Two nodes at LS=-1.00, many
+negative. The stiffness × duration INTERACTION is destructive: stiffness creates soft regions where
+longer pulses cause runaway overshoot. ampL=0.020 indicates the model has nearly collapsed.
+
+**s3 (durhi40, no stiff):** Duration goes to 40.0 (cap). Without stiffness, the uniform field absorbs
+the extra pulse energy more evenly. LS=0.117 is WORSE than the control (0.136), not better. Red loops
+are slightly larger but poorly shaped — the extra energy doesn't improve morphology.
+
+**s1 (ω=3, coarser stiff):** Stiffness blobs are visibly larger (coarser). LS=0.116 < control 0.136.
+The coarser regions are TOO large — they average over nodes that need different stiffness. Worst
+chirality (0.48). Indicates ω=5 is better-sized than ω=3 for this tissue.
+
+**s2 (gain0=0.3 + stiff):** Best uniformity (SD=0.182). The lower gain compresses the range, reducing
+outlier overshoot but also reducing the best nodes. LS=0.134 ≈ control (0.136), so gain0=0.3 is neutral
+with stiffness on the mean but trades off peak performance for safety.
+
+### Surprise
+
+**dur_hi=40 HURTS.** The hypothesis "dur_hi=30 is a binding constraint limiting SIZE" is FALSIFIED.
+Raising dur_hi to 40 degrades LS without stiffness (0.117 < 0.136) and is catastrophic WITH stiffness
+(-0.070). The optimizer drives duration to the cap, but more pulse energy doesn't improve loop
+morphology — it causes overshoot or poorly-shaped loops. The duration saturating at dur_hi=30 was NOT
+the optimizer being energy-starved; it was the optimizer maximizing total impulse (its gradient), which
+is distinct from maximizing loop quality.
+
+**Second surprise: wider stiffness range HELPS (LS=0.152).** Stiffness [30,200] beats [50,150] (0.136)
+by Δ=+0.016. More contrast = stronger regional amplitude modulation. The binary field is robust —
+every stiffness slot converges to a high/low partition regardless of range.
+
+### Verdict
+
+- "dur_hi=30 is a binding constraint on SIZE" — **FALSIFIED**. Raising dur_hi HURTS (alone: LS drops
+  0.117 < 0.136; with stiffness: catastrophic -0.070). Duration saturation at 30 is the optimizer
+  pushing for max impulse, not a beneficial constraint. `[mechanism@LoopScore, 2400it]`.
+- "Wider stiffness range helps" — **SUPPORTED**. [30,200] > [50,150] by +0.016 LS. More contrast →
+  stronger regional modulation. `[mechanism@LoopScore, 2400it, ω=5]`.
+- "Coarser stiffness (ω=3) helps" — **FALSIFIED**. ω=3 hurts (0.116 < 0.136). ω=5 is better-sized.
+  `[mechanism@LoopScore, 2400it]`.
+- "gain0=0.3 + stiffness synergize" — **NEUTRAL**. gain0=0.3 trades outlier reduction for peak
+  performance; ~neutral on mean. `[optimization@LoopScore, 2400it]`.
+
+Best optimizer slot: **s4 (b2_stiff_wide)** — LS=0.152, new best. Wider stiffness range is load-bearing.
+Best scientific slot: **s0 (b2_stiff_durhi40)** — though catastrophic, it reveals the stiffness × duration
+interaction: spatial stiffness heterogeneity amplifies the effect of longer pulses, creating catastrophic
+overshoot in soft regions. This is a mechanistically important destructive interaction.
+
+### Batch outcome: improved LoopScore (0.133→0.152) AND improved morphology map (dur_hi falsified; stiffness×duration interaction discovered; ω-resolution mapped).
+
+### Next
+
+The persistent bottleneck: 1-2 catastrophic outlier nodes (LS=-1.00) in soft regions of the binary
+stiffness field. Fixing these outliers would boost mean LS by ~0.1-0.2. The binary stiffness field
+provides beneficial regional modulation but creates extreme overshoot at soft-region nodes.
+
+Open: can we keep the wide stiffness range while taming the outliers? Possible approaches:
+(a) Raise stiff_lo floor (e.g. [50,200]) to limit how soft the softest region can be.
+(b) Try ω=7 (finer field — smaller regions may prevent large continuous soft zones).
+(c) Amplitude — untested at amp=12/15 with wide stiffness; may push mean loops larger.
+(d) Fibre field — relatively unexplored with stiffness; orientation may help chirality.
+
+Parent for Batch 3: s4_stiff_wide (LS=0.152, stiff [30,200], ω=5, gain0=0.5, 2400it).
+
+## Batch 3 — 2026-06-27
+Parent: s2=b2_stiff_wide (LS=0.152, learn=fibre,gain,dur,stiff, stiff [30,200], ω=5, gain0=0.5, amp=10, dur→30, 2400it)
+Surprise (from batch 2): "Wider stiffness range [30,200] gave new best LS=0.152; 1-2 catastrophic outlier nodes remain."
+Observation: "Catastrophic outlier nodes (LS=-1.00) in soft stiffness regions are the main LS drag. Need to tame them."
+Hypothesis: "Raising stiff_lo floor (50), finer ω=7, or amplitude 12 will tame outliers while preserving regional modulation. Coarser fibre (wl=40) may improve chirality/orientation."
+
+### Results
+
+| Rank | Slot | Name | Variable changed | LS | LS_SD | R² | ampL | open | chir+ | size |
+|------|------|------|------------------|-----|-------|-----|------|------|-------|------|
+| 1 | s2 | b3_amp12 | amp=12 (from 10) | **+0.159** | 0.217 | -1.319 | 0.072 | 0.182 | 0.76 | 9.65e-4 |
+| 2 | s0 | b3_hifloor | stiff_lo=50 (from 30) | +0.148 | 0.195 | -1.124 | 0.133 | 0.173 | 0.75 | 9.08e-4 |
+| 3 | s3 | b3_fibre_wl40 | fibre_wl=40 (from 28.8) | -0.051 | 0.493 | -1.896 | 0.022 | 0.211 | 0.63 | 1.03e-3 |
+| 4 | s5 | b3_control_s4 | CONTROL (reproduce parent) | -0.208 | 0.549 | -2.338 | 0.004 | 0.206 | 0.59 | 1.11e-3 |
+| 5 | s1 | b3_omega7 | ω=7 (from 5) | -0.217 | 0.539 | -2.559 | 0.000 | 0.210 | 0.50 | 1.19e-3 |
+| 6 | s4 | b3_gain03_wide | gain0=0.3 (from 0.5) | -0.406 | 0.586 | -2.972 | 0.009 | 0.227 | 0.54 | 1.24e-3 |
+
+(Residual decomposition not available — could not run eval_decompose in this session.)
+
+### Dashboard observations
+
+**s2 (amp12, NEW BEST):** Stiffness binary field similar to parent (mostly yellow/high with purple/low
+patches). 1 catastrophic outlier node at LS=-1.00. Best zoom nodes: +0.38, +0.27, +0.24. Red loops
+slightly larger and better-matched to green than amp=10 slots. Fibre field: regular diagonal parametric
+pattern, uniform quiver. Amplitude 12 provides marginally larger loops → better size match.
+
+**s0 (hifloor, stiff_lo=50):** Binary stiffness similar to parent, floor raised. STILL has 1 catastrophic
+node at LS=-1.00. Best nodes: +0.26, +0.24, +0.21. The stiff_lo=50 floor did NOT eliminate the outlier.
+Red loops match green shape but are slightly small. Good uniformity (SD=0.195, best in batch).
+
+**s5 (CONTROL — FAILED):** LS=-0.208 vs parent's +0.152 — DRAMATIC FAILURE. Binary stiffness but with
+LARGER purple (soft) regions than the parent. THREE catastrophic nodes at LS=-1.00. The SIREN stiffness
+converged to a different spatial pattern with more soft-region nodes hitting catastrophic overshoot. Some
+good nodes (+0.36, +0.25, +0.24) but overwhelmed by 3 outliers. This proves the B2 parent's LS=0.152
+was PARTLY A LUCKY SEED — same config can produce LS from -0.2 to +0.16 depending on initialization.
+
+**s1 (omega7, CATASTROPHIC):** Stiffness field more fragmented/finer (as expected with higher ω). Many
+red loops overshoot green dramatically. Two nodes at LS=-1.00 plus many negative. One anomalously good
+node at LS=+0.57 (the best SINGLE node in the entire batch!) — suggests ω=7 CAN find local matches but
+the finer field is globally unstable, creating too many overshoot regions.
+
+**s3 (fibre_wl40):** Stiffness with more intermediate values (green/teal) and fragmented pattern.
+THREE catastrophic nodes at LS=-1.00. Coarser fibre wavelength appears to destabilize the SIREN
+stiffness optimization — the changed parametric base shifts gradient flow enough to produce a worse
+stiffness pattern. Bad: wl=40 HURTS.
+
+**s4 (gain03_wide, WORST):** Stiffness pattern more uniformly yellow (high) — lower gain produces less
+gradient signal for stiffness learning? THREE catastrophic nodes at LS=-1.00 plus LS=-0.69 node.
+gain0=0.3 with wide stiffness is destructive. This confirms gain0=0.3 + stiffness is a bad combination
+(previously it was neutral without stiffness).
+
+### Surprise
+
+**THE CONTROL FAILED.** This is the biggest finding of Batch 3. The identical config (stiff [30,200],
+ω=5, gain0=0.5, amp=10, 2400it) produced LS=-0.208 (3 outlier nodes) vs the parent's LS=0.152 (1
+outlier node). SIREN stiffness convergence is HIGHLY STOCHASTIC: the binary field pattern depends on
+initialization, and different patterns create different numbers of catastrophic overshoot nodes. The
+number of LS=-1.00 nodes is the DOMINANT driver of mean LS — 1 node → LS≈0.15; 3 nodes → LS≈-0.2.
+
+**Implication:** All previous stiffness "improvements" must be re-evaluated — the LS gap between
+[30,200] and [50,150] (+0.016) is within seed noise (±0.36). Only conclusions supported by MULTIPLE
+runs are reliable. The ω=5, [50,150] config (tested twice: B1=0.133, B2=0.136) is the most
+reproducible stiffness config so far.
+
+**Second surprise: amplitude 12 is (marginally) beneficial** (LS=0.159 vs parent 0.152). But given
+the control variance, this +0.007 is NOT statistically significant from a single run. The best
+INDIVIDUAL nodes improved (+0.38 vs ~+0.27 in parent), which is a slightly more robust signal.
+
+### Verdict
+
+- "Raising stiff_lo floor (50) tames outliers" — **FALSIFIED**. stiff_lo=50 still has 1 catastrophic
+  node; LS=0.148 ≈ parent 0.152. Floor of 50 is not high enough. `[mechanism@LoopScore, 2400it]`.
+- "ω=7 (finer stiffness) helps" — **FALSIFIED**. Catastrophic (LS=-0.217). Confirms ω=5 as the best
+  frequency. ω>5 creates too many overshoot regions. `CLOSED for ω>5. [mechanism@LoopScore, 2400it]`.
+- "Amplitude 12 helps" — **TENTATIVELY SUPPORTED** but within seed noise. LS=0.159 (best in batch),
+  best nodes improved. Needs replication. `[provisional@LoopScore, 2400it, single run]`.
+- "Coarser fibre (wl=40) improves chirality" — **FALSIFIED**. LS=-0.051, 3 catastrophic nodes.
+  Coarser fibre destabilizes stiffness optimization. `[mechanism@LoopScore, 2400it]`.
+- "gain0=0.3 + wide stiffness synergizes" — **FALSIFIED**. LS=-0.406, worst in batch. Lower gain
+  with wide stiffness is catastrophic. `[mechanism@LoopScore, 2400it]`.
+- **NEW FINDING: SIREN stiffness is STOCHASTIC.** Control failure (LS=-0.208 vs 0.152) proves the
+  binary stiffness pattern is seed-dependent. The number of catastrophic nodes (1 vs 3) determines LS
+  sign. Wide range [30,200] has high variance; narrow [50,150] is more reproducible (2 runs: 0.133,
+  0.136). `[optimization@LoopScore, 2400it, ω=5]`.
+
+Best optimizer slot: **s2 (b3_amp12)** — LS=0.159, new best (marginally). amp=12 with 1 outlier node.
+Best scientific slot: **s5 (b3_control_s4)** — the CONTROL FAILURE is the most informative result. It
+reveals that SIREN stiffness convergence is stochastic, all prior stiffness comparisons are within seed
+noise, and the number of catastrophic outlier nodes is the dominant LS driver.
+
+### Batch outcome: improved LoopScore (0.152→0.159, marginal) AND significantly improved morphology map
+(discovered stiffness stochasticity; invalidated single-run stiffness comparisons).
+
+### Next
+
+The dominant question is now: **how to make SIREN stiffness convergence RELIABLE** (eliminate catastrophic
+outlier nodes). Options for Batch 4:
+(a) Much higher stiff_lo floor (80 or 100) — prevent very soft spots entirely.
+(b) Increase w_amp (motion energy penalty) — penalize overshoot nodes more.
+(c) Pair amp=12 with narrower, reproducible stiffness [50,150].
+(d) Control: re-run s2 to test reproducibility of the amp=12 result.
+
+Parent for Batch 4: s2 (amp=12, stiff [30,200], ω=5, gain0=0.5, 2400it, LS=0.159).
+
+## Batch 4 — 2026-06-27
+Parent: s2_amp12 (LS=0.159, learn=fibre,gain,dur,stiff, stiff [30,200], ω=5, gain0=0.5, amp=12, dur→30, 2400it)
+Surprise (from batch 3): "CONTROL FAILED — SIREN stiffness convergence is stochastic (LS -0.208 vs 0.152). The number of catastrophic outlier nodes (1 vs 3) determines LS sign."
+Observation: "Need to make stiffness convergence reliable. Catastrophic outlier nodes in soft stiffness regions are the dominant LS drag."
+Hypothesis: "Raising stiff_lo much higher (80, 100) will structurally prevent extreme soft spots and make convergence reliable. w_amp=0.6 may penalize overshoot directly."
+
+### Results
+
+| Rank | Slot | Name | Variable changed | LS | LS_SD | R² | ampL | open | chir+ | size |
+|------|------|------|------------------|-----|-------|-----|------|------|-------|------|
+| 1 | s5 | b4_control_s2 | CONTROL (reproduce parent) | **+0.149** | 0.254 | -1.325 | 0.066 | 0.208 | 0.76 | 9.97e-4 |
+| 2 | s2 | b4_wamp06 | w_amp=0.6 (from 0.3) | +0.144 | 0.269 | -1.473 | 0.041 | 0.205 | 0.74 | 1.05e-3 |
+| 3 | s0 | b4_floor80 | stiff_lo=80 (from 30) | +0.138 | 0.179 | -1.094 | 0.148 | 0.170 | 0.74 | 8.88e-4 |
+| 4 | s1 | b4_floor100 | stiff_lo=100 (from 30) | +0.134 | 0.175 | -1.061 | 0.161 | 0.171 | 0.70 | 8.69e-4 |
+| 5 | s3 | b4_amp14 | amp=14 (from 12) | -0.247 | 0.567 | -2.153 | 0.012 | 0.232 | 0.50 | 1.08e-3 |
+| 6 | s4 | b4_gain07 | gain0=0.7 (from 0.5) | -0.272 | 0.578 | -2.299 | 0.014 | 0.228 | 0.65 | 1.06e-3 |
+
+### Dashboard observations
+
+**s5 (CONTROL — REPRODUCED!):** LS=+0.149 vs parent's +0.159 — within 0.01. Binary stiffness field
+similar to parent with elongated purple (low) patches among yellow (high). Exactly 1 catastrophic
+node at LS=-1.00 (position: middle row, right column of 3×3 zoom). Best nodes: +0.60, +0.29, +0.29.
+The control REPRODUCED — validating the parent's result as genuine, not a lucky seed. Both the
+parent and control have 1 catastrophic node at the SAME position.
+
+**s2 (wamp06):** w_amp=0.6 doubled the anti-collapse penalty. LS=+0.144, slightly below control.
+Higher spread (SD=0.269). Stiffness field more fragmented/patchy than control. 1 catastrophic node
+at the same position (LS=-1.00), but also 2 mildly negative nodes (-0.18, -0.10). Best nodes: +0.55,
++0.28, +0.27. The increased w_amp did NOT tame the outlier and introduced more mid-range negatives.
+It may have shifted the optimizer's trade-off: higher w_amp penalizes amplitude mismatch, which
+conflicts with the LoopScore loss — the optimizer spends capacity on amplitude match instead of
+morphology.
+
+**s0 (floor80):** stiff_lo=80 raised the stiffness floor. LS=+0.138, SD=0.179 — BEST UNIFORMITY in
+batch. Stiffness field: binary yellow/purple with large coarse regions, but now the "low" regions
+are at 80 (not 30). 1 catastrophic node at the SAME position (LS=-1.00). Node scores compressed:
+all positive nodes in [0.01, 0.22] — lower ceiling but no mid-range catastrophes. The floor HELPS
+uniformity dramatically (SD 0.254→0.179) but trades ~0.01 mean LS.
+
+**s1 (floor100):** stiff_lo=100 raised the floor further. LS=+0.134, SD=0.175 — tied best uniformity.
+Binary stiffness with smaller purple region. STILL 1 catastrophic node at the same position
+(LS=-1.00). Node scores: [0.03, 0.25]. Floor 100 vs 80: almost identical performance (0.134 vs
+0.138). Further constraining stiffness range doesn't help — the ceiling matters too.
+
+**s3 (amp14 — FAILED):** Amplitude 14 is CATASTROPHIC. LS=-0.247, 3 catastrophic nodes (LS=-1.00,
+-1.00, -1.00) plus LS=-0.98. Stiffness field predominantly purple (low stiffness). Higher amplitude
+pushes too much energy into the system; soft regions cannot contain it. The transition from
+amp=12 (safe) to amp=14 (catastrophic) is sharp — amp=12 is near the upper stability limit
+with wide stiffness.
+
+**s4 (gain07 — FAILED):** gain0=0.7 is CATASTROPHIC with wide stiffness [30,200]. LS=-0.272,
+3 catastrophic nodes. Stiffness field mostly yellow (high) with scattered purple patches. Higher
+initial gain creates more aggressive contraction that soft regions amplify into overshoot. This
+confirms gain0=0.5 is the only safe gain with wide stiffness (gain0=0.3 was also catastrophic
+in B3, gain0=0.7 catastrophic here).
+
+### Surprise
+
+**THE STIFFNESS FLOOR (EVEN AT 100) DOES NOT ELIMINATE THE PERSISTENT CATASTROPHIC NODE.**
+All 4 successful slots (floor80, floor100, wamp06, control) have EXACTLY 1 catastrophic node at
+the SAME spatial position (middle row, right column of the 3×3 zoom). The floor prevents the
+3-node catastrophe (all failed B3 slots and B4's amp14/gain07 had 3 catastrophic nodes), but the
+single persistent outlier survives even at stiff_lo=100.
+
+This means the catastrophe at that node is NOT caused by "too soft" stiffness — it's a STRUCTURAL
+mismatch. The real loop at that position has morphology (likely chirality or axis orientation) that
+the model cannot produce with the current fibre direction and gain. The stiffness field creates
+the right AMPLITUDE modulation elsewhere but cannot fix a directional mismatch.
+
+**Second surprise: the floor improves UNIFORMITY dramatically (LS_SD 0.254→0.175-0.179) but
+slightly HURTS mean LS (0.149→0.134-0.138).** This is a mean-vs-uniformity tradeoff. The
+narrower stiffness range constrains the optimizer, producing more uniform but lower-ceiling fits
+across the non-catastrophic nodes.
+
+**Third surprise: the control REPRODUCED** (LS=0.149 vs parent 0.159, Δ=0.01). After B3's
+control failure (0.152→-0.208), this is reassuring. Two successful runs of the [30,200] amp=12
+config: LS=0.159 and 0.149. The result is genuine at ~0.15 ± 0.01.
+
+### Per-node pattern (3×3 zoom, all successful slots)
+
+| Position | floor80 | floor100 | wamp06 | control | Pattern |
+|----------|---------|----------|--------|---------|---------|
+| (1,1) | +0.13 | +0.24 | -0.18 | -0.14 | VARIABLE (±0.2) |
+| (1,2) | +0.12 | +0.11 | +0.16 | +0.08 | STABLE low-positive |
+| (1,3) | +0.22 | +0.25 | +0.28 | +0.29 | STABLE medium |
+| (2,1) | +0.05 | +0.03 | -0.10 | -0.09 | VARIABLE (near 0) |
+| (2,2) | +0.05 | +0.04 | +0.08 | +0.08 | STABLE low-positive |
+| (2,3) | **-1.00** | **-1.00** | **-1.00** | **-1.00** | **ALWAYS CATASTROPHIC** |
+| (3,1) | +0.20 | +0.18 | +0.27 | +0.29 | STABLE medium |
+| (3,2) | +0.01 | +0.04 | +0.15 | +0.15 | MODERATE |
+| (3,3) | +0.14 | +0.17 | +0.55 | +0.60 | VARIABLE (high ceiling) |
+
+Node (2,3) is ALWAYS catastrophic regardless of stiffness floor, w_amp, or configuration.
+Node (3,3) has the highest CEILING (0.55-0.60) — the model CAN match some nodes well.
+Nodes (1,1) and (2,1) are VARIABLE — they swing between negative and positive across runs.
+The floor slots (80, 100) compress all non-catastrophic nodes into a narrow band [0.01, 0.25],
+while the wide-stiffness runs allow higher peaks (0.55-0.60) but also mid-range negatives.
+
+### Verdict
+
+- "Raising stiff_lo to 80/100 tames outliers" — **PARTIALLY SUPPORTED**. The floor prevents
+  multi-node catastrophe (3→1 outliers) and dramatically improves uniformity (SD 0.254→0.175).
+  But the single persistent outlier at node (2,3) is NOT stiffness-related — it survives even
+  at floor=100. Mean LS is slightly lower. `[mechanism@LoopScore, 2400it]`.
+- "w_amp=0.6 penalizes overshoot" — **FALSIFIED as LS improver.** w_amp=0.6 did not reduce
+  outliers and introduced mid-range negatives. The w_amp penalty conflicts with LoopScore
+  optimization — the two losses pull in different directions. `[mechanism@LoopScore, 2400it]`.
+- "amp=14 extends the amp=12 benefit" — **FALSIFIED.** amp=14 is catastrophic (3 outlier nodes).
+  The amp=12→14 transition is sharp. amp=12 is the upper stability boundary with wide stiffness.
+  `[mechanism@LoopScore, 2400it]`. Keep amplitude ≤12.
+- "gain0=0.7 with stiffness could help" — **FALSIFIED.** gain0=0.7 catastrophic (3 nodes).
+  Only gain0=0.5 works with wide stiffness [30,200]. `[mechanism@LoopScore, 2400it]`.
+- **NEW FINDING: persistent catastrophic node is STRUCTURAL, not stiffness-driven.** The same
+  node (2,3) fails at LS=-1.00 across ALL successful runs regardless of stiff_lo (30, 80, 100).
+  This is a local mechanism mismatch — likely the fibre direction at that location produces wrong
+  chirality/axis, which no amount of stiffness tuning can fix. `[mechanism@LoopScore, 2400it]`.
+
+Best optimizer slot: **s5 (control_s2)** — LS=0.149, confirmed parent result.
+Best scientific slot: **s0 (floor80)** — reveals that the stiffness floor fixes uniformity (SD)
+but not the persistent outlier, proving the outlier is a structural (fibre/direction) mismatch,
+not a stiffness problem. This redirects the search from stiffness tuning to fibre direction.
+
+### Batch outcome: improved morphology map (stiffness floor mechanism understood; persistent outlier
+identified as structural/directional; mean-vs-uniformity tradeoff characterized). LS not improved
+(best=0.149 < parent 0.159, within noise).
+
+### Next
+
+The dominant question is now: **what causes the persistent catastrophic node (2,3)?** Since
+stiffness floor (up to 100) doesn't fix it, the issue is likely FIBRE DIRECTION — the contraction
+axis at that node produces wrong chirality or axis orientation. The fibre parametric field (wl=28.8,
+angle=0.17, amp=0.39, phase=0.41) is learned, but the optimizer may be stuck in a local minimum.
+
+For Batch 5: test fibre parameter init sensitivity. Different initial fibre_angle and fibre_phase
+values may guide the optimizer to a different local minimum that avoids the outlier. Use floor=80
+as the reliability base (best uniformity). Also test stiffness ablation with amp=12 to establish
+the fibre-only ceiling.
+
+Parent for Batch 5: s0_floor80 (LS=0.138, SD=0.179, stiff_lo=80, stiff_hi=200, ω=5, gain0=0.5,
+amp=12, fibre: wl=28.8/angle=0.17/amp=0.39/phase=0.41, dur→30, 2400it).
+
+---
+
+## Batch 5 — 2026-06-27 (fibre direction init sensitivity + stiffness ablation)
+
+Parent: s0_floor80 from B4 (LS=0.138, SD=0.179, learn=fibre,gain,dur,stiff, stiff_src=siren,
+ω=5, stiff [80,200], gain0=0.5, amp=12, dur0=14, dur_hi=30, fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, 2400it).
+
+Surprise (from B4): "The persistent outlier at node (2,3) survives stiff_lo=100.
+It's STRUCTURAL, not stiffness-driven. Redirected to fibre direction."
+
+Observation: "One catastrophic node drags mean LS by ~0.11. The fibre direction field is the
+untested lever for chirality and orientation — the top LS-sensitivity dimensions."
+
+Hypothesis: "Different fibre parametric init (angle, phase) may guide the optimizer to a fibre
+basin that avoids the catastrophe at node (2,3). The optimization landscape for fibre has local minima."
+
+### Results (ranked by LS)
+
+| Rank | Slot | Name | Role | Variable | LS | LS_SD | R² | ampL | open | chir+ | size |
+|------|------|------|------|----------|-----|-------|-----|------|------|-------|------|
+| 1 | s4 | b5_stiff_hi300 | explore | stiff_hi=300 | **+0.149** | 0.178 | -1.151 | 0.125 | 0.173 | 0.71 | 9.31e-4 |
+| 2 | s1 | b5_angle_neg | exploit | fibre_angle=-0.3 | +0.144 | 0.183 | -1.088 | 0.149 | 0.164 | 0.78 | 8.72e-4 |
+| 3 | s5 | b5_control | control | (parent repeat) | +0.137 | 0.184 | -1.099 | 0.144 | 0.172 | 0.73 | 8.89e-4 |
+| 4 | s3 | b5_no_stiff | explore | uniform stiffness | +0.118 | 0.217 | -1.255 | 0.309 | 0.200 | 0.59 | 7.14e-4 |
+| 5 | s2 | b5_phase_shift | exploit | fibre_phase=1.2 | +0.085 | 0.314 | -1.803 | 0.102 | 0.194 | 0.62 | 9.00e-4 |
+| 6 | s0 | b5_angle05 | exploit | fibre_angle=0.5 | +0.044 | 0.346 | -1.754 | 0.108 | 0.188 | 0.46 | 9.04e-4 |
+
+### Dashboard observations
+
+**s4 (stiff_hi300, LS=0.149) — BEST:** Wider stiffness [80,300] gives the optimizer more contrast.
+Clean binary stiffness pattern. Node (2,3) still LS=-1.00 (persistent). Node (1,1) = -0.14
+(improved vs control's -0.35). Best node (1,3)=+0.30. Fibre quiver shows very regular pattern.
+Wider range helps non-outlier nodes without destabilizing.
+
+**s1 (angle_neg, LS=0.144):** fibre_angle=-0.3 reaches nearly control-level LS. Node (2,3) still
+LS=-1.00. Node (1,1) = -0.50. Stiffness: large contiguous dark/light regions. chir+=0.78 (highest
+in batch, even beating control's 0.73). The negative angle init produced a slightly better chirality
+match but did NOT fix the persistent outlier. Fibre angle pattern similar to control after optimization.
+
+**s5 (control, LS=0.137):** Reproduces parent (B4 s0: LS=0.138, Δ=0.001). Node (2,3) = LS=-1.00.
+Node (1,1) = -0.35. Stiffness: large contiguous pattern. Control reproduced reliably.
+
+**s3 (no_stiff, LS=0.118):** Uniform stiffness, fibre-only at amp=12. Node (1,1) = -0.57 (a
+DIFFERENT node is worst — not (2,3)). chir+=0.59 (lowest of successful slots). ampL=0.309 (highest
+— without stiffness variation, bulk motion is higher). This CONFIRMS fibre-only ceiling at amp=12:
+LS≈0.12. Stiffness adds ~0.02 net.
+
+**s2 (phase_shift, LS=0.085):** fibre_phase=1.2 WORSENED things significantly. TWO catastrophic
+nodes: (1,1) at LS=-1.00, (2,1) at LS=-0.17. The phase shift led to multiple bad nodes, not just
+the usual (2,3). chir+=0.62. SD=0.314 (poor uniformity). Wrong phase → deep bad basin.
+
+**s0 (angle05, LS=0.044) — WORST:** fibre_angle=0.5 is CATASTROPHIC. Node (1,1) = LS=-0.87.
+chir+=0.46 (worst). SD=0.346 (worst). The angle=0.5 init led to a terrible fibre basin. The
+stiffness field is noisy/fragmented. The optimizer was trapped in a poor local minimum for 2400it.
+
+### Per-node pattern (3×3 zoom, stiffness-active slots)
+
+| Position | s0 (angle05) | s1 (angle_neg) | s2 (phase) | s4 (hi300) | s5 (ctrl) |
+|----------|-------------|----------------|------------|-----------|-----------|
+| (1,1) | **-0.87** | **-0.50** | **-1.00** | -0.14 | -0.35 |
+| (1,2) | +0.22 | +0.10 | +0.11 | +0.16 | +0.11 |
+| (1,3) | +0.18 | +0.19 | +0.19 | **+0.30** | +0.24 |
+| (2,1) | +0.07 | +0.06 | -0.17 | +0.10 | +0.01 |
+| (2,2) | +0.06 | +0.05 | +0.08 | +0.07 | +0.04 |
+| (2,3) | +0.27 | **-1.00** | +0.29 | **-1.00** | **-1.00** |
+| (3,1) | +0.09 | +0.17 | -0.01 | +0.19 | +0.20 |
+| (3,2) | +0.33 | +0.04 | +0.19 | +0.04 | +0.04 |
+| (3,3) | +0.13 | +0.22 | +0.13 | +0.16 | +0.20 |
+
+**CRITICAL FINDING:** In s0 (angle05), node (2,3) has LS=+0.27 — NOT catastrophic! This is the
+ONLY stiffness-active slot where node (2,3) is not at -1.00. But node (1,1) is -0.87 instead,
+and the overall LS is terrible (0.044). So the angle=0.5 basin avoids the (2,3) catastrophe but
+creates worse problems elsewhere. The catastrophic node LOCATION varies with fibre init — it's
+not a fixed structural property of the tissue at position (2,3) per se, but rather a property
+of the INTERACTION between the learned stiffness pattern and the fibre direction at specific nodes.
+
+In s2 (phase_shift), node (2,3) = +0.29 (ALSO not catastrophic) but (1,1) = -1.00 instead.
+Again, the catastrophe MOVED to a different node.
+
+**This overturns the B4 conclusion.** The "persistent outlier at (2,3)" is NOT truly structural —
+it's an artifact of the fibre init basin. Different fibre inits move the catastrophe to different
+nodes. The STIFFNESS field + fibre basin interaction creates ONE catastrophic node somewhere, but
+not always at the same position.
+
+### Surprise
+
+**THE "PERSISTENT" OUTLIER AT NODE (2,3) IS NOT FIXED TO THAT POSITION.** When fibre_angle=0.5
+or phase=1.2, the catastrophe moves to node (1,1) instead. Node (2,3) becomes +0.27/+0.29 in
+those configs! The catastrophe is a property of the STIFFNESS × FIBRE BASIN interaction, not a
+structural tissue property at position (2,3). This is a fundamental reinterpretation.
+
+**Second surprise: fibre init sensitivity is MASSIVE.** angle=0.5 drops LS by 0.093 from control.
+The optimizer is trapped in deep local minima for the fibre direction — 2400 iterations is NOT
+enough to escape a bad fibre basin. The fibre optimization landscape is highly non-convex.
+
+**Third surprise: stiff_hi=300 matches/slightly beats stiff_hi=200** (0.149 vs 0.137). Wider
+stiffness contrast is beneficial, not destabilizing. This is the new best config with floor.
+
+### Verdict
+
+- "Different fibre init avoids the persistent outlier at (2,3)" — **PARTIALLY SUPPORTED, BUT
+  REFRAMED.** The outlier MOVES to different nodes with different fibre inits. It's not fixed at
+  (2,3) — it's a stiffness×fibre basin artifact. The fibre basin determines WHICH node catastrophes.
+  No single fibre init eliminates ALL catastrophic nodes. `[mechanism@LoopScore, 2400it]`.
+- "Fibre angle init sensitivity is high" — **CONFIRMED.** LS swings by 0.1 across inits. The
+  fibre optimization landscape has deep local minima. `[optimization@LoopScore, 2400it]`.
+- "Wider stiffness (hi=300) destabilizes" — **FALSIFIED.** stiff_hi=300 matches best LS (0.149)
+  with good uniformity (SD=0.178). `[mechanism@LoopScore, 2400it]`.
+- "Fibre phase init matters" — **CONFIRMED destructive at phase=1.2.** Multiple catastrophic
+  nodes. Bad basin. `[optimization@LoopScore, 2400it]`.
+- "Fibre-only ceiling at amp=12 is LS≈0.12" — **CONFIRMED.** s3 (no_stiff) = LS=0.118.
+  Stiffness adds ~0.02 net (0.118→0.137). `[mechanism@LoopScore, 2400it, amp=12]`.
+
+Best optimizer slot: **s4 (stiff_hi300)** — LS=0.149, SD=0.178. Wider stiffness [80,300] is
+the new best floored config.
+
+Best scientific slot: **s0 (angle05)** — despite terrible LS (0.044), it revealed that the
+"persistent outlier at (2,3)" is NOT position-fixed. The catastrophe moves with fibre init,
+proving it's a stiffness×fibre basin interaction, not a structural tissue property. This
+reframes the entire outlier problem from "fix one node" to "find a fibre basin without any
+catastrophic node" — a fundamentally different (and potentially tractable) problem.
+
+### Batch outcome: improved morphology map (catastrophe is basin-dependent, not position-fixed;
+fibre landscape has deep local minima; wider stiffness [80,300] works). LS not improved
+(best=0.149, matching prior best).
+
+### Next
+
+The catastrophe is a fibre×stiffness basin interaction. The parametric fibre has 4 init params
+(wl, angle, amp, phase) and the optimizer can't escape bad basins in 2400it. Two approaches:
+1. **Add LOCAL fibre flexibility** — re-open SIREN fibre with TIGHT deviation bounds (0.15-0.5
+   rad, vs the ±π/2 that was catastrophic). A small local correction may fix the one catastrophic
+   node without destabilizing the rest.
+2. **Systematic fibre init search** — but this is parameter search, not mechanism discovery.
+
+Approach 1 is more mechanism-informative: if tight SIREN fibre works, it proves that the
+parametric field's expressiveness (not the optimizer) is the bottleneck. If it fails even at
+tight bounds, the bottleneck is elsewhere.
+
+Parent for Batch 6: s5_control (LS=0.137, stiff [80,200], default fibre init, 2400it).
+
+---
+
+## Batch 6 — 2026-06-28 (SIREN fibre with tight deviation bounds)
+
+Parent: B5-s5_control (LS=0.137, SD=0.184, learn=fibre,gain,dur,stiff, stiff_src=siren,
+ω=5, stiff [80,200], gain0=0.5, amp=12, dur0=14, dur_hi=30, fibre wl=28.8/angle=0.17/amp=0.39/phase=0.41, 2400it).
+
+Surprise (from B5): "The catastrophic node is NOT position-fixed — it moves with fibre
+init basin. No parametric fibre init eliminates it. The parametric fibre's 4-param
+expressiveness may be the bottleneck."
+
+Observation: "Every stiffness-active run has exactly 1 catastrophic node. The parametric
+fibre field cannot simultaneously satisfy all nodes. SIREN fibre at ±π/2 was catastrophic
+(B2-era), but tight bounds (0.15–0.5 rad) are untested."
+
+Hypothesis: "A SIREN fibre deviation with TIGHT bounds (0.15–0.5 rad) adds local correction
+capability without the global destabilization seen at ±π/2. If tight bounds fix the outlier,
+the bottleneck is parametric fibre expressiveness, not the optimizer or stiffness."
+
+### Results (ranked by LS)
+
+| Rank | Slot | Name | Role | Variable | LS | LS_SD | R² | ampL | open | chir+ | size |
+|------|------|------|------|----------|-----|-------|-----|------|------|-------|------|
+| 1 | s5 | b6_control | control | (parent repeat) | **+0.140** | 0.184 | -1.099 | 0.143 | 0.170 | 0.71 | 8.90e-4 |
+| 2 | s4 | b6_gain04 | explore | gain0=0.4 | +0.139 | 0.172 | -1.053 | 0.167 | 0.175 | 0.72 | 8.70e-4 |
+| 3 | s3 | b6_fibre_amp08 | explore | fibre_amp=0.8 | +0.098 | 0.303 | -1.693 | 0.136 | 0.202 | 0.55 | 8.92e-4 |
+| 4 | s0 | b6_siren_fibre_015 | exploit | siren_fibre, dev=0.15 | -0.002 | 0.434 | -1.886 | 0.081 | 0.235 | 0.51 | 9.69e-4 |
+| 5 | s1 | b6_siren_fibre_03 | exploit | siren_fibre, dev=0.3 | -0.213 | 0.561 | -2.541 | 0.003 | 0.228 | 0.70 | 1.16e-3 |
+| 6 | s2 | b6_siren_fibre_05 | exploit | siren_fibre, dev=0.5 | -0.276 | 0.571 | -2.667 | 0.000 | 0.226 | 0.50 | 1.20e-3 |
+
+### Dashboard observations
+
+**s5 (control, LS=0.140):** Reproduces B5 control reliably (B5: 0.137, B6: 0.140). Binary
+stiffness pattern, regular fibre quiver. Per-node: 0.31, 0.11, 0.24, 0.02, 0.04, -1.00,
+0.20, 0.04, 0.20. One catastrophic node at position (2,3). Non-outlier nodes range 0.02–0.31.
+
+**s4 (gain04, LS=0.139):** Essentially IDENTICAL to control. Per-node: 0.25, 0.11, 0.23,
+0.03, 0.04, -1.00, 0.18, 0.03, 0.19. Same catastrophic node (2,3). SD=0.172 (slightly
+better uniformity than control's 0.184). gain0=0.4 is indistinguishable from gain0=0.5 in
+this regime — the gain lever is FLAT between 0.4–0.5.
+
+**s3 (fibre_amp08, LS=0.098):** Higher parametric fibre amplitude init. Per-node: -0.30,
+0.10, 0.20, -0.17, 0.02, -0.05, 0.01, 0.24, 0.27. Stiffness pattern more fragmented/noisy.
+THREE negative nodes (not just one catastrophic). Higher fibre_amp destabilizes the
+stiffness optimization — the fibre init basin matters even for the stiffness convergence.
+
+**s0 (siren_fibre_015, LS=-0.002) — THE KEY RESULT:** SIREN dθ map shows noisy/speckled
+pattern (pixel-scale variations within ±0.15 rad). Per-node: -1.00, -0.15, -0.04, +0.29,
++0.04, -0.28, +0.04, **+0.76**, +0.36. THE FORMERLY CATASTROPHIC NODE (2,3) IS NOW +0.76 —
+the BEST individual node in ANY run! But NEW catastrophes appear: node (1,1) = -1.00, and
+several others go negative. The SIREN fibre REDISTRIBUTES catastrophes rather than
+eliminating them. It provides the local correction needed at node (2,3), but the joint
+optimization with SIREN stiffness creates new instabilities at other nodes.
+
+**s1 (siren_fibre_03, LS=-0.213):** Per-node: -1.00, +0.36, -1.00, +0.43, +0.03, -1.00,
++0.37, +0.66, +0.37. THREE nodes at LS=-1.00. The high-scoring nodes are actually BETTER
+than control's best (+0.66 vs +0.31), but the catastrophes multiply with wider dev bounds.
+SIREN dθ map noisier, with more structured but still fine-scale deviations.
+
+**s2 (siren_fibre_05, LS=-0.276):** Per-node: -1.00, -1.00, -1.00, +0.28, +0.12, -1.00,
++0.22, +0.73, +0.08. FOUR nodes at LS=-1.00 (entire top row catastrophic). Some surviving
+nodes still good (+0.73). The wider dev bound creates even more catastrophes. Fibre dθ map
+shows larger but still noisy deviations. The pattern is monotonic: wider dev → more catastrophes.
+
+### Per-node pattern (3×3 zoom)
+
+| Position | s0 (dev=0.15) | s1 (dev=0.3) | s2 (dev=0.5) | s5 (ctrl) |
+|----------|---------------|--------------|--------------|-----------|
+| (1,1) | **-1.00** | **-1.00** | **-1.00** | +0.31 |
+| (1,2) | -0.15 | +0.36 | **-1.00** | +0.11 |
+| (1,3) | -0.04 | **-1.00** | **-1.00** | +0.24 |
+| (2,1) | +0.29 | +0.43 | +0.28 | +0.02 |
+| (2,2) | +0.04 | +0.03 | +0.12 | +0.04 |
+| (2,3) | -0.28 | **-1.00** | **-1.00** | **-1.00** |
+| (3,1) | +0.04 | +0.37 | +0.22 | +0.20 |
+| (3,2) | **+0.76** | +0.66 | +0.73 | +0.04 |
+| (3,3) | +0.36 | +0.37 | +0.08 | +0.20 |
+
+**CRITICAL FINDING:** Node (3,2) goes from +0.04 in control to +0.76 in s0 — a MASSIVE
+improvement. Node (2,1) improves from +0.02 to +0.29. But node (1,1) collapses from +0.31
+to -1.00. The SIREN fibre CAN achieve much better individual node scores (ceiling +0.76 vs
++0.31) but REDISTRIBUTES the catastrophe to different nodes in the joint optimization.
+
+The per-node ceiling increase (+0.76 vs +0.31 best individual node) proves the model COULD
+match loop morphology much better. The bottleneck is NOT the physics model's representational
+capacity — it's the JOINT OPTIMIZATION of stiffness + fibre SIRENs creating a landscape
+where fixing one catastrophe creates another.
+
+### Surprise
+
+**THE BIGGEST SURPRISE: SIREN fibre FIXES the catastrophic node while CREATING NEW ones.**
+The tightest bound (dev=0.15) lifted node (3,2) from +0.04 to +0.76 and node (2,1) from
++0.02 to +0.29, proving the parametric fibre's limited expressiveness WAS the bottleneck for
+those nodes. But node (1,1) collapsed from +0.31 to -1.00. This is REDISTRIBUTION, not
+elimination — the joint stiffness×fibre SIREN optimization has a constrained manifold where
+improving some nodes worsens others. The monotonic trend (wider dev → more catastrophes)
+shows this isn't a convergence issue — it's a structural property of the joint optimization.
+
+**Second surprise: gain0=0.4 ≈ gain0=0.5.** The gain lever is FLAT in the 0.4–0.5 range
+with this stiffness configuration. Combined with B3 (gain0=0.3 catastrophic with wide
+stiffness) and earlier results, the viable gain window is narrow: 0.4–0.5 with stiffness.
+
+**Third surprise: fibre_amp=0.8 creates MULTI-node failure.** Higher parametric fibre
+amplitude doesn't just affect loop morphology — it destabilizes the stiffness pattern (more
+fragmented). The fibre init affects not just fibre convergence but also STIFFNESS convergence.
+
+### Verdict
+
+- "Tight-bound SIREN fibre (0.15–0.5 rad) eliminates the catastrophic outlier" —
+  **FALSIFIED as stated, but REFRAMED.** SIREN fibre REDISTRIBUTES catastrophes (fixes
+  specific nodes, breaks others) rather than eliminating them. This occurs when jointly
+  optimized with SIREN stiffness. The mechanism WORKS locally (per-node ceiling jumps
+  from +0.31 to +0.76) but the joint optimization landscape prevents simultaneous
+  improvement at all nodes. `[mechanism+optimization@LoopScore, 2400it, joint stiff+fibre SIREN]`.
+- "gain0=0.4 vs 0.5 matters" — **FALSIFIED.** LS=0.139 vs 0.140. Gain is flat in [0.4,0.5]
+  with stiffness. `[mechanism@LoopScore, 2400it, stiff [80,200]]`.
+- "fibre_amp=0.8 improves orientation coverage" — **FALSIFIED.** LS drops to 0.098. Higher
+  parametric fibre amplitude destabilizes stiffness convergence. `[mechanism@LoopScore, 2400it]`.
+
+Best optimizer slot: **s5 (control)** — LS=0.140, SD=0.184. No improvement over parent.
+Best scientific slot: **s0 (siren_fibre_015)** — despite LS=-0.002, it revealed that (a) SIREN
+fibre CAN fix specific catastrophic nodes (individual ceiling +0.76), (b) but joint
+optimization with SIREN stiffness creates redistribution rather than elimination, and (c) the
+per-node ceiling is much higher than previously observed (+0.76 vs +0.31). This redirects the
+search from "add more per-pixel freedom" to "break the stiffness×fibre joint optimization
+deadlock" — either by isolating SIREN fibre from stiffness or by sequential learning.
+
+### Batch outcome: improved morphology map (catastrophe redistribution mechanism discovered;
+per-node ceiling +0.76; gain flat in [0.4,0.5]; fibre_amp destabilizes stiffness). LS not
+improved (best=0.140 ≈ parent 0.137, within noise). SIREN fibre closed for joint optimization
+with SIREN stiffness.
+
+### Next
+
+The dominant question: **Is the catastrophe redistribution caused by the SIREN fibre × SIREN
+stiffness INTERACTION, or is SIREN fibre intrinsically destabilizing?**
+
+Test: SIREN fibre with UNIFORM stiffness (no SIREN stiffness). If SIREN fibre exceeds the
+fibre-only ceiling (LS≈0.118) WITHOUT catastrophes, the interaction is the culprit. Also test
+coarser fibre SIREN (ω=3; since there's no stiffness SIREN, omega only affects fibre).
+
+Parent for Batch 7: B5-s4 (stiff [80,300], LS=0.149) for stiffness-active slots;
+B5-s3 (fibre-only, LS=0.118) for fibre-isolation slots.

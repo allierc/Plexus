@@ -44,21 +44,33 @@ sets:
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
+  movie_activation:
+    description: A single greyish-white circular blob appears in the center of a black background. The
+      blob remains stationary and maintains its shape throughout the duration of the video. There is no
+      movement, expansion, or contraction of the object over time. The scene remains static with no changes
+      in lighting or environment.
+    objects: The scene contains a single circular object located in the center of the frame. The object
+      is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black
+      background. The object is isolated and does not interact with any other elements.
   movie_cell:
-    description: The simulation shows a dense field of blue particles contained within a square boundary.
-      Over the course of the video, the particles undergo subtle stochastic fluctuations in their positions.
-      The overall density and distribution of the blue field remain constant throughout the sequence.
-      There is no significant macroscopic movement or structural change in the aggregate.
-    objects: The scene contains a large number of small, blue, irregularly shaped particles. These particles
-      are densely packed together to form a continuous, textured square. The particles are distributed
-      uniformly across the two-dimensional plane of the square. The blue color is consistent across all
-      particles, contrasting against the white background.
+    description: The simulation shows a dense collection of blue particles contained within a square boundary.
+      Over the course of the video, the particles undergo constant, rapid fluctuations in their local
+      positions. The overall density and distribution of the blue field remain statistically uniform throughout
+      the sequence. There is no discernible macroscopic motion or structural evolution, indicating a steady-state
+      stochastic process.
+    objects: The scene contains a large number of small, blue particles. These particles are arranged
+      in a dense, disordered cluster that fills a square area. Each individual particle is tiny and appears
+      as a single pixel or a small group of pixels. The particles are not connected to one another, forming
+      a granular and homogeneous distribution.
   movie_mpm_particle:
-    description: The video shows a static distribution of blue particles within a square boundary. There
-      is no visible movement or evolution of the particles across the four keyframes. The spatial arrangement
-      of the dots remains constant throughout the sequence. The simulation appears to be in a steady state
-      or represents a single snapshot of a random field.
-    objects: The scene contains a large number of small, blue dots distributed across a white background.
-      These particles are arranged in a stochastic, non-uniform pattern that fills a square area. Each
-      individual dot is tiny and uniform in size and color. The dots are not connected to one another,
-      forming a discrete point cloud.
+    description: The simulation shows a large collection of blue particles distributed within a square
+      boundary. Over the course of the video, the particles appear to undergo a stochastic process, shifting
+      positions slightly while maintaining a relatively uniform density. There is no discernible global
+      motion or large-scale structural formation, suggesting a state of equilibrium or high-entropy diffusion.
+      The overall distribution remains consistent throughout the sequence, with no significant clustering
+      or depletion of particles.
+    objects: The scene contains thousands of small, individual blue dots representing discrete particles.
+      These particles are arranged in a dense, random distribution that fills a square area. Each particle
+      is roughly the same size and maintains a consistent blue hue throughout the simulation. The particles
+      are not connected to one another, forming a point-cloud topology rather than a continuous field
+      or network.

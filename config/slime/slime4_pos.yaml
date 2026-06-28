@@ -20,8 +20,8 @@ operators:
 - {op: decay, at: chemical, rate: 0.003148}
 - {op: sense, at: cell, from: chemical, cross: -0.801473}
 - {op: bounce, at: cell}
-- {op: advance, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, advance]
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
 plotting:
   colors:
     a: [0.2, 0.95, 0.65]

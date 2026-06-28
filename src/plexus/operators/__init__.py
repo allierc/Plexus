@@ -16,7 +16,7 @@ from . import Coulomb                # noqa: F401  registers Coulomb (lateral, 2
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
 from . import alignment             # noqa: F401  Vicsek velocity alignment (nominal); boids = special case
 from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
-from . import self_propel           # noqa: F401  Vicsek self-propulsion (active matter; The Well)
+from . import cruise               # noqa: F401  Vicsek self-propulsion: cruise to speed v0 (2nd-order; active matter, The Well)
 from . import drag                  # noqa: F401  registers drag (lateral, 2nd-derivative)
 # field-coupled primitives (the slime/Physarum decomposition: 1 set + 1 scalar field)
 from . import scalar_field          # noqa: F401  registers the `grid` scalar field
@@ -24,7 +24,7 @@ from . import deposit               # noqa: F401  set -> field
 from . import diffuse               # noqa: F401  field -> field
 from . import decay                 # noqa: F401  field -> field
 from . import sense                 # noqa: F401  field -> set, sensor-fan steering (2D/3D, vector heading)
-from . import advance               # noqa: F401  set -> self-propelled move (2D/3D, vector heading)
+from . import glide                # noqa: F401  slime self-propulsion: glide along the heading (1st-order, overdamped)
 from . import bounce                # noqa: F401  set -> wall/obstacle reflection (2D/3D specular re-head)
 from . import video_field           # noqa: F401  registers the `video` field + playback
 from . import chemotaxis            # noqa: F401  field -> set gradient coupling (1st order)
@@ -48,8 +48,8 @@ from . import mpm_grid_update       # noqa: F401  mpm_grid -> mpm_grid    (grid 
 from . import g2p                   # noqa: F401  mpm_grid -> particle    (gather + advect)
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
-           "cohesion", "alignment", "separation", "drag",
-           "scalar_field", "deposit", "diffuse", "decay", "sense", "advance", "bounce",
+           "cohesion", "alignment", "separation", "cruise", "drag",
+           "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "video_field", "chemotaxis", "chemo_force", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_drag", "mpm_anchor", "material_map", "mpm",

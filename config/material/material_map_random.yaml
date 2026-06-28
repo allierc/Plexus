@@ -44,24 +44,31 @@ sets:
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
+  movie_activation:
+    description: A single greyish-white circular blob appears in the center of a black background. The
+      blob remains stationary and maintains its shape throughout the duration of the video. There is no
+      movement, expansion, or contraction of the object over time. The scene remains static with no changes
+      in lighting or environment.
+    objects: The scene contains a single circular object located in the center of the frame. The object
+      is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black
+      background. The object is isolated and does not interact with any other elements.
   movie_cell:
     description: The simulation shows a static distribution of blue particles within a square boundary.
       There is no observable movement or evolution of the particles across the provided keyframes. The
       spatial arrangement of the blue dots remains constant throughout the sequence. The overall density
       and pattern of the field do not change over time.
     objects: The scene contains a large number of small, blue particles. These particles are arranged
-      in a dense, stochastic distribution that fills a square area. The particles are disconnected from
-      one another, forming a granular texture. Each individual particle is uniform in size and color,
-      creating a consistent blue field.
+      in a dense, stochastic distribution that fills a square area. Each individual particle is roughly
+      the same size and appears as a distinct dot. The particles are not connected to one another, forming
+      a granular, cloud-like topology.
   movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed within a square
-      boundary. Over the course of the video, the particles appear to undergo a stochastic process, shifting
-      positions slightly while maintaining a relatively uniform density. There is no discernible global
-      motion or large-scale structural formation, suggesting a state of equilibrium or high-entropy diffusion.
-      The overall distribution remains consistent throughout the sequence, with no significant clustering
-      or depletion of particles.
+    description: The simulation shows a large collection of blue particles distributed uniformly across
+      a square white field. Over the course of the video, the particles appear to undergo a stochastic
+      process, shifting positions slightly while maintaining a constant overall density. There is no discernible
+      global motion or structural formation, suggesting a state of equilibrium or high-entropy diffusion.
+      The distribution remains homogeneous throughout the entire time sequence.
     objects: The scene contains thousands of small, individual blue dots representing discrete particles.
-      These particles are arranged in a random, non-ordered distribution across a two-dimensional plane.
+      These particles are arranged in a random, non-connected spatial distribution across the entire frame.
       Each particle is uniform in size and color, appearing as a single pixel or a small cluster of pixels.
-      The particles are not connected to one another, forming a disconnected set of points within a defined
-      square area.
+      The particles are bounded within a square region, creating a dense, speckled texture against the
+      white background.

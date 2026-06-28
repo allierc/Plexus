@@ -43,7 +43,7 @@ def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
     """Initial positions + headings for a self-propelled set (Lague's SpawnMode).
 
     Heading is a [n, 2] unit VECTOR (the universal orientation representation, the
-    same [N, D] convention as `_spawn3d`), not a scalar angle -- so `advance`,
+    same [N, D] convention as `_spawn3d`), not a scalar angle -- so `glide`,
     `bounce`, and `sense` are one dimension-generic operator each."""
     cx, cy = W / 2.0, 0.5
     if mode == "random":
@@ -255,7 +255,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl.render = render
         if head is not None:
             # heading is a unit VECTOR [., D] in every dimension (the universal
-            # orientation representation read by advance / bounce / sense).
+            # orientation representation read by glide / bounce / sense).
             hbuf = torch.zeros(buffer, head.shape[1], device=device)
             hbuf[:n] = head
             lvl.register_buffer("heading", hbuf)

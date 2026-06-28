@@ -1,5 +1,5 @@
 # vicsek_4t -- multi-species Vicsek active matter: 4 types with DIFFERENT per-type alignment
-# strengths (the boids special case of `alignment`, per_type: true) + shared self_propel.
+# strengths (the boids special case of `alignment`, per_type: true) + shared cruise.
 # Strong-alignment species flock; weak ones stay a disordered gas -- coloured by species.
 # Refs: Vicsek et al., PRL 75 (1995); The Well (Ohana et al., NeurIPS 2024).
 general: {name: vicsek_4t, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
@@ -16,8 +16,8 @@ fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.05}
   - {op: alignment,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
-  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.0015}
-schedule: [radius_graph, alignment, self_propel]
+  - {op: cruise,  at: particle, v0: 0.005, noise: 0.0015}
+schedule: [radius_graph, alignment, cruise]
 plotting: {background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}
 
 # --- auto: video descriptions (gemma-4-12B) ---

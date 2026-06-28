@@ -1,5 +1,5 @@
 # slime_eight -- ported from prototype/slime to the decomposed src operators:
-# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / advance.
+# deposit(set->field) / diffuse,decay(field->field) / sense(field->set) / bounce / glide.
 general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
 sets:
   cell:
@@ -22,8 +22,8 @@ operators:
 - {op: decay,   at: chemical, rate: 0.0025}
 - {op: sense,   at: cell, from: chemical, cross: -1.0}
 - {op: bounce,  at: cell}
-- {op: advance, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, advance]
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
 plotting:
   colors:
     a: [0.2, 0.95, 0.65]

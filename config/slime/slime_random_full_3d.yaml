@@ -1,5 +1,5 @@
 # 3D variant of slime_random_full -- N-D scalar field + vector-heading agents
-# (sense cone sensing / advance / bounce). Field res 80.
+# (sense cone sensing / glide / bounce). Field res 80.
 general:
   name: slime_random_full_3d
   seed: 0
@@ -46,7 +46,7 @@ operators:
   cross: -1.0
 - op: bounce
   at: cell
-- op: advance
+- op: glide
   at: cell
 schedule:
 - deposit
@@ -54,7 +54,7 @@ schedule:
 - decay
 - sense
 - bounce
-- advance
+- glide
 plotting:
   colors:
     a:

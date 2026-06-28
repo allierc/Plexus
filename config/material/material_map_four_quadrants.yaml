@@ -45,22 +45,32 @@ sets:
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
+  movie_activation:
+    description: A single greyish-white circular blob appears in the center of a black background. The
+      blob remains stationary and maintains its shape throughout the duration of the video. There is no
+      movement, expansion, or contraction of the object over time. The scene remains static with no changes
+      in lighting or environment.
+    objects: The scene contains a single circular object located in the center of the frame. The object
+      is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black
+      background. The object is isolated and does not interact with any other elements.
   movie_cell:
     description: The simulation begins with a uniform distribution of blue particles within a square boundary.
-      Over time, a subtle density gradient develops, with a slight concentration of particles appearing
-      toward the center. The overall distribution remains largely stochastic, maintaining a high degree
-      of entropy throughout the sequence. By the final frame, the spatial arrangement shows minor fluctuations
-      but retains its general homogeneous character.
-    objects: The scene contains a large collection of small, blue particles. These particles are arranged
-      in a dense, two-dimensional square formation. Each individual particle is roughly uniform in size
-      and shape. The particles are disconnected from one another, forming a granular, point-like texture.
+      Over time, a subtle inward migration occurs, causing the density of particles to increase toward
+      the center of the frame. This central concentration creates a darker, more saturated blue region
+      as the particles cluster together. By the final frame, the central core is noticeably denser than
+      the surrounding periphery.
+    objects: The scene contains a large collection of small, individual blue particles. These particles
+      are arranged in a roughly square formation with a porous, speckled texture. The color of the particles
+      is a consistent medium blue against a white background. The size of each individual particle is
+      very small and uniform, creating a granular appearance across the entire field.
   movie_mpm_particle:
-    description: The simulation begins with a uniform distribution of blue particles across a square domain.
-      Over time, the particles begin to cluster and aggregate toward the center of the space. This central
-      concentration becomes increasingly dense, forming a distinct core of high particle density. By the
-      final frame, the particles have formed a concentrated central mass with a sparser periphery.
-    objects: The scene contains a large number of small, individual blue particles. These particles are
-      initially arranged in a random, homogeneous distribution throughout the square area. As the simulation
-      progresses, the particles maintain their individual identities but change their spatial arrangement.
-      The final state shows a dense, interconnected cluster in the center surrounded by a more dispersed
-      cloud of points.
+    description: The simulation shows a large collection of blue particles distributed within a square
+      boundary. Over time, the particles exhibit a subtle inward migration toward the center of the frame.
+      The density of the particles increases slightly in the middle region as the simulation progresses.
+      The overall distribution remains largely stochastic, with no significant structural formation or
+      large-scale movement.
+    objects: The scene contains thousands of small, individual blue dots representing particles. These
+      particles are arranged in a roughly uniform, two-dimensional distribution across a white background.
+      Each particle is approximately the same size and maintains a consistent blue color throughout the
+      sequence. The particles are not connected to one another, forming a discrete point cloud rather
+      than a continuous field.
