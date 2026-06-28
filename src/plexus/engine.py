@@ -156,7 +156,7 @@ def _start_centers(start, n: int, rng, device: str) -> torch.Tensor:
 
 
 def _resolve_prediction(sim: Spec) -> dict:
-    """set -> integration order, read from the PREDICTION of the force-emitting
+    """set -> integration order (first or second), read from the PREDICTION of the force-emitting
     operators acting on it. All such operators on one set must agree (a set
     integrates as a single order); a conflict is a modelling error, raised here."""
     modes: dict[str, str] = {}
@@ -395,16 +395,16 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     fstride = max(1, (sim.n_frames + field_cap) // field_cap)
     rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
 
-    def _run_tok(tok, frame):
-        """Run every operator instance named `tok` once, enforcing the frame-0
-        integration-invariant guard on non-opted-out operators."""
+    def _run_token(token, tick):
+        """Run every operator instance named `token` (one schedule token) once,
+        enforcing the first-tick integration-invariant guard on non-opted-out operators."""
         for nm, ob, sel in inst:
-            if nm != tok:
+            if nm != token:
                 continue
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
-                    if frame == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
+                    if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
             for lvlname, d in ob(H, _mask(H, sel)).items():
-                H.add_delta(lvlname, d)
+                H.add_delta(lvlname, d)   # call operator
             if snap is not None:
                 for n, before in snap.items():
                     if not torch.equal(before, H.levels[n].state):
@@ -415,8 +415,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
 
     with torch.no_grad():
-        for frame in range(sim.n_frames + 1):
-            H.frame = frame                          # current tick (read by prescribed fields, e.g. playback)
+        for tick in range(sim.n_frames + 1):         # one tick = one pass of the schedule + integrate
+            H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
             for step in sim.schedule:                # operators accumulate per-set deltas
                 # `{substep: N, dt: <dt>, steps: [...]}` -- a micro-loop: run the inner
@@ -425,25 +425,25 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 if isinstance(step, dict) and "substep" in step:
                     H.sub_dt = float(step.get("dt", sim.dt))
                     for _ in range(int(step["substep"])):
-                        for tok in step["steps"]:
-                            _run_tok(tok, frame)
+                        for token in step["steps"]:
+                            _run_token(token, tick)
                     H.sub_dt = None
                     continue
-                for tok in (step if isinstance(step, list) else [step]):
-                    _run_tok(tok, frame)
+                for token in (step if isinstance(step, list) else [step]):
+                    _run_token(token, tick)
             _integrate(H, sim.dt)                    # integrate each set once, at end of tick
             for name, lvl in H.levels.items():
-                rec_sets[name][frame] = lvl.get("pos").cpu().numpy()
-                occ_sets[name][frame] = lvl.active.cpu().numpy()
-            if H.fields and (frame % fstride == 0 or frame == sim.n_frames):
+                rec_sets[name][tick] = lvl.get("pos").cpu().numpy()
+                occ_sets[name][tick] = lvl.active.cpu().numpy()
+            if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
                         continue
                     rec_fields[fn].append(fld.grid.detach().to("cpu", torch.float32).numpy().copy())
-            # generic per-frame hook: lets a diagnostic capture live H state (e.g. the MPM
+            # generic per-tick hook: lets a diagnostic capture live H state (e.g. the MPM
             # continuum buffers F/C/Jp + the transient grid) that the trajectory does not store.
             if on_frame is not None:
-                on_frame(H, frame)
+                on_frame(H, tick)
 
     out = {"sets": {name: {"pos": rec_sets[name], "occ": occ_sets[name],
                            "node_type": (H.level(name).node_type.cpu().numpy()
