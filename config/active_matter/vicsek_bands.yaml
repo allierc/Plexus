@@ -1,0 +1,31 @@
+# vicsek_bands -- Vicsek active matter (radius_graph + alignment + self_propel): near-critical, dense -> travelling bands
+# Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
+# The Well (Ohana et al., NeurIPS 2024). Coexistence.
+general: {name: vicsek_bands, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  particle:
+    n: 4000
+    vel_init: 0.005
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: alignment,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
+  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.0021, chirality: 0.0}
+schedule: [radius_graph, alignment, self_propel]
+plotting:
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a large collection of blue particles distributed across a black
+      background. Over time, the particles appear to move and shift, creating a dynamic, fluid-like motion.
+      The density of the particles fluctuates as they cluster and disperse in different regions of the
+      frame. The overall effect is a continuous, stochastic evolution of a granular system.
+    objects: The scene contains thousands of small, blue, rod-like particles. These objects are disconnected
+      from one another, moving independently as a granular gas or fluid. Each particle is uniform in color
+      and maintains a consistent, small size throughout the simulation. They are arranged in a non-uniform
+      distribution, with some areas showing higher concentrations than others.

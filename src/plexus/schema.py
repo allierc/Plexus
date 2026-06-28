@@ -189,7 +189,9 @@ def load(path: str) -> Spec:
     # --- warn about per-type properties no operator reads (typo guard) ------ #
     used_props = set()
     for o in raw["operators"]:
-        used_props |= set(getattr(registry.get_operator(o["op"]), "REQUIRES_TYPE_PROPS", []))
+        cls = registry.get_operator(o["op"])
+        used_props |= set(getattr(cls, "REQUIRES_TYPE_PROPS", []))
+        used_props |= set(getattr(cls, "OPTIONAL_TYPE_PROPS", []))   # read only in some modes (e.g. alignment per_type)
     # core/layers/block: consumed by an entity provision hook (e.g. mpm_particle), not by an operator
     _KNOWN_TYPE_KEYS = {"fraction", "core", "layers", "block"} | used_props
     for sname, s in raw["sets"].items():

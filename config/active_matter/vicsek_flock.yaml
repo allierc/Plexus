@@ -1,0 +1,32 @@
+# vicsek_flock -- Vicsek active matter (radius_graph + alignment + self_propel): low noise -> polar order (phi->1)
+# Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
+# The Well (Ohana et al., NeurIPS 2024). Ordered flock.
+general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  particle:
+    n: 2000
+    vel_init: 0.005
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: alignment,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
+  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
+schedule: [radius_graph, alignment, self_propel]
+plotting:
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a large collection of blue triangular particles distributed across
+      a black background. Over time, the particles appear to move and shift their positions, creating
+      a sense of fluid motion. The density of the particles fluctuates as they cluster and disperse in
+      different regions of the frame. The overall movement suggests a stochastic or turbulent flow of
+      agents within a bounded space.
+    objects: The scene contains thousands of small, blue triangular particles. These objects are disconnected
+      from one another, moving independently as individual agents. Each triangle is uniform in size and
+      maintains a consistent bright blue color throughout the sequence. The particles are arranged in
+      a non-uniform distribution, forming dense clusters and sparse regions.

@@ -1,0 +1,38 @@
+# vicsek_8t -- multi-species Vicsek active matter: 8 types with DIFFERENT per-type alignment
+# strengths (the boids special case of `alignment`, per_type: true) + shared self_propel.
+# Strong-alignment species flock; weak ones stay a disordered gas -- coloured by species.
+# Refs: Vicsek et al., PRL 75 (1995); The Well (Ohana et al., NeurIPS 2024).
+general: {name: vicsek_8t, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  particle:
+    n: 4000
+    vel_init: 0.005
+    types:
+      t0: {fraction: 0.125, alignment: 1.0}
+      t1: {fraction: 0.125, alignment: 0.871}
+      t2: {fraction: 0.125, alignment: 0.743}
+      t3: {fraction: 0.125, alignment: 0.614}
+      t4: {fraction: 0.125, alignment: 0.486}
+      t5: {fraction: 0.125, alignment: 0.357}
+      t6: {fraction: 0.125, alignment: 0.229}
+      t7: {fraction: 0.125, alignment: 0.1}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: alignment,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
+  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.0015}
+schedule: [radius_graph, alignment, self_propel]
+plotting: {background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a large collection of small, multi-colored particles distributed
+      across a black background. Over time, the particles exhibit a subtle, fluid-like motion, shifting
+      and swirling slightly in their positions. There is a noticeable increase in the density of particles
+      in the central and right-hand regions as the video progresses. The overall movement appears stochastic,
+      with no single dominant direction of flow for the entire group.
+    objects: The scene contains thousands of tiny, needle-like particles scattered throughout the frame.
+      These objects are arranged in a dense, disorganized cloud with varying local concentrations. The
+      particles feature a diverse color palette, including red, blue, green, yellow, and purple. Each
+      individual particle is very small and uniform in size, appearing as thin, elongated strokes.

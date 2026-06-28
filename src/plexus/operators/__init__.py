@@ -14,8 +14,9 @@ from . import broadcast             # noqa: F401  parent -> children lift (conta
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
 from . import Coulomb                # noqa: F401  registers Coulomb (lateral, 2nd-derivative, charged particles)
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
-from . import alignment             # noqa: F401  boids steering rule (lateral, 2nd-derivative)
+from . import alignment             # noqa: F401  Vicsek velocity alignment (nominal); boids = special case
 from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
+from . import self_propel           # noqa: F401  Vicsek self-propulsion (active matter; The Well)
 from . import drag                  # noqa: F401  registers drag (lateral, 2nd-derivative)
 # field-coupled primitives (the slime/Physarum decomposition: 1 set + 1 scalar field)
 from . import scalar_field          # noqa: F401  registers the `grid` scalar field

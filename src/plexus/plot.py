@@ -21,6 +21,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.collections import PolyCollection
 
 from plexus.schema import Spec
 from plexus.paths import graphs_data_path
@@ -89,6 +90,27 @@ def _point_size(style: dict, n: int) -> float:
     return 8.0 if n <= 4000 else (4.0 if n <= 12000 else 2.0)
 
 
+def _frame_dir(pos, i, periodic, world):
+    """Per-particle unit heading at frame i, from the local displacement
+    (pos[i] - pos[i-1]); minimum-image under periodic BC. Used to orient triangles."""
+    a = max(i - 1, 0); b = a + 1 if pos.shape[0] > 1 else 0
+    d = (pos[b] - pos[a]).astype(np.float32)
+    if periodic:
+        W = np.asarray(world, np.float32) if np.ndim(world) else np.array([world, 1.0], np.float32)
+        d = d - W * np.round(d / W)
+    n = np.linalg.norm(d, axis=1, keepdims=True)
+    return np.where(n > 1e-9, d / np.clip(n, 1e-9, None), np.array([1.0, 0.0], np.float32))
+
+
+def _triangle_verts(xy, u, L, wbase):
+    """Oriented triangle vertices [N,3,2]: tip a distance L along heading u, base wbase."""
+    perp = np.stack([-u[:, 1], u[:, 0]], axis=1)
+    tip = xy + L * u
+    base_l = xy - 0.5 * L * u + 0.5 * wbase * perp
+    base_r = xy - 0.5 * L * u - 0.5 * wbase * perp
+    return np.stack([tip, base_l, base_r], axis=1)
+
+
 def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     """Render a generated simulation's trajectory into its dataset directory.
     Returns the directory written to."""
@@ -154,6 +176,14 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         # cloud -- colour the particles by parent cell, then fuse them into one smooth
         # blob per cell -- instead of a bare centroid dot.
         container = _container_child(d, sname)
+        # marker style: dots (default) or thin-line colour triangles oriented along the
+        # heading (the local displacement) -- shows flow direction for flocks / active matter.
+        marker = str(style.get("marker", "dot"))
+        tri_L = float(style.get("triangle_size", 0.016))           # triangle length (world units)
+        tri_w = float(style.get("triangle_width", tri_L * 0.62))   # base width
+        tri_lw = float(style.get("triangle_lw", 0.6))              # outline thickness
+        periodic = (getattr(sim, "boundary", "wall") == "periodic")
+        wsize = getattr(sim, "world_size", [W, 1.0])
 
         def _draw(ax, i):
             if container is not None:
@@ -163,9 +193,15 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
                 ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off"); return
             live = occ[i]
             c = (color[live] if color is not None else "#1f77b4")
-            sz = (s[live] if np.ndim(s) else s)       # per-node size (e.g. ~|charge|) or scalar
             ax.set_facecolor(bg)
-            ax.scatter(pos[i, live, 0], pos[i, live, 1], s=sz, c=c, linewidths=0)
+            if marker == "triangle":
+                u = _frame_dir(pos, i, periodic, wsize)[live]
+                verts = _triangle_verts(pos[i, live], u, tri_L, tri_w)
+                ax.add_collection(PolyCollection(verts, facecolors="none", edgecolors=c,
+                                                 linewidths=tri_lw, closed=True))
+            else:
+                sz = (s[live] if np.ndim(s) else s)   # per-node size (e.g. ~|charge|) or scalar
+                ax.scatter(pos[i, live, 0], pos[i, live, 1], s=sz, c=c, linewidths=0)
             _draw_obstacles(ax, obstacles)
             ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
 
@@ -195,7 +231,8 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
                               bg=bg, obstacles=obstacles)
             else:
                 _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"),
-                       bg=bg, obstacles=obstacles)
+                       bg=bg, obstacles=obstacles, marker=marker, periodic=periodic, world=wsize,
+                       tri=(tri_L, tri_w, tri_lw))
 
     # --- continuum fields: composite the channels and draw the heatmap ------- #
     gamma = float(style.get("gamma", 0.7))
@@ -702,28 +739,41 @@ def _merged_movie(cpos, par, ncell, W, cmap, T, out_base, max_frames: int = 120,
 
 
 def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white",
-           obstacles=None) -> None:
-    """Render a movie of a set's trajectory. Writes mp4 via ffmpeg when available,
-    else falls back to gif. `out_base` is the path without extension."""
+           obstacles=None, marker="dot", periodic=False, world=None, tri=(0.016, 0.01, 0.6)) -> None:
+    """Render a movie of a set's trajectory (mp4 via ffmpeg, else gif). `marker`: 'dot'
+    (scatter) or 'triangle' (thin-line colour triangles oriented along the heading)."""
     from matplotlib.animation import FuncAnimation
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
-    # render large (8in) at high dpi so the dense dot cloud stays crisp through H.264
-    # -- the old 5in/150dpi (750px) softened the small antialiased points into a blur.
+    # render large (8in) at high dpi so the dense cloud stays crisp through H.264.
     fig, ax = plt.subplots(figsize=(8 * W, 8)); ax.set_xlim(0, W); ax.set_ylim(0, 1)
     ax.set_aspect("equal"); ax.axis("off"); ax.set_facecolor(bg); fig.patch.set_facecolor(bg)
     fig.tight_layout(pad=0)
-    sm = (s * 1.6 if np.ndim(s) else s * 1.6)              # crisper dots at the larger canvas
-    sc = ax.scatter(pos[0, :, 0], pos[0, :, 1], s=sm, linewidths=0,
-                    c=(color if color is not None else "#1f77b4"))
-    _draw_obstacles(ax, obstacles)
+    if marker == "triangle":
+        tri_L, tri_w, tri_lw = tri
+        ec0 = (color[occ[0]] if color is not None else "#1f77b4")
+        pc = PolyCollection(_triangle_verts(pos[0, occ[0]], _frame_dir(pos, 0, periodic, world)[occ[0]],
+                            tri_L, tri_w), facecolors="none", edgecolors=ec0, linewidths=tri_lw, closed=True)
+        ax.add_collection(pc); _draw_obstacles(ax, obstacles)
 
-    def upd(i):
-        live = occ[i]
-        sc.set_offsets(pos[i, live])
-        if color is not None:
-            sc.set_color(color[live])
-        return sc,
+        def upd(i):
+            live = occ[i]
+            pc.set_verts(_triangle_verts(pos[i, live], _frame_dir(pos, i, periodic, world)[live], tri_L, tri_w))
+            if color is not None:
+                pc.set_edgecolor(color[live])
+            return pc,
+    else:
+        sm = (s * 1.6 if np.ndim(s) else s * 1.6)         # crisper dots at the larger canvas
+        sc = ax.scatter(pos[0, :, 0], pos[0, :, 1], s=sm, linewidths=0,
+                        c=(color if color is not None else "#1f77b4"))
+        _draw_obstacles(ax, obstacles)
+
+        def upd(i):
+            live = occ[i]
+            sc.set_offsets(pos[i, live])
+            if color is not None:
+                sc.set_color(color[live])
+            return sc,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
     out = _save_anim(anim, out_base, bg, dpi=200)
