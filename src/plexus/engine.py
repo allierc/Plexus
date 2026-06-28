@@ -333,15 +333,38 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 # --------------------------------------------------------------------------- #
 #  selectors: resolve to a live boolean mask, every tick
 # --------------------------------------------------------------------------- #
-def _mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
+def _coerce(s: str):
+    """Parse a selector value to int/float when numeric (so `done=0` compares to 0,
+    not the string '0'), else keep the string (for `type=a`)."""
+    for cast in (int, float):
+        try:
+            return cast(s)
+        except ValueError:
+            pass
+    return s
+
+
+def _selector_mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
+    """The live boolean mask an operator acts on, from its `at:` selector. Recomputed
+    each tick, so occupancy and state-dependent selectors track the run:
+
+      at: <field>      -> None              (field-internal op: no per-node mask)
+      at: set          -> lvl.active        (all live nodes, occ > 0)
+      at: set[type=a]  -> live & node_type == a
+      at: set[attr=v]  -> live & lvl.attr == v   (any per-node buffer, e.g. cell[done=0])
+    """
     if sel.set not in H.levels:                        # a field-internal operator (at: <field>)
         return None                                    # has no per-node mask
     lvl = H.level(sel.set)
     if sel.attr is None:
         return lvl.active                              # all live nodes
-    if sel.attr == "type":
+    if sel.attr == "type":                             # type name -> node_type index
         return lvl.active & (lvl.node_type == lvl.type_names.index(sel.val))
-    raise ValueError(f"unknown selector attribute {sel.attr!r}")
+    # general set[attr=val]: match a per-node buffer (e.g. cell[done=0] -> lvl.done == 0)
+    if not hasattr(lvl, sel.attr):
+        raise ValueError(f"selector {sel.set!r}[{sel.attr}={sel.val}] has no per-node "
+                         f"buffer {sel.attr!r} on the set (set it via an operator first).")
+    return lvl.active & (getattr(lvl, sel.attr) == _coerce(sel.val))
 
 
 # --------------------------------------------------------------------------- #
@@ -403,7 +426,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 continue
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
-            for lvlname, d in ob(H, _mask(H, sel)).items():
+            for lvlname, d in ob(H, _selector_mask(H, sel)).items():
                 H.add_delta(lvlname, d)   # call operator
             if snap is not None:
                 for n, before in snap.items():
