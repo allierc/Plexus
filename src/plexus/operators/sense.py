@@ -78,8 +78,10 @@ def _read(fld, centers, weights, ssz):
     ssz = ssz if torch.is_tensor(ssz) else centers.new_full((N,), float(ssz))
     ks = int(ssz.max().item())
     shape = fld.shape
+    per = getattr(fld, "periodic", False)                  # torus field: wrap the window across the seam
     for off in itertools.product(range(-ks, ks + 1), repeat=D):
-        idx = tuple((gidx[k] + off[k]).clamp(0, shape[k] - 1) for k in range(D))
+        idx = tuple((torch.remainder(gidx[k] + off[k], shape[k]) if per
+                     else (gidx[k] + off[k]).clamp(0, shape[k] - 1)) for k in range(D))
         inwin = torch.ones(N, dtype=torch.bool, device=centers.device)
         for o in off:
             inwin = inwin & (abs(o) <= ssz)
@@ -95,13 +97,14 @@ class Sense(Exchange):
     REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]
     MECHANISM_TAGS = ["trail_following", "stigmergy", "physarum_sensing"]
     MORPHOLOGY_PRIOR = ["filaments", "transport_network"]
-    PARAM_ROLES = {"cross": "inter_species_coupling_sign"}
+    PARAM_ROLES = {"cross": "inter_species_coupling_sign", "noise": "steer_noise"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("from")
         self.cross = float(params.get("cross", -1.0))      # sense weight on OTHER species' channels
-        self.at = params.get("_at", "cell")
+        self.noise = float(params.get("noise", 0.0))       # steer-noise knob in [0,1]: 0 = deterministic
+        self.at = params.get("_at", "cell")                # turn (theta = turn_speed); 1 = uniform[0, turn_speed]
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -132,7 +135,14 @@ class Sense(Exchange):
         target = stacked[torch.arange(N, device=dev), best_idx]        # [N, D]
         straight = centre >= best_val                      # centre wins -> keep heading
 
-        theta = (torch.rand(N, generator=H.rng, device=dev) * ts)[:, None]            # turn angle <= turn_speed
+        # turn magnitude toward the winning sensor. `noise` knob (default 0) blends a
+        # deterministic full turn (frac=1 -> theta=turn_speed) with the stochastic
+        # Physarum turn (frac ~ uniform[0,1]); noise=1 reproduces the old `rand*ts`.
+        if self.noise > 0.0:
+            frac = (1.0 - self.noise) + self.noise * torch.rand(N, generator=H.rng, device=dev)
+        else:
+            frac = torch.ones(N, device=dev)
+        theta = (ts * frac)[:, None]                                                   # turn angle <= turn_speed
         t_perp = target - (target * h).sum(1, keepdim=True) * h         # toward target, perp to h
         t_perp = t_perp / t_perp.norm(dim=1, keepdim=True).clamp(min=1e-9)
         turned = torch.cos(theta) * h + torch.sin(theta) * t_perp      # rotate h by theta toward target

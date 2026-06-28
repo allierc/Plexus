@@ -277,8 +277,90 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         if movie and not static:
             _field_movie(grid, colors, W, os.path.join(data_dir, f"movie_{fname}"), gamma, fbg)
 
+    # --- overlay: triangles streaming on top of their coupled trail field -------- #
+    # `plotting.overlay: true` adds one combined movie per coupled (field, set) pair:
+    # the slime trail composited as the background with the oriented set markers drawn
+    # over it -- so "the triangle of a given type flowing along the slime of a given
+    # type" reads in a single view (vicsek marker + Physarum field).
+    if movie and bool(style.get("overlay", False)):
+        _overlay_outputs(sim, d, data_dir, style, W, gamma, fbg)
+
     print(f"[plot] figures -> {data_dir}", flush=True)
     return data_dir
+
+
+def _overlay_outputs(sim, d, data_dir, style, W, gamma, fbg) -> None:
+    """For each 2D field coupled to a set, render `movie_overlay_<field>`: the field
+    heatmap (imshow) with the coupled set's markers drawn on top. The field is recorded
+    at a coarser stride than the set, so each set frame maps to the proportional field
+    frame. Honours the set's `marker` (triangle/dot) and per-type palette."""
+    marker = str(style.get("marker", "dot"))
+    tL = float(style.get("triangle_size", 0.016))
+    tri = (tL, float(style.get("triangle_width", tL * 0.62)), float(style.get("triangle_lw", 0.6)))
+    periodic = (getattr(sim, "boundary", "wall") == "periodic")
+    wsize = getattr(sim, "world_size", [W, 1.0])
+    for fname in _fields_in(d):
+        grid = d[f"{fname}__grid"]
+        if grid.ndim != 4:                            # 2D fields only
+            continue
+        sname = (sim.fields or {}).get(fname, {}).get("couples_to")
+        if not sname or f"{sname}__pos" not in d.files or d[f"{sname}__pos"].shape[-1] != 2:
+            continue
+        pos, occ = d[f"{sname}__pos"], d[f"{sname}__occ"]
+        pal, _ = _typed_palette(sim, sname, style)
+        cby = _render_meta(sname).get("color_by")
+        nt = d[f"{sname}__{cby}"] if (cby and f"{sname}__{cby}" in d.files) else None
+        color = (pal[nt % len(pal)] if (pal is not None and nt is not None) else None)
+        _overlay_movie(pos, occ, color, grid, d[f"{fname}__colors"], W, gamma, fbg,
+                       os.path.join(data_dir, f"movie_overlay_{fname}"),
+                       marker=marker, tri=tri, periodic=periodic, world=wsize)
+
+
+def _overlay_movie(pos, occ, color, grid, fcolors, W, gamma, fbg, out_base,
+                   marker="triangle", tri=(0.016, 0.01, 0.6), periodic=False, world=None,
+                   max_frames: int = 150) -> None:
+    """Trail field (imshow) + set markers (triangles/dots) over time, in one movie."""
+    from matplotlib.animation import FuncAnimation
+    T, Tf = pos.shape[0], grid.shape[0]
+    stride = max(1, T // max_frames)
+    frames = list(range(0, T, stride))
+    fidx = lambda i: min(int(round(i / max(T - 1, 1) * (Tf - 1))), Tf - 1)
+    fig, ax = plt.subplots(figsize=(8 * W, 8)); fig.patch.set_facecolor(fbg); ax.set_facecolor(fbg)
+    ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
+    fig.tight_layout(pad=0)
+    im = ax.imshow(_composite(grid[fidx(0)], fcolors, gamma), origin="lower",
+                   extent=[0, W, 0, 1], interpolation="bilinear", zorder=0)
+    tri_L, tri_w, tri_lw = tri
+    if marker == "triangle":
+        ec0 = (color[occ[0]] if color is not None else "#ffffff")
+        pc = PolyCollection(_triangle_verts(pos[0, occ[0]], _frame_dir(pos, 0, periodic, world)[occ[0]],
+                            tri_L, tri_w), facecolors="none", edgecolors=ec0, linewidths=tri_lw,
+                            closed=True, zorder=1)
+        ax.add_collection(pc)
+
+        def upd(i):
+            live = occ[i]
+            im.set_data(_composite(grid[fidx(i)], fcolors, gamma))
+            pc.set_verts(_triangle_verts(pos[i, live], _frame_dir(pos, i, periodic, world)[live], tri_L, tri_w))
+            if color is not None:
+                pc.set_edgecolor(color[live])
+            return im, pc
+    else:
+        sc = ax.scatter(pos[0, occ[0], 0], pos[0, occ[0], 1], s=4.0, linewidths=0,
+                        c=(color[occ[0]] if color is not None else "#ffffff"), zorder=1)
+
+        def upd(i):
+            live = occ[i]
+            im.set_data(_composite(grid[fidx(i)], fcolors, gamma))
+            sc.set_offsets(pos[i, live])
+            if color is not None:
+                sc.set_color(color[live])
+            return im, sc
+
+    anim = FuncAnimation(fig, upd, frames=frames, interval=50)
+    out = _save_anim(anim, out_base, fbg, dpi=200)
+    plt.close(fig)
+    print(f"[plot] overlay movie -> {os.path.basename(out)}", flush=True)
 
 
 def _ffmpeg() -> str | None:

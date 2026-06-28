@@ -255,3 +255,47 @@ All files updated. Here's the summary:
 **Key causal comparisons:** SIREN fibre with vs without stiffness isolates the interaction; ω=5 vs ω=3 tests whether coarser fibre deviations are more coherent.
 
 Note: The `run_decompose_b6.sh` script is ready for residual decomposition when you approve it.
+
+
+================================================================================
+## DESIGN 8 -- 2026-06-28 09:28:14
+================================================================================
+All files updated. Here's the summary:
+
+---
+
+## Batch 7 Results — SIREN fibre CLOSED, amplitude flat
+
+### Ranking (by LS)
+| Rank | Slot | Config | LS | LS_SD |
+|------|------|--------|-----|-------|
+| 1 | s5 | stiff300_ctrl (control) | **+0.151** | 0.178 |
+| 2 | s3 | amp10_stiff300 | **+0.150** | 0.177 |
+| 3 | s4 | fibreonly_ctrl | +0.118 | 0.216 |
+| 4 | s2 | siren_fibre+stiff300 | +0.011 | 0.432 |
+| 5 | s1 | siren_fibre_nostiff ω=3 | -0.047 | 0.478 |
+| 6 | s0 | siren_fibre_nostiff ω=5 | **-0.222** | 0.547 |
+
+### Biggest SURPRISE
+**SIREN fibre WITHOUT stiffness is far WORSE (LS=-0.222), not better.** The B7 hypothesis — that stiffness interaction caused catastrophe redistribution — is **FALSIFIED**. SIREN fibre is intrinsically destabilizing. Stiffness actually *stabilizes* the fibre SIREN optimization landscape.
+
+### Key findings
+1. **SIREN fibre dθ is CLOSED** across all configurations (with/without stiffness, ω=3/5, dev=0.3)
+2. **amp=10 ≈ amp=12** (LS=0.150 vs 0.151) — amplitude flat in [10,12]
+3. **Controls reproduce** — stiff300: 0.151, fibre-only: 0.118
+4. **Per-node ceiling = +1.00** (perfect match at one node in s3/s5)
+
+### Batch 8 Design — Break the LS≈0.15 plateau
+**Hypothesis:** All spatial-field levers are exhausted. Progress requires probing untested physical parameters (drag) or optimization strategies (deeper training, w_amp ablation).
+
+| Slot | Role | ONE variable changed | Rationale |
+|------|------|---------------------|-----------|
+| b8_drag20 | EXPLOIT | drag_k=20 (vs 30) | Less damping → more dynamic response → different loop shape |
+| b8_deep3600 | EXPLOIT | n_iter=3600 (vs 2400) | Deeper training at best config [80,300] |
+| b8_wamp0 | EXPLOIT | w_amp=0 (vs 0.3) | Ablate motion-energy penalty — may conflict with LS |
+| b8_drag50 | EXPLORE | drag_k=50 (vs 30) | More damping → different morphology family |
+| b8_stiff400 | EXPLORE | stiff_hi=400 (vs 300) | Wider stiffness range → stronger spatial contrast |
+| b8_ctrl | CONTROL | (none) | Reproduce B7 best |
+
+**Best optimizer slot:** s5 (LS=0.151, control)
+**Best scientific slot:** s0 (LS=-0.222) — falsifies the stiffness-interaction hypothesis; SIREN fibre is intrinsically destabilizing

@@ -47,9 +47,11 @@ def _random_unit(n, D, rng, device):
 class Bounce(Lateral):
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection
     REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
+    PARAM_ROLES = {"noise": "obstacle_reheading_randomness"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
+        self.noise = float(params.get("noise", 0.0))    # obstacle re-head: 0 = reverse (deterministic), 1 = isotropic
         self.at = params.get("_at", "cell")
 
     def forward(self, H, mask=None):
@@ -70,12 +72,16 @@ class Bounce(Lateral):
         out = (nxt < 0) | (nxt > box[None, :])              # which axes would exit the box
         new_h = torch.where(out, -h, h)                     # specular reflect the exiting components
 
-        # obstacles (2D maze rects/discs): re-head isotropically where the step would
-        # enter one -- they carry no single axis-aligned normal to reflect against.
+        # obstacles (2D maze rects/discs): re-head where the step would enter one --
+        # they carry no single axis-aligned normal to reflect against. The `noise` knob
+        # (default 0) sets how random that re-heading is: 0 reverses the heading (-h,
+        # deterministic), 1 picks an isotropic random direction (the old behaviour).
         obs = getattr(H, "obstacles", [])
         if obs and pos.shape[1] == 2:
             hit = _in_obstacles(nxt[:, 0], nxt[:, 1], obs)
-            new_h = torch.where(hit[:, None], _random_unit(N, 2, H.rng, dev), new_h)
+            rehead = -h if self.noise <= 0.0 else \
+                (1.0 - self.noise) * (-h) + self.noise * _random_unit(N, 2, H.rng, dev)
+            new_h = torch.where(hit[:, None], rehead, new_h)
 
         new_h = new_h / new_h.norm(dim=1, keepdim=True).clamp(min=1e-9)
         lvl.heading = torch.where(keep, new_h, h)

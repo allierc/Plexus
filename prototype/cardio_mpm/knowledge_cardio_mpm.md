@@ -20,10 +20,10 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 ## Current best result
 
 - **Under LoopScore (corrected metric, floor=0.02):** **LS ≈ 0.14–0.15** (reproducible across
-  5 runs of amp=12, stiff + floor, ω=5, gain0=0.5, 2400it: LS=0.159, 0.149, 0.149, 0.144, 0.140).
-  Peak single-node: **+0.76** (with SIREN fibre, B6). ALL runs have exactly 1 catastrophic node,
+  7+ runs of amp=10-12, stiff [80,300], ω=5, gain0=0.5, 2400it: LS=0.159, 0.151, 0.150, 0.149×2,
+  0.144, 0.140). Peak single-node: **+1.00** (B7 s3/s5). ALL runs have exactly 1 catastrophic node,
   position depends on fibre init basin.
-- **Best floored config:** stiff [80,300], LS=0.149, SD=0.178 (B5). stiff [80,200]: LS≈0.140 (B6).
+- **Best floored config:** stiff [80,300], LS=0.151, SD=0.178 (B7 control). amp=10 ≈ amp=12.
 - **Fibre-only (no stiffness):** LS ≈ 0.118 at amp=12 (B5). Stiffness adds ~0.02 net.
 - **Under R² (diagnostic only):** best R² = −0.912 (gain0=0.3, fibre+gain+dur, 2400it).
 
@@ -41,10 +41,11 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
    But **raising dur_hi is NOT beneficial**: dur_hi=40 HURTS (alone: LS 0.117 < 0.136; with stiffness:
    catastrophic LS=-0.070). The optimizer maximizes total impulse (gradient signal), but more pulse energy
    does not improve loop morphology. `[mechanism@LoopScore, 2400it, FALSIFIED@binding-constraint]`.
-4. **Amplitude 12 is the CONFIRMED optimum.** amp=12 reproduces at LS≈0.15 (2 runs: 0.159, 0.149).
-   amp=14 is CATASTROPHIC (3 outlier nodes, LS=-0.247). The amp=12→14 transition is sharp — amp=12
-   is the upper stability boundary with wide stiffness. Keep amplitude ≤12.
-   `[mechanism@LoopScore, 2400it, confirmed@2-runs]`.
+4. **Amplitude is FLAT in [10, 12] and CATASTROPHIC at 14.** amp=10 ≈ amp=12 (LS=0.150 vs 0.151,
+   identical per-node patterns, B7). amp=14 is catastrophic (LS=-0.247, B4). The model compensates
+   for amplitude changes via gain/stiffness adjustment — amplitude is not a morphology lever within
+   [10,12]. Keep amplitude in [10,12].
+   `[mechanism@LoopScore, 2400it, confirmed@B4+B7]`.
 5. **Fibre co-learning is LOAD-BEARING under LoopScore** — freezing fibre drops LS from 0.119→0.088
    (Δ=−0.031). This OVERTURNS the R²-era finding (fibre hurt at depth under R²). The parametric fibre
    provides orientation structure that the LS per-node gradient rewards. `[mechanism@LoopScore, 2400it]`.
@@ -60,13 +61,14 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
    uniform stiffness (LS=0.117) but catastrophic with spatial stiffness (LS=-0.070). Soft regions
    amplify the extra pulse energy into runaway overshoot. Keep dur_hi=30 when stiffness is active.
    `[mechanism@LoopScore, 2400it]`.
-8. **SIREN fibre dθ REDISTRIBUTES catastrophes when jointly optimized with SIREN stiffness.** Tight-bound
-   SIREN fibre (dev=0.15–0.5 rad) CAN fix specific catastrophic nodes (per-node ceiling jumps from +0.31
-   to +0.76) but CREATES NEW catastrophes at other nodes. Wider dev → more catastrophes (monotonic).
-   The per-node ceiling increase proves the model COULD match morphology much better — the bottleneck is
-   the JOINT stiffness×fibre optimization landscape, not the physics representation. Whether SIREN fibre
-   works WITHOUT stiffness is UNTESTED (B7 experiment).
-   `[mechanism+optimization@LoopScore, 2400it, joint stiff+fibre SIREN, B6]`.
+8. **SIREN fibre dθ is INTRINSICALLY DESTABILIZING — CLOSED across all configurations.** Without
+   stiffness: CATASTROPHIC (ω=5: LS=-0.222; ω=3: LS=-0.047, B7). With stiffness: catastrophe
+   redistribution (B6: LS≈0.098–0.140; B7: LS=0.011). Stiffness actually STABILIZES the fibre SIREN
+   (opposite of the B6 hypothesis). The per-pixel SIREN fibre has too many degrees of freedom for the
+   optimizer to solve globally — it improves some nodes (ceiling +0.76) while destroying others.
+   The per-node ceiling proves the model CAN match morphology; the bottleneck is the OPTIMIZATION
+   LANDSCAPE of per-pixel direction fields. `CLOSED for SIREN fibre dθ at current architecture.`
+   `[mechanism+optimization@LoopScore, 2400it, dev=0.3, ω=3-5, ±stiffness, B6+B7]`.
 9. **Gain is FLAT in [0.4, 0.5] with stiffness.** gain0=0.4 ≈ gain0=0.5 (LS=0.139 vs 0.140). Combined
    with gain0=0.3 catastrophic (B3) and gain0=0.7 catastrophic (B4) with wide stiffness, the viable gain
    window is 0.4–0.5. `[mechanism@LoopScore, 2400it, stiff [80,200], B6]`.
@@ -120,11 +122,10 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 - "Spatial stiffness lifts the fit" — **FALSIFIED@R²; OVERTURNED@LoopScore.** SIREN stiffness converged to
   uniform under R² (no gradient signal) but is ACTIVE under LoopScore (binary pattern, LS +0.014). Moved
   to Established mechanisms #6.
-- "Per-pixel fibre direction dθ (UNet or SIREN) helps" — **FALSIFIED@R², @LS at fibre_dev≥π/2, AND
-  @LS with tight bounds (0.15–0.5 rad) WHEN JOINTLY OPTIMIZED WITH SIREN STIFFNESS** (B6). Tight-bound
-  SIREN fibre fixes individual nodes (ceiling +0.76) but REDISTRIBUTES catastrophes to other nodes.
-  `CLOSED for joint stiffness+fibre SIREN optimization.` **RE-OPENED for SIREN fibre WITHOUT stiffness**
-  — the interaction may be the culprit, not the mechanism. `B7 test`.
+- "Per-pixel fibre direction dθ (UNet or SIREN) helps" — **FALSIFIED across ALL configurations.**
+  With stiffness: catastrophe redistribution (B6). Without stiffness: WORSE — LS=-0.222 (ω=5) or
+  -0.047 (ω=3), B7. Stiffness STABILIZES fibre SIREN (opposite of hypothesis). The SIREN dθ
+  optimization landscape is intrinsically too rough at per-pixel resolution. `CLOSED. B6+B7`.
 - "A travelling-wave phase delay τ(x,y) bends the loops" — **FALSIFIED** (τ stayed tiny).
 - "Active stress is catastrophic / force ≫ stress" — **SUPERSEDED** (NaN artifact).
 - "Zero-motion collapse needs `w_amp` to defend the fit" — **FALSIFIED** (no collapse at amp10–25).
@@ -156,65 +157,67 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
   stiffness convergence. `B6`.
 - "gain0=0.4 differs from gain0=0.5" — **FALSIFIED@LoopScore, 2400it, stiff [80,200].**
   LS=0.139 vs 0.140 (identical). Gain is flat in [0.4,0.5]. `B6`.
+- "SIREN fibre without stiffness avoids catastrophe redistribution" — **FALSIFIED@LoopScore, 2400it.**
+  Without stiffness: LS=-0.222 (ω=5), -0.047 (ω=3). Far WORSE than with stiffness. Stiffness
+  STABILIZES fibre SIREN. `B7`.
+- "amp=10 differs from amp=12" — **FALSIFIED@LoopScore, 2400it, stiff [80,300].** LS=0.150 vs 0.151,
+  identical per-node patterns. Amplitude is flat in [10,12]. `B7`.
 
 ## Open questions
 
-- **Does SIREN fibre dθ work WITHOUT SIREN stiffness (uniform stiffness)?** B6 showed SIREN fibre
-  REDISTRIBUTES catastrophes when jointly optimized with SIREN stiffness. The interaction — not
-  the fibre dθ mechanism itself — may be the cause. If SIREN fibre with uniform stiffness exceeds
-  the fibre-only ceiling (LS≈0.118) without catastrophes, the mechanism works in isolation.
-  **#1 priority.** `B7 test`.
-- **Does coarser SIREN fibre (ω=3 instead of ω=5) produce more coherent directional corrections?**
-  The B6 dθ maps were noisy/speckled at ω=5. With uniform stiffness, ω only affects the fibre
-  SIREN — testing ω=3 may produce coarser, more effective directional corrections. `B7 test`.
 - **What is the dominant BOTTLENECK dimension across nodes?** Need residual decomposition to
-  quantify. SIZE and CHIRALITY are the top-sensitivity dimensions (engineering).
-- **Can amp<12 help?** amp=12 is optimal, amp=14 catastrophic. amp=10 is untested at [80,300].
+  quantify. SIZE and CHIRALITY are the top-sensitivity dimensions (engineering). **#1 priority.**
+- **Does drag_k affect loop morphology?** drag_k=30 is COMPLETELY UNTESTED. It controls the
+  damping timescale (overdamped drag). Higher drag → slower response → potentially different loop
+  shape/chirality. Lower drag → more dynamic/inertial → larger loops. `B8 test`.
+- **Does w_amp=0 improve LS?** w_amp=0.3 is default; 0.6 failed (B4). With LoopScore as objective,
+  the anti-collapse penalty may conflict with morphology optimization. Ablating it may free the
+  optimizer. `B8 test`.
+- **Can deeper optimization (3600it) at the best config [80,300] break the LS≈0.15 plateau?**
+  Previously tested at a weaker config. `B8 test`.
+- **Can a coarser parametric fibre (wl=35) with stiffness improve over wl=28.8?** wl=40 was
+  catastrophic but wl=35 is untested. The fibre+stiffness interaction may benefit from slightly
+  coarser direction. `B8 test`.
 - Multiscale LoopScore (`K∈{1,2,4,8}` weighted) — future option.
 
 ---
 
 ## Previous theme summaries (last 4, oldest→newest; MUST precede ## Current theme)
 
-- **Batch 3 (2026-06-27):** CONTROL FAILED — stiffness stochasticity. 1 vs 3 outlier nodes = LS sign.
-  ω=7 catastrophic. amp=12 marginal best (0.159). Single-run stiffness comparisons unreliable.
 - **Batch 4 (2026-06-27):** Stiffness floor (80, 100) fixes UNIFORMITY (SD 0.254→0.175) but NOT the
-  persistent outlier at node (2,3). Control reproduced (LS=0.149). amp=14 and gain0=0.7 catastrophic.
-  w_amp=0.6 unhelpful. The outlier is STRUCTURAL, not stiffness-related. Redirects to fibre direction.
+  persistent outlier. Control reproduced (LS=0.149). amp=14 and gain0=0.7 catastrophic.
 - **Batch 5 (2026-06-27):** Fibre init sensitivity MASSIVE (ΔLS=0.093 from angle change). Catastrophic
-  node is NOT position-fixed — moves with fibre basin. stiff_hi=300 matches best (LS=0.149). Fibre-only
-  ceiling at amp=12 confirmed: LS=0.118. Parametric fibre lacks local expressiveness. Redirects to
-  tight-bound SIREN fibre as the next mechanism.
-- **Batch 6 (2026-06-28):** SIREN fibre with tight bounds (0.15–0.5 rad) REDISTRIBUTES catastrophes
-  rather than eliminating them — fixes specific nodes (ceiling +0.76!) but creates new catastrophes at
-  other nodes. Joint stiffness×fibre SIREN optimization is the culprit. gain0=0.4≈0.5 (flat).
-  fibre_amp=0.8 destabilizes. CLOSED for joint SIREN optimization. Redirects to fibre SIREN isolation.
+  node is NOT position-fixed — moves with fibre basin. stiff_hi=300 best (LS=0.149). Fibre-only
+  ceiling: LS=0.118. Parametric fibre lacks local expressiveness.
+- **Batch 6 (2026-06-28):** SIREN fibre with tight bounds REDISTRIBUTES catastrophes — fixes specific
+  nodes (ceiling +0.76!) but creates new catastrophes. gain0=0.4≈0.5 (flat). CLOSED for joint SIREN.
+- **Batch 7 (2026-06-28):** SIREN fibre WITHOUT stiffness is WORSE (LS=-0.222), not better — FALSIFIES
+  the stiffness-interaction hypothesis. SIREN fibre is intrinsically destabilizing. Stiffness
+  STABILIZES. amp=10 ≈ amp=12. SIREN fibre CLOSED across ALL configurations. Controls reproduce.
 
 ---
 
 ## Current theme
 ### Current hypothesis
-"The catastrophe redistribution observed in B6 is caused by the SIREN fibre × SIREN stiffness
-INTERACTION — not by the SIREN fibre mechanism itself. SIREN fibre with UNIFORM stiffness (no
-stiffness SIREN) should provide local directional corrections without the destabilizing interaction,
-potentially exceeding the fibre-only ceiling (LS≈0.118). A coarser fibre SIREN (ω=3) may produce
-more coherent corrections than the noisy ω=5 patterns seen in B6."
+"The parametric model has plateaued at LS≈0.15 — all spatial-field levers (stiffness, fibre direction)
+are exhausted at the current SIREN architecture. Progress requires probing UNTESTED physical parameters
+(drag_k, w_amp) that affect the DYNAMIC RESPONSE (loop shape via damping timescale), or optimization
+strategies (deeper training, lower lr) that improve the global solution. Drag_k controls the overdamped
+timescale — different drag may shift the loop morphology family (chirality/size balance) toward the
+target."
 ### Iterations this theme
-- Batch 1–4: stiffness is active (ω=5), floor helps uniformity, outlier persists regardless of
-  stiffness params. Fibre is load-bearing. Redirected to fibre direction.
-- Batch 5: fibre init sensitivity confirmed. Catastrophic node MOVES with fibre basin (not
-  position-fixed). Fibre-only ceiling = LS≈0.118 at amp=12.
-- Batch 6: SIREN fibre (tight bounds 0.15–0.5 rad) + SIREN stiffness → catastrophe REDISTRIBUTION.
-  Per-node ceiling jumps to +0.76. The mechanism works locally but joint optimization destabilizes.
-  CLOSED for joint SIREN optimization. RE-OPENED for fibre SIREN without stiffness.
-- Batch 7: test SIREN fibre with UNIFORM stiffness (isolate the interaction). Compare ω=5 vs ω=3
-  for fibre granularity. Also probe amp=10 and establish stiff [80,300] as new parent.
+- Batch 1–7: stiffness [80,300] at ω=5 is the stable spatial lever (+0.03 LS over fibre-only).
+  SIREN fibre dθ CLOSED (intrinsically destabilizing). amp flat in [10,12]. gain flat in [0.4,0.5].
+  Parametric fibre ceiling LS≈0.118. Best reproducible: LS≈0.15. Per-node ceiling: +1.00 (B7).
+- Batch 8: probe drag_k (untested), w_amp=0 (ablation), deeper training (3600it), and coarser
+  fibre wavelength. The goal: break the LS≈0.15 plateau via physical or optimization parameters.
 ### Emerging observations
-- Reproducible best: LS≈0.14–0.15 with amp=12, stiff [80,200-300], ω=5 (5 runs: 0.159–0.140).
+- Reproducible best: LS≈0.15 with amp=10-12, stiff [80,300], ω=5 (7+ runs: 0.140–0.159).
 - Every stiffness-active run has 1 catastrophic node. Position varies with fibre basin.
-- Per-node ceiling: **+0.76** (with SIREN fibre, B6). Model CAN match morphology much better.
+- Per-node ceiling: **+1.00** (B7 s3/s5). Model CAN perfectly match individual nodes.
+- SIREN fibre dθ: CLOSED across all configs (with/without stiffness, ω=3-5, dev=0.15-0.5).
 - Eliminating the outlier would lift mean LS from ~0.15 to ~0.26 — the single largest possible gain.
-- SIREN fibre + stiffness SIREN: CLOSED (catastrophe redistribution). Without stiffness: UNTESTED.
-- gain0 flat in [0.4,0.5] with stiffness. Viable window: 0.4–0.5 with wide stiffness.
+- gain0 flat in [0.4,0.5]; amp flat in [10,12]. Viable window is narrow but stable.
 - Sensitivity: chirality ≈ size >> orientation > openness (engineering, regime-robust).
+- UNTESTED: drag_k, w_amp=0, 3600it at best config, fibre_wl=35.
 **CRITICAL: this section must ALWAYS be at the END of the file.**

@@ -35,13 +35,14 @@ class AttractionRepulsion(Lateral):
     # short-range Gaussian (p3,p4) the push; their balance sets the phase.
     MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
     MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice", "filaments"]
-    PARAM_ROLES = {"sigma": "interaction_length",
+    PARAM_ROLES = {"sigma": "interaction_length", "noise": "exploration_noise",
                    "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.sigma = float(params["sigma"])
         self.aggr = params.get("aggr", "mean")               # mean (default, matches the reference) or sum
+        self.noise = float(params.get("noise", 0.0))         # isotropic velocity noise (off by default)
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
@@ -69,6 +70,9 @@ class AttractionRepulsion(Lateral):
             deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
             dpos = dpos / deg.clamp(min=1.0)[:, None]
         dpos = dpos * occ[:, None]
+        if self.noise > 0.0:                                 # exploratory noise on the overdamped velocity
+            dpos = dpos + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None),
+                                                   device=pos.device) * occ[:, None]
         if mask is not None:
             dpos = dpos * mask[:, None].float()
         return {self.at: dpos}

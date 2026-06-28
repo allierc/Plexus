@@ -2613,3 +2613,111 @@ coarser fibre SIREN (ω=3; since there's no stiffness SIREN, omega only affects 
 
 Parent for Batch 7: B5-s4 (stiff [80,300], LS=0.149) for stiffness-active slots;
 B5-s3 (fibre-only, LS=0.118) for fibre-isolation slots.
+
+---
+
+## Batch 8 — 2026-06-28
+Parent: s5 = B5-s4 stiff [80,300] reproduced (LS=0.149→0.151); B5-s3 fibre-only (LS=0.118)
+Surprise (from B7): "SIREN fibre WITHOUT stiffness is CATASTROPHIC (LS=-0.222), far WORSE than
+  with stiffness (+0.011). The hypothesis that stiffness interaction caused catastrophe redistribution
+  is FALSIFIED — SIREN fibre is INTRINSICALLY destabilizing. Stiffness STABILIZES the SIREN fibre
+  optimization landscape, not the reverse. Also: amp=10 ≈ amp=12 (LS=0.150 vs 0.151), extending
+  the flat amplitude window to [10,12]."
+Observation (systematic failure): "At the best config (stiff [80,300], LS=0.151), most nodes score
+  LS=0.04–0.30, one node is perfect (LS=1.00), and one is catastrophic (LS≈-0.10). The per-node
+  spread is the dominant problem: the catastrophic node drags the mean by ~0.10, and the many
+  mediocre nodes (LS≈0.04–0.06) contribute the rest of the gap. The parametric fibre field provides
+  a single global direction pattern — nodes where this pattern aligns well score high, nodes where it
+  misaligns score low. SIREN fibre (per-pixel correction) has the DEGREES OF FREEDOM to fix
+  individual nodes (ceiling +0.76, +1.00) but the optimization landscape is too rough — the optimizer
+  improves some nodes at the expense of others."
+Hypothesis: "The bottleneck is the OPTIMIZATION LANDSCAPE, not the physics representation. The
+  current best config (stiff [80,300], amp=12, gain0=0.5) has exhausted the parametric levers.
+  Progress requires either (a) a physically different mechanism (drag, substeps) or (b) a
+  regularization/optimization strategy that prevents catastrophic nodes (lower lr, deeper training,
+  different w_amp). Drag_k=30 is COMPLETELY UNTESTED — it controls the damping timescale and thus
+  loop shape/dynamics."
+
+### Per-slot results (ranked by LS)
+
+Slot 5 [b7_stiff300_ctrl] role=CONTROL stiff [80,300] amp=12 LS=+0.151±0.178 R²=-1.166
+  ampL=0.120 open=0.173 chir+=0.72 size=9.32e-04 dur=29.4
+  red-on-green=good superposition for 7/9 nodes; 1 perfect (LS=1.00), 1 weak (LS=0.04)
+  stiffness: binary pattern (large soft+stiff regions), same as prior batches
+  fibre: regular parametric pattern. Reproduces B5 best (0.149→0.151). CONTROL PASSES.
+
+Slot 3 [b7_amp10_stiff300] role=EXPLORE amp=10 (vs 12) stiff [80,300] LS=+0.150±0.177 R²=-1.151
+  ampL=0.125 open=0.175 chir+=0.72 size=9.26e-04 dur=29.4
+  red-on-green=essentially IDENTICAL to s5. Same per-node pattern (1 perfect LS=1.00, same weak nodes).
+  stiffness: same binary pattern. amp=10 produces the SAME morphology as amp=12 — amplitude is
+  FLAT in [10,12]. The model compensates via gain/stiffness for different amplitude inputs.
+
+Slot 4 [b7_fibreonly_ctrl] role=CONTROL fibre-only (no stiffness) LS=+0.118±0.216 R²=-1.261
+  ampL=0.307 open=0.200 chir+=0.58 size=7.16e-04 dur=30.0
+  red-on-green=moderate; 1 node at LS=-0.53 (less extreme than stiff runs). Higher ampL (0.307 vs
+  0.120) — without stiffness, motion energy is less constrained. Lower chir+ (0.58 vs 0.72) — stiffness
+  helps chirality. Reproduces B5 fibre-only ceiling (0.118). CONTROL PASSES.
+
+Slot 2 [b7_siren_fibre_stiff300] role=EXPLOIT SIREN fibre (dev=0.3) + stiff [80,300] LS=+0.011±0.432
+  R²=-1.475 ampL=0.111 open=0.215 chir+=0.64 size=9.11e-04 dur=30.0
+  red-on-green=poor; 1 node LS=-1.00, several negative. stiffness: extreme binary pattern. fibre dθ:
+  noisy/speckled. SIREN fibre DESTROYS the stiffness-only fit (0.151→0.011). Confirming B6 finding:
+  joint SIREN fibre+stiffness is destructive. Best single node: +0.58.
+
+Slot 1 [b7_siren_fibre_nostiff_coarse] role=EXPLORE SIREN fibre ω=3 (coarser), no stiffness
+  LS=-0.047±0.478 R²=-1.616 ampL=0.135 open=0.251 chir+=0.56 size=9.15e-04 dur=30.0
+  red-on-green=poor; 1 node LS=-0.92, several negative. Coarser fibre dθ is LESS destructive than
+  ω=5 (LS=-0.047 vs -0.222) but still net-negative. Best single node: +0.76 (matches B6 ceiling).
+  The coarser field can improve individual nodes but not the global fit.
+
+Slot 0 [b7_siren_fibre_nostiff] role=EXPLOIT SIREN fibre ω=5, no stiffness LS=-0.222±0.547
+  R²=-2.216 ampL=0.029 open=0.259 chir+=0.57 size=1.03e-03 dur=30.0
+  red-on-green=CATASTROPHIC; 3 nodes at LS=-1.00, most nodes negative. ampL nearly collapsed (0.029).
+  fibre dθ: dense speckled noise. stiffness: ~uniform. The SIREN fibre at ω=5 without stiffness
+  DESTROYS the fit entirely — far worse than the fibre-only parametric control (0.118).
+
+### Key findings
+
+1. **SIREN fibre is INTRINSICALLY DESTABILIZING** — not just when combined with stiffness. Without
+   stiffness: LS=-0.222 (ω=5) or -0.047 (ω=3). With stiffness: LS=+0.011 (B7) or catastrophe
+   redistribution (B6). The SIREN fibre optimization landscape has too many degrees of freedom at
+   this architecture — the optimizer cannot simultaneously improve all nodes.
+
+2. **Stiffness STABILIZES the SIREN fibre landscape** (opposite of B6 hypothesis). Without stiffness
+   to constrain regional amplitudes, the SIREN fibre deviation drives extreme overshoot at multiple
+   nodes. The stiffness field provides a spatial regularizer that limits how much fibre changes affect
+   each region.
+
+3. **Amplitude is FLAT in [10, 12].** amp=10 produces the SAME morphology, per-node pattern, and
+   LoopScore as amp=12. Combined with amp=14 catastrophic, the viable window is [10,12] with no
+   sensitivity. The model compensates for amplitude changes via gain/stiffness adjustment.
+
+4. **Controls reproduce.** stiff300_ctrl: LS=0.151 (matches 0.149 from B5). fibreonly_ctrl: LS=0.118
+   (matches 0.118 from B5). The experimental setup is reliable.
+
+5. **The coarser SIREN fibre (ω=3) is less destructive** than ω=5 (-0.047 vs -0.222 without stiffness),
+   confirming the coarse-region principle. But even at ω=3, the fit is still net-negative — the SIREN
+   fibre mechanism itself is the problem.
+
+### Best optimizer slot: s5 (stiff300_ctrl, LS=0.151) — control reproduces prior best
+### Best scientific slot: s0 (siren_fibre_nostiff, LS=-0.222) — most informative because it
+   FALSIFIES the stiffness-interaction hypothesis. The causal finding: SIREN fibre dθ is intrinsically
+   destabilizing at the current SIREN architecture, and stiffness STABILIZES (not destabilizes) it.
+
+### Verdict: FALSIFIED (B7 hypothesis that stiffness interaction caused catastrophe redistribution).
+   SIREN fibre dθ is CLOSED as a mechanism across ALL tested configurations.
+   `[mechanism@LoopScore, 2400it, SIREN fibre dev=0.3, ω=3-5, ±stiffness]`.
+
+### Batch outcome: improved morphology map (SIREN fibre mechanism CLOSED comprehensively; stiffness
+   found to STABILIZE fibre SIREN; amplitude flat in [10,12]). LS not improved (best=0.151 ≈ prior).
+
+### Next
+
+SIREN fibre is CLOSED. The parametric model has plateaued at LS≈0.15. The remaining levers are:
+1. **drag_k** — COMPLETELY UNTESTED. Controls damping timescale → loop shape/dynamics.
+2. **w_amp** — 0.3 is default, 0.6 failed (B4). w_amp=0 untested under LoopScore.
+3. **Deeper optimization** — 3600it at best config [80,300].
+4. **Different stiffness range** — stiff [80,400] or [50,300].
+5. **Residual decomposition** — quantify which morphology dimension is the dominant bottleneck.
+
+Parent for Batch 8: s5 (stiff [80,300], amp=12, gain0=0.5, ω=5, 2400it, LS=0.151).

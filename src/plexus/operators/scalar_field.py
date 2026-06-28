@@ -44,6 +44,7 @@ class ScalarField(Field):
         else:                                          # 3D: axes 1,2 span [0,1]
             self.nz = self.R
             self.shape = (self.nx, self.ny, self.nz)
+        self.periodic = False                          # set by the engine from the spec boundary
         self.register_buffer("grid", torch.zeros((self.C,) + self.shape, device=device))
 
     def pix(self, *coords):
@@ -52,9 +53,15 @@ class ScalarField(Field):
         Accepts D coordinate tensors (x, y[, z]) and returns a D-tuple of index
         tensors. Axis 0 spans [0, W], every other axis spans [0, 1]; each maps by the
         common pixels-per-unit R. The 2D call `pix(x, y)` returns `(gx, gy)` exactly as
-        before (back-compatible)."""
+        before (back-compatible). When `self.periodic`, indices WRAP modulo the grid
+        (a torus) instead of clamping to the edge -- so a sensor reaching past one
+        side reads the other (matching the periodic particle wrap in `_integrate`)."""
         out = []
         for k, c in enumerate(coords):
             box = self.width if k == 0 else 1.0
-            out.append((c.clamp(0, box - 1e-6) * self.R).long().clamp(0, self.shape[k] - 1))
+            if getattr(self, "periodic", False):
+                # floor (not trunc-toward-0) so a coord just below 0 wraps to the far edge
+                out.append(torch.remainder(torch.floor(c * self.R).long(), self.shape[k]))   # torus wrap
+            else:
+                out.append((c.clamp(0, box - 1e-6) * self.R).long().clamp(0, self.shape[k] - 1))
         return tuple(out)

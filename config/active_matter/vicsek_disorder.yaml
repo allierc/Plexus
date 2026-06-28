@@ -1,7 +1,7 @@
 # vicsek_disorder -- Vicsek active matter (radius_graph + alignment + cruise): high noise -> disorder (phi->0)
 # Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
 # The Well (Ohana et al., NeurIPS 2024). Disordered gas.
-general: {name: vicsek_disorder, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+general: {name: vicsek_disorder, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
 sets:
   particle:
     n: 2000
@@ -21,11 +21,11 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The video shows a static distribution of small, blue geometric shapes against a black
-      background. There is no visible movement or evolution of the particles across the four keyframes.
-      The spatial arrangement of the elements remains constant throughout the sequence. The scene represents
-      a steady-state configuration of a discrete particle system.
-    objects: The scene contains numerous small, blue, rod-like or rectangular particles. These objects
+    description: The video shows a static distribution of blue geometric shapes on a black background.
+      There is no visible movement or evolution of the particles between the frames. The spatial arrangement
+      of the elements remains constant throughout the entire sequence. The simulation appears to be a
+      steady-state representation of a granular or particle system.
+    objects: The scene contains numerous small, blue, triangular and linear geometric shapes. These objects
       are distributed randomly across the entire frame without any specific connectivity or clustering.
-      Each particle is uniform in size and color, appearing as thin blue outlines. The background is a
-      solid, uniform black, providing high contrast for the blue elements.
+      Each individual element is very small in size relative to the overall canvas. The uniform blue color
+      of the shapes contrasts sharply against the solid black background.

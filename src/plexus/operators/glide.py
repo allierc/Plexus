@@ -26,9 +26,11 @@ class Glide(Lateral):
     PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_TYPE_PROPS = ["move_speed"]
+    PARAM_ROLES = {"noise": "translational_noise"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
+        self.noise = float(params.get("noise", 0.0))      # isotropic translational noise (active Brownian; off by default)
         self.at = params.get("_at", "cell")
 
     def forward(self, H, mask=None):
@@ -39,4 +41,6 @@ class Glide(Lateral):
         spd = lvl.move_speed                              # [N]
         m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
         vel = spd[:, None] * h                            # move along the heading
+        if self.noise > 0.0:                              # glide + noise = an active Brownian walker
+            vel = vel + self.noise * torch.randn(N, h.shape[-1], generator=getattr(H, "rng", None), device=dev)
         return {self.at: vel * m[:, None]}

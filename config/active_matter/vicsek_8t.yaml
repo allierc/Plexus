@@ -2,7 +2,7 @@
 # strengths (the boids special case of `alignment`, per_type: true) + shared cruise.
 # Strong-alignment species flock; weak ones stay a disordered gas -- coloured by species.
 # Refs: Vicsek et al., PRL 75 (1995); The Well (Ohana et al., NeurIPS 2024).
-general: {name: vicsek_8t, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+general: {name: vicsek_8t, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
 sets:
   particle:
     n: 4000
@@ -27,12 +27,13 @@ plotting: {background: black, marker: triangle, triangle_size: 0.01, colormap: t
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a large collection of small, multi-colored particles distributed
-      across a black background. Over time, the particles exhibit a subtle, fluid-like motion, shifting
-      and swirling slightly in their positions. There is a noticeable increase in the density of particles
-      in the central and right-hand regions as the video progresses. The overall movement appears stochastic,
-      with no single dominant direction of flow for the entire group.
-    objects: The scene contains thousands of tiny, needle-like particles scattered throughout the frame.
-      These objects are arranged in a dense, disorganized cloud with varying local concentrations. The
-      particles feature a diverse color palette, including red, blue, green, yellow, and purple. Each
-      individual particle is very small and uniform in size, appearing as thin, elongated strokes.
+    description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
+      across the black background. Over time, the particles begin to aggregate into distinct, swirling
+      filamentary structures that resemble turbulent flows or cosmic webs. These structures expand and
+      rotate, creating complex interconnected networks of high-density regions. By the final frame, the
+      particles have organized into large, coherent clusters with significant empty space between them.
+    objects: The scene contains thousands of small, triangular particles of varying sizes. These particles
+      are colored in a diverse palette including red, blue, green, yellow, and magenta. Initially, the
+      objects are arranged in a stochastic, disordered distribution across the entire frame. As the simulation
+      progresses, they form elongated, curved topologies that cluster together into dense, multi-colored
+      filaments.

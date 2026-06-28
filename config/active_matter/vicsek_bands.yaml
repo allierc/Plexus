@@ -1,7 +1,7 @@
 # vicsek_bands -- Vicsek active matter (radius_graph + alignment + cruise): near-critical, dense -> travelling bands
 # Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
 # The Well (Ohana et al., NeurIPS 2024). Coexistence.
-general: {name: vicsek_bands, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+general: {name: vicsek_bands, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
 sets:
   particle:
     n: 4000
@@ -21,11 +21,12 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a large collection of blue particles distributed across a black
-      background. Over time, the particles appear to move and shift, creating a dynamic, fluid-like motion.
-      The density of the particles fluctuates as they cluster and disperse in different regions of the
-      frame. The overall effect is a continuous, stochastic evolution of a granular system.
-    objects: The scene contains thousands of small, blue, rod-like particles. These objects are disconnected
-      from one another, moving independently as a granular gas or fluid. Each particle is uniform in color
-      and maintains a consistent, small size throughout the simulation. They are arranged in a non-uniform
-      distribution, with some areas showing higher concentrations than others.
+    description: The simulation shows a collection of blue triangular particles moving in a complex, fluid-like
+      motion. Over time, the particles form swirling, turbulent structures that resemble vortices or eddies
+      in a liquid. These clusters shift and merge as they flow across the black background, creating a
+      dynamic sense of motion. The overall pattern evolves from a relatively uniform distribution into
+      distinct, organized flow patterns.
+    objects: The scene contains thousands of small, blue triangular particles. These particles are arranged
+      in dense, swirling clusters that form interconnected, filamentary structures. Each individual triangle
+      is uniform in size and color, appearing as a bright blue outline against the black void. The topology
+      of the objects is characterized by high-density regions of flow and sparse areas of low concentration.
