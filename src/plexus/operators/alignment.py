@@ -20,6 +20,11 @@ OPTION -- `gate: contact`: a smoothstep contact gate weights w_ij by how close i
 and j are (1 in contact, 0 at radius r), for dense/contact active matter with no
 discontinuity as neighbours drift in and out of range.
 
+OPTION -- `noise`: isotropic orientation noise added to the alignment acceleration
+(off by default). In the canonical Vicsek model the noise eta lives ON the heading
+update, so the order/disorder transition can be driven here instead of (or with) the
+`noise` in `cruise` -- raise it to melt the flock into a disordered gas.
+
 Second-derivative law (an acceleration): the engine integrates vel += dt*acc,
 pos += dt*vel. No 1/|d|^2 term, so it needs no `min_radius` and composes cleanly
 with `cruise`, `cohesion`, `separation`, `drag`.
@@ -45,7 +50,8 @@ class Alignment(Lateral):
     OPTIONAL_TYPE_PROPS = ["alignment"]        # read per-receiver only when `per_type: true` (boids)
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion", "vicsek"]
     MORPHOLOGY_PRIOR = ["flock", "bands", "swirl", "streams"]
-    PARAM_ROLES = {"a": "alignment_strength", "gate": "neighbour_weighting", "r": "contact_radius"}
+    PARAM_ROLES = {"a": "alignment_strength", "gate": "neighbour_weighting",
+                   "r": "contact_radius", "noise": "orientation_noise"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -55,6 +61,7 @@ class Alignment(Lateral):
         self.softness = float(params.get("softness", 0.5))            # falloff band [0,1]; 0 = hard cutoff
         self.per_type = bool(params.get("per_type", False))           # boids special case: per-type weight
         self.weight_prop = str(params.get("weight", "alignment"))     # which type property holds the weight
+        self.noise = float(params.get("noise", 0.0))                  # isotropic Vicsek orientation noise (off by default)
         self.at = params.get("_at", "particle")
         if self.gate not in ("none", "contact"):
             raise ValueError(f"alignment: gate must be 'none' or 'contact', got {self.gate!r}")
@@ -86,6 +93,9 @@ class Alignment(Lateral):
         acc = torch.zeros(N, D, device=vel.device).index_add_(0, i, msg)
         deg = torch.zeros(N, device=vel.device).index_add_(0, i, w)
         acc = (acc / deg.clamp(min=1.0)[:, None]) * occ[:, None]       # (weighted) mean over neighbours
+        if self.noise > 0.0:                                           # Vicsek angular noise: order vs disorder
+            acc = acc + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None),
+                                                 device=vel.device) * occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()
         return {self.at: acc}

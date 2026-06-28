@@ -6,21 +6,20 @@
 #   - keep BOTH pressures: default ~3 exploit (improve LS) · 2 explore (new morphology family) · 1 control/ablation
 #   - keep stiffness/direction COARSE (low --siren_omega, larger --fibre_wl); amplitude in [10,15]
 #
-# BATCH 7 — ISOLATE SIREN FIBRE FROM STIFFNESS INTERACTION
-# Parent A (stiff-active): B5-s4 stiff_hi300 (LS=0.149, stiff [80,300], gain0=0.5, amp=12, ω=5, 2400it)
-# Parent B (fibre-only):   B5-s3 no_stiff   (LS=0.118, uniform stiff, gain0=0.5, amp=12, 2400it)
+# BATCH 8 — BREAK THE LS≈0.15 PLATEAU: UNTESTED PHYSICAL + OPTIMIZATION PARAMETERS
+# Parent: B7-s5 stiff300_ctrl (LS=0.151, stiff [80,300], gain0=0.5, amp=12, ω=5, 2400it)
 #
-# Hypothesis: "The catastrophe redistribution in B6 is caused by SIREN fibre × SIREN stiffness
-#   INTERACTION. SIREN fibre with UNIFORM stiffness (no stiffness SIREN) avoids this interaction
-#   and should break the fibre-only ceiling (LS≈0.118). A coarser fibre SIREN (ω=3) may produce
-#   more coherent corrections than ω=5's noisy patterns."
+# Hypothesis: "The parametric model has plateaued at LS≈0.15 with all spatial-field levers exhausted.
+#   Progress requires probing UNTESTED physical parameters (drag_k) that affect the dynamic response
+#   (loop shape via damping timescale), or optimization strategies (deeper training, w_amp ablation)
+#   that improve the global solution. Different drag may shift loop morphology toward the target."
 #
-# EXPLOIT (3): SIREN fibre isolated from stiffness, and with stiffness at best config
-b7_siren_fibre_nostiff : --gain0 0.5 --learn fibre,gain,dur --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --siren_fibre 1 --fibre_dev 0.3 --siren_omega 5 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
-b7_siren_fibre_nostiff_coarse : --gain0 0.5 --learn fibre,gain,dur --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --siren_fibre 1 --fibre_dev 0.3 --siren_omega 3 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
-b7_siren_fibre_stiff300 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --siren_fibre 1 --fibre_dev 0.3 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
-# EXPLORE (2): amplitude probe + fibre-only ablation baseline
-b7_amp10_stiff300 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 10 --drag_k 30 --dur0 14 --dur_hi 30
-b7_fibreonly_ctrl : --gain0 0.5 --learn fibre,gain,dur --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
-# CONTROL (1): reproduce B5 best (stiff [80,300])
-b7_stiff300_ctrl : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
+# EXPLOIT (3): try to break the plateau via drag, deeper training, w_amp ablation
+b8_drag20 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 20 --dur0 14 --dur_hi 30
+b8_deep3600 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 3600 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
+b8_wamp0 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30 --w_amp 0
+# EXPLORE (2): drag sweep to map morphology families + wider stiffness range
+b8_drag50 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 50 --dur0 14 --dur_hi 30
+b8_stiff400 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 400 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30
+# CONTROL (1): reproduce B7 best
+b8_ctrl : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 14 --dur_hi 30

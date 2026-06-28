@@ -325,6 +325,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if "dim" in inspect.signature(cls.__init__).parameters and "dim" not in fcfg:
             fcfg["dim"] = H.dim                                       # N-D grid field follows the dimension contract
         fld = cls(fname, width=H.world_width, device=device, **fcfg)   # name positional; rest by keyword
+        if hasattr(fld, "periodic"):
+            fld.periodic = H.periodic                                   # torus field iff the world wraps
         H.add_field(fld)
 
     return H

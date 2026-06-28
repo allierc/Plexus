@@ -2,7 +2,7 @@
 # strengths (the boids special case of `alignment`, per_type: true) + shared cruise.
 # Strong-alignment species flock; weak ones stay a disordered gas -- coloured by species.
 # Refs: Vicsek et al., PRL 75 (1995); The Well (Ohana et al., NeurIPS 2024).
-general: {name: vicsek_4t, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+general: {name: vicsek_4t, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
 sets:
   particle:
     n: 3000
@@ -23,11 +23,13 @@ plotting: {background: black, marker: triangle, triangle_size: 0.01, colormap: t
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a large collection of small particles moving and interacting within
-      a black void. Over time, the particles appear to cluster into several distinct, dense regions or
-      "clouds." These clusters shift and morph slightly as the particles move dynamically. The overall
-      motion suggests a system evolving toward a state of localized aggregation.
-    objects: The scene contains thousands of tiny, individual particles scattered across the frame. Each
-      particle is a small, elongated shape, resembling a short line or a thin needle. The particles are
-      colored in a mix of red, green, blue, and yellow. They are arranged in a mostly random distribution
-      that transitions into dense, overlapping clusters in the center and bottom-right areas.
+    description: The simulation shows a collection of small, multi-colored particles moving in a complex,
+      fluid-like motion. Over time, the particles appear to form and dissolve into dense, swirling clusters
+      or filaments. These structures shift and evolve, exhibiting dynamic interactions that suggest a
+      turbulent or self-organizing flow. The overall movement is continuous, with the density of the clusters
+      fluctuating as they migrate across the frame.
+    objects: The scene contains thousands of tiny, triangular or wedge-shaped particles scattered across
+      a black background. These objects are colored in a mix of red, green, blue, and yellow, often appearing
+      in close proximity to one another. They are arranged in loose, elongated clusters that resemble
+      turbulent eddies or filaments in a fluid. Each individual particle is very small and uniform in
+      size, but their collective arrangement creates large, complex topological structures.

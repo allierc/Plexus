@@ -1,7 +1,7 @@
 # vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -> polar order (phi->1)
 # Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
 # The Well (Ohana et al., NeurIPS 2024). Ordered flock.
-general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
 sets:
   particle:
     n: 2000
@@ -21,12 +21,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a large collection of blue triangular particles distributed across
-      a black background. Over time, the particles appear to move and shift their positions, creating
-      a sense of fluid motion. The density of the particles fluctuates as they cluster and disperse in
-      different regions of the frame. The overall movement suggests a stochastic or turbulent flow of
-      agents within a bounded space.
-    objects: The scene contains thousands of small, blue triangular particles. These objects are disconnected
-      from one another, moving independently as individual agents. Each triangle is uniform in size and
-      maintains a consistent bright blue color throughout the sequence. The particles are arranged in
-      a non-uniform distribution, forming dense clusters and sparse regions.
+    description: The simulation shows a collection of blue triangular particles moving in a complex, fluid-like
+      motion. Over time, the particles form swirling patterns and dense clusters that shift and evolve
+      across the black background. The flow exhibits turbulent characteristics, with some areas showing
+      high concentration and others remaining sparse. The overall movement suggests a dynamic system governed
+      by collective behavior or fluid dynamics.
+    objects: The scene contains numerous small, blue triangular particles distributed across a black field.
+      These particles are arranged in irregular, swirling clusters and elongated filaments that suggest
+      a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
+      representation of the data. The topology of the objects changes as they aggregate into dense regions
+      and disperse into more scattered formations.

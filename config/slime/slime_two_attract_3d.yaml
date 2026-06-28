@@ -51,6 +51,7 @@ operators:
   at: cell
   from: chemical
   cross: 1.0
+  noise: 1.0
 - op: bounce
   at: cell
 - op: glide

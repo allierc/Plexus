@@ -29,11 +29,13 @@ class Diffuse(FieldUpdate):
         fld = H.fields[self.field_name]
         g = fld.grid                                                    # [C, *shape]
         dt = float(getattr(H.config, "dt", 1.0))
+        # periodic field -> wrap the blur across the seam (`circular`); else edge-clamp.
+        pmode = "circular" if getattr(fld, "periodic", False) else "replicate"
         if g.dim() == 3:                                               # 2D field [C, nx, ny]
-            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1), mode="replicate")   # edge-clamp
+            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1), mode=pmode)
             blur = Fnn.avg_pool2d(gp, 3, stride=1).squeeze(0)             # 3x3 mean, same size
         else:                                                         # 3D field [C, nx, ny, nz]
-            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1, 1, 1), mode="replicate")
+            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1, 1, 1), mode=pmode)
             blur = Fnn.avg_pool3d(gp, 3, stride=1).squeeze(0)            # 3x3x3 mean, same size
         dw = min(max(self.rate * dt, 0.0), 1.0)                        # saturate(rate*dt)
         fld.grid = g * (1.0 - dw) + blur * dw

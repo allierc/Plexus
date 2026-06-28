@@ -17,7 +17,7 @@ operators:
 - {op: deposit, at: cell, to: chemical, amount: 0.045}
 - {op: diffuse, at: chemical,            rate: 0.0175}
 - {op: decay,   at: chemical,            rate: 0.0006}
-- {op: sense,   at: cell, from: chemical, cross: -1.0}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
 - {op: bounce,  at: cell}
 - {op: glide, at: cell}
 schedule: [deposit, diffuse, decay, sense, bounce, glide]
