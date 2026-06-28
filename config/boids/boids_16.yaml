@@ -132,7 +132,7 @@ fields: {}
 operators:
   - { op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001 }
   - { op: cohesion, at: particle } # boids decomposed: the three steering rules
-  - { op: alignment, at: particle } # are separate operators; the engine sums them
+  - { op: alignment, at: particle, per_type: true } # are separate operators; the engine sums them
   - { op: separation, at: particle }
 
 schedule: [radius_graph, cohesion, alignment, separation]

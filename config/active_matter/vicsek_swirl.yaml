@@ -1,0 +1,33 @@
+# vicsek_swirl -- Vicsek active matter (radius_graph + alignment + self_propel): chiral self-propulsion -> rotating swirls
+# Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
+# The Well (Ohana et al., NeurIPS 2024). Chirality on.
+general: {name: vicsek_swirl, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  particle:
+    n: 2000
+    vel_init: 0.005
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: alignment,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
+  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.002, chirality: 0.05}
+schedule: [radius_graph, alignment, self_propel]
+plotting:
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a large collection of small, blue triangular particles distributed
+      across a black background. Over time, the particles appear to undergo a subtle shift in their spatial
+      distribution, moving from a more uniform spread to a slightly more clustered arrangement. The movement
+      is fluid and continuous, with individual particles rotating and shifting positions. By the final
+      frame, the overall density of the particles remains relatively constant, but the local patterns
+      of clustering have evolved.
+    objects: The scene contains thousands of small, individual triangular particles. These objects are
+      colored in a bright, electric blue that contrasts sharply with the black background. The particles
+      are disconnected from one another, moving independently as a granular system. Each triangle is of
+      a uniform size, creating a consistent texture across the entire field of view.

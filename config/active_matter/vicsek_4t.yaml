@@ -1,0 +1,33 @@
+# vicsek_4t -- multi-species Vicsek active matter: 4 types with DIFFERENT per-type alignment
+# strengths (the boids special case of `alignment`, per_type: true) + shared self_propel.
+# Strong-alignment species flock; weak ones stay a disordered gas -- coloured by species.
+# Refs: Vicsek et al., PRL 75 (1995); The Well (Ohana et al., NeurIPS 2024).
+general: {name: vicsek_4t, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  particle:
+    n: 3000
+    vel_init: 0.005
+    types:
+      t0: {fraction: 0.25, alignment: 1.0}
+      t1: {fraction: 0.25, alignment: 0.7}
+      t2: {fraction: 0.25, alignment: 0.4}
+      t3: {fraction: 0.25, alignment: 0.1}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: alignment,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
+  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.0015}
+schedule: [radius_graph, alignment, self_propel]
+plotting: {background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a large collection of small particles moving and interacting within
+      a black void. Over time, the particles appear to cluster into several distinct, dense regions or
+      "clouds." These clusters shift and morph slightly as the particles move dynamically. The overall
+      motion suggests a system evolving toward a state of localized aggregation.
+    objects: The scene contains thousands of tiny, individual particles scattered across the frame. Each
+      particle is a small, elongated shape, resembling a short line or a thin needle. The particles are
+      colored in a mix of red, green, blue, and yellow. They are arranged in a mostly random distribution
+      that transitions into dense, overlapping clusters in the center and bottom-right areas.
