@@ -34,6 +34,15 @@ from plexus.generators.graph_data_generator import data_generate
 
 
 def main():
+    # --- manual / debug entry --------------------------------------------------- #
+    # Run Plexus_Main.py with NO CLI args (e.g. the IDE "Debug" button) and it falls
+    # back to these hardcoded values. Edit the list to debug a different task/config.
+    # Ignored as soon as any real CLI argument is passed.
+    if len(sys.argv) == 1:
+        sys.argv += ["-o", "generate",
+                     "/workspace/Plexus/config/attraction_repulsion/arbitrary_2.yaml",
+                     "--device", "cuda:0", "--movie", "--grid"]
+
     parser = argparse.ArgumentParser(description="plexus")
     parser.add_argument("-o", "--option", nargs="+", required=True,
                         help="<task> <config_name>, e.g. -o generate attraction_repulsion")

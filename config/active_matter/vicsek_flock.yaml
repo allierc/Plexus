@@ -1,4 +1,4 @@
-# vicsek_flock -- Vicsek active matter (radius_graph + alignment + self_propel): low noise -> polar order (phi->1)
+# vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -> polar order (phi->1)
 # Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
 # The Well (Ohana et al., NeurIPS 2024). Ordered flock.
 general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
@@ -10,8 +10,8 @@ fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.05}
   - {op: alignment,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
-  - {op: self_propel,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
-schedule: [radius_graph, alignment, self_propel]
+  - {op: cruise,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
+schedule: [radius_graph, alignment, cruise]
 plotting:
   background: black
   marker: triangle

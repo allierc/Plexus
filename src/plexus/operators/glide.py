@@ -1,10 +1,10 @@
-"""advance -- set (lateral). Self-propulsion: move along the heading at speed.
+"""glide -- set (lateral). Self-propulsion: glide along the heading at constant speed (overdamped, first-order; the heading-kinematic sibling of `cruise`).
 
 A first-derivative dynamics operator: it returns a velocity delta
 `v_i = move_speed_i * heading_i` and lets the ENGINE integrate the position
 (`pos += dt * v`), exactly like attraction_repulsion returns a dpos. It does NOT
 touch `pos`, and it is purely propulsion -- domain/obstacle reflection is a separate
-`bounce` operator (run before advance), so this stays one concern.
+`bounce` operator (run before glide), so this stays one concern.
 
 Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
 every dimension, so `vel = speed * heading` is the same law in 2D and 3D -- no
@@ -21,8 +21,8 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("advance", level="cell", kind="lateral")
-class Advance(Lateral):
+@register_operator("glide", level="cell", kind="lateral")
+class Glide(Lateral):
     PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_TYPE_PROPS = ["move_speed"]

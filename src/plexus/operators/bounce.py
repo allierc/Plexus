@@ -2,7 +2,7 @@
 
 A boundary condition on *orientation*, kept separate from propulsion: if a dt-step
 along the current heading would leave the box (or enter an obstacle), the heading is
-turned back inside. Run it AFTER `sense` (which steers) and BEFORE `advance` (which
+turned back inside. Run it AFTER `sense` (which steers) and BEFORE `glide` (which
 emits the propulsion velocity), so the velocity already points back inside --
 proactive bounce, no agent ever crosses the wall.
 
