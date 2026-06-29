@@ -296,17 +296,14 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             r = torch.rand(Np, generator=H.rng, device=device).pow(1.0 / D) * radius   # uniform in the D-ball
             offset = d * r[:, None]
         state[:, px0:px1] = ppos + offset
-        vinit = float(s.get("vel_init", 0.0))                     # per-PARTICLE random velocity (isotropic jitter)
-        vcube = float(s.get("vel_init_cube", 0.0))                # per-CUBE coherent random launch velocity
-        if "vel" in schema and (vinit > 0 or vcube > 0):
+        # `vel_init` on a CONTAINED set = one coherent random launch velocity per parent
+        # CELL (the ball/cube body), shared by all its particles, so the whole object
+        # translates (not per-particle jitter). `vel_init_cell` / `vel_init_cube`: aliases.
+        vcell = float(s.get("vel_init", s.get("vel_init_cell", s.get("vel_init_cube", 0.0))))
+        if vcell > 0 and "vel" in schema:
             vx0, vx1 = schema["vel"]
-            v = torch.zeros(Np, D, device=device)
-            if vinit > 0:
-                v = v + (torch.rand(Np, D, generator=H.rng, device=device) - 0.5) * (2 * vinit)
-            if vcube > 0:                                         # one random velocity per parent cell -> its particles
-                vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcube)
-                v = v + vc[parent_idx]
-            state[:, vx0:vx1] = v
+            vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
+            state[:, vx0:vx1] = vc[parent_idx]
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
@@ -414,7 +411,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
-        on_frame=None) -> tuple[Hierarchy, dict]:
+        on_frame=None, progress: bool = False) -> tuple[Hierarchy, dict]:
     H = build(sim, device)
     H.predict = _resolve_prediction(sim)         # set -> integration order (from the operators)
     # (op_name, instance, selector); params carry the field refs + the set name (_at)
@@ -457,8 +454,15 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                             f"integrates it); only structural / derived-readout operators "
                             f"(MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)")
 
+    ticks = range(sim.n_frames + 1)
+    if progress:                                     # live progress bar over the simulated frames
+        try:
+            from tqdm import tqdm
+            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", dynamic_ncols=True, leave=False)
+        except ImportError:
+            pass
     with torch.no_grad():
-        for tick in range(sim.n_frames + 1):         # one tick = one pass of the schedule + integrate
+        for tick in ticks:                           # one tick = one pass of the schedule + integrate
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
             for step in sim.schedule:                # operators accumulate per-set deltas

@@ -34,7 +34,7 @@ sets:
       c24: {fraction: 0.037037, youngs: 220, block: [0.11, 0.61, 0.61, 0.19, 0.69, 0.69]}
       c25: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.61, 0.44, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
       c26: {fraction: 0.037038, youngs: 90, block: [0.61, 0.61, 0.61, 0.69, 0.69, 0.69], layers: [{frac: 1.0, youngs: 90, material: snow}]}
-  mpm_particle: {parent: cell, per_parent: 1100, radius: 0.05, density: 1.0, vel_init_cube: 3.0}
+  mpm_particle: {parent: cell, per_parent: 1100, radius: 0.05, density: 1.0, vel_init: 3.0}
 fields:
   mpm_grid: {frame: mpm_grid, n_grid: 96}
 operators:

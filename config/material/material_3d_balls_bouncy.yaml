@@ -1,5 +1,5 @@
 # material_3d_balls_bouncy -- the 3D version of the bouncing balls: three stiff elastic
-# balls in a box, each with a different launch velocity (vel_init_cube), damping near-off
+# balls in a box, each with a different launch velocity (vel_init), damping near-off
 # (drag 0, wall_damp 1.0) so they bounce around. Dots render + white box frame.
 general: {name: material_3d_balls_bouncy, seed: 1, n_frames: 900, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
@@ -10,7 +10,7 @@ sets:
       a: {fraction: 0.3334, youngs: 500}
       b: {fraction: 0.3333, youngs: 500}
       c: {fraction: 0.3333, youngs: 500}
-  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.10, density: 1.0, vel_init_cube: 0.4}
+  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.10, density: 1.0, vel_init: 0.4}
 fields:
   mpm_grid: {frame: mpm_grid, n_grid: 64}
 operators:
