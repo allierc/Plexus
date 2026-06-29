@@ -1,0 +1,50 @@
+# material_3d_obstacle_slab -- 3D MLS-MPM with fixed obstacles (no-slip box/sphere solids).
+general:
+  name: material_3d_obstacle_slab
+  seed: 0
+  n_frames: 320
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  obstacles:
+  - [0.15, 0.3, 0.15, 0.85, 0.35, 0.85]
+sets:
+  cell:
+    n: 4
+    types:
+      a: {fraction: 0.25, youngs: 240, block: [0.20, 0.55, 0.20, 0.40, 0.75, 0.40]}
+      b: {fraction: 0.25, youngs: 240, block: [0.60, 0.55, 0.20, 0.80, 0.75, 0.40]}
+      c: {fraction: 0.25, youngs: 240, block: [0.20, 0.55, 0.60, 0.40, 0.75, 0.80]}
+      d: {fraction: 0.25, youngs: 240, block: [0.60, 0.55, 0.60, 0.80, 0.75, 0.80]}
+  mpm_particle: {parent: cell, per_parent: 4000, radius: 0.06, density: 1.0, vel_init_cube: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 16.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.0, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep: 18, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 1.2
+  splat_res: 620
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  colors:
+    a: [1.0, 0.5, 0.4]
+    b: [0.4, 0.85, 0.55]
+    c: [0.55, 0.74, 0.96]
+    d: [1.0, 0.85, 0.3]

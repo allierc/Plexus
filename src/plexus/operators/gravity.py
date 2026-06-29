@@ -28,6 +28,7 @@ class GravityOperator(Lateral):
     # PREDICTION is intentionally None: gravity emits a force the MPM substep consumes,
     # it is NOT integrated on the cell (the cell is a centroid readout). So `cell` never
     # enters H.predict and the engine never advects it under gravity.
+    SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
     PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
     MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
 
@@ -43,7 +44,8 @@ class GravityOperator(Lateral):
     def forward(self, H, mask=None):
         cell = H.level(self.at)
         dev = cell.state.device
-        accel = torch.zeros(cell.n, 2, device=dev)
+        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector; -y (axis 1) is "down"
+        accel = torch.zeros(cell.n, D, device=dev)
         if not (self.after <= int(getattr(H, "frame", 0)) < self.before):
             return {cell.name: accel}                    # outside the active window -> no body force
         accel[:, 0] = self.gx

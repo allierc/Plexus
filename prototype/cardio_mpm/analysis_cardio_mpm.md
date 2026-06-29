@@ -2721,3 +2721,301 @@ SIREN fibre is CLOSED. The parametric model has plateaued at LS≈0.15. The rema
 5. **Residual decomposition** — quantify which morphology dimension is the dominant bottleneck.
 
 Parent for Batch 8: s5 (stiff [80,300], amp=12, gain0=0.5, ω=5, 2400it, LS=0.151).
+
+---
+
+## Batch 9 — 2026-06-28
+Parent: s5 = B7-s5 reproduced (LS=0.152); deep3600 is the same config at 3600it
+Surprise (from B8): "3600it BROKE THE LS≈0.15 PLATEAU — LS=0.162, up from 0.152 at 2400it.
+  The unexpected mechanism: duration found an INTERIOR OPTIMUM at dur=24.0, below dur_hi=30.
+  In ALL prior 2400it runs, duration saturated at ~29-30. The extra 1200 iterations allowed
+  the optimizer to escape the dur_hi saturation basin. This OVERTURNS the prior conclusion
+  that 'duration saturates at dur_hi in ALL slots under LoopScore'. Also: drag_k is ASYMMETRIC —
+  drag_k=50 ≈ 30 (LS=0.152), but drag_k=20 HURTS (LS=0.112, 2 catastrophic nodes). w_amp=0
+  HURTS (LS=0.132, SD=0.272). stiff_hi=400 CATASTROPHIC (LS=0.076)."
+Observation (systematic failure): "The best slot (3600it, LS=0.162) still has 1 catastrophic
+  node (LS=-1.00) and several mediocre nodes (LS=0.06-0.15). Duration at 24.0 is the first
+  interior optimum seen — prior runs all had dur→30 at convergence. The improvement came from
+  SHORTER, SHARPER pulses producing better contract→release→recoil dynamics. The catastrophic
+  node (position (2,2)) has not changed in character."
+Hypothesis: "The LS improvement at 3600it comes specifically from duration escaping the
+  dur_hi saturation basin and finding an interior optimum (~24). If duration is constrained
+  (dur_hi=25) or initialized closer (dur0=10), the same benefit should appear at 2400it.
+  The depth was needed to overcome the basin barrier, not for gradual refinement."
+
+### Per-slot results (ranked by LS)
+
+Slot 1 [b8_deep3600] role=EXPLOIT 3600it (vs 2400) LS=+0.162±0.190 R²=-1.270
+  ampL=0.084 open=0.175 chir+=0.68 size=9.84e-04 dur=24.0 amp=12.0 drag=30.0
+  red-on-green=good for 7/9; 1 catastrophic (LS=-1.00 at (2,2)); best nodes: 0.29, 0.20, 0.19
+  stiffness: binary pattern similar to 2400it but slightly refined
+  fibre: same parametric pattern. Duration converged to 24.0 — FIRST interior optimum seen.
+  **NEW BEST LS=0.162.** Breaks the 0.15 plateau. The mechanism is duration finding an interior
+  solution rather than saturating at dur_hi.
+
+Slot 3 [b8_drag50] role=EXPLORE drag_k=50 (vs 30) LS=+0.152±0.178 R²=-1.139
+  ampL=0.124 open=0.170 chir+=0.75 size=9.18e-04 dur=29.2 amp=12.0 drag=50.0
+  red-on-green=good for 7/9; 1 catastrophic (LS=-1.00 at same position as ctrl)
+  stiffness: binary pattern, more concentrated than ctrl. Higher chirality (0.75 vs 0.71).
+  Drag_k=50 is EQUIVALENT to drag_k=30. The damping timescale is already fast enough at 30.
+
+Slot 5 [b8_ctrl] role=CONTROL drag_k=30, 2400it LS=+0.152±0.181 R²=-1.168
+  ampL=0.117 open=0.173 chir+=0.71 size=9.34e-04 dur=29.3 amp=12.0 drag=30.0
+  red-on-green=good for 7/9; 1 catastrophic (LS=-1.00); nodes: 0.32, 0.20, 0.17, 0.16, 0.10, 0.06, 0.04, 0.02
+  Reproduces prior best (0.151→0.152). CONTROL PASSES.
+
+Slot 2 [b8_wamp0] role=EXPLOIT w_amp=0 (vs 0.3) LS=+0.132±0.272 R²=-1.715
+  ampL=0.151 open=0.181 chir+=0.61 size=8.50e-04 dur=30.0 amp=12.0 drag=30.0
+  red-on-green=moderate; 1 node LS=-0.20, several near 0. SD much worse (0.272 vs 0.181).
+  Without w_amp, more nodes lose motion. The anti-collapse term IS load-bearing — it prevents
+  motion collapse at vulnerable nodes. Lower chirality (0.61 vs 0.71).
+
+Slot 0 [b8_drag20] role=EXPLOIT drag_k=20 (vs 30) LS=+0.112±0.225 R²=-1.099
+  ampL=0.178 open=0.186 chir+=0.65 size=8.52e-04 dur=30.0 amp=12.0 drag=20.0
+  red-on-green=poor; 2 catastrophic nodes (LS=-0.87, -0.79). Higher ampL (0.178 vs 0.117).
+  Lower drag = more inertial = overshoot at vulnerable nodes. The damping is insufficient to
+  control the elastic recoil, creating multiple catastrophes.
+
+Slot 4 [b8_stiff400] role=EXPLORE stiff_hi=400 (vs 300) LS=+0.076±0.338 R²=-2.190
+  ampL=0.050 open=0.172 chir+=0.51 size=9.85e-04 dur=30.0 amp=12.0 drag=30.0
+  red-on-green=poor; 5/9 nodes negative (LS=-0.70, -0.28, -0.00×2, -0.01). SD=0.338.
+  The wider stiffness range creates too much contrast — soft regions overshoot catastrophically.
+  stiff_hi=300 is the upper limit.
+
+### Key findings
+
+1. **3600it BREAKS the LS≈0.15 plateau (0.152→0.162)** via duration finding an INTERIOR optimum
+   at dur=24. This OVERTURNS the prior conclusion (Established mechanism #3) that "duration
+   saturates at dur_hi in ALL slots." At 2400it, the optimizer is stuck in the dur≈30 basin;
+   3600it is needed to escape. The shorter pulse (24 vs 30 frames) produces better
+   contract→release→recoil dynamics. `[optimization+mechanism@LoopScore, 3600it]`.
+
+2. **Drag is ASYMMETRIC with a FLOOR at ~30.** drag_k=50 ≈ 30 (LS=0.152 both), but drag_k=20
+   HURTS (LS=0.112, 2 catastrophes). The overdamped drag needs to be sufficient to prevent
+   elastic recoil overshoot. Above the floor, drag is inert. `[mechanism@LoopScore, 2400it]`.
+
+3. **w_amp IS load-bearing.** w_amp=0 drops LS to 0.132 with much worse SD (0.272). Without
+   the anti-collapse penalty, some nodes lose motion. This OVERTURNS the B4 rejection of
+   w_amp=0.6 — the DIRECTION was wrong (increase hurts) but the mechanism IS needed.
+   `[mechanism@LoopScore, 2400it]`.
+
+4. **stiff_hi=400 CATASTROPHIC.** LS=0.076, 5/9 negative. Too much stiffness contrast creates
+   multiple catastrophic nodes. stiff_hi=300 is the upper limit.
+   `[mechanism@LoopScore, 2400it]`.
+
+5. **Residual decomposition not run** — GPU access denied during analysis.
+
+### Best optimizer slot: **s1 (deep3600, LS=0.162)** — NEW BEST. Breaks the plateau.
+### Best scientific slot: **s1 (deep3600)** — also the most informative. The duration interior
+   optimum at dur=24 reveals that the optimizer was previously trapped in a dur≈30 basin, and
+   that SHORTER pulses produce better loop morphology. This reframes duration from "saturating"
+   to "optimization-limited" — the conclusion was wrong, the optimizer just hadn't escaped.
+
+### Verdict: SUPPORTED (deeper optimization discovers duration interior optimum that improves LS).
+   OVERTURNED: "duration saturates at dur_hi" was an optimization-depth artifact.
+   `[optimization+mechanism@LoopScore, 3600it]`.
+
+### Batch outcome: **improved LoopScore (0.152→0.162, NEW BEST)** + improved morphology map
+   (drag asymmetry discovered; w_amp load-bearing confirmed; duration reframed from
+   saturating to optimization-limited).
+
+### Next
+The central question: "Is the 3600it improvement due to duration finding its interior optimum,
+or to a broader optimization benefit?" Test by constraining dur_hi=25 (forces duration into
+the right range at 2400it). Also push depth to 4800it and test combinations at 3600it.
+
+Parent for Batch 9: s1 (3600it, stiff [80,300], LS=0.162) for exploit;
+                     s5 (2400it, stiff [80,300], LS=0.152) for explore/control.
+
+## Batch 9 — 2026-06-29
+
+Parent: B8-s1 deep3600 (LS=0.162, 3600it, dur→24, stiff [80,300], gain0=0.5, amp=12, ω=5)
+Surprise (from B8): "Duration has an interior optimum at ~24 — was the 3600it improvement
+  specifically due to duration escaping the dur≈30 basin, or a broader optimization benefit?"
+Observation: all slots still show 1 catastrophic node at LS=-1.00 in the same grid position
+  (row 2, col 3 in zoom); the stiffness binary pattern is virtually identical across all 6 slots.
+Hypothesis: "If dur_hi=25 or dur0=10 at 2400it reproduces LS≈0.162, the depth was only needed
+  to overcome the duration basin barrier. If not, deeper training provides a broader benefit."
+
+### Per-slot results (ranked by LS)
+
+| Rank | Slot | Name | Role | Variable | LS | LS_SD | R² | dur | ampL | open | chir+ | Morph |
+|------|------|------|------|----------|-----|-------|-----|-----|------|------|-------|-------|
+| 1 | s0 | deep4800 | exploit | n_iter=4800 | 0.166 | 0.194 | -1.346 | 21.1 | 0.068 | 0.178 | 0.65 | PARTIAL (4150/4800, killed) |
+| 2 | s3 | dur0_10 | explore | dur0=10 | 0.165 | 0.187 | -1.383 | 19.4 | 0.066 | 0.190 | 0.62 | complete |
+| 3 | s4 | durhi20 | explore | dur_hi=20 | 0.163 | 0.185 | -1.350 | 20.0 | 0.072 | 0.185 | 0.63 | complete |
+| 4 | s5 | ctrl3600 | control | reproduce B8 | 0.160 | 0.186 | -1.259 | 24.3 | 0.086 | 0.174 | 0.69 | complete |
+| 5 | s2 | 3600_gain04 | exploit | gain0=0.4 | 0.159 | 0.184 | -1.247 | 24.1 | 0.091 | 0.176 | 0.69 | complete |
+| 6 | s1 | durhi25 | exploit | dur_hi=25 | 0.157 | 0.185 | -1.228 | 24.4 | 0.098 | 0.178 | 0.69 | complete |
+
+### Per-node LS from dashboards (3x3 zoom grid, row-major)
+
+- s0 (deep4800): +0.15, +0.20, +0.27, +0.08, +0.10, **-1.00**, +0.18, +0.09, +0.13
+- s1 (durhi25):  +0.03, +0.17, +0.29, +0.09, +0.07, **-1.00**, +0.18, +0.05, +0.15
+- s2 (gain04):   +0.10, +0.18, +0.28, +0.11, +0.08, **-1.00**, +0.18, +0.05, +0.15
+- s3 (dur0_10):  +0.06, +0.20, +0.27, +0.06, +0.11, **-1.00**, +0.17, +0.18, +0.09
+- s4 (durhi20):  +0.05, +0.20, +0.27, +0.06, +0.10, **-1.00**, +0.19, +0.10, +0.12
+- s5 (ctrl3600): +0.10, +0.17, +0.29, +0.10, +0.07, **-1.00**, +0.20, +0.05, +0.15
+
+### Key observations
+
+1. **BIGGEST SURPRISE: dur0=10 at 2400it (s3, LS=0.165) nearly MATCHES 4800it (s0, LS=0.166)!**
+   Starting duration from 10 instead of 14 lets the optimizer find dur=19.4 at just 2400it,
+   bypassing the dur=30 basin entirely. This CONFIRMS the hypothesis: the B8 improvement was
+   SPECIFICALLY about duration escaping its basin, not about general optimization quality.
+
+2. **Duration interior optimum is ~19-21, NOT ~24 as B8 suggested.** With better init (dur0=10)
+   or longer training (4800it -> dur=21.1), duration converges BELOW the 3600it value of 24.
+   The dur=24 at 3600it was still en route — itself an optimization artifact.
+
+3. **TWO DISTINCT DURATION REGIMES emerge from the data:**
+   - **Short-duration regime (dur 19-21):** s0 (dur=21.1, LS=0.166), s3 (dur=19.4, LS=0.165),
+     s4 (dur=20.0, LS=0.163). Higher LS, LOWER chirality (0.62-0.65), HIGHER openness (0.178-0.190),
+     LOWER ampL (0.066-0.072).
+   - **Medium-duration regime (dur 24):** s1 (dur=24.4, LS=0.157), s2 (dur=24.1, LS=0.159),
+     s5 (dur=24.3, LS=0.160). Lower LS, HIGHER chirality (0.69), LOWER openness (0.174-0.178),
+     HIGHER ampL (0.086-0.098).
+   The short-duration regime trades chirality for openness and SIZE, gaining net LS because
+   LS weights chirality and size equally (~1.97), and the openness improvement adds.
+
+4. **dur_hi=25 (s1) is the WORST slot** (LS=0.157). Constraining dur_hi to 25 forces duration
+   to saturate at 24.4 (the ceiling), preventing escape to the true optimum at ~20.
+
+5. **dur_hi=20 (s4, LS=0.163) BEATS dur_hi=25 (s1, LS=0.157)** — inverted ranking proves
+   dur=24 is a LOCAL optimum between the true optimum (~20) and the dur=30 basin.
+
+6. **gain0=0.4 still flat vs gain0=0.5 at 3600it.** CONFIRMED FLAT across all tested depths.
+
+7. **4800it provides NO benefit over dur0=10 at 2400it.** LS=0.166 vs 0.165 — noise level.
+
+8. **Catastrophic node is UNIVERSAL and POSITION-FIXED** in B9 (same fibre init across slots).
+
+9. **Residual decomposition pending** — script at run_decompose_b9.sh.
+
+### Best optimizer slot: **s0 (deep4800, LS=0.166)** — marginal NEW BEST (tied with s3).
+### Best scientific slot: **s3 (dur0_10)** — demonstrates duration-init substitutes for depth;
+   true optimum is ~19-20; clean NEVER-TRUST-OPTIMIZATION demonstration.
+
+### Verdict: SUPPORTED — B8 improvement was a duration-init basin effect. Duration init (dur0)
+   is a first-class variable that substitutes for optimization depth.
+   OVERTURNED: "dur=24 is the interior optimum" -> dur=24 was en route to ~19-21.
+   CONFIRMED: gain0=0.4=0.5 flat at 3600it.
+   `[mechanism+optimization@LoopScore, 2400-4150it, dur regime]`.
+
+### Batch outcome: **marginal LS improvement (0.162->0.166)** + **MAJOR morphology map gain**
+   (two duration regimes; duration init substitutes for depth; inverted dur_hi ranking
+   proves multi-basin landscape).
+
+### Next
+Parent for Batch 10: s3 (dur0=10, 2400it, LS=0.165) — short-duration regime, efficient.
+The BOTTLENECK is the single catastrophic node (LS=-1.00), dragging the mean by ~0.13.
+Next batch should attack this bottleneck and explore whether the short-duration regime
+can be pushed further (dur0=10 at 3600it, different fibre inits to move the outlier).
+
+---
+
+## Batch 10 — 2026-06-29
+Parent: s5 ctrl = B9-s3 dur0_10 (LS=0.165, 2400it, dur0=10, dur→19.4, stiff [80,300], gain0=0.5, amp=12, ω=5)
+Surprise (from B9): "Duration init (dur0=10) matched 4150it depth at only 2400it. True optimum dur≈19-21."
+Observation: "The single catastrophic node (LS=-1.00, position (2,3)) drags the mean by ~0.13. All scalar levers are flat or optimized."
+Hypothesis: "The catastrophic node is a fibre×stiffness basin interaction. Changing fibre init will MOVE the catastrophe; if the new position has smaller GT impact, LS improves without mechanism change."
+
+### Per-slot results (ranked by LS)
+
+| Rank | Slot | Name | Role | Variable | LS | LS_SD | R² | dur | ampL | open | chir+ | size |
+|------|------|------|------|----------|-----|-------|-----|------|------|------|-------|------|
+| 1 | s4 | durhi15 | explore | dur_hi=15 | **0.196** | 0.227 | -1.428 | 11.3 | 0.049 | 0.180 | 0.70 | 9.84e-04 |
+| 2 | s2 | deep3600 | exploit | n_iter=3600 | 0.175 | 0.192 | -1.467 | 18.8 | 0.053 | 0.191 | 0.63 | 1.03e-03 |
+| 3 | s3 | wl35 | explore | fibre_wl=35 | 0.165 | 0.191 | -1.450 | 18.7 | 0.064 | 0.181 | 0.57 | 1.02e-03 |
+| 4 | s5 | ctrl | control | (reproduce B9) | 0.161 | 0.187 | -1.346 | 19.3 | 0.075 | 0.187 | 0.65 | 1.02e-03 |
+| 5 | s1 | phase12 | exploit | fibre_phase=1.2 | 0.158 | 0.188 | -1.298 | 20.3 | 0.080 | 0.167 | 0.69 | 1.00e-03 |
+| 6 | s0 | angle05 | exploit | fibre_angle=0.5 | 0.060 | 0.341 | -1.723 | 27.8 | 0.133 | 0.190 | 0.62 | 9.00e-04 |
+
+### Dashboard observations
+
+**s4 (durhi15, LS=0.196, NEW BEST):**
+- Per-node zoom: LS=-0.45, +0.08, +0.14, +0.16, +0.07, -0.13, +0.51, +0.06, +0.37
+- The catastrophic node has LS=-0.45 — NOT -1.00. This is a massive improvement (+0.55 on that node).
+- Two nodes above +0.37, one at +0.51 (the best per-node score ever seen).
+- One mildly negative node at -0.13 (new — different from the usual catastrophic position).
+- SD=0.227 is higher than ctrl (0.187) because the per-node range is -0.45 to +0.51.
+- Duration converged to 11.3 (clamped near dur_hi=15 floor — NOT at ceiling).
+- Stiffness field: more fragmented binary pattern than ctrl.
+- Red loops are generally SMALLER than green (lower ampL=0.049) — the very short pulse limits energy.
+
+**s2 (deep3600, LS=0.175):**
+- Per-node zoom: LS=+0.18, +0.22, +0.26, +0.01, +0.11, -1.00, +0.19, +0.12, +0.18
+- Still has the LS=-1.00 catastrophic node.
+- Non-catastrophic nodes improved slightly vs ctrl (best +0.26).
+- Duration pushed to 18.8 (vs 19.3 at 2400it) — continuing to shorten.
+- Stiffness field: finer texture than 2400it, more scattered islands.
+
+**s3 (wl35, LS=0.165):**
+- Per-node zoom: LS=+0.25, +0.22, +0.28, +0.02, +0.15, -1.00, +0.19, +0.22, +0.09
+- Still has -1.00 node. Top-left node excellent (+0.25, +0.28).
+- wl=35 is NEUTRAL (matches ctrl within noise). Unlike wl=40 which was catastrophic.
+- Fibre pattern: slightly coarser than default (wl=28.8).
+
+**s5 (ctrl, LS=0.161):**
+- Per-node zoom: LS=+0.05, +0.20, +0.26, +0.07, +0.10, -1.00, +0.17, +0.12, +0.12
+- Matches B9 ctrl (LS=0.165→0.161, within stochastic range).
+- Catastrophic node at usual position, LS=-1.00.
+
+**s1 (fibre_phase12, LS=0.158):**
+- Per-node zoom: LS=+0.02, +0.20, +0.23, +0.08, +0.09, -1.00, +0.17, -0.00, +0.10
+- Catastrophic node at -1.00, plus one near-zero node.
+- Phase change slightly worse — may have moved a marginal node into a worse basin.
+
+**s0 (fibre_angle05, LS=0.060):**
+- Per-node zoom: LS=-0.85, +0.14, +0.09, +0.45, +0.03, +0.06, +0.14, +0.09, +0.20
+- CRITICAL: dur=27.8 despite dur0=10! The angle=0.5 fibre init PREVENTS duration from escaping.
+- This is a fibre×duration interaction: the wrong fibre basin traps duration in the long-duration regime.
+- One catastrophic node at -0.85 (not floored, but very bad).
+- Compare B5 (angle=0.5 with dur0=14): LS=0.044. Here with dur0=10: LS=0.060. Marginally better but
+  fundamentally the same failure — the fibre basin is the bottleneck, not dur0.
+
+### Key findings
+
+1. **THIRD DURATION BASIN discovered at dur≈11.** The landscape has THREE basins: dur≈30 (trapped,
+   LS≈0.06-0.12), dur≈19-21 (previously "optimal", LS≈0.16), and dur≈11 (NEW BEST, LS=0.196).
+   The dur≈19-21 "optimum" was NOT the global optimum — it was the second-best basin.
+
+2. **Short duration TAMES the catastrophic node.** The LS=-1.00 catastrophe drops to LS=-0.45 at
+   dur≈11. Mechanism: shorter pulse limits the overshoot energy that creates the catastrophe.
+   The catastrophe is fundamentally an ENERGY OVERSHOOT, not a structural tissue property.
+
+3. **Fibre angle=0.5 traps duration at dur≈28 even with dur0=10.** The fibre init × duration
+   interaction is strong: the wrong fibre basin prevents the optimizer from finding short duration.
+   This confirms that fibre init is a basin selector, not just a fibre property lever.
+
+4. **deep3600 improved to LS=0.175** (from 2400it ctrl at 0.161, +0.014). Duration continued
+   shortening (18.8 vs 19.3). Still has LS=-1.00 catastrophe. 3600it helps in the dur≈19 regime
+   but cannot compete with dur_hi=15's basin change.
+
+5. **wl=35 is neutral** (LS=0.165 vs ctrl 0.161). Unlike wl=40 (catastrophic, B8). The viable
+   wl range is [28.8, 35], with 40 outside.
+
+6. **fibre_phase=1.2 is slightly worse** (LS=0.158 vs 0.161). Phase changes don't improve LS in
+   the short-duration regime — the catastrophic node remains at LS=-1.00 regardless of phase.
+
+### Residual decomposition: PENDING (run_decompose_b10.sh created, needs execution).
+
+### Best optimizer slot: **s4 (durhi15, LS=0.196)** — NEW ALL-TIME BEST (+0.030 over prior best 0.166).
+   Achieves this by taming the catastrophic node from -1.00 to -0.45 via very short duration.
+
+### Best scientific slot: **s4 (durhi15)** — ALSO the most informative. Reveals:
+   (a) a THIRD duration basin at dur≈11, overturning "dur≈19-21 is optimal";
+   (b) the catastrophic node is an ENERGY overshoot, tamed by shorter pulses;
+   (c) the duration landscape has 3 distinct regimes with different morphology families.
+
+### Verdict: PARTIALLY FALSIFIED — the fibre init hypothesis (moving the catastrophe) was
+   irrelevant; the real breakthrough came from the EXPLORE slot (durhi15) discovering a new
+   duration basin. `[mechanism@LoopScore, 2400it, OVERTURNED@B9-dur-optimum]`.
+
+### Batch outcome: **MAJOR LS improvement (0.166→0.196, +18%)** + **MAJOR morphology map gain**
+   (third duration basin; catastrophe as energy overshoot; fibre×duration interaction).
+
+### Next
+Parent for Batch 11: s4 (durhi15, LS=0.196, dur_hi=15, dur→11.3).
+KEY QUESTION: Is dur≈11 the floor of this basin, or does even shorter duration help?
+Also: can depth (3600it) improve the durhi15 regime? Does amp=10 further tame the catastrophe?

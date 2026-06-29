@@ -16,6 +16,7 @@ Figures land next to the data, in the dataset directory.
 from __future__ import annotations
 
 import os
+import itertools
 
 import numpy as np
 import matplotlib
@@ -128,7 +129,10 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     world_size = d["world_size"] if "world_size" in d.files else None   # per-axis box (3D splat)
     obstacles = list(getattr(sim, "obstacles", []) or [])   # wall geometry to overlay (grey)
 
+    hide = set(style.get("hide_sets", []) or [])     # sets to skip plotting (e.g. MPM `cell` centroids)
     for sname in _sets_in(d):
+        if sname in hide:
+            continue
         pos = d[f"{sname}__pos"]                      # [T, N, 2]
         occ = d[f"{sname}__occ"]                      # [T, N]
         cby = _render_meta(sname).get("color_by")     # which per-node field colors the points
@@ -142,6 +146,27 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         if D == 3:
             box = (np.asarray(world_size, np.float32) if world_size is not None
                    and len(world_size) == 3 else np.array([W, 1.0, 1.0], np.float32))
+            # up-axis: the splat camera takes world axis 2 (z) as screen-vertical. A scene
+            # with a gravity "down" on another axis (MPM gravity is on axis 1 = y, like the
+            # 2D convention + the MPM reference) sets `plotting.up_axis` to that axis so the
+            # fall renders vertical (else it looks like a sideways drift). Default 2 = no-op.
+            obs_src = list(getattr(sim, "obstacles", []) or [])   # 3D obstacles (box[6]/sphere[4]) in world coords
+            up = int(style.get("up_axis", 2))
+            obs3 = obs_src
+            if up != 2:
+                perm = [a for a in (0, 1, 2) if a != up] + [up]
+                pos = pos[..., perm].copy(); box = box[perm]
+                pos[..., 2] = box[2] - pos[..., 2]    # mirror so -up (gravity) points DOWN on screen
+                b2 = float(box[2])                    # transform obstacles by the same perm + vertical mirror
+                obs3 = []
+                for o in obs_src:
+                    v = [float(x) for x in o]
+                    if len(v) == 6:
+                        lo = [v[:3][perm[k]] for k in range(3)]; hi = [v[3:6][perm[k]] for k in range(3)]
+                        obs3.append([lo[0], lo[1], b2 - hi[2], hi[0], hi[1], b2 - lo[2]])
+                    elif len(v) == 4:
+                        c = [v[:3][perm[k]] for k in range(3)]
+                        obs3.append([c[0], c[1], b2 - c[2], v[3]])
             # auto-frame: if the cloud escaped the world box (a `free`/unbounded run),
             # re-centre and size the render to the trajectory's own extent (+margin); a
             # bounded run (extent ~ box) is left exactly as before.
@@ -151,12 +176,24 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
             if bool((extent > box * 1.02).any()):
                 box = extent * 1.06
                 pos = pos - 0.5 * (lo + hi)[None, None, :] + 0.5 * box[None, None, :]
+            # colour by own type (charge palette), else by PARENT cell -- mapped through
+            # the parent set's type palette so a contained MPM set inherits its material
+            # colour (jelly/water/snow), falling back to a distinct hue per parent body.
+            par = d[f"{sname}__parent"] if f"{sname}__parent" in d.files else None
             if pal is not None and nt is not None:
                 color3 = pal[nt % len(pal)]
+            elif par is not None:
+                pname = str(d[f"{sname}__parent_name"]) if f"{sname}__parent_name" in d.files else None
+                ppal = (_typed_palette(sim, pname, style)[0] if pname else None)
+                pnt = d[f"{pname}__node_type"] if (pname and f"{pname}__node_type" in d.files) else None
+                if ppal is not None and pnt is not None:
+                    color3 = ppal[pnt[par] % len(ppal)]   # per-particle: parent cell's material colour
+                else:
+                    color3 = cmap(par % cmap.N)           # distinct hue per parent body
             else:
                 color3 = cmap(nt % cmap.N) if nt is not None else None
             _splat3d_outputs(pos, occ, _point_rgb(color3, N), box, data_dir, sname, style,
-                             movie, T, size_scale=size_scale)
+                             movie, T, size_scale=size_scale, obstacles=obs3)
             continue
         s = _point_size(style, N)
         if size_scale is not None:                    # scale point area by |type prop| (charge)
@@ -626,10 +663,97 @@ def _splat_style(style: dict) -> dict:
     )
 
 
-def _splat3d_renderer(style, box):
+def _project_points(points, box, azim, elev, res, zoom):
+    """Project centred world points to screen pixels (sx, sy) + camera depth, the same
+    camera the splat uses (box-centred, half-diagonal span / zoom)."""
+    P = np.asarray(points, np.float32) - 0.5 * np.asarray(box, np.float32)[None, :]
+    screen, depth = _rot_camera(P, azim, elev)
+    span = (float(np.linalg.norm(box)) * 0.5 + 1e-9) / max(zoom, 1e-6)
+    sx = (screen[:, 0] / (2 * span) + 0.5) * res
+    sy = (screen[:, 1] / (2 * span) + 0.5) * res
+    return sx, sy, depth
+
+
+def _box_corners_edges(box):
+    """The 8 corners of [0,bx]x[0,by]x[0,bz] and the 12 edges (corner-index pairs)."""
+    corners = np.array(list(itertools.product([0, 1], repeat=3)), np.float32) * np.asarray(box, np.float32)[None, :]
+    edges = [(i, j) for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count("1") == 1]
+    return corners, edges
+
+
+def _draw_edges(img, corners, box, azim, elev, res, zoom, color, mix, which="all"):
+    """Draw the wireframe edges of an 8-corner box into `img` (faint blended line).
+    `which`: 'all', or 'far'/'near' to draw only edges on the far/near side of the box
+    centre (so the near edges can be drawn AFTER the points -> proper occlusion)."""
+    cx, cy, cd = _project_points(corners, box, azim, elev, res, zoom)   # cd = camera depth
+    _, edges = _box_corners_edges(np.ones(3))            # the 12 edge index pairs (adjacency only)
+    med = float(np.median(cd)); color = np.asarray(color, np.float32)
+    for a, b in edges:
+        if which != "all":                              # smaller depth = nearer the camera
+            near = 0.5 * (cd[a] + cd[b]) < med
+            if (which == "near") != near:
+                continue
+        n = int(max(abs(cx[a] - cx[b]), abs(cy[a] - cy[b])) * 1.5) + 2
+        gx = np.clip(np.linspace(cx[a], cx[b], n).astype(int), 0, res - 1)
+        gy = np.clip(np.linspace(cy[a], cy[b], n).astype(int), 0, res - 1)
+        img[gy, gx] = (1 - mix) * img[gy, gx] + mix * color
+
+
+def _aabb_corners(lo, hi):
+    """The 8 corners of the axis-aligned box [lo, hi] (each [3])."""
+    lo, hi = np.asarray(lo, np.float32), np.asarray(hi, np.float32)
+    return np.array([[lo[0] if i & 4 else hi[0], lo[1] if i & 2 else hi[1], lo[2] if i & 1 else hi[2]]
+                     for i in range(8)], np.float32)
+
+
+def render_points_3d(points, rgb, box, res=600, azim=0.7, elev=1.18, bg="black",
+                     size=2.0, fog=0.5, zoom=1.0, frame=False, obstacles=None):
+    """Render 3D points as SIMPLE flat dots (depth-ordered, painter's algorithm; near
+    overwrites far) -- the 3D analogue of the 2D MPM scatter, no soft gaussian blur.
+    `frame=True` draws the box as thin white wireframe edges; `obstacles` (already in the
+    render frame: box [x0,y0,z0,x1,y1,z1] / sphere [cx,cy,cz,r]) are drawn as grey solids.
+    Returns an [res,res,3] image."""
+    from matplotlib.colors import to_rgb
+    box = np.asarray(box, np.float32)
+    img = np.tile(np.asarray(to_rgb(bg), np.float32), (res, res, 1))
+    fcorners = _box_corners_edges(box)[0] if frame else None
+    if frame:                                            # FAR box edges go behind the points
+        _draw_edges(img, fcorners, box, azim, elev, res, zoom, (1, 1, 1), 0.55, which="far")
+    for o in (obstacles or []):                          # grey obstacle solids (drawn under the particles)
+        v = [float(x) for x in o]
+        if len(v) == 6:                                  # box: wireframe + faint fill of surface dots
+            _draw_edges(img, _aabb_corners(v[:3], v[3:6]), box, azim, elev, res, zoom, (0.55, 0.55, 0.6), 0.8)
+        elif len(v) == 4:                                # sphere: a shell of grey dots (Fibonacci sphere)
+            m = 700; k = np.arange(m); ph = np.arccos(1 - 2 * (k + 0.5) / m); th = np.pi * (1 + 5 ** 0.5) * k
+            shell = v[3] * np.stack([np.cos(th) * np.sin(ph), np.sin(th) * np.sin(ph), np.cos(ph)], 1) + np.array(v[:3])
+            sxo, syo, dep = _project_points(shell.astype(np.float32), box, azim, elev, res, zoom)
+            for sxx, syy in zip(sxo.astype(int), syo.astype(int)):
+                if 0 <= sxx < res and 0 <= syy < res:
+                    img[syy, sxx] = (0.5, 0.5, 0.55)
+    if len(points):
+        rgb = np.broadcast_to(np.asarray(rgb, np.float32), (len(points), 3))
+        sx, sy, depth = _project_points(points, box, azim, elev, res, zoom)
+        dn = (depth - depth.min()) / (np.ptp(depth) + 1e-9)        # 1 = nearest
+        cols = np.clip(rgb * ((1 - fog) + fog * dn)[:, None], 0, 1)
+        order = np.argsort(depth)[::-1]                  # far first; near painted last -> on top
+        sxo, syo, colo = sx[order].astype(int), sy[order].astype(int), cols[order]
+        r = int(round(size))
+        for oy in range(-r, r + 1):
+            for ox in range(-r, r + 1):
+                if ox * ox + oy * oy > r * r + 0.5:
+                    continue
+                gx = np.clip(sxo + ox, 0, res - 1); gy = np.clip(syo + oy, 0, res - 1)
+                img[gy, gx] = colo
+    if frame:                                            # NEAR box edges go IN FRONT of the points
+        _draw_edges(img, fcorners, box, azim, elev, res, zoom, (1, 1, 1), 0.55, which="near")
+    return np.clip(img, 0, 1)[::-1]
+
+
+def _splat3d_renderer(style, box, obstacles=None):
     """Build the per-frame 3D point renderer `render(points, rgb, azim) -> image` from
-    the spec's `plotting:` block. `render_3d` selects the method (default `tight` =
-    sharp depth-sorted sprites = method B; `splat` = the soft grid-blur). Returns
+    the spec's `plotting:` block. `render_3d` selects the method: `tight` (default) =
+    sharp depth-sorted sprites; `splat` = soft grid-blur; `dots` = simple flat dots
+    (the 2D-MPM look) with an optional `box_frame` wireframe + grey `obstacles`. Returns
     (render_fn, bg, azim0, turns, elev)."""
     bg = style.get("background", "black")
     azim0 = float(style.get("camera_azim", 0.7))
@@ -638,7 +762,15 @@ def _splat3d_renderer(style, box):
     zoom_amp = float(style.get("camera_zoom", 0.12))      # slow zoom-in over the clip (fractional, e.g. 0.12 = +12%)
     elev = float(style.get("camera_elev", 0.5))
     mode = style.get("render_3d", "tight")
-    if mode == "splat":                                   # soft grid-blur splat (the original)
+    if mode == "dots":                                    # simple flat dots (2D-MPM look) + frame/obstacles
+        res = int(style.get("splat_res", 600))
+        dot = float(style.get("dot_size", style.get("splat_size", 2.0)))
+        fog = float(style.get("splat_fog", 0.4))
+        frame = bool(style.get("box_frame", False))
+        def render(pts, c, az, zoom=1.0, size=None):
+            return render_points_3d(pts, c, box, res=res, azim=az, elev=elev, bg=bg,
+                                     size=dot, fog=fog, zoom=zoom, frame=frame, obstacles=obstacles)
+    elif mode == "splat":                                 # soft grid-blur splat (the original)
         kw = _splat_style(style)
         def render(pts, c, az, zoom=1.0, size=None):
             return gaussian_splat_3d(pts, c, box, azim=az, zoom=zoom, **kw)
@@ -670,12 +802,12 @@ def _cam_azim(azim0, turns, rock, i, n):
     return azim0 + rock * np.sin(2 * np.pi * t)
 
 
-def _splat3d_outputs(pos, occ, rgb, box, data_dir, sname, style, movie, T, size_scale=None):
+def _splat3d_outputs(pos, occ, rgb, box, data_dir, sname, style, movie, T, size_scale=None, obstacles=None):
     """Evolution montage + final frame + (optional) movie for a 3D set. The renderer
     (`plotting.render_3d`: `tight` sharp sprites [default] or `splat` soft grid-blur)
     and its appearance come from the `plotting:` block. `size_scale` ([N], optional)
     scales each point's sprite (e.g. ~|charge|). Mirrors the 2D set outputs."""
-    render, bg, azim0, turns, rock, zoom_amp, _elev = _splat3d_renderer(style, box)
+    render, bg, azim0, turns, rock, zoom_amp, _elev = _splat3d_renderer(style, box, obstacles=obstacles)
 
     def img(i, az, zoom=1.0):
         live = occ[i]
@@ -699,7 +831,7 @@ def _splat3d_outputs(pos, occ, rgb, box, data_dir, sname, style, movie, T, size_
 
     if movie:
         _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T,
-                       os.path.join(data_dir, f"movie_{sname}"))
+                       os.path.join(data_dir, f"movie_{sname}"), fps=int(style.get("fps", 15)))
 
 
 def _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T, out_base,

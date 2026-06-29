@@ -6,6 +6,10 @@ the particle positions. Recomputes the B-spline weights from the (pre-advection)
 positions so they match p2g exactly. Advection is integrated state, so this opts out
 of the engine guard (MAY_MUTATE_INTEGRATED_STATE) -- the substep loop owns it, like the
 oracle. Step 4 of the decomposed MLS-MPM (oracle: `mls_mpm_mechanics`).
+
+Dimension-generic: gather, the affine C outer product, the wall-contact test and the
+advection clamp all run over D axes (box = world_size, axis 0 = width, others 1). The
+2D path reduces bit-identically to the original.
 """
 from __future__ import annotations
 
@@ -13,11 +17,12 @@ import torch
 
 from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
-from plexus.operators.mpm_grid import _OFFSETS, bspline, sub_dt
+from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
 @register_operator("g2p", level="particle", kind="exchange")
 class G2P(Exchange):
+    SUPPORTED_DIMS = [2, 3]
     MAY_MUTATE_INTEGRATED_STATE = True             # advects pos/vel inside the substep (like the oracle)
     MECHANISM_TAGS = ["grid_to_particle", "advection"]
 
@@ -33,20 +38,23 @@ class G2P(Exchange):
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.frm); dev = p.state.device
         dt = sub_dt(H, self.dt_sub)
-        nx, ny, inv_dx, dx = g.nx, g.ny, g.inv_dx, g.dx
+        inv_dx, dx = g.inv_dx, g.dx
+        D = p.F.shape[-1]
         periodic = bool(getattr(H, "periodic", False))
-        width = float(getattr(H, "world_width", 1.0))
-        offsets = _OFFSETS.to(dev)
+        box = [float(b) for b in getattr(H, "world_size", torch.tensor([g.width, 1.0]))][:D]
+        offsets = stencil_offsets(D, dev); S = offsets.shape[0]
         X, V = p.get("pos"), p.get("vel")
-        fx, weight, flat = bspline(X, inv_dx, offsets, nx, ny, periodic)
-        gvn = g.v[flat].view(p.n, 9, 2)
+        fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
+        gvn = g.v[flat].view(p.n, S, D)
         new_V = (weight[..., None] * gvn).sum(1)
         dpos_grid = offsets[None] - fx[:, None, :]
         new_C = 4 * inv_dx * (weight[..., None, None] * (gvn[..., :, None] @ dpos_grid[..., None, :])).sum(1)
         new_V = torch.nan_to_num(new_V)
         if self.wall_damp != 1.0 and not periodic:                 # inelastic wall contact (solids)
             cb = self.wall_contact
-            near = ((X[:, 0] < cb) | (X[:, 0] > width - cb) | (X[:, 1] < cb) | (X[:, 1] > 1.0 - cb))
+            near = torch.zeros(p.n, dtype=torch.bool, device=dev)
+            for k in range(D):
+                near = near | (X[:, k] < cb) | (X[:, k] > box[k] - cb)
             liquid = getattr(p, "is_liquid", None)
             if liquid is not None:
                 near = near & ~liquid
@@ -57,9 +65,9 @@ class G2P(Exchange):
         new_C = torch.nan_to_num(new_C)
         Xn = torch.nan_to_num(X + dt * new_V, nan=0.5)
         if periodic:
-            Xn = torch.stack([torch.remainder(Xn[:, 0], width), torch.remainder(Xn[:, 1], 1.0)], dim=1)
+            Xn = torch.stack([torch.remainder(Xn[:, k], box[k]) for k in range(D)], dim=1)
         else:
-            Xn = torch.stack([Xn[:, 0].clamp(2 * dx, width - 2 * dx), Xn[:, 1].clamp(2 * dx, 1 - 2 * dx)], dim=1)
+            Xn = torch.stack([Xn[:, k].clamp(2 * dx, box[k] - 2 * dx) for k in range(D)], dim=1)
         new = p.state.clone()
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
         new[:, pa:pb] = Xn; new[:, va:vb] = new_V

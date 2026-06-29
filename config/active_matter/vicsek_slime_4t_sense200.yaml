@@ -1,0 +1,76 @@
+# NOISE SWEEP variant -- sense steer-noise = 2.0 (beyond nominal: frac in [-1,1],
+# so agents sometimes turn AWAY from the best sensor -> more disordered networks).
+# vicsek_slime_4t -- a MIX of vicsek_4t (active matter) and slime_four (Physarum):
+# four species rendered as oriented triangles (the active-matter marker), each one
+# FLOWING ALONG ITS OWN SLIME TRAIL. The slime mechanism does the steering: every
+# type deposits into its own field channel (deposit), the trail diffuses + decays,
+# and `sense` (cross=-1) makes a type follow its OWN channel and avoid the others --
+# so the four colours self-organise into four interleaving transport networks, with
+# the triangles streaming along them. Heading-kinematic (sense->glide, 1st order):
+# the same paradigm as slime, so triangles orient along the heading they are steered.
+# Periodic (toroidal) world: particles wrap, and the chemical field wraps with them
+# (diffuse uses circular padding, sense wraps its window) -- so the trail networks are
+# seamless across every edge. No `bounce`: there are no walls on a torus.
+# Refs: Vicsek et al., PRL 75 (1995); Jones/Physarum (Jones, Artif. Life 2010).
+general: {name: vicsek_slime_4t_sense200, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 9000
+    spawn: random
+    types:
+      a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.024}
+- {op: diffuse, at: chemical, rate: 0.013}
+- {op: decay,   at: chemical, rate: 0.002}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 2.0}   # follow own trail, avoid the others
+- {op: glide,   at: cell}
+schedule: [deposit, diffuse, decay, sense, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  marker: triangle
+  triangle_size: 0.009
+  gamma: 0.7
+  overlay: true        # extra movie: the trail field with the triangles streaming on top
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The video shows a static field of multicolored, multi-segmented particles against a black
+      background. There is no visible movement or evolution of the particles between the keyframes. The
+      distribution of the objects remains constant throughout the entire sequence. The scene represents
+      a steady-state snapshot of a complex system.
+    objects: The scene contains thousands of small, multi-segmented particles scattered randomly across
+      the frame. Each particle consists of several connected line segments forming irregular, branching
+      shapes. The particles are colored in a variety of hues, including red, green, blue, and yellow.
+      They are uniformly distributed with no specific clustering or large-scale structural organization.
+  movie_chemical:
+    description: The simulation shows a dense, chaotic field of multi-colored fibers or filaments. These
+      filaments appear to be in a state of constant, high-frequency fluctuation or jittering. There is
+      no discernible global motion or large-scale structural evolution over the time sequence. The overall
+      texture remains statistically stationary, maintaining a consistent level of complexity and density.
+    objects: The scene is composed of a vast number of thin, thread-like filaments. These filaments are
+      randomly oriented and intertwined, creating a complex, non-ordered network. The colors are a mix
+      of cyan, yellow, red, and blue against a dark background. Each individual filament is very small
+      and elongated, contributing to a high-frequency noise-like appearance.
+  movie_overlay_chemical:
+    description: The video shows a dense collection of small, multi-colored particles moving randomly
+      against a black background. Each particle appears to be a small, irregular shape that rotates and
+      shifts position slightly in every frame. The overall distribution of the particles remains relatively
+      uniform throughout the duration of the simulation. There is no discernible global flow or pattern,
+      suggesting a stochastic or Brownian motion behavior.
+    objects: The scene contains thousands of tiny, individual particles scattered across the entire frame.
+      These objects are colored in a mix of red, green, blue, and yellow, often appearing as multi-colored
+      clusters. Each particle has a small, jagged, and irregular topology, resembling tiny shards or flecks.
+      The particles are uniform in size and are not connected to one another, maintaining a discrete and
+      independent distribution.

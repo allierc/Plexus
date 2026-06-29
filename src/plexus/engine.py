@@ -142,17 +142,16 @@ def _entity_class(sname: str):
 
 
 def _start_centers(start, n: int, rng, device: str) -> torch.Tensor:
-    """Explicit top-level placement from a spec `start`: either a list of [x,y]
-    points (deterministic, tiled to n) or a region rect [x0,y0,x1,y1] (uniform
-    sample). Used by sets that seed at known locations (e.g. an MPM water blob)."""
+    """Explicit top-level placement from a spec `start`: either a list of D-point
+    coords (deterministic, tiled to n) or a flat region box [lo..., hi...] (2*D values,
+    uniform sample). Dimension-generic. Used by sets that seed at known locations
+    (e.g. an MPM water blob / falling cube)."""
     if isinstance(start[0], (list, tuple)):
-        pts = torch.tensor([[float(p[0]), float(p[1])] for p in start], device=device)
+        pts = torch.tensor([[float(x) for x in p] for p in start], device=device)
         return pts[torch.arange(n, device=device) % pts.shape[0]]
-    x0, y0, x1, y1 = [float(v) for v in start]
-    c = torch.rand(n, 2, generator=rng, device=device)
-    c[:, 0] = x0 + c[:, 0] * (x1 - x0)
-    c[:, 1] = y0 + c[:, 1] * (y1 - y0)
-    return c
+    v = [float(x) for x in start]; D = len(v) // 2
+    lo = torch.tensor(v[:D], device=device); hi = torch.tensor(v[D:2 * D], device=device)
+    return lo + torch.rand(n, D, generator=rng, device=device) * (hi - lo)
 
 
 def _resolve_prediction(sim: Spec) -> dict:
@@ -275,7 +274,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             raise ValueError(f"set {sname!r} has parent {pname!r}, which is not a declared set")
         parent = H.level(pname)
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
-        schema, render, level = _entity_meta(sname)
+        _, render, level = _entity_meta(sname)         # render hints + level from the registry
+        schema = _dim_schema(H.dim)                     # pos/vel sized to the dimension contract (like top-level sets)
         dim = max(b for _, b in schema.values())
         Np = parent.n * per                                       # one block of `per` children per parent slot
         parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per)
@@ -296,6 +296,17 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             r = torch.rand(Np, generator=H.rng, device=device).pow(1.0 / D) * radius   # uniform in the D-ball
             offset = d * r[:, None]
         state[:, px0:px1] = ppos + offset
+        vinit = float(s.get("vel_init", 0.0))                     # per-PARTICLE random velocity (isotropic jitter)
+        vcube = float(s.get("vel_init_cube", 0.0))                # per-CUBE coherent random launch velocity
+        if "vel" in schema and (vinit > 0 or vcube > 0):
+            vx0, vx1 = schema["vel"]
+            v = torch.zeros(Np, D, device=device)
+            if vinit > 0:
+                v = v + (torch.rand(Np, D, generator=H.rng, device=device) - 0.5) * (2 * vinit)
+            if vcube > 0:                                         # one random velocity per parent cell -> its particles
+                vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcube)
+                v = v + vc[parent_idx]
+            state[:, vx0:vx1] = v
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
@@ -412,7 +423,14 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              o.on)
             for o in sim.operators]
 
-    n_rec = sim.n_frames + 1
+    # SET positions are recorded at a stride that caps the trajectory at ~`record_cap`
+    # frames, so an ultra-long run (e.g. 120k/240k frames) does not blow up RAM/disk.
+    # n_frames <= record_cap -> stride 1 -> every frame recorded (unchanged).
+    set_cap = int(getattr(sim, "record_cap", 1500))
+    sstride = max(1, (sim.n_frames + set_cap) // set_cap)
+    rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})
+    rec_index = {t: i for i, t in enumerate(rec_ticks)}
+    n_rec = len(rec_ticks)
     rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32) for name, lvl in H.levels.items()}
     occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}
     # fields are large [C,nx,ny] grids -> record at a stride that caps ~160 frames.
@@ -457,9 +475,11 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 for token in (step if isinstance(step, list) else [step]):
                     _run_token(token, tick)
             _integrate(H, sim.dt)                    # integrate each set once, at end of tick
-            for name, lvl in H.levels.items():
-                rec_sets[name][tick] = lvl.get("pos").cpu().numpy()
-                occ_sets[name][tick] = lvl.active.cpu().numpy()
+            ri = rec_index.get(tick)                 # None on un-recorded ticks (strided long runs)
+            if ri is not None:
+                for name, lvl in H.levels.items():
+                    rec_sets[name][ri] = lvl.get("pos").cpu().numpy()
+                    occ_sets[name][ri] = lvl.active.cpu().numpy()
             if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded

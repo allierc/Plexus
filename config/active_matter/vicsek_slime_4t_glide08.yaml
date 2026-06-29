@@ -1,0 +1,78 @@
+# NOISE SWEEP variant -- glide translational-noise = 0.008.
+# vicsek_slime_4t -- a MIX of vicsek_4t (active matter) and slime_four (Physarum):
+# four species rendered as oriented triangles (the active-matter marker), each one
+# FLOWING ALONG ITS OWN SLIME TRAIL. The slime mechanism does the steering: every
+# type deposits into its own field channel (deposit), the trail diffuses + decays,
+# and `sense` (cross=-1) makes a type follow its OWN channel and avoid the others --
+# so the four colours self-organise into four interleaving transport networks, with
+# the triangles streaming along them. Heading-kinematic (sense->glide, 1st order):
+# the same paradigm as slime, so triangles orient along the heading they are steered.
+# Periodic (toroidal) world: particles wrap, and the chemical field wraps with them
+# (diffuse uses circular padding, sense wraps its window) -- so the trail networks are
+# seamless across every edge. No `bounce`: there are no walls on a torus.
+# Refs: Vicsek et al., PRL 75 (1995); Jones/Physarum (Jones, Artif. Life 2010).
+general: {name: vicsek_slime_4t_glide08, seed: 0, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 9000
+    spawn: random
+    types:
+      a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.024}
+- {op: diffuse, at: chemical, rate: 0.013}
+- {op: decay,   at: chemical, rate: 0.002}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
+- {op: glide,   at: cell, noise: 0.008}
+schedule: [deposit, diffuse, decay, sense, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  marker: triangle
+  triangle_size: 0.009
+  gamma: 0.7
+  overlay: true        # extra movie: the trail field with the triangles streaming on top
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a collection of small, multi-colored particles moving in a complex,
+      swirling pattern. Over time, the particles appear to form large, rotating spiral structures that
+      shift and evolve. The density of the particles remains relatively uniform as they flow through the
+      space. The motion is fluid and continuous, with the spiral arms expanding and contracting slightly.
+    objects: The scene contains thousands of tiny, individual particles scattered across a black background.
+      These particles are colored in distinct shades of red, green, blue, and yellow. They are arranged
+      in large, interconnected spiral formations that dominate the visual field. Each particle is very
+      small and maintains a consistent size throughout the entire simulation.
+  movie_chemical:
+    description: The simulation shows a complex network of intertwined, thread-like structures that remain
+      relatively static in their overall configuration. Over time, the internal textures and intensities
+      of the colored filaments fluctuate slightly, creating a shimmering effect. The spatial distribution
+      of the different colored strands does not change significantly, maintaining a dense, tangled web.
+      The video captures a steady-state evolution of a multi-component filamentary system.
+    objects: 'The scene contains several sets of elongated, curvilinear filaments that are densely intertwined
+      and overlapping. These filaments are color-coded into four distinct groups: blue, yellow, green,
+      and red. Each filament is of a similar thickness and length, forming a complex, non-linear topology
+      across the entire frame. The structures appear as continuous, smooth curves that weave through one
+      another to create a high-density network.'
+  movie_overlay_chemical:
+    description: The simulation begins with a dense, chaotic distribution of small, multi-colored particles
+      scattered across a black background. Over time, these particles begin to organize into distinct,
+      winding filaments of red, green, yellow, and blue. The filaments grow in thickness and length, weaving
+      through each other to form a complex, interconnected network. By the final frame, the filaments
+      have become prominent, thick structures that dominate the space while the smaller particles remain
+      dispersed around them.
+    objects: The scene contains thousands of tiny, needle-like particles in red, green, yellow, and blue.
+      These particles are initially distributed randomly and independently across the entire frame. As
+      the simulation progresses, they aggregate into long, continuous, and winding filaments. These filaments
+      are much larger than the individual particles and are organized into a dense, overlapping web of
+      four distinct colors.

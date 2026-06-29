@@ -1,0 +1,64 @@
+# mpm3d_multimaterial -- three materials side by side in one 3D box (the spirit of
+# MPM_pytorch's multimaterial_1_3D, trimmed to three blocks for a quick inspect):
+# an elastic jelly cube, a liquid water cube and a plastic snow cube fall together.
+# Three cells, one material type each (assigned by `fraction`), each block-filled.
+# Tests multi-object / multi-material 3D in a single grid solve.
+general: {name: material_3d_multimaterial, seed: 0, n_frames: 360, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  cell:
+    n: 3
+    start: [[0.24, 0.6, 0.5], [0.5, 0.6, 0.5], [0.76, 0.6, 0.5]]
+    types:
+      jelly: {fraction: 0.3334, youngs: 260, block: [0.14, 0.50, 0.40, 0.34, 0.72, 0.60]}
+      water:
+        fraction: 0.3333
+        youngs: 200
+        block: [0.40, 0.50, 0.40, 0.60, 0.72, 0.60]
+        layers: [{frac: 1.0, youngs: 200, material: liquid}]
+      snow:
+        fraction: 0.3333
+        youngs: 90
+        block: [0.66, 0.50, 0.40, 0.86, 0.72, 0.60]
+        layers: [{frac: 1.0, youngs: 90, material: snow}]
+  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.16, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 16.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep: 16, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  dot_size: 1.2
+  render_3d: dots
+  splat_size: 2.4
+  splat_res: 600
+  camera_turns: 0.0
+  colors: {jelly: [0.40, 0.85, 0.55], water: [0.30, 0.62, 1.0], snow: [0.95, 0.96, 1.0]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: Initially, three distinct clusters of particles are arranged in a linear sequence along
+      a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across
+      the bottom plane of the bounding box. The green and white clusters remain relatively stationary
+      as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles
+      form a large, thin sheet on the floor while the green and white clusters sit atop it.
+    objects: 'There are three primary clusters of particles: one green, one blue, and one white. The green
+      cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster
+      is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts
+      as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that
+      covers the bottom of the cube.'

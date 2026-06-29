@@ -1,0 +1,56 @@
+# mpm3d_snow_block -- a SNOW cube hitting the floor (plastic deformation) in 3D.
+# Snow clamps the singular values of F and hardens via the plastic ratio Jp; on impact
+# the cube crumples and packs instead of bouncing back elastically. Tests the 3D snow
+# branch in mpm_strain (3x3 SVD + the proper-rotation sign fix from MPM_3D).
+general: {name: material_3d_snow_block, seed: 0, n_frames: 320, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  cell:
+    n: 1
+    start: [[0.5, 0.6, 0.5]]
+    types:
+      snow:
+        fraction: 1.0
+        youngs: 90
+        block: [0.37, 0.50, 0.37, 0.63, 0.82, 0.63]
+        layers:
+        - {frac: 1.0, youngs: 90, material: snow}
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.18, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 18.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.0, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.6}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.6, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep: 16, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  dot_size: 1.2
+  render_3d: dots
+  splat_size: 2.6
+  splat_res: 560
+  camera_turns: 0.0
+  colors: {snow: [0.92, 0.95, 1.0]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: A dense cluster of grey particles is initially positioned in the center of a large wireframe
+      cube. Over the course of the simulation, the cluster gradually descends toward the bottom face of
+      the cube. The particles maintain a relatively cohesive, roughly spherical shape as they move downward.
+      By the final frame, the cluster has settled near the bottom corner of the bounding box.
+    objects: The scene contains a large, hollow wireframe cube that defines the spatial boundaries. Inside
+      this cube, there is a dense collection of small, grey particles. These particles are clustered together
+      to form a single, roughly spherical mass. The particles are much smaller than the cube, which serves
+      as the primary reference for scale.

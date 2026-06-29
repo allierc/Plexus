@@ -1,0 +1,59 @@
+# material_3d_obstacle_pillars -- 3D MLS-MPM with fixed obstacles (no-slip box/sphere solids).
+general:
+  name: material_3d_obstacle_pillars
+  seed: 0
+  n_frames: 320
+  dt: 1.0
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  obstacles:
+  - [0.3, 0.0, 0.3, 0.38, 0.55, 0.38]
+  - [0.62, 0.0, 0.3, 0.7, 0.55, 0.38]
+  - [0.3, 0.0, 0.62, 0.38, 0.55, 0.7]
+  - [0.62, 0.0, 0.62, 0.7, 0.55, 0.7]
+sets:
+  cell:
+    n: 1
+    types:
+      water: {fraction: 1.0, youngs: 200, block: [0.30, 0.62, 0.30, 0.70, 0.9, 0.70], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+  mpm_particle: {parent: cell, per_parent: 18000, radius: 0.05, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 15.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.85}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.85, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep: 18, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 1.2
+  splat_res: 620
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  colors:
+    water: [0.30, 0.62, 1.0]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: A large cluster of blue particles begins in the upper center of a cubic volume. Over
+      time, the cluster descends and spreads outward toward the bottom surface. As it falls, the particles
+      interact with three vertical rectangular pillars, causing some to accumulate around them. By the
+      final frame, the particles have mostly settled into a flat layer across the bottom of the cube.
+    objects: The scene contains a large cloud of small blue particles that form a dense, roughly spherical
+      mass. There are three tall, thin rectangular pillars arranged in a triangular formation at the base
+      of the cube. The entire simulation is contained within a large, transparent white wireframe cube.
+      The background is solid black, providing high contrast for the blue particles and white outlines.
