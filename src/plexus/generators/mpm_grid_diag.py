@@ -34,15 +34,24 @@ _TYPE_COLORS = [(0.20, 0.55, 0.95), (0.95, 0.30, 0.30), (0.25, 0.75, 0.35),
 
 
 def _stress_norm(F, mu, la):
-    """Per-particle ||fixed-corotated stress||, the same material law p2g scatters
-    (2*mu*(F-R)F^T + la*J(J-1)I), R = analytic 2x2 polar rotation."""
-    a, b, c, d = F[:, 0, 0], F[:, 0, 1], F[:, 1, 0], F[:, 1, 1]
-    J = a * d - b * c
-    cs, sn = (a + d), (c - b)
-    r = torch.sqrt(cs * cs + sn * sn) + 1e-9
-    cs, sn = cs / r, sn / r
-    R = torch.stack([torch.stack([cs, -sn], -1), torch.stack([sn, cs], -1)], -2)
-    eye = torch.eye(2, device=F.device).expand_as(F)
+    """Per-particle ||fixed-corotated stress|| (2*mu*(F-R)F^T + la*J(J-1)I), the same law
+    p2g scatters. R = analytic 2x2 polar rotation in 2D, SVD polar U Vh in 3D."""
+    D = F.shape[-1]
+    eye = torch.eye(D, device=F.device).expand_as(F)
+    if D == 2:
+        a, b, c, d = F[:, 0, 0], F[:, 0, 1], F[:, 1, 0], F[:, 1, 1]
+        J = a * d - b * c
+        cs, sn = (a + d), (c - b)
+        r = torch.sqrt(cs * cs + sn * sn) + 1e-9
+        cs, sn = cs / r, sn / r
+        R = torch.stack([torch.stack([cs, -sn], -1), torch.stack([sn, cs], -1)], -2)
+    else:
+        J = torch.linalg.det(F)
+        U, S, Vh = torch.linalg.svd(F)
+        U = U.clone(); Vh = Vh.clone()
+        negU = torch.det(U) < 0; U[negU, :, -1] *= -1
+        negV = torch.det(Vh) < 0; Vh[negV, -1, :] *= -1
+        R = U @ Vh
     stress = 2 * mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \
         + eye * (la * J * (J - 1))[:, None, None]
     return stress.reshape(F.shape[0], -1).norm(dim=1)
@@ -64,12 +73,22 @@ def _capture(H, particle_set="mpm_particle", grid_field="mpm_grid"):
     }
     g = H.fields[grid_field] if (hasattr(H, "fields") and grid_field in H.fields) else None
     if g is not None and hasattr(g, "v"):
-        nx, ny, dx = g.nx, g.ny, g.dx
-        gv = g.v.detach().reshape(nx, ny, 2).norm(dim=2).cpu().numpy()
-        xs = (np.arange(nx) + 0.5) * dx
-        ys = (np.arange(ny) + 0.5) * dx
-        gx, gy = np.meshgrid(xs, ys, indexing="ij")
-        rec["grid"] = (gx[::2, ::2].ravel(), gy[::2, ::2].ravel(), gv[::2, ::2].ravel())
+        D = X.shape[1]; dx = g.dx
+        if D == 2:
+            nx, ny = g.nx, g.ny
+            gv = g.v.detach().reshape(nx, ny, 2).norm(dim=2).cpu().numpy()
+            xs = (np.arange(nx) + 0.5) * dx; ys = (np.arange(ny) + 0.5) * dx
+            gx, gy = np.meshgrid(xs, ys, indexing="ij")
+            rec["grid"] = (gx[::2, ::2].ravel(), gy[::2, ::2].ravel(), gv[::2, ::2].ravel())
+        else:                                            # 3D: active grid cells (momentum > 0) as a point cloud
+            nx, ny, nz = g.shape
+            gv = g.v.detach().reshape(nx, ny, nz, 3).norm(dim=3).cpu().numpy()
+            s = slice(None, None, 2)
+            xs = (np.arange(nx) + 0.5) * dx; ys = (np.arange(ny) + 0.5) * dx; zs = (np.arange(nz) + 0.5) * dx
+            gx, gy, gz = np.meshgrid(xs, ys, zs, indexing="ij")
+            gx, gy, gz, gvn = gx[s, s, s], gy[s, s, s], gz[s, s, s], gv[s, s, s]
+            m = gvn > 1e-6                               # only active cells (else a dense cube)
+            rec["grid3"] = (gx[m], gy[m], gz[m], gvn[m])
     return rec
 
 
@@ -81,6 +100,72 @@ def _rng(vals, lo=1.0, hi=99.0, pad=1e-9):
     if vmax - vmin < pad:
         vmax = vmin + pad
     return float(vmin), float(vmax)
+
+
+def _render3d(frames, grid_dir, sim, cbar, ranges):
+    """3D version of the 6-panel diagnostic: each panel projects the particles with the
+    spec's camera (same `up_axis`/`camera_elev` as the main render) and scatters them,
+    coloured by the panel's scalar; the grid panel scatters the active grid cells. A thin
+    box wireframe frames every panel. Depth-sorted so near points draw on top."""
+    import itertools
+    from plexus.plot import _rot_camera
+    c_lo, c_hi, f_lo, f_hi, s_lo, s_hi, has_grid3, g3_lo, g3_hi = ranges
+    style = sim.plotting or {}
+    up = int(style.get("up_axis", 2))
+    azim = float(style.get("camera_azim", 0.7))
+    elev = float(style.get("camera_elev", 1.18 if up != 2 else 0.5))
+    ws = np.asarray(getattr(sim, "world_size", [1.0, 1.0, 1.0]), float)
+    box3 = ws[:3] if ws.shape[0] >= 3 else np.array([1.0, 1.0, 1.0])
+    perm = ([a for a in (0, 1, 2) if a != up] + [up]) if up != 2 else [0, 1, 2]
+    bperm = box3[perm]
+
+    def proj(X):                                          # world [N,3] -> screen (sx, sy, depth)
+        Xp = np.asarray(X, float)[:, perm].copy()
+        if up != 2:
+            Xp[:, 2] = bperm[2] - Xp[:, 2]                # mirror so -up points down (matches main render)
+        s, depth = _rot_camera(Xp - 0.5 * bperm[None, :], azim, elev)
+        return s[:, 0], s[:, 1], depth
+
+    span = float(np.linalg.norm(box3)) * 0.55
+    corners = np.array(list(itertools.product([0, 1], repeat=3)), float) * box3[None, :]
+    cedges = [(a, b) for a in range(8) for b in range(a + 1, 8) if bin(a ^ b).count("1") == 1]
+    cfx, cfy, _ = proj(corners)
+
+    def style3(ax, title):
+        ax.set_title(title, color=_FG, fontsize=8)
+        for a, b in cedges:
+            ax.plot([cfx[a], cfx[b]], [cfy[a], cfy[b]], color="0.55", lw=0.4, alpha=0.5, zorder=0)
+        ax.set_xlim(-span, span); ax.set_ylim(-span, span); ax.set_aspect("equal")
+        ax.set_facecolor(_BG); ax.axis("off")
+
+    def panel(sp, title, sx, sy, order, c, cmap, vmin, vmax):
+        ax = plt.subplot(2, 3, sp)
+        sc = ax.scatter(sx[order], sy[order], c=c[order], s=1, cmap=cmap, vmin=vmin, vmax=vmax)
+        style3(ax, title); cbar(ax, sc)
+
+    for i, fr in enumerate(frames):
+        sx, sy, depth = proj(fr["X"]); order = np.argsort(depth)[::-1]
+        plt.figure(figsize=(15, 10), facecolor=_BG)
+        ax = plt.subplot(2, 3, 1)
+        for t in np.unique(fr["nt"]):
+            m = fr["nt"] == t
+            ax.scatter(sx[m], sy[m], s=1, color=_TYPE_COLORS[int(t) % len(_TYPE_COLORS)])
+        style3(ax, "objects"); cbar(ax, None)
+        panel(2, "C (Jacobian of velocity)", sx, sy, order, fr["cnorm"], "viridis", c_lo, c_hi)
+        panel(3, "F (deformation)", sx, sy, order, fr["fnorm"], "coolwarm", f_lo, f_hi)
+        panel(4, "Jp (volume deformation)", sx, sy, order, fr["Jp"], "viridis", 0.75, 1.25)
+        panel(5, "stress", sx, sy, order, fr["stress"], "hot", s_lo, s_hi)
+        ax6 = plt.subplot(2, 3, 6)
+        if has_grid3:
+            gx, gy, gz, gvn = fr["grid3"]
+            gsx, gsy, gdep = proj(np.stack([gx, gy, gz], 1)); go = np.argsort(gdep)[::-1]
+            sc = ax6.scatter(gsx[go], gsy[go], c=gvn[go], s=4, cmap="viridis", vmin=g3_lo, vmax=g3_hi)
+            style3(ax6, "grid momentum"); cbar(ax6, sc)
+        else:
+            style3(ax6, "grid momentum"); cbar(ax6, None)
+        plt.tight_layout()
+        plt.savefig(os.path.join(grid_dir, f"Fig_{i:06d}.png"), dpi=100, facecolor=_BG)
+        plt.close()
 
 
 def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3,
@@ -107,7 +192,9 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
     f_lo, f_hi = _rng([f["fnorm"] for f in frames])
     s_lo, s_hi = _rng([f["stress"] for f in frames])
     has_grid = "grid" in frames[0]
+    has_grid3 = "grid3" in frames[0]
     g_lo, g_hi = _rng([f["grid"][2] for f in frames]) if has_grid else (0.0, 1.0)
+    g3_lo, g3_hi = _rng([f["grid3"][3] for f in frames]) if has_grid3 else (0.0, 1.0)
 
     grid_dir = os.path.join(data_dir, "Grid")
     os.makedirs(grid_dir, exist_ok=True)
@@ -115,12 +202,6 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
         os.remove(old)
 
     obstacles = list(getattr(sim, "obstacles", []) or [])   # wall geometry to overlay (grey)
-
-    def _style(ax, title):
-        ax.set_title(title, color=_FG, fontsize=8)
-        _draw_obstacles(ax, obstacles, color="0.55")       # same grey walls as the particle/cell movies
-        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_aspect("equal")
-        ax.set_facecolor(_BG); ax.axis("off")              # no boundary box / ticks
 
     def _cbar(ax, sc):
         # a small (thin + short) colorbar inset just outside the panel's right edge. It
@@ -134,33 +215,44 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
         cb.ax.locator_params(nbins=4)
         cb.outline.set_edgecolor(_FG); cb.outline.set_linewidth(0.3)
 
-    def panel(sp, title, X, c, cmap, vmin, vmax):
-        ax = plt.subplot(2, 3, sp)
-        sc = ax.scatter(X[:, 0], X[:, 1], c=c, s=1, cmap=cmap, vmin=vmin, vmax=vmax)
-        _style(ax, title); _cbar(ax, sc)
+    D = frames[0]["X"].shape[1]
+    if D == 2:
+        def _style(ax, title):
+            ax.set_title(title, color=_FG, fontsize=8)
+            _draw_obstacles(ax, obstacles, color="0.55")   # same grey walls as the particle/cell movies
+            ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_aspect("equal")
+            ax.set_facecolor(_BG); ax.axis("off")          # no boundary box / ticks
 
-    for i, fr in enumerate(frames):
-        X = fr["X"]
-        plt.figure(figsize=(15, 10), facecolor=_BG)
-        ax = plt.subplot(2, 3, 1)
-        for t in np.unique(fr["nt"]):
-            m = fr["nt"] == t
-            ax.scatter(X[m, 0], X[m, 1], s=1, color=_TYPE_COLORS[int(t) % len(_TYPE_COLORS)])
-        _style(ax, "objects"); _cbar(ax, None)             # spacer keeps panel 1 the same size
-        panel(2, "C (Jacobian of velocity)", X, fr["cnorm"], "viridis", c_lo, c_hi)
-        panel(3, "F (deformation)", X, fr["fnorm"], "coolwarm", f_lo, f_hi)
-        panel(4, "Jp (volume deformation)", X, fr["Jp"], "viridis", 0.75, 1.25)
-        panel(5, "stress", X, fr["stress"], "hot", s_lo, s_hi)
-        ax6 = plt.subplot(2, 3, 6)
-        if has_grid:
-            gx, gy, gv = fr["grid"]
-            sc = ax6.scatter(gx, gy, c=gv, s=4, cmap="viridis", vmin=g_lo, vmax=g_hi)
-            _style(ax6, "grid momentum"); _cbar(ax6, sc)
-        else:
-            _style(ax6, "grid momentum"); _cbar(ax6, None)
-        plt.tight_layout()
-        plt.savefig(os.path.join(grid_dir, f"Fig_{i:06d}.png"), dpi=100, facecolor=_BG)
-        plt.close()
+        def panel(sp, title, X, c, cmap, vmin, vmax):
+            ax = plt.subplot(2, 3, sp)
+            sc = ax.scatter(X[:, 0], X[:, 1], c=c, s=1, cmap=cmap, vmin=vmin, vmax=vmax)
+            _style(ax, title); _cbar(ax, sc)
+
+        for i, fr in enumerate(frames):
+            X = fr["X"]
+            plt.figure(figsize=(15, 10), facecolor=_BG)
+            ax = plt.subplot(2, 3, 1)
+            for t in np.unique(fr["nt"]):
+                m = fr["nt"] == t
+                ax.scatter(X[m, 0], X[m, 1], s=1, color=_TYPE_COLORS[int(t) % len(_TYPE_COLORS)])
+            _style(ax, "objects"); _cbar(ax, None)         # spacer keeps panel 1 the same size
+            panel(2, "C (Jacobian of velocity)", X, fr["cnorm"], "viridis", c_lo, c_hi)
+            panel(3, "F (deformation)", X, fr["fnorm"], "coolwarm", f_lo, f_hi)
+            panel(4, "Jp (volume deformation)", X, fr["Jp"], "viridis", 0.75, 1.25)
+            panel(5, "stress", X, fr["stress"], "hot", s_lo, s_hi)
+            ax6 = plt.subplot(2, 3, 6)
+            if has_grid:
+                gx, gy, gv = fr["grid"]
+                sc = ax6.scatter(gx, gy, c=gv, s=4, cmap="viridis", vmin=g_lo, vmax=g_hi)
+                _style(ax6, "grid momentum"); _cbar(ax6, sc)
+            else:
+                _style(ax6, "grid momentum"); _cbar(ax6, None)
+            plt.tight_layout()
+            plt.savefig(os.path.join(grid_dir, f"Fig_{i:06d}.png"), dpi=100, facecolor=_BG)
+            plt.close()
+    else:
+        _render3d(frames, grid_dir, sim, _cbar,
+                  (c_lo, c_hi, f_lo, f_hi, s_lo, s_hi, has_grid3, g3_lo, g3_hi))
 
     out = os.path.join(data_dir, "grid.mp4")
     ff = _ffmpeg()

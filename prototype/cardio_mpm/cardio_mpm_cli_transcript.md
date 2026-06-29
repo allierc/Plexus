@@ -299,3 +299,115 @@ All files updated. Here's the summary:
 
 **Best optimizer slot:** s5 (LS=0.151, control)
 **Best scientific slot:** s0 (LS=-0.222) — falsifies the stiffness-interaction hypothesis; SIREN fibre is intrinsically destabilizing
+
+
+================================================================================
+## DESIGN 9 -- 2026-06-28 18:01:36
+================================================================================
+All files updated. Here's the summary:
+
+---
+
+## Batch 8 Results
+
+**Ranked by LoopScore:**
+
+| Rank | Slot | LS | SD | Key finding |
+|------|------|----|----|-------------|
+| 1 | s1 deep3600 | **0.162** | 0.190 | **NEW BEST** — dur→24 interior optimum |
+| 2 | s3 drag50 | 0.152 | 0.178 | drag_k=50 ≈ 30 |
+| 3 | s5 ctrl | 0.152 | 0.181 | Control passes |
+| 4 | s2 wamp0 | 0.132 | 0.272 | w_amp IS load-bearing |
+| 5 | s0 drag20 | 0.112 | 0.225 | drag_k=20 HURTS (2 catastrophes) |
+| 6 | s4 stiff400 | 0.076 | 0.338 | stiff_hi=400 CATASTROPHIC |
+
+**THE SURPRISE:** 3600it broke the LS≈0.15 plateau to **0.162**. The mechanism: **duration found an interior optimum at 24 frames** instead of saturating at dur_hi=30. This overturns the prior "duration saturates" conclusion — it was an optimization-depth artifact. Shorter, sharper pulses produce better contract→release→recoil dynamics.
+
+**Other findings:** Drag has an asymmetric floor at ~30 (below = catastrophic, above = inert). w_amp=0.3 is load-bearing. stiff_hi=300 is the upper limit.
+
+## Batch 9 Design
+
+**Hypothesis:** "The LS improvement at 3600it comes specifically from duration escaping its saturation basin. If dur_hi=25 or dur0=10 reproduces the benefit at 2400it, depth was only needed to overcome the basin barrier."
+
+| Slot | Role | Variable | Tests |
+|------|------|----------|-------|
+| b9_deep4800 | exploit | n_iter=4800 | Does deeper continue improving? |
+| b9_durhi25 | exploit | dur_hi=25 at 2400it | Forces duration into the right range cheaply |
+| b9_3600_gain04 | exploit | gain0=0.4 at 3600it | Does gain differentiate at depth? |
+| b9_dur0_10 | explore | dur0=10 at 2400it | Init closer to interior optimum |
+| b9_durhi20 | explore | dur_hi=20 at 2400it | Duration below discovered optimum |
+| b9_ctrl3600 | control | reproduce s1 | Reproducibility check |
+
+**Residual decomposition** could not be run (GPU access denied). The decompose script is saved as `run_decompose_b8.sh` for later execution.
+
+
+================================================================================
+## DESIGN 10 -- 2026-06-29 04:15:03
+================================================================================
+All files updated. Here's the summary:
+
+---
+
+## Batch 9 Results
+
+**BIGGEST SURPRISE:** `dur0=10` at 2400it (s3, **LS=0.165**) nearly MATCHES 4800it partial (s0, **LS=0.166**). The B8 improvement was specifically about duration escaping the dur≈30 basin — not general optimization depth. Initializing closer to the true optimum replaces 2x more iterations.
+
+### Ranking by LS
+
+| Rank | Slot | LS | dur | Key finding |
+|------|------|----|-----|-------------|
+| 1 | s0 deep4800 | 0.166 | 21.1 | PARTIAL (killed at 4150it), marginal best |
+| 2 | s3 dur0=10 | 0.165 | 19.4 | **Best scientific slot** — matches depth with init |
+| 3 | s4 durhi=20 | 0.163 | 20.0 | Constrained at ceiling, still competitive |
+| 4 | s5 ctrl3600 | 0.160 | 24.3 | Reproduces B8 |
+| 5 | s2 gain0=0.4 | 0.159 | 24.1 | Gain still FLAT at 3600it |
+| 6 | s1 durhi=25 | 0.157 | 24.4 | WORST — ceiling traps in wrong basin |
+
+### Key findings
+- **True duration optimum is ~19-21**, not ~24 (B8 was still en route)
+- **Two duration regimes:** short (19-21) trades chirality for openness; medium (24) has reverse pattern
+- **dur_hi=20 > dur_hi=25** — inverted ranking proves dur≈24 is a local optimum between the true optimum and the dur≈30 trap
+- **gain0 CONFIRMED FLAT** at 3600it (0.159 vs 0.160)
+- All slots share the same catastrophic node at LS=-1.00 (position 2,3)
+
+### Batch 10 Design
+**Hypothesis:** The catastrophic node is a fibre×stiffness basin interaction. Changing fibre init should MOVE it.
+
+- **3 exploit:** fibre_angle=0.5, fibre_phase=1.2, dur0=10+3600it (push short-duration deeper)
+- **2 explore:** fibre_wl=35 (untested middle ground), dur_hi=15 (even shorter?)
+- **1 control:** reproduce B9-s3 (dur0=10, 2400it)
+
+Parent: B9-s3 (dur0=10, LS=0.165). All slots use `dur0=10` to start in the correct basin.
+
+**Decomposition script** (`run_decompose_b9.sh`) is ready but needs GPU execution — please run when GPUs are available.
+
+
+================================================================================
+## DESIGN 11 -- 2026-06-29 13:02:12
+================================================================================
+All files updated. Here's the summary:
+
+---
+
+## Batch 10 Results — Biggest surprise: dur_hi=15 → LS=0.196 (NEW BEST, +18%)
+
+**The "true optimum at dur≈19-21" was WRONG.** A third duration basin at dur≈11 was discovered. Very short pulses TAME the catastrophic node from LS=-1.00 to -0.45 by limiting overshoot energy.
+
+**Ranking (by LS):**
+1. **s4 durhi15: LS=0.196** (SD=0.227) — dur→11.3, catastrophic node at -0.45 instead of -1.00
+2. s2 deep3600: LS=0.175 (SD=0.192) — dur→18.8, still has -1.00 node
+3. s3 wl35: LS=0.165 — neutral vs ctrl
+4. s5 ctrl: LS=0.161 — reproduces B9
+5. s1 phase12: LS=0.158 — phase change doesn't help
+6. s0 angle05: LS=0.060 — **angle=0.5 traps duration at dur≈28 even with dur0=10** (fibre x duration interaction)
+
+**Key mechanistic finding:** The catastrophic node is an **energy overshoot**, not a structural tissue property. Shorter pulses limit the energy available for elastic recoil, taming the catastrophe.
+
+**Batch 11 design** (parent: durhi15, LS=0.196):
+- **3 EXPLOIT:** dur_hi=12, dur_hi=10 (map the short-duration floor), 3600it at dur_hi=15
+- **2 EXPLORE:** amp=10 at dur_hi=15, uniform stiffness at dur_hi=15 (does stiffness still matter in this regime?)
+- **1 CONTROL:** reproduce durhi15
+
+**Hypothesis:** "dur≈11 is NOT the floor — even shorter pulses will continue to tame the catastrophe until pulse energy becomes too low for any loop structure. Mapping this transition reveals the overshoot-vs-structure boundary."
+
+**Note:** Residual decomposition script created (`run_decompose_b10.sh`) but needs manual execution.

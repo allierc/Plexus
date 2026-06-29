@@ -1,0 +1,80 @@
+# LONG RUN (10x = 12000 frames) of vicsek_slime_4t -- does the 4-species trail
+# network reach a steady state, or keep rearranging (chaotic / never settling)?
+# vicsek_slime_4t -- a MIX of vicsek_4t (active matter) and slime_four (Physarum):
+# four species rendered as oriented triangles (the active-matter marker), each one
+# FLOWING ALONG ITS OWN SLIME TRAIL. The slime mechanism does the steering: every
+# type deposits into its own field channel (deposit), the trail diffuses + decays,
+# and `sense` (cross=-1) makes a type follow its OWN channel and avoid the others --
+# so the four colours self-organise into four interleaving transport networks, with
+# the triangles streaming along them. Heading-kinematic (sense->glide, 1st order):
+# the same paradigm as slime, so triangles orient along the heading they are steered.
+# Periodic (toroidal) world: particles wrap, and the chemical field wraps with them
+# (diffuse uses circular padding, sense wraps its window) -- so the trail networks are
+# seamless across every edge. No `bounce`: there are no walls on a torus.
+# Refs: Vicsek et al., PRL 75 (1995); Jones/Physarum (Jones, Artif. Life 2010).
+general: {name: vicsek_slime_4t_x10, seed: 0, n_frames: 12000, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 9000
+    spawn: random
+    types:
+      a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.024}
+- {op: diffuse, at: chemical, rate: 0.013}
+- {op: decay,   at: chemical, rate: 0.002}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}   # follow own trail, avoid the others
+- {op: glide,   at: cell}
+schedule: [deposit, diffuse, decay, sense, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  marker: triangle
+  triangle_size: 0.009
+  gamma: 0.7
+  overlay: true        # extra movie: the trail field with the triangles streaming on top
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a collection of colorful, curved lines and closed loops evolving
+      on a black background. Over time, the shapes shift and deform, with some loops expanding while others
+      contract or merge. The movement appears fluid and continuous, suggesting a dynamic field or a system
+      of interacting agents. The overall pattern maintains a consistent density of elements throughout
+      the duration of the video.
+    objects: The scene contains several closed loops and elongated, winding paths in various colors including
+      red, yellow, green, and blue. These objects are interconnected or adjacent, forming a complex network
+      of overlapping and nested shapes. The sizes of the loops vary significantly, ranging from small
+      circular points to large, sprawling enclosures. Each object is composed of a textured, dashed-line
+      appearance that gives them a vibrant, energetic look.
+  movie_chemical:
+    description: The simulation shows a dynamic field of interconnected, fluid-like loops and lines evolving
+      over time. The structures shift and morph, with some loops expanding while others contract or merge
+      into larger shapes. The lines flow smoothly across the black background, exhibiting a continuous,
+      organic motion. By the final frame, the complex network of paths has rearranged into a new configuration
+      of nested and overlapping curves.
+    objects: The scene contains several closed loops and elongated, winding lines in various colors including
+      teal, gold, pink, and blue. These objects are topologically connected in some areas, forming complex
+      networks where multiple paths converge or branch out. The sizes of the loops vary significantly,
+      ranging from small, tight circles to large, expansive shapes that dominate the frame. The colors
+      remain consistent throughout the sequence, providing a clear visual distinction between the different
+      flowing paths.
+  movie_overlay_chemical:
+    description: The simulation begins with a dense, chaotic field of small, multicolored particles scattered
+      across a black background. Over time, these particles begin to organize into distinct, flowing streams
+      and closed loops. The movement transitions from random diffusion to a structured, fluid-like motion
+      where lines of color trace continuous paths. By the final frames, the particles have coalesced into
+      thick, vibrant ribbons and circular orbits that define a complex topological network.
+    objects: The scene contains thousands of tiny, triangular particles in red, yellow, green, and blue.
+      These particles aggregate into long, continuous curvilinear paths and closed circular loops. The
+      primary structures are thick, glowing ribbons of color that vary in width and curvature. The overall
+      topology consists of interconnected loops and branching streams that create a sense of fluid flow.

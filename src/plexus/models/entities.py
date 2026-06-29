@@ -68,6 +68,7 @@ class MPMParticle:
         rho = float(s.get("density", 1.0)); rad = float(s.get("radius", 0.02))
         ppc = int(s["per_parent"])
         px0, px1 = lvl.state_schema["pos"]
+        D = px1 - px0                                            # particle dimension (2D or 3D)
         pos = lvl.state[:, px0:px1].clone()
         cpos = parent.get("pos")[pidx]                           # each particle's parent center
         r = (pos - cpos).norm(dim=1)                             # radial distance (for layer bands)
@@ -87,7 +88,8 @@ class MPMParticle:
                 type_layers[tid] = [(float(L["frac"]), float(L["youngs"]), L.get("material", "elastic"))
                                     for L in layers]
 
-        # block-fill: a type FILLS a rectangle (pool/cube) instead of a disc around the centre
+        # block-fill: a type FILLS an axis-aligned box (pool/cube) instead of a disc
+        # around the centre. 2D block = [x0,y0,x1,y1]; 3D block = [x0,y0,z0,x1,y1,z1].
         for tid, t in enumerate(type_list):
             blk = t.get("block")
             if blk is None:
@@ -96,9 +98,10 @@ class MPMParticle:
             nb = int(bm.sum())
             if nb == 0:
                 continue
-            x0, y0, x1, y1 = [float(v) for v in blk]
-            u = torch.rand(nb, 2, generator=H.rng, device=device)
-            pos[bm] = torch.stack([x0 + u[:, 0] * (x1 - x0), y0 + u[:, 1] * (y1 - y0)], 1)
+            v = [float(x) for x in blk]
+            lo = torch.tensor(v[:D], device=device); hi = torch.tensor(v[D:2 * D], device=device)
+            u = torch.rand(nb, D, generator=H.rng, device=device)
+            pos[bm] = lo + u * (hi - lo)
         lvl.state[:, px0:px1] = pos                              # commit block positions
 
         # per-particle stiffness + material masks (inner->outer radial bands)
@@ -129,17 +132,21 @@ class MPMParticle:
         mu, la = _lame(p_y)
         mu = torch.where(is_liquid, torch.zeros_like(mu), mu)    # liquid: no shear modulus -> pressure only
 
-        # per-particle volume: disc footprint pi*r^2/ppc, or block area/ppc for a pool
-        p_vol = torch.full((Np,), math.pi * rad * rad / ppc, device=device)
+        # per-particle volume: ball footprint (disc pi*r^2 in 2D, sphere 4/3 pi r^3 in
+        # 3D) / ppc, or the box volume / ppc for a block-filled pool.
+        unit_vol = math.pi * rad * rad if D == 2 else (4.0 / 3.0) * math.pi * rad ** 3
+        p_vol = torch.full((Np,), unit_vol / ppc, device=device)
         for tid, t in enumerate(type_list):
             blk = t.get("block")
             if blk is not None:
-                x0, y0, x1, y1 = [float(v) for v in blk]
-                area = abs((x1 - x0) * (y1 - y0))
-                p_vol = torch.where(ntp[pidx] == tid, torch.full_like(p_vol, area / ppc), p_vol)
+                v = [float(x) for x in blk]
+                vol = 1.0
+                for k in range(D):
+                    vol *= abs(v[D + k] - v[k])
+                p_vol = torch.where(ntp[pidx] == tid, torch.full_like(p_vol, vol / ppc), p_vol)
 
-        lvl.register_buffer("C", torch.zeros(Np, 2, 2, device=device))
-        lvl.register_buffer("F", torch.eye(2, device=device).expand(Np, 2, 2).contiguous())
+        lvl.register_buffer("C", torch.zeros(Np, D, D, device=device))
+        lvl.register_buffer("F", torch.eye(D, device=device).expand(Np, D, D).contiguous())
         lvl.register_buffer("mu", mu)
         lvl.register_buffer("la", la)
         lvl.register_buffer("is_liquid", is_liquid)

@@ -15,6 +15,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("aggregate", level="cell", kind="aggregate")
 class Centroid(Aggregate):
+    SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
     MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
 
     def __init__(self, params, device="cpu"):
@@ -32,9 +33,9 @@ class Centroid(Aggregate):
         if pidx.numel() == 0:
             return {}
         dev = parent.state.device
-        px0, px1 = parent.state_schema["pos"]
+        px0, px1 = parent.state_schema["pos"]; D = px1 - px0
         cpos = child.get("pos"); cocc = child.occ
-        s = torch.zeros(parent.n, 2, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
+        s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
         w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
         centroid = s / w.clamp(min=1.0)[:, None]
         new = parent.state.clone()                 # only live parents take the readout

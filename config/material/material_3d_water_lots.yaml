@@ -1,0 +1,89 @@
+# material_3d_water_lots -- a BIG body of water: 27 liquid cubes (3x3x3), ~94500 particles,
+# each cube a DISTINCT colour (same material -> colour just tags the cube so you can watch
+# them merge/mix), launched with per-cube velocity and dropped in a box -> a large splash.
+general: {name: material_3d_water_lots, seed: 0, n_frames: 320, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  cell:
+    n: 27
+    types:
+      w00: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.11, 0.19, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w01: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.11, 0.44, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w02: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.11, 0.69, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w03: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.11, 0.19, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w04: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.11, 0.44, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w05: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.11, 0.69, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w06: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.11, 0.19, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w07: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.11, 0.44, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w08: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.11, 0.69, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w09: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.36, 0.19, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w10: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.36, 0.44, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w11: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.36, 0.69, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w12: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.36, 0.19, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w13: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.36, 0.44, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w14: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.36, 0.69, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w15: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.36, 0.19, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w16: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.36, 0.44, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w17: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.36, 0.69, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w18: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.61, 0.19, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w19: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.61, 0.44, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w20: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.61, 0.69, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w21: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.61, 0.19, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w22: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.61, 0.44, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w23: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.61, 0.69, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w24: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.61, 0.19, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w25: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.61, 0.44, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w26: {fraction: 0.037038, youngs: 200, block: [0.61, 0.61, 0.61, 0.69, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+  mpm_particle: {parent: cell, per_parent: 3500, radius: 0.05, density: 1.0, vel_init_cube: 2.5}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 16.0}
+- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
+- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.9}
+- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep: 18, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 1.2
+  splat_res: 640
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  colors:
+    w00: [np.float64(1.0), np.float64(0.0), np.float64(0.0)]
+    w01: [np.float64(1.0), np.float64(0.208), np.float64(0.0)]
+    w02: [np.float64(1.0), np.float64(0.417), np.float64(0.0)]
+    w03: [np.float64(1.0), np.float64(0.649), np.float64(0.0)]
+    w04: [np.float64(1.0), np.float64(0.857), np.float64(0.0)]
+    w05: [np.float64(0.911), np.float64(1.0), np.float64(0.0)]
+    w06: [np.float64(0.703), np.float64(1.0), np.float64(0.0)]
+    w07: [np.float64(0.471), np.float64(1.0), np.float64(0.0)]
+    w08: [np.float64(0.263), np.float64(1.0), np.float64(0.0)]
+    w09: [np.float64(0.031), np.float64(1.0), np.float64(0.0)]
+    w10: [np.float64(0.0), np.float64(1.0), np.float64(0.177)]
+    w11: [np.float64(0.0), np.float64(1.0), np.float64(0.409)]
+    w12: [np.float64(0.0), np.float64(1.0), np.float64(0.617)]
+    w13: [np.float64(0.0), np.float64(1.0), np.float64(0.849)]
+    w14: [np.float64(0.0), np.float64(0.943), np.float64(1.0)]
+    w15: [np.float64(0.0), np.float64(0.711), np.float64(1.0)]
+    w16: [np.float64(0.0), np.float64(0.503), np.float64(1.0)]
+    w17: [np.float64(0.0), np.float64(0.271), np.float64(1.0)]
+    w18: [np.float64(0.0), np.float64(0.063), np.float64(1.0)]
+    w19: [np.float64(0.169), np.float64(0.0), np.float64(1.0)]
+    w20: [np.float64(0.378), np.float64(0.0), np.float64(1.0)]
+    w21: [np.float64(0.609), np.float64(0.0), np.float64(1.0)]
+    w22: [np.float64(0.818), np.float64(0.0), np.float64(1.0)]
+    w23: [np.float64(0.996), np.float64(0.0), np.float64(0.946)]
+    w24: [np.float64(1.0), np.float64(0.0), np.float64(0.742)]
+    w25: [np.float64(1.0), np.float64(0.0), np.float64(0.511)]
+    w26: [np.float64(1.0), np.float64(0.0), np.float64(0.302)]
