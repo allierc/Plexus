@@ -3,27 +3,58 @@
 # about the cell centre (the pass-2 isotropic-direction seeding) -- a sphere, not a
 # cube. The ball squashes on impact and bounces. Tests the no-block (disc/ball) seed
 # path + sphere p_vol (4/3 pi r^3) in 3D.
-general: {name: material_3d_ball_drop, seed: 0, n_frames: 640, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+general:
+  {
+    name: material_3d_ball_drop,
+    seed: 0,
+    n_frames: 640,
+    dt: 1.0,
+    boundary: wall,
+    dim: 3,
+    world: [1.0, 1.0, 1.0],
+  }
 sets:
   cell:
     n: 1
     start: [[0.5, 0.6, 0.5]]
     types:
-      ball: {fraction: 1.0, youngs: 190}
-  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.15, density: 1.0, vel_init_cube: 0.45}
+      ball: { fraction: 1.0, youngs: 190 }
+  mpm_particle:
+    {
+      parent: cell,
+      per_parent: 14000,
+      radius: 0.15,
+      density: 1.0,
+      vel_init: 0.25,
+    }
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 64}
+  mpm_grid: { frame: mpm_grid, n_grid: 64 }
 operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.0, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.6}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.6, wall_contact: 0.04, vmax: 1000000000.0}
+  - { op: aggregate, at: cell }
+  - { op: gravity, at: cell, g: 16.0 }
+  - { op: mpm_strain, at: mpm_particle, dt_sub: 0.0002 }
+  - {
+      op: p2g,
+      at: mpm_particle,
+      to: mpm_grid,
+      dt_sub: 0.0002,
+      drag: 0.0,
+      a_max: 200,
+    }
+  - { op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.6 }
+  - {
+      op: g2p,
+      at: mpm_particle,
+      from: mpm_grid,
+      dt_sub: 0.0002,
+      wall_damp: 0.6,
+      wall_contact: 0.04,
+      vmax: 1000000000.0,
+    }
 schedule:
-- aggregate
-- gravity
-- {substep: 15, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+  - aggregate
+  - gravity
+  - { substep: 15, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p] }
 plotting:
   background: black
   up_axis: 1
@@ -37,15 +68,17 @@ plotting:
   splat_size: 2.6
   splat_res: 560
   camera_turns: 0.0
-  colors: {ball: [1.0, 0.55, 0.35]}
+  colors: { ball: [1.0, 0.55, 0.35] }
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_mpm_particle:
-    description: A spherical cluster of particles begins at the center of a 3D bounding box. It moves
+    description:
+      A spherical cluster of particles begins at the center of a 3D bounding box. It moves
       downward and toward the right side of the box. The cluster maintains its spherical shape and size
       throughout the motion. It eventually settles near the bottom-right corner of the frame.
-    objects: The scene contains a single spherical cluster composed of many small, reddish-brown particles.
+    objects:
+      The scene contains a single spherical cluster composed of many small, reddish-brown particles.
       This cluster is situated within a large, transparent 3D wireframe cube. The cube is defined by white
       lines and serves as a spatial boundary for the simulation. The particles are densely packed to form
       a cohesive, roughly spherical mass.

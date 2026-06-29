@@ -225,7 +225,7 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         def _draw(ax, i):
             if container is not None:
                 cpos, par, ncell = container
-                ax.imshow(_merged_rgb(cpos[i], par, ncell, W, cmap), extent=[0, W, 0, 1], origin="upper")
+                ax.imshow(_merged_rgb(cpos[i], par, ncell, W, cmap, bg=bg), extent=[0, W, 0, 1], origin="upper")
                 _draw_obstacles(ax, obstacles)
                 ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off"); return
             live = occ[i]
@@ -907,15 +907,15 @@ def _field3d_outputs(grid, colors, W, data_dir, fname, style, movie, T):
         print(f"[plot] 3D field splat movie -> {os.path.basename(out)}", flush=True)
 
 
-def _merged_rgb(xy, par, ncell, W, cmap, res: int = 820, sigma: float = 1.7):
+def _merged_rgb(xy, par, ncell, W, cmap, res: int = 820, sigma: float = 1.7, bg="white"):
     """Splat each parent's child particles to a blurred density mask and paint it the
-    parent's colour: a smooth, uniform per-cell blob composited over white. This is the
-    special cell<-MPM 'apply colour then merge the particles' container view. Renders at
-    high internal resolution (res~820) with a tight blur (sigma~1.7) and a steep alpha
-    ramp so the blob stays a SOLID body with a crisp rim -- the old res=300/sigma=2.2
-    upscaled to the movie frame and read as a soft, washed-out blur."""
+    parent's colour: a smooth, uniform per-cell blob composited over the spec background
+    `bg`. This is the special cell<-MPM 'apply colour then merge the particles' container
+    view. Renders at high internal resolution (res~820) with a tight blur (sigma~1.7) and
+    a steep alpha ramp so the blob stays a SOLID body with a crisp rim."""
+    from matplotlib.colors import to_rgb
     Hh = res; Wd = max(1, int(round(res * W)))
-    rgb = np.ones((Hh, Wd, 3))
+    rgb = np.tile(np.asarray(to_rgb(bg), float)[None, None, :], (Hh, Wd, 1))
     gx = np.clip((xy[:, 0] / max(W, 1e-9) * Wd).astype(int), 0, Wd - 1)
     gy = np.clip((xy[:, 1] * Hh).astype(int), 0, Hh - 1)
     for c in range(ncell):
@@ -939,13 +939,13 @@ def _merged_movie(cpos, par, ncell, W, cmap, T, out_base, max_frames: int = 120,
     # render large (8in) at high dpi so the high-res blob mask is not softened on upscale
     fig, ax = plt.subplots(figsize=(8 * W, 8)); ax.axis("off"); fig.patch.set_facecolor(bg)
     fig.tight_layout(pad=0)
-    im = ax.imshow(_merged_rgb(cpos[0], par, ncell, W, cmap), extent=[0, W, 0, 1],
+    im = ax.imshow(_merged_rgb(cpos[0], par, ncell, W, cmap, bg=bg), extent=[0, W, 0, 1],
                    origin="upper", interpolation="bilinear")
     _draw_obstacles(ax, obstacles)
     ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal")
 
     def upd(i):
-        im.set_data(_merged_rgb(cpos[i], par, ncell, W, cmap)); return im,
+        im.set_data(_merged_rgb(cpos[i], par, ncell, W, cmap, bg=bg)); return im,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
     out = _save_anim(anim, out_base, bg, dpi=200); plt.close(fig)

@@ -48,7 +48,7 @@ def main():
                         help="<task> <config_name>, e.g. -o generate attraction_repulsion")
     parser.add_argument("--output_root", default=None,
                         help="root for graphs_data/ and log/ (default: $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT / shared GraphData)")
-    parser.add_argument("--device", default="cpu", help="cpu or cuda:N")
+    parser.add_argument("--device", default="cuda:0", help="cuda:N (default) or cpu")
     parser.add_argument("--force", action="store_true",
                         help="erase + regenerate data even if it already exists")
     parser.add_argument("--movie", action="store_true",
@@ -60,6 +60,12 @@ def main():
     parser.add_argument("--describe-out", default=None,
                         help="aggregate description file (default: graphs_data/video_descriptions.txt)")
     args = parser.parse_args()
+
+    if args.device.startswith("cuda"):               # fall back to CPU if no GPU is present
+        import torch
+        if not torch.cuda.is_available():
+            print(f"[device] {args.device} unavailable -> falling back to cpu", flush=True)
+            args.device = "cpu"
 
     if args.output_root:
         assert os.path.isdir(args.output_root), f"--output_root does not exist: {args.output_root}"

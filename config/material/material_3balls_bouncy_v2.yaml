@@ -1,5 +1,5 @@
 # material_3balls_bouncy_v2 -- like material_3balls_bouncy but each ball gets a DIFFERENT
-# initial launch velocity (vel_init_cube), so they fly off in different directions and
+# initial launch velocity (vel_init), so they fly off in different directions and
 # bounce around the box. Damping near-off (drag 0, wall_damp 1.0); stiff elastic rebound.
 general:
   {
@@ -23,7 +23,7 @@ sets:
       per_parent: 3000,
       radius: 0.085,
       density: 1.0,
-      vel_init_cube: 0.45,
+      vel_init: 0.25,
     }
 fields:
   mpm_grid: { frame: mpm_grid, n_grid: 128 }

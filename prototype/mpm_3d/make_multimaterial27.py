@@ -8,7 +8,7 @@ Geometry matches the reference (utils.init_MPM_3D_shapes, n_shapes==27): cube si
 
 For real per-cube variability the 27 cubes cycle THREE MATERIALS (elastic jelly /
 liquid / snow) -- the colour now MEANS the material -- and each cube gets a per-cube
-coherent launch velocity (`vel_init_cube`); the 5 variants differ by `seed`, so the
+coherent launch velocity (`vel_init`); the 5 variants differ by `seed`, so the
 launch directions (and the resulting collisions/pile) differ run to run.
 Differences from the reference: actual material variety (not just density), axis-aligned
 cubes (no per-cube rotation), gravity on -y (render up-axis), coarser grid.
@@ -62,7 +62,7 @@ sets:
     n: 27
     types:
 {types_block}
-  mpm_particle: {{parent: cell, per_parent: 1100, radius: 0.05, density: 1.0, vel_init_cube: 3.0}}
+  mpm_particle: {{parent: cell, per_parent: 1100, radius: 0.05, density: 1.0, vel_init: 3.0}}
 fields:
   mpm_grid: {{frame: mpm_grid, n_grid: 96}}
 operators:

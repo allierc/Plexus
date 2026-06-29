@@ -46,7 +46,7 @@ def data_generate(
     print(f"[generate] {folder}/{sim.name}: {sim.n_frames} frames, "
           f"sets={ {k: int(v.get('n', 0)) for k, v in sim.sets.items() if 'n' in v} } -> {data_dir}",
           flush=True)
-    H, out = run(sim, out_path=out_path, device=device)
+    H, out = run(sim, out_path=out_path, device=device, progress=True)
 
     # also save a light, framework-agnostic .npz (positions/occupancy per set) so
     # downstream code need not depend on zarr to read a generated dataset back.
