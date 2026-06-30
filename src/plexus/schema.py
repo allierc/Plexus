@@ -202,13 +202,14 @@ def load(path: str) -> Spec:
                           f"(known: {sorted(_KNOWN_TYPE_KEYS)})")
 
     # --- schedule: every token resolves to an operator or a builtin --------- #
-    # A step may be a token, a list of tokens (run in sequence), or a substep micro-loop
-    # `{substep: N, dt: <dt>, steps: [...]}` whose inner tokens run N times (e.g. MPM).
+    # A step may be a token, a list of tokens (run in sequence), or a substep micro-loop:
+    # `{substep: N, dt: <dt>, steps: [...]}` (explicit count) or `{substep_dt: <dt>, steps:
+    # [...]}` (count derived from general.dt). Inner tokens run once per substep (e.g. MPM).
     op_names = {o.op for o in ops}
     for step in raw["schedule"]:
-        if isinstance(step, dict) and "substep" in step:
+        if isinstance(step, dict) and ("substep" in step or "substep_dt" in step):
             if not isinstance(step.get("steps"), list):
-                raise ValueError("a `{substep: N, ...}` schedule step needs a `steps:` list")
+                raise ValueError("a `{substep…}` schedule step needs a `steps:` list")
             tokens = step["steps"]
         else:
             tokens = step if isinstance(step, list) else [step]

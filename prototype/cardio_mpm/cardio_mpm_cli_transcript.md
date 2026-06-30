@@ -411,3 +411,35 @@ All files updated. Here's the summary:
 **Hypothesis:** "dur≈11 is NOT the floor — even shorter pulses will continue to tame the catastrophe until pulse energy becomes too low for any loop structure. Mapping this transition reveals the overshoot-vs-structure boundary."
 
 **Note:** Residual decomposition script created (`run_decompose_b10.sh`) but needs manual execution.
+
+
+================================================================================
+## DESIGN 12 -- 2026-06-29 21:50:21
+================================================================================
+All files updated. Here's the Batch 12 summary:
+
+---
+
+## Batch 11 Results — Key Findings
+
+**BIGGEST SURPRISE:** Slot s0 (dur_hi=12 → dur=10.0, LS=0.200) is the **FIRST CONFIG EVER with ZERO negative per-node LS.** The persistent catastrophic node that plagued ALL prior runs (10 batches, LS as low as -1.00) is completely ELIMINATED. Meanwhile dur_hi=10 (dur→8.5) has the highest mean LS=0.211 but RE-INTRODUCES 3 negatives — a **duration-uniformity tradeoff**.
+
+**Ranking:** durhi10 (0.211) > durhi12 (0.200) > deep3600 (0.198) > ctrl (0.191) > amp10 (0.184) > uniform_stiff (0.092)
+
+**Three key mechanisms discovered:**
+1. **Goldilocks zone at dur≈10** — pulse energy too low for overshoot at any node, yet sufficient for loops everywhere
+2. **Stiffness is 3-5× more load-bearing at short duration** (ΔLS=0.10 vs 0.02 at dur≈19)
+3. **amp×dur interaction** — amp=10≈12 at dur≈19, but amp=10 HURTS at dur≈11
+
+## Batch 12 Design — "The Goldilocks Zone: High LS + Zero Negatives"
+
+**Hypothesis:** "The dur=10 Goldilocks zone depends on stiffness contrast. Narrower stiffness should extend it to shorter durations; depth should push durhi12's mean above 0.211."
+
+| Slot | Role | Variable changed | Parent |
+|------|------|-----------------|--------|
+| b12_deep3600 | exploit | 3600it (vs 2400) | durhi12 |
+| b12_durhi11 | exploit | dur_hi=11 (vs 12) | durhi12 |
+| b12_durhi10_narrow | exploit | stiff [100,200] + dur_hi=10 | durhi10 |
+| b12_lo100 | explore | stiff_lo=100 (vs 80) | durhi12 |
+| b12_narrow_stiff | explore | stiff [100,200] (vs [80,300]) | durhi12 |
+| b12_ctrl | control | reproduce durhi12 | durhi12 |
