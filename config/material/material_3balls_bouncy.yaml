@@ -35,21 +35,19 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The three colored spheres begin in a triangular formation with the orange sphere at the
-      top. Over time, the spheres move toward each other and begin to converge into a linear arrangement.
-      They eventually align horizontally, with the orange sphere moving to the left and the blue sphere
-      to the center. In the final frames, the spheres settle into a horizontal line with the orange sphere
-      on the left, the blue sphere in the middle, and the green sphere on the right.
-    objects: The scene contains three distinct spherical objects of roughly equal size. One sphere is
-      bright blue, one is vibrant orange, and one is bright green. Initially, they are arranged in a triangular
-      pattern, but they transition into a linear horizontal row. The spheres maintain their individual
-      colors and sizes throughout the entire simulation.
+    description: The orange circle starts at the top center and moves downward toward the bottom center.
+      The blue circle remains stationary on the left side of the frame throughout the sequence. The green
+      circle remains stationary on the right side of the frame throughout the sequence. The orange circle
+      completes its downward path by the final frame.
+    objects: There are three circular objects arranged in a triangular formation. The circle on the left
+      is blue and has a medium diameter. The circle on the right is green and has a medium diameter. The
+      circle in the center is orange and has a medium diameter.
   movie_mpm_particle:
-    description: The three colored clusters of particles initially form an upward-curving arc. Over time,
-      the clusters move toward each other and begin to converge into a tighter group. The orange cluster
-      moves downward and to the left, while the blue cluster moves upward and to the right. In the final
-      frames, the three clusters settle into a nearly horizontal linear arrangement.
-    objects: The scene contains three distinct clusters of small, densely packed particles. One cluster
-      is blue, one is orange, and one is green. Each cluster is roughly spherical in shape and maintains
-      a consistent size throughout the simulation. The clusters are initially separated but move relative
-      to one another to change their spatial configuration.
+    description: The three clusters of particles begin in a triangular formation with the orange cluster
+      at the top. Over the course of the simulation, the orange cluster moves downward while the blue
+      and green clusters remain relatively stationary. The orange cluster eventually passes through the
+      center of the triangle and settles at the bottom. By the final frame, the three clusters form an
+      inverted triangle with the orange cluster at the base.
+    objects: The scene contains three distinct clusters of small particles. Each cluster is roughly spherical
+      in shape and approximately the same size. The clusters are colored blue, orange, and green. They
+      are arranged in a triangular configuration that changes orientation as the orange cluster moves.
