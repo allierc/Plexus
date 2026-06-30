@@ -202,14 +202,18 @@ def load(path: str) -> Spec:
                           f"(known: {sorted(_KNOWN_TYPE_KEYS)})")
 
     # --- schedule: every token resolves to an operator or a builtin --------- #
-    # A step may be a token, a list of tokens (run in sequence), or a substep micro-loop:
-    # `{substep: N, dt: <dt>, steps: [...]}` (explicit count) or `{substep_dt: <dt>, steps:
-    # [...]}` (count derived from general.dt). Inner tokens run once per substep (e.g. MPM).
+    # A step may be a token, a list of tokens (run in sequence), or a substep micro-loop
+    # `{substep_dt: <dt>, steps: [...]}` whose inner tokens run once per substep; the count
+    # is round(general.dt / dt). (e.g. the MPM strain->P2G->grid->G2P cycle.)
     op_names = {o.op for o in ops}
     for step in raw["schedule"]:
-        if isinstance(step, dict) and ("substep" in step or "substep_dt" in step):
+        if isinstance(step, dict) and "substep" in step:
+            raise ValueError("the `{substep: N, dt: X}` schedule form was removed; write "
+                             "`{substep_dt: X, steps: [...]}` and set `general.dt` to the "
+                             "per-frame sim time (substeps = round(general.dt / X)).")
+        if isinstance(step, dict) and "substep_dt" in step:
             if not isinstance(step.get("steps"), list):
-                raise ValueError("a `{substep…}` schedule step needs a `steps:` list")
+                raise ValueError("a `{substep_dt: …}` schedule step needs a `steps:` list")
             tokens = step["steps"]
         else:
             tokens = step if isinstance(step, list) else [step]

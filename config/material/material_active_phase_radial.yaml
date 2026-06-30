@@ -3,28 +3,23 @@ fields:
   direction: {frame: vector_grid, source: material/dir_radial_in.tif}
   mpm_grid: {frame: mpm_grid, n_grid: 128}
   delay_map: {frame: image, source: material/delay_radial.tif}
-general: {boundary: wall, dt: 1.0, n_frames: 250, name: material_active_phase_radial,
-  seed: 0}
+general: {boundary: wall, dt: 0.002, n_frames: 250, name: material_active_phase_radial, seed: 0}
 operators:
 - {at: cell, op: aggregate}
-- {op: phase_delay_pulse, at: activation, delay_from: delay_map, max_delay: 60.0,
-  period: 150.0, duration: 30.0}
-- {amplitude: 10.0, at: mpm_particle, direction_from: direction, from: activation,
-  op: pulse_to_active_stress}
+- {op: phase_delay_pulse, at: activation, delay_from: delay_map, max_delay: 60.0, period: 150.0, duration: 30.0}
+- {amplitude: 10.0, at: mpm_particle, direction_from: direction, from: activation, op: pulse_to_active_stress}
 - {at: mpm_particle, k: 30.0, op: mpm_drag}
-- {at: mpm_particle, dt_sub: 0.0002, op: mpm_strain}
-- {a_max: 200, at: mpm_particle, drag: 0.0, dt_sub: 0.0002, op: p2g, to: mpm_grid}
-- {at: mpm_grid, dt_sub: 0.0002, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
-- {at: mpm_particle, dt_sub: 0.0002, from: mpm_grid, op: g2p, wall_contact: 0.06,
-  wall_damp: 0.5}
+- {at: mpm_particle, op: mpm_strain}
+- {a_max: 200, at: mpm_particle, drag: 0.0, op: p2g, to: mpm_grid}
+- {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, from: mpm_grid, op: g2p, wall_contact: 0.06, wall_damp: 0.5}
 schedule:
 - aggregate
 - phase_delay_pulse
 - pulse_to_active_stress
 - mpm_drag
-- dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
-  substep: 10
 sets:
   cell:
     n: 1
@@ -40,30 +35,11 @@ sets:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_activation:
-    description: A white ring-like structure appears in the center of a black background. The ring expands
-      outward while its inner void grows larger. The white area eventually transitions into a thick outer
-      border as the central black region dominates the frame. Finally, the white border fades away, leaving
-      a solid black screen.
-    objects: The primary object is a white, circular ring with a blurred, diffuse edge. It is centered
-      on a solid black background. Over time, the ring's inner radius increases, causing the white band
-      to move toward the periphery. The final state shows the white ring completely disappearing into
-      the black background.
+    description: A white ring-like structure appears in the center of a black background. The ring expands outward while its inner void grows larger. The white area eventually transitions into a thick outer border as the central black region dominates the frame. Finally, the white border fades away, leaving a solid black screen.
+    objects: The primary object is a white, circular ring with a blurred, diffuse edge. It is centered on a solid black background. Over time, the ring's inner radius increases, causing the white band to move toward the periphery. The final state shows the white ring completely disappearing into the black background.
   movie_cell:
-    description: The simulation shows a dense field of blue particles distributed within a square boundary.
-      Over time, the particles undergo subtle fluctuations in their spatial distribution, creating a shimmering
-      effect. There is a slight increase in the concentration of white space in the center of the field
-      as the simulation progresses. The overall density and boundary of the blue cluster remain constant
-      throughout the sequence.
-    objects: The primary objects are small, blue, irregularly shaped particles. These particles are densely
-      packed together to form a large, roughly square-shaped cluster. The cluster is set against a plain
-      white background, which highlights the blue color. The individual particles are very small and appear
-      to be randomly distributed within the overall structure.
+    description: The simulation shows a dense field of blue particles distributed within a square boundary. Over time, the particles undergo subtle fluctuations in their spatial distribution, creating a shimmering effect. There is a slight increase in the concentration of white space in the center of the field as the simulation progresses. The overall density and boundary of the blue cluster remain constant throughout the sequence.
+    objects: The primary objects are small, blue, irregularly shaped particles. These particles are densely packed together to form a large, roughly square-shaped cluster. The cluster is set against a plain white background, which highlights the blue color. The individual particles are very small and appear to be randomly distributed within the overall structure.
   movie_mpm_particle:
-    description: The simulation shows a large collection of blue particles distributed across a square
-      field. Over the course of the video, the particles undergo subtle shifts in their spatial positions.
-      The overall density and distribution of the particles remain relatively constant throughout the
-      sequence. There is no significant emergence of large-scale structures or patterns as time progresses.
-    objects: The scene contains thousands of small, individual blue dots. These particles are arranged
-      in a stochastic, non-uniform distribution across a white background. Each particle is roughly the
-      same size and maintains a distinct, point-like appearance. The particles are not connected to one
-      another, forming a discrete set of independent entities.
+    description: The simulation shows a large collection of blue particles distributed across a square field. Over the course of the video, the particles undergo subtle shifts in their spatial positions. The overall density and distribution of the particles remain relatively constant throughout the sequence. There is no significant emergence of large-scale structures or patterns as time progresses.
+    objects: The scene contains thousands of small, individual blue dots. These particles are arranged in a stochastic, non-uniform distribution across a white background. Each particle is roughly the same size and maintains a distinct, point-like appearance. The particles are not connected to one another, forming a discrete set of independent entities.

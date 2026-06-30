@@ -2,7 +2,7 @@ general:
   name: material_bowl_3
   seed: 0
   n_frames: 1300
-  dt: 1.0
+  dt: 0.0033
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.12, 0.5]
@@ -29,36 +29,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.00015}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.00015, drag: 0.35, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.00015, surface_tension: 4.0, wall_damp: 0.6}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.00015, wall_damp: 0.6, wall_contact: 0.05, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.35, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 4.0, wall_damp: 0.6}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.6, wall_contact: 0.05, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 22
-  dt: 0.00015
+- substep_dt: 0.00015
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue circle appears in the center of a white background with gray stepped borders.
-      The circle then rapidly shrinks and fades into a light blue horizontal band. This band expands and
-      settles into a wider, more irregular shape across the middle of the frame. Finally, the blue area
-      stabilizes into a steady, horizontal layer with a small vertical extension at the bottom.
-    objects: A large, solid blue circle is initially centered in the upper half of the frame. The gray
-      borders are arranged in a symmetrical, stepped pattern on the left and right sides. A light blue
-      horizontal band forms in the middle, connecting the two gray structures. A small, vertical blue
-      column extends downward from the center of the horizontal band.
+    description: A large blue circle appears in the center of a white background with gray stepped borders. The circle then rapidly shrinks and fades into a light blue horizontal band. This band expands and settles into a wider, more irregular shape across the middle of the frame. Finally, the blue area stabilizes into a steady, horizontal layer with a small vertical extension at the bottom.
+    objects: A large, solid blue circle is initially centered in the upper half of the frame. The gray borders are arranged in a symmetrical, stepped pattern on the left and right sides. A light blue horizontal band forms in the middle, connecting the two gray structures. A small, vertical blue column extends downward from the center of the horizontal band.
   movie_mpm_particle:
-    description: A large, circular cluster of blue particles is initially centered in the upper half of
-      the frame. As the simulation progresses, the cluster rapidly expands downward and disintegrates
-      into a more diffuse, irregular shape. The particles eventually settle into a wide, horizontal band
-      that fills the lower portion of the frame. Finally, the particles concentrate into a central vertical
-      column that extends to the bottom edge.
-    objects: The primary objects are numerous small, light-blue particles that form a cohesive group.
-      These particles are initially arranged in a dense, circular topology in the center of the white
-      space. Over time, they transition into a wide, stepped horizontal formation that spans the width
-      of the gray base. The final state shows the particles organized into a narrow, vertical column at
-      the bottom center.
+    description: A large, circular cluster of blue particles is initially centered in the upper half of the frame. As the simulation progresses, the cluster rapidly expands downward and disintegrates into a more diffuse, irregular shape. The particles eventually settle into a wide, horizontal band that fills the lower portion of the frame. Finally, the particles concentrate into a central vertical column that extends to the bottom edge.
+    objects: The primary objects are numerous small, light-blue particles that form a cohesive group. These particles are initially arranged in a dense, circular topology in the center of the white space. Over time, they transition into a wide, stepped horizontal formation that spans the width of the gray base. The final state shows the particles organized into a narrow, vertical column at the bottom center.

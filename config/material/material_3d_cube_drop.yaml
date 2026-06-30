@@ -3,7 +3,7 @@
 # hit the reflective floor and bounce (fixed-corotated elasticity springs it back).
 # Exercises the dimension-generic mpm stack (mpm_grid 64^3, p2g/g2p 27-cell stencil,
 # 3D polar rotation via SVD) -- the 3D counterpart of the 2D material_* ball specs.
-general: {name: material_3d_cube_drop, seed: 0, n_frames: 320, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: material_3d_cube_drop, seed: 0, n_frames: 320, dt: 0.003, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   cell:
     n: 1
@@ -16,14 +16,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.0, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- {substep: 15, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   background: black
   up_axis: 1
@@ -42,11 +42,5 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_mpm_particle:
-    description: A dense cluster of blue particles is initially positioned in the center of a large wireframe
-      cube. Over time, the cluster remains stationary and maintains its compact, roughly spherical shape.
-      There is no visible movement or expansion of the particles throughout the sequence. The scene remains
-      static, showing a stable distribution of points within the bounded volume.
-    objects: The primary objects are a large number of small, blue particles clustered together. These
-      particles form a dense, roughly spherical cloud in the center of the frame. They are contained within
-      a large, white wireframe cube that defines the spatial boundaries. The particles are uniform in
-      color and size, creating a textured, volumetric appearance.
+    description: A dense cluster of blue particles is initially positioned in the center of a large wireframe cube. Over time, the cluster remains stationary and maintains its compact, roughly spherical shape. There is no visible movement or expansion of the particles throughout the sequence. The scene remains static, showing a stable distribution of points within the bounded volume.
+    objects: The primary objects are a large number of small, blue particles clustered together. These particles form a dense, roughly spherical cloud in the center of the frame. They are contained within a large, white wireframe cube that defines the spatial boundaries. The particles are uniform in color and size, creating a textured, volumetric appearance.

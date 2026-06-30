@@ -1,4 +1,4 @@
-general: {name: material_snow_pile, seed: 0, n_frames: 800, dt: 1.0, boundary: wall}
+general: {name: material_snow_pile, seed: 0, n_frames: 800, dt: 0.00375, boundary: wall}
 sets:
   cell:
     n: 1
@@ -15,36 +15,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0001875}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0001875, drag: 0.2, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0001875, surface_tension: 0, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0001875, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.2, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 0, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 20
-  dt: 0.0001875
+- substep_dt: 0.0001875
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue sphere appears at the top of the frame in the first keyframe. In the second
-      keyframe, the sphere has flattened into a thin horizontal disc at the top. The disc then begins
-      to disintegrate into a vertical stream of small particles falling downward. By the final keyframe,
-      the particles have accumulated into a large, irregular splash at the bottom of the frame.
-    objects: The primary object is a large, solid blue sphere in the initial frame. This object transforms
-      into a thin, elongated blue disc in the second frame. A collection of small, scattered blue particles
-      forms a vertical column between the top and bottom. A large, irregular blue splash forms at the
-      base of the scene in the final frames.
+    description: A large blue sphere appears at the top of the frame in the first keyframe. In the second keyframe, the sphere has flattened into a thin horizontal disc at the top. The disc then begins to disintegrate into a vertical stream of small particles falling downward. By the final keyframe, the particles have accumulated into a large, irregular splash at the bottom of the frame.
+    objects: The primary object is a large, solid blue sphere in the initial frame. This object transforms into a thin, elongated blue disc in the second frame. A collection of small, scattered blue particles forms a vertical column between the top and bottom. A large, irregular blue splash forms at the base of the scene in the final frames.
   movie_mpm_particle:
-    description: A dense cluster of blue particles initially forms a large, roughly circular shape at
-      the top of the frame. This cluster then rapidly collapses and flattens into a thin horizontal layer
-      near the top. Simultaneously, a stream of sparse particles falls vertically from this top layer
-      toward the bottom of the frame. These falling particles accumulate at the base, forming a growing,
-      irregular mound of blue material.
-    objects: The primary objects are small, individual blue particles that aggregate into larger structures.
-      Initially, these particles form a large, dense, circular cluster at the top of the scene. As time
-      progresses, they reorganize into a thin, elongated horizontal band at the top and a growing, jagged
-      mound at the bottom. The particles are uniformly blue in color and vary in density, ranging from
-      sparse individual dots to thick, opaque clusters.
+    description: A dense cluster of blue particles initially forms a large, roughly circular shape at the top of the frame. This cluster then rapidly collapses and flattens into a thin horizontal layer near the top. Simultaneously, a stream of sparse particles falls vertically from this top layer toward the bottom of the frame. These falling particles accumulate at the base, forming a growing, irregular mound of blue material.
+    objects: The primary objects are small, individual blue particles that aggregate into larger structures. Initially, these particles form a large, dense, circular cluster at the top of the scene. As time progresses, they reorganize into a thin, elongated horizontal band at the top and a growing, jagged mound at the bottom. The particles are uniformly blue in color and vary in density, ranging from sparse individual dots to thick, opaque clusters.

@@ -2,7 +2,7 @@ general:
   name: material_steps_3
   seed: 0
   n_frames: 1700
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.16, 0.34]
@@ -26,33 +26,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.35, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 12.0, wall_damp: 0.65}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.65, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.35, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 12.0, wall_damp: 0.65}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.65, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large, textured blue sphere is positioned above a grey stepped structure. As the simulation
-      progresses, the sphere rapidly shrinks in size. The sphere eventually disappears from the frame
-      entirely. The grey stepped structure remains stationary throughout the entire sequence.
-    objects: A large, textured blue sphere is located in the upper left quadrant of the frame. The sphere
-      has a mottled, light blue and white appearance. A grey stepped structure occupies the bottom left
-      corner, consisting of four descending levels. The steps are uniform in width and height, creating
-      a staircase-like pattern.
+    description: A large, textured blue sphere is positioned above a grey stepped structure. As the simulation progresses, the sphere rapidly shrinks in size. The sphere eventually disappears from the frame entirely. The grey stepped structure remains stationary throughout the entire sequence.
+    objects: A large, textured blue sphere is located in the upper left quadrant of the frame. The sphere has a mottled, light blue and white appearance. A grey stepped structure occupies the bottom left corner, consisting of four descending levels. The steps are uniform in width and height, creating a staircase-like pattern.
   movie_mpm_particle:
-    description: A large cluster of blue particles initially sits atop a grey stepped structure. As time
-      progresses, the particles begin to flow downward and spread across the steps. The particles eventually
-      form a thin, continuous layer that covers the entire surface of the stairs. By the final frame,
-      the particles have settled into a uniform distribution across the lower levels.
-    objects: The scene contains a set of grey steps arranged in a descending staircase pattern. A large
-      collection of small blue particles forms a dense, semi-circular cluster at the start. These blue
-      particles are uniform in size and color throughout the simulation. The grey steps are solid, geometric
-      shapes that provide a static foundation for the moving particles.
+    description: A large cluster of blue particles initially sits atop a grey stepped structure. As time progresses, the particles begin to flow downward and spread across the steps. The particles eventually form a thin, continuous layer that covers the entire surface of the stairs. By the final frame, the particles have settled into a uniform distribution across the lower levels.
+    objects: The scene contains a set of grey steps arranged in a descending staircase pattern. A large collection of small blue particles forms a dense, semi-circular cluster at the start. These blue particles are uniform in size and color throughout the simulation. The grey steps are solid, geometric shapes that provide a static foundation for the moving particles.

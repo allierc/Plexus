@@ -8,7 +8,7 @@ general:
   name: genB_gallery_star_ball
   seed: 0
   n_frames: 600
-  dt: 1.0
+  dt: 0.0023868
   boundary: wall
   obstacles:
   - [0.5, 0.30, 0.12]              # fixed rigid ball (a single circular obstacle)
@@ -25,14 +25,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0001326}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0001326, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0001326, surface_tension: 10, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0001326, wall_damp: 0.5, wall_contact: 0.06, vmax: 1.0e9}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1.0e9}
 schedule:
 - aggregate
 - gravity
-- {substep: 18, dt: 0.0001326, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- {substep_dt: 0.0001326, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   colors: {star_v: [0.9, 0.12, 0.12], star_h: [0.9, 0.12, 0.12]}
   background: white
@@ -40,15 +40,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: 'The blue vertical bar and orange horizontal bar start as a cross shape above a grey
-      circle.
+    description: 'The blue vertical bar and orange horizontal bar start as a cross shape above a grey circle.
 
       The orange bar begins to rotate clockwise while the blue bar remains vertical.
 
       The blue bar then begins to rotate clockwise along with the orange bar.
 
-      The entire cross structure rotates until it is tilted at a 45-degree angle and moves to the right
-      of the circle.'
+      The entire cross structure rotates until it is tilted at a 45-degree angle and moves to the right of the circle.'
     objects: 'There is a blue vertical bar that is medium in size.
 
       There is an orange horizontal bar that is medium in size and intersects the blue bar.

@@ -2,7 +2,7 @@ general:
   name: material_steps_2
   seed: 0
   n_frames: 1300
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.16, 0.34]
@@ -26,15 +26,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.35, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 12.0, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.35, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 12.0, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
@@ -55,11 +54,5 @@ descriptions:
 
       The background is a plain white field that provides high contrast for the objects.'
   movie_mpm_particle:
-    description: A large cluster of blue particles is initially positioned above a grey stepped structure.
-      As time progresses, the cluster breaks apart and flows downward, following the contours of the steps.
-      The particles spread out across the lower levels, forming a thin layer that coats the surface. By
-      the end of the sequence, the particles have settled into a steady state across the bottom-most steps.
-    objects: The scene contains a large, dense cluster of small blue particles. These particles are arranged
-      in a semi-circular shape at the beginning of the simulation. A solid grey structure with a stepped,
-      staircase-like topology serves as the base. The grey steps are large and uniform in color, providing
-      a stable surface for the blue particles to interact with.
+    description: A large cluster of blue particles is initially positioned above a grey stepped structure. As time progresses, the cluster breaks apart and flows downward, following the contours of the steps. The particles spread out across the lower levels, forming a thin layer that coats the surface. By the end of the sequence, the particles have settled into a steady state across the bottom-most steps.
+    objects: The scene contains a large, dense cluster of small blue particles. These particles are arranged in a semi-circular shape at the beginning of the simulation. A solid grey structure with a stepped, staircase-like topology serves as the base. The grey steps are large and uniform in color, providing a stable surface for the blue particles to interact with.

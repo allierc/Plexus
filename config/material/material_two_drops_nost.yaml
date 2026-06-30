@@ -1,4 +1,4 @@
-general: {name: material_two_drops_nost, seed: 0, n_frames: 600, dt: 1.0, boundary: wall}
+general: {name: material_two_drops_nost, seed: 0, n_frames: 600, dt: 0.0028, boundary: wall}
 sets:
   cell:
     n: 2
@@ -22,34 +22,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 0.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 0.0, wall_damp: 1.0}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 1.0}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 14
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The video shows two circular particles that remain stationary throughout the entire duration.
-      There is no movement, change in size, or change in color observed in the scene. The two particles
-      maintain a constant relative position to each other. The simulation appears to be in a static state
-      with no dynamic evolution.
-    objects: The scene contains two circular objects of equal size. One object is colored blue and is
-      positioned on the left side of the frame. The second object is colored orange and is positioned
-      on the right side of the frame. The two circles are placed side-by-side, slightly overlapping at
-      their center points.
+    description: The video shows two circular particles that remain stationary throughout the entire duration. There is no movement, change in size, or change in color observed in the scene. The two particles maintain a constant relative position to each other. The simulation appears to be in a static state with no dynamic evolution.
+    objects: The scene contains two circular objects of equal size. One object is colored blue and is positioned on the left side of the frame. The second object is colored orange and is positioned on the right side of the frame. The two circles are placed side-by-side, slightly overlapping at their center points.
   movie_mpm_particle:
-    description: The video shows two circular clusters of particles that remain stationary throughout
-      the duration. The blue cluster is positioned on the left, while the orange cluster is on the right.
-      There is no movement, expansion, or contraction of the particles over time. The scene remains completely
-      static across all four keyframes.
-    objects: There are two distinct circular clusters composed of many small, individual particles. The
-      left cluster is blue and the right cluster is orange. Both clusters are approximately the same size
-      and are positioned side-by-side. The particles within each cluster are densely packed to form a
-      roughly spherical shape.
+    description: The video shows two circular clusters of particles that remain stationary throughout the duration. The blue cluster is positioned on the left, while the orange cluster is on the right. There is no movement, expansion, or contraction of the particles over time. The scene remains completely static across all four keyframes.
+    objects: There are two distinct circular clusters composed of many small, individual particles. The left cluster is blue and the right cluster is orange. Both clusters are approximately the same size and are positioned side-by-side. The particles within each cluster are densely packed to form a roughly spherical shape.

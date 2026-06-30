@@ -2,7 +2,7 @@ general:
   name: material_wedge
   seed: 0
   n_frames: 1100
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.2, 0.45]
@@ -26,36 +26,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.3, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 12, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 12, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue sphere is initially positioned above a grey stepped structure. As the simulation
-      progresses, the sphere rapidly descends and merges into the grey structure. The blue color then
-      spreads horizontally across the top of the steps. Finally, the blue area expands to fill the entire
-      upper region of the frame.
-    objects: A large, circular blue sphere is the primary moving object in the scene. A grey stepped structure
-      occupies the bottom left corner of the frame. The blue color transitions from a concentrated sphere
-      to a distributed field. The grey steps remain stationary and maintain their geometric shape throughout
-      the simulation.
+    description: A large blue sphere is initially positioned above a grey stepped structure. As the simulation progresses, the sphere rapidly descends and merges into the grey structure. The blue color then spreads horizontally across the top of the steps. Finally, the blue area expands to fill the entire upper region of the frame.
+    objects: A large, circular blue sphere is the primary moving object in the scene. A grey stepped structure occupies the bottom left corner of the frame. The blue color transitions from a concentrated sphere to a distributed field. The grey steps remain stationary and maintain their geometric shape throughout the simulation.
   movie_mpm_particle:
-    description: A large cluster of blue particles begins as a spherical mass in the upper left of the
-      frame. As time progresses, the cluster descends and spreads out across a series of grey steps. The
-      particles flow downward, following the contours of the steps while maintaining a dense, fluid-like
-      structure. By the final frame, the particles have settled into a thick layer covering the lower
-      steps and the bottom right corner.
-    objects: The primary objects are numerous small, light-blue particles that form a cohesive, granular
-      mass. These particles are arranged in a dynamic, flowing formation that changes from a sphere to
-      a descending stream. A set of four large, grey rectangular blocks is arranged in a descending staircase
-      pattern at the bottom of the frame. The grey blocks are solid, opaque, and significantly larger
-      than the individual blue particles.
+    description: A large cluster of blue particles begins as a spherical mass in the upper left of the frame. As time progresses, the cluster descends and spreads out across a series of grey steps. The particles flow downward, following the contours of the steps while maintaining a dense, fluid-like structure. By the final frame, the particles have settled into a thick layer covering the lower steps and the bottom right corner.
+    objects: The primary objects are numerous small, light-blue particles that form a cohesive, granular mass. These particles are arranged in a dynamic, flowing formation that changes from a sphere to a descending stream. A set of four large, grey rectangular blocks is arranged in a descending staircase pattern at the bottom of the frame. The grey blocks are solid, opaque, and significantly larger than the individual blue particles.

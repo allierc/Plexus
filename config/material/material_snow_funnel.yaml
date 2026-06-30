@@ -2,7 +2,7 @@ general:
   name: material_snow_funnel
   seed: 0
   n_frames: 900
-  dt: 1.0
+  dt: 0.00375
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.18, 1.0]
@@ -27,35 +27,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0001875}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0001875, drag: 0.2, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0001875, surface_tension: 0, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0001875, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.2, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 0, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 20
-  dt: 0.0001875
+- substep_dt: 0.0001875
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A blue circular particle is initially centered within a white rectangular frame. The
-      particle then undergoes a rapid transformation, stretching vertically into a series of blue segments.
-      These segments appear to move downward while the white frame remains stationary. Finally, the blue
-      shapes settle into a fragmented, vertical column at the bottom of the frame.
-    objects: The scene contains a large white rectangular frame that serves as the background. A blue
-      circular particle is the primary dynamic object in the first frame. In subsequent frames, this particle
-      transforms into multiple smaller blue rectangular segments. These blue segments are arranged vertically
-      and decrease in size as they move toward the bottom.
+    description: A blue circular particle is initially centered within a white rectangular frame. The particle then undergoes a rapid transformation, stretching vertically into a series of blue segments. These segments appear to move downward while the white frame remains stationary. Finally, the blue shapes settle into a fragmented, vertical column at the bottom of the frame.
+    objects: The scene contains a large white rectangular frame that serves as the background. A blue circular particle is the primary dynamic object in the first frame. In subsequent frames, this particle transforms into multiple smaller blue rectangular segments. These blue segments are arranged vertically and decrease in size as they move toward the bottom.
   movie_mpm_particle:
-    description: A large circular cluster of blue particles is initially centered in a white rectangular
-      area. The cluster then rapidly disintegrates and moves downward into a narrower white channel. As
-      it descends, the particles spread out and form a dense, horizontal band across the channel. Finally,
-      the particles continue to fall, settling into a smaller, concentrated mass at the bottom of the
-      channel.
-    objects: The scene contains a large, circular cluster of blue particles at the top. A white rectangular
-      background provides a container for the initial particle distribution. A narrower white channel
-      is positioned below the rectangle to guide the falling particles. The blue particles are small,
-      individual points that aggregate into larger, distinct shapes as they move.
+    description: A large circular cluster of blue particles is initially centered in a white rectangular area. The cluster then rapidly disintegrates and moves downward into a narrower white channel. As it descends, the particles spread out and form a dense, horizontal band across the channel. Finally, the particles continue to fall, settling into a smaller, concentrated mass at the bottom of the channel.
+    objects: The scene contains a large, circular cluster of blue particles at the top. A white rectangular background provides a container for the initial particle distribution. A narrower white channel is positioned below the rectangle to guide the falling particles. The blue particles are small, individual points that aggregate into larger, distinct shapes as they move.

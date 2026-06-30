@@ -2,7 +2,7 @@ general:
   name: material_bowl_2
   seed: 0
   n_frames: 1300
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.12, 0.5]
@@ -29,15 +29,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.35, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 16.0, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.35, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 16.0, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
@@ -52,18 +51,11 @@ descriptions:
       The final frame shows a dark blue band with a vertical extension at the bottom center.'
     objects: 'The primary object is a large, circular blue shape centered in the upper half of the frame.
 
-      The background consists of a white upper region and a gray lower region with a stepped, symmetrical
-      border.
+      The background consists of a white upper region and a gray lower region with a stepped, symmetrical border.
 
       A horizontal blue band emerges, spanning the width of the central white area.
 
       A vertical blue column extends downward from the center of the horizontal band in the final frames.'
   movie_mpm_particle:
-    description: A large circular cluster of blue particles is initially suspended in the upper half of
-      the frame. As the simulation progresses, this cluster rapidly disintegrates and falls downward.
-      The particles settle into a stepped, symmetrical formation at the bottom of the frame. Finally,
-      the particles stabilize into a solid, tiered structure against a gray background.
-    objects: The primary objects are thousands of small, blue, circular particles. These particles are
-      initially arranged in a dense, spherical cluster in the center. They then transition into a structured,
-      symmetrical, stepped formation at the bottom. The background consists of a white upper region and
-      a gray, stepped lower region.
+    description: A large circular cluster of blue particles is initially suspended in the upper half of the frame. As the simulation progresses, this cluster rapidly disintegrates and falls downward. The particles settle into a stepped, symmetrical formation at the bottom of the frame. Finally, the particles stabilize into a solid, tiered structure against a gray background.
+    objects: The primary objects are thousands of small, blue, circular particles. These particles are initially arranged in a dense, spherical cluster in the center. They then transition into a structured, symmetrical, stepped formation at the bottom. The background consists of a white upper region and a gray, stepped lower region.

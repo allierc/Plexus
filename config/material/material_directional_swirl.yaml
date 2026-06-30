@@ -2,8 +2,7 @@ fields:
   activation: {frame: grid, res: 128}
   mpm_grid: {frame: mpm_grid, n_grid: 128}
   direction: {frame: vector_grid, source: material/dir_swirl.tif}
-general: {boundary: wall, dt: 1.0, n_frames: 250, name: material_directional_swirl,
-  seed: 0}
+general: {boundary: wall, dt: 0.002, n_frames: 250, name: material_directional_swirl, seed: 0}
 operators:
 - {at: cell, op: aggregate}
 - {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
@@ -13,23 +12,20 @@ operators:
   op: pulse_stimulus
   radius: 0.12
   profile: uniform
-- {amplitude: 25.0, at: mpm_particle, from: activation, mode: directional, op: pulse_to_contraction,
-  direction_from: direction}
+- {amplitude: 25.0, at: mpm_particle, from: activation, mode: directional, op: pulse_to_contraction, direction_from: direction}
 - {at: mpm_particle, k: 30.0, op: mpm_drag}
-- {at: mpm_particle, dt_sub: 0.0002, op: mpm_strain}
-- {a_max: 200, at: mpm_particle, drag: 0.0, dt_sub: 0.0002, op: p2g, to: mpm_grid}
-- {at: mpm_grid, dt_sub: 0.0002, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
-- {at: mpm_particle, dt_sub: 0.0002, from: mpm_grid, op: g2p, wall_contact: 0.06,
-  wall_damp: 0.5}
+- {at: mpm_particle, op: mpm_strain}
+- {a_max: 200, at: mpm_particle, drag: 0.0, op: p2g, to: mpm_grid}
+- {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, from: mpm_grid, op: g2p, wall_contact: 0.06, wall_damp: 0.5}
 schedule:
 - aggregate
 - pacemaker
 - pulse_stimulus
 - pulse_to_contraction
 - mpm_drag
-- dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
-  substep: 10
 sets:
   cell:
     n: 1
@@ -45,25 +41,11 @@ sets:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_activation:
-    description: The video shows a black screen with no visible movement or changes. There are no particles,
-      agents, or fields evolving over time. The scene remains static and completely dark throughout the
-      entire duration. No scientific simulation is occurring in this sequence.
-    objects: There are no objects present in the scene. The entire frame is a uniform black color. There
-      is no topology or arrangement to describe as the space is empty. The size of any potential objects
-      is zero as they do not exist.
+    description: The video shows a black screen with no visible movement or changes. There are no particles, agents, or fields evolving over time. The scene remains static and completely dark throughout the entire duration. No scientific simulation is occurring in this sequence.
+    objects: There are no objects present in the scene. The entire frame is a uniform black color. There is no topology or arrangement to describe as the space is empty. The size of any potential objects is zero as they do not exist.
   movie_cell:
-    description: The blue particles are initially arranged in a perfectly square formation. Over time,
-      the square begins to rotate clockwise around its center. The rotation continues steadily throughout
-      the duration of the sequence. By the final frame, the square has completed a significant portion
-      of a full turn.
-    objects: The scene contains a large collection of small blue particles. These particles are densely
-      packed together to form a single, cohesive square shape. The color of the particles is a consistent
-      medium blue against a white background. The overall size of the square remains constant as it rotates.
+    description: The blue particles are initially arranged in a perfectly square formation. Over time, the square begins to rotate clockwise around its center. The rotation continues steadily throughout the duration of the sequence. By the final frame, the square has completed a significant portion of a full turn.
+    objects: The scene contains a large collection of small blue particles. These particles are densely packed together to form a single, cohesive square shape. The color of the particles is a consistent medium blue against a white background. The overall size of the square remains constant as it rotates.
   movie_mpm_particle:
-    description: The video shows a large collection of blue particles distributed within a square boundary.
-      Over time, the entire set of particles undergoes a subtle rotation around its center. The distribution
-      of the particles remains relatively uniform throughout the sequence. The overall shape of the cluster
-      maintains its integrity while tilting slightly.
-    objects: The scene contains thousands of small, individual blue dots. These particles are arranged
-      in a dense, roughly square-shaped cluster. Each dot is uniform in size and color, creating a speckled
-      texture. The particles are not connected but are packed closely together to form a coherent field.
+    description: The video shows a large collection of blue particles distributed within a square boundary. Over time, the entire set of particles undergoes a subtle rotation around its center. The distribution of the particles remains relatively uniform throughout the sequence. The overall shape of the cluster maintains its integrity while tilting slightly.
+    objects: The scene contains thousands of small, individual blue dots. These particles are arranged in a dense, roughly square-shaped cluster. Each dot is uniform in size and color, creating a speckled texture. The particles are not connected but are packed closely together to form a coherent field.
