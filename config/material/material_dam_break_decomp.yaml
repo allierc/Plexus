@@ -3,7 +3,7 @@
 # (mpm_strain -> p2g -> mpm_grid_update -> g2p) over a substep micro-loop, against an
 # explicit `mpm_grid` background FIELD. Reproduces the monolith oracle frame-by-frame
 # (see tests/test_mpm_decomposition.py). Same dam-break scenario as material_dam_break.
-general: {name: material_dam_break_decomp, seed: 0, n_frames: 300, dt: 1.0, boundary: wall}
+general: {name: material_dam_break_decomp, seed: 0, n_frames: 300, dt: 0.0036, boundary: wall}
 sets:
   cell:
     n: 1
@@ -14,36 +14,22 @@ sets:
 fields:
   mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
-  - {op: aggregate, at: cell}
-  - {op: gravity,   at: cell, g: 12.0}
-  - {op: mpm_strain,      at: mpm_particle, dt_sub: 2.0e-4}
-  - {op: p2g,             at: mpm_particle, to: mpm_grid, dt_sub: 2.0e-4, drag: 0.08, a_max: 200}
-  - {op: mpm_grid_update, at: mpm_grid, dt_sub: 2.0e-4, surface_tension: 10.0, wall_damp: 0.5, wall_contact: 0.06}
-  - {op: g2p,             at: mpm_particle, from: mpm_grid, dt_sub: 2.0e-4, wall_damp: 0.5, wall_contact: 0.06, vmax: 1.0e9}
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.08, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10.0, wall_damp: 0.5, wall_contact: 0.06}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1.0e9}
 schedule:
-  - aggregate
-  - gravity
-  - {substep: 18, dt: 2.0e-4, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- aggregate
+- gravity
+- {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A blue rectangular block initially appears on the left side of the frame. It then begins
-      to deform and stretch towards the right, losing its sharp edges. As it continues to move, it thins
-      out and spreads across the bottom of the screen. Finally, it transforms into a complex, elongated
-      shape with several small detached fragments at the top right.
-    objects: The primary object is a solid blue mass that changes shape throughout the sequence. It starts
-      as a large, vertical rectangle with a uniform light blue color. As time progresses, the object becomes
-      a horizontal, irregular shape that occupies the lower portion of the frame. By the end, the main
-      body is a wide, jagged strip accompanied by several tiny, scattered blue dots in the upper right
-      corner.
+    description: A blue rectangular block initially appears on the left side of the frame. It then begins to deform and stretch towards the right, losing its sharp edges. As it continues to move, it thins out and spreads across the bottom of the screen. Finally, it transforms into a complex, elongated shape with several small detached fragments at the top right.
+    objects: The primary object is a solid blue mass that changes shape throughout the sequence. It starts as a large, vertical rectangle with a uniform light blue color. As time progresses, the object becomes a horizontal, irregular shape that occupies the lower portion of the frame. By the end, the main body is a wide, jagged strip accompanied by several tiny, scattered blue dots in the upper right corner.
   movie_mpm_particle:
-    description: A dense cluster of blue particles initially forms a vertical rectangular block on the
-      left side of the frame. Over time, the block begins to collapse and spread horizontally toward the
-      right. The particles eventually flatten out into a thin, elongated layer across the bottom of the
-      space. By the final frame, the particles have dispersed into a wavy, irregular band along the lower
-      edge.
-    objects: The scene contains a large collection of small, blue circular particles. Initially, these
-      particles are tightly packed into a tall, solid rectangular shape. As the simulation progresses,
-      the particles lose their vertical structure and move into a more fluid, horizontal arrangement.
-      The final state shows the particles forming a wide, low-profile band with varying thickness.
+    description: A dense cluster of blue particles initially forms a vertical rectangular block on the left side of the frame. Over time, the block begins to collapse and spread horizontally toward the right. The particles eventually flatten out into a thin, elongated layer across the bottom of the space. By the final frame, the particles have dispersed into a wavy, irregular band along the lower edge.
+    objects: The scene contains a large collection of small, blue circular particles. Initially, these particles are tightly packed into a tall, solid rectangular shape. As the simulation progresses, the particles lose their vertical structure and move into a more fluid, horizontal arrangement. The final state shows the particles forming a wide, low-profile band with varying thickness.

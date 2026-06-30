@@ -2,7 +2,7 @@ general:
   name: material_leak_tank
   seed: 0
   n_frames: 1100
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.18, 0.0, 0.23, 0.8]
@@ -25,34 +25,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.12, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 10, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.12, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The blue area initially occupies the majority of the space between the two vertical grey
-      bars. Over time, the blue area recedes downward, leaving a larger white space at the top. The right
-      grey bar breaks into two segments as the blue area moves lower. By the final frame, the blue area
-      is confined to the bottom portion of the container.
-    objects: The scene contains two primary vertical grey bars that act as boundaries. A large blue field
-      represents a fluid or particle mass that changes its vertical position. The right grey bar is initially
-      a single continuous piece but eventually splits into two smaller segments. The background is a solid
-      white color, providing a high-contrast environment for the blue and grey elements.
+    description: The blue area initially occupies the majority of the space between the two vertical grey bars. Over time, the blue area recedes downward, leaving a larger white space at the top. The right grey bar breaks into two segments as the blue area moves lower. By the final frame, the blue area is confined to the bottom portion of the container.
+    objects: The scene contains two primary vertical grey bars that act as boundaries. A large blue field represents a fluid or particle mass that changes its vertical position. The right grey bar is initially a single continuous piece but eventually splits into two smaller segments. The background is a solid white color, providing a high-contrast environment for the blue and grey elements.
   movie_mpm_particle:
-    description: A large volume of blue particles is initially contained within a vessel with a gap in
-      the right wall. As time progresses, the particles flow through the gap into a smaller adjacent chamber.
-      The flow rate decreases as the level of the particles in the main chamber drops. Eventually, the
-      particles fill the smaller chamber and the flow from the main chamber slows significantly.
-    objects: The scene contains a large main chamber and a smaller side chamber connected by a gap. The
-      main chamber is bounded by thick grey vertical walls on the left and right. The particles are small,
-      blue, and densely packed within the chambers. The side chamber is located at the bottom right and
-      is partially filled by the flowing particles.
+    description: A large volume of blue particles is initially contained within a vessel with a gap in the right wall. As time progresses, the particles flow through the gap into a smaller adjacent chamber. The flow rate decreases as the level of the particles in the main chamber drops. Eventually, the particles fill the smaller chamber and the flow from the main chamber slows significantly.
+    objects: The scene contains a large main chamber and a smaller side chamber connected by a gap. The main chamber is bounded by thick grey vertical walls on the left and right. The particles are small, blue, and densely packed within the chambers. The side chamber is located at the bottom right and is partially filled by the flowing particles.

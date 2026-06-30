@@ -2,7 +2,7 @@ general:
   name: material_pillars
   seed: 0
   n_frames: 900
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.2, 0.0, 0.28, 0.3]
@@ -26,28 +26,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.25, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 12, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.25, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 12, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue sphere is positioned above a set of grey bars. As time progresses, a blue
-      horizontal band appears and expands across the grey bars. This blue band eventually covers the entire
-      width of the bars and the surrounding area. The final frame shows the blue band fully integrated
-      with the grey bars.
-    objects: A large, circular blue sphere is located at the top of the frame. Five grey vertical bars
-      of varying heights are arranged in a row at the bottom. A light blue horizontal band emerges and
-      grows to span the width of the bars. The blue band is semi-transparent and appears to merge with
-      the grey structures.
+    description: A large blue sphere is positioned above a set of grey bars. As time progresses, a blue horizontal band appears and expands across the grey bars. This blue band eventually covers the entire width of the bars and the surrounding area. The final frame shows the blue band fully integrated with the grey bars.
+    objects: A large, circular blue sphere is located at the top of the frame. Five grey vertical bars of varying heights are arranged in a row at the bottom. A light blue horizontal band emerges and grows to span the width of the bars. The blue band is semi-transparent and appears to merge with the grey structures.
   movie_mpm_particle:
     description: 'A large cluster of blue particles is initially positioned above a series of grey bars.
 
@@ -55,13 +48,11 @@ descriptions:
 
       The particles flow into the gaps between the bars, filling the spaces and forming a continuous layer.
 
-      By the final frame, the blue particles have completely filled the area between the bars, creating
-      a unified blue field.'
+      By the final frame, the blue particles have completely filled the area between the bars, creating a unified blue field.'
     objects: 'The scene contains a large, roughly circular cluster of small blue particles at the top.
 
       There are five vertical grey bars of varying heights arranged in a row at the bottom.
 
       The blue particles are numerous and small, creating a granular texture throughout the simulation.
 
-      The grey bars are solid, rectangular, and significantly larger in height than the individual blue
-      particles.'
+      The grey bars are solid, rectangular, and significantly larger in height than the individual blue particles.'

@@ -3,7 +3,7 @@ general:
   name: material_balls_bowl
   seed: 0
   n_frames: 800
-  dt: 1.0
+  dt: 0.0038454
   boundary: wall
   obstacles:
   - [0.0, 0.0, 0.16, 0.55]
@@ -28,31 +28,20 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain,      at: mpm_particle, dt_sub: 1.326e-04}
-- {op: p2g,             at: mpm_particle, to: mpm_grid, dt_sub: 1.326e-04, drag: 0.2, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 1.326e-04, surface_tension: 0, wall_damp: 0.6}
-- {op: g2p,             at: mpm_particle, from: mpm_grid, dt_sub: 1.326e-04, wall_damp: 0.6, wall_contact: 0.06, vmax: 1.0e9}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.2, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 0, wall_damp: 0.6}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.6, wall_contact: 0.06, vmax: 1.0e9}
 schedule:
 - aggregate
 - gravity
-- {substep: 29, dt: 1.326e-04, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- {substep_dt: 0.0001326, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A cluster of four overlapping circles moves downward and slightly to the right. A separate
-      green circle moves from the right side toward the center. The cluster and the green circle eventually
-      merge into a single group. The final group of five circles settles at the bottom center of the frame.
-    objects: The first set consists of four overlapping circles in orange, brown, purple, and red. These
-      circles are medium-sized and clustered closely together. The second object is a single green circle
-      of similar size. The green circle is initially isolated on the right side of the scene.
+    description: A cluster of four overlapping circles moves downward and slightly to the right. A separate green circle moves from the right side toward the center. The cluster and the green circle eventually merge into a single group. The final group of five circles settles at the bottom center of the frame.
+    objects: The first set consists of four overlapping circles in orange, brown, purple, and red. These circles are medium-sized and clustered closely together. The second object is a single green circle of similar size. The green circle is initially isolated on the right side of the scene.
   movie_mpm_particle:
-    description: A cluster of multi-colored particles is initially positioned in the upper left quadrant
-      of the frame. Over time, this cluster moves downward and toward the center of the image. Simultaneously,
-      a separate green cluster of particles moves from the upper right toward the center. The two groups
-      eventually converge and overlap in the lower central region of the scene.
-    objects: The first set of objects is a cluster of four overlapping circular regions in orange, brown,
-      purple, and red. These regions are medium-sized and appear to be composed of many small, dense particles.
-      The second set of objects is a single, distinct green circular region located to the right of the
-      first cluster. This green region is similar in size and texture to the individual components of
-      the first cluster.
+    description: A cluster of multi-colored particles is initially positioned in the upper left quadrant of the frame. Over time, this cluster moves downward and toward the center of the image. Simultaneously, a separate green cluster of particles moves from the upper right toward the center. The two groups eventually converge and overlap in the lower central region of the scene.
+    objects: The first set of objects is a cluster of four overlapping circular regions in orange, brown, purple, and red. These regions are medium-sized and appear to be composed of many small, dense particles. The second set of objects is a single, distinct green circular region located to the right of the first cluster. This green region is similar in size and texture to the individual components of the first cluster.

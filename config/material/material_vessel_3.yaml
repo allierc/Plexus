@@ -2,7 +2,7 @@ general:
   name: material_vessel_3
   seed: 0
   n_frames: 1100
-  dt: 1.0
+  dt: 0.0036
   boundary: wall
   obstacles:
   - [0.58, 0.15, 0.64, 1.0]
@@ -22,34 +22,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.3, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 30.0, wall_damp: 0.4}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.4, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 30.0, wall_damp: 0.4}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.4, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A blue spherical particle is initially positioned to the left of a vertical grey bar.
-      As time progresses, the particle rapidly moves downward and spreads out into a horizontal layer.
-      This blue substance settles at the bottom of the frame, forming a thick, irregular band. The grey
-      bar remains stationary throughout the entire duration of the simulation.
-    objects: The scene contains a blue spherical particle that is relatively large and circular. A vertical
-      grey bar stands in the center, appearing as a thin, solid rectangle. Over time, the blue particle
-      transforms into a wide, horizontal blue field at the base of the frame. The background is a plain
-      white space that provides a high-contrast environment for the objects.
+    description: A blue spherical particle is initially positioned to the left of a vertical grey bar. As time progresses, the particle rapidly moves downward and spreads out into a horizontal layer. This blue substance settles at the bottom of the frame, forming a thick, irregular band. The grey bar remains stationary throughout the entire duration of the simulation.
+    objects: The scene contains a blue spherical particle that is relatively large and circular. A vertical grey bar stands in the center, appearing as a thin, solid rectangle. Over time, the blue particle transforms into a wide, horizontal blue field at the base of the frame. The background is a plain white space that provides a high-contrast environment for the objects.
   movie_mpm_particle:
-    description: A large cluster of blue particles initially forms a spherical shape in the upper left
-      of the frame. The sphere then rapidly collapses and falls toward the bottom of the container, spreading
-      out into a thin layer. As the particles settle, they form a wavy, uneven bed across the bottom of
-      the space. A vertical grey bar remains stationary throughout the entire duration of the simulation.
-    objects: The primary objects are numerous small blue particles that behave like a fluid or granular
-      material. These particles are initially concentrated into a large, dense sphere before dispersing
-      into a flat, horizontal layer. A single, thick grey vertical bar is positioned in the center-right
-      of the frame. The background is a plain white space that serves as the container for the simulation.
+    description: A large cluster of blue particles initially forms a spherical shape in the upper left of the frame. The sphere then rapidly collapses and falls toward the bottom of the container, spreading out into a thin layer. As the particles settle, they form a wavy, uneven bed across the bottom of the space. A vertical grey bar remains stationary throughout the entire duration of the simulation.
+    objects: The primary objects are numerous small blue particles that behave like a fluid or granular material. These particles are initially concentrated into a large, dense sphere before dispersing into a flat, horizontal layer. A single, thick grey vertical bar is positioned in the center-right of the frame. The background is a plain white space that serves as the container for the simulation.

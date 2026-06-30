@@ -466,20 +466,14 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
             for step in sim.schedule:                # operators accumulate per-set deltas
-                # A micro-loop: run the inner operators N times at the substep dt (e.g. the
-                # MPM strain->P2G->grid->G2P cycle). Two equivalent forms:
-                #   `{substep: N, dt: <dt_sub>, steps: [...]}` -- explicit count + dt;
-                #   `{substep_dt: <dt_sub>, steps: [...]}`     -- ONE micro-step; the count is
-                #     derived as round(general.dt / dt_sub), so `general.dt` is the sim-time
-                #     advanced per FRAME (lower it for slow-motion; dt_sub stays CFL-stable).
-                # Deltas accumulated by the OUTER schedule (gravity) persist across it.
-                if isinstance(step, dict) and ("substep" in step or "substep_dt" in step):
-                    if "substep_dt" in step:
-                        H.sub_dt = float(step["substep_dt"])
-                        count = max(1, round(sim.dt / H.sub_dt))
-                    else:
-                        H.sub_dt = float(step.get("dt", sim.dt))
-                        count = int(step["substep"])
+                # A micro-loop `{substep_dt: <dt_sub>, steps: [...]}`: run the inner operators
+                # once per substep at `dt_sub` (e.g. the MPM strain->P2G->grid->G2P cycle). The
+                # count is derived as round(general.dt / dt_sub), so `general.dt` is the sim-time
+                # advanced per FRAME (lower it for slow-motion; dt_sub stays CFL-stable). Deltas
+                # accumulated by the OUTER schedule (gravity) persist across it.
+                if isinstance(step, dict) and "substep_dt" in step:
+                    H.sub_dt = float(step["substep_dt"])
+                    count = max(1, round(sim.dt / H.sub_dt))
                     for _ in range(count):
                         for token in step["steps"]:
                             _run_token(token, tick)

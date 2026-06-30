@@ -1,4 +1,4 @@
-general: {name: material_dam_viscous, seed: 0, n_frames: 900, dt: 1.0, boundary: wall}
+general: {name: material_dam_viscous, seed: 0, n_frames: 900, dt: 0.0036, boundary: wall}
 sets:
   cell:
     n: 1
@@ -16,36 +16,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.9, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 10, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.9, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A large blue rectangular block is initially positioned on the left side of the frame.
-      As time progresses, the block undergoes a dramatic transformation, stretching and thinning into
-      a horizontal band across the bottom. The band then begins to fluctuate and undulate, developing
-      irregular peaks and valleys. Finally, the shape stabilizes into a relatively flat, slightly wavy
-      horizontal layer at the base of the image.
-    objects: The primary object is a solid blue mass that changes its geometric configuration over time.
-      It starts as a tall, vertical rectangle with a uniform light blue color. It then transitions into
-      a wide, thin horizontal strip that spans the width of the frame. The final state is a low-profile,
-      undulating blue field with a textured, slightly fuzzy edge.
+    description: A large blue rectangular block is initially positioned on the left side of the frame. As time progresses, the block undergoes a dramatic transformation, stretching and thinning into a horizontal band across the bottom. The band then begins to fluctuate and undulate, developing irregular peaks and valleys. Finally, the shape stabilizes into a relatively flat, slightly wavy horizontal layer at the base of the image.
+    objects: The primary object is a solid blue mass that changes its geometric configuration over time. It starts as a tall, vertical rectangle with a uniform light blue color. It then transitions into a wide, thin horizontal strip that spans the width of the frame. The final state is a low-profile, undulating blue field with a textured, slightly fuzzy edge.
   movie_mpm_particle:
-    description: A dense rectangular block of blue particles is initially positioned on the left side
-      of the frame. Over time, the block undergoes a dramatic transformation, breaking apart and flowing
-      toward the bottom and right edges of the screen. The particles eventually settle into a thin, undulating
-      layer across the bottom of the frame. The final state shows a sparse, wavy distribution of blue
-      dots against a white background.
-    objects: The primary objects are thousands of small, blue circular particles. Initially, they are
-      arranged in a compact, vertical rectangular formation. As the simulation progresses, the particles
-      disperse into a fluid-like, horizontal layer. The final arrangement consists of a continuous but
-      irregular band of blue dots along the bottom edge.
+    description: A dense rectangular block of blue particles is initially positioned on the left side of the frame. Over time, the block undergoes a dramatic transformation, breaking apart and flowing toward the bottom and right edges of the screen. The particles eventually settle into a thin, undulating layer across the bottom of the frame. The final state shows a sparse, wavy distribution of blue dots against a white background.
+    objects: The primary objects are thousands of small, blue circular particles. Initially, they are arranged in a compact, vertical rectangular formation. As the simulation progresses, the particles disperse into a fluid-like, horizontal layer. The final arrangement consists of a continuous but irregular band of blue dots along the bottom edge.

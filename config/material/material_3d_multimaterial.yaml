@@ -3,7 +3,7 @@
 # an elastic jelly cube, a liquid water cube and a plastic snow cube fall together.
 # Three cells, one material type each (assigned by `fraction`), each block-filled.
 # Tests multi-object / multi-material 3D in a single grid solve.
-general: {name: material_3d_multimaterial, seed: 0, n_frames: 360, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: material_3d_multimaterial, seed: 0, n_frames: 360, dt: 0.0032, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   cell:
     n: 3
@@ -26,14 +26,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 16.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.05, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- {substep: 16, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   background: black
   up_axis: 1
@@ -52,13 +52,5 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_mpm_particle:
-    description: Initially, three distinct clusters of particles are arranged in a linear sequence along
-      a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across
-      the bottom plane of the bounding box. The green and white clusters remain relatively stationary
-      as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles
-      form a large, thin sheet on the floor while the green and white clusters sit atop it.
-    objects: 'There are three primary clusters of particles: one green, one blue, and one white. The green
-      cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster
-      is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts
-      as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that
-      covers the bottom of the cube.'
+    description: Initially, three distinct clusters of particles are arranged in a linear sequence along a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across the bottom plane of the bounding box. The green and white clusters remain relatively stationary as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles form a large, thin sheet on the floor while the green and white clusters sit atop it.
+    objects: 'There are three primary clusters of particles: one green, one blue, and one white. The green cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that covers the bottom of the cube.'

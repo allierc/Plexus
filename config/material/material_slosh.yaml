@@ -1,4 +1,4 @@
-general: {name: material_slosh, seed: 0, n_frames: 1000, dt: 1.0, boundary: wall}
+general: {name: material_slosh, seed: 0, n_frames: 1000, dt: 0.0036, boundary: wall}
 sets:
   cell:
     n: 1
@@ -16,34 +16,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0, gx: 6.0, gy: -10.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.15, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 10, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.15, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 18
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: A blue mass starts as a thin, horizontal strip at the bottom of the frame. Over time,
-      the right side of the mass begins to rise and expand upward. The shape eventually develops a jagged,
-      mountain-like peak on the right side. By the final frame, the mass has grown into a large, solid
-      triangular wedge.
-    objects: The primary object is a single, continuous blue mass. It is located at the bottom of the
-      white background. The mass starts as a small, rectangular shape and grows into a large, irregular
-      polygon. Its color remains a consistent light blue throughout the entire sequence.
+    description: A blue mass starts as a thin, horizontal strip at the bottom of the frame. Over time, the right side of the mass begins to rise and expand upward. The shape eventually develops a jagged, mountain-like peak on the right side. By the final frame, the mass has grown into a large, solid triangular wedge.
+    objects: The primary object is a single, continuous blue mass. It is located at the bottom of the white background. The mass starts as a small, rectangular shape and grows into a large, irregular polygon. Its color remains a consistent light blue throughout the entire sequence.
   movie_mpm_particle:
-    description: A dense cluster of blue particles begins at the bottom of the frame and gradually expands
-      upward and to the right. As time progresses, the particles form a distinct wave-like structure that
-      rises more steeply toward the end of the sequence. The overall shape transitions from a flat, horizontal
-      band into a large, triangular mass. By the final frame, the particles have occupied a significant
-      portion of the right side of the image.
-    objects: The scene consists of a large collection of small, individual blue dots. These particles
-      are densely packed together to form a continuous, textured mass. The dots are uniform in size and
-      color, creating a cohesive visual field. They are arranged in a dynamic, evolving shape that moves
-      from a low horizontal position to a high vertical peak.
+    description: A dense cluster of blue particles begins at the bottom of the frame and gradually expands upward and to the right. As time progresses, the particles form a distinct wave-like structure that rises more steeply toward the end of the sequence. The overall shape transitions from a flat, horizontal band into a large, triangular mass. By the final frame, the particles have occupied a significant portion of the right side of the image.
+    objects: The scene consists of a large collection of small, individual blue dots. These particles are densely packed together to form a continuous, textured mass. The dots are uniform in size and color, creating a cohesive visual field. They are arranged in a dynamic, evolving shape that moves from a low horizontal position to a high vertical peak.

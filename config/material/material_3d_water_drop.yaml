@@ -2,7 +2,7 @@
 # A water column (block-filled) released under gravity: the liquid path drops shear
 # (mpm_strain resets F := J^(1/3) I, mu = 0 so stress is pure pressure) and it slumps
 # and spreads on the floor. Tests the 3D liquid material branch + low wall friction.
-general: {name: material_3d_water_drop, seed: 0, n_frames: 360, dt: 1.0, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: material_3d_water_drop, seed: 0, n_frames: 360, dt: 0.0032, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   cell:
     n: 1
@@ -20,14 +20,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 14.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, wall_damp: 0.9}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- {substep: 16, dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   background: black
   up_axis: 1
@@ -46,11 +46,5 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_mpm_particle:
-    description: A cluster of blue particles initially occupies the center of a 3D bounding box. Over
-      time, the cluster collapses downward toward the bottom surface of the box. The particles spread
-      out horizontally as they settle, forming a thin layer. By the final frame, the particles have flattened
-      into a nearly uniform distribution across the bottom plane.
-    objects: The scene contains a large collection of small, blue particles. These particles are initially
-      clustered in a dense, roughly spherical shape in the center of the space. As the simulation progresses,
-      they transition into a flattened, disc-like arrangement. The particles are contained within a large,
-      transparent wireframe cube that defines the spatial boundaries.
+    description: A cluster of blue particles initially occupies the center of a 3D bounding box. Over time, the cluster collapses downward toward the bottom surface of the box. The particles spread out horizontally as they settle, forming a thin layer. By the final frame, the particles have flattened into a nearly uniform distribution across the bottom plane.
+    objects: The scene contains a large collection of small, blue particles. These particles are initially clustered in a dense, roughly spherical shape in the center of the space. As the simulation progresses, they transition into a flattened, disc-like arrangement. The particles are contained within a large, transparent wireframe cube that defines the spatial boundaries.

@@ -1,4 +1,4 @@
-general: {name: material_two_drops_st, seed: 0, n_frames: 4000, dt: 1.0, boundary: wall}
+general: {name: material_two_drops_st, seed: 0, n_frames: 4000, dt: 0.0028, boundary: wall}
 sets:
   cell:
     n: 2
@@ -22,35 +22,21 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 0.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0002}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0002, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0002, surface_tension: 120.0, wall_damp: 1.0}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0002, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 120.0, wall_damp: 1.0}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 14
-  dt: 0.0002
+- substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: Two separate circular particles initially move toward each other from the left and right
-      sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse,
-      the boundary between the two colors becomes irregular and complex. Finally, the two particles completely
-      integrate into a single, multi-colored blob.
-    objects: The scene contains two primary circular particles that are initially distinct and separate.
-      One particle is light blue and the other is light orange, both having a similar diameter. As the
-      simulation progresses, the two circles overlap and deform into a single, larger irregular shape.
-      The final object is a single composite blob featuring both blue and orange colors with a jagged
-      internal boundary.
+    description: Two separate circular particles initially move toward each other from the left and right sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse, the boundary between the two colors becomes irregular and complex. Finally, the two particles completely integrate into a single, multi-colored blob.
+    objects: The scene contains two primary circular particles that are initially distinct and separate. One particle is light blue and the other is light orange, both having a similar diameter. As the simulation progresses, the two circles overlap and deform into a single, larger irregular shape. The final object is a single composite blob featuring both blue and orange colors with a jagged internal boundary.
   movie_mpm_particle:
-    description: Two separate blue and orange circular clusters of particles initially exist side-by-side.
-      They begin to move toward each other and merge into a single, unified spherical mass. As they merge,
-      the blue and orange particles intermix to form a composite globe-like structure. The final frames
-      show a stable, integrated sphere where the two colors are distributed across the surface.
-    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the
-      blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation
-      progresses, the particles reorganize into a single spherical topology. The final object is a single
-      sphere composed of both blue and orange particles of uniform size.
+    description: Two separate blue and orange circular clusters of particles initially exist side-by-side. They begin to move toward each other and merge into a single, unified spherical mass. As they merge, the blue and orange particles intermix to form a composite globe-like structure. The final frames show a stable, integrated sphere where the two colors are distributed across the surface.
+    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.

@@ -1,4 +1,4 @@
-general: {name: material_crown_splash, seed: 0, n_frames: 900, dt: 1.0, boundary: wall}
+general: {name: material_crown_splash, seed: 0, n_frames: 900, dt: 0.0037128, boundary: wall}
 sets:
   cell:
     n: 2
@@ -21,15 +21,14 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: gravity, at: cell, g: 12.0}
-- {op: mpm_strain, at: mpm_particle, dt_sub: 0.0001326}
-- {op: p2g, at: mpm_particle, to: mpm_grid, dt_sub: 0.0001326, drag: 0.1, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, dt_sub: 0.0001326, surface_tension: 10, wall_damp: 0.5}
-- {op: g2p, at: mpm_particle, from: mpm_grid, dt_sub: 0.0001326, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10, wall_damp: 0.5}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
 schedule:
 - aggregate
 - gravity
-- substep: 28
-  dt: 0.0001326
+- substep_dt: 0.0001326
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 
 # --- auto: video descriptions (gemma-4-12B) ---
@@ -42,21 +41,13 @@ descriptions:
       As it descends, the top edge of the blue base begins to deform into a wave-like shape.
 
       The sphere eventually settles into the center of the blue base, which now features a prominent peak.'
-    objects: 'The scene contains a single orange sphere that maintains a consistent size throughout the
-      video.
+    objects: 'The scene contains a single orange sphere that maintains a consistent size throughout the video.
 
       A blue rectangular base occupies the bottom portion of the frame, spanning the entire width.
 
       The background is a solid white field that provides a high-contrast environment for the objects.
 
-      The blue base transitions from a flat top to a wavy topology with a central peak as the sphere interacts
-      with it.'
+      The blue base transitions from a flat top to a wavy topology with a central peak as the sphere interacts with it.'
   movie_mpm_particle:
-    description: The orange sphere starts high in the sky and descends toward the blue textured surface.
-      As it moves downward, the blue surface develops undulating waves that rise to meet the sphere. The
-      sphere eventually makes contact with the surface and becomes partially submerged. By the final frame,
-      the sphere is mostly below the surface, with only its top portion visible.
-    objects: The orange sphere is a large, circular cluster of orange particles located in the upper half
-      of the frame. The blue surface is a wide, rectangular field of small blue particles at the bottom
-      of the frame. The blue surface is connected to the sphere as it moves into the blue field. The orange
-      sphere remains a consistent size and color throughout the entire sequence.
+    description: The orange sphere starts high in the sky and descends toward the blue textured surface. As it moves downward, the blue surface develops undulating waves that rise to meet the sphere. The sphere eventually makes contact with the surface and becomes partially submerged. By the final frame, the sphere is mostly below the surface, with only its top portion visible.
+    objects: The orange sphere is a large, circular cluster of orange particles located in the upper half of the frame. The blue surface is a wide, rectangular field of small blue particles at the bottom of the frame. The blue surface is connected to the sphere as it moves into the blue field. The orange sphere remains a consistent size and color throughout the entire sequence.
