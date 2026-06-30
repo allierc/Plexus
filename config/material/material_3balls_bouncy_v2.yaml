@@ -30,3 +30,26 @@ schedule:
 plotting:
   background: black
   colormap: tab10
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The three colored clusters begin in a triangular formation with the orange cluster at
+      the top. Over time, the orange cluster moves downward and to the right, while the blue cluster moves
+      slightly upward and to the right. The green cluster remains relatively stationary but shifts slightly
+      toward the center. By the final frame, the three clusters have converged into a much tighter, nearly
+      linear arrangement.
+    objects: The scene contains three distinct circular clusters of particles. The blue cluster is located
+      on the left, the orange cluster is in the center, and the green cluster is on the right. Each cluster
+      is roughly the same size and maintains a dense, spherical shape throughout the simulation. The colors
+      are vibrant and distinct against the solid black background.
+  movie_mpm_particle:
+    description: The three clusters of particles begin in a triangular formation with the orange cluster
+      at the top. Over time, the orange cluster moves downward and to the right, while the blue cluster
+      moves slightly upward and to the right. The green cluster remains relatively stationary but shifts
+      slightly to the right. By the final frame, the three clusters have aligned into a nearly horizontal
+      row.
+    objects: There are three distinct clusters of small particles, each forming a roughly spherical shape.
+      The cluster on the left is blue, the cluster in the middle is orange, and the cluster on the right
+      is green. All three clusters are approximately equal in size and density. The clusters are initially
+      arranged in a triangle and transition into a linear horizontal arrangement.
