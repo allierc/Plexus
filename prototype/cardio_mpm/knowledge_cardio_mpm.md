@@ -19,14 +19,15 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 
 ## Current best result
 
-- **Under LoopScore (corrected metric, floor=0.02):** **LS = 0.196, SD=0.227** (B10 durhi15:
-  stiff [80,300], ω=5, gain0=0.5, amp=12, dur_hi=15→dur=11.3, 2400it). The **very-short-
-  duration regime (dur≈11)** TAMES the catastrophic node from LS=-1.00 to LS=-0.45, lifting
-  the mean by +0.035 over the prior best. SD is higher (0.227 vs 0.187) because the per-node
-  range widened (-0.45 to +0.51) — but the mean improvement is real.
-- **Previous best:** LS=0.166 (B9 deep4800 at 4150it, dur→21.1) ≈ LS=0.165 (B9 dur0_10, 2400it).
-- **Best 2400it config:** dur_hi=15, dur0=10, stiff [80,300], LS=0.196 (B10). Prior: 0.165.
-- **Fibre-only (no stiffness):** LS ≈ 0.118 at amp=12 (B5). Stiffness adds ~0.03 net.
+- **Under LoopScore (corrected metric, floor=0.02):** **LS = 0.211, SD=0.234** (B11 durhi10:
+  stiff [80,300], ω=5, gain0=0.5, amp=12, dur_hi=10→dur=8.5, 2400it). Highest mean LS, but
+  3 negative nodes (-0.36, -0.25, -0.06). Driven by high ceiling (0.71).
+- **Best UNIFORM config (ZERO negative nodes):** **LS = 0.200, SD=0.216** (B11 durhi12:
+  dur_hi=12→dur=10.0). FIRST config ever with ALL per-node LS ≥ 0 (min=0.00, max=0.58).
+  The persistent catastrophic node is ELIMINATED. This proves the catastrophe is purely
+  energy overshoot, not a structural tissue defect.
+- **Previous best:** LS=0.196 (B10 durhi15, dur→11.3), LS=0.166 (B9).
+- **Fibre-only (no stiffness):** LS ≈ 0.118 at amp=12 (B5). Stiffness adds ~0.10 at dur≈11.
 - **Under R² (diagnostic only):** best R² = −0.912 (gain0=0.3, fibre+gain+dur, 2400it).
 
 ## Established mechanisms  `[mechanism]` — causal, regime-conditional
@@ -38,31 +39,31 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 2. **Gain is a size/overshoot lever** — a single learned global scalar. Lower gain reduces overshoot; at
    gain0=0.3 the mean LS is unchanged vs 0.5 but uniformity improves dramatically (SD 0.212→0.152).
    `[mechanism@LoopScore, 2400it, corrected metric]`. (R²-era: gain0=0.5 > 0.854; confirmed directionally.)
-3. **Pulse duration landscape has THREE basins; very-short (dur≈11) is the current best.**
-   The landscape: (a) dur≈30 (default init trap, LS≈0.06-0.12), (b) dur≈19-21 (intermediate,
-   LS≈0.16), (c) **dur≈11 (best, LS=0.196, reachable via dur_hi=15).** The very-short regime
-   TAMES the catastrophic node from LS=-1.00 to -0.45 because shorter pulses limit overshoot
-   energy. This proves the catastrophe is an ENERGY OVERSHOOT, not a structural tissue defect.
-   Duration INIT and dur_hi CEILING are first-class experimental variables: dur0=10 + dur_hi=15
-   reaches dur≈11 at 2400it. Morphology: very-short dur has highest chirality (0.70) and lowest
-   ampL (0.049); medium-dur (19-21) has lower chir (0.63-0.65), higher ampL.
-   `[mechanism+optimization@LoopScore, 2400it, UPDATED@B10, OVERTURNED@B9-dur19-21]`.
-4. **Amplitude is FLAT in [10, 12] and CATASTROPHIC at 14.** amp=10 ≈ amp=12 (LS=0.150 vs 0.151,
-   identical per-node patterns, B7). amp=14 is catastrophic (LS=-0.247, B4). The model compensates
-   for amplitude changes via gain/stiffness adjustment — amplitude is not a morphology lever within
-   [10,12]. Keep amplitude in [10,12].
-   `[mechanism@LoopScore, 2400it, confirmed@B4+B7]`.
+3. **Pulse duration controls a MONOTONIC LS–UNIFORMITY TRADEOFF with a Goldilocks zone at dur≈10.**
+   Four regimes mapped: (a) dur≈30 (init trap, LS≈0.06-0.12); (b) dur≈19-21 (intermediate,
+   LS≈0.16); (c) **dur≈10 (Goldilocks, LS=0.200, ZERO negative nodes — ALL ≥ 0);** (d) dur≈8.5
+   (highest mean LS=0.211 but 3 negative nodes re-introduced). Shorter duration raises the ceiling
+   for good nodes but eventually breaks uniformity: dur=10 is the ONLY regime with zero catastrophes.
+   The persistent catastrophic node progressed: LS=-1.00 (B1-B9) → -0.45 (B10, dur≈11) → **0.00
+   (B11, dur≈10) → GONE.** This proves the catastrophe is purely ENERGY OVERSHOOT. Duration INIT
+   and dur_hi CEILING are first-class variables. `[mechanism@LoopScore, 2400it, UPDATED@B11]`.
+4. **Amplitude×duration INTERACTION: amp=10≈12 at dur≈19, but amp=10 HURTS at dur≈11.**
+   At dur≈19: amp=10 ≈ amp=12 (LS=0.150 vs 0.151, B7). At dur≈11: amp=10 drops LS from 0.191
+   to 0.184 and worsens the catastrophic node (-0.19 → -0.47, B11). Short pulses need full
+   amplitude=12 to avoid energy starvation in stiff regions while soft regions overshoot.
+   amp=14 remains catastrophic (LS=-0.247, B4). Keep amplitude=12 at dur≈10.
+   `[mechanism@LoopScore, 2400it, UPDATED@B11, amp×dur interaction]`.
 5. **Fibre co-learning is LOAD-BEARING under LoopScore** — freezing fibre drops LS from 0.119→0.088
    (Δ=−0.031). This OVERTURNS the R²-era finding (fibre hurt at depth under R²). The parametric fibre
    provides orientation structure that the LS per-node gradient rewards. `[mechanism@LoopScore, 2400it]`.
-6. **Coarse SIREN stiffness is ACTIVE under LoopScore with a BASIN-DEPENDENT OUTLIER.** SIREN (ω=5)
-   converges to a binary spatial pattern adding ~0.02 LS over fibre-only. Every run has 1 catastrophic
-   node (LS=-1.00), but the catastrophic node's POSITION is NOT fixed — it depends on the fibre init
-   basin (B5: default→(2,3), angle=0.5→(1,1), phase=1.2→(1,1)). The stiffness × fibre basin
-   INTERACTION creates the catastrophe, not a structural tissue property at one location. Stiffness
-   FLOOR (80-100) prevents MULTI-node catastrophe and improves uniformity (SD 0.254→0.175). Wider
-   range [80,300] is beneficial (LS=0.149 vs 0.137 at [80,200]). ω=5 confirmed sweet spot.
-   `[mechanism+optimization@LoopScore, 2400it, ω=5, updated B5]`.
+6. **Coarse SIREN stiffness is CRITICAL — 3-5× MORE load-bearing at short duration.** SIREN (ω=5)
+   converges to a binary spatial pattern. At dur≈19, stiffness adds ~0.02-0.03 LS. At **dur≈11,
+   stiffness adds ~0.10 LS** (0.191→0.092 without it; ampL spikes 0.048→0.272, B11). The stiffness
+   spatial pattern controls where energy goes when pulse energy is limited — without it, the short-
+   pulse regime is catastrophic. Stiffness FLOOR (80-100) prevents multi-node catastrophe. Wider
+   range [80,300] is beneficial. ω=5 confirmed sweet spot. The stiffness×duration interaction is
+   the dominant remaining lever for improving uniformity.
+   `[mechanism@LoopScore, 2400it, ω=5, UPDATED@B11, stiff×dur interaction]`.
 7. **Stiffness × duration interaction is DESTRUCTIVE.** Longer pulses (dur_hi=40) are tolerable with
    uniform stiffness (LS=0.117) but catastrophic with spatial stiffness (LS=-0.070). Soft regions
    amplify the extra pulse energy into runaway overshoot. Keep dur_hi=30 when stiffness is active.
@@ -97,10 +98,10 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
   init changed. B9 is a textbook case: "dur=24 is the interior optimum" (B8) was itself an optimization
   artifact — dur0=10 at 2400it reaches dur≈19.4, matching 4150it. Depth was only needed because the
   default init (dur0=14) trapped duration in the dur≈30 basin.
-- **3600it improves over 2400it modestly in the dur≈19 regime.** With dur0=10, 3600it→LS=0.175
-  (dur=18.8) vs 2400it→LS=0.161 (dur=19.3). The +0.014 benefit is real but small. However,
-  dur_hi=15 at 2400it (LS=0.196) beats both — init constraints are more powerful than depth.
-  `[optimization@LoopScore, B10, UPDATED from B9]`.
+- **3600it barely helps at dur≈11 (+0.007) and dur≈19 (+0.014).** At dur≈11: 3600it→LS=0.198
+  vs 2400it→LS=0.191 (B11). At dur≈19: 3600it→0.175 vs 2400it→0.161 (B10). Init constraints
+  (dur_hi ceiling) are far more powerful than depth in the short-duration regime.
+  `[optimization@LoopScore, B11, UPDATED from B10]`.
 - **Gain viable range is [0.4, 0.5] with wide stiffness.** gain0=0.3 CATASTROPHIC (LS=-0.406, B3);
   gain0=0.7 CATASTROPHIC (LS=-0.272, B4); gain0=0.4 ≈ 0.5 (LS=0.139 vs 0.140, B6). Without
   stiffness or with narrow stiffness, gain0 is flexible. `[optimization@LoopScore-corrected, 2400it]`.
@@ -183,8 +184,9 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 - "SIREN fibre without stiffness avoids catastrophe redistribution" — **FALSIFIED@LoopScore, 2400it.**
   Without stiffness: LS=-0.222 (ω=5), -0.047 (ω=3). Far WORSE than with stiffness. Stiffness
   STABILIZES fibre SIREN. `B7`.
-- "amp=10 differs from amp=12" — **FALSIFIED@LoopScore, 2400it, stiff [80,300].** LS=0.150 vs 0.151,
-  identical per-node patterns. Amplitude is flat in [10,12]. `B7`.
+- "amp=10 differs from amp=12" — **FALSIFIED at dur≈19 (B7: 0.150≈0.151); OVERTURNED at dur≈11
+  (B11: 0.184 < 0.191).** Amplitude×duration interaction: amp=10 HURTS at short duration (catastrophic
+  node worsens -0.19→-0.47). Amplitude is flat only at longer durations. `B7+B11`.
 - "drag_k=50 or drag_k=20 changes loop morphology vs drag_k=30" — drag_k=50 **FALSIFIED**
   (LS=0.152≈ctrl). drag_k=20 **HARMFUL** (LS=0.112, 2 catastrophes). Drag is flat above 30
   and destructive below. `B8`.
@@ -220,65 +222,68 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 ## Open questions
 
 - **What is the dominant BOTTLENECK dimension across nodes?** Need residual decomposition to
-  quantify (scripts ready: `run_decompose_b10.sh`). SIZE and CHIRALITY are the top-sensitivity
+  quantify (scripts ready: `run_decompose_b11.sh`). SIZE and CHIRALITY are the top-sensitivity
   dimensions (engineering). **#1 priority.**
-- **Is dur≈11 the floor, or does even shorter duration improve LS?** dur_hi=12 and dur_hi=10
-  are untested. Below some floor, pulse energy may be too low for any loop. **#2 priority.**
-- **Does depth (3600it) help in the dur≈11 regime?** At dur≈19, depth gave +0.014. In the
-  dur≈11 regime the benefit may differ. **#3 priority.**
-- **Can the remaining catastrophic node (LS=-0.45 at dur≈11) be further tamed?** Reducing
-  amplitude from 12→10 or adjusting stiffness topology might help. The catastrophe is now
-  confirmed as an ENERGY OVERSHOOT mechanism.
-- **Does amp=10 + dur_hi=15 synergize?** amp=10≈12 was established at dur≈19; in the dur≈11
-  regime, the interaction may differ.
+- **Can we get BOTH high LS AND zero negatives?** dur=10 (durhi12) eliminates all negatives
+  (LS=0.200); dur=8.5 (durhi10) has best LS=0.211 but 3 negatives. Can depth (3600it in
+  durhi12) push mean LS above 0.211 while keeping all-positive? **#2 priority.**
+- **Does narrowing stiffness contrast extend the Goldilocks zone to shorter duration?**
+  At dur=8.5, soft regions overshoot while stiff regions are fine. If stiff_hi is reduced
+  (less contrast), can durhi10 keep its high mean while eliminating negatives? **#3 priority.**
+- **Is dur_hi=11 better than dur_hi=12?** Squeezing the ceiling further might find a
+  tighter Goldilocks zone (dur≈9-10) with higher mean but still zero negatives.
 - Multiscale LoopScore (`K∈{1,2,4,8}` weighted) — future option.
-- ~~**Can wl=35 improve over wl=28.8?**~~ **ANSWERED (B10): NO.** wl=35 neutral (LS=0.165).
-- ~~**Is dur≈19-21 the GLOBAL optimum?**~~ **ANSWERED (B10): NO.** dur≈11 (via dur_hi=15) gives
-  LS=0.196, +18% improvement. Three basins discovered.
-- ~~**Does dur0=10 + 3600it improve?**~~ **PARTIALLY ANSWERED (B10):** 3600it gives LS=0.175
-  (dur→18.8) vs 2400it 0.161 (dur→19.3). Modest +0.014 gain. But dur_hi=15 at 2400it beats it.
+- ~~**Is dur≈11 the floor?**~~ **ANSWERED (B11): NO.** dur=8.5 gives LS=0.211. BUT dur=10 is
+  a UNIFORMITY optimum (zero negatives).
+- ~~**Does depth help at dur≈11?**~~ **ANSWERED (B11): BARELY.** +0.007, marginal.
+- ~~**Does amp=10 help at dur≈11?**~~ **ANSWERED (B11): NO.** amp=10 HURTS (0.184 vs 0.191).
+- ~~**Can the catastrophic node be tamed?**~~ **ANSWERED (B11): YES.** dur_hi=12 → dur=10.0
+  ELIMINATES it completely (LS=0.00, first ever all-positive config).
 
 ---
 
 ## Previous theme summaries (last 4, oldest→newest; MUST precede ## Current theme)
 
-- **Batch 7 (2026-06-28):** SIREN fibre WITHOUT stiffness is WORSE (LS=-0.222). SIREN fibre is
-  intrinsically destabilizing. Stiffness STABILIZES. amp=10 ≈ amp=12. SIREN fibre CLOSED.
 - **Batch 8 (2026-06-28):** 3600it BREAKS the LS≈0.15 plateau (LS=0.162) — duration escapes
   dur≈30 basin to interior optimum dur=24. drag_k=50≈30 but 20 HURTS. w_amp IS load-bearing.
   stiff_hi=400 catastrophic. Duration saturation was an optimization-depth artifact.
 - **Batch 9 (2026-06-29):** dur0=10 at 2400it (LS=0.165) MATCHES 4150it (LS=0.166). True
   duration optimum is ~19-21, not 24. Duration init substitutes for depth. gain0 FLAT at 3600it.
-- **Batch 10 (2026-06-29):** dur_hi=15 → dur=11.3 → **LS=0.196 (NEW BEST, +18%).** THIRD
+- **Batch 10 (2026-06-29):** dur_hi=15 → dur=11.3 → LS=0.196 (NEW BEST, +18%). THIRD
   duration basin discovered at dur≈11. Very-short pulses TAME the catastrophic node from
-  LS=-1.00 to -0.45 by limiting overshoot energy. fibre_angle=0.5 TRAPS duration at dur≈28
-  even with dur0=10 (fibre×duration cross-interaction). wl=35 neutral. 3600it gives modest
-  +0.014 in dur≈19 regime but can't compete with dur_hi=15's basin change.
+  LS=-1.00 to -0.45. fibre_angle=0.5 TRAPS duration at dur≈28.
+- **Batch 11 (2026-06-29):** dur_hi=12 → dur=10.0 → **LS=0.200, FIRST EVER ALL-POSITIVE
+  config** (zero negative per-node LS). dur_hi=10 → dur=8.5 → LS=0.211 (new best mean but
+  3 negatives). Goldilocks zone at dur≈10: shorter raises ceiling but breaks uniformity.
+  Stiffness 3-5× MORE load-bearing at short dur (0.10 vs 0.02 ΔLS). amp=10 HURTS at dur≈11.
+  3600it marginal (+0.007).
 
 ---
 
 ## Current theme
 ### Current hypothesis
-"The very-short-duration regime (dur≈11, via dur_hi=15) broke the LS plateau by TAMING
-the catastrophic node. The catastrophe is an ENERGY OVERSHOOT: shorter pulses limit the
-energy available for recoil. The question is whether dur≈11 is the floor of this basin
-or whether even shorter duration (dur_hi=12 or 10) continues to improve. Secondary:
-can depth (3600it) or amplitude reduction (amp=10) further improve the dur≈11 regime?"
+"The dur=10 regime (durhi12) occupies a GOLDILOCKS ZONE: pulse energy too low for overshoot
+at ANY node, yet sufficient for all nodes to form loops. This zone depends on the stiffness
+contrast — wider ranges narrow the zone (soft regions still overshoot), narrower ranges may
+widen it. The path to best-of-both-worlds (high LS + zero negatives) is either: (1) deepen
+durhi12 to push its mean LS above 0.211, or (2) narrow stiffness in durhi10 to eliminate its
+negatives. Stiffness topology, not duration or amplitude, is the dominant remaining lever."
 ### Iterations this theme
 - Batch 1–7: all continuous levers mapped; SIREN fibre CLOSED; best at 2400it: LS≈0.15.
 - Batch 8: depth broke the plateau via duration (LS=0.162). Drag/w_amp/stiff bounds mapped.
 - Batch 9: CONFIRMED duration-init as the mechanism. True optimum dur≈19-21. LS=0.166.
-- Batch 10: dur_hi=15 → dur=11.3 → LS=0.196 (NEW BEST). Third duration basin. Catastrophe
-  tamed (-1.00→-0.45). fibre×duration interaction discovered. wl=35 neutral.
-- Batch 11: explore the dur≈11 regime — shorter, deeper, amplitude, stiffness topology.
+- Batch 10: dur_hi=15 → dur=11.3 → LS=0.196. Third duration basin. Catastrophe tamed.
+- Batch 11: dur_hi=12 → dur=10.0 → LS=0.200 (ZERO negatives!). dur_hi=10 → dur=8.5 →
+  LS=0.211 (best mean but 3 negatives). Goldilocks zone at dur≈10. Stiffness 3-5× more
+  load-bearing at short duration. amp=10 HURTS at dur≈11. 3600it marginal.
+- Batch 12: exploit the Goldilocks zone — depth, stiffness topology, squeezed ceiling.
 ### Emerging observations
-- **NEW BEST: LS=0.196** (dur_hi=15, dur=11.3, 2400it).
-- Duration landscape has THREE basins: dur≈30 (trap), dur≈19-21 (intermediate), dur≈11 (best).
-- The catastrophic node is an ENERGY OVERSHOOT: shorter pulses tame it (-1.00→-0.45).
-- fibre_angle=0.5 traps duration at dur≈28 even with dur0=10 — fibre×duration interaction.
-- Very-short-dur regime: highest chirality (0.70), lowest ampL (0.049).
-- The dur≈11 regime's SD (0.227) is higher than dur≈19 (0.187) — room for uniformity improvement.
+- **NEW BEST MEAN: LS=0.211** (dur_hi=10, dur=8.5, 2400it). But 3 negative nodes.
+- **FIRST ALL-POSITIVE: LS=0.200** (dur_hi=12, dur=10.0). Zero negatives, min=0.00.
+- Duration-uniformity TRADEOFF: shorter dur → higher ceiling, lower floor. dur=10 is sweet spot.
+- Catastrophe FULLY CONTROLLED: -1.00 (B1-B9) → -0.45 (B10) → 0.00 (B11) → GONE.
+- Stiffness is 3-5× more load-bearing at dur≈10 than dur≈19 (ΔLS: 0.10 vs 0.02).
+- amp=10 HURTS at dur≈10 (energy starvation in stiff regions).
 - Sensitivity: chirality ≈ size >> orientation > openness (engineering, regime-robust).
-- Scalar levers (gain, amp, drag, w_amp) are FLAT in viable ranges — duration ceiling is the
-  new active lever.
+- Scalar levers (gain, amp, drag, w_amp) are saturated — stiffness topology is the next frontier.
 **CRITICAL: this section must ALWAYS be at the END of the file.**

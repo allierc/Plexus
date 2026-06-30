@@ -1,58 +1,33 @@
-# material_3balls_bouncy -- three stiff ELASTIC balls dropped in 2D with damping nearly
-# OFF, so they bounce many times: drag 0 (no Stokes), wall_damp 1.0 (no inelastic wall
-# loss); the rebound is the fixed-corotated elastic spring-back, so a high `youngs` keeps
-# them lively. (MLS-MPM still has a little numerical dissipation, so they decay slowly.)
-general:
-  {
-    name: material_3balls_bouncy,
-    seed: 0,
-    n_frames: 1500,
-    dt: 0.5,
-    boundary: wall,
-  }
+# material_3balls_bouncy -- three stiff ELASTIC balls dropped in 2D, damping near-off
+# (drag 0, wall_damp 1.0) so they bounce many times; the rebound is the fixed-corotated
+# elastic spring-back (high youngs).
+#
+# `general.dt` is the sim-time advanced per FRAME -- LOWER IT FOR SLOW-MOTION (gravity
+# unchanged). `substep_dt` is the single CFL-stable MPM micro-step; the engine runs
+# round(dt / substep_dt) substeps per frame (here 0.0015 / 0.0001 = 15).
+general: {name: material_3balls_bouncy, seed: 0, n_frames: 1500, dt: 0.0015, boundary: wall}
 sets:
   cell:
     n: 3
     start: [[0.22, 0.72], [0.5, 0.84], [0.78, 0.72]]
     types:
-      a: { fraction: 0.3334, youngs: 600 }
-      b: { fraction: 0.3333, youngs: 600 }
-      c: { fraction: 0.3333, youngs: 600 }
-  mpm_particle: { parent: cell, per_parent: 3000, radius: 0.085, density: 1.0 }
+      a: {fraction: 0.3334, youngs: 600}
+      b: {fraction: 0.3333, youngs: 600}
+      c: {fraction: 0.3333, youngs: 600}
+  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.085, density: 1.0}
 fields:
-  mpm_grid: { frame: mpm_grid, n_grid: 128 }
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
 operators:
-  - { op: aggregate, at: cell }
-  - { op: gravity, at: cell, g: 9.0 }
-  - { op: mpm_strain, at: mpm_particle, dt_sub: 0.0001 }
-  - {
-      op: p2g,
-      at: mpm_particle,
-      to: mpm_grid,
-      dt_sub: 0.0001,
-      drag: 0.0,
-      a_max: 200,
-    }
-  - {
-      op: mpm_grid_update,
-      at: mpm_grid,
-      dt_sub: 0.0001,
-      surface_tension: 0.0,
-      wall_damp: 1.0,
-    }
-  - {
-      op: g2p,
-      at: mpm_particle,
-      from: mpm_grid,
-      dt_sub: 0.0001,
-      wall_damp: 1.0,
-      wall_contact: 0.04,
-      vmax: 1000000000.0,
-    }
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 9.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 1.0}
+- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
-  - aggregate
-  - gravity
-  - { substep: 30, dt: 0.0001, steps: [mpm_strain, p2g, mpm_grid_update, g2p] }
+- aggregate
+- gravity
+- {substep_dt: 0.0001, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   background: black
   colormap: tab10
@@ -60,24 +35,21 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description:
-      The orange particle starts at a high vertical position and moves downward toward the
-      center. The blue and green particles remain stationary at the same horizontal level throughout the
-      sequence. The orange particle eventually settles into a linear alignment with the other two particles.
-      The final frame shows all three particles in a horizontal row.
-    objects:
-      There are three circular particles in the scene. The blue particle is on the left, the orange
-      particle is in the middle, and the green particle is on the right. All three particles are approximately
-      the same size and have a textured, grainy appearance. The blue and green particles are a constant
-      color, while the orange particle changes its vertical position.
+    description: The three colored spheres begin in a triangular formation with the orange sphere at the
+      top. Over time, the spheres move toward each other and begin to converge into a linear arrangement.
+      They eventually align horizontally, with the orange sphere moving to the left and the blue sphere
+      to the center. In the final frames, the spheres settle into a horizontal line with the orange sphere
+      on the left, the blue sphere in the middle, and the green sphere on the right.
+    objects: The scene contains three distinct spherical objects of roughly equal size. One sphere is
+      bright blue, one is vibrant orange, and one is bright green. Initially, they are arranged in a triangular
+      pattern, but they transition into a linear horizontal row. The spheres maintain their individual
+      colors and sizes throughout the entire simulation.
   movie_mpm_particle:
-    description:
-      The orange cluster starts at a high vertical position and moves downward in a curved
-      path. The blue and green clusters remain relatively stationary in their horizontal positions throughout
-      the sequence. The orange cluster eventually settles into a position lower than both the blue and
-      green clusters. The final frame shows the three clusters arranged in a shallow "V" shape.
-    objects:
-      There are three distinct clusters of particles, each forming a roughly circular shape. The
-      cluster on the left is blue, the cluster in the middle is orange, and the cluster on the right is
-      green. All three clusters are approximately equal in size and diameter. The clusters are spatially
-      separated from one another, with no overlapping boundaries between them.
+    description: The three colored clusters of particles initially form an upward-curving arc. Over time,
+      the clusters move toward each other and begin to converge into a tighter group. The orange cluster
+      moves downward and to the left, while the blue cluster moves upward and to the right. In the final
+      frames, the three clusters settle into a nearly horizontal linear arrangement.
+    objects: The scene contains three distinct clusters of small, densely packed particles. One cluster
+      is blue, one is orange, and one is green. Each cluster is roughly spherical in shape and maintains
+      a consistent size throughout the simulation. The clusters are initially separated but move relative
+      to one another to change their spatial configuration.

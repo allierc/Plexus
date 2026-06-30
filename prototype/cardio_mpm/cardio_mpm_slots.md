@@ -6,21 +6,22 @@
 #   - keep BOTH pressures: default ~3 exploit (improve LS) · 2 explore (new morphology family) · 1 control/ablation
 #   - keep stiffness/direction COARSE (low --siren_omega, larger --fibre_wl); amplitude in [10,15]
 #
-# BATCH 11 — EXPLORING THE VERY-SHORT-DURATION REGIME (dur≈11)
-# Parent: B10-s4 durhi15 (LS=0.196, 2400it, dur_hi=15, dur→11.3, stiff [80,300], gain0=0.5, amp=12, omega=5, dur0=10)
+# BATCH 12 — THE GOLDILOCKS ZONE: HIGH LS + ZERO NEGATIVES
+# Parent A (uniformity): B11-s0 durhi12 (LS=0.200, dur_hi=12→dur=10.0, ZERO negative nodes, stiff [80,300], gain0=0.5, amp=12, omega=5, dur0=10)
+# Parent B (best mean):  B11-s1 durhi10 (LS=0.211, dur_hi=10→dur=8.5, 3 negatives)
 #
-# Hypothesis: "dur≈11 is NOT the floor — even shorter pulses (dur_hi=12 or 10) will continue to
-#   tame the catastrophic node because the overshoot energy scales with pulse duration. Below some
-#   threshold, pulse energy will be insufficient for any loop structure, creating a new
-#   morphology family (degenerate stubs). The transition between productive short-duration
-#   and degenerate no-motion is the next boundary to map."
+# Hypothesis: "The dur=10 regime (durhi12) is a Goldilocks zone where pulse energy is too low
+#   for overshoot at ANY node but sufficient for all to form loops. This zone depends on the
+#   stiffness contrast: narrower stiffness range should EXTEND the Goldilocks zone to shorter
+#   durations (eliminating durhi10's negatives), while deeper training should push durhi12's
+#   mean LS above 0.211 while preserving the all-positive property."
 #
-# EXPLOIT (3): push the dur≈11 regime — shorter ceiling, deeper training, lower amplitude
-b11_durhi12 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 12
-b11_durhi10 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 8 --dur_hi 10
-b11_deep3600 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 3600 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 15
-# EXPLORE (2): test amplitude and stiffness in the new regime
-b11_amp10 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 10 --drag_k 30 --dur0 10 --dur_hi 15
-b11_uniform_stiff : --gain0 0.5 --learn fibre,gain,dur --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_lo 100 --stiff_hi 100 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 15
-# CONTROL (1): reproduce B10-s4 parent exactly
-b11_ctrl : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 15
+# EXPLOIT (3): push LS in the all-positive durhi12 regime
+b12_deep3600 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 3600 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 12
+b12_durhi11 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 11
+b12_durhi10_narrow : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 100 --stiff_hi 200 --amplitude 12 --drag_k 30 --dur0 8 --dur_hi 10
+# EXPLORE (2): stiffness topology variations in the Goldilocks zone
+b12_lo100 : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 100 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 12
+b12_narrow_stiff : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 100 --stiff_hi 200 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 12
+# CONTROL (1): reproduce the all-positive durhi12 config
+b12_ctrl : --gain0 0.5 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 80 --stiff_hi 300 --amplitude 12 --drag_k 30 --dur0 10 --dur_hi 12
