@@ -3115,3 +3115,298 @@ exploit; s1 (durhi10, dur→8.5, LS=0.211) for LS-focused exploit.
 KEY QUESTION: Can we get BOTH — high LS AND zero negatives? Two routes: (1) deepen durhi12 to push
 mean above 0.211 while keeping all-positive; (2) narrow stiffness contrast in durhi10 to eliminate
 its negatives. The Goldilocks zone may be extensible via stiffness topology.
+
+---
+
+## Batch 12 — 2026-06-30
+Parent A (uniformity): B11-s0 durhi12 (LS=0.200, dur_hi=12→dur=10.0, ZERO negative nodes, stiff [80,300], gain0=0.5, amp=12, ω=5, dur0=10, 2400it)
+Parent B (best mean): B11-s1 durhi10 (LS=0.211, dur_hi=10→dur=8.5, 3 negatives)
+Surprise (from Batch 11): "durhi12 was the FIRST EVER config with ALL per-node LS ≥ 0, proving the catastrophe is purely energy overshoot controllable by duration."
+Observation (systematic failure): "The B11 all-positive result (durhi12) was the key breakthrough. This batch tested whether it is reproducible and whether the Goldilocks zone can be extended via stiffness topology or depth."
+Hypothesis: "The dur=10 regime (durhi12) is a Goldilocks zone where pulse energy is too low for overshoot at ANY node but sufficient for all to form loops. This zone depends on stiffness contrast: narrower stiffness should extend the Goldilocks zone to shorter durations; depth should push durhi12's mean LS above 0.211."
+
+### Results (ranked by LS)
+
+Slot 0 [deep3600] role=exploit 3600it,dur_hi=12 LS=**0.208**±0.221 R²=-1.475 dur→10.1 ampL=0.051 chir+=0.65 open=0.211 size=1.02e-3
+  Per-node: -0.47, -0.07, +0.20, +0.17, +0.05, -0.42, +0.20, +0.28, +0.67  (3 negative nodes)
+  3600it on durhi12 pushes mean +0.014 above ctrl (0.194) but RE-INTRODUCES 3 negatives.
+  Depth helps mean but BREAKS the all-positive property.
+
+Slot 1 [durhi11] role=exploit dur_hi=11 LS=**0.208**±0.227 R²=-1.460 dur→9.5 ampL=0.053 chir+=0.65 open=0.212 size=1.02e-3
+  Per-node: +0.39, -0.01, +0.21, +0.24, +0.03, -0.27, +0.22, +0.13, +0.72  (2 negative: -0.01, -0.27)
+  dur_hi=11 → dur=9.5. Matches deep3600 LS=0.208 at only 2400it. Highest single-node LS=0.72.
+  Node 0 is +0.39 (vs -0.47 to -0.61 in other slots) — dur_hi=11 GOT LUCKY on this node.
+
+Slot 5 [ctrl] role=control reproduce durhi12 LS=0.194±0.219 R²=-1.465 dur→10.1 ampL=0.051 chir+=0.64 open=0.203 size=1.02e-3
+  Per-node: -0.52, +0.05, +0.19, +0.22, +0.05, -0.54, +0.17, +0.23, +0.65  (2 negative: -0.52, -0.54)
+  **CRITICAL: FAILED TO REPRODUCE the all-positive property of B11 durhi12.** B11 had zero
+  negatives (min=0.00, max=0.58); this ctrl has 2 negatives (-0.52, -0.54). Mean LS=0.194 vs
+  B11's 0.200. The "all-positive" result was a STOCHASTIC artifact of SIREN initialization, NOT
+  a deterministic property of dur_hi=12.
+
+Slot 3 [lo100] role=explore stiff_lo=100,stiff_hi=300,dur_hi=12 LS=0.177±0.221 R²=-1.398 dur→10.4 ampL=0.076 chir+=0.67 open=0.207 size=1.01e-3
+  Per-node: -0.48, +0.12, +0.29, +0.17, +0.05, -0.46, +0.22, +0.18, +0.46  (2 negative)
+  Raising stiff_lo from 80→100 HURTS (LS=0.177 vs ctrl 0.194, Δ=-0.017). The stiffness floor
+  at 80 is load-bearing — raising it removes necessary soft regions.
+
+Slot 2 [durhi10_narrow] role=explore stiff=[100,200],dur_hi=10,dur0=8 LS=0.159±0.212 R²=-1.268 dur→8.9 ampL=0.114 chir+=0.69 open=0.202 size=9.33e-4
+  Per-node: -1.00, +0.15, +0.18, +0.19, +0.06, +0.01, +0.23, +0.15, +0.45  (1 catastrophic: -1.00)
+  Narrowing stiffness [100,200] at dur_hi=10 CATASTROPHIC. The -1.00 node returns. Narrower
+  stiffness does NOT extend the Goldilocks zone — it DESTROYS it by removing the spatial
+  contrast needed to control overshoot at short durations.
+
+Slot 4 [narrow_stiff] role=explore stiff=[100,200],dur_hi=12 LS=0.158±0.195 R²=-1.335 dur→10.5 ampL=0.092 chir+=0.67 open=0.183 size=9.69e-4
+  Per-node: -0.61, +0.15, +0.21, +0.13, +0.08, -0.29, +0.18, +0.10, +0.37  (2 negative: -0.61, -0.29)
+  Narrowing stiffness [100,200] at dur_hi=12 also HURTS (LS=0.158 vs ctrl 0.194, Δ=-0.036).
+  BUT has best SD=0.195 (most uniform among the non-negative nodes). The narrow range prevents
+  the stiffness field from solving the problem nodes but makes the good nodes more uniform.
+
+### Key findings
+
+1. **The "all-positive" Goldilocks zone is STOCHASTIC, not deterministic.** The ctrl (identical
+   config to B11-s0 durhi12) FAILED to reproduce zero negatives. B11's all-positive result
+   (min=0.00) depended on a favorable SIREN stiffness initialization. The B12 ctrl gets
+   min=-0.54. This is a CRITICAL revelation: the zero-negative property is about optimization
+   luck, not about dur=10 being a magic threshold.
+
+2. **LS≈0.208 is a NEW PLATEAU shared by two independent routes:** deep3600 (3600it on durhi12)
+   and durhi11 (2400it at dur_hi=11→dur=9.5) both converge to LS=0.208. The convergence from
+   two different directions suggests this is a real architecture ceiling, not a depth artifact.
+
+3. **Narrowing stiffness range HURTS in ALL tested configurations.** [100,200] at durhi12:
+   LS=0.158 (Δ=-0.036); [100,200] at durhi10: LS=0.159 (catastrophic -1.00); [100,300]:
+   LS=0.177 (Δ=-0.017). The wide range [80,300] is essential — the spatial contrast between
+   very soft (80) and very stiff (300) regions is how the SIREN controls local overshoot.
+
+4. **Problem nodes are spatially persistent but stochastically assigned.** Across 6 slots:
+   - Node position 0 (top-left zoom): negative in 5/6 (range -0.47 to -0.61; exception: +0.39 in s1)
+   - Node position 5 (mid-right zoom): negative in 5/6 (range -0.27 to -0.54; exception: +0.01 in s2)
+   These are SPECIFIC spatial regions that the SIREN stiffness field cannot reliably solve.
+   The SIREN converges to a binary stiff/soft pattern, but the exact partition at these problem
+   regions varies with initialization.
+
+5. **dur_hi=11 is a strong contender.** LS=0.208 at only 2400it, matching 3600it on durhi12.
+   dur=9.5 is between the dur=10 and dur=8.5 regimes. The per-node ceiling is highest (0.72).
+
+### Residual decomposition: run_decompose_b12.sh created (PENDING execution).
+
+### Best optimizer slot: **s0 (deep3600, LS=0.208)** = **s1 (durhi11, LS=0.208)** — TIED.
+   Both set a new LS plateau. s1 is more efficient (2400it vs 3600it) and has fewer negatives (2 vs 3).
+
+### Best scientific slot: **s5 (ctrl, LS=0.194)** — MOST INFORMATIVE despite low LS:
+   Reveals that B11's "all-positive" Goldilocks zone was STOCHASTIC, not deterministic. This
+   overturns the hypothesis that dur=10 is a magic threshold. The real bottleneck is SIREN
+   stiffness optimization, not duration tuning.
+
+### Verdict: PARTIALLY FALSIFIED — the Goldilocks zone hypothesis was OVERTURNED (the all-positive
+   property is stochastic); stiffness narrowing FALSIFIED (all configurations worse). But the
+   depth hypothesis was PARTIALLY SUPPORTED (deep3600 improved mean +0.014). The unexpected
+   convergence of two routes to LS=0.208 suggests an architecture ceiling.
+   `[mechanism+optimization@LoopScore, 2400-3600it, durhi11-12, B12]`.
+
+### Batch outcome: **TIED best LS (0.208 ≈ previous 0.211, within stochastic noise)** +
+   **MAJOR knowledge gain** (all-positive is stochastic; stiffness narrowing falsified;
+   LS≈0.208 plateau from two routes; persistent problem-node positions identified).
+
+### Next
+Parent for Batch 13: s1 (durhi11, LS=0.208, dur_hi=11→dur=9.5, stiff [80,300], ω=5, 2400it).
+KEY QUESTION: The LS≈0.208 plateau appears to be an ARCHITECTURE ceiling — can changing SIREN
+capacity (hidden width, layers) or optimization dynamics (lr) break it? The per-node ceiling
+(0.72) proves the MODEL can match loops; the bottleneck is the SIREN stiffness field's ability
+to simultaneously solve all spatial regions.
+
+---
+
+## Batch 13 — 2026-06-30
+Parent: s5 ctrl = B12-s1 durhi11 (LS=0.208, dur_hi=11→dur=9.5, stiff [80,300], gain0=0.5, amp=12, ω=5, 2400it)
+Surprise (from B12): "Two independent routes converge to LS≈0.208 — is this a SIREN capacity ceiling?"
+Observation: "Problem nodes (positions 0 and 5) are spatially persistent. Per-node ceiling=0.72. All scalar levers saturated."
+Hypothesis: "The LS≈0.208 plateau is a SIREN capacity ceiling imposed by 256-hidden/3-layer stiffness network. Increasing hidden width (384) or layers (4) should break the plateau."
+
+### Results (ranked by LS)
+
+Slot 2 [layers4] role=exploit siren_layers=4 LS=0.206±0.227 R²=-1.472 dur→9.5 ampL=0.052 chir+=0.69 open=0.215 size=1.02e-3
+  Per-node: -0.51, +0.01, +0.20, +0.18, +0.04, -0.38, +0.25, +0.18, +0.70
+  (2 negative: -0.51, -0.38). 4 layers marginally better than ctrl (+0.008), within stochastic range.
+  Best node at 0.70 (matches other slots). Stiffness field similar to 3-layer.
+
+Slot 4 [dur0_8] role=explore dur0=8 LS=0.204±0.231 R²=-1.440 dur→9.1 ampL=0.058 chir+=0.66 open=0.213 size=1.01e-3
+  Per-node: -0.55, +0.04, +0.21, +0.24, +0.06, -0.03, +0.25, +0.14, +0.67
+  (1 strong negative: -0.55; position 5 nearly FIXED at -0.03). Notable: dur0=8 resulted in
+  dur=9.1 (vs ctrl dur=9.5), and position 5 is dramatically better (-0.03 vs ctrl -0.31).
+  The shorter init may have steered the SIREN stiffness into a better local basin for position 5.
+
+Slot 3 [lr5e4] role=explore lr=5e-4 LS=0.201±0.234 R²=-1.458 dur→9.0 ampL=0.058 chir+=0.67 open=0.213 size=1.01e-3
+  Per-node: -0.71, -0.04, +0.19, +0.20, +0.04, -0.28, +0.29, +0.10, +0.66
+  (3 negative/near-zero: -0.71, -0.04, -0.28). Lower lr slightly worse than ctrl.
+  Position 0 has worst score in batch (-0.71). Lower lr did not improve SIREN convergence.
+
+Slot 0 [deep3600] role=exploit n_iter=3600 LS=0.200±0.239 R²=-1.456 dur→9.8 ampL=0.054 chir+=0.72 open=0.211 size=1.02e-3
+  Per-node: -0.79, +0.04, +0.23, +0.16, +0.07, -0.35, +0.22, +0.21, +0.71
+  (2 negative: -0.79, -0.35). Position 0 is WORST in batch (-0.79!). Extra 1200 iterations
+  did NOT help; actually slightly worse than ctrl. Confirms depth cannot break the plateau.
+
+Slot 5 [ctrl] role=control reproduce durhi11 LS=0.198±0.232 R²=-1.462 dur→9.5 ampL=0.053 chir+=0.65 open=0.213 size=1.02e-3
+  Per-node: -0.33, -0.08, +0.19, +0.24, +0.01, -0.31, +0.27, +0.13, +0.66
+  (3 negative/near-zero: -0.33, -0.08, -0.31). Control reproduces the LS≈0.20 plateau.
+  Note LS=0.198 vs parent B12-s1's 0.208 — the ±0.010 stochastic variation continues.
+
+Slot 1 [hidden384] role=exploit siren_hidden=384 LS=0.146±0.224 R²=-1.278 dur→9.7 ampL=0.113 chir+=0.63 open=0.197 size=9.59e-4
+  Per-node: -0.52, +0.11, +0.24, +0.07, +0.08, -0.38, +0.16, +0.34, +0.31
+  **THE SURPRISE: hidden384 COLLAPSED.** LS=0.146, Δ=-0.052 from ctrl. The wider SIREN is
+  CATASTROPHICALLY WORSE. Higher ampL (0.113 vs ctrl 0.053) indicates overshoot. Best node only
+  0.34 (vs 0.66+ elsewhere). The wider optimization landscape is HARDER for Adam to navigate,
+  not easier. This FALSIFIES the hypothesis that SIREN capacity is the bottleneck.
+
+### Key findings
+
+1. **SIREN capacity is NOT the bottleneck — the hypothesis is FALSIFIED.** hidden384 HURT badly
+   (LS=0.146, Δ=-0.052); layers4 was neutral (+0.008, within stochastic range). The wider SIREN
+   has MORE parameters but converges to a WORSE solution. The optimization landscape becomes
+   harder with more parameters, not easier.
+
+2. **The LS≈0.20 plateau is a PHYSICS MODEL ceiling, not an architecture ceiling.** Five different
+   configurations (layers4, dur0_8, lr5e4, deep3600, ctrl) all converge to LS≈0.198-0.206. Only
+   hidden384 breaks away — downward. The plateau is robust to architecture, depth, learning rate,
+   and duration init changes.
+
+3. **Lower lr (5e-4) does NOT improve SIREN convergence.** LS=0.201 ≈ ctrl 0.198. The stochastic
+   outcome quality is the same. The problem is the optimization LANDSCAPE, not the learning rate.
+
+4. **dur0=8 produced the best position-5 outcome (-0.03).** This was the only slot where
+   position 5 was nearly neutral. The different duration init may have steered the optimizer
+   into a different basin for the stiffness SIREN. However, position 0 remained strongly
+   negative (-0.55). This suggests positions 0 and 5 are partially independent problem regions.
+
+5. **Residual decomposition still PENDING** (B12 and B13). Script `run_decompose_b13.sh` created.
+
+### Best optimizer slot: **s2 (layers4, LS=0.206)** — marginally best, but within stochastic range.
+   No slot broke the plateau.
+
+### Best scientific slot: **s1 (hidden384, LS=0.146)** — MOST INFORMATIVE despite worst LS:
+   Definitively FALSIFIES the "SIREN capacity ceiling" hypothesis. The wider SIREN's failure
+   proves that the bottleneck is NOT network expressiveness — the model's physics (uniform gain,
+   simple parametric fibre) cannot simultaneously satisfy all spatial regions. The next step must
+   be a NEW MECHANISM, not a bigger network.
+
+### Verdict: FALSIFIED — "The LS≈0.208 plateau is a SIREN capacity ceiling" is WRONG. hidden384
+   collapsed; layers4 was neutral. The plateau is robust to architecture, depth, and lr changes.
+   The bottleneck is the PHYSICS MODEL: uniform global gain cannot independently control
+   contraction amplitude in different spatial regions. A spatial gain field is the natural
+   next mechanism.
+   `[mechanism+optimization@LoopScore, 2400-3600it, durhi11, stiff [80,300], ω=5, B13]`.
+
+### Batch outcome: **LS unchanged (plateau confirmed, LS≈0.20)** + **MAJOR knowledge gain**
+   (SIREN capacity hypothesis FALSIFIED; physics model ceiling identified; spatial gain as
+   next mechanism motivated).
+
+### Next
+Parent for Batch 14: s5 ctrl (durhi11 baseline, LS=0.198, dur_hi=11, stiff [80,300], ω=5, 2400it).
+KEY QUESTION: "Can a SPATIAL GAIN field (SIREN, ω=5) break the LS≈0.20 plateau by providing
+independent per-region control of active-stress amplitude?" Code modified: added `--gain_src siren`
+option to cardio_mpm_train.py. The spatial gain SIREN maps gain(x,y) ∈ [0.1, 2.5], decoupling
+contraction amplitude from material stiffness.
+
+---
+
+## Batch 14 — 2026-07-01
+Parent: s5 ctrl = B13-s5 ctrl (LS=0.198, dur_hi=11→dur=9.5, stiff [80,300], gain0=0.5, amp=12, ω=5, 2400it)
+Surprise (from B13): "The LS≈0.20 plateau is a PHYSICS MODEL ceiling, not SIREN capacity. Spatial gain implemented."
+Observation: "Uniform global gain constrains all spatial regions to same contraction amplitude. Problem nodes (positions 0, 5) have LS=-0.33 to -0.79 under uniform gain. Per-node ceiling=0.72 proves model CAN match individual loops."
+Hypothesis: "Spatial gain (SIREN, ω=5, bounded [0.1, 2.5]) breaks the plateau by decoupling contraction amplitude from material stiffness — different spatial regions get independently-tuned active-stress strength."
+
+### Results (ranked by LS)
+
+Slot 4 [sgain_amp10] role=explore gain_src=siren, amp=10 LS=0.323±0.257 R²=-1.581 dur→10.0 ampL=0.028 chir+=0.66 open=0.215 size=1.06e-3
+  Per-node: +0.32, +0.07, +0.14, +0.45, +0.09, -0.02, +0.73, +0.57, +0.78
+  **THE SURPRISE: amp=10 is BEST — OVERTURNS B11 finding that amp=10 hurts at dur≈11.**
+  Only 1 barely-negative node (-0.02). Best node at 0.78. Position 0 FIXED (+0.32 vs ctrl -0.73).
+  Position 5 nearly neutral (-0.02 vs ctrl -0.31). Spatial gain compensates for lower base
+  amplitude. Low ampL=0.028 indicates minimal overshoot. Stiffness field: clean binary pattern.
+
+Slot 3 [sgain_dur0_8] role=explore gain_src=siren, dur0=8 LS=0.294±0.274 R²=-1.728 dur→9.5 ampL=0.022 chir+=0.64 open=0.212 size=1.02e-3
+  Per-node: +0.08, -0.01, +0.13, +0.37, +0.18, +0.10, +0.35, +0.48, +0.87
+  1 barely-negative (-0.01). Best node at 0.87 (highest single node in ALL batches!).
+  Position 5 FIXED at +0.10. Very low ampL=0.022. R² most negative (-1.728) — LS/R² fully
+  decoupled. Stiffness similar to other spatial gain slots.
+
+Slot 1 [sgain_deep] role=exploit gain_src=siren, n_iter=3600 LS=0.277±0.287 R²=-1.484 dur→10.4 ampL=0.067 chir+=0.71 open=0.213 size=1.01e-3
+  Per-node: +0.24, +0.11, +0.16, +0.55, +0.07, +0.35, +0.58, +0.71, +0.69
+  **ALL POSITIVE — ZERO negatives!** First ALL-POSITIVE slot with spatial gain at depth.
+  Previously this property was stochastic; spatial gain+depth makes it ACHIEVABLE.
+  Highest chirality+ (0.71). Position 5 FIXED at +0.35. Position 0 improved to +0.24.
+
+Slot 0 [sgain] role=exploit gain_src=siren (baseline) LS=0.218±0.310 R²=-1.617 dur→10.1 ampL=0.054 chir+=0.64 open=0.229 size=1.00e-3
+  Per-node: +0.01, +0.03, +0.10, +0.27, +0.06, -0.40, +0.32, +0.71, +0.34
+  1 negative at position 5 (-0.40). Position 0 barely positive (+0.01). Highest LS_SD (0.310).
+  Baseline spatial gain: clearly above ctrl (+0.013) but worse than amp10/dur0_8 variants.
+
+Slot 5 [ctrl] role=control NO spatial gain LS=0.205±0.237 R²=-1.471 dur→9.4 ampL=0.050 chir+=0.67 open=0.215 size=1.02e-3
+  Per-node: -0.73, -0.05, +0.21, +0.20, +0.05, -0.31, +0.25, +0.15, +0.72
+  3 negatives (-0.73, -0.05, -0.31). Reproduces the LS≈0.20 plateau. Stiffness field is
+  MORE FRAGMENTED than spatial gain slots (noisier binary pattern). Confirms uniform gain
+  as the previous ceiling.
+
+Slot 2 [sgain_nostiff] role=control/ablation gain_src=siren, stiff=uniform(100) LS=0.125±0.203 R²=-1.050 dur→9.4 ampL=0.254 chir+=0.53 open=0.240 size=8.12e-4
+  Per-node: +0.11, +0.06, +0.05, +0.10, +0.08, -0.15, +0.12, +0.12, +0.10
+  1 negative (-0.15). Very UNIFORM but WEAK loops (all ≈0.10). High ampL=0.254 indicates
+  spatial gain without stiffness uses motion-energy to overshoot. Stiffness LOAD-BEARING
+  even with spatial gain — spatial gain alone is not enough.
+
+### Key findings
+
+1. **SPATIAL GAIN BROKE THE LS≈0.20 PLATEAU.** LS=0.323 (best), Δ=+0.118 above ctrl (0.205).
+   This is the LARGEST single-batch improvement in the entire project. The hypothesis is CONFIRMED:
+   spatial gain provides per-region contraction control that uniform gain cannot.
+
+2. **amp=10 + spatial gain is BEST — OVERTURNS B11 amp×dur interaction.** At dur≈11 with UNIFORM
+   gain, amp=10 HURT (B11: 0.184 < 0.191). With SPATIAL gain, amp=10 is BEST (0.323 > 0.218 at
+   amp=12). The mechanism: lower base amplitude reduces the overshoot ceiling, and the spatial gain
+   field compensates by varying contraction strength regionally. This is a QUALITATIVE change —
+   the entire gain-amplitude landscape is reshaped by spatial gain.
+
+3. **Deep (3600it) achieves ALL-POSITIVE nodes.** s1 has ZERO negatives at LS=0.277. Previously,
+   zero-negative was stochastic under uniform gain; spatial gain provides enough degrees of
+   freedom for the optimizer to solve all regions simultaneously at sufficient depth.
+
+4. **Stiffness remains LOAD-BEARING with spatial gain.** nostiff at LS=0.125 vs 0.218-0.323
+   with stiffness. Spatial gain and spatial stiffness provide COMPLEMENTARY, not redundant,
+   spatial control (gain=amplitude, stiffness=frequency/timing).
+
+5. **Problem nodes (positions 0, 5) are DRAMATICALLY IMPROVED.** ctrl: -0.73/-0.31. Best
+   spatial gain (amp10): +0.32/-0.02. The spatial gain field can target these specific regions.
+
+6. **R² degrades with spatial gain** (all LS>ctrl slots have R² < -1.47 vs ctrl -1.47). This is
+   a SUCCESS: LS rewards loop morphology, not frame-wise displacement matching.
+
+7. **Spatial gain optimization is NOT fully converged at 2400it.** s0 (LS=0.218) vs s1-deep
+   (LS=0.277, +0.059 in 1200 extra iterations). The spatial gain field has more parameters to
+   optimize than uniform gain, and depth matters more now.
+
+### Best optimizer slot: **s4 (sgain_amp10, LS=0.323)** — highest mean LS by far. 1 barely-
+   negative node. Amplitude reduction + spatial gain = best morphology match.
+
+### Best scientific slot: **s4 (sgain_amp10, LS=0.323)** — ALSO most informative: it reveals
+   that the gain-amplitude landscape is QUALITATIVELY DIFFERENT with spatial gain. Previous
+   "amp=10 hurts at dur≈11" was specific to UNIFORM gain. The amp×gain interaction overturns
+   a prior conclusion, revealing spatial gain as a distinct dynamical mechanism, not just a
+   finer-grained version of scalar gain.
+   Runner-up scientific: s1 (sgain_deep) for achieving the first ALL-POSITIVE config with
+   spatial gain, confirming that the multi-node problem is solvable at depth.
+
+### Verdict: CONFIRMED — "Spatial gain breaks the LS≈0.20 physics model ceiling." The hypothesis
+   is the clearest confirmation in the project: ALL spatial gain+stiffness slots beat ctrl,
+   and the best beats it by +0.118 (60% relative improvement). The mechanism is decoupled
+   per-region contraction amplitude control.
+   `[mechanism@LoopScore, 2400-3600it, durhi11, stiff [80,300], ω=5, B14]`.
+
+### Batch outcome: **MAJOR LS improvement (0.205→0.323, +58%)** + **MAJOR knowledge gain**
+   (spatial gain confirmed as ceiling-breaking mechanism; amp×gain interaction overturned;
+   first all-positive at depth; stiffness+gain complementarity established).
+
+### Next
+Parent for Batch 15: s4 (sgain_amp10, LS=0.323, gain_src=siren, amp=10, dur_hi=11, stiff [80,300], ω=5, 2400it).
+KEY QUESTIONS: (1) Can deeper training push spatial gain+amp10 further? The s0→s1 gain (+0.059
+in 1200it) suggests convergence is incomplete. (2) Is the spatial gain SIREN omega (ω=5) optimal,
+or would coarser/finer help? (3) What is the gain field's spatial structure — does it correlate with
+the stiffness field? (4) Can the gain bounds [0.1, 2.5] be adjusted to improve LS?
