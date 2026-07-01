@@ -272,17 +272,20 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
     rest = rest.detach().cpu().numpy(); sim_d = sim_d.detach().cpu().numpy(); real_d = real_d.detach().cpu().numpy()
-    ym = youngs_map.detach().cpu().numpy()
+    ym = youngs_map.detach().cpu().numpy(); gm = gain_map.detach().cpu().numpy()
     tm = theta_map.detach().cpu().numpy(); dg = dir_grid.detach().cpu().numpy()
-    td = theta_dev.detach().cpu().numpy() if theta_dev is not None else None
     amp = float(traj_amp)
     fig = plt.figure(figsize=(22, 14), facecolor="black")
     gs = fig.add_gridspec(2, 3, hspace=0.18, wspace=0.18)
     Rr = rest[idx][None] + amp * real_d[:, idx]; Asim = rest[idx][None] + amp * sim_d[:, idx]
 
-    def img(ax, m, cmap, title, **kw):
+    def plabel(ax, letter):                              # bold panel letter top-left, no title
+        ax.text(0.02, 0.98, letter, transform=ax.transAxes, color="white", fontsize=19,
+                fontweight="bold", va="top", ha="left")
+
+    def img(ax, m, cmap, letter, **kw):
         ax.set_facecolor("black"); im = ax.imshow(m.T, origin="lower", cmap=cmap, **kw)
-        ax.set_title(title, color="#ccc", fontsize=9); ax.set_xticks([]); ax.set_yticks([])
+        plabel(ax, letter); ax.set_xticks([]); ax.set_yticks([])
         cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
 
@@ -292,22 +295,13 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
     for Xc, col in ((Rr, (0.2, 1.0, 0.2, 0.7)), (Asim, (1.0, 0.0, 0.0, 0.85))):
         segs = np.stack([Xc[:-1], Xc[1:]], 2).transpose(1, 0, 2, 3).reshape(-1, 2, 2)
         ax.add_collection(LineCollection(list(segs), colors=col, linewidths=1.3))
-    ax.set_title(f"it {it}: sim red / real green (amp x{amp:.0f})", color="#ccc", fontsize=9)
+    plabel(ax, "a")
 
     # [0,1] learned stiffness
-    img(fig.add_subplot(gs[0, 1]), ym, "viridis", "stiffness (youngs)")
+    img(fig.add_subplot(gs[0, 1]), ym, "viridis", "b")
 
-    # [0,2] learned fibre-angle deviation dθ(x,y) -- blank panel when no deviation field is active
-    ax02 = fig.add_subplot(gs[0, 2]); ax02.set_facecolor("black")
-    if td is not None:
-        mx = float(np.abs(td).max()) + 1e-6
-        im = ax02.imshow(td.T, origin="lower", cmap="twilight", vmin=-mx, vmax=mx)
-        ax02.set_title("fibre angle dθ (rad)", color="#ccc", fontsize=9)
-        cb = fig.colorbar(im, ax=ax02, fraction=0.046, pad=0.04)
-        cb.ax.tick_params(colors="white", labelsize=7); plt.setp(cb.ax.get_yticklabels(), color="white")
-    else:
-        ax02.set_title("fibre angle dθ (off)", color="#666", fontsize=9)
-    ax02.set_xticks([]); ax02.set_yticks([])
+    # [0,2] learned GAIN field gain(x,y)
+    img(fig.add_subplot(gs[0, 2]), gm, "viridis", "c")
 
     # [1,0] ZOOM: 3x3 grid of individual node loops (sim red / real green), per-cell autoscaled
     gz = gs[1, 0].subgridspec(3, 3, hspace=0.12, wspace=0.12)
@@ -331,22 +325,23 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
                 color="white", fontweight="bold", ha="left", va="top")
         for sp in az.spines.values():
             sp.set_color("#333")
-        if cell == 1:
-            az.set_title("zoom 3x3: sim red / real green", color="#ccc", fontsize=9)
+    # bold panel letter for the zoom block, at its top-left (above the 3x3 subgrid)
+    pos10 = gs[1, 0].get_position(fig)
+    fig.text(pos10.x0, pos10.y1, "d", color="white", fontsize=19, fontweight="bold", va="bottom", ha="left")
 
-    # [1,1] fibre angle field
-    img(fig.add_subplot(gs[1, 1]), tm, "twilight", "fibre angle (rad)")
+    # [1,1] fibre angle = parametrized + SIREN (the effective field)
+    img(fig.add_subplot(gs[1, 1]), tm, "viridis", "e")
 
     # [1,2] fibre contraction-axis quiver (cos θ, sin θ)
     axq = fig.add_subplot(gs[1, 2]); axq.set_facecolor("black"); axq.set_aspect("equal")
     step = 7                                                              # subsample; lower = denser arrows
     I, J = np.mgrid[0:RES:step, 0:RES:step]                              # I=row=y, J=col=x
     U = dg[0, ::step, ::step]; V = dg[1, ::step, ::step]                 # cos θ (x-comp), sin θ (y-comp)
-    axq.quiver(J, I, U, V, np.hypot(U, V), cmap="twilight", pivot="mid",
+    axq.quiver(J, I, U, V, np.hypot(U, V), cmap="viridis", pivot="mid",
                angles="xy", scale_units="xy", scale=1.0 / (step * 0.85), # arrow ~step px (tune this for amplitude)
                width=0.004, headwidth=0, headlength=0, headaxislength=0)  # headless -> axis lines (undirected)
     axq.set_xlim(0, RES); axq.set_ylim(RES, 0); axq.set_xticks([]); axq.set_yticks([])
-    axq.set_title("fibre axis  quiver(cos θ, sin θ)", color="#ccc", fontsize=9)
+    plabel(axq, "f")
 
     ck = os.path.join(outdir, "checkpoints"); os.makedirs(ck, exist_ok=True)
     fig.savefig(os.path.join(ck, f"dashboard_{it:05d}.png"), dpi=110, facecolor="black", bbox_inches="tight")
@@ -381,8 +376,12 @@ def main():
     ap.add_argument("--fibre_angle", type=float, default=0.6)
     ap.add_argument("--fibre_amp", type=float, default=1.0)
     ap.add_argument("--fibre_phase", type=float, default=0.7)
-    # GAIN (now a single UNIFORM GLOBAL learnable scalar -- the magnitude/size lever)
+    # GAIN (default: single UNIFORM GLOBAL learnable scalar; option: SIREN spatial field)
     ap.add_argument("--gain0", type=float, default=1.0, help=f"initial uniform global gain (LEARNABLE, bounded [{GAIN_LO},{GAIN_HI}])")
+    ap.add_argument("--gain_src", type=str, default="scalar", choices=["scalar", "siren"],
+                     help="gain source: 'scalar' (default, one global learnable) or 'siren' (spatial field)")
+    ap.add_argument("--gain_omega", type=float, default=0,
+                     help="SIREN omega_0 for gain field (0 = use --siren_omega; nonzero = independent)")
     # STIFF: UNet(microscope) -> youngs in [stiff_lo, stiff_hi] (the youngs RANGE stays fixed; the UNet learns the spatial pattern)
     ap.add_argument("--stiff_lo", type=float, default=50.0)
     ap.add_argument("--stiff_hi", type=float, default=150.0)
@@ -412,6 +411,8 @@ def main():
     ap.add_argument("--dur0", type=float, default=8.0, help=f"initial pulse duration (frames, LEARNABLE, bounded [{DUR_LO:.0f},{DUR_HI:.0f}] -> sharp pulse)")
     ap.add_argument("--dur_hi", type=float, default=DUR_HI, help=f"upper bound for learnable pulse duration (default {DUR_HI:.0f}; raise to explore longer pulses)")
     ap.add_argument("--resume", default="")
+    ap.add_argument("--redash", type=int, default=0, help="EVAL ONLY: with --resume <ckpt>, render ONE dashboard from "
+                    "the loaded checkpoint (into the ckpt's run dir) and exit -- no training")
     ap.add_argument("--tag", default="")
     ap.add_argument("--outdir", default="")
     ap.add_argument("--smoke", type=int, default=0)
@@ -471,6 +472,13 @@ def main():
               outermost_linear=True, first_omega_0=args.siren_omega, hidden_omega_0=args.siren_omega)
     stiff_siren = Siren(**sk).to(dev) if args.stiff_src == "siren" else None
     fibre_siren = Siren(**sk).to(dev) if args.siren_fibre else None
+    if args.gain_src == "siren":
+        _go = args.gain_omega if args.gain_omega > 0 else args.siren_omega
+        gk = dict(in_features=2, hidden_features=args.siren_hidden, hidden_layers=args.siren_layers,
+                  out_features=1, outermost_linear=True, first_omega_0=_go, hidden_omega_0=_go)
+        gain_siren = Siren(**gk).to(dev)
+    else:
+        gain_siren = None
     # coordinate grid for the SIREN fields (matches aniso_field_torch row=y / col=x convention)
     _ar01 = torch.linspace(0, 1, RES, device=dev)
     _yy, _xx = torch.meshgrid(_ar01, _ar01, indexing="ij")
@@ -480,10 +488,11 @@ def main():
     stiff_params = (list(net.parameters()) if net is not None else []) \
                  + (list(stiff_siren.parameters()) if stiff_siren is not None else [])
     fibre_params = [f_wl, f_ang, f_amp, f_ph] + (list(fibre_siren.parameters()) if fibre_siren is not None else [])
-    groups = {"fibre": fibre_params, "stiff": stiff_params, "gain": [raw_g], "dur": [raw_dur]}
+    gain_params = [raw_g] + (list(gain_siren.parameters()) if gain_siren is not None else [])
+    groups = {"fibre": fibre_params, "stiff": stiff_params, "gain": gain_params, "dur": [raw_dur]}
     sel = set(groups) if args.learn.strip() == "all" else {g.strip() for g in args.learn.split(",")}
     learn = [p for g in groups for p in groups[g] if g in sel]
-    for mod, grp in ((net, "stiff"), (stiff_siren, "stiff"), (fibre_siren, "fibre")):
+    for mod, grp in ((net, "stiff"), (stiff_siren, "stiff"), (fibre_siren, "fibre"), (gain_siren, "gain")):
         if mod is not None and grp not in sel:
             for prm in mod.parameters():
                 prm.requires_grad_(False)                                       # frozen field -> stays at init
@@ -519,10 +528,15 @@ def main():
             theta_dev = args.fibre_dev * torch.tanh(uout[uch["fibre"]])      # bounded microscope deviation (legacy)
             theta = theta + theta_dev
         d = torch.stack([torch.cos(theta), torch.sin(theta)])                # [2,RES,RES] unit contraction axis
-        # GAIN: a single UNIFORM GLOBAL learnable scalar (the GLOBAL size lever)
-        gain_g = GAIN_LO + (GAIN_HI - GAIN_LO) * torch.sigmoid(raw_g)        # scalar
-        gain_p = gain_g * torch.ones(rest.shape[0], device=dev)              # [N] uniform
-        gain_map = gain_g * torch.ones(RES, RES, device=dev)                 # [RES,RES] flat (for dashboard)
+        # GAIN: either a single UNIFORM GLOBAL scalar or a SIREN spatial field
+        gain_g = GAIN_LO + (GAIN_HI - GAIN_LO) * torch.sigmoid(raw_g)        # scalar (base or mean init)
+        if gain_siren is not None:
+            gain01 = torch.sigmoid(gain_siren(field_coords)[:, 0].reshape(RES, RES))   # FREE spatial field in [0,1]
+            gain_map = GAIN_LO + (GAIN_HI - GAIN_LO) * gain01                         # [RES,RES] in [GAIN_LO, GAIN_HI]
+            gain_p = sample_to_particles(gain_map)                                     # [N]
+        else:
+            gain_p = gain_g * torch.ones(rest.shape[0], device=dev)              # [N] uniform
+            gain_map = gain_g * torch.ones(RES, RES, device=dev)                 # [RES,RES] flat (for dashboard)
         # STIFF: youngs pattern -- image-INDEPENDENT SIREN f(x,y), or legacy microscope UNet (the per-region size lever)
         if stiff_siren is not None:
             stiff01 = torch.sigmoid(stiff_siren(field_coords)[:, 0].reshape(RES, RES))  # FREE field in [0,1]
@@ -571,13 +585,15 @@ def main():
                 stiff_siren.load_state_dict(sd["stiff_siren"])
             if "fibre_siren" in sd and fibre_siren is not None:
                 fibre_siren.load_state_dict(sd["fibre_siren"])
+            if "gain_siren" in sd and gain_siren is not None:
+                gain_siren.load_state_dict(sd["gain_siren"])
             try:
                 start_iter = int(os.path.basename(path).split("_")[1].split(".")[0]) + 1
             except Exception:
                 start_iter = 0
             print(f"  resumed from {path} (start_iter={start_iter})", flush=True)
 
-    if args.eval_montage or args.eval_decompose:                       # EVAL: one forward from the loaded ckpt, then exit
+    if args.eval_montage or args.eval_decompose or args.redash:        # EVAL: one forward from the loaded ckpt, then exit
         with torch.no_grad():
             reset_state(lvl, rest, dev)
             youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta, theta_dev = maps()
@@ -599,6 +615,14 @@ def main():
             render_eval_montage(rest, idx, sim_d, real_d, mov, args.eval_montage, args.harm_K, args.traj_amp, spec.name)
         if args.eval_decompose:
             render_residual_decomposition(sim_d, real_d, mov, args.eval_decompose, args.harm_K, spec.name)
+        if args.redash:                                                # re-render the dashboard for this checkpoint
+            import re as _re
+            _m = _re.search(r"model_(\d+)", str(args.resume))
+            it = int(_m.group(1)) if _m else 0
+            rd_out = os.path.dirname(os.path.dirname(os.path.abspath(args.resume)))   # the run dir (has checkpoints/)
+            render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta, dir_grid, rd_out,
+                        info=f"{spec.name} redash it {it}", traj_amp=args.traj_amp, theta_dev=theta_dev)
+            print(f"  redash -> {rd_out}/checkpoints/dashboard_{it:05d}.png", flush=True)
         return
 
     pbar = tqdm(range(start_iter, args.n_iter), ncols=180, desc=spec.name)
@@ -660,7 +684,8 @@ def main():
             info = (f"{spec.name} [PARAMETRIC active-stress]  it {it}/{args.n_iter}  R2={r2:+.3f}  "
                     f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}  dur={dur.item():.1f}{dh_tag} amp={args.amplitude} "
                     f"drag={args.drag_k}\nfibre wl={f_wl.item():.1f} ang={f_ang.item():.2f} amp={f_amp.item():.2f} "
-                    f"ph={f_ph.item():.2f} | gain(uniform)={gain_p.mean().item():.3f} | "
+                    f"ph={f_ph.item():.2f} | gain({'SIREN' if gain_siren is not None else 'uniform'})={gain_p.mean().item():.3f}"
+                    f"{'[' + f'{gain_map.min().item():.2f},{gain_map.max().item():.2f}' + ']' if gain_siren is not None else ''} | "
                     f"stiff({'SIREN' if args.stiff_src == 'siren' else 'UNet'}) "
                     f"youngs[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}]"
                     f"{' fibreSIREN' if args.siren_fibre else ''} learn={args.learn}")
@@ -672,6 +697,7 @@ def main():
             if net is not None: sd_save["net"] = net.state_dict()
             if stiff_siren is not None: sd_save["stiff_siren"] = stiff_siren.state_dict()
             if fibre_siren is not None: sd_save["fibre_siren"] = fibre_siren.state_dict()
+            if gain_siren is not None: sd_save["gain_siren"] = gain_siren.state_dict()
             torch.save(sd_save, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:
                 pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} LS={harm_r2:+.3f} LS_SD={harm_sd:.3f} "

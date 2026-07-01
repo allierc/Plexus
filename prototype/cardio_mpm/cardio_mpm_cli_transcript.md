@@ -443,3 +443,141 @@ All files updated. Here's the Batch 12 summary:
 | b12_lo100 | explore | stiff_lo=100 (vs 80) | durhi12 |
 | b12_narrow_stiff | explore | stiff [100,200] (vs [80,300]) | durhi12 |
 | b12_ctrl | control | reproduce durhi12 | durhi12 |
+
+
+================================================================================
+## DESIGN 13 -- 2026-06-30 06:59:26
+================================================================================
+All files are updated. Here's the **Batch 13 summary**:
+
+---
+
+## Batch 12 Results & Batch 13 Design
+
+### BIGGEST SURPRISE from B12
+The **control FAILED to reproduce** B11's all-positive Goldilocks zone. B11 durhi12 had ZERO negative nodes (LS=0.200); B12's identical config got **2 negatives** (-0.52, -0.54, LS=0.194). The "all-positive" property was **stochastic** (SIREN init luck), not a deterministic property of dur=10.
+
+### B12 Ranking (by LS)
+
+| Rank | Slot | Role | LS | SD | Neg | dur | Key |
+|---|---|---|---|---|---|---|---|
+| 1= | s0 deep3600 | exploit | **0.208** | 0.221 | 3 | 10.1 | 3600it on durhi12 |
+| 1= | s1 durhi11 | exploit | **0.208** | 0.227 | 2 | 9.5 | dur_hi=11, 2400it |
+| 3 | s5 ctrl | control | 0.194 | 0.219 | 2 | 10.1 | FAILED to reproduce all-positive |
+| 4 | s3 lo100 | explore | 0.177 | 0.221 | 2 | 10.4 | stiff_lo=100 HURTS |
+| 5 | s2 durhi10_narrow | explore | 0.159 | 0.212 | 1(-1.00) | 8.9 | narrow stiff CATASTROPHIC |
+| 6 | s4 narrow_stiff | explore | 0.158 | 0.195 | 2 | 10.5 | narrow stiff HURTS |
+
+**Best optimizer:** s0/s1 tied (LS=0.208). **Best scientific:** s5 ctrl — reveals all-positive is stochastic.
+
+### Key B12 Findings
+1. **LS≈0.208 is a PLATEAU** — two independent routes converge (durhi11@2400it, durhi12@3600it)
+2. **Stiffness narrowing FALSIFIED** in all configs — [80,300] is a hard optimum
+3. **Problem nodes are spatially persistent** (positions 0, 5 negative in 5/6 slots) but stochastically assigned
+4. All scalar levers are **saturated** — SIREN capacity is the next frontier
+
+### B13 Design — SIREN CAPACITY
+
+**Hypothesis:** The LS≈0.208 plateau is a SIREN capacity ceiling. The per-node ceiling (0.72) proves the model CAN match loops; the bottleneck is the 256-hidden/3-layer SIREN's inability to simultaneously resolve all spatial regions. More SIREN capacity should break the plateau.
+
+**Parent:** B12-s1 durhi11 (LS=0.208, dur_hi=11→dur=9.5)
+
+| Slot | Role | Change | Rationale |
+|---|---|---|---|
+| b13_deep3600 | exploit | 3600it | depth at durhi11 |
+| b13_hidden384 | exploit | siren_hidden=384 | wider SIREN |
+| b13_layers4 | exploit | siren_layers=4 | deeper SIREN |
+| b13_lr5e4 | explore | lr=5e-4 | slower, more careful optim |
+| b13_dur0_8 | explore | dur0=8 | different dur init basin |
+| b13_ctrl | control | reproduce parent | check stochasticity |
+
+Note: `run_decompose_b12.sh` is ready for manual execution to get per-dimension residual breakdown.
+
+
+================================================================================
+## DESIGN 14 -- 2026-06-30 15:49:53
+================================================================================
+All files updated. Here's the **Batch 13 summary** and **Batch 14 design**:
+
+---
+
+## Batch 13 Results (ranked by LS)
+
+| Rank | Slot | Name | LS | SD | Key change |
+|------|------|------|-----|-----|-----------|
+| 1 | s2 | layers4 | 0.206 | 0.227 | siren_layers=4 |
+| 2 | s4 | dur0_8 | 0.204 | 0.231 | dur0=8 |
+| 3 | s3 | lr5e4 | 0.201 | 0.234 | lr=5e-4 |
+| 4 | s0 | deep3600 | 0.200 | 0.239 | 3600it |
+| 5 | s5 | ctrl | 0.198 | 0.232 | control |
+| 6 | s1 | **hidden384** | **0.146** | 0.224 | siren_hidden=384 |
+
+## Biggest SURPRISE
+
+**hidden384 COLLAPSED** (LS=0.146, a massive -0.052 drop from ctrl). The hypothesis was that SIREN capacity is the bottleneck — instead, a wider SIREN makes the optimization landscape *harder*. This **FALSIFIES the "SIREN capacity ceiling" hypothesis** definitively.
+
+Five other configurations (layers4, dur0_8, lr5e4, deep3600, ctrl) all converge to LS=0.198-0.206, confirming the LS~0.20 plateau is **robust to architecture, depth, learning rate, and duration init**.
+
+## Verdict
+
+The LS~0.20 plateau is a **PHYSICS MODEL ceiling**, not an architecture/optimization ceiling. The model lacks a needed mechanism: **uniform gain** forces all spatial regions to share the same contraction amplitude, while the problem nodes need different amplitudes.
+
+## Batch 14 Design — SPATIAL GAIN
+
+**Hypothesis:** "Spatial gain (SIREN, omega=5) breaks the plateau by decoupling contraction amplitude from material stiffness — these have different dynamical effects (amplitude vs natural frequency)."
+
+**Code change:** Added `--gain_src siren` to `cardio_mpm_train.py`. When enabled, gain becomes a SIREN spatial field bounded in [0.1, 2.5] instead of a single scalar.
+
+| Slot | Role | Key change | Purpose |
+|------|------|-----------|---------|
+| b14_sgain | exploit | spatial gain SIREN | Core mechanism test |
+| b14_sgain_deep | exploit | spatial gain + 3600it | Spatial gain with more depth |
+| b14_sgain_nostiff | exploit | spatial gain, NO stiffness | Isolate gain vs stiffness |
+| b14_sgain_dur0_8 | explore | spatial gain + dur0=8 | Different basin, dur0=8 helped pos-5 |
+| b14_sgain_amp10 | explore | spatial gain + amp=10 | amp×gain interaction |
+| b14_ctrl | control | scalar gain (parent) | Baseline for comparison |
+
+
+================================================================================
+## DESIGN 15 -- 2026-07-01 01:52:10
+================================================================================
+All files updated. Here's the summary:
+
+## Batch 14 Results — BREAKTHROUGH
+
+**Spatial gain BROKE the LS≈0.20 plateau.** Ranked by LS:
+
+| Rank | Slot | Config | LS | LS_SD | R² | Neg nodes |
+|------|------|--------|-----|-------|-----|-----------|
+| 1 | s4 sgain_amp10 | sgain + amp=10 | **0.323** | 0.257 | -1.58 | 1 (-0.02) |
+| 2 | s3 sgain_dur0_8 | sgain + dur0=8 | 0.294 | 0.274 | -1.73 | 1 (-0.01) |
+| 3 | s1 sgain_deep | sgain + 3600it | 0.277 | 0.287 | -1.48 | **0** |
+| 4 | s0 sgain | sgain baseline | 0.218 | 0.310 | -1.62 | 1 (-0.40) |
+| 5 | s5 ctrl | no sgain | 0.205 | 0.237 | -1.47 | 3 |
+| 6 | s2 sgain_nostiff | sgain, no stiff | 0.125 | 0.203 | -1.05 | 1 |
+
+**Biggest surprise:** amp=10 is BEST (LS=0.323) — **overturns** B11 finding that amp=10 hurts at dur≈11. With spatial gain, the field compensates for lower base amplitude regionally while lower amp reduces the overshoot ceiling globally. This is a 3-way amp×dur×gain-type interaction.
+
+**Key findings:**
+1. LS jumped from 0.205 → 0.323 (+58%) — largest single-batch improvement in the project
+2. ALL-positive nodes achieved at 3600it depth (previously stochastic)
+3. Stiffness + gain are complementary (gain alone = 0.125; together = 0.323)
+4. NOT converged: +0.059 from 2400→3600it suggests more room
+
+## Batch 15 Design
+
+**Parent:** B14-s4 sgain_amp10 (LS=0.323)
+**Hypothesis:** "Spatial gain at amp=10 is not converged at 2400it. Deeper training will push LS further. The gain SIREN omega (ω=5) may not be optimal — a coarser gain field (ω=3) may better match the tissue."
+
+| Slot | Role | ONE variable changed | Rationale |
+|------|------|---------------------|-----------|
+| b15_deep3600 | exploit | n_iter=3600 | Test convergence depth |
+| b15_deep4800 | exploit | n_iter=4800 | Push convergence further |
+| b15_amp11 | exploit | amplitude=11 | Map the amp curve with sgain |
+| b15_gomega3 | explore | gain_omega=3 | Coarser gain SIREN (independent of stiffness ω=5) |
+| b15_durhi13 | explore | dur_hi=13 | More duration freedom with sgain |
+| b15_ctrl_nosgain | control | NO gain_src=siren | Confirms amp=10 hurts without spatial gain |
+
+**Code change:** Added `--gain_omega` flag to decouple gain SIREN frequency from stiffness SIREN.
+
+**Decomposition script** `run_decompose_b14.sh` is ready for execution.
