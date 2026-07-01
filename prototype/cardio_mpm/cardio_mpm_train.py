@@ -264,7 +264,7 @@ def render_eval_montage(rest, idx, sim_d, real_d, mov, outpath, K, amp, name="")
 
 
 def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, dir_grid, outdir,
-                info="", traj_amp=10.0, theta_dev=None):
+                info="", traj_amp=10.0, theta_dev=None, microscope=None):
     """Dashboard:
        top:    trajectories (sim red / real green) | stiffness | UNet fibre-angle dθ (blank if --unet_fibre=0)
        bottom: ZOOM 3x3 per-node loops (sim red / real green) | fibre angle | fibre-axis quiver
@@ -279,9 +279,8 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
     gs = fig.add_gridspec(2, 3, hspace=0.18, wspace=0.18)
     Rr = rest[idx][None] + amp * real_d[:, idx]; Asim = rest[idx][None] + amp * sim_d[:, idx]
 
-    def plabel(ax, letter):                              # bold panel letter top-left, no title
-        ax.text(0.02, 0.98, letter, transform=ax.transAxes, color="white", fontsize=19,
-                fontweight="bold", va="top", ha="left")
+    def plabel(ax, letter):                              # panel letters disabled (removed per request)
+        return
 
     def img(ax, m, cmap, letter, **kw):
         ax.set_facecolor("black"); im = ax.imshow(m.T, origin="lower", cmap=cmap, **kw)
@@ -300,8 +299,14 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
     # [0,1] learned stiffness
     img(fig.add_subplot(gs[0, 1]), ym, "viridis", "b")
 
-    # [0,2] learned GAIN field gain(x,y)
-    img(fig.add_subplot(gs[0, 2]), gm, "viridis", "c")
+    # [0,2] learned GAIN field gain(x,y) + its correlation with the microscope image
+    axc = fig.add_subplot(gs[0, 2]); img(axc, gm, "viridis", "c")
+    if microscope is not None:
+        mi = np.asarray(microscope, float)
+        if mi.shape == gm.shape:
+            r = float(np.corrcoef(gm.ravel(), mi.ravel())[0, 1])
+            axc.text(0.02, 0.02, f"corr(microscope) = {r:+.3f}", transform=axc.transAxes,
+                     color="white", fontsize=14, fontweight="bold", va="bottom", ha="left")
 
     # [1,0] ZOOM: 3x3 grid of individual node loops (sim red / real green), per-cell autoscaled
     gz = gs[1, 0].subgridspec(3, 3, hspace=0.12, wspace=0.12)
@@ -325,9 +330,6 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
                 color="white", fontweight="bold", ha="left", va="top")
         for sp in az.spines.values():
             sp.set_color("#333")
-    # bold panel letter for the zoom block, at its top-left (above the 3x3 subgrid)
-    pos10 = gs[1, 0].get_position(fig)
-    fig.text(pos10.x0, pos10.y1, "d", color="white", fontsize=19, fontweight="bold", va="bottom", ha="left")
 
     # [1,1] fibre angle = parametrized + SIREN (the effective field)
     img(fig.add_subplot(gs[1, 1]), tm, "viridis", "e")
@@ -337,11 +339,10 @@ def render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta_map, d
     step = 7                                                              # subsample; lower = denser arrows
     I, J = np.mgrid[0:RES:step, 0:RES:step]                              # I=row=y, J=col=x
     U = dg[0, ::step, ::step]; V = dg[1, ::step, ::step]                 # cos θ (x-comp), sin θ (y-comp)
-    axq.quiver(J, I, U, V, np.hypot(U, V), cmap="viridis", pivot="mid",
+    axq.quiver(J, I, U, V, color="white", pivot="mid",                   # white arrows (clearer on black)
                angles="xy", scale_units="xy", scale=1.0 / (step * 0.85), # arrow ~step px (tune this for amplitude)
                width=0.004, headwidth=0, headlength=0, headaxislength=0)  # headless -> axis lines (undirected)
     axq.set_xlim(0, RES); axq.set_ylim(RES, 0); axq.set_xticks([]); axq.set_yticks([])
-    plabel(axq, "f")
 
     ck = os.path.join(outdir, "checkpoints"); os.makedirs(ck, exist_ok=True)
     fig.savefig(os.path.join(ck, f"dashboard_{it:05d}.png"), dpi=110, facecolor="black", bbox_inches="tight")
@@ -467,6 +468,7 @@ def main():
         uch["fibre"] = nuo; nuo += 1
     net = UNet(out=nuo).to(dev) if nuo > 0 else None
     ximg = load_image((RES, RES)).to(dev)[None, None] if net is not None else None   # [1,1,RES,RES] registered identity
+    microscope_img = load_image((RES, RES)).detach().cpu().numpy()                   # [RES,RES] for the gain<->image corr
     # image-INDEPENDENT SIREN fields (decoupled from the microscope; omega_0 band-limits them)
     sk = dict(in_features=2, hidden_features=args.siren_hidden, hidden_layers=args.siren_layers, out_features=1,
               outermost_linear=True, first_omega_0=args.siren_omega, hidden_omega_0=args.siren_omega)
@@ -621,7 +623,8 @@ def main():
             it = int(_m.group(1)) if _m else 0
             rd_out = os.path.dirname(os.path.dirname(os.path.abspath(args.resume)))   # the run dir (has checkpoints/)
             render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta, dir_grid, rd_out,
-                        info=f"{spec.name} redash it {it}", traj_amp=args.traj_amp, theta_dev=theta_dev)
+                        info=f"{spec.name} redash it {it}", traj_amp=args.traj_amp, theta_dev=theta_dev,
+                        microscope=microscope_img)
             print(f"  redash -> {rd_out}/checkpoints/dashboard_{it:05d}.png", flush=True)
         return
 
@@ -690,7 +693,7 @@ def main():
                     f"youngs[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}]"
                     f"{' fibreSIREN' if args.siren_fibre else ''} learn={args.learn}")
             render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta, dir_grid, outdir,
-                        info=info, traj_amp=args.traj_amp, theta_dev=theta_dev)
+                        info=info, traj_amp=args.traj_amp, theta_dev=theta_dev, microscope=microscope_img)
             params_sd = {"f_wl": f_wl.detach(), "f_ang": f_ang.detach(), "f_amp": f_amp.detach(), "f_ph": f_ph.detach(),
                          "raw_g": raw_g.detach(), "raw_dur": raw_dur.detach()}
             sd_save = {"params": params_sd}
