@@ -58,6 +58,12 @@ def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
         a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
         pos = torch.stack([cx + r * torch.cos(a), cy + r * torch.sin(a)], 1)
         a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
+    elif mode in ("sunflower", "disc_even", "equidistant"):     # Vogel golden-angle spiral: even disc coverage
+        idx = torch.arange(n, dtype=torch.float32, device=device) + 0.5
+        r = torch.sqrt(idx / n) * radius
+        theta = math.pi * (1.0 + 5.0 ** 0.5) * idx
+        pos = torch.stack([cx + r * torch.cos(theta), cy + r * torch.sin(theta)], 1)
+        a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
     elif mode in ("ring_in", "ring_out"):
         a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
         pos = torch.stack([cx + radius * torch.cos(a), cy + radius * torch.sin(a)], 1)
@@ -252,6 +258,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
+        lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
         if head is not None:
             # heading is a unit VECTOR [., D] in every dimension (the universal
             # orientation representation read by glide / bounce / sense).
@@ -394,6 +401,10 @@ def _integrate(H: Hierarchy, dt: float) -> None:
         px0, px1 = lvl.state_schema["pos"]; vx0, vx1 = lvl.state_schema["vel"]
         x, v = lvl.state[:, px0:px1], lvl.state[:, vx0:vx1]
         v = out if pred == "first_derivative" else v + dt * out
+        vmax = getattr(lvl, "vmax", None)                      # optional speed clamp (anti-overshoot)
+        if vmax:
+            sp = v.norm(dim=-1, keepdim=True)
+            v = v * (sp.clamp(max=vmax) / sp.clamp(min=1e-9))
         x = x + dt * v
         b = getattr(H, "boundary", "wall")
         if b == "periodic":

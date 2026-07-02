@@ -1,0 +1,61 @@
+# agent_mpm_blastula -- ACTIVE MATTER x MPM, 2D. Two-material embryo + homogeneous cell coverage.
+# A BLASTULA: an elastic MEMBRANE shell (deep blue) enclosing a WATER core (light blue), held by
+# a substrate anchor so the shell contains the fluid and nothing drifts. Cells cover the disc
+# HOMOGENEOUSLY: instead of Vicsek alignment (which drives MIPS clustering) they interact by
+# `attraction_repulsion` -- a force with an EQUILIBRIUM distance (repel near / attract far) that
+# makes cells settle EQUIDISTANT (lattice_forming), i.e. tile the surface without clumps. Active
+# dynamics come from `glide` (self-propulsion), `flow_align` (polarity follows the tissue flow,
+# the SPV rule) and `cell_divide` (proliferation fills gaps). Confined by material density.
+general: {name: agent_mpm_blastula, seed: 0, n_frames: 1500, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 900
+    buffer: 4000
+    spawn: disc
+    spawn_radius: 0.20
+    types:
+      # p = [pull_strength, pull_range, push_strength, push_range]; equal -> one homogeneous sheet
+      a: {fraction: 0.5, move_speed: 0.3, div_rate: 0.5, p: [6.0, 1.0, 7.0, 1.6]}
+      b: {fraction: 0.5, move_speed: 0.3, div_rate: 0.5, p: [6.0, 1.0, 7.0, 1.6]}
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 150
+        layers:
+          - {frac: 0.80, youngs: 30,  material: liquid}    # inner core = water (light blue)
+          - {frac: 1.0,  youngs: 150, material: elastic}    # outer shell = elastic membrane (deep blue)
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.34, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: radius_graph, at: agent, radius: 0.06}
+  - {op: attraction_repulsion, at: agent, sigma: 0.02}        # equidistant spacing -> homogeneous tiling
+  - {op: glide, at: agent}                                    # self-propulsion (per-type move_speed)
+  - {op: cell_divide, at: agent, rate: 0.5, max_occ: 0.95, offset: 0.006}
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 40.0}   # shell contains the water core
+  - {op: mpm_spin, at: mpm_particle, omega: 0.4, spin_k: 20.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 1.5e-5, k: 1.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.6, confine: 2.0}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 60.0}
+schedule:
+  - radius_graph
+  - attraction_repulsion
+  - glide
+  - cell_divide
+  - mpm_anchor
+  - mpm_spin
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.008

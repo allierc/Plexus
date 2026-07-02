@@ -1,0 +1,15 @@
+data/
+archive/
+loop_logs/
+montages/
+__pycache__/
+*.mp4
+*.pyc
+*.png
+embryo_loop_state.json
+embryo_cli_transcript.md
+*.aux
+*.fls
+*.fdb_latexmk
+*.out
+*.log

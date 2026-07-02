@@ -1,0 +1,55 @@
+# agent_mpm_embryo_div -- ACTIVE MATTER x MPM + PROLIFERATION. 2D.
+# The epithelial embryogenesis model: a fully-elastic anchored disc (bounded substrate) whose
+# surface is colonised by DIVIDING cells. Cells start sparse (n=400) and proliferate on a fixed
+# buffer (cell_divide, per-type div_rate) until the tissue is confluent; strong soft repulsion
+# (exclusion) makes them TILE the surface without clustering, and they align their polarity to
+# the tissue FLOW (flow_align, the SPV rule). Confined by material density, disc rotates slowly.
+general: {name: agent_mpm_embryo_div, seed: 0, n_frames: 1500, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 400                                   # start sparse
+    buffer: 4000                             # dormant slots for proliferation (occupancy-driven)
+    spawn: disc
+    spawn_radius: 0.30
+    types:
+      a: {fraction: 0.5, move_speed: 0.4, div_rate: 1.1}
+      b: {fraction: 0.5, move_speed: 0.4, div_rate: 0.8}
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body: {fraction: 1.0, youngs: 80}     # fully elastic anchored tissue
+  mpm_particle: {parent: cell, per_parent: 12000, radius: 0.34, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: radius_graph, at: agent, radius: 0.03}
+  - {op: polar_align, at: agent, gamma: 40.0, noise: 3.0}
+  - {op: repel, at: agent, strength: 6.0, r0: 0.022}          # soft exclusion -> confluent tiling
+  - {op: glide, at: agent}
+  - {op: cell_divide, at: agent, rate: 1.0, max_occ: 0.95, offset: 0.006}   # proliferation
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 40.0}
+  - {op: mpm_spin, at: mpm_particle, omega: 0.4, spin_k: 20.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 1.5e-5, k: 1.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.7, confine: 2.0}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 100.0}
+schedule:
+  - radius_graph
+  - polar_align
+  - repel
+  - glide
+  - cell_divide
+  - mpm_anchor
+  - mpm_spin
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.008

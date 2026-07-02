@@ -37,6 +37,7 @@ from . import phase_delay           # noqa: F401  spatial phase-delay clock tau(
 from . import pulse_to_contraction  # noqa: F401  activation gradient -> per-particle force (exchange)
 from . import pulse_to_active_stress  # noqa: F401  activation -> per-particle active stress -A nn^T (exchange)
 from . import mpm_drag              # noqa: F401  viscous body drag -k*v as a particle force (lateral)
+from . import mpm_spin              # noqa: F401  drive MPM body toward slow solid-body rotation (lateral)
 from . import mpm_anchor            # noqa: F401  substrate/boundary rest-anchor k*(rest-pos) (lateral)
 from . import material_map          # noqa: F401  image field + apply_material_map (per-particle stiffness)
 from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: MLS-MPM mechanics (mls_mpm_mechanics)
@@ -46,11 +47,18 @@ from . import mpm_strain            # noqa: F401  particle -> particle  (F + mat
 from . import p2g                   # noqa: F401  particle -> mpm_grid   (scatter)
 from . import mpm_grid_update       # noqa: F401  mpm_grid -> mpm_grid    (grid solve + BCs)
 from . import g2p                   # noqa: F401  mpm_grid -> particle    (gather + advect)
+# active-matter <-> MPM two-way coupling (agents dragged/confined by + deforming the material):
+from . import agent_to_mpm          # noqa: F401  agent set -> mpm_grid   (agents deform material)
+from . import mpm_to_agent          # noqa: F401  mpm_grid  -> agent set  (material drags + confines agents)
+from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (cells soften/rigidify tissue)
+from . import flow_align            # noqa: F401  mpm_grid -> agent heading (polarity-velocity/flow alignment)
+from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "cohesion", "alignment", "separation", "cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "video_field", "chemotaxis", "chemo_force", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
-           "mpm_drag", "mpm_anchor", "material_map", "mpm",
-           "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p"]
+           "mpm_drag", "mpm_spin", "mpm_anchor", "material_map", "mpm",
+           "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
+           "agent_to_mpm", "mpm_to_agent", "agent_remodel"]
