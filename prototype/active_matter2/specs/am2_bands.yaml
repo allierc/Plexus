@@ -1,0 +1,34 @@
+# am2_bands -- COMMUNICATING ACTIVE MATTER: polar bands.
+# Ziepke et al., Nat. Commun. 13:6727 (2022), Fig. 1i,n.
+#
+# Alignment-dominated regime: strong polar_align with weak chemotaxis (small omega)
+# recovers the Vicsek travelling BANDS -- dense polar-ordered stripes moving through a
+# dilute disordered background. The chemical is still emitted and diffuses, but is too
+# weak to reorganize the flock, so orientational order (not chemotaxis) sets the state.
+general: {name: am2_bands, seed: 2, n_frames: 1000, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 9000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.007}
+fields:
+  chemical: {frame: grid, res: 200, couples_to: cell, components: 1}
+operators:
+- {op: radius_graph, at: cell, radius: 0.035}
+- {op: relay,  at: cell, to: chemical, beta: 0.08, c_th: -0.001, sigma: 1.1}
+- {op: adapt,  at: cell, from: chemical, eps: 0.05}
+- {op: diffuse, at: chemical, rate: 0.14}
+- {op: decay,   at: chemical, rate: 0.03}
+- {op: polar_align, at: cell, gamma: 0.42, noise: 0.06}      # strong Vicsek alignment + noise
+- {op: chemotax, at: cell, from: chemical, omega: 0.06}      # weak chemotaxis
+- {op: repel,  at: cell, strength: 0.012, r0: 0.009}
+- {op: glide,  at: cell}
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [0.55, 1.0, 0.5]}
+  background: black
+  marker: triangle
+  triangle_size: 0.012
+  gamma: 0.7
+  overlay: true

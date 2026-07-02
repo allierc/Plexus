@@ -1,0 +1,10 @@
+# active_matter2: commit CODE + SPECS + KNOWLEDGE only, never generated media/data
+archive/
+loop_logs/
+data/
+__pycache__/
+*.pyc
+*.png
+*.mp4
+*.npz
+*.zarr/

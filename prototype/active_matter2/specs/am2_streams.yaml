@@ -1,0 +1,37 @@
+# am2_streams -- COMMUNICATING ACTIVE MATTER: directed particle streams.
+# Ziepke, Maryshev, Aranson & Frey, Nat. Commun. 13:6727 (2022), Fig. 1g,l.
+#
+# Self-propelled agents (glide) emit an excitable chemical (relay), which diffuses
+# and decays; every agent aligns its heading with neighbours (polar_align) AND turns
+# toward the chemical gradient (chemotax), while an internal state s (adapt) makes the
+# emission refractory. Moderate chemotaxis pulls agents into long directed streams
+# that flow toward the chemical-wave sources. Periodic (toroidal) world.
+#
+# Heading-kinematic (1st order): the heading ops steer, glide+repel move. dt = 1 tick.
+general: {name: am2_streams, seed: 0, n_frames: 1000, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 8000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006}
+fields:
+  chemical: {frame: grid, res: 200, couples_to: cell, components: 1}   # single shared signal c
+operators:
+- {op: radius_graph, at: cell, radius: 0.03}                 # interaction radius r_c
+- {op: relay,  at: cell, to: chemical, beta: 0.16, c_th: -0.001, sigma: 1.2}   # Eqs 3-4
+- {op: adapt,  at: cell, from: chemical, eps: 0.05}          # Eq 5  refractory state s
+- {op: diffuse, at: chemical, rate: 0.16}                    # Dc lap c
+- {op: decay,   at: chemical, rate: 0.02}                    # -alpha c
+- {op: polar_align, at: cell, gamma: 0.15, noise: 0.04}      # Eq 2 term 1 + xi
+- {op: chemotax, at: cell, from: chemical, omega: 0.38}      # Eq 2 term 2
+- {op: repel,  at: cell, strength: 0.015, r0: 0.010}         # f_ij hard core
+- {op: glide,  at: cell}                                     # v0 n_i
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [0.35, 0.8, 1.0]}
+  background: black
+  marker: triangle
+  triangle_size: 0.011
+  gamma: 0.7
+  overlay: true          # movie_overlay_chemical: triangles streaming over the signal field

@@ -1,0 +1,33 @@
+# am2_droplets_v2 -- active droplets, FIGURE-REPRODUCTION variant.
+# v1 fragmented into a gas of micro-wells (chemical too short-ranged; each agent
+# self-trapped). Here the signal reaches across gaps -- higher diffusion + slower decay
+# give a medium-range attraction so micro-clusters COALESCE into a few compact motile
+# droplets; strong chemotaxis condenses them, repulsion bounds their size, and a modest
+# polar bias keeps them migrating. Lower density -> distinct blobs.
+general: {name: am2_droplets_v2, seed: 4, n_frames: 1400, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 4500
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006}
+fields:
+  chemical: {frame: grid, res: 200, couples_to: cell, components: 1}
+operators:
+- {op: radius_graph, at: cell, radius: 0.04}
+- {op: relay,  at: cell, to: chemical, beta: 0.24, c_th: -0.001, sigma: 1.4}
+- {op: adapt,  at: cell, from: chemical, eps: 0.05}
+- {op: diffuse, at: chemical, rate: 0.13}                     # medium-range attraction (v1: 0.06)
+- {op: decay,   at: chemical, rate: 0.025}                    # persistent wells (v1: 0.05)
+- {op: polar_align, at: cell, gamma: 0.2, noise: 0.045}
+- {op: chemotax, at: cell, from: chemical, omega: 0.8}        # strong condensation
+- {op: repel,  at: cell, strength: 0.04, r0: 0.016}           # bounds droplet size
+- {op: glide,  at: cell}
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [1.0, 0.4, 0.7]}
+  background: black
+  marker: triangle
+  triangle_size: 0.012
+  gamma: 0.7
+  overlay: true

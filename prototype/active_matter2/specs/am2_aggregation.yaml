@@ -1,0 +1,35 @@
+# am2_aggregation -- COMMUNICATING ACTIVE MATTER: aggregation dynamics.
+# Ziepke et al., Nat. Commun. 13:6727 (2022), Supplementary Note 2 (aggregation without
+# active decision-making): pure chemotactic coarsening.
+#
+# Alignment is switched OFF (gamma ~ 0): agents have no polar order, they simply emit
+# and climb the shared chemical, so density fluctuations amplify and clusters nucleate
+# and MERGE over time (Keller-Segel-like coarsening) -- the disordered baseline the
+# polar/excitable states organize out of. Watch the number of clusters decrease.
+general: {name: am2_aggregation, seed: 5, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 8000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.005}
+fields:
+  chemical: {frame: grid, res: 200, couples_to: cell, components: 1}
+operators:
+- {op: radius_graph, at: cell, radius: 0.03}
+- {op: relay,  at: cell, to: chemical, beta: 0.16, c_th: -0.001, sigma: 1.4}
+- {op: adapt,  at: cell, from: chemical, eps: 0.05}
+- {op: diffuse, at: chemical, rate: 0.12}
+- {op: decay,   at: chemical, rate: 0.03}
+- {op: polar_align, at: cell, gamma: 0.0, noise: 0.06}        # NO alignment -> no polar order
+- {op: chemotax, at: cell, from: chemical, omega: 0.4}        # pure chemotactic aggregation
+- {op: repel,  at: cell, strength: 0.02, r0: 0.012}
+- {op: glide,  at: cell}
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [0.6, 0.8, 1.0]}
+  background: black
+  marker: dot
+  point_size: 2
+  gamma: 0.7
+  overlay: true
