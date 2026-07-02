@@ -1,0 +1,23 @@
+{
+  "_doc": "Compiled recipes: state -> {kind, flags} for am2_job.py. Flags are deltas from the worker defaults (agent) / the 'fig' hydro preset. Regenerate any state with: python am2_job.py --outdir archive/<state> --kind <kind> --device cuda:0 <flags>. See am2_knowledge_compiled.md for mechanism.",
+  "agent": {
+    "streams":         {"gamma": 0.35, "omega": 0.38},
+    "ring_streams":    {"gamma": 0.50, "omega": 0.45, "diffuse": 0.22, "decay": 0.014, "eps": 0.035, "n": 9000},
+    "active_droplets": {"gamma": 0.55, "omega": 0.30, "eps": 0.012, "n": 4500, "move_speed": 0.002},
+    "polar_bands":     {"gamma": 0.42, "omega": 0.06, "move_speed": 0.007, "beta": 0.08, "decay": 0.03},
+    "aggregation":     {"gamma": 0.0, "omega": 0.85, "marker": "dot"},
+    "vortex":          {"move_speed": 0.002, "omega": 0.55, "n": 20000},
+    "spiral_vortex":   {"move_speed": 0.002, "omega": 0.55, "n": 20000, "c_th": 0.05, "c_base": 0.05, "spiral_seed": 1, "rf_tau": 40, "rf_gain": 0.10, "rf_th": 0.5}
+  },
+  "hydro": {
+    "vortices":            {"v0": 0.6, "omega": 1.8},
+    "vortices_few_large":  {"v0": 0.6, "omega": 1.8, "Dc": 2.2},
+    "droplets_few_large":  {"v0": 1.0, "omega": 1.0, "rho0": 1.02, "chi": 0.0},
+    "droplets_many_small": {"v0": 1.0, "omega": 1.8, "chi": 0.0},
+    "rings":               {"v0": 0.6, "omega": 1.4, "chi": 0.0, "Dc": 4.0, "rho0": 1.05},
+    "bands_silent":        {"v0": 2.0, "omega": 0.0, "rho0": 1.10, "Drho": 0.15},
+    "bands_signalling":    {"v0": 2.0, "omega": 0.5, "rho0": 1.10, "Drho": 0.15},
+    "streams":             {"v0": 1.8, "omega": 0.6, "rho0": 1.05, "Dp": 0.2},
+    "spiral_vortex":       {"v0": 0.6, "omega": 1.8, "Dc": 2.2}
+  }
+}

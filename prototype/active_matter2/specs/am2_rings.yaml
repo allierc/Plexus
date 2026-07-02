@@ -1,0 +1,35 @@
+# am2_rings -- COMMUNICATING ACTIVE MATTER: ring-like streams ("whispering gallery").
+# Ziepke et al., Nat. Commun. 13:6727 (2022), Fig. 1e,j.
+#
+# Agents circulate on CLOSED loops retained by whispering-gallery chemical waves --
+# the metastable precursor to vortices. Strong chemotaxis + strong polar alignment
+# keep the flow coherent and curved, while a fast-diffusing, slowly-decaying signal
+# forms the closed wave fronts the agents ride. Moderate density (streams, not filled
+# vortices).
+general: {name: am2_rings, seed: 3, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 9000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell, components: 1}
+operators:
+- {op: radius_graph, at: cell, radius: 0.03}
+- {op: relay,  at: cell, to: chemical, beta: 0.18, c_th: -0.001, sigma: 1.3}
+- {op: adapt,  at: cell, from: chemical, eps: 0.035}          # slow refractory -> long-lived wave rings
+- {op: diffuse, at: chemical, rate: 0.22}                     # fast diffusion -> smooth closed fronts
+- {op: decay,   at: chemical, rate: 0.014}                    # slow decay -> persistent rings
+- {op: polar_align, at: cell, gamma: 0.30, noise: 0.03}       # strong coherent circulation
+- {op: chemotax, at: cell, from: chemical, omega: 0.45}
+- {op: repel,  at: cell, strength: 0.018, r0: 0.011}
+- {op: glide,  at: cell}
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [0.7, 0.6, 1.0]}
+  background: black
+  marker: triangle
+  triangle_size: 0.010
+  gamma: 0.65
+  overlay: true

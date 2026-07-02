@@ -1,0 +1,35 @@
+# am2_droplets -- COMMUNICATING ACTIVE MATTER: active droplets.
+# Ziepke et al., Nat. Commun. 13:6727 (2022), Fig. 1f,k.
+#
+# Compact motile blobs: mutual chemotaxis into a LOCAL, slowly-diffusing chemical well
+# (low diffusion + fast decay -> short-range attraction) condenses agents into finite
+# droplets; hard-core repulsion bounds their size, and a residual polar bias makes them
+# migrate. They carry no intrinsic spiral wave, so they drift with external gradients.
+# Lower density than the vortex regime.
+general: {name: am2_droplets, seed: 4, n_frames: 1200, dt: 1.0, boundary: periodic}
+sets:
+  cell:
+    n: 5000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006}
+fields:
+  chemical: {frame: grid, res: 200, couples_to: cell, components: 1}
+operators:
+- {op: radius_graph, at: cell, radius: 0.03}
+- {op: relay,  at: cell, to: chemical, beta: 0.2, c_th: -0.001, sigma: 1.0}
+- {op: adapt,  at: cell, from: chemical, eps: 0.06}
+- {op: diffuse, at: chemical, rate: 0.06}                     # LOW diffusion -> localized wells
+- {op: decay,   at: chemical, rate: 0.05}                     # fast decay -> short-range attraction
+- {op: polar_align, at: cell, gamma: 0.12, noise: 0.05}       # weak alignment -> motile, not banded
+- {op: chemotax, at: cell, from: chemical, omega: 0.6}        # strong condensation
+- {op: repel,  at: cell, strength: 0.03, r0: 0.013}           # bounds droplet size
+- {op: glide,  at: cell}
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [1.0, 0.4, 0.7]}
+  background: black
+  marker: triangle
+  triangle_size: 0.011
+  gamma: 0.7
+  overlay: true

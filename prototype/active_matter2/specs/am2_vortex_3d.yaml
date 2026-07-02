@@ -1,0 +1,36 @@
+# am2_vortex_3d -- COMMUNICATING ACTIVE MATTER in 3D.
+# 3D extension of Ziepke et al., Nat. Commun. 13:6727 (2022): the SAME dimension-generic
+# operators (polar_align / chemotax / relay / adapt / repel, heading is a [N,3] unit
+# vector; the chemical is a [1,nx,ny,nz] scalar field). Strong 3D chemotaxis + excitable
+# emission aggregate the swimmers into dense scroll-wave cores -- the 3D analogue of the
+# 2D vortices. Toroidal box.
+general: {name: am2_vortex_3d, seed: 1, n_frames: 700, dt: 1.0, boundary: periodic, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  cell:
+    n: 16000
+    spawn: random
+    types:
+      a: {fraction: 1.0, move_speed: 0.006}
+fields:
+  chemical: {frame: grid, res: 96, couples_to: cell, components: 1}
+operators:
+- {op: radius_graph, at: cell, radius: 0.05}
+- {op: relay,  at: cell, to: chemical, beta: 0.22, c_th: -0.001, sigma: 1.1}
+- {op: adapt,  at: cell, from: chemical, eps: 0.05}
+- {op: diffuse, at: chemical, rate: 0.2}
+- {op: decay,   at: chemical, rate: 0.02}
+- {op: polar_align, at: cell, gamma: 0.2, noise: 0.04}
+- {op: chemotax, at: cell, from: chemical, omega: 0.55}
+- {op: repel,  at: cell, strength: 0.03, r0: 0.02}
+- {op: glide,  at: cell}
+schedule: [radius_graph, relay, adapt, diffuse, decay, polar_align, chemotax, repel, glide]
+plotting:
+  colors: {a: [1.0, 0.6, 0.25]}
+  background: black
+  up_axis: 2
+  render_3d: dots
+  dot_size: 1.1
+  splat_res: 620
+  box_frame: true
+  camera_turns: 0.5
+  fps: 30
