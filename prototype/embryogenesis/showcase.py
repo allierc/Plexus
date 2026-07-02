@@ -56,19 +56,21 @@ def _panel_scatter(ax, X, val, W, cmap, vmin, vmax, title):
 def _draw_tracks(ax, hist, at, colors, W, tail):
     ax.set_facecolor("black"); ax.set_xlim(0, W); ax.set_ylim(0, 1)
     ax.set_aspect("equal"); ax.axis("off"); ax.set_title("cell tracks", color="white", fontsize=10)
-    seg = hist[-tail:].copy()                                # [k, N, 2]
+    seg = hist[-tail:].copy()                                # [k, N, 2]  (longer tail = more history)
     origin = (np.abs(seg[..., 0]) < 1e-4) & (np.abs(seg[..., 1]) < 1e-4)   # unborn/dormant -> no tail
     seg[origin] = np.nan
+    N = at.shape[0]
+    s = float(max(1.5, 7.0 * (400.0 / max(N, 1)) ** 0.5))    # SAME dot size as the top-left panel
     if len(seg) >= 2:
         for ti, col in enumerate(colors):
             m = at == ti
             xs = seg[:, m, 0]; ys = seg[:, m, 1]              # [k, n]
-            for j in range(0, xs.shape[1], 2):                # thin for speed
-                ax.plot(xs[:, j], ys[:, j], color=col, lw=0.5, alpha=0.5)
+            for j in range(xs.shape[1]):                      # every cell (thicker, fuller trails)
+                ax.plot(xs[:, j], ys[:, j], color=col, lw=1.2, alpha=0.6)
     cur = hist[-1]
     for ti, col in enumerate(colors):
         m = at == ti
-        ax.scatter(cur[m, 0], cur[m, 1], s=6, c=[col], edgecolors="none")
+        ax.scatter(cur[m, 0], cur[m, 1], s=s, c=[col], edgecolors="none")
 
 
 def main():
@@ -77,7 +79,7 @@ def main():
     no_cap = "--no-caption" in args
     ov = dict(kv.split("=", 1) for kv in args if "=" in kv)
     tag = ov.pop("tag", "show"); frames = int(ov.pop("frames", 1500))
-    stride = int(ov.pop("stride", 3)); tail = int(ov.pop("tail", 30))
+    stride = int(ov.pop("stride", 3)); tail = int(ov.pop("tail", 60))   # longer tails on the tracks panel
     sim = S.load(spec_path); sim.n_frames = frames
     sim.name = f"{sim.name}_{tag}"
     for k, v in ov.items():

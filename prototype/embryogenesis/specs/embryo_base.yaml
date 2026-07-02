@@ -8,7 +8,7 @@
 # collapse (min cell-cell distance held by `repel`); motion bounded by PARAMETER BALANCE (not the
 # vmax clamp); division progressively deforms the blastula; continuous flow at high density;
 # collective migration + left/right partitioning by type.
-general: {name: embryo_base, seed: 0, n_frames: 3000, dt: 0.002, boundary: wall}
+general: {name: embryo_base, seed: 0, n_frames: 6000, dt: 0.002, boundary: wall}
 sets:
   agent:
     n: 44                                    # start sparse (~/8); proliferate to fill the core
@@ -17,8 +17,8 @@ sets:
     spawn_radius: 0.22
     vmax: 0.6                                # safety clamp only; the loop must find a balance that rarely hits it
     types:
-      a: {fraction: 0.5, move_speed: 0.06, div_rate: 0.6}
-      b: {fraction: 0.5, move_speed: 0.06, div_rate: 0.6}
+      a: {fraction: 0.5, move_speed: 0.12, div_rate: 0.6}
+      b: {fraction: 0.5, move_speed: 0.12, div_rate: 0.6}
   cell:
     n: 1
     start: [[0.5, 0.5]]
@@ -36,7 +36,7 @@ operators:
   - {op: radius_graph, at: agent, radius: 0.05}
   - {op: repel, at: agent, strength: 8.0, r0: 0.02}          # HARD min cell-cell distance (no collapse)
   - {op: glide, at: agent}
-  - {op: cell_divide, at: agent, rate: 0.6, max_occ: 0.9, offset: 0.004}
+  - {op: cell_divide, at: agent, rate: 0.6, max_occ: 0.95, offset: 0.004}
   - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 40.0}
   - {op: mpm_spin, at: mpm_particle, omega: 0.3, spin_k: 20.0}
   - {op: mpm_strain, at: mpm_particle}

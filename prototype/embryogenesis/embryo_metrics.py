@@ -21,7 +21,7 @@ def phase1_metrics(traj_path, r0=0.024, core_r=0.27, membrane_band=0.85):
                               tr["mpm_particle__pos"], r0=r0, membrane_band=membrane_band)
 
 
-def phase1_from_arrays(ap, occ, nt, mp, r0=0.024, membrane_band=0.85):
+def phase1_from_arrays(ap, occ, nt, mp, r0=0.024, membrane_band=0.85, core_frac=0.9):
     ap = np.asarray(ap); occ = np.asarray(occ); nt = np.asarray(nt); mp = np.asarray(mp)
     c = np.array([0.5, 0.5]); T = ap.shape[0]
     last = occ[-1] > 0
@@ -74,7 +74,18 @@ def phase1_from_arrays(ap, occ, nt, mp, r0=0.024, membrane_band=0.85):
     else:
         accel = 0.0
 
+    # --- 7. ESCAPE (hard constraint): fraction of live cells that left the CORE into/through the
+    # membrane. Cells must stay in the water core (frac<=~0.93 of radius); r > core_frac*Rd = escaped.
+    # Rd is the membrane's outer radius (0.99-quantile of shell-particle radius). Needed to read the
+    # confine ablation: a `confine 0` run that drops `collapsed` is only a Stage-1A win if escape~0.
+    if len(P) > 0:
+        rc = np.linalg.norm(P - c, axis=1)
+        escape = float((rc > core_frac * Rd).mean())
+        r_cell_max = float(rc.max() / max(Rd, 1e-6))         # furthest cell, in units of outer radius
+    else:
+        escape = 0.0; r_cell_max = 0.0
+
     return dict(n_cells=int(last.sum()), collapsed=round(collapsed, 4), nn_min=round(nn_min, 4),
                 nn_mean=round(nn_mean, 4), deform=round(deform, 4), flow=round(speed, 5),
                 migration=round(migration, 4), segregation=round(seg, 4), accel=round(accel, 6),
-                disc_R=round(float(Rd), 4))
+                escape=round(escape, 4), r_cell_max=round(r_cell_max, 4), disc_R=round(float(Rd), 4))
