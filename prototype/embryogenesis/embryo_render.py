@@ -75,7 +75,7 @@ def _draw(ax, mpos, apos, atype, colors, blob_rgb, W, nbin=220, sigma=2.2, mem_m
         _blob_layer(ax, mpos, W, blob_rgb, nbin, sigma, amax=0.85, z=1)
     # --- the CELLS: filled dots coloured by type (size adapts to cell count) ---
     N = apos.shape[0]
-    s = float(max(3.0, 14.0 * (400.0 / max(N, 1)) ** 0.5))
+    s = float(max(1.5, 7.0 * (400.0 / max(N, 1)) ** 0.5))
     for ti, col in enumerate(colors):
         m = atype == ti
         ax.scatter(apos[m, 0], apos[m, 1], s=s, c=[col], edgecolors="none", alpha=0.95, zorder=3)

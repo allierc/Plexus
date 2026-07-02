@@ -65,8 +65,8 @@ roles): couplings `agent_to_mpm`, `mpm_to_agent` (`field: mass|colour`), `mpm_sp
    the movies show, not from a plan.
 2. **Hypothesize** — write ONE explicit, predictive hypothesis (e.g. "lowering `mpm_to_agent.k`
    below X stops collapse while keeping membrane deformation").
-3. **Design ≤6 slots** into `embryo_slots.md`, one variable/operator change per slot, roles balanced
-   ≈ 3 exploit · 2 explore · 1 control. Isolate one lever per slot for causal attribution.
+3. **Design 8 slots** into `embryo_slots.md`, one variable/operator change per slot, roles balanced
+   ≈ 4 exploit · 3 explore · 1 control. Isolate one lever per slot for causal attribution.
 4. **Predict** the observable change each slot should produce.
 5. After results: **verify** — supported / falsified / overturned / inconclusive; note the regime.
 6. **Append** a dated section to `analysis_embryo.md` (never overwrite prior batches).
@@ -78,10 +78,15 @@ roles): couplings `agent_to_mpm`, `mpm_to_agent` (`field: mass|colour`), `mpm_sp
 - `SPEC` names the spec YAML you authored for this slot (compose operators there).
 - optional `KEY val` are dotted overrides applied on top (e.g. `mpm_to_agent.k 0.2`,
   `repel.r0 0.024`, `agent.move_speed 0.05`, `agent_to_mpm.agent_mass 1e-6`, `cell_divide.rate 0.6`,
-  `n_grid 64`, `frames 1500`).
-- lines starting `#` are comments. Keep ≤6 non-comment lines.
+  `n_grid 64`, `frames 6000`).
+- lines starting `#` are comments. Keep exactly 8 non-comment lines (batches of 8, run in parallel on L4).
 
-## Budget
-Each job renders the full **2×2 mp4** and must run in **≈20 min on an L4**. Keep `frames`,
-`per_parent` and `n_grid` within that budget (the worker prints seconds; a local A6000 second ≈ 2–3
-L4 seconds, so target ≲8 min locally).
+## Budget & USER DIRECTIVES (mandatory — 2026-07-02)
+- **frames ≈ 6000** on every run (2× longer, so slow dynamics develop). A ~6000-frame job is ~16 min
+  on L4 — that is FINE (wall is 30 min). Do NOT shrink to 1500/3000. Raise `stride` (6–10) to keep
+  render time bounded; that only subsamples the movie, not the physics.
+- **move_speed baseline 0.12** (2× faster than before); you MAY go up to ~0.24 when a stage needs
+  faster flow/migration.
+- **cells may grow up to ~4× via `cell_divide`** (`div_rate`/`max_occ`; `buffer` is 3000) — do not
+  cap proliferation prematurely when 1C/1D calls for density.
+Keep `per_parent`/`n_grid` sane; each job must still finish within the 30-min L4 wall.
