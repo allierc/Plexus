@@ -124,6 +124,9 @@ roles): couplings `agent_to_mpm`, `mpm_to_agent` (`field: mass|colour`), `mpm_sp
   render time bounded; that only subsamples the movie, not the physics.
 - **move_speed baseline 0.12** (2× faster than before); you MAY go up to ~0.24 when a stage needs
   faster flow/migration.
-- **cells may grow up to ~4× via `cell_divide`** (`div_rate`/`max_occ`; `buffer` is 3000) — do not
-  cap proliferation prematurely when 1C/1D calls for density.
+- **cells SHOULD proliferate via `cell_divide`** to grow and deform the blastula (`div_rate`; `buffer`
+  is 3000) — there is NO fixed multiplier target; grow the population as the biology/goal calls for and
+  do NOT cap proliferation prematurely when 1C/1D calls for density. The ONLY real limit is physical:
+  the population must not exceed what the (deforming) domain can hold at `repel.r0`, else cells over-pack
+  and `collapsed` just measures jamming rather than the mechanism under test.
 Keep `per_parent`/`n_grid` sane; each job must still finish within the 45-min L4 wall.
