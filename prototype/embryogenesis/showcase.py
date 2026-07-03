@@ -3,7 +3,8 @@
 engine's per-frame hook (stress & deformation are NOT in the trajectory), producing
 
   * blob.mp4          -- cells-in-a-blob overlay (blue material + coloured cells)
-  * summary2x2.mp4    -- the 2x2 summary:  a) blob   b) stress   c) deformation   d) cell tracks
+  * summary2x2.mp4    -- the 2x2 summary:  a) blob (+n_cells/n_mpm)  b) stress
+                         c) deformation + cell tracks   d) material flow field
   * *_evolution.png   -- static montages of both
   * metrics.json      -- confinement / stability numbers
 
@@ -53,10 +54,31 @@ def _panel_scatter(ax, X, val, W, cmap, vmin, vmax, title):
     ax.set_title(title, color="white", fontsize=10)
 
 
-def _draw_tracks(ax, hist, at, colors, W, tail):
-    from matplotlib.collections import LineCollection
+def _panel_flow(ax, X, vel, W, vmin, vmax, title, quiver_n=400):
+    """Material flow: particles coloured by SPEED |v| + a subsampled unit-direction quiver.
+    Visualizes the inner circulation that drives membrane deformation."""
     ax.set_facecolor("black"); ax.set_xlim(0, W); ax.set_ylim(0, 1)
-    ax.set_aspect("equal"); ax.axis("off"); ax.set_title("cell tracks", color="white", fontsize=10)
+    ax.set_aspect("equal"); ax.axis("off")
+    spd = np.linalg.norm(vel, axis=1)
+    ax.scatter(X[:, 0], X[:, 1], c=spd, s=2.0, cmap="turbo", vmin=vmin, vmax=vmax, edgecolors="none")
+    N = X.shape[0]
+    if N > 0:
+        step = max(1, N // quiver_n)
+        Xs, Vs = X[::step], vel[::step]
+        mag = np.linalg.norm(Vs, axis=1, keepdims=True); mag[mag == 0] = 1.0
+        U = Vs / mag * 0.028                                  # fixed-length arrows -> show DIRECTION field
+        ax.quiver(Xs[:, 0], Xs[:, 1], U[:, 0], U[:, 1], color="white", alpha=0.45,
+                  angles="xy", scale_units="xy", scale=1, width=0.003, headwidth=3, headlength=4)
+    ax.set_title(title, color="white", fontsize=10)
+
+
+def _draw_tracks(ax, hist, at, colors, W, tail, bg=True, title="cell tracks"):
+    from matplotlib.collections import LineCollection
+    ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
+    if bg:                                                    # bg=False -> OVERLAY on an existing panel
+        ax.set_facecolor("black")
+    if title:
+        ax.set_title(title, color="white", fontsize=10)
     seg = hist[-tail:].copy()                                # [k, N, 2]  (longer tail = more history)
     origin = (np.abs(seg[..., 0]) < 1e-4) & (np.abs(seg[..., 1]) < 1e-4)   # unborn/dormant -> no tail
     seg[origin] = np.nan
@@ -162,6 +184,13 @@ def main():
         mem = r0m > 0.90 * np.quantile(r0m, 0.99)          # outer shell = membrane
     s_lo, s_hi = np.percentile(stress, 2), np.percentile(stress, 98)
     f_lo, f_hi = np.percentile(fnorm, 2), np.percentile(fnorm, 98)
+    # material flow: per-frame particle displacement (velocity up to the constant stride*dt factor)
+    mvel = np.zeros_like(mX)
+    if T > 1:
+        mvel[1:] = mX[1:] - mX[:-1]
+    v_lo, v_hi = np.percentile(np.linalg.norm(mvel, axis=2), 2), np.percentile(np.linalg.norm(mvel, axis=2), 98)
+    if v_hi <= v_lo:
+        v_hi = v_lo + 1e-9
     print(f"[showcase] captured {T} frames in {time.time()-t0:.0f}s", flush=True)
 
     d = graphs_data_path(PRE, sim.name); os.makedirs(d, exist_ok=True)
@@ -171,10 +200,17 @@ def main():
     def draw2x2(fig, k):
         axs = fig.subplots(2, 2)
         lv = occ[k] > 0
-        _draw(axs[0, 0], mX[k], aX[k][lv], at[lv], colors, blob, W, mem_mask=mem); axs[0, 0].set_title("cells + material", color="white", fontsize=10)
+        _draw(axs[0, 0], mX[k], aX[k][lv], at[lv], colors, blob, W, mem_mask=mem)
+        axs[0, 0].set_title("cells + material", color="white", fontsize=10)
+        axs[0, 0].text(0.02, 0.98, f"n_cells {int(lv.sum())}\nn_mpm {mX[k].shape[0]}",
+                       transform=axs[0, 0].transAxes, color="white", fontsize=8, va="top", ha="left",
+                       bbox=dict(boxstyle="round,pad=0.25", fc="black", ec="none", alpha=0.5))
         _panel_scatter(axs[0, 1], mX[k], stress[k], W, "inferno", s_lo, s_hi, "stress")
-        _panel_scatter(axs[1, 0], mX[k], fnorm[k], W, "viridis", f_lo, f_hi, "deformation")
-        _draw_tracks(axs[1, 1], aX[:k + 1][:, lv], at[lv], colors, W, tail)
+        # deformation with the cell TRACKS overlaid on top (bottom-left)
+        _panel_scatter(axs[1, 0], mX[k], fnorm[k], W, "viridis", f_lo, f_hi, "deformation + cell tracks")
+        _draw_tracks(axs[1, 0], aX[:k + 1][:, lv], at[lv], colors, W, tail, bg=False, title=None)
+        # material flow field (bottom-right)
+        _panel_flow(axs[1, 1], mX[k], mvel[k], W, v_lo, v_hi, "material flow")
 
     # static 2x2 at 5 timepoints (evolution montage)
     ks = np.linspace(0, T - 1, 5).astype(int)
