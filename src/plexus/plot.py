@@ -204,7 +204,15 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         if pal is not None and nt is not None:
             color = pal[nt % len(pal)]                # explicit per-type colours (charge code)
         elif par is not None:
-            color = cmap(par % cmap.N)
+            # inherit the PARENT cell's TYPE palette (material colour: elastic / viscoelastic /
+            # water) if one is defined, else a distinct hue per parent body.
+            pname = str(d[f"{sname}__parent_name"]) if f"{sname}__parent_name" in d.files else None
+            ppal = (_typed_palette(sim, pname, style)[0] if pname else None)
+            pnt = d[f"{pname}__node_type"] if (pname and f"{pname}__node_type" in d.files) else None
+            if ppal is not None and pnt is not None:
+                color = ppal[pnt[par] % len(ppal)]
+            else:
+                color = cmap(par % cmap.N)
         elif nt is not None:
             color = cmap(nt % cmap.N)
         else:

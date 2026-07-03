@@ -45,6 +45,16 @@ class MPMStrain(Lateral):
             Jc = J.clamp(min=1e-6)
             Jl = torch.sqrt(Jc) if D == 2 else Jc.pow(1.0 / D)     # volume-preserving isotropic reset
             F = torch.where(liquid[:, None, None], eye * Jl[:, None, None], F)
+        visco = getattr(p, "is_visco", None)
+        if visco is not None and visco.any():                      # VISCOELASTIC (Maxwell): PARTIAL shape reset
+            vm = visco                                             # relax F toward isotropic with time-constant tau,
+            Fv = F[vm]                                             # keeping VOLUME (J) -> stress builds then decays
+            U, sig, Vh = torch.linalg.svd(Fv)                      # SVD: sig = principal stretches
+            Jl = sig.prod(-1).clamp(min=1e-6).pow(1.0 / D)         # isotropic (volume-preserving) target stretch
+            a = torch.exp(-dt / p.visco_tau[vm].clamp(min=1e-6))   # memory retained this substep: a->1 elastic, a->0 liquid
+            sig = Jl[:, None] + (sig - Jl[:, None]) * a[:, None]   # pull stretches toward isotropic (shear relaxes, volume kept)
+            F = F.clone()
+            F[vm] = U @ torch.diag_embed(sig) @ Vh
         snow = getattr(p, "is_snow", None)
         if snow is not None and snow.any():                        # SNOW: clamp singular values, harden via Jp
             sm = snow; Fs = F[sm]

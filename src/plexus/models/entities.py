@@ -85,7 +85,8 @@ class MPMParticle:
                 core_y[sel] = float(core["youngs"]); core_f[sel] = float(core.get("frac", 0.5))
             layers = t.get("layers")
             if layers is not None:
-                type_layers[tid] = [(float(L["frac"]), float(L["youngs"]), L.get("material", "elastic"))
+                type_layers[tid] = [(float(L["frac"]), float(L["youngs"]), L.get("material", "elastic"),
+                                     float(L.get("tau", 0.0)))                  # tau: viscoelastic relaxation time
                                     for L in layers]
 
         # block-fill: a type FILLS an axis-aligned box (pool/cube) instead of a disc
@@ -109,28 +110,36 @@ class MPMParticle:
         p_y = torch.where(is_core, core_y[pidx], youngs_c[pidx])
         is_liquid = torch.zeros(Np, dtype=torch.bool, device=device)
         is_snow = torch.zeros(Np, dtype=torch.bool, device=device)
+        is_visco = torch.zeros(Np, dtype=torch.bool, device=device)          # viscoelastic (Maxwell) band
+        visco_tau = torch.full((Np,), 1e9, device=device)                    # 1e9 = no relaxation (pure elastic)
+
+        def _mark(mat, sel_band, tau):                                       # set the material mask(s) for a band
+            nonlocal is_liquid, is_snow, is_visco, visco_tau
+            if mat == "liquid":
+                is_liquid = is_liquid | sel_band
+            elif mat == "snow":
+                is_snow = is_snow | sel_band
+            elif mat == "viscoelastic":
+                is_visco = is_visco | sel_band
+                visco_tau = torch.where(sel_band, torch.full_like(visco_tau, max(tau, 1e-6)), visco_tau)
+
         if type_layers:
             rnorm = r / max(rad, 1e-9)
             nt = ntp[pidx]
             for tid, lyrs in type_layers.items():
                 sel = nt == tid
                 assigned = torch.zeros_like(sel)
-                for (frac, yng, mat) in lyrs:                    # first band that contains the particle
+                for (frac, yng, mat, tau) in lyrs:               # first band that contains the particle
                     band = sel & (~assigned) & (rnorm <= frac)
                     p_y = torch.where(band, torch.full_like(p_y, yng), p_y)
-                    if mat == "liquid":
-                        is_liquid = is_liquid | band
-                    elif mat == "snow":
-                        is_snow = is_snow | band
+                    _mark(mat, band, tau)
                     assigned = assigned | band
                 rem = sel & (~assigned)                          # rounding slop -> outermost layer
                 p_y = torch.where(rem, torch.full_like(p_y, lyrs[-1][1]), p_y)
-                if lyrs[-1][2] == "liquid":
-                    is_liquid = is_liquid | rem
-                elif lyrs[-1][2] == "snow":
-                    is_snow = is_snow | rem
+                _mark(lyrs[-1][2], rem, lyrs[-1][3])
         mu, la = _lame(p_y)
         mu = torch.where(is_liquid, torch.zeros_like(mu), mu)    # liquid: no shear modulus -> pressure only
+                                                                 # (viscoelastic KEEPS mu -- it relaxes F, not mu)
 
         # per-particle volume: ball footprint (disc pi*r^2 in 2D, sphere 4/3 pi r^3 in
         # 3D) / ppc, or the box volume / ppc for a block-filled pool.
@@ -151,6 +160,8 @@ class MPMParticle:
         lvl.register_buffer("la", la)
         lvl.register_buffer("is_liquid", is_liquid)
         lvl.register_buffer("is_snow", is_snow)
+        lvl.register_buffer("is_visco", is_visco)
+        lvl.register_buffer("visco_tau", visco_tau)
         lvl.register_buffer("Jp", torch.ones(Np, device=device))
         lvl.register_buffer("p_vol", p_vol)
         lvl.register_buffer("mass", p_vol * rho)

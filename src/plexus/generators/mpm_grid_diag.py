@@ -57,6 +57,33 @@ def _stress_norm(F, mu, la):
     return stress.reshape(F.shape[0], -1).norm(dim=1)
 
 
+def _object_palette(sim):
+    """Per-parent-type RGB palette for the objects panel, from the spec's `plotting.colors`
+    (so a viscoelastic / water / elastic body shows its declared colour). None -> fall back
+    to the generic `_TYPE_COLORS`."""
+    try:
+        from plexus.plot import _typed_palette
+        pstyle = getattr(sim, "plotting", {}) or {}
+        pname = ((getattr(sim, "sets", {}) or {}).get("mpm_particle", {}) or {}).get("parent")
+        return _typed_palette(sim, pname, pstyle)[0] if pname else None
+    except Exception:
+        return None
+
+
+def _obj_scatter(ax, xs, ys, fr, obj_pal):
+    """Draw the objects panel: colour each body by its PARENT material type via the spec
+    palette when available, else by the particle node_type via the generic palette."""
+    pnt = fr.get("pnt")
+    if obj_pal is not None and pnt is not None:
+        for t in np.unique(pnt):
+            m = pnt == t
+            ax.scatter(xs[m], ys[m], s=1, color=obj_pal[int(t) % len(obj_pal)])
+    else:
+        for t in np.unique(fr["nt"]):
+            m = fr["nt"] == t
+            ax.scatter(xs[m], ys[m], s=1, color=_TYPE_COLORS[int(t) % len(_TYPE_COLORS)])
+
+
 def _capture(H, particle_set="mpm_particle", grid_field="mpm_grid"):
     """Snapshot the live MPM diagnostic arrays from the hierarchy at one frame."""
     p = H.levels[particle_set]
@@ -71,6 +98,16 @@ def _capture(H, particle_set="mpm_particle", grid_field="mpm_grid"):
         "Jp": (p.Jp.detach().cpu().numpy() if hasattr(p, "Jp") else np.ones(p.n)),
         "stress": _stress_norm(F, p.mu, p.la).cpu().numpy(),
     }
+    # per-particle PARENT TYPE index -> lets the objects panel colour each body by its
+    # material (elastic / viscoelastic / water) via the spec's plotting palette.
+    pname = getattr(p, "parent_name", None)
+    if hasattr(p, "parent") and pname and hasattr(H, "levels") and pname in H.levels \
+            and hasattr(H.levels[pname], "node_type"):
+        par = p.parent.detach().cpu().numpy()
+        cnt = H.levels[pname].node_type.detach().cpu().numpy()
+        rec["pnt"] = cnt[par]
+    else:
+        rec["pnt"] = None
     g = H.fields[grid_field] if (hasattr(H, "fields") and grid_field in H.fields) else None
     if g is not None and hasattr(g, "v"):
         D = X.shape[1]; dx = g.dx
@@ -110,6 +147,7 @@ def _render3d(frames, grid_dir, sim, cbar, ranges):
     import itertools
     from plexus.plot import _rot_camera
     c_lo, c_hi, f_lo, f_hi, s_lo, s_hi, has_grid3, g3_lo, g3_hi = ranges
+    obj_pal = _object_palette(sim)          # per-parent-type spec palette (material colour) or None
     style = sim.plotting or {}
     up = int(style.get("up_axis", 2))
     azim = float(style.get("camera_azim", 0.7))
@@ -147,9 +185,7 @@ def _render3d(frames, grid_dir, sim, cbar, ranges):
         sx, sy, depth = proj(fr["X"]); order = np.argsort(depth)[::-1]
         plt.figure(figsize=(15, 10), facecolor=_BG)
         ax = plt.subplot(2, 3, 1)
-        for t in np.unique(fr["nt"]):
-            m = fr["nt"] == t
-            ax.scatter(sx[m], sy[m], s=1, color=_TYPE_COLORS[int(t) % len(_TYPE_COLORS)])
+        _obj_scatter(ax, sx, sy, fr, obj_pal)
         style3(ax, "objects"); cbar(ax, None)
         panel(2, "C (Jacobian of velocity)", sx, sy, order, fr["cnorm"], "viridis", c_lo, c_hi)
         panel(3, "F (deformation)", sx, sy, order, fr["fnorm"], "coolwarm", f_lo, f_hi)
@@ -186,6 +222,8 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
     run(sim, out_path=None, device=device, on_frame=hook)
     if not frames:
         return None
+
+    obj_pal = _object_palette(sim)          # per-parent-type spec palette (material colour) or None
 
     # per-run colour ranges (Jp kept on the physical band, like the reference)
     c_lo, c_hi = _rng([f["cnorm"] for f in frames])
@@ -232,9 +270,7 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
             X = fr["X"]
             plt.figure(figsize=(15, 10), facecolor=_BG)
             ax = plt.subplot(2, 3, 1)
-            for t in np.unique(fr["nt"]):
-                m = fr["nt"] == t
-                ax.scatter(X[m, 0], X[m, 1], s=1, color=_TYPE_COLORS[int(t) % len(_TYPE_COLORS)])
+            _obj_scatter(ax, X[:, 0], X[:, 1], fr, obj_pal)
             _style(ax, "objects"); _cbar(ax, None)         # spacer keeps panel 1 the same size
             panel(2, "C (Jacobian of velocity)", X, fr["cnorm"], "viridis", c_lo, c_hi)
             panel(3, "F (deformation)", X, fr["fnorm"], "coolwarm", f_lo, f_hi)
