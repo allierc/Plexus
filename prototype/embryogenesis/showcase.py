@@ -54,6 +54,7 @@ def _panel_scatter(ax, X, val, W, cmap, vmin, vmax, title):
 
 
 def _draw_tracks(ax, hist, at, colors, W, tail):
+    from matplotlib.collections import LineCollection
     ax.set_facecolor("black"); ax.set_xlim(0, W); ax.set_ylim(0, 1)
     ax.set_aspect("equal"); ax.axis("off"); ax.set_title("cell tracks", color="white", fontsize=10)
     seg = hist[-tail:].copy()                                # [k, N, 2]  (longer tail = more history)
@@ -61,16 +62,53 @@ def _draw_tracks(ax, hist, at, colors, W, tail):
     seg[origin] = np.nan
     N = at.shape[0]
     s = float(max(1.5, 7.0 * (400.0 / max(N, 1)) ** 0.5))    # SAME dot size as the top-left panel
-    if len(seg) >= 2:
+    k = seg.shape[0]
+    if k >= 2:
+        rec = (np.arange(1, k, dtype=float) / max(k - 1, 1)) ** 1.6   # recency 0(old)->1(new)
         for ti, col in enumerate(colors):
-            m = at == ti
-            xs = seg[:, m, 0]; ys = seg[:, m, 1]              # [k, n]
-            for j in range(xs.shape[1]):                      # every cell (thicker, fuller trails)
-                ax.plot(xs[:, j], ys[:, j], color=col, lw=1.2, alpha=0.6)
+            P = seg[:, at == ti, :]                          # [k, nm, 2]
+            nm = P.shape[1]
+            if nm == 0:
+                continue
+            segs = np.stack([P[:-1], P[1:]], axis=2).reshape(-1, 2, 2)   # [(k-1)*nm, 2, 2]
+            alpha = np.repeat(rec, nm) * 0.8                 # TRANSPARENT tail -> opaque head
+            valid = ~np.isnan(segs).any(axis=(1, 2))
+            rgba = np.zeros((segs.shape[0], 4)); rgba[:, :3] = col; rgba[:, 3] = alpha
+            ax.add_collection(LineCollection(segs[valid], colors=rgba[valid], linewidths=1.2))
     cur = hist[-1]
     for ti, col in enumerate(colors):
         m = at == ti
         ax.scatter(cur[m, 0], cur[m, 1], s=s, c=[col], edgecolors="none")
+
+
+_PANEL_KEYS = [
+    ("shape", ["fourier_m2", "fourier_m3", "circularity", "shape_index", "deform_rms"]),
+    ("organization", ["nn_mean", "gr_peak", "density_cv", "contact_same"]),
+    ("flow", ["speed", "polar_order", "net_circulation", "msd", "corr_length_xi"]),
+    ("topology", ["t1_rate"]),
+    ("partition", ["segregation_index", "mixing_entropy", "mi_type_x"]),
+    ("coupling", ["stress_cell_corr", "deform_cell_corr", "div_stress_angle"]),
+]
+
+
+def _scorecard_panel(sc, name, path):
+    """Grid of metric-EVOLUTION line plots (value vs 5/25/50/75/100% of the run)."""
+    ev = sc["evolution"]; pcts = sc["pcts"]
+    items = [(fam, k) for fam, ks in _PANEL_KEYS for k in ks if k in ev]
+    ncol = 4; nrow = int(np.ceil(len(items) / ncol))
+    fig, axes = plt.subplots(nrow, ncol, figsize=(3.0 * ncol, 2.2 * nrow))
+    fig.patch.set_facecolor("black"); axes = np.atleast_1d(axes).ravel()
+    fcol = {"shape": "#7fd1ff", "organization": "#ffd24a", "flow": "#8affc1",
+            "partition": "#ff7a7a", "coupling": "#c79bff"}
+    for ax, (fam, k) in zip(axes, items):
+        y = [np.nan if v is None else v for v in ev[k]]
+        ax.set_facecolor("black"); ax.plot(pcts, y, "-o", color=fcol.get(fam, "w"), lw=1.5, ms=3)
+        ax.set_title(f"{fam}:{k}", color="white", fontsize=7.5)
+        ax.tick_params(colors="white", labelsize=6); [s.set_color("#444") for s in ax.spines.values()]
+    for ax in axes[len(items):]:
+        ax.axis("off")
+    fig.suptitle(f"scorecard evolution — {name}", color="white", fontsize=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.97]); fig.savefig(path, dpi=110, facecolor="black"); plt.close(fig)
 
 
 def main():
@@ -89,7 +127,7 @@ def main():
     W = float(getattr(sim, "world_size", [1.0])[0])
     print(f"[showcase] {sim.name}: frames={frames} stride={stride} overrides={ov}", flush=True)
 
-    caps = {"aX": [], "mX": [], "stress": [], "fnorm": [], "occ": []}
+    caps = {"aX": [], "mX": [], "stress": [], "fnorm": [], "occ": [], "saxis": []}
     at_box = {}
     t0 = time.time()
 
@@ -106,6 +144,10 @@ def main():
         caps["mX"].append(p.get("pos").detach().cpu().numpy().copy())
         caps["stress"].append(_stress_norm(p.F.detach(), p.mu, p.la).cpu().numpy())
         caps["fnorm"].append((p.F.detach() - eye).reshape(p.n, -1).norm(dim=1).cpu().numpy())
+        if D == 2:                                            # principal STRAIN/stress axis angle per particle (for div_stress_angle)
+            Fd = p.F.detach(); Cg = Fd.transpose(-1, -2) @ Fd     # right Cauchy-Green (symmetric)
+            evec = torch.linalg.eigh(Cg)[1][:, :, -1]            # max-eigenvalue eigenvector
+            caps["saxis"].append(torch.atan2(evec[:, 1], evec[:, 0]).cpu().numpy())
 
     run(sim, out_path=None, device=dev, on_frame=hook)
     aX = np.array(caps["aX"]); mX = np.array(caps["mX"])
@@ -164,8 +206,10 @@ def main():
         os.remove(os.path.join(tmp, f))
     os.rmdir(tmp)
 
-    # metrics: Phase-1 scientific observables (collapse / deform / flow / migration / segregation / accel)
+    # metrics: hard-failure gate (phase1) + the QUANTITATIVE SCORECARD (shape/org/flow/partition/coupling,
+    # each at 5/25/50/75/100% of the run) -> the loop DECIDES on numbers, not on visual captions.
     from embryo_metrics import phase1_from_arrays
+    import scorecard as SC
     occ = np.array(caps["occ"])
     r0 = 0.024
     for o in sim.operators:
@@ -173,13 +217,21 @@ def main():
             r0 = float(o.params.get("r0", r0))
     m = phase1_from_arrays(aX, occ, at, mX, r0=r0)
     m.update(frames=frames, seconds=round(time.time() - t0, 1))
+    sc = SC.compute({"aX": aX, "occ": occ, "at": at, "mX": mX, "stress": stress, "fnorm": fnorm,
+                     "saxis": np.array(caps["saxis"]) if caps["saxis"] else None},
+                    W=W, r0=r0, dt=float(getattr(sim, "dt", 0.002)))
+    m.update(sc["final"])                                     # final scorecard metrics ride along for ranking
     with open(os.path.join(d, "metrics.json"), "w") as fh:
         json.dump({"name": sim.name, **m}, fh, indent=2)
-    print(f"[showcase] {sim.name}: " + "  ".join(f"{k}={v}" for k, v in m.items()), flush=True)
+    with open(os.path.join(d, "scorecard.json"), "w") as fh:
+        json.dump({"name": sim.name, "pcts": sc["pcts"], "final": sc["final"], "evolution": sc["evolution"]}, fh, indent=2)
+    _scorecard_panel(sc, sim.name, os.path.join(d, "scorecard.png"))
+    print(f"[showcase] {sim.name}: " + "  ".join(f"{k}={v}" for k, v in list(m.items())[:14]), flush=True)
 
     # archive
     adir = os.path.join(ARCHIVE, sim.name); os.makedirs(adir, exist_ok=True)
-    for f in ("summary2x2.mp4", "summary2x2_final.png", "blob.mp4", "blob_evolution.png", "metrics.json"):
+    for f in ("summary2x2.mp4", "summary2x2_final.png", "blob.mp4", "blob_evolution.png",
+              "metrics.json", "scorecard.json", "scorecard.png"):
         src = os.path.join(d, f)
         if os.path.isfile(src):
             shutil.copy2(src, adir)

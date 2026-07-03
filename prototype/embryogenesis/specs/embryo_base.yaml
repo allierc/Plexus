@@ -8,7 +8,7 @@
 # collapse (min cell-cell distance held by `repel`); motion bounded by PARAMETER BALANCE (not the
 # vmax clamp); division progressively deforms the blastula; continuous flow at high density;
 # collective migration + left/right partitioning by type.
-general: {name: embryo_base, seed: 0, n_frames: 6000, dt: 0.002, boundary: wall}
+general: {name: embryo_base, seed: 0, n_frames: 12000, dt: 0.002, boundary: wall}
 sets:
   agent:
     n: 44                                    # start sparse (~/8); proliferate to fill the core
