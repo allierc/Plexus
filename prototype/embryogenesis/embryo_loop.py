@@ -105,8 +105,8 @@ def poll_cluster(ids):
 BATCH_JOBS = "embryo_batch_jobs.json"
 
 
-def save_batch_jobs(batch, ids):
-    json.dump({"batch": batch, "ids": ids}, open(BATCH_JOBS, "w"))
+def save_batch_jobs(batch, ids, designed=False):
+    json.dump({"batch": batch, "ids": ids, "designed": designed}, open(BATCH_JOBS, "w"))
 
 
 def load_batch_jobs():
@@ -127,11 +127,15 @@ def jobs_live(ids):
     return live
 
 
+SUBMIT_RETRY_MIN = float(os.environ.get("EMBRYO_SUBMIT_RETRY_MIN", "10"))  # hold cadence during a cluster/credential outage
+
+
 def run_batch_cluster(slots, batch):
     ids = submit_cluster(slots, batch)
     save_batch_jobs(batch, ids)                     # persist so a restart RESUMES these, not resubmits
     poll_cluster(ids)
     print("[loop] L4 batch complete", flush=True)
+    return ids                                      # empty dict => TOTAL submit failure (dead SSH/credential)
 
 
 PHASE_HOURS = float(os.environ.get("EMBRYO_PHASE_HOURS", "24"))   # max wall-clock per sub-phase
@@ -313,12 +317,26 @@ def main():
             print(f"[loop] RESUME batch {b}: {len(live)} jobs still on L4 — polling (no redesign/resubmit)", flush=True)
             poll_cluster(bj["ids"])
         else:
-            if not manual:
+            # Design ONCE per batch; reuse the same slots across submit-retries during a cluster outage
+            # so a dead credential does not burn Claude cost or the per-stage batch budget.
+            bj0 = load_batch_jobs()
+            designed = bool(bj0 and bj0.get("batch") == b and bj0.get("designed"))
+            if not manual and not designed:
                 run_claude(design_prompt(b, n), f"DESIGN batch {b}")
             slots = parse_slots(b)
             if not slots:
                 print(f"[loop] no slots for batch {b}; stopping"); break
-            run_batch(slots, b)
+            ids = run_batch(slots, b)
+            if cluster and not ids:
+                # TOTAL submit failure => cluster/credential unreachable. Do NOT advance (would waste the
+                # 48-batch stage budget) and do NOT redesign. HOLD this batch and retry until SSH is renewed.
+                save_batch_jobs(b, {}, designed=True)   # remember slots are already designed
+                save_state(b)                           # stay on batch b across driver/watchdog restarts
+                print(f"[loop] SUBMIT OUTAGE batch {b}: 0/{len(slots)} jobs launched — cluster unreachable "
+                      f"(renew SSH/Kerberos on the driver host). HOLDING batch {b}; retry in {SUBMIT_RETRY_MIN:g} min.",
+                      flush=True)
+                time.sleep(SUBMIT_RETRY_MIN * 60)
+                continue                                # retry SAME batch, no redesign, no montage, no advance
         montage(b)
         rename_batch_dirs(b)                         # -> embryo_<stage>_b<NN>_... (consistent archive naming)
         save_state(b + 1)

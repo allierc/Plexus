@@ -18,8 +18,10 @@ CUMULATIVE -- prior R²-objective conclusions are carried forward as provisional
   python cardio_mpm_loop.py 40 --fresh         # restart from batch 1
   python cardio_mpm_loop.py 3 --local          # local GPUs (testing)
 """
-import os, sys, glob
+import os, sys, glob, time
 import cardio_mpm_cluster as L                                         # reuse the proven cluster machinery
+
+HOLD_MIN = float(os.environ.get("CARDIO_SUBMIT_RETRY_MIN", "10"))     # hold cadence during a cluster/credential outage
 
 # --- Phase-3 file overrides (read by our main() below) ---
 L.TRAIN = "cardio_mpm_train.py"
@@ -140,10 +142,16 @@ def main(n_batches, fresh, local):
             L.run_local(jobs); ids = {j["slot"]: "local" for j in jobs}
         else:
             ids = L.submit_cluster(jobs)
-            if ids:
-                L.wait_cluster(ids, jobs)
-            else:
-                print("[loop] no jobs submitted -- aborting batch (check bsub/queue)", flush=True)
+            while not ids:
+                # TOTAL submit failure => cluster/credential unreachable (e.g. expired Kerberos ticket).
+                # HOLD this batch and retry the SAME jobs (no redesign, no counter advance) so an outage
+                # cannot silently burn the batch budget. Auto-resumes the instant `kinit` is renewed.
+                print(f"[loop] SUBMIT OUTAGE batch {b}: 0/{len(jobs)} jobs launched -- cluster unreachable "
+                      f"(renew kinit / SSH on the driver host). HOLDING batch {b}; retry in {HOLD_MIN:g} min.",
+                      flush=True)
+                time.sleep(HOLD_MIN * 60)
+                ids = L.submit_cluster(jobs)
+            L.wait_cluster(ids, jobs)
         L.check_completion(jobs, ids if not local else {j["slot"]: "local" for j in jobs})
         L.save_state(b + 1)
     print(f"[loop] DONE through batch {n_batches}. Ledger: {L.LEDGER}  Analysis: {L.ANALYSIS}", flush=True)
