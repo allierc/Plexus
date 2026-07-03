@@ -212,6 +212,14 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
         print("[grid] no mpm_particle set -- skipping grid diagnostic movie", flush=True)
         return None
 
+    # honor the spec's plotting.fps + movie_max_frames so grid.mp4 matches the main movies'
+    # duration (frames / fps). budget caps captured frames -> stride set to hit ~budget frames.
+    style = getattr(sim, "plotting", {}) or {}
+    fps = int(style.get("fps", fps))
+    budget = int(style.get("movie_max_frames", 0))
+    if budget > 0:
+        stride = max(stride, int(np.ceil(sim.n_frames / budget)))
+
     frames: list[dict] = []
 
     def hook(H, frame):
