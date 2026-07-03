@@ -264,9 +264,25 @@ def main():
     _scorecard_panel(sc, sim.name, os.path.join(d, "scorecard.png"))
     print(f"[showcase] {sim.name}: " + "  ".join(f"{k}={v}" for k, v in list(m.items())[:14]), flush=True)
 
+    # save the EFFECTIVE run spec (base yaml + this slot's overrides) so every archive is self-documenting
+    try:
+        base_txt = open(spec_path).read()
+    except OSError:
+        base_txt = "# (base spec unreadable)\n"
+    ovr = "  ".join(f"{k}={v}" for k, v in ov.items()) or "(none)"
+    header = (f"# === effective run spec ===\n"
+              f"# name:      {sim.name}\n"
+              f"# base spec: {spec_path}\n"
+              f"# frames={frames}  stride={stride}\n"
+              f"# overrides: {ovr}\n"
+              f"# (the override values above are applied ON TOP of the base yaml below)\n"
+              f"# ==========================\n")
+    with open(os.path.join(d, "spec.yaml"), "w") as fh:
+        fh.write(header + base_txt)
+
     # archive
     adir = os.path.join(ARCHIVE, sim.name); os.makedirs(adir, exist_ok=True)
-    for f in ("summary2x2.mp4", "summary2x2_final.png", "blob.mp4", "blob_evolution.png",
+    for f in ("spec.yaml", "summary2x2.mp4", "summary2x2_final.png", "blob.mp4", "blob_evolution.png",
               "metrics.json", "scorecard.json", "scorecard.png"):
         src = os.path.join(d, f)
         if os.path.isfile(src):
