@@ -30,12 +30,49 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 - **1E — two-type partitioning.** The two types segregate (e.g. left/right; `segregation` ↑).
 State which stage the batch targets in the analysis entry; only one stage-transition per batch.
 
-## The observables (diagnostics, not a single loss) — from `embryo_metrics.phase1_*`
-`collapsed` (frac stacked, want 0) · `nn_min`/`nn_mean` (min distance held) · `deform` (RMS membrane
-radial displacement, want ↑) · `flow` (mean cell speed, want >0) · `migration` (velocity polar order,
-want ↑) · `segregation` (|⟨x⟩_a−⟨x⟩_b|/R, want ↑) · `accel` (95th-pct, want bounded) · `n_cells`.
-Rank a batch by, in order: **1. no-collapse (collapsed≈0)  2. the target phenomenon of the batch's
-hypothesis  3. flow/migration  4. the rest.** A pretty run that collapsed is a failure.
+**PER-STAGE BUDGET — ≤2 DAYS (48h) OR ≤48 batches per sub-phase (1A/1B/1C/1D/1E), whichever first.** The driver injects a `>>> TIME CAP HIT` directive into your prompt when the 48h is up — when you see it, advance immediately. In STAGE STATUS record the batch
+each stage STARTED. If a stage's gate is not met within its 2-day / 48-batch budget, STOP grinding it: log the
+blocker as `[open]` in the ledger, ADOPT the best clean (escape-free) point achieved as that stage's
+operating spec, and ADVANCE to the next stage — or, if the gate is physically unreachable with the
+current operator set, relax the numeric target to the best value found and move on. Never spend >48
+batches on one rung; breadth across the ladder beats perfecting one. **Each batch, write the target sub-phase (e.g. `1B`) to `current_stage.txt`** — the loop uses it to name archive dirs `embryo_<stage>_b<NN>_<slot>`. (1B started at Batch 2; with the 48-batch stage cap it may run to the campaign's end at Batch 48.)
+
+## The QUANTITATIVE SCORECARD — decide on NUMBERS, not on the movie
+Every slot writes **`scorecard.json`** (+ a `scorecard.png` evolution panel) via `scorecard.py`, with
+FIVE families, EACH computed at **5 / 25 / 50 / 75 / 100 %** of the run (so transients, drift and
+steady-state are visible — the 3000-vs-6000-frame trap):
+- **shape** — `fourier_m1` (drift) `m2` (elongation) `m3+` (lobing), `circularity`, `shape_index` (p=P/√A, ≈3.81 fluid↔solid), `area`, `perimeter`, `deform_rms`.
+- **organization** — `gr_peak`/`gr_peak_r` (RDF), `nn_mean`/`nn_cv`, `density_cv`, `contact_same`.
+- **flow** — `speed`, `polar_order`, `enstrophy`/`net_circulation` (swirl vs bulk translation), `msd`, `persistence_frames`, `corr_length_xi` (ξ).
+- **topology** — `t1_rate` (neighbour-exchange / fluidity).
+- **partition** — `segregation_index`, `mixing_entropy`, `mi_type_x`, `interface_frac`.
+- **coupling** — `stress_cell_corr`, `deform_cell_corr`, `flow_deform_lag`, `div_stress_angle` (division axis vs principal-stress, Campinho 2013).
+`metrics.json` = the hard-failure gate PLUS the final scorecard. **Read the numbers AND their 5-point
+trajectory; the mp4 / 2×2 only PROPOSE a hypothesis — the scorecard DECIDES whether it survives.**
+
+**METRIC TIERS — decide on the top two, read the third as context (do NOT gate on tier-3):**
+- **TIER 1 — HARD GATE** (a fail is a fail, never a tradeoff): `collapsed`, `escape`, `nn_min`, `accel`.
+- **TIER 2 — PRIMARY PHENOTYPE** (the decision metrics; robust, low binning-dependence): `deform_rms`,
+  `fourier_m1/m2/m3`, `shape_index`, `circularity`, `polar_order`, `segregation_index`, `n_cells`,
+  `net_circulation`, `msd`.
+- **TIER 3 — SECONDARY DIAGNOSTICS** (interpret, don't gate — sensitive to neighbour-radius / binning /
+  capture-stride, so validate before trusting): `gr_peak`, `nn_cv`, `density_cv`, `contact_same`,
+  `mixing_entropy`, `interface_frac`, `mi_type_x`, `stress_cell_corr`, `deform_cell_corr`,
+  `flow_deform_lag`, and the biology-facing `corr_length_xi`, `t1_rate`, `div_stress_angle`.
+Rank a batch by: **1. no Tier-1 failure  2. the batch hypothesis's target Tier-2 metric (right
+trajectory)  3. Tier-3 for mechanism/interpretation only.**
+
+## QUANTITATIVE REPORT PROTOCOL (mandatory in every `analysis_embryo.md` entry)
+For EVERY claim, pair the visual observation with its scorecard support — never a bare visual claim:
+> **visual claim:** "the blastula becomes lobed toward the end"
+> **quantitative support:** shape.fourier_m3 0.006→0.013 (2.1×) over 50→100%; circularity 0.92→0.78; deform_rms 0.018→0.031
+A claim with no scorecard number behind it is an OPINION, not a finding — do not log it as one.
+
+## `[established]` GATE — replicated + significant, or it stays `[open]`
+Promote a mechanism to `[established]` ONLY when (a) it ran on **≥3 seeds** (vary `general.seed` across
+slots) and (b) the effect vs its ablation control is **larger than noise: |Δ| > 2·SD** across seeds
+(report **mean ± SD**). One run + a movie is `[open]` at best. State the seeds and mean±SD in the
+ledger entry. LoopScore discipline: visuals propose, statistics decide.
 
 ## The action set — PLAY WITH THE OPERATORS (compose from the whole codebase)
 You may change scalar params AND **add / remove / swap operators**. Each slot is a full spec you
@@ -78,15 +115,15 @@ roles): couplings `agent_to_mpm`, `mpm_to_agent` (`field: mass|colour`), `mpm_sp
 - `SPEC` names the spec YAML you authored for this slot (compose operators there).
 - optional `KEY val` are dotted overrides applied on top (e.g. `mpm_to_agent.k 0.2`,
   `repel.r0 0.024`, `agent.move_speed 0.05`, `agent_to_mpm.agent_mass 1e-6`, `cell_divide.rate 0.6`,
-  `n_grid 64`, `frames 6000`).
+  `n_grid 64`, `frames 12000`, `stride 16`).
 - lines starting `#` are comments. Keep exactly 8 non-comment lines (batches of 8, run in parallel on L4).
 
 ## Budget & USER DIRECTIVES (mandatory — 2026-07-02)
-- **frames ≈ 6000** on every run (2× longer, so slow dynamics develop). A ~6000-frame job is ~16 min
-  on L4 — that is FINE (wall is 30 min). Do NOT shrink to 1500/3000. Raise `stride` (6–10) to keep
+- **frames ≈ 12000** on every run (long, so slow dynamics fully develop). A ~12000-frame job is ~25–30
+  min on L4 — FINE (wall is 45 min). Do NOT shrink below ~12000. Use `stride ≈ 16` to keep
   render time bounded; that only subsamples the movie, not the physics.
 - **move_speed baseline 0.12** (2× faster than before); you MAY go up to ~0.24 when a stage needs
   faster flow/migration.
 - **cells may grow up to ~4× via `cell_divide`** (`div_rate`/`max_occ`; `buffer` is 3000) — do not
   cap proliferation prematurely when 1C/1D calls for density.
-Keep `per_parent`/`n_grid` sane; each job must still finish within the 30-min L4 wall.
+Keep `per_parent`/`n_grid` sane; each job must still finish within the 45-min L4 wall.

@@ -189,12 +189,29 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         return
     lvl.type_names = list(types.keys())
     node_type = torch.zeros(lvl.n, dtype=torch.long, device=device)
-    perm = torch.randperm(lvl.n, generator=H.rng, device=device)
+    # Type ordering over the buffer. Default: random permutation (salt-and-pepper mix).
+    # Opt-in `type_layout: split_x` sorts by x so the per-type fractions tile the domain
+    # left->right (type a = low x, last type = high x) -- seeds a spatial partition so a
+    # sorting force can be tested on whether it MAINTAINS/sharpens a split, decoupled from
+    # the symmetry-break-from-a-mixed-start problem. Positions are already set (build pass 1)
+    # before this runs, so state[:,0] is the live x-coordinate.
+    layout = s.get("type_layout", "random")
     type_list = list(types.values())
+    if layout == "split_x":
+        # Split the LIVE cells by x (dead buffer slots stay type 0). MUST use the
+        # live count and live indices -- argsort over lvl.n (the buffer) sorts the
+        # dead slots (x=0) to the front, so they swallow the low-x types and ALL
+        # live cells fall into the last type (single-populated-type bug, cost b17).
+        perm = torch.nonzero(lvl.occ > 0, as_tuple=False).flatten()
+        perm = perm[torch.argsort(lvl.state[perm, 0])]
+        total = int(perm.numel())
+    else:
+        perm = torch.randperm(lvl.n, generator=H.rng, device=device)
+        total = lvl.n
     start = 0
     for tid, t in enumerate(type_list):
         # last type absorbs the remainder, so per-type rounding never leaves nodes unassigned
-        k = (lvl.n - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * lvl.n))
+        k = (total - start) if tid == len(type_list) - 1 else int(round(t["fraction"] * total))
         node_type[perm[start:start + k]] = tid; start += k
     lvl.register_buffer("node_type", node_type)
     if all("p" in t for t in types.values()):

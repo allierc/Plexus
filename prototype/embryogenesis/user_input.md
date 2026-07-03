@@ -7,5 +7,5 @@ Overall the runs so far look good but three ranges should change:
 2. **Allow the cell population to grow up to ~4x via `cell_divide`.** Use division (`div_rate`,
    `max_occ`, `buffer` already 3000) to reach up to ~4x the starting count when a stage (1C/1D)
    calls for it — do not cap proliferation prematurely.
-3. **Double the simulation length — use ~6000 frames** (was 3000) so slow dynamics have time to
+3. **Double the simulation length — use ~12000 frames (was 6000)) so slow dynamics have time to
    develop. Keep each job within the L4 wall (30 min); raise `stride` if render time grows.

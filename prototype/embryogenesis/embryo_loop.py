@@ -134,12 +134,47 @@ def run_batch_cluster(slots, batch):
     print("[loop] L4 batch complete", flush=True)
 
 
+PHASE_HOURS = float(os.environ.get("EMBRYO_PHASE_HOURS", "24"))   # max wall-clock per sub-phase
+PHASE_TIMER = "phase_timer.json"
+
+
+def phase_elapsed_h():
+    """(stage, hours) the CURRENT stage (current_stage.txt) has run; clock starts on first sight."""
+    stage = ""
+    if os.path.isfile("current_stage.txt"):
+        raw = open("current_stage.txt").read().strip()
+        stage = raw.split()[0] if raw else ""
+    if not stage:
+        return "", 0.0
+    t = {}
+    if os.path.isfile(PHASE_TIMER):
+        try:
+            t = json.load(open(PHASE_TIMER))
+        except Exception:
+            t = {}
+    now = time.time()
+    if stage not in t:
+        t[stage] = now
+        json.dump(t, open(PHASE_TIMER, "w"))
+    return stage, (now - t[stage]) / 3600.0
+
+
 def design_prompt(batch, n):
+    stage, eh = phase_elapsed_h()
+    timecap = ""
+    if stage and eh >= PHASE_HOURS:
+        timecap = (f"\n\n>>> TIME CAP HIT: sub-phase {stage} has run {eh:.1f}h (>= {PHASE_HOURS:.0f}h budget). "
+                   f"THIS BATCH you MUST: adopt the best clean (escape-free) point as {stage}'s operating spec, "
+                   f"log the blocker as [open] in the ledger, ADVANCE to the next sub-phase, and write the new "
+                   f"stage to current_stage.txt (which resets the phase clock). Do not run more {stage} experiments.")
     prev = f"montages/embryo_b{batch-1:02d}.png"
-    obs = (f"Read the previous batch montage {prev} and each archive/eb_b{batch-1:02d}_*/metrics.json."
+    obs = (f"Read the previous batch montage {prev}, and for EACH slot read archive/eb_b{batch-1:02d}_*/"
+           f"scorecard.json (5-family metrics at 5/25/50/75/100%) + metrics.json (hard-failure gate) + scorecard.png. "
+           f"Decide on the NUMBERS + their trajectory, not the movie."
            if batch > 1 else
-           "FIRST batch: read specs/embryo_base.yaml; design slots that probe the Phase-1 targets "
-           "(start by finding a WEAK-coupling regime that deforms the membrane without collapsing).")
+           "FIRST batch (fresh restart): read specs/embryo_base.yaml, knowledge_embryo.md (system + scorecard "
+           "+ the zebrafish quantitative reference + provisional pilot hints to RE-VERIFY). Target Stage 1A "
+           "(stable, no collapse) and design slots that establish the scorecard baseline.")
     return f"""EMBRYOGENESIS BLASTULA / PHASE 1 -- BATCH {batch}/{n}. You are a SCIENTIST discovering
 which operators + couplings make a flowing, dividing, self-partitioning blastula (NOT a param search).
 
@@ -153,8 +188,11 @@ Your MEMORY (read EVERY batch):
 
 Do ALL, in order, AUTO-UPDATING the files:
 1. OBSERVE: from the montage/metrics, what happened vs last batch's predictions? (collapse? deform? flow? migration? partition?)
-2. EDIT {ANALYSIS}: append "## Batch {batch}" with observations, per-slot verdicts (supported/falsified/inconclusive), and levers.
-3. DISTILL {LEDGER}: merge new causal findings, tagged [established]/[open]/[rejected]/[engineering]; keep compact.
+2. EDIT {ANALYSIS}: append "## Batch {batch}". EVERY claim = QUANTITATIVE REPORT PROTOCOL: pair each
+   visual observation with scorecard support (e.g. "lobed" -> "shape.fourier_m3 0.006->0.013 (2.1x); circularity 0.92->0.78").
+   A claim with no scorecard number is an opinion, not a finding.
+3. DISTILL {LEDGER}: merge findings tagged [established]/[open]/[rejected]/[engineering]. Promote to
+   [established] ONLY with >=3 seeds AND |delta|>2*SD vs control (report mean+/-SD); else it is [open]. Keep compact.
 4. STATE ONE predictive hypothesis for this batch.
 5. DESIGN 8 slots into {SLOTS}: one variable/operator change per slot (~4 exploit, 3 explore, 1 control).
    Each line: `name : SPEC specs/<file>.yaml [key val ...]`. AUTHOR the per-slot spec YAML (copy embryo_base, edit operators) when you change the mechanism; use dotted overrides for scalar tweaks.
@@ -226,6 +264,26 @@ def run_batch_local(slots, batch):
     print("[loop] batch complete", flush=True)
 
 
+def rename_batch_dirs(batch):
+    """After montage, rename this batch's archive dirs `*eb_b<NN>_*` ->
+    `embryo_<stage>_b<NN>_<rest>` using the stage Claude wrote to current_stage.txt."""
+    stage = ""
+    if os.path.isfile("current_stage.txt"):
+        stage = open("current_stage.txt").read().strip().split()[0][:3] if open("current_stage.txt").read().strip() else ""
+    if not stage:
+        return
+    import glob
+    for d in glob.glob(os.path.join(ARCHIVE, f"*eb_b{batch:02d}_*")):
+        base = os.path.basename(d)
+        rest = re.sub(r".*eb_b\d+_", "", base)
+        new = os.path.join(ARCHIVE, f"embryo_{stage}_b{batch:02d}_{rest}")
+        if os.path.abspath(d) != os.path.abspath(new) and not os.path.exists(new):
+            try:
+                os.rename(d, new)
+            except OSError:
+                pass
+
+
 def montage(batch):
     try:
         subprocess.run([PYBIN, "montage.py", "--out", f"embryo_b{batch:02d}.png", f"eb_b{batch:02d}"], check=False)
@@ -262,6 +320,7 @@ def main():
                 print(f"[loop] no slots for batch {b}; stopping"); break
             run_batch(slots, b)
         montage(b)
+        rename_batch_dirs(b)                         # -> embryo_<stage>_b<NN>_... (consistent archive naming)
         save_state(b + 1)
         print(f"[loop] === batch {b} done ({len(slots)} slots) -> montages/embryo_b{b:02d}.png ===", flush=True)
 
