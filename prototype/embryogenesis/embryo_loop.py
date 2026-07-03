@@ -317,26 +317,21 @@ def main():
             print(f"[loop] RESUME batch {b}: {len(live)} jobs still on L4 — polling (no redesign/resubmit)", flush=True)
             poll_cluster(bj["ids"])
         else:
-            # Design ONCE per batch; reuse the same slots across submit-retries during a cluster outage
-            # so a dead credential does not burn Claude cost or the per-stage batch budget.
-            bj0 = load_batch_jobs()
-            designed = bool(bj0 and bj0.get("batch") == b and bj0.get("designed"))
-            if not manual and not designed:
+            if not manual:
                 run_claude(design_prompt(b, n), f"DESIGN batch {b}")
             slots = parse_slots(b)
             if not slots:
                 print(f"[loop] no slots for batch {b}; stopping"); break
             ids = run_batch(slots, b)
-            if cluster and not ids:
-                # TOTAL submit failure => cluster/credential unreachable. Do NOT advance (would waste the
-                # 48-batch stage budget) and do NOT redesign. HOLD this batch and retry until SSH is renewed.
-                save_batch_jobs(b, {}, designed=True)   # remember slots are already designed
-                save_state(b)                           # stay on batch b across driver/watchdog restarts
+            while cluster and not ids:
+                # TOTAL submit failure => cluster/credential unreachable (e.g. expired Kerberos ticket).
+                # HOLD this batch: retry the SAME slots in-place (a `continue` here would ADVANCE the for-loop
+                # to b+1 and burn the 48-batch stage budget). Auto-resumes the instant `kinit` is renewed.
                 print(f"[loop] SUBMIT OUTAGE batch {b}: 0/{len(slots)} jobs launched — cluster unreachable "
                       f"(renew SSH/Kerberos on the driver host). HOLDING batch {b}; retry in {SUBMIT_RETRY_MIN:g} min.",
                       flush=True)
                 time.sleep(SUBMIT_RETRY_MIN * 60)
-                continue                                # retry SAME batch, no redesign, no montage, no advance
+                ids = run_batch(slots, b)
         montage(b)
         rename_batch_dirs(b)                         # -> embryo_<stage>_b<NN>_... (consistent archive naming)
         save_state(b + 1)
