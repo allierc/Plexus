@@ -11,7 +11,7 @@ operators:
 - at: activation
   center: [0.5, 0.5]
   clock: beat
-  op: pulse_stimulus
+  op: activation_pulse
   radius: 0.12
   profile: uniform
 - {amplitude: 25.0, at: mpm_particle, from: activation, mode: directional, op: pulse_to_contraction, direction_from: direction}
@@ -24,7 +24,7 @@ schedule:
 - aggregate
 - apply_material_map
 - pacemaker
-- pulse_stimulus
+- activation_pulse
 - pulse_to_contraction
 - drag
 - substep_dt: 0.0002
