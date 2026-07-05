@@ -5,12 +5,13 @@
 # addition is only the numerical realization. No mpm_anchor (it would pin grown material to rest).
 general: {name: material_cell_grow_aniso, seed: 0, n_frames: 1800, dt: 0.0015, boundary: wall}
 sets:
-  cell: {n: 1, start: [[0.5, 0.34]], types: {body: {fraction: 1.0, youngs: 90}}}
-  mpm_particle: {parent: cell, per_parent: 2500, grow_reserve: 9000, radius: 0.06, density: 1.0}
+  cell: {n: 1, start: [[0.5, 0.4]], types: {body: {fraction: 1.0, youngs: 90}}}
+  mpm_particle: {parent: cell, per_parent: 2500, grow_reserve: 7000, radius: 0.07, density: 1.0}
 fields: {mpm_grid: {frame: mpm_grid, n_grid: 128}}
 operators:
-  # rest-volume growth law: logistic (rate, target), tip-localized along +y (bud), anisotropic placement
-  - {op: cell_grow, at: cell, rate: 1.1, target: 4.5, mode: tip, axis: [0.0, 1.0], aniso: 0.85, tip: 8.0, offset: 0.011}
+  # rest-volume growth law: logistic (rate, target~2.8x), MILD tip-localization along +y + moderate
+  # anisotropy -> a FAT bud (not a jet) that grows upward then ROUNDS as growth saturates + elasticity relaxes.
+  - {op: cell_grow, at: cell, rate: 0.9, target: 2.8, mode: tip, axis: [0.0, 1.0], aniso: 0.5, tip: 2.5, offset: 0.013}
   - {op: mpm_strain, at: mpm_particle}
   - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
   - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.95}
