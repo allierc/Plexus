@@ -391,10 +391,13 @@ of position or of velocity. A \emph{first-order} (overdamped) operator returns a
 velocity and integrates as $x_{t+1}=x_t+\Delta t\sum_i\Delta_i$; a
 \emph{second-order} (inertial) operator returns an acceleration and integrates as
 $v_{t+1}=v_t+\Delta t\sum_i\Delta_i,\ x_{t+1}=x_t+\Delta t\,v_{t+1}$. The order is
-a fixed property of each operator (\code{PREDICTION}): attraction--repulsion is
-first order, boids flocking is second; all operators acting on one set must agree,
-so the set integrates as a single order. Friction in the inertial case is itself an
-operator (a \code{drag} delta $-\kappa v$), not a special term in the integrator.
+a fixed property of each operator (\code{EMIT}: \code{velocity} for first order,
+\code{acceleration} for second): attraction--repulsion is first order, boids flocking
+is second; all engine-integrated operators acting on one set must agree, so the set
+integrates as a single order. (A dynamics operator may instead declare \code{EMIT} $=$
+\code{mpm\_acceleration} --- an acceleration consumed by the MPM substep as the external
+force $a_\text{ext}$ rather than integrated by the engine.) Friction in the inertial case
+is itself an operator (a \code{drag} delta $-\kappa v$), not a special term in the integrator.
 
 Two consequences follow: several operators may
 act on the same set in one tick (their deltas simply add --- none overwrites
@@ -554,9 +557,9 @@ $\langle$params$\rangle$ & operator-specific arguments               & \code{gai
 \midrule
 \multicolumn{3}{@{}l}{\emph{Schedule} (sub-grammar; per-tick order)}\\
 operator name         & run that operator this tick                  & \code{sense}\\
-\code{[a, b]}         & a group run in the same stage                & \code{[motility, sense]}\\
-\code{aggregate}      & builtin: Aggregate$\uparrow$ (parent $=$ mean of children) & \code{aggregate}\\
-\code{name.diffuse}   & builtin: advance that field one step         & \code{chemical.diffuse}\\
+\code{[a, b]}         & a group run in the same stage                & \code{[glide, sense]}\\
+\code{aggregate}      & a registered op: Aggregate$\uparrow$ (parent $=$ mean of children) & \code{aggregate}\\
+\code{diffuse}        & a field op: advance that field one step (Laplacian) & \code{diffuse}\\
 \midrule
 \multicolumn{3}{@{}l}{\code{plotting:} (render style only --- never affects dynamics)}\\
 \code{colormap}, \code{point\_size}, \code{background} & how the sets are drawn & \code{background: black}\\
@@ -600,7 +603,7 @@ specs), UFL (PDE operators), and NetLogo/Mesa (agent rules).
 A complete spec is a single \code{spec.yaml}. Listing~\ref{lst:agg} assembles the
 vocabulary of Table~\ref{tab:lang} into one: two cell \code{types},
 \code{particle}s contained in each \code{cell}, one chemical \code{field}, and a
-\code{schedule}. Soft cells \code{secrete} the chemical and \code{sense} (climb)
+\code{schedule}. Soft cells \code{deposit} the chemical and \code{chemotax} (climb)
 it, so they self-aggregate, while stiff cells --- selected out by
 \code{cell[type=soft]} --- do not.
 
@@ -612,13 +615,15 @@ sets:
     types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}
   particle: {parent: cell, per_parent: 100, radius: 0.02}   # containment
 fields:
-  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
+  chemical: {frame: grid, res: 96, couples_to: cell}
 operators:
-  - {op: motility, at: cell, speed: 15.0, rot: 0.4}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 800, drag: 4}
-  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}    # only pop 1 makes it
-  - {op: sense,  at: "cell[type=soft]", from: chemical, gain: 150.0} # only pop 1 follows it
-schedule: [aggregate, [motility], secrete, chemical.diffuse, sense, mpm]
+  - {op: glide, at: cell, speed: 15.0, rot: 0.4}
+  - {op: mls_mpm_mechanics, at: particle, n_grid: 128, substeps: 8, a_max: 800, drag: 4}
+  - {op: deposit,  at: "cell[type=soft]", to: chemical, rate: 1.0}    # only pop 1 makes it
+  - {op: diffuse,  at: chemical, rate: 0.1}                           # field self-dynamics (was chemical.diffuse)
+  - {op: decay,    at: chemical, rate: 0.05}
+  - {op: chemotax, at: "cell[type=soft]", from: chemical, gain: 150.0} # only pop 1 climbs it
+schedule: [aggregate, [glide], deposit, diffuse, decay, chemotax, mls_mpm_mechanics]
 \end{lstlisting}
 
 The validator (prototype: \code{scenario\_schema.py}) guarantees that a file which
@@ -630,38 +635,52 @@ token resolves. (One trap: never use a YAML~1.1 boolean key such as
 \section{Operator catalog}
 
 Operators are the system's vocabulary; it grows monotonically and every past spec
-keeps working. The catalog, grouped by what each operator changes (Section~\ref{sec:operators});
-\emph{1st}/\emph{2nd} marks the integration order of the dynamics operators:
+keeps working. The catalog, grouped by what each operator changes (Section~\ref{sec:operators}).
+\code{EMIT} is the temporal-integration state a dynamics operator's returned delta
+represents --- \code{velocity} / \code{acceleration} integrated by the engine,
+\code{mpm\_acceleration} routed to the MPM substep, or \code{---} for an operator that
+writes a field, a relation, or a \code{heading} and returns no set delta:
 
 \begin{center}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}llll@{}}
+\renewcommand{\arraystretch}{1.12}
+\footnotesize
+\begin{tabular}{@{}lll p{6.4cm}@{}}
 \toprule
-\textbf{op} & \textbf{kind} & \textbf{acts on} & \textbf{behaviour} \\
+\textbf{op} & \textbf{kind} & \textbf{EMIT} & \textbf{behaviour} \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{Dynamics --- move state}}\\
-\code{attraction\_repulsion} & lateral \emph{1st} & particle & per-type difference-of-Gaussians interaction law \\
-\code{boids}    & lateral \emph{2nd} & particle/cell & flocking (cohesion/align/separate) \\
-\code{drag}     & lateral \emph{2nd} & any         & viscous friction $-\kappa v$ \\
-\code{motility} & lateral   & cell        & active self-propulsion (wandering heading) \\
-\code{adhesion} & lateral   & cell        & type-specific cohesion ($+$ \code{cross}$<$0 repels $\to$ sorting) \\
-\code{mpm}      & exchange  & particle    & MLS-MPM mechanics; soft/stiff via \code{youngs} \\
-\code{secrete}  & exchange  & cell$\to$field & deposit into a field (or consume, rate$<$0) \\
-\code{sense}    & exchange  & cell$\leftarrow$field & chemotactic accel up-gradient \\
-\code{graze}    & exchange  & cell$\leftarrow$field & consume a field (capped at stock); harvest objective \\
-\code{trail}    & exchange  & cell        & Physarum 3-sensor pheromone steering (ants) \\
+\multicolumn{4}{@{}l}{\emph{Dynamics --- move a set's state (return a delta)}}\\
+\code{attraction\_repulsion} & lateral & velocity & per-type difference-of-Gaussians interaction law \\
+\code{coulomb}               & lateral & acceleration & electrostatic inverse-square law (per-type \code{charge}) \\
+\code{cohesion},\,\code{alignment},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
+\code{cruise}                & lateral & acceleration & Vicsek self-propulsion toward cruising speed $v_0$ \\
+\code{drag}                  & lateral & accel.\,$|$\,mpm\_accel. & viscous friction $-\kappa v$ (\code{emit:} routes to the engine or the MPM substep) \\
+\code{glide}                 & lateral & velocity & active self-propulsion along the \code{heading} \\
+\code{gravity},\,\code{mpm\_anchor},\,\code{mpm\_spin} & lateral & mpm\_accel. & uniform / rest-anchor / solid-spin body forces (MPM substep) \\
+\code{bounce}                & lateral & --- & specular wall/obstacle re-heading (writes \code{heading}) \\
+\code{chemotax}              & exchange & vel.\,$|$\,mpm\_accel. & climb/flee a field's gradient (\code{emit:} routes) \\
+\code{sense}                 & exchange & --- & Physarum 3-sensor pheromone steering (writes \code{heading}) \\
+\code{deposit}               & exchange & --- & secrete/deposit set state into a field \\
+\code{heading\_align},\,\code{flow\_align} & exchange & --- & align \code{heading} to neighbours / to solved MPM flow \\
+\code{pulse\_to\_contraction} & exchange & mpm\_accel. & activation-gradient body force (cardiac contraction) \\
+\code{pulse\_to\_active\_stress} & exchange & --- & activation $\to$ active-stress tensor (\code{H.active\_stress}) \\
+\code{apply\_material\_map}  & exchange & --- & image field $\to$ per-particle material (\code{youngs}) \\
+\code{agent\_to\_mpm},\,\code{mpm\_to\_agent},\,\code{agent\_remodel} & exchange & --- / vel. & two-way agent\,$\leftrightarrow$\,material coupling \\
+\code{aggregate}             & aggregate & --- & parent state $=$ mass-weighted mean of children ($\uparrow$) \\
+\code{broadcast}             & broadcast & velocity & lift parent state onto its children ($\downarrow$) \\
+\code{mpm\_strain},\,\code{p2g},\,\code{mpm\_grid\_update},\,\code{g2p} & lat./exch./field & --- & the decomposed MLS-MPM cycle (strain\,$\to$\,P2G\,$\to$\,grid solve\,$\to$\,G2P) \\
+\code{mls\_mpm\_mechanics}   & exchange & --- & the same cycle as one fenced \emph{transitional} oracle (Section~\ref{sec:roadmap}) \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{Relations --- change the edge set $E$}}\\
-\code{radius\_graph} & rewire & particle & neighbour graph: pairs within a cutoff, rebuilt each tick \\
-\code{ring}     & rewire    & particle    & closed loop over a role's particles (a membrane) \\
+\multicolumn{4}{@{}l}{\emph{Fields --- a field's own dynamics (\code{kind=field}; write the grid, return \{\})}}\\
+\code{diffuse},\,\code{decay} & field & --- & Laplacian diffusion / linear evaporation \\
+\code{pacemaker}             & field & --- & periodic scalar clock $p(t)\to$\,\code{H.signals} \\
+\code{activation\_pulse}     & field & --- & clocked activation field: shared-clock $\times$ profile, or per-pixel delayed wave \\
+\code{playback}              & field & --- & advance a \code{prescribed} (video) field one frame \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{Entities --- change the node set $|S|$}}\\
-\code{divide}   & structural& cell        & cell division: split occupancy $w$ into a new slot \\
-\code{die}      & structural& cell        & cell death/efflux: occupancy $w\!\to\!0$ \\
+\multicolumn{4}{@{}l}{\emph{Relations --- change the edge set $E$ (\code{kind=rewire})}}\\
+\code{radius\_graph}         & rewire & --- & neighbour graph: live pairs within a cutoff, rebuilt each tick \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{Builtins}}\\
-\code{aggregate}& builtin   & ---         & parent state $=$ (mass-weighted) mean of children ($\uparrow$) \\
-\code{<field>.diffuse} & builtin & ---    & field self-update (Laplacian $+$ decay) \\
+\multicolumn{4}{@{}l}{\emph{Entities --- change the node set $|S|$ (\code{kind=structural})}}\\
+\code{cell\_divide}          & structural & --- & proliferation: wake a dormant buffer slot (\code{occ}) beside the mother \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -675,10 +694,10 @@ structure), it follows fixed rules; the most useful:
 \item ``$N$ cells/agents'' $\to$ a set with \code{n: N}.
 \item ``made of $K$ X per cell'' $\to$ a contained set with \code{parent}/\code{per\_parent} (two levels).
 \item ``two types differing by $P$'' $\to$ \code{types:} with $P$ as a per-type property.
-\item ``mechanical/elastic/rigid'' $\to$ particles $+$ \code{mpm}; map stiffness to \code{youngs}.
-\item ``moves by boids / flock'' $\to$ \code{boids}; ``wanders / motile'' $\to$ \code{motility}.
-\item ``creates/secretes a chemical'' $\to$ a \code{field} $+$ \code{secrete};
-      ``follows / chemotaxis'' $\to$ \code{sense}; ``ant trails'' $\to$ \code{trail}.
+\item ``mechanical/elastic/rigid'' $\to$ particles $+$ the MPM operators; map stiffness to \code{youngs}.
+\item ``moves by boids / flock'' $\to$ \code{cohesion}$+$\code{alignment}$+$\code{separation}; ``wanders / motile'' $\to$ \code{glide}.
+\item ``creates/secretes a chemical'' $\to$ a \code{field} $+$ \code{deposit};
+      ``follows a gradient / chemotaxis'' $\to$ \code{chemotax}; ``ant / pheromone trails'' $\to$ \code{sense} (Physarum 3-sensor).
 \item ``particles attract/repel, interact by type'' $\to$ a \code{radius\_graph}
       (the relation) followed by a lateral interaction op (e.g.\
       \code{attraction\_repulsion}); the per-type law parameters go in
@@ -723,9 +742,9 @@ the same operator registry by changing only the spec.}
 
 \section{Emergent ant trails}
 
-Adding the \code{trail} operator (a Physarum/Jones three-sensor rule: each ant
+Adding the \code{sense} operator (a Physarum/Jones three-sensor rule: each ant
 samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest,
-while \code{motility} drives it forward and \code{secrete} lays pheromone) yields
+while \code{glide} drives it forward and \code{deposit} lays pheromone) yields
 self-reinforcing trails that grow, are followed, and coarsen over long runs
 (Fig.~\ref{fig:ant}). Listing~\ref{lst:ant} is the full simulation.
 
@@ -742,7 +761,7 @@ stigmergy.}
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_ant_variants.png}
-\caption{Ten ant variants, each the same \code{trail}$+$\code{motility}$+$\code{secrete}
+\caption{Ten ant variants, each the same \code{sense}$+$\code{glide}$+$\code{deposit}
 code with a few parameters changed (turn rate, sensor reach/angle, pheromone
 diffusion/decay, deposit rate, rotational noise). The parameter axes span the
 trail-formation regime --- from loose wandering to tight reinforced networks.}
@@ -759,13 +778,15 @@ sets:
     types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}
   particle: {parent: cell, per_parent: 60, radius: 0.012}
 fields:
-  pheromone: {frame: grid, res: 160, diffusion: 0.02, decay: 0.04, couples_to: cell}
+  pheromone: {frame: grid, res: 160, couples_to: cell}
 operators:
-  - {op: motility, at: cell, speed: 300.0, rot: 0.06}            # persistent forward motion
-  - {op: trail,  at: "cell[type=soft]", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}
-  - {op: secrete, at: "cell[type=soft]", to: pheromone, rate: 2.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}
-schedule: [aggregate, trail, motility, secrete, pheromone.diffuse, mpm]
+  - {op: glide, at: cell, speed: 300.0, rot: 0.06}              # persistent forward motion
+  - {op: sense,  at: "cell[type=soft]", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}
+  - {op: deposit, at: "cell[type=soft]", to: pheromone, rate: 2.0}
+  - {op: diffuse, at: pheromone, rate: 0.02}                    # field self-dynamics (was pheromone.diffuse)
+  - {op: decay,   at: pheromone, rate: 0.04}
+  - {op: mls_mpm_mechanics, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}
+schedule: [aggregate, sense, glide, deposit, diffuse, decay, mls_mpm_mechanics]
 \end{lstlisting}
 
 \section{Cells in a maze: foraging and optimization}
@@ -933,7 +954,7 @@ fields, and operators. The engine must resolve names only through this registry.
 entity kinds. It is the only source of truth for what columns of \code{Level.state}
 mean.
 \item \code{operators/*.py}: one operator per file, one concern per operator.
-Operators declare their \code{KIND}, \code{PREDICTION}, \code{REQUIRES\_PARAMS},
+Operators declare their \code{KIND}, \code{EMIT}, \code{REQUIRES\_PARAMS},
 \code{REQUIRES\_TYPE\_PROPS}, and optional mechanism-search metadata.
 \item \code{fields/*.py}: field state classes. A field stores continuum state and
 geometry. Field dynamics are operators, not field methods.
@@ -995,11 +1016,17 @@ delta:
 \[
 \Delta_i =
 \begin{cases}
-\text{a velocity}      & \text{if PREDICTION = first\_derivative},\\
-\text{an acceleration} & \text{if PREDICTION = second\_derivative}.
+\text{a velocity}                  & \text{if EMIT = \texttt{velocity}},\\
+\text{an acceleration}             & \text{if EMIT = \texttt{acceleration}},\\
+\text{a substep body acceleration} & \text{if EMIT = \texttt{mpm\_acceleration}}.
 \end{cases}
 \]
-The engine sums all deltas for a set and integrates once at the end of the tick.
+The engine sums the deltas for a set and integrates once at the end of the tick;
+\texttt{mpm\_acceleration} deltas are read instead by the MPM substep (as the external
+acceleration $a_\text{ext}$) and are never engine-integrated. This is one vocabulary,
+shared by the class attribute \code{EMIT} and the spec \code{emit:} override with no
+translation table; \code{EMIT} $=$ \code{None} (a \code{field} / \code{rewire} /
+\code{structural} operator, or an exchange that writes a field) emits no set delta at all.
 
 Allowed in-place mutations are limited to:
 \begin{itemize}\itemsep2pt
@@ -1045,7 +1072,7 @@ A field is pure state: a grid, geometry, and possibly external data. A field doe
 not own its dynamics.
 \begin{itemize}\itemsep2pt
 \item \code{deposit}: set $\to$ field, \code{kind="exchange"}.
-\item \code{sense} or \code{chemotaxis}: field $\to$ set, \code{kind="exchange"}.
+\item \code{sense} or \code{chemotax}: field $\to$ set, \code{kind="exchange"}.
 \item \code{diffuse}, \code{decay}, \code{playback}, \code{react}: field $\to$ field,
 \code{kind="field"}.
 \end{itemize}
