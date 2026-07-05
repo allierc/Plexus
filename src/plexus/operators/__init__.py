@@ -35,7 +35,6 @@ from . import pulse_stimulus        # noqa: F401  clock x Gaussian -> activation
 from . import phase_delay           # noqa: F401  spatial phase-delay clock tau(x,y) -> activation field (field)
 from . import pulse_to_contraction  # noqa: F401  activation gradient -> per-particle force (exchange)
 from . import pulse_to_active_stress  # noqa: F401  activation -> per-particle active stress -A nn^T (exchange)
-from . import mpm_drag              # noqa: F401  viscous body drag -k*v as a particle force (lateral)
 from . import mpm_spin              # noqa: F401  drive MPM body toward slow solid-body rotation (lateral)
 from . import mpm_anchor            # noqa: F401  substrate/boundary rest-anchor k*(rest-pos) (lateral)
 from . import material_map          # noqa: F401  image field + apply_material_map (per-particle stiffness)
@@ -59,6 +58,6 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "prescribed_field", "chemotax", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
-           "mpm_drag", "mpm_spin", "mpm_anchor", "material_map", "mpm",
+           "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
            "agent_to_mpm", "mpm_to_agent", "agent_remodel", "flow_align", "heading_align"]

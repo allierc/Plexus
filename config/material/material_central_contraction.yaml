@@ -24,7 +24,7 @@ operators:
 - {op: pacemaker, at: activation, name: beat, period: 150, duration: 30, phase: 0}
 - {op: pulse_stimulus, at: activation, clock: beat, center: [0.5, 0.5], radius: 0.12}
 - {op: pulse_to_contraction, at: mpm_particle, from: activation, amplitude: 20.0, mode: inward}
-- {op: mpm_drag, at: mpm_particle, k: 30.0}
+- {op: drag, emit: mpm_acceleration, at: mpm_particle, k: 30.0}
 - {op: mpm_strain, at: mpm_particle}
 - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
 - {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.5, wall_contact: 0.06}
@@ -35,7 +35,7 @@ schedule:
 - pacemaker
 - pulse_stimulus
 - pulse_to_contraction
-- mpm_drag
+- drag
 - {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
