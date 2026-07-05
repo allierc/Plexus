@@ -1,7 +1,7 @@
-# arbitrary_bison_g3 (chemotaxis gain 0.04, coupling-strength sweep) -- 3-type attraction-repulsion particles coupled to a field that
+# arbitrary_bison_g3 (chemotax gain 0.04, coupling-strength sweep) -- 3-type attraction-repulsion particles coupled to a field that
 # is PRESCRIBED from a movie (video_bisons.tif, a 257-frame 100x100 scalar field).
 # The Plexus form of ParticleGraph's node_value_map: a `video` field driven by
-# `playback` (field <- frame t) and read by `chemotaxis` (particles climb its
+# `playback` (field <- frame t) and read by `chemotax` (particles climb its
 # gradient). The two velocities -- type interaction + field gradient -- simply sum
 # on the particle set (the framework's "deltas add" rule).
 general:
@@ -23,8 +23,8 @@ operators:
   - {op: playback,             at: bison}                       # field <- video frame t
   - {op: radius_graph,         at: particle, radius: 0.075}
   - {op: attraction_repulsion, at: particle, sigma: 0.005}
-  - {op: chemotaxis,           at: particle, from: bison, gain: 0.0004}
-schedule: [playback, radius_graph, attraction_repulsion, chemotaxis]
+  - {op: chemotax,           at: particle, from: bison, gain: 0.0004}
+schedule: [playback, radius_graph, attraction_repulsion, chemotax]
 plotting:
   background: black
   colormap: tab10
