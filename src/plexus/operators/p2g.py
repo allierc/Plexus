@@ -95,6 +95,11 @@ class P2G(Exchange):
         affine = stress + mass[:, None, None] * C
 
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
+        # DORMANT particles (occ==0, e.g. a cell_grow reserve) contribute NOTHING to the grid:
+        # mask the scatter weights by occupancy. Byte-identical when all particles are live.
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            weight = weight * (occ > 0).to(weight.dtype)[:, None]
         dpos_phys = (offsets[None] - fx[:, None, :]) * dx
         mom = mass[:, None, None] * V[:, None, :] + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)
         gm = torch.zeros(g.n_cells, device=dev); gmv = torch.zeros(g.n_cells, D, device=dev)

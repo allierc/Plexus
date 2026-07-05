@@ -68,6 +68,14 @@ class G2P(Exchange):
             Xn = torch.stack([torch.remainder(Xn[:, k], box[k]) for k in range(D)], dim=1)
         else:
             Xn = torch.stack([Xn[:, k].clamp(2 * dx, box[k] - 2 * dx) for k in range(D)], dim=1)
+        # DORMANT particles (occ==0, a cell_grow reserve) are FROZEN -- not advected -- so they sit as a
+        # compact reservoir until cell_grow activates + repositions them. Byte-identical when all are live.
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            live = occ > 0
+            Xn = torch.where(live[:, None], Xn, X)
+            new_V = torch.where(live[:, None], new_V, V)
+            new_C = torch.where(live[:, None, None], new_C, p.C)
         new = p.state.clone()
         pa, pb = p.state_schema["pos"]; va, vb = p.state_schema["vel"]
         new[:, pa:pb] = Xn; new[:, va:vb] = new_V

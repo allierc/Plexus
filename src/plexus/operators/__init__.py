@@ -29,6 +29,7 @@ from . import bounce                # noqa: F401  set -> wall/obstacle reflectio
 from . import prescribed_field      # noqa: F401  registers the `prescribed` field + playback
 from . import chemotax              # noqa: F401  field -> set gradient coupling; emit: velocity|mpm_acceleration (merges chemotaxis+chemo_force)
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
+from . import sediment              # noqa: F401  agent-level per-type directional drift (differential sedimentation)
 # active-stimulus decomposition (clock -> activation field -> contraction -> MPM):
 from . import pacemaker             # noqa: F401  periodic scalar clock p(t) -> H.signals (field)
 from . import activation_pulse      # noqa: F401  clocked activation field: shared-clock profile OR per-pixel delayed wave (merges pulse_stimulus+phase_delay_pulse)
@@ -51,11 +52,12 @@ from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (ce
 from . import flow_align            # noqa: F401  mpm_grid -> agent heading (polarity-velocity/flow alignment)
 from . import heading_align         # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment)
 from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
+from . import cell_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "coulomb",
            "cohesion", "alignment", "separation", "cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
-           "prescribed_field", "chemotax", "gravity",
+           "prescribed_field", "chemotax", "gravity", "sediment",
            "pacemaker", "activation_pulse", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
