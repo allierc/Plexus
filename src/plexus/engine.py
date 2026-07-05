@@ -301,11 +301,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             raise ValueError(f"set {sname!r} has parent {pname!r}, which is not a declared set")
         parent = H.level(pname)
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
+        reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for cell_grow to wake
+        per_tot = per + reserve
         _, render, level = _entity_meta(sname)         # render hints + level from the registry
         schema = _dim_schema(H.dim)                     # pos/vel sized to the dimension contract (like top-level sets)
         dim = max(b for _, b in schema.values())
-        Np = parent.n * per                                       # one block of `per` children per parent slot
-        parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per)
+        Np = parent.n * per_tot                                   # `per` live + `reserve` dormant per parent slot
+        parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
         state = torch.zeros(Np, dim, device=device)
         px0, px1 = schema["pos"]
         D = px1 - px0                                             # the child's own pos dimension
@@ -332,6 +334,11 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
             state[:, vx0:vx1] = vc[parent_idx]
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
+        if reserve > 0:                                           # the `reserve` tail of each parent block starts DORMANT
+            block_pos = torch.arange(Np, device=device) % per_tot
+            is_reserve = block_pos >= per
+            occ[is_reserve] = 0.0
+            state[is_reserve, px0:px1] = ppos[is_reserve]         # park the dormant pool at the parent centre
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render

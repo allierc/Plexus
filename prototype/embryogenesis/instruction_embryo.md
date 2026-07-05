@@ -28,42 +28,43 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 - **1D — high-density flow / migration.** At confluence cells keep flowing (`flow`>0, not jammed) and
   **collective migration** emerges (`migration` ↑, coherent streams).
 - **1E — two-type partitioning.** The two types segregate (e.g. left/right; `segregation` ↑).
-- **INT — integrate all (Phase-1 capstone, DONE this campaign).** Combine every established operator into ONE
-  blastula that holds together, flows, divides (bounded), orients, and partitions. ESTABLISHED here:
-  `cell_divide` ALONE caps realistic growth at ~1.5× — division is a mechanical mixing/repacking event, so 2×
-  dilutes the demix and 3–4× ruptures it. INT is the "minimal proliferative blastula that holds together", NOT
-  real embryonic growth — which is why Phase 2 needs a new growth mechanism (below).
+- **INT — integrate all (Phase-1 capstone).** Combine every established operator into ONE blastula that holds
+  together, flows, divides (bounded), and partitions. ESTABLISHED here: `cell_divide` ALONE caps realistic
+  growth at ~1.5× — division is a mechanical mixing/repacking event, so 2× dilutes the demix and 3–4× ruptures.
+- **ORI — axis orientation (Phase-1 capstone).** Give the integrated blastula a stable, programmed AXIS — e.g.
+  an external field (`gravity`) or asymmetric cue that orients the body. Gate: a reproducible body axis that
+  PERSISTS (stable orientation, the 1E partition aligned to it), the substrate Phase 2 builds on.
 
-## PHASE 2 — DEVELOPMENTAL LADDER (build on the oriented, integrated blastula). Continue here after INT.
-## **After MOR the campaign is COMPLETE — STOP. Do NOT invent further stages (no ORI / 2A / gravity sweeps);
-## every Phase-2 experiment must serve the blastula's development.** Same gate discipline + hard failures.
-- **DEV — development / gastrulation.** The oriented blastula undergoes gastrulation-like morphogenesis
-  (large-scale internal rearrangement + shape change) WHILE PRESERVING its programmed axis. Gate: big shape
-  change (`deform_rms` / `fourier_m2/m3` ↑, `shape_index`/area shift) with the 1E L/R partition axis KEPT
-  (`segregation_index` holds, axis orientation stable — morphogenesis must not scramble the pattern).
-- **PAT — patterning.** Establish STABLE spatial identities (germ-layer / tissue domains) on the oriented
-  embryo — e.g. chemical fields (`deposit`+`diffuse`+`decay`+`chemotax`) driving type identity. Gate: emergent,
-  spatially-stable type domains (`mi_type_x` ↑, domains persistent = low late-time `mixing_entropy` drift),
-  layered ON TOP of DEV's morphology.
-- **MOR — morphogenesis.** Axis-driven body shaping: convergence/extension, epiboly (spreading / area growth),
-  lumen formation. Gate: DIRECTIONAL tissue reshaping — anisotropic strain (AP-extension / ML-convergence
-  bands), `t1_rate` fluidity, area growth (epiboly), or an interior lumen (void).
-
-**GROWTH MECHANISM (the Phase-2 enabler — do NOT just crank `div_rate`).** Real embryonic growth needs a
-mechanism BEYOND `cell_divide` (which repacks/mixes and destroys demix above ~1.5–2×): **rest-length / volume
-growth** of the MPM body, **MPM-particle ADDITION** (add material points to expand/branch a cell), **oriented
-daughter placement**, or **growth-coupled sorting**. DEV/MOR will likely require introducing such an operator
-rather than more division. (A cell-growth-by-particle-addition operator is the planned enabler — see ledger.)
+## PHASE 2 — MORPHOGENESIS. Causal chain: **Blastula → Orientation → GROWTH → PATTERN → MORPHOGENESIS.** Do
+## NOT attempt morphogenesis before the model can actually grow tissue. **After MOR the campaign is COMPLETE —
+## STOP (no invented stages, no off-mission operators).** Same gate discipline + hard failures throughout.
+##
+## GROWTH-vs-DIVISION ROLES (Phase 2 — do NOT make division the growth mechanism):
+##   `cell_grow`   INCREASES tissue volume + creates protrusions (continuous, anisotropic material addition).
+##   `cell_divide` FILLS the newly grown volume (repopulation) — it follows growth, it does not create shape.
+- **GRO — growth (the prerequisite; START HERE).** Introduce continuous tissue growth via `cell_grow`
+  (MPM-material / rest-volume increase, INDEPENDENT of division). Goal: smooth expansion, buds, branches,
+  lobes. Learn how ANISOTROPIC growth generates a protrusion that LATER ROUNDS (grow directional → relax /
+  isotropic → the elastic + surface-tension physics rounds the bud). Gate: controlled area/volume growth with
+  a clean protrusion→rounding, blastula still intact (collapsed=0, escape=0). First GRO batch = an ISOLATED
+  `cell_grow` mechanism-validation (zero-growth no-op control + a small growth sweep), NOT a full morphogenesis test.
+- **PAT — patterning.** Stable chemical/mechanical identities on the GROWING tissue — domains persist during
+  growth, and growth fields become spatially programmable (a chemical field gates WHERE `cell_grow` acts).
+  Gate: `mi_type_x` ↑, domains persistent (low late-time `mixing_entropy` drift) even under active growth.
+- **MOR — morphogenesis (terminus).** PATTERN CONTROLS GROWTH: localized anisotropic `cell_grow` (gated by the
+  PAT field) creates buds / folds / elongation / branching; remodeling rounds + stabilizes. Targets:
+  gastrulation, convergence/extension, epiboly, lumen formation. Gate: directional, pattern-localized reshaping
+  (anisotropic strain bands, `t1_rate` fluidity, area growth, or a lumen) traceable to the PAT domains.
 
 State which stage the batch targets in the analysis entry; only one stage-transition per batch.
 
 **PER-STAGE BUDGET — ≤2 DAYS (48h) OR ≤10 batches per sub-phase, whichever first.** The driver injects a
 `>>> TIME CAP HIT` or `>>> BATCH CAP HIT` directive into your prompt when either budget is up — when you
 see it, advance IMMEDIATELY (adopt the best clean point, log any open blocker, write the next stage to
-`current_stage.txt`). Every stage — Phase 1 AND Phase 2 (DEV/PAT/MOR) — is hard-capped at 10 batches.
-**Ladder order: 1A→1B→1C→1D→1E→INT→DEV→PAT→MOR, then STOP.** Phase 1 (through INT) is COMPLETE; the campaign
-is now in Phase 2 starting at **DEV**. When the cap fires on **MOR** (the terminus), do NOT advance to any
-new stage — STOP designing experiments; the campaign is done. In STAGE STATUS record the batch each stage
+`current_stage.txt`). Every stage — Phase 1 AND Phase 2 (GRO/PAT/MOR) — is hard-capped at 10 batches.
+**Ladder order: 1A→1B→1C→1D→1E→INT→ORI→GRO→PAT→MOR, then STOP.** Phase 1 (through ORI) is COMPLETE; the
+campaign is now in Phase 2 starting at **GRO** (growth — the prerequisite). When the cap fires on **MOR**
+(the terminus), do NOT advance to any new stage — STOP designing experiments; the campaign is done. In STAGE STATUS record the batch each stage
 STARTED. If a stage's gate is not met within its budget, STOP grinding it: log the blocker as `[open]`,
 ADOPT the best clean (escape-free) point achieved as that stage's operating spec, and ADVANCE — or, if the
 gate is physically unreachable with the current operator set, relax the numeric target to the best value
