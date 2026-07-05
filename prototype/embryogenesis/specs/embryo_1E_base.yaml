@@ -1,0 +1,73 @@
+# embryo_1E_base -- Stage-1E (two-type partition) batch 1. Substrate = the calm 1D confluent container
+# (n132 nodiv, k4/anch/spin0.3/flow_align40) with the FLOCKING drivers REMOVED (heading_align OFF -- polar
+# coherence MIXES, the opposite of sorting) and the anchor STIFFENED (k10->20) for an escape-safe round shell
+# so cells sort WITHIN a stable container. NEW mechanism (R1 minimal, R3 one family): `attraction_repulsion`
+# -- a per-type first-derivative pull/push law (proven to compose with repel/glide/MPM in b05 embryo_ar).
+#
+# DIFFERENTIAL ADHESION (Steinberg): type a carries a cohesive PULL (p1>0), type b is NEUTRAL (p=0). The op
+# uses RECEIVER-type params, so a-cells cohere to their neighbourhood while b-cells do not -> the cohesive
+# type demixes into a compact CORE and displaces the neutral type to the PERIPHERY (differential-adhesion
+# sorting). `repel` (150,r0 0.02) stays the hard exclusion floor so pull cannot collapse nn_min.
+# p = [pull, pull_exp, push, push_exp]; sigma 0.03 = cohesion range ~2sigma; radius_graph 0.05 captures it.
+#
+# HYPOTHESIS (Batch 24): differential self-cohesion SORTS the two types -- segregation_index and contact_same
+# RISE and mixing_entropy/interface_frac FALL vs the no-adhesion control (s7), monotonically in pull strength,
+# while escape/collapsed/nn_min HOLD (cohesion pulls inward = escape-safe). Falsifier: if seg_index does not
+# separate from control across the pull ladder (0.3/0.6/1.0), differential self-cohesion cannot sort in this
+# confined blastula -> next batch needs a true cross-type mechanism (per-type chemotaxis cross-repulsion).
+# Judge TIER-1 (escape=0 & collapsed=0 & nn_min>=r0) FIRST, then segregation_index/contact_same vs ctrl s7.
+general: {name: embryo_1E_base, seed: 0, n_frames: 12000, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 132                                   # CONFLUENT (~3x): sorting is a confluence phenomenon
+    buffer: 200
+    spawn: sunflower
+    spawn_radius: 0.30
+    vmax: 0.6
+    types:
+      a: {fraction: 0.5, move_speed: 0.12, p: [0.6, 1.0, 0.0, 1.0]}   # COHESIVE: pull 0.6, no push
+      b: {fraction: 0.5, move_speed: 0.12, p: [0.0, 1.0, 0.0, 1.0]}   # NEUTRAL: no cohesion
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 200
+        layers:
+          - {frac: 0.93, youngs: 40,  material: liquid}     # water core (light blue)
+          - {frac: 1.0,  youngs: 200, material: elastic}     # thin elastic membrane (deep blue)
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.34, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: cell_divide, at: agent, rate: 0.0, max_occ: 0.88, offset: 0.004}   # division OFF (isolate sorting)
+  - {op: radius_graph, at: agent, radius: 0.05}
+  - {op: repel, at: agent, strength: 150.0, r0: 0.02}         # 1A-locked hard exclusion (pull-safe floor)
+  - {op: attraction_repulsion, at: agent, sigma: 0.03}        # NEW: per-type cohesion (differential adhesion)
+  - {op: glide, at: agent}
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 20.0}   # STIFFER shell (escape-safe container)
+  - {op: mpm_spin, at: mpm_particle, omega: 0.3, spin_k: 20.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 8.0e-6, k: 4.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.3, confine: 0.03, field: colour}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 40.0}    # regularizes the confluent pump (b20)
+schedule:
+  - cell_divide
+  - radius_graph
+  - repel
+  - attraction_repulsion
+  - glide
+  - mpm_anchor
+  - mpm_spin
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.01

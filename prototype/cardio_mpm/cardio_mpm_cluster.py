@@ -35,6 +35,7 @@ QUEUE = os.environ.get("CARDIO_QUEUE", f"gpu_{NODE}")
 NCPUS = os.environ.get("CARDIO_NCPUS", "8")
 WALL_MIN = int(os.environ.get("CARDIO_WALL_MIN", "600"))
 POLL_SEC = int(os.environ.get("CARDIO_POLL_SEC", "300"))          # status every 5 min
+HOLD_MIN = float(os.environ.get("CARDIO_SUBMIT_RETRY_MIN", "10"))  # hold cadence during a total-submit outage
 TIMEOUT_MIN = float(os.environ.get("CLAUDE_TIMEOUT_MIN", "40"))
 LOCAL_GPUS = [g for g in os.environ.get("CARDIO_LOCAL_GPUS", "0,1").split(",") if g != ""]
 
@@ -44,6 +45,22 @@ TRANSCRIPT = "cardio_mpm_cli_transcript.md"                        # human-only 
 PLAN = "cardio_mpm_plan.json"
 INSTR, LEDGER, ANALYSIS, USERIN = "instruction_cardio_mpm.md", "knowledge_cardio_mpm.md", "analysis_cardio_mpm.md", "user_input.md"
 LOGDIR = "loop_logs"
+
+# The devcontainer mounts the shared NFS export /groups/saalfeld/home/allierc/Graph at
+# /workspace, so the SAME files are /workspace/... here but /groups/.../Graph/... on the
+# cluster. The driver (run_claude / file writes) uses the local /workspace path; every
+# CLUSTER-SIDE path (bsub cd, job script, -o/-e logs, PYTHONPATH) is translated. When the
+# loop is run FROM a submit host where HERE is already cluster-visible, this is a no-op.
+_MAP = os.environ.get("CARDIO_CLUSTER_ROOT_MAP", "/workspace:/groups/saalfeld/home/allierc/Graph").split(":")
+
+
+def _cpath(p):
+    ap = os.path.abspath(p)
+    return (_MAP[1] + ap[len(_MAP[0]):]) if (len(_MAP) == 2 and ap.startswith(_MAP[0])) else ap
+
+
+CLUSTER_HERE = _cpath(HERE)
+CLUSTER_SRC = _cpath(SRC)
 
 
 def _now():
@@ -98,12 +115,20 @@ def _write_manifest(job):
 
 
 def _ssh(remote_cmd, retries=1):
+    # ServerAlive* + a hard subprocess timeout so an ESTABLISHED-but-wedged session cannot
+    # block the driver forever (ConnectTimeout only covers connection setup). A single hung
+    # bjobs ssh once froze wait_cluster for >80 min; this bounds every ssh to ~SSH_TIMEOUT.
     payload = f"bash -l -c {shlex.quote(remote_cmd)}"
-    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", CLUSTER_SSH, payload]
+    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+           "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", CLUSTER_SSH, payload]
+    ssh_timeout = int(os.environ.get("CARDIO_SSH_TIMEOUT", "90"))
     last = None
     for attempt in range(retries):
-        last = subprocess.run(cmd, capture_output=True, text=True)
-        if last.returncode == 0 or last.stdout.strip():
+        try:
+            last = subprocess.run(cmd, capture_output=True, text=True, timeout=ssh_timeout)
+        except subprocess.TimeoutExpired:
+            last = None                                   # treat a hung ssh as a failed attempt
+        if last is not None and (last.returncode == 0 or last.stdout.strip()):
             return last
         time.sleep(min(30, 5 * (2 ** attempt)))
     return last
@@ -114,9 +139,11 @@ def _train_cmd(job, device):
 
 
 def _job_script(job):
+    # written on the devcontainer side; the compute node sees the same file under the
+    # cluster path, so its CONTENT (cd / PYTHONPATH) must use the translated cluster paths.
     path = os.path.join(HERE, LOGDIR, f"{job['arch']}.sh")
     with open(path, "w") as f:
-        f.write("\n".join(["#!/bin/bash -l", f"cd {HERE}", f"export PYTHONPATH={SRC}",
+        f.write("\n".join(["#!/bin/bash -l", f"cd {CLUSTER_HERE}", f"export PYTHONPATH={CLUSTER_SRC}",
                            f"conda run -n {CONDA_ENV} python {_train_cmd(job, 'cuda')}"]) + "\n")
     os.chmod(path, 0o755)
     return path
@@ -125,9 +152,9 @@ def _job_script(job):
 def submit_cluster(jobs):
     ids = {}
     for j in jobs:
-        _write_manifest(j); script = _job_script(j)
-        out = os.path.join(HERE, j["log"]); err = out[:-4] + ".err"
-        bsub = (f"cd {HERE} && bsub -n {NCPUS} -gpu num=1 -q {QUEUE} -W {WALL_MIN} "
+        _write_manifest(j); script = _cpath(_job_script(j))
+        out = _cpath(os.path.join(HERE, j["log"])); err = out[:-4] + ".err"
+        bsub = (f"cd {CLUSTER_HERE} && bsub -n {NCPUS} -gpu num=1 -q {QUEUE} -W {WALL_MIN} "
                 f"-J {j['arch']} -o {out} -e {err} bash -l {script}")
         res = _ssh(bsub, retries=3)
         m = re.search(r"Job <(\d+)>", res.stdout if res else "")
@@ -201,17 +228,33 @@ def _final_r2(job):
     return None
 
 
+def _job_done(job, jid, states):
+    """A job is complete ONLY on POSITIVE evidence: bjobs reports a terminal (non-RUNNING)
+    state, OR its log shows the trainer's 'done ->' marker. An EMPTY/failed bjobs read
+    (states has no entry -> None) is NOT completion -- it means the query failed, so we keep
+    waiting. This is the fix for the flaky-ssh false-completion that advanced a batch while
+    its jobs were still training."""
+    st = states.get(jid)
+    if st is not None and st not in RUNNING_STATES:
+        return True                                          # bjobs says terminal (DONE/EXIT/...)
+    logf = os.path.join(HERE, job["log"])
+    if os.path.exists(logf) and "done ->" in open(logf, errors="ignore").read():
+        return True                                          # trainer printed completion
+    return False                                             # running, OR bjobs unknown -> keep waiting
+
+
 def wait_cluster(ids, jobs):
+    by_jid = {ids[j["slot"]]: j for j in jobs if j["slot"] in ids}
     pending = set(ids.values())
     while pending:
-        states = _bjobs_states(list(ids.values()))
-        print(f"[loop] status {_now()}  ({len([j for j in ids.values() if states.get(j) in RUNNING_STATES])}"
-              f"/{len(ids)} active):", flush=True)
+        states = _bjobs_states(list(pending))
+        active = len([jid for jid in pending if states.get(jid) in RUNNING_STATES])
+        print(f"[loop] status {_now()}  ({active}/{len(ids)} active):", flush=True)
         for j in jobs:
             jid = ids.get(j["slot"], "-"); st = states.get(jid, "?")
             print(f"[loop]   s{j['slot']} {j['name']:20s} {st:5s}  {_short_progress(j)}", flush=True)
         print(flush=True)                                            # blank line between status blocks
-        pending = {jid for jid in ids.values() if states.get(jid) in RUNNING_STATES}
+        pending = {jid for jid in pending if not _job_done(by_jid[jid], jid, states)}
         if pending:
             time.sleep(POLL_SEC)
     print(f"[loop] all {len(ids)} cluster jobs left the queue {_now()}", flush=True)
@@ -351,10 +394,16 @@ def main(n_batches, fresh, local):
             run_local(jobs); ids = {j["slot"]: "local" for j in jobs}
         else:
             ids = submit_cluster(jobs)
-            if ids:
-                wait_cluster(ids, jobs)
-            else:
-                print("[loop] no jobs submitted -- aborting batch (check bsub/queue)", flush=True)
+            while not ids:
+                # TOTAL submit failure => cluster/credential unreachable (dead Kerberos/SSH ticket).
+                # HOLD this batch and retry the SAME jobs; do NOT advance the counter, so an infra
+                # outage cannot silently burn the 40-batch science budget. Auto-resumes on renewal.
+                print(f"[loop] SUBMIT OUTAGE batch {b}: 0/{len(jobs)} jobs launched -- cluster unreachable "
+                      f"(renew kinit/SSH on the driver host). HOLDING batch {b}; retry in {HOLD_MIN:g} min.",
+                      flush=True)
+                time.sleep(HOLD_MIN * 60)
+                ids = submit_cluster(jobs)
+            wait_cluster(ids, jobs)
         check_completion(jobs, ids)
         run_claude(analysis_prompt(b, n_batches, jobs), f"BATCH {b}")
         save_state(b + 1)

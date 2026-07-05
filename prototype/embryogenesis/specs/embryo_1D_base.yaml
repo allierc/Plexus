@@ -1,0 +1,66 @@
+# embryo_1D_base -- Stage-1D workhorse (STARTED Batch 20). High-density CONFLUENT blastula, DIVISION
+# OFF, to isolate collective FLOW/MIGRATION from the 1C division-escape confound.
+# Substrate = the 1C operating point couplings (anch10 + agent_to_mpm.k 4, escape-safer than k6) but:
+#   - n 44 -> 132 initialized DENSE at spawn_radius 0.30 (near-confluent across the disc_R 0.338 shell)
+#     instead of proliferating there via cell_divide (nodiv = clean density, no division impulse).
+#   - cell_divide.rate 0.0 (operator kept so slots CAN re-enable; base is nodiv).
+# 1D question (Batch 20): at confluence do cells keep flowing (flow>0, t1_rate>0, not jammed) AND does
+# COLLECTIVE MIGRATION emerge -- polar_order UP, net_circulation UP from its campaign-long 0, msd/migration UP?
+# HYPOTHESIS: collective flow = the agent_to_mpm <-> flow_align FEEDBACK LOOP closing at high density
+# (cells push fluid -> coherent fluid velocity builds -> flow_align turns cells INTO the flow -> more push).
+# flow_align (first-derivative, steers heading toward local fluid velocity) is the coherence lever; the
+# 2nd-derivative Vicsek alignment/cruise/cohesion are BLOCKED in this 1st-order cell set (b12 note).
+# Judge TIER-1 (escape=0 & collapsed=0 & nn_min>=r0) FIRST, then net_circulation/polar_order/msd vs the gain-0 control.
+general: {name: embryo_1D_base, seed: 0, n_frames: 12000, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 132                                   # CONFLUENT start (~3x): high density is the 1D operating point
+    buffer: 200
+    spawn: sunflower
+    spawn_radius: 0.30                        # spread near the shell (disc_R 0.338) -> confluent init
+    vmax: 0.6
+    types:
+      a: {fraction: 0.5, move_speed: 0.12}
+      b: {fraction: 0.5, move_speed: 0.12}
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 200
+        layers:
+          - {frac: 0.93, youngs: 40,  material: liquid}     # water core (light blue)
+          - {frac: 1.0,  youngs: 200, material: elastic}     # thin elastic membrane (deep blue)
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.34, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: cell_divide, at: agent, rate: 0.0, max_occ: 0.88, offset: 0.004}   # 1D: division OFF (isolate flow from division)
+  - {op: radius_graph, at: agent, radius: 0.05}
+  - {op: repel, at: agent, strength: 150.0, r0: 0.02}         # 1A-locked hard exclusion
+  - {op: glide, at: agent}
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 10.0}   # 1C compliant anchor
+  - {op: mpm_spin, at: mpm_particle, omega: 0.3, spin_k: 20.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 8.0e-6, k: 4.0}   # cell->fluid (escape-safer k4)
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.3, confine: 0.03, field: colour}   # 1A-locked low press
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 40.0}    # fluid->cell heading: the 1D coherence lever
+schedule:
+  - cell_divide
+  - radius_graph
+  - repel
+  - glide
+  - mpm_anchor
+  - mpm_spin
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.01

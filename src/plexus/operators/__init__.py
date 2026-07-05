@@ -52,6 +52,7 @@ from . import agent_to_mpm          # noqa: F401  agent set -> mpm_grid   (agent
 from . import mpm_to_agent          # noqa: F401  mpm_grid  -> agent set  (material drags + confines agents)
 from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (cells soften/rigidify tissue)
 from . import flow_align            # noqa: F401  mpm_grid -> agent heading (polarity-velocity/flow alignment)
+from . import heading_align         # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment)
 from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
@@ -61,4 +62,4 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_drag", "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
-           "agent_to_mpm", "mpm_to_agent", "agent_remodel"]
+           "agent_to_mpm", "mpm_to_agent", "agent_remodel", "flow_align", "heading_align"]

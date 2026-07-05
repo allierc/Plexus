@@ -90,6 +90,35 @@ shrinks loop SIZE, the dimension LS is most sensitive to in this regime."*
   - Tag the result **[engineering]** (it characterises the metric, not the model; regime-robust, rarely
     re-tested) — but it UNDERWRITES every `[mechanism]` claim about why a parameter helped.
 
+## The residual vocabulary — MAGNITUDE / ENCLOSURE / DIRECTION / SHAPE (the STANDARD loop language)
+
+LoopScore is the objective (a single number). But **"does LS go up?" is not enough to reason mechanistically** —
+LS collapses four independent failure modes into one scalar. The 2026-07-04 audit showed the trap directly: a
+fit can have the RIGHT total motion (energy ratio 0.95) yet the WRONG loop (encloses ~1/6 the real area),
+because the old `size`/`ampL` diagnostics were sim-only and blind to the sim-vs-real *residual*. So the loop now
+carries a richer state: the real-referenced **`enclosure_row`** decomposition (in `cardio_mpm_train.py`, written
+to each run's `progress.txt` under `RESIDUAL_MORPHOLOGY`), reported per axis as **sim | real | ratio**
+(ratio = sim/real, 1.0 = perfect; real is the fixed data target, ~constant across runs, so a change in the ratio
+is attributable). The FOUR axes are the standard vocabulary of this campaign:
+
+  - **MAGNITUDE** — `energy` (√Σdisp², total work) and `peak` excursion. Is the tissue doing about the right
+    *amount* of motion? (This is what `ampL` already tracked — label it magnitude, NOT loop quality.)
+  - **ENCLOSURE** — `area` (|signed area|) and `loopiness` (|area|/bbox). Does the trajectory actually enclose
+    area, or is it a thin sliver? This is the loop-defining quantity R² is blind to.
+  - **DIRECTION** — `chir_match` (fraction of nodes whose rotation SENSE matches real). Right-handed vs
+    left-handed circulation.
+  - **SHAPE** — `minor` (minor-axis variance fraction λ₂/(λ₁+λ₂)). Is the motion genuinely 2-D (round loop) or
+    collapsed onto one principal axis (degenerate radial line)?
+
+**Use this vocabulary to interpret EVERY operator.** When a slot changes LS, do not stop at "LS up/down" — read
+the `enclosure_row` axes and answer: *does it move MAGNITUDE, ENCLOSURE, DIRECTION, or SHAPE?* A knob that lifts
+LS by fixing magnitude is a different mechanism from one that lifts LS by adding enclosure, even at equal ΔLS.
+Record findings in that language (e.g. "stiffness softening is a magnitude/overshoot lever, enclosure-neutral";
+"the travelling wave is an enclosure/shape lever"). This makes mechanisms comparable across batches and prevents
+re-confusing a magnitude change for a morphology change (the exact error the pre-audit "size frontier" narrative
+made). The LS sensitivity ranking (above) says which axes MOVE LS most; the enclosure_row says which axis an
+operator actually TOUCHED — together they turn "LS went up" into a mechanism.
+
 ## The model — what is learned vs fixed
 
 Forward = `pacemaker → uniform activation pulse → parametric stiffness/gain/fibre fields →
@@ -133,7 +162,8 @@ Every batch follows the same cycle. **Begin from observations, never from parame
    R², `ampL`. **Begin from the SURPRISE**: the result that contradicted your prediction, a flipped ranking,
    an unexpected morphology, a lever that did nothing where you expected an effect. Surprises drive science
    better than objectives — they point at the next experiment. Then characterize the *systematic* failure
-   (which nodes/regions are wrong, and how — too small? wrong chirality? wrong axis? overshoot?).
+   IN THE STANDARD VOCABULARY (read `progress.txt` → `RESIDUAL_MORPHOLOGY`): is the gap MAGNITUDE, ENCLOSURE,
+   DIRECTION, or SHAPE? (not just "too small" — that conflates magnitude and enclosure, the pre-audit error).
 2. **Hypothesize** — write ONE explicit hypothesis that makes a prediction. (e.g. "gain limits loop size";
    "fibre wavelength controls loop aspect"; "coarse stiffness creates regional coordination"; "the optimizer
    has not converged"; "duration changes chirality".)
@@ -142,7 +172,9 @@ Every batch follows the same cycle. **Begin from observations, never from parame
    sharpens the inference, one ablation.
 4. **Run** — training determines the outcome. Never predict results.
 5. **Interpret** — rank by LS, then LS SD, morphology, R². Did the result support or contradict the
-   hypothesis?
+   hypothesis? Then classify the operator in the standard vocabulary: which axis did it MOVE —
+   MAGNITUDE, ENCLOSURE, DIRECTION, or SHAPE (from the `enclosure_row` sim|real|ratio)? Two knobs with equal
+   ΔLS but different moved-axes are DIFFERENT mechanisms — record the axis, not just the ΔLS.
 6. **Update knowledge** — see below.
 
 ## Autonomy — design from evidence, not a roadmap

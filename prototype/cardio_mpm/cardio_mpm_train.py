@@ -195,6 +195,67 @@ def _openness(tr):
     return abs(_shoelace(tr)) / (np.ptp(tr[:, 0]) * np.ptp(tr[:, 1]) + 1e-12)
 
 
+def enclosure_row(sim_np, real_np, mov_np):
+    """REAL-REFERENCED residual-morphology decomposition over the interior-moving (mov) FIT nodes --
+    the set LoopScore actually uses (NOT the boundary-contaminated dashboard idx set). Every quantity
+    is a sim/real RATIO or agreement, so 1.0 == perfect and the number says WHICH way the fit fails.
+
+    The 2026-07-04 independent audit (audit_trajectories.py) established the residual is NOT
+    "insufficient displacement" but "insufficient CIRCULATION": the tissue does about the right amount
+    of work but the motion collapses onto one axis instead of enclosing area. Every axis is reported as
+    RAW SIM, RAW REAL, and their RATIO (=sim/real, 1.0==perfect) -- keeping the raw values makes a change
+    in the ratio attributable (did sim move, or did the real target shift -- real is the same data every
+    run, so it should be ~constant; if it drifts, the node set / centring changed). Four axes:
+        magnitude : energy = sqrt(sum sq disp)           sim~real  -> ratio ~0.95 (right work)
+                    peak   = median peak excursion         ratio ~0.6  (excursions a bit small)
+        enclosure : area   = median |signed area|          ratio ~0.16 (STRONGLY deficient)
+                    loop   = median |area|/bbox             sim under-encloses vs real
+        direction : chir_match = frac nodes matching sense ~0.81 (rotation sense mostly right)
+        shape     : minor  = aggregate lambda2/(l1+l2)     sim~0.17 / real~0.39 -> motion 1-D not 2-D
+    minor-axis fraction uses the pooled trajectory covariance (matches the audit's 0.17-vs-0.39 headline).
+    Position/DC removed per node before every statistic. All aggregates are node medians so ratio =
+    (median sim)/(median real) holds exactly and the table stays self-consistent.
+
+    NB: DIAGNOSIS ONLY (no grad). Replaces the old sim-only size/openness readout whose blindness to the
+    real loop made the loop misread an enclosure deficit as a fixed "size" limit."""
+    idx = np.where(mov_np)[0]
+    s_raw = sim_np[:, idx]; r_raw = real_np[:, idx]                     # [G,M,2] displacement from frame 0
+    s = s_raw - s_raw.mean(0, keepdims=True)                            # centred per node (loop SHAPE only)
+    r = r_raw - r_raw.mean(0, keepdims=True)
+
+    def _area(d):                                                       # signed shoelace area per node -> [M]
+        x, y = d[..., 0], d[..., 1]
+        return 0.5 * (x * np.roll(y, -1, 0) - np.roll(x, -1, 0) * y).sum(0)
+
+    def _minor_frac(d):                                                # aggregate lambda2/(lambda1+lambda2)
+        C = np.einsum('gmi,gmj->ij', d, d)                             # pooled 2x2 covariance
+        sv = np.linalg.svd(C, compute_uv=False)
+        return float(sv[1] / (sv.sum() + 1e-12))
+
+    a_s, a_r = _area(s), _area(r)
+    bb_s = np.ptp(s[..., 0], 0) * np.ptp(s[..., 1], 0) + 1e-12
+    bb_r = np.ptp(r[..., 0], 0) * np.ptp(r[..., 1], 0) + 1e-12
+    # ENERGY = total work: raw (UN-centred) displacement, so it matches the in-loop ampL/energy anchor
+    # (record ~0.95). Everything else is DC-removed because loop SHAPE is position-invariant.
+    energy_s = float(np.sqrt((s_raw ** 2).sum())); energy_r = float(np.sqrt((r_raw ** 2).sum()))
+    peak_s = float(np.median(np.abs(s).max(0).max(1))); peak_r = float(np.median(np.abs(r).max(0).max(1)))
+    area_s = float(np.median(np.abs(a_s))); area_r = float(np.median(np.abs(a_r)))
+    loop_s = float(np.median(np.abs(a_s) / bb_s)); loop_r = float(np.median(np.abs(a_r) / bb_r))
+    minor_s, minor_r = _minor_frac(s), _minor_frac(r)
+
+    def _ratio(sim, real):
+        return float(sim / (real + 1e-12))
+
+    return dict(
+        energy_sim=energy_s, energy_real=energy_r, energy_ratio=_ratio(energy_s, energy_r),
+        peak_sim=peak_s, peak_real=peak_r, peak_ratio=_ratio(peak_s, peak_r),
+        area_sim=area_s, area_real=area_r, area_ratio=_ratio(area_s, area_r),
+        loop_sim=loop_s, loop_real=loop_r, loop_ratio=_ratio(loop_s, loop_r),
+        minor_sim=minor_s, minor_real=minor_r, minor_ratio=_ratio(minor_s, minor_r),
+        chir_match=float((np.sign(a_s) == np.sign(a_r)).mean()),       # real reference = 1.0 (perfect sense)
+    )
+
+
 def morphology_row(sim_d, idx):
     """openness · chirality from the in-memory sim beat over the dashboard nodes [G,n,2]."""
     s = sim_d[:, idx]
@@ -383,6 +444,10 @@ def main():
                      help="gain source: 'scalar' (default, one global learnable) or 'siren' (spatial field)")
     ap.add_argument("--gain_omega", type=float, default=0,
                      help="SIREN omega_0 for gain field (0 = use --siren_omega; nonzero = independent)")
+    ap.add_argument("--gain_lo", type=float, default=0,
+                     help="lower gain bound (0 = use hardcoded GAIN_LO)")
+    ap.add_argument("--gain_hi", type=float, default=0,
+                     help="upper gain bound (0 = use hardcoded GAIN_HI)")
     # STIFF: UNet(microscope) -> youngs in [stiff_lo, stiff_hi] (the youngs RANGE stays fixed; the UNet learns the spatial pattern)
     ap.add_argument("--stiff_lo", type=float, default=50.0)
     ap.add_argument("--stiff_hi", type=float, default=150.0)
@@ -409,6 +474,20 @@ def main():
     # GLOBAL fixed knobs (swept per slot, not differentiated -- like amplitude/drag in train.py)
     ap.add_argument("--amplitude", type=float, default=10.0, help="active-stress amplitude (FIXED knob; plan constrains 10-15)")
     ap.add_argument("--drag_k", type=float, default=30.0, help="overdamped drag k (FIXED knob)")
+    ap.add_argument("--pulse_skew", type=float, default=1.0, help="activation time-asymmetry (FIXED knob): "
+                    "release/rise Gaussian-width ratio. 1.0 = symmetric (default). >1 = fast contract, "
+                    "slow release (physiological twitch); <1 = slow contract, fast release. Size-mechanism probe.")
+    ap.add_argument("--tw_amp", type=float, default=0.0, help="travelling-wave activation phase (FIXED knob, "
+                    "action-potential propagation): peak-to-peak activation delay in FRAMES across the unit "
+                    "domain along tw_angle. 0 = OFF (single global pulse, radial motion). >0 staggers regional "
+                    "contraction to break radial symmetry -> enclosed loops (LOOPINESS/area-enclosure probe).")
+    ap.add_argument("--tw_angle", type=float, default=0.0, help="travelling-wave propagation direction (radians). "
+                    "0 = wave sweeps along +x; 1.5708 = along +y. Only active when tw_amp>0.")
+    ap.add_argument("--rot_stress", type=float, default=0.0, help="ROTATING contraction axis (FIXED knob, radians): "
+                    "peak swing of the active-stress axis over the beat, theta(x,y) + rot_stress*sin(2*pi*(fr-onset)/period). "
+                    "0 = OFF (fixed axis -> time-reversible radial motion). >0 makes the contraction axis rotate DURING "
+                    "the beat so the release path differs from the contraction path -> the trajectory ENCLOSES AREA "
+                    "(loopiness/area-enclosure probe; targets the enclosure residual after travelling-wave falsified it).")
     ap.add_argument("--dur0", type=float, default=8.0, help=f"initial pulse duration (frames, LEARNABLE, bounded [{DUR_LO:.0f},{DUR_HI:.0f}] -> sharp pulse)")
     ap.add_argument("--dur_hi", type=float, default=DUR_HI, help=f"upper bound for learnable pulse duration (default {DUR_HI:.0f}; raise to explore longer pulses)")
     ap.add_argument("--resume", default="")
@@ -421,6 +500,8 @@ def main():
                     "10x10 GT(green)-vs-LEARNED(red) montage with per-node LoopScore to this path, then exit (no training)")
     ap.add_argument("--eval_decompose", default="", help="EVAL ONLY: with --resume <ckpt>, run ONE forward and save a "
                     "RESIDUAL-DECOMPOSITION bar chart (which morphology dimension the model loses LoopScore on) to this path")
+    ap.add_argument("--eval_dump", default="", help="EVAL ONLY: with --resume <ckpt>, run ONE forward and save the raw "
+                    "sim_d/real_d/mov/idx arrays to this .npz for independent (out-of-pipeline) trajectory analysis")
     args = ap.parse_args()
     if args.smoke:
         args.n_iter, args.warmup, args.grad, args.substeps = 2, 12, 12, 4
@@ -457,7 +538,9 @@ def main():
         frac = min(max((v - lo) / (hi - lo), 1e-3), 1 - 1e-3)
         return P(np.log(frac / (1 - frac)))
     f_wl, f_ang, f_amp, f_ph = P(args.fibre_wl), P(args.fibre_angle), P(args.fibre_amp), P(args.fibre_phase)
-    raw_g = _logit_init(args.gain0, GAIN_LO, GAIN_HI)                            # uniform global gain (bounded)
+    g_lo = args.gain_lo if args.gain_lo > 0 else GAIN_LO
+    g_hi = args.gain_hi if args.gain_hi > 0 else GAIN_HI
+    raw_g = _logit_init(args.gain0, g_lo, g_hi)                            # uniform global gain (bounded)
     raw_dur = _logit_init(args.dur0, DUR_LO, DUR_HI)                             # dur = DUR_LO+(DUR_HI-DUR_LO)*sigmoid(raw_dur)
     s_lo, s_hi = float(args.stiff_lo), float(args.stiff_hi)                      # fixed youngs range; the field learns the pattern
     # microscope UNet -- built ONLY for the channels still sourced from the image (legacy paths)
@@ -506,6 +589,16 @@ def main():
     force_ops = ["pulse_to_active_stress", "mpm_drag"]
     mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]
     spatial = _spatial_profile(profile, center, radius, dev)
+    # TRAVELLING-WAVE activation phase tau(x,y): a coarse PLANE WAVE (action-potential propagation).
+    # Per-pixel activation delay in frames = tw_amp * projection onto the wave direction, centered so the
+    # mean delay is 0 (the beat stays phase-locked). tw_amp=0 -> tw_delay None -> the original global pulse.
+    if args.tw_amp:
+        _xs = (torch.arange(RES, device=dev) + 0.5) / RES
+        _gx, _gy = torch.meshgrid(_xs, _xs, indexing="ij")
+        tw_delay = args.tw_amp * ((_gx - 0.5) * float(np.cos(args.tw_angle))
+                                  + (_gy - 0.5) * float(np.sin(args.tw_angle)))   # [RES,RES] frames
+    else:
+        tw_delay = None
     pa, pb = lvl.state_schema["pos"]
 
     # particle <- map-pixel sampling grid (same convention as train.py)
@@ -531,10 +624,10 @@ def main():
             theta = theta + theta_dev
         d = torch.stack([torch.cos(theta), torch.sin(theta)])                # [2,RES,RES] unit contraction axis
         # GAIN: either a single UNIFORM GLOBAL scalar or a SIREN spatial field
-        gain_g = GAIN_LO + (GAIN_HI - GAIN_LO) * torch.sigmoid(raw_g)        # scalar (base or mean init)
+        gain_g = g_lo + (g_hi - g_lo) * torch.sigmoid(raw_g)        # scalar (base or mean init)
         if gain_siren is not None:
             gain01 = torch.sigmoid(gain_siren(field_coords)[:, 0].reshape(RES, RES))   # FREE spatial field in [0,1]
-            gain_map = GAIN_LO + (GAIN_HI - GAIN_LO) * gain01                         # [RES,RES] in [GAIN_LO, GAIN_HI]
+            gain_map = g_lo + (g_hi - g_lo) * gain01                         # [RES,RES] in [g_lo, g_hi]
             gain_p = sample_to_particles(gain_map)                                     # [N]
         else:
             gain_p = gain_g * torch.ones(rest.shape[0], device=dev)              # [N] uniform
@@ -557,8 +650,31 @@ def main():
     opt = torch.optim.Adam(learn, lr=args.lr)
 
     def pulse_env(fr, dur):
-        ph = (fr - onset) % period; ph = min(ph, period - ph)
-        return torch.exp(-0.5 * (ph / (dur + 1e-3)) ** 2)
+        sph = (fr - onset) % period                       # signed phase about nearest onset:
+        if sph > period / 2: sph -= period                #   <0 = rising toward onset, >0 = releasing after
+        w = dur if sph <= 0 else dur * args.pulse_skew     # skew>1 = fatter (slower) release side
+        return torch.exp(-0.5 * (sph / (w + 1e-3)) ** 2)
+
+    def act_grid(fr, dur):
+        """[RES,RES] activation field = temporal pulse (optionally travelling-wave-delayed) x spatial mask."""
+        if tw_delay is None:
+            return pulse_env(fr, dur) * spatial
+        sph = (fr - onset) % period
+        if sph > period / 2: sph -= period
+        sph_px = sph - tw_delay                                        # [RES,RES] per-pixel phase
+        sph_px = sph_px - period * torch.round(sph_px / period)        # wrap to [-period/2, period/2]
+        w = torch.where(sph_px <= 0, dur * torch.ones_like(sph_px), dur * args.pulse_skew)  # skew on release side
+        return torch.exp(-0.5 * (sph_px / (w + 1e-3)) ** 2) * spatial
+
+    def dir_at(theta, dir_grid, fr):
+        """Contraction-axis direction grid [2,RES,RES] for frame fr. rot_stress=0 -> the fixed dir_grid
+        (byte-identical to the old path); rot_stress>0 rotates the axis by a mean-zero, phase-locked
+        offset over the beat so the release path differs from the contraction path (encloses area)."""
+        if not args.rot_stress:
+            return dir_grid
+        off = args.rot_stress * float(np.sin(2 * np.pi * (fr - onset) / period))
+        th = theta + off
+        return torch.stack([torch.cos(th), torch.sin(th)])                # differentiable in theta
 
     outdir = args.outdir or os.path.join(HERE, "archive", "fit2_" + spec.name + (("_" + args.tag) if args.tag else ""))
     os.makedirs(outdir, exist_ok=True)
@@ -595,20 +711,22 @@ def main():
                 start_iter = 0
             print(f"  resumed from {path} (start_iter={start_iter})", flush=True)
 
-    if args.eval_montage or args.eval_decompose or args.redash:        # EVAL: one forward from the loaded ckpt, then exit
+    if args.eval_montage or args.eval_decompose or args.redash or args.eval_dump:  # EVAL: one forward from the loaded ckpt, then exit
         with torch.no_grad():
             reset_state(lvl, rest, dev)
             youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta, theta_dev = maps()
             dur = DUR_LO + (args.dur_hi - DUR_LO) * torch.sigmoid(raw_dur)
             set_maps(H, lvl, youngs_p, dir_grid, gain_p)
             for fr in range(start, onset):
-                H.fields["activation"].grid = (pulse_env(fr, dur) * spatial)[None]
+                H.fields["activation"].grid = act_grid(fr, dur)[None]
+                H.fields["direction"].grid = dir_at(theta, dir_grid, fr)   # rotating axis (no-op if rot_stress=0)
                 step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
             sim = []
             for k in range(grad_len):
                 fr = onset + k
-                H.fields["activation"].grid = (pulse_env(fr, dur) * spatial)[None]
+                H.fields["activation"].grid = act_grid(fr, dur)[None]
+                H.fields["direction"].grid = dir_at(theta, dir_grid, fr)   # rotating axis (no-op if rot_stress=0)
                 step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
                 sim.append(lvl.state[:, pa:pb])
@@ -617,6 +735,12 @@ def main():
             render_eval_montage(rest, idx, sim_d, real_d, mov, args.eval_montage, args.harm_K, args.traj_amp, spec.name)
         if args.eval_decompose:
             render_residual_decomposition(sim_d, real_d, mov, args.eval_decompose, args.harm_K, spec.name)
+        if args.eval_dump:
+            np.savez(args.eval_dump,
+                     sim_d=sim_d.detach().cpu().numpy(), real_d=real_d.detach().cpu().numpy(),
+                     mov=mov.detach().cpu().numpy(), idx=np.asarray(idx),
+                     rest=rest.detach().cpu().numpy(), bnd=bnd.detach().cpu().numpy())
+            print(f"  eval_dump -> {args.eval_dump}  sim_d{tuple(sim_d.shape)} real_d{tuple(real_d.shape)} mov={int(mov.sum())}", flush=True)
         if args.redash:                                                # re-render the dashboard for this checkpoint
             import re as _re
             _m = _re.search(r"model_(\d+)", str(args.resume))
@@ -639,14 +763,16 @@ def main():
         with torch.no_grad():                                              # warmup -> settle to the beat rhythm
             set_maps(H, lvl, youngs_p.detach(), dir_grid.detach(), gain_p.detach())
             for fr in range(start, onset):
-                H.fields["activation"].grid = (pulse_env(fr, dur.detach()) * spatial)[None]
+                H.fields["activation"].grid = act_grid(fr, dur.detach())[None]
+                H.fields["direction"].grid = dir_at(theta.detach(), dir_grid.detach(), fr)  # rotating axis (no-op if rot_stress=0)
                 step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
         set_maps(H, lvl, youngs_p, dir_grid, gain_p)                       # differentiable beat
         sim = []
         for k in range(grad_len):
             fr = onset + k
-            H.fields["activation"].grid = (pulse_env(fr, dur) * spatial)[None]
+            H.fields["activation"].grid = act_grid(fr, dur)[None]
+            H.fields["direction"].grid = dir_at(theta, dir_grid, fr)       # rotating axis (no-op if rot_stress=0)
             step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
             anchor(lvl, rest, real_disp[fr] - ref, bnd)
             sim.append(lvl.state[:, pa:pb])
@@ -682,11 +808,22 @@ def main():
                              f"fwl={f_wl.item():.1f} fang={f_ang.item():.2f} gain={gain_p.mean().item():.2f} "
                              f"yng[{youngs_map.min().item():.0f},{youngs_map.max().item():.0f}]")
         if it % args.ckpt_every == 0 or it == args.n_iter - 1:
-            op_, chir_, size_ = morphology_row(sim_d.detach().cpu().numpy(), idx)
+            _sim_np = sim_d.detach().cpu().numpy()
+            op_, chir_, size_ = morphology_row(_sim_np, idx)           # sim-only; dashboard labels only
+            enc = enclosure_row(_sim_np, real_d.detach().cpu().numpy(), mov.detach().cpu().numpy())
+            # 4-axis residual morphology, each axis as sim|real|ratio (ratio=sim/real, 1.0==perfect).
+            # PRIMARY diagnostic for the agentic loop: right MAGNITUDE, deficient ENCLOSURE/SHAPE. Raw
+            # sim & real are kept (not just the ratio) so a change in the ratio is attributable.
+            enc_line = (f"[mag] energy {enc['energy_sim']:.3g}|{enc['energy_real']:.3g}|{enc['energy_ratio']:.3f} "
+                        f"peak {enc['peak_sim']:.2e}|{enc['peak_real']:.2e}|{enc['peak_ratio']:.3f}  "
+                        f"[enc] area {enc['area_sim']:.2e}|{enc['area_real']:.2e}|{enc['area_ratio']:.3f} "
+                        f"loop {enc['loop_sim']:.3f}|{enc['loop_real']:.3f}|{enc['loop_ratio']:.3f}  "
+                        f"[dir] chir_match {enc['chir_match']:.3f}  "
+                        f"[shape] minor {enc['minor_sim']:.3f}|{enc['minor_real']:.3f}|{enc['minor_ratio']:.3f}")
             dh_tag = f" dur_hi={args.dur_hi:.0f}" if args.dur_hi != DUR_HI else ""
             info = (f"{spec.name} [PARAMETRIC active-stress]  it {it}/{args.n_iter}  R2={r2:+.3f}  "
                     f"open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}  dur={dur.item():.1f}{dh_tag} amp={args.amplitude} "
-                    f"drag={args.drag_k}\nfibre wl={f_wl.item():.1f} ang={f_ang.item():.2f} amp={f_amp.item():.2f} "
+                    f"drag={args.drag_k}\n{enc_line}\nfibre wl={f_wl.item():.1f} ang={f_ang.item():.2f} amp={f_amp.item():.2f} "
                     f"ph={f_ph.item():.2f} | gain({'SIREN' if gain_siren is not None else 'uniform'})={gain_p.mean().item():.3f}"
                     f"{'[' + f'{gain_map.min().item():.2f},{gain_map.max().item():.2f}' + ']' if gain_siren is not None else ''} | "
                     f"stiff({'SIREN' if args.stiff_src == 'siren' else 'UNet'}) "
@@ -704,8 +841,19 @@ def main():
             torch.save(sd_save, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:
                 pf.write(f"it={it}/{args.n_iter} R2={r2:+.3f} LS={harm_r2:+.3f} LS_SD={harm_sd:.3f} "
-                         f"loss={loss.item():.3f} ampL={amp_loss.item():.3f} open={op_:.3f} chir+={chir_:.2f} "
-                         f"size={size_:.2e} dur={dur.item():.1f} amp={args.amplitude} drag={args.drag_k} objective={args.loss}")
+                         f"loss={loss.item():.3f} ampL={amp_loss.item():.3f} tw={args.tw_amp:.0f} rot={args.rot_stress:.2f} "
+                         f"dur={dur.item():.1f} amp={args.amplitude} drag={args.drag_k} objective={args.loss}\n"
+                         # RESIDUAL MORPHOLOGY -- read THIS, not the sim-only size, to reason about the fit.
+                         # Each axis: sim | real | ratio (=sim/real, 1.0=perfect). Right work, wrong circulation.
+                         f"RESIDUAL_MORPHOLOGY (sim|real|ratio):\n"
+                         f"  magnitude  energy={enc['energy_sim']:.3g}|{enc['energy_real']:.3g}|{enc['energy_ratio']:.3f}"
+                         f"  peak={enc['peak_sim']:.2e}|{enc['peak_real']:.2e}|{enc['peak_ratio']:.3f}\n"
+                         f"  enclosure  area={enc['area_sim']:.2e}|{enc['area_real']:.2e}|{enc['area_ratio']:.3f}"
+                         f"  loopiness={enc['loop_sim']:.3f}|{enc['loop_real']:.3f}|{enc['loop_ratio']:.3f}\n"
+                         f"  direction  chir_match={enc['chir_match']:.3f}|1.000|{enc['chir_match']:.3f}\n"
+                         f"  shape      minor_axis={enc['minor_sim']:.3f}|{enc['minor_real']:.3f}|{enc['minor_ratio']:.3f}\n"
+                         # legacy sim-only fields retained for back-compat parsing (MAGNITUDE only, NOT loop quality):
+                         f"legacy_simonly: open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}")
     _hm, _hsd = HARM.harmonic_stats(sim_d, real_d, mov, K=args.harm_K)
     print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f} LS={_hm:+.3f} LS_SD={_hsd:.3f} objective={args.loss})", flush=True)
 
