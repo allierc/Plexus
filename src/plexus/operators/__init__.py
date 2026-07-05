@@ -26,7 +26,7 @@ from . import decay                 # noqa: F401  field -> field
 from . import sense                 # noqa: F401  field -> set, sensor-fan steering (2D/3D, vector heading)
 from . import glide                # noqa: F401  slime self-propulsion: glide along the heading (1st-order, overdamped)
 from . import bounce                # noqa: F401  set -> wall/obstacle reflection (2D/3D specular re-head)
-from . import video_field           # noqa: F401  registers the `video` field + playback
+from . import prescribed_field      # noqa: F401  registers the `prescribed` field + playback
 from . import chemotax              # noqa: F401  field -> set gradient coupling; emit: velocity|mpm_acceleration (merges chemotaxis+chemo_force)
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
 # active-stimulus decomposition (clock -> activation field -> contraction -> MPM):
@@ -57,7 +57,7 @@ from . import cell_divide           # noqa: F401  agent set structural: prolifer
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "cohesion", "alignment", "separation", "cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
-           "video_field", "chemotax", "gravity",
+           "prescribed_field", "chemotax", "gravity",
            "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_drag", "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
