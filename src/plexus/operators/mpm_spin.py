@@ -8,7 +8,7 @@ A proportional controller toward the rigid-rotation velocity field about a centr
 
 Returned as a particle-level delta the engine sums into `H.delta(mpm_particle)`; the MLS-MPM
 `p2g` scatter consumes it as an external body force (`a_ext += H.delta(particle)`), exactly like
-`mpm_drag` and `gravity`. `PREDICTION=None` (the engine does not integrate the particle set; g2p
+`mpm_drag` and `gravity`. `EMIT=None` (the engine does not integrate the particle set; g2p
 owns advection), so the spin enters mechanics only through the substep. The `-v_i` term damps
 toward the target rate, so a disc started at rest spins UP to `omega` and then rotates steadily
 -- a single "rotate the disc slowly" knob, no external swirl map or pacemaker needed. Self-
@@ -27,7 +27,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("mpm_spin", level="particle", kind="lateral")
 class MPMSpin(Lateral):
-    PREDICTION = None                 # consumed by the MPM substep as a body force, not engine-integrated
+    EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["omega"]
     MECHANISM_TAGS = ["solid_body_rotation", "swirl"]

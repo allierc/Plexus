@@ -101,7 +101,7 @@ class ApplyMaterialMap(Exchange):
     Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
     a per-particle buffer of that name. Mutates per-particle buffers, returns {}."""
 
-    PREDICTION = None                              # sets material, emits no force
+    EMIT = None                              # sets material, emits no force
     REQUIRES_PARAMS = ["from", "target"]
     SUPPORTED_DIMS = [2, 3]
     MECHANISM_TAGS = ["material_map", "heterogeneous_stiffness", "symmetry_breaking"]

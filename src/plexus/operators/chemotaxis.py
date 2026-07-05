@@ -17,7 +17,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("chemotaxis", level="particle", kind="exchange")
 class Chemotaxis(Exchange):
-    PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates
+    EMIT = "velocity"             # emits a velocity; the ENGINE integrates
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation"]
     MORPHOLOGY_PRIOR = ["single_cluster", "field_outline"]

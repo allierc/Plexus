@@ -13,7 +13,7 @@ Agents have no physical mass, so a coupling is parameterised by `agent_mass` (an
 per-agent mass, ~ a fluid particle's `p_vol*rho`) times a gain `k`. The scattered velocity is
 the agent's propulsion velocity `move_speed * heading` (the same vector `glide` emits).
 
-`kind=exchange`, `PREDICTION = None`: it writes the grid field in place and returns {} (like
+`kind=exchange`, `EMIT = None`: it writes the grid field in place and returns {} (like
 p2g). ORDERING IS CRITICAL: schedule it INSIDE the MPM substep, AFTER p2g (which zeroes and
 overwrites g.m/g.mv every substep) and BEFORE mpm_grid_update (which consumes them). Substep:
 `[mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]`.
@@ -29,7 +29,7 @@ from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 @register_operator("agent_to_mpm", level="cell", kind="exchange")
 class AgentToMPM(Exchange):
-    PREDICTION = None                               # writes the grid; consumed by the MPM substep
+    EMIT = None                               # writes the grid; consumed by the MPM substep
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["agent_to_grid", "active_stress_source"]

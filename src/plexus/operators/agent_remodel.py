@@ -12,7 +12,7 @@ rate where cells sit), material points gather it, and their Lame moduli drift mu
 
 The multiplicative form preserves liquid points (mu=0 stays 0) and never flips sign; the clamps
 bound the excursion. Grid cells with no cells nearby get rate 0 -> factor 1 -> no change, so
-only the cell-occupied tissue is remodelled. `kind=exchange`, `PREDICTION=None` (mutates the
+only the cell-occupied tissue is remodelled. `kind=exchange`, `EMIT=None` (mutates the
 target set's buffers in place, returns {}). Schedule it in the OUTER loop (once per frame), like
 the other body-force couplings.
 """
@@ -27,7 +27,7 @@ from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 @register_operator("agent_remodel", level="cell", kind="exchange")
 class AgentRemodel(Exchange):
-    PREDICTION = None
+    EMIT = None
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["to", "target"]
     MECHANISM_TAGS = ["tissue_remodelling", "stiffening", "fluidisation"]

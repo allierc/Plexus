@@ -10,7 +10,7 @@ summed over its neighbours j (the edges left by a `rewire` operator such as
 with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
 Gaussian is the long-range pull, the second the short-range push; their balance
 gives type-specific phases (clusters, networks, lattices). First-derivative law:
-returns a velocity (set `prediction: first_derivative`).
+returns a velocity (`EMIT = velocity`; overdamped, engine-integrated).
 
 This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
 a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
@@ -27,7 +27,7 @@ from plexus.geometry import minimum_image
 
 @register_operator("attraction_repulsion", level="particle", kind="lateral")
 class AttractionRepulsion(Lateral):
-    PREDICTION = "first_derivative"             # emits a velocity (overdamped law)
+    EMIT = "velocity"             # emits a velocity (overdamped law)
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
     REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
     REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]

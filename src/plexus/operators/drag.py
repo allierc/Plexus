@@ -4,7 +4,7 @@ A `drag` force opposes velocity: acc = -k * vel. Modelling friction as an
 operator (rather than a `damping` field baked into the integrator) keeps the
 integrator generic and lets drag compose in the schedule with the other forces.
 It is a second-derivative contribution (an acceleration), so it lives on sets
-integrated with `prediction: second_derivative` (e.g. alongside boids).
+integrated with `emit: acceleration` (the class default; e.g. alongside boids).
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("drag", level="particle", kind="lateral")
 class Drag(Lateral):
-    PREDICTION = "second_derivative"            # emits an acceleration
+    EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
     PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}

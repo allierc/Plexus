@@ -27,7 +27,7 @@ from plexus.geometry import minimum_image
 
 @register_operator("Coulomb", level="particle", kind="lateral")
 class Coulomb(Lateral):
-    PREDICTION = "second_derivative"            # emits an acceleration (charges have inertia)
+    EMIT = "acceleration"            # emits an acceleration (charges have inertia)
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
     REQUIRES_TYPE_PROPS = ["charge"]            # per-type charge q (signed scalar)
     MECHANISM_TAGS = ["electrostatics", "coulomb", "inverse_square", "long_range"]

@@ -15,7 +15,7 @@ from plexus.geometry import neighbour_mean
 
 @register_operator("separation", level="particle", kind="lateral")
 class Separation(Lateral):
-    PREDICTION = "second_derivative"
+    EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
     REQUIRES_TYPE_PROPS = ["separation"]
     MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]

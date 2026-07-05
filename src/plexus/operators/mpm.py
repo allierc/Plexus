@@ -322,7 +322,7 @@ class MLSMPMMechanics(Exchange):
         dev = p.state.device
         # external per-cell acceleration = the PARENT set's accumulated delta. A cell-level
         # force operator (e.g. gravity) returns {cell: g}; the engine accumulates it and --
-        # since the cell has no PREDICTION -- never integrates it, so the MPM substep is free
+        # since the cell has no EMIT -- never integrates it, so the MPM substep is free
         # to consume it here as a body force (no bespoke `H.cell_accel`).
         pn = getattr(p, "parent_name", None)
         if pn is not None:
