@@ -37,14 +37,10 @@ class ChemoForce(Exchange):
         self.gain = float(params.get("gain", 1.0))
         self.channel = params.get("channel", None)          # None -> sum all channels (any slime trail)
         self.by_material = bool(params.get("by_material", False))  # solids climb (+|gain|), liquids flee (-|gain|)
-        self.after = int(params.get("after", 0))            # gate: off until frame >= after (phased forcing)
-        self.before = int(params.get("before", 1 << 30))    # gate: off once frame >= before
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        if not (self.after <= int(getattr(H, "frame", 0)) < self.before):
-            return {self.at: torch.zeros_like(lvl.get("pos"))}      # outside the active window -> no force
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
         g = fld.grid.sum(0) if self.channel is None else fld.grid[int(self.channel)]   # [nx, ny]
