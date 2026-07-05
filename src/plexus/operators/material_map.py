@@ -21,7 +21,6 @@ from __future__ import annotations
 import os
 
 import torch
-import torch.nn.functional as Fnn
 
 from plexus.models.base import Field, Exchange
 from plexus.models.registry import register_field, register_operator
@@ -117,16 +116,8 @@ class ApplyMaterialMap(Exchange):
         self.at = params.get("_at", "mpm_particle")
 
     def _sample(self, H, lvl):
-        """Bilinear-sample the map field at the particle positions -> intensity [N]."""
-        pos = lvl.get("pos")
-        g = H.fields[self.field_name].grid[self.channel]            # [nx, ny]
-        W = float(getattr(H, "world_width", 1.0))
-        gxn = (pos[:, 0] / W) * 2 - 1
-        gyn = (pos[:, 1] / 1.0) * 2 - 1
-        grid = torch.stack([gyn, gxn], -1)[None, None]             # grid_sample expects (x=ny, y=nx)
-        val = Fnn.grid_sample(g[None, None], grid, mode="bilinear",
-                              padding_mode="border", align_corners=True)[0, 0, 0]
-        return val.clamp(0.0, 1.0)
+        """Bilinear-sample the map field at the particle positions -> intensity [N] in [0,1]."""
+        return H.fields[self.field_name].sample(lvl.get("pos"), self.channel).clamp(0.0, 1.0)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)

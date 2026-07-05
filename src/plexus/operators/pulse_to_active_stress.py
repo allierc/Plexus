@@ -20,7 +20,6 @@ which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as Fnn
 
 from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
@@ -44,23 +43,13 @@ class PulseToActiveStress(Exchange):
                              "(a vector_grid field giving the contraction axis n)")
         self.at = params.get("_at", "particle")
 
-    def _sample(self, field_grid, pos, W):
-        """Bilinear-sample a `[C, nx, ny]` field at particle positions -> `[N, C]`.
-        Same convention as pulse_to_contraction so force<->stress is a clean mechanism swap."""
-        gxn = (pos[:, 0] / W) * 2 - 1
-        gyn = (pos[:, 1] / 1.0) * 2 - 1
-        grid = torch.stack([gyn, gxn], -1)[None, None]              # grid_sample expects (x=ny, y=nx)
-        return Fnn.grid_sample(field_grid[None], grid, mode="bilinear",
-                               padding_mode="border", align_corners=True)[0, :, 0].t()
-
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
-        W = float(getattr(H, "world_width", 1.0))
 
-        a = self._sample(fld.grid[self.channel:self.channel + 1], pos, W)[:, 0]   # [N] activation a(x)
-        n = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2] contraction axis
+        a = fld.sample(pos, self.channel)                                         # [N] activation a(x)
+        n = H.fields[self.direction_from].sample(pos)                             # [N, 2] contraction axis
         n = n / n.norm(dim=1, keepdim=True).clamp(min=1e-9)                        # unit
         gate = (a * lvl.occ).clamp(min=0.0)                                       # only inactive=0 particles off
         gain = getattr(lvl, "gain", None)                                         # optional per-particle gain map
