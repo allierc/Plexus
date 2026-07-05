@@ -1,5 +1,5 @@
-"""VideoField -- a scalar field *prescribed* from an external video, plus the
-`playback` operator that advances it frame by frame.
+"""PrescribedField -- a scalar field *prescribed* from external data (currently a
+video), plus the `playback` operator that advances it frame by frame.
 
 Some fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded
 movie becomes a time-varying scalar field over the domain. The field is pure state
@@ -20,8 +20,8 @@ from plexus.models.registry import register_field, register_operator
 from plexus.paths import graphs_data_path
 
 
-@register_field("video", frame="video")
-class VideoField(Field):
+@register_field("prescribed", frame="prescribed")
+class PrescribedField(Field):
     """A 1-channel scalar field whose grid is read from a video `[T, ny, nx]` (tif).
     Pure state: the `video` buffer `[T, nx, ny]`, the current `grid` `[1, nx, ny]`,
     and the world<->pixel geometry. No dynamics -- `playback` drives it."""
