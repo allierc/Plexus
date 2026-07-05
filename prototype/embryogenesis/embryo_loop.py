@@ -50,10 +50,20 @@ CLUSTER_HERE = _cpath(HERE)
 
 
 def _ssh(cmd, retries=3):
+    # ServerAlive* + a hard subprocess timeout so an ESTABLISHED-but-wedged session cannot
+    # block the poller forever (ConnectTimeout only covers connection setup). A single hung
+    # bjobs ssh froze the sibling cardio loop for >80 min; this bounds every ssh to ~timeout.
+    timeout = int(os.environ.get("EMBRYO_SSH_TIMEOUT", "90"))
+    r = None
     for _ in range(retries):
-        r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", CLUSTER_SSH,
-                            f"source {LSF_PROFILE} 2>/dev/null; {cmd}"], capture_output=True, text=True)
-        if r.returncode == 0:
+        try:
+            r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+                                "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", CLUSTER_SSH,
+                                f"source {LSF_PROFILE} 2>/dev/null; {cmd}"],
+                               capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            r = None                                    # treat a hung ssh as a failed attempt
+        if r is not None and r.returncode == 0:
             return r
         time.sleep(5)
     return r
@@ -87,19 +97,37 @@ def submit_cluster(slots, batch):
 def poll_cluster(ids):
     if not ids:
         return
-    live = set(ids.values())
+    jid_to_tag = {str(v): k for k, v in ids.items()}
+    live = set(str(v) for v in ids.values())
     while live:
         time.sleep(POLL_SEC)
         r = _ssh("bjobs -noheader -o 'id stat' " + " ".join(sorted(live)))
         txt = (r.stdout if r else "") or ""
+        # parse the states we actually got back
+        states = {}
+        for ln in txt.splitlines():
+            p = ln.split()
+            if len(p) >= 2 and p[0].isdigit():
+                states[p[0]] = p[1]
+        query_ok = bool(r and r.returncode == 0)
         done = set()
         for jid in list(live):
-            st = next((ln.split()[1] for ln in txt.splitlines() if ln.split() and ln.split()[0] == jid), "DONE")
-            if st not in ("PEND", "RUN", "PROV", "WAIT"):
+            tag = jid_to_tag.get(jid, "")
+            st = states.get(jid)
+            outf = os.path.join(HERE, "loop_logs", f"{tag}.out")
+            finished = ((os.path.isfile(outf) and "END " in open(outf, errors="ignore").read())
+                        or os.path.isfile(os.path.join(HERE, "archive", tag, "metrics.json")))
+            terminal = st is not None and st not in ("PEND", "RUN", "PROV", "WAIT")
+            # POSITIVE completion ONLY: the job's own END/metrics marker, a terminal bjobs state,
+            # OR the job is absent from a query that SUCCEEDED and still saw OTHER jobs (purged).
+            # An EMPTY/failed bjobs read (states=={} or ssh failed) is NOT completion -> keep waiting.
+            # This fixes the "poll silently drops a whole batch" hazard: a flaky bjobs no longer
+            # marks running 12000-frame jobs DONE.
+            purged = query_ok and bool(states) and st is None
+            if finished or terminal or purged:
                 done.add(jid)
         live -= done
-        if done:
-            print(f"[loop] {len(live)} L4 jobs still running", flush=True)
+        print(f"[loop] {len(live)} L4 jobs still running", flush=True)
 
 
 BATCH_JOBS = "embryo_batch_jobs.json"
@@ -140,6 +168,29 @@ def run_batch_cluster(slots, batch):
 
 PHASE_HOURS = float(os.environ.get("EMBRYO_PHASE_HOURS", "24"))   # max wall-clock per sub-phase
 PHASE_TIMER = "phase_timer.json"
+STAGE_BATCH_CAP = int(os.environ.get("EMBRYO_STAGE_BATCH_CAP", "10"))   # max batches per sub-phase (hard)
+STAGE_BATCH = "stage_batch.json"
+
+
+def phase_batches(batch):
+    """(stage, n_batches) the CURRENT stage (current_stage.txt) has run; counts from the batch it
+    first appeared on (persisted in stage_batch.json), so a hard per-stage batch budget can bind."""
+    stage = ""
+    if os.path.isfile("current_stage.txt"):
+        raw = open("current_stage.txt").read().strip()
+        stage = raw.split()[0] if raw else ""
+    if not stage:
+        return "", 0
+    t = {}
+    if os.path.isfile(STAGE_BATCH):
+        try:
+            t = json.load(open(STAGE_BATCH))
+        except Exception:
+            t = {}
+    if stage not in t:
+        t[stage] = batch
+        json.dump(t, open(STAGE_BATCH, "w"))
+    return stage, (batch - t[stage] + 1)
 
 
 def phase_elapsed_h():
@@ -165,12 +216,18 @@ def phase_elapsed_h():
 
 def design_prompt(batch, n):
     stage, eh = phase_elapsed_h()
+    bstage, nb = phase_batches(batch)
     timecap = ""
     if stage and eh >= PHASE_HOURS:
         timecap = (f"\n\n>>> TIME CAP HIT: sub-phase {stage} has run {eh:.1f}h (>= {PHASE_HOURS:.0f}h budget). "
                    f"THIS BATCH you MUST: adopt the best clean (escape-free) point as {stage}'s operating spec, "
                    f"log the blocker as [open] in the ledger, ADVANCE to the next sub-phase, and write the new "
                    f"stage to current_stage.txt (which resets the phase clock). Do not run more {stage} experiments.")
+    elif bstage and nb >= STAGE_BATCH_CAP:
+        timecap = (f"\n\n>>> BATCH CAP HIT: sub-phase {bstage} has run {nb} batches (>= {STAGE_BATCH_CAP}-batch budget). "
+                   f"THIS BATCH you MUST: adopt the best clean (escape-free) point as {bstage}'s operating spec, "
+                   f"log any open blocker as [open] in the ledger, ADVANCE to the next sub-phase, and write the new "
+                   f"stage to current_stage.txt. Do not run more {bstage} experiments.")
     prev = f"montages/embryo_b{batch-1:02d}.png"
     obs = (f"Read the previous batch montage {prev}, and for EACH slot read archive/eb_b{batch-1:02d}_*/"
            f"scorecard.json (5-family metrics at 5/25/50/75/100%) + metrics.json (hard-failure gate) + scorecard.png. "
