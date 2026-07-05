@@ -277,6 +277,30 @@ class Field(nn.Module):
     def step(self) -> None:                             # advance the field's own PDE
         raise NotImplementedError
 
+    # --- Axis B: spatial field math on the grid (same category as `pix`) ----- #
+    def grad_at(self, pos, channel=0, periodic=False):
+        """gradient of a grid channel, bilinear-sampled at world positions `pos`
+        [N, D] -> [N, D]. Boundary-aware central difference: wrap under a periodic
+        world, replicate under a wall (a wall edge has no artificial gradient).
+        `channel=None` sums all channels (follow any trail). 2D grid fields
+        (`self.grid` is [C, nx, ny]); operators that use it declare
+        SUPPORTED_DIMS=[2] -- N-D is a follow-up. This is the gradient the
+        chemotactic operators used to compute inline; it lives on the field so
+        spatial (Axis B) math is not duplicated across operators."""
+        import torch.nn.functional as F
+        g = self.grid.sum(0) if channel is None else self.grid[int(channel)]      # [nx, ny]
+        W = self.width
+        mode = "circular" if periodic else "replicate"
+        gp = F.pad(g[None, None], (1, 1, 1, 1), mode=mode)[0, 0]                   # [nx+2, ny+2]
+        gx = (gp[2:, 1:-1] - gp[:-2, 1:-1]) * 0.5 * (self.nx / W)                  # d/dx per world unit
+        gy = (gp[1:-1, 2:] - gp[1:-1, :-2]) * 0.5 * self.ny                        # d/dy per world unit
+        grad = torch.stack([gx, gy], 0)[None]                                     # [1, 2, nx, ny]
+        gxn = (pos[:, 0] / W) * 2 - 1
+        gyn = (pos[:, 1] / 1.0) * 2 - 1
+        grid = torch.stack([gyn, gxn], -1)[None, None]                            # grid_sample: x=ny, y=nx
+        return F.grid_sample(grad, grid, mode="bilinear", padding_mode="border",
+                             align_corners=True)[0, :, 0].t()                     # [N, D]
+
 
 # --------------------------------------------------------------------------- #
 #  Container: Hierarchy
