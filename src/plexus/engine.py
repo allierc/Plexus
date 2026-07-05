@@ -446,10 +446,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False) -> tuple[Hierarchy, dict]:
     H = build(sim, device)
     H.emit_order = _resolve_emit(sim)         # set -> integration order (from the operators)
-    # (op_name, instance, selector); params carry the field refs + the set name (_at)
+    # (op_name, instance, selector, frame-window); params carry the field refs + the set name (_at).
+    # The frame gate (after_frame/before_frame) is enforced HERE for every op, not re-implemented
+    # inside each operator -- so any op line can carry it and no operator special-cases the clock.
     inst = [(o.op,
              get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
-             o.on)
+             o.on,
+             (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
             for o in sim.operators]
 
     # SET positions are recorded at a stride that caps the trajectory at ~`record_cap`
@@ -470,9 +473,11 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     def _run_token(token, tick):
         """Run every operator instance named `token` (one schedule token) once,
         enforcing the first-tick integration-invariant guard on non-opted-out operators."""
-        for nm, ob, sel in inst:
+        for nm, ob, sel, (after_frame, before_frame) in inst:
             if nm != token:
                 continue
+            if not (after_frame <= tick < before_frame):
+                continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
             for lvlname, d in ob(H, _selector_mask(H, sel)).items():

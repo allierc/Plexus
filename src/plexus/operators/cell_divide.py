@@ -32,12 +32,9 @@ class CellDivide(Structural):
         self.rate = float(params.get("rate", 0.0))        # fallback rate if no per-type div_rate
         self.offset = float(params.get("offset", 0.006))  # daughter placement jitter (world units)
         self.max_occ = float(params.get("max_occ", 0.98)) # stop when this fraction of the buffer is live
-        self.after = int(params.get("after", 0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device
-        if int(getattr(H, "frame", 0)) < self.after:
-            return {}
         dt = float(getattr(H.config, "dt", 1.0))
         occ = lvl.occ
         live = occ > 0
