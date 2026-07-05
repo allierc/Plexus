@@ -125,6 +125,8 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
     style = sim.plotting or {}
     cmap = plt.get_cmap(style.get("colormap", "tab10"))
     bg = style.get("background", "white")             # figure/axes background colour
+    mov_fps = int(style.get("fps", 25))               # movie playback fps (plotting.fps): LOWER = slower
+    mov_maxf = int(style.get("movie_max_frames", 120))  # frames kept in a movie (more = smoother slow-mo)
     W = float(d["world"]) if "world" in d.files else sim.world
     world_size = d["world_size"] if "world_size" in d.files else None   # per-axis box (3D splat)
     obstacles = list(getattr(sim, "obstacles", []) or [])   # wall geometry to overlay (grey)
@@ -221,6 +223,14 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         # cloud -- colour the particles by parent cell, then fuse them into one smooth
         # blob per cell -- instead of a bare centroid dot.
         container = _container_child(d, sname)
+        # per-parent (per-cell) MATERIAL colour from the type palette, so a merged cell<-MPM
+        # cloud paints each cell its `plotting.colors` hue (e.g. viscoelastic = purple) instead
+        # of a colormap-by-parent hue that ignores the palette.
+        parent_rgb = None
+        if container is not None and pal is not None and f"{sname}__node_type" in d.files:
+            ntc = d[f"{sname}__node_type"]            # the cell set's material type per cell
+            _, _, _ncell = container
+            parent_rgb = np.array([pal[int(ntc[c]) % len(pal)][:3] for c in range(_ncell)])
         # marker style: dots (default) or thin-line colour triangles oriented along the
         # heading (the local displacement) -- shows flow direction for flocks / active matter.
         marker = str(style.get("marker", "dot"))
@@ -233,7 +243,8 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         def _draw(ax, i):
             if container is not None:
                 cpos, par, ncell = container
-                ax.imshow(_merged_rgb(cpos[i], par, ncell, W, cmap, bg=bg), extent=[0, W, 0, 1], origin="upper")
+                ax.imshow(_merged_rgb(cpos[i], par, ncell, W, cmap, bg=bg, parent_rgb=parent_rgb),
+                          extent=[0, W, 0, 1], origin="upper")
                 _draw_obstacles(ax, obstacles)
                 ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off"); return
             live = occ[i]
@@ -273,11 +284,12 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
             if container is not None:
                 cpos, par, ncell = container
                 _merged_movie(cpos, par, ncell, W, cmap, T, os.path.join(data_dir, f"movie_{sname}"),
-                              bg=bg, obstacles=obstacles)
+                              bg=bg, obstacles=obstacles, parent_rgb=parent_rgb,
+                              fps=mov_fps, max_frames=mov_maxf)
             else:
                 _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"),
                        bg=bg, obstacles=obstacles, marker=marker, periodic=periodic, world=wsize,
-                       tri=(tri_L, tri_w, tri_lw))
+                       tri=(tri_L, tri_w, tri_lw), fps=mov_fps, max_frames=mov_maxf)
 
     # --- continuum fields: composite the channels and draw the heatmap ------- #
     gamma = float(style.get("gamma", 0.7))
@@ -915,7 +927,7 @@ def _field3d_outputs(grid, colors, W, data_dir, fname, style, movie, T):
         print(f"[plot] 3D field splat movie -> {os.path.basename(out)}", flush=True)
 
 
-def _merged_rgb(xy, par, ncell, W, cmap, res: int = 820, sigma: float = 1.7, bg="white"):
+def _merged_rgb(xy, par, ncell, W, cmap, res: int = 820, sigma: float = 1.7, bg="white", parent_rgb=None):
     """Splat each parent's child particles to a blurred density mask and paint it the
     parent's colour: a smooth, uniform per-cell blob composited over the spec background
     `bg`. This is the special cell<-MPM 'apply colour then merge the particles' container
@@ -935,33 +947,37 @@ def _merged_rgb(xy, par, ncell, W, cmap, res: int = 820, sigma: float = 1.7, bg=
         # steep ramp: full opacity already at 8% of peak density -> solid interior, the
         # tight blur leaves only a thin crisp rim instead of a wide washed-out gradient.
         a = np.clip(dens / (dens.max() * 0.08 + 1e-9), 0, 1)[..., None]
-        rgb = rgb * (1 - a) + np.asarray(cmap(c % cmap.N)[:3])[None, None, :] * a
+        # per-parent MATERIAL colour (plotting.colors: e.g. viscoelastic = purple) if given,
+        # else a distinct colormap hue per parent body.
+        col = np.asarray(parent_rgb[c][:3] if parent_rgb is not None else cmap(c % cmap.N)[:3], float)
+        rgb = rgb * (1 - a) + col[None, None, :] * a
     return rgb[::-1]                                # image row 0 = top = high y
 
 
 def _merged_movie(cpos, par, ncell, W, cmap, T, out_base, max_frames: int = 120, bg: str = "white",
-                  obstacles=None) -> None:
+                  obstacles=None, parent_rgb=None, fps: int = 25) -> None:
     """Movie of a container set rendered as merged per-cell blobs."""
     from matplotlib.animation import FuncAnimation
     stride = max(1, T // max_frames); frames = list(range(0, T, stride))
     # render large (8in) at high dpi so the high-res blob mask is not softened on upscale
     fig, ax = plt.subplots(figsize=(8 * W, 8)); ax.axis("off"); fig.patch.set_facecolor(bg)
     fig.tight_layout(pad=0)
-    im = ax.imshow(_merged_rgb(cpos[0], par, ncell, W, cmap, bg=bg), extent=[0, W, 0, 1],
-                   origin="upper", interpolation="bilinear")
+    im = ax.imshow(_merged_rgb(cpos[0], par, ncell, W, cmap, bg=bg, parent_rgb=parent_rgb),
+                   extent=[0, W, 0, 1], origin="upper", interpolation="bilinear")
     _draw_obstacles(ax, obstacles)
     ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal")
 
     def upd(i):
-        im.set_data(_merged_rgb(cpos[i], par, ncell, W, cmap, bg=bg)); return im,
+        im.set_data(_merged_rgb(cpos[i], par, ncell, W, cmap, bg=bg, parent_rgb=parent_rgb)); return im,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
-    out = _save_anim(anim, out_base, bg, dpi=200); plt.close(fig)
+    out = _save_anim(anim, out_base, bg, fps=fps, dpi=200); plt.close(fig)
     print(f"[plot] merged-cell movie -> {os.path.basename(out)}", flush=True)
 
 
 def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white",
-           obstacles=None, marker="dot", periodic=False, world=None, tri=(0.016, 0.01, 0.6)) -> None:
+           obstacles=None, marker="dot", periodic=False, world=None, tri=(0.016, 0.01, 0.6),
+           fps: int = 25) -> None:
     """Render a movie of a set's trajectory (mp4 via ffmpeg, else gif). `marker`: 'dot'
     (scatter) or 'triangle' (thin-line colour triangles oriented along the heading)."""
     from matplotlib.animation import FuncAnimation
@@ -998,7 +1014,7 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
             return sc,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
-    out = _save_anim(anim, out_base, bg, dpi=200)
+    out = _save_anim(anim, out_base, bg, fps=fps, dpi=200)
     plt.close(fig)
     print(f"[plot] movie -> {os.path.basename(out)}", flush=True)
 

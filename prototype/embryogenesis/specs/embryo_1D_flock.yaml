@@ -1,0 +1,75 @@
+# embryo_1D_flock -- Stage-1D flocking probe (Batch 21). 1D_base + the NEW heading_align operator:
+# a FIRST-ORDER Vicsek polar alignment (steer heading toward the mean heading of radius-graph neighbours).
+#
+# WHY a new operator (b20 pre-registered falsifier): the 1st-order flow_align feedback loop (sweep b20:
+# gain 40/120/200, spin, motility, density, k) does NOT flock robustly -- net_circ ticked off its
+# campaign-long 0 (~0.001-0.005) but polar_order stays weak (<=0.16), non-monotone in gain (gain200 < gain120),
+# no sustained coherent streams. The falsifier called for the "2nd-order Vicsek rebuild" -- but that is
+# ARCHITECTURALLY BLOCKED: the engine forces ONE integration order per set (engine._resolve_prediction RAISES
+# on conflict) and mpm_to_agent (the confine coupling that keeps cells inside the shell) is first_derivative-
+# LOCKED, so the 2nd-derivative alignment/cruise/separation cannot join the MPM-coupled agent set. flow_align
+# proves a HEADING-STEER alignment (PREDICTION=None) composes with the first-derivative set -> heading_align is
+# the first-derivative-compatible realization of the Vicsek order term (R1 minimal mechanism, R3 one new family).
+#
+# HYPOTHESIS (Batch 21): agent-agent heading alignment (heading_align, NOT fluid alignment) is the missing
+# coherence lever -- at confluence it makes neighbouring cells swim together -> polar_order UP and, seeded by
+# mpm_spin's chirality, net_circulation UP into sustained swirl. heading_align.gain is the Vicsek order lever.
+# Falsifier: if the gain ladder leaves polar_order weak/non-monotone AND net_circ ~0 like flow_align, then NO
+# first-order heading rule flocks in this confined MPM blastula -> 1D is operator-limited; close on the b20
+# flow-off-zero arm and advance to 1E.
+# Judge TIER-1 (escape=0 & collapsed=0 & nn_min>=r0) FIRST, then polar_order/net_circulation/msd vs gain-0 control.
+general: {name: embryo_1D_flock, seed: 0, n_frames: 12000, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 132                                   # CONFLUENT start (~3x): high density is the 1D operating point
+    buffer: 200
+    spawn: sunflower
+    spawn_radius: 0.30                        # spread near the shell (disc_R 0.338) -> confluent init
+    vmax: 0.6
+    types:
+      a: {fraction: 0.5, move_speed: 0.12}
+      b: {fraction: 0.5, move_speed: 0.12}
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 200
+        layers:
+          - {frac: 0.93, youngs: 40,  material: liquid}     # water core (light blue)
+          - {frac: 1.0,  youngs: 200, material: elastic}     # thin elastic membrane (deep blue)
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.34, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: cell_divide, at: agent, rate: 0.0, max_occ: 0.88, offset: 0.004}   # 1D: division OFF (isolate flow from division)
+  - {op: radius_graph, at: agent, radius: 0.05}
+  - {op: repel, at: agent, strength: 150.0, r0: 0.02}         # 1A-locked hard exclusion
+  - {op: glide, at: agent}
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 10.0}   # 1C compliant anchor
+  - {op: mpm_spin, at: mpm_particle, omega: 0.3, spin_k: 20.0}     # seeds a chiral fluid rotation
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 8.0e-6, k: 4.0}   # cell->fluid (escape-safer k4)
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.3, confine: 0.03, field: colour}   # 1A-locked low press confine
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 40.0}    # fluid->cell heading (kept: regularizes the confluent pump; ctrl b20 s7 gain0 blew up escape=1.0)
+  - {op: heading_align, at: agent, gain: 120.0}               # NEW: agent->agent heading (1st-order Vicsek order lever)
+schedule:
+  - cell_divide
+  - radius_graph
+  - repel
+  - glide
+  - mpm_anchor
+  - mpm_spin
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+  - heading_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.01

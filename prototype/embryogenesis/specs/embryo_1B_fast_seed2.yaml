@@ -1,0 +1,56 @@
+# embryo_1B_fast_seed2 -- Batch-10 seed replicate of embryo_1B_fast (move_speed 0.24), SEED 2.
+# Purpose: 3rd seed of the b09 CLEAN flagship deform point fast_k4 (agent_to_mpm.k 4.0 + agent_mass 8e-6:
+# deform_rms 0.01287, fourier_m2 0.01973 = campaign max, escape 0). Seed overrides are NOT honoured by the
+# dotted-override resolver, so a fresh spec with seed:2 is required to accumulate toward the >=3-seed
+# [established] gate. Identical to embryo_1B_fast otherwise. Used with agent_to_mpm.k=4.0 + agent_mass=8e-6.
+general: {name: embryo_1B_fast_s2, seed: 2, n_frames: 12000, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 44
+    buffer: 3000
+    spawn: sunflower
+    spawn_radius: 0.22
+    vmax: 0.6
+    types:
+      a: {fraction: 0.5, move_speed: 0.24}
+      b: {fraction: 0.5, move_speed: 0.24}
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 200
+        layers:
+          - {frac: 0.93, youngs: 40,  material: liquid}
+          - {frac: 1.0,  youngs: 200, material: elastic}
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.34, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: radius_graph, at: agent, radius: 0.05}
+  - {op: repel, at: agent, strength: 150.0, r0: 0.02}
+  - {op: glide, at: agent}
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 40.0}
+  - {op: mpm_spin, at: mpm_particle, omega: 0.3, spin_k: 20.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 2.0e-6, k: 1.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.3, confine: 0.03, field: colour}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 40.0}
+schedule:
+  - radius_graph
+  - repel
+  - glide
+  - mpm_anchor
+  - mpm_spin
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.01
