@@ -13,7 +13,7 @@ operators:
   op: pulse_stimulus
   radius: 0.12
 - {amplitude: 20.0, at: mpm_particle, from: activation, mode: inward, op: pulse_to_contraction}
-- {at: mpm_particle, k: 30.0, op: mpm_drag}
+- {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
 - {at: mpm_particle, op: mpm_strain}
 - {a_max: 200, at: mpm_particle, drag: 0.0, op: p2g, to: mpm_grid}
 - {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
@@ -24,7 +24,7 @@ schedule:
 - pacemaker
 - pulse_stimulus
 - pulse_to_contraction
-- mpm_drag
+- drag
 - substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
 sets:

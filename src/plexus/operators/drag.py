@@ -3,8 +3,10 @@
 A `drag` force opposes velocity: acc = -k * vel. Modelling friction as an
 operator (rather than a `damping` field baked into the integrator) keeps the
 integrator generic and lets drag compose in the schedule with the other forces.
-It is a second-derivative contribution (an acceleration), so it lives on sets
-integrated with `emit: acceleration` (the class default; e.g. alongside boids).
+It is a second-derivative contribution (an acceleration): `emit: acceleration`
+(the class default) sums it into a set the ENGINE integrates (e.g. alongside boids);
+`emit: mpm_acceleration` routes the same -k*v into the MPM substep as a body force
+(p2g reads H.delta as a_ext) -- this replaces the former `mpm_drag` operator.
 """
 from __future__ import annotations
 
