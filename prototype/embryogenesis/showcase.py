@@ -148,7 +148,7 @@ def main():
     W = float(getattr(sim, "world_size", [1.0])[0])
     print(f"[showcase] {sim.name}: frames={frames} stride={stride} overrides={ov}", flush=True)
 
-    caps = {"aX": [], "mX": [], "stress": [], "fnorm": [], "occ": [], "saxis": []}
+    caps = {"aX": [], "mX": [], "stress": [], "fnorm": [], "occ": [], "mocc": [], "saxis": []}
     at_box = {}
     t0 = time.time()
 
@@ -163,6 +163,7 @@ def main():
         caps["aX"].append(a.get("pos").detach().cpu().numpy().copy())
         caps["occ"].append(a.occ.detach().cpu().numpy().copy())
         caps["mX"].append(p.get("pos").detach().cpu().numpy().copy())
+        caps["mocc"].append(p.occ.detach().cpu().numpy().copy())     # material occupancy: hide dormant grow_reserve
         caps["stress"].append(_stress_norm(p.F.detach(), p.mu, p.la).cpu().numpy())
         caps["fnorm"].append((p.F.detach() - eye).reshape(p.n, -1).norm(dim=1).cpu().numpy())
         if D == 2:                                            # principal STRAIN/stress axis angle per particle (for div_stress_angle)
@@ -172,6 +173,7 @@ def main():
 
     run(sim, out_path=None, device=dev, on_frame=hook)
     aX = np.array(caps["aX"]); mX = np.array(caps["mX"])
+    mocc = np.array(caps["mocc"]); mlive = mocc > 0                 # LIVE material only (dormant reserve hidden)
     stress = np.array(caps["stress"]); fnorm = np.array(caps["fnorm"]); at = at_box["at"]
     T = aX.shape[0]
     # two-blue material: mark the outer elastic MEMBRANE (deep blue) vs inner core (light blue),
@@ -181,13 +183,15 @@ def main():
     if two_blue:
         r0m = np.linalg.norm(mX[0] - np.array([0.5, 0.5]), axis=1)
         mem = r0m > 0.90 * np.quantile(r0m, 0.99)          # outer shell = membrane
-    s_lo, s_hi = np.percentile(stress, 2), np.percentile(stress, 98)
-    f_lo, f_hi = np.percentile(fnorm, 2), np.percentile(fnorm, 98)
+    # colour ranges over LIVE material only (dormant reserve is frozen at F=I -> would bias the low end)
+    s_lo, s_hi = np.percentile(stress[mlive], 2), np.percentile(stress[mlive], 98)
+    f_lo, f_hi = np.percentile(fnorm[mlive], 2), np.percentile(fnorm[mlive], 98)
     # material flow: per-frame particle displacement (velocity up to the constant stride*dt factor)
     mvel = np.zeros_like(mX)
     if T > 1:
         mvel[1:] = mX[1:] - mX[:-1]
-    v_lo, v_hi = np.percentile(np.linalg.norm(mvel, axis=2), 2), np.percentile(np.linalg.norm(mvel, axis=2), 98)
+    vnrm = np.linalg.norm(mvel, axis=2)
+    v_lo, v_hi = np.percentile(vnrm[mlive], 2), np.percentile(vnrm[mlive], 98)
     if v_hi <= v_lo:
         v_hi = v_lo + 1e-9
     print(f"[showcase] captured {T} frames in {time.time()-t0:.0f}s", flush=True)
@@ -198,18 +202,20 @@ def main():
 
     def draw2x2(fig, k):
         axs = fig.subplots(2, 2)
-        lv = occ[k] > 0
-        _draw(axs[0, 0], mX[k], aX[k][lv], at[lv], colors, blob, W, mem_mask=mem)
+        lv = occ[k] > 0                                   # live agents
+        lm = mlive[k]                                     # live material (dormant grow_reserve hidden)
+        memk = mem[lm] if mem is not None else None
+        _draw(axs[0, 0], mX[k][lm], aX[k][lv], at[lv], colors, blob, W, mem_mask=memk)
         axs[0, 0].set_title("cells + material", color="white", fontsize=10)
-        axs[0, 0].text(0.02, 0.98, f"n_cells {int(lv.sum())}\nn_mpm {mX[k].shape[0]}",
+        axs[0, 0].text(0.02, 0.98, f"n_cells {int(lv.sum())}\nn_mpm {int(lm.sum())}",
                        transform=axs[0, 0].transAxes, color="white", fontsize=8, va="top", ha="left",
                        bbox=dict(boxstyle="round,pad=0.25", fc="black", ec="none", alpha=0.5))
-        _panel_scatter(axs[0, 1], mX[k], stress[k], W, "inferno", s_lo, s_hi, "stress")
+        _panel_scatter(axs[0, 1], mX[k][lm], stress[k][lm], W, "inferno", s_lo, s_hi, "stress")
         # deformation with the cell TRACKS overlaid on top (bottom-left)
-        _panel_scatter(axs[1, 0], mX[k], fnorm[k], W, "viridis", f_lo, f_hi, "deformation + cell tracks")
+        _panel_scatter(axs[1, 0], mX[k][lm], fnorm[k][lm], W, "viridis", f_lo, f_hi, "deformation + cell tracks")
         _draw_tracks(axs[1, 0], aX[:k + 1][:, lv], at[lv], colors, W, tail, bg=False, title=None)
         # material flow field (bottom-right)
-        _panel_flow(axs[1, 1], mX[k], mvel[k], W, v_lo, v_hi, "material flow")
+        _panel_flow(axs[1, 1], mX[k][lm], mvel[k][lm], W, v_lo, v_hi, "material flow")
 
     # static 2x2 at 5 timepoints (evolution montage)
     ks = np.linspace(0, T - 1, 5).astype(int)
@@ -228,8 +234,8 @@ def main():
     # blob evolution montage (5 timepoints) -- the blob-only movie (blob.mp4) is intentionally NOT rendered
     fig, axes = plt.subplots(1, 5, figsize=(15, 3.2)); fig.patch.set_facecolor("black")
     for i, k in enumerate(ks):
-        lv = occ[k] > 0
-        _draw(axes[i], mX[k], aX[k][lv], at[lv], colors, blob, W, mem_mask=mem); axes[i].set_title(f"t={k*stride} n={int(lv.sum())}", color="white", fontsize=9)
+        lv = occ[k] > 0; lm = mlive[k]; memk = mem[lm] if mem is not None else None
+        _draw(axes[i], mX[k][lm], aX[k][lv], at[lv], colors, blob, W, mem_mask=memk); axes[i].set_title(f"t={k*stride} n={int(lv.sum())}", color="white", fontsize=9)
     fig.tight_layout(); fig.savefig(os.path.join(d, "blob_evolution.png"), dpi=120, facecolor="black"); plt.close(fig)
     for f in os.listdir(tmp):
         os.remove(os.path.join(tmp, f))
