@@ -4,7 +4,7 @@ The orientational half of the Vicsek model, realised as a HEADING-STEER (like
 `flow_align`/`chemotax`) so it composes with the first-derivative embryo cell set
 (`glide` + `repel` + `mpm_to_agent` confine) WITHOUT the integration-order conflict
 that blocks the 2nd-derivative `alignment`/`cruise` operators (the engine forces one
-integration order per set; `mpm_to_agent` confine is `first_derivative`-locked).
+integration order per set; `mpm_to_agent` confine is `velocity`-locked).
 
 Each cell relaxes its polarity (unit heading n_i) toward the mean heading of its
 radius-graph neighbours j (the edges left by `radius_graph`), so neighbouring cells

@@ -13,7 +13,7 @@ and is stretched/sheared by its neighbours. Interior forces appear only where A 
 the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
 not a pointwise push. This is the standard cardiac active-stress formulation.
 
-`kind=exchange`, `PREDICTION=None` (the stress is consumed by the MPM substep, never engine-
+`kind=exchange`, `EMIT=None` (the stress is consumed by the MPM substep, never engine-
 integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
 which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
 """
@@ -28,7 +28,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("pulse_to_active_stress", level="particle", kind="exchange")
 class PulseToActiveStress(Exchange):
-    PREDICTION = None                         # stress is consumed by the MPM substep, not integrated
+    EMIT = None                         # stress is consumed by the MPM substep, not integrated
     REQUIRES_PARAMS = ["from", "direction_from"]
     MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}

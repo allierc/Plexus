@@ -9,7 +9,7 @@ Every operator is dispatched the same way (by name); the engine never special-
 cases a kind. The seven kinds split by what they touch: the set-dynamics kinds
 (lateral / aggregate / broadcast / exchange) return a per-level delta the engine
 sums and integrates once per tick (order -- 1st vs 2nd derivative -- from each
-operator's `PREDICTION`); `field` operators mutate a field in place; `rewire`
+operator's `EMIT`); `field` operators mutate a field in place; `rewire`
 rebuilds a relation; `structural` changes the entity set. The integration
 invariant -- only `_integrate` writes pos/vel, unless an operator declares
 `MAY_MUTATE_INTEGRATED_STATE` (structural / derived-readout) -- is enforced per operator on
@@ -160,21 +160,24 @@ def _start_centers(start, n: int, rng, device: str) -> torch.Tensor:
     return lo + torch.rand(n, D, generator=rng, device=device) * (hi - lo)
 
 
-def _resolve_prediction(sim: Spec) -> dict:
-    """set -> integration order (first or second), read from the PREDICTION of the force-emitting
-    operators acting on it. All such operators on one set must agree (a set
-    integrates as a single order); a conflict is a modelling error, raised here."""
+def _resolve_emit(sim: Spec) -> dict:
+    """set -> engine integration order (`velocity` or `acceleration`), read from each
+    force-emitting operator's `emit:` (spec, if given) else its class `EMIT` --
+    one vocabulary, no translation table. Only the two engine-integrated states set a
+    set's order and must agree; `None` (emits no set delta) and `mpm_acceleration`
+    (routed to the MPM substep as a_ext, not the engine) do not participate. A conflict
+    is a modelling error, raised here."""
     modes: dict[str, str] = {}
     for o in sim.operators:
-        pred = getattr(get_operator(o.op), "PREDICTION", None)
-        if pred is None:
-            continue                                   # rewire / structural / field-write: emits no force
+        emit = o.params.get("emit") or getattr(get_operator(o.op), "EMIT", None)
+        if emit not in ("velocity", "acceleration"):
+            continue                                   # None / mpm_acceleration: no engine-integrated set delta
         s = o.on.set
-        if s in modes and modes[s] != pred:
+        if s in modes and modes[s] != emit:
             raise ValueError(
-                f"set {s!r} has operators with conflicting prediction "
-                f"({modes[s]} vs {pred} from {o.op!r}); a set integrates as one order.")
-        modes[s] = pred
+                f"set {s!r} has operators with conflicting integration order "
+                f"({modes[s]} vs {emit} from {o.op!r}); a set integrates as one order.")
+        modes[s] = emit
     return modes
 
 
@@ -406,18 +409,19 @@ def _selector_mask(H: Hierarchy, sel: Selector) -> torch.Tensor:
 # --------------------------------------------------------------------------- #
 def _integrate(H: Hierarchy, dt: float) -> None:
     """Turn each set's accumulated delta into its next state, once per tick. The
-    integration order is resolved from the set's operators (H.predict):
-    first_derivative reads the delta as a velocity (x += dt·dpos); second_derivative
-    reads it as an acceleration (v += dt·acc; x += dt·v). Only sets that have
-    force-emitting operators (a prediction) are integrated; others hold still.
-    Friction is the `drag` operator, not a knob here."""
+    integration order is resolved from the set's operators (H.emit_order):
+    `velocity` reads the delta as a velocity (x += dt·dpos); `acceleration` reads it as
+    an acceleration (v += dt·acc; x += dt·v). Only sets with engine-integrated operators
+    are integrated; others hold still (a set driven only by `mpm_acceleration` body
+    forces is advected by the MPM substep, not here). Friction is the `drag` operator,
+    not a knob here."""
     box = H.world_size                                     # [D] per-axis box size
-    for name, pred in H.predict.items():
+    for name, emit in H.emit_order.items():
         lvl = H.levels[name]
         out = H.delta(name)
         px0, px1 = lvl.state_schema["pos"]; vx0, vx1 = lvl.state_schema["vel"]
         x, v = lvl.state[:, px0:px1], lvl.state[:, vx0:vx1]
-        v = out if pred == "first_derivative" else v + dt * out
+        v = out if emit == "velocity" else v + dt * out
         vmax = getattr(lvl, "vmax", None)                      # optional speed clamp (anti-overshoot)
         if vmax:
             sp = v.norm(dim=-1, keepdim=True)
@@ -441,7 +445,7 @@ def _integrate(H: Hierarchy, dt: float) -> None:
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False) -> tuple[Hierarchy, dict]:
     H = build(sim, device)
-    H.predict = _resolve_prediction(sim)         # set -> integration order (from the operators)
+    H.emit_order = _resolve_emit(sim)         # set -> integration order (from the operators)
     # (op_name, instance, selector); params carry the field refs + the set name (_at)
     inst = [(o.op,
              get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),

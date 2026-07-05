@@ -1,7 +1,7 @@
 """chemo_force -- set <- field. A chemotactic BODY FORCE (acceleration along grad).
 
 Identical sampling to `chemotaxis` (bilinear grad(field) at each particle), but it
-returns an ACCELERATION (`gain * grad`) rather than a velocity. `PREDICTION = None`
+returns an ACCELERATION (`gain * grad`) rather than a velocity. `EMIT = None`
 (it does not vote on a set's integration order), which makes it a universal body
 force consumed two ways:
 
@@ -25,7 +25,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("chemo_force", level="particle", kind="exchange")
 class ChemoForce(Exchange):
-    PREDICTION = None                           # body force: MPM p2g consumes it, or a boids set integrates it
+    EMIT = "mpm_acceleration"             # p2g consumes it as a_ext, or a boids set integrates the accel
     SUPPORTED_DIMS = [2]
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_flow"]

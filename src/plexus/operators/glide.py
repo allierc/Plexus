@@ -23,7 +23,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("glide", level="cell", kind="lateral")
 class Glide(Lateral):
-    PREDICTION = "first_derivative"             # emits a velocity; the ENGINE integrates pos
+    EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_TYPE_PROPS = ["move_speed"]
     PARAM_ROLES = {"noise": "translational_noise"}

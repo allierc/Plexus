@@ -11,7 +11,7 @@ gradient `+confine * grad(c)`: the colour `g.c` is ~1 inside the fluid and ~0 in
 force the user asked for (a soft membrane, not a hard wall). No colour field (dry/elastic disc
 with no liquid band) -> `g.c == 0` -> confinement is a no-op.
 
-`kind=exchange` (field -> set coupling). `PREDICTION = "first_derivative"`: it returns an added
+`kind=exchange` (field -> set coupling). `EMIT = "velocity"`: it returns an added
 ADVECTION VELOCITY that the engine sums with the agent set's other first-derivative ops
 (`glide`, `repel`) and integrates once per tick (`pos += dt * sum(v)`). It MUST therefore share
 the first-derivative prediction with those ops (the engine forbids mixing predictions on one
@@ -29,7 +29,7 @@ from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 @register_operator("mpm_to_agent", level="cell", kind="exchange")
 class MPMToAgent(Exchange):
-    PREDICTION = "first_derivative"                 # emits an advection velocity; engine integrates pos
+    EMIT = "velocity"                 # emits an advection velocity; engine integrates pos
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["grid_to_agent", "fluid_drag", "surface_confinement"]

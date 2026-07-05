@@ -41,7 +41,7 @@ Operators
   It returns a dict `{level_name: delta}` of *time-derivative contributions*. The
   engine sums same-level deltas into that level's accumulator and integrates each
   set once at the end of the tick (the order -- 1st-derivative velocity vs
-  2nd-derivative acceleration -- comes from the operator's `PREDICTION`). An
+  2nd-derivative acceleration -- comes from the operator's `EMIT`). An
   operator that changes *membership* or *relations* (structural / rewire) or that
   writes a field (exchange) mutates `H` in place and returns `{}` -- uniform with
   every other operator, so the engine never special-cases a kind.
@@ -102,6 +102,19 @@ import torch.nn as nn
 # Naming them lets the registry enumerate "what can change the state, the field, the
 # relation, or the set".
 KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire")
+
+
+# The recognised temporal-integration states (Axis A: how a SET moves in time), shared by
+# the class attribute `Operator.EMIT` and the spec `emit:` param -- ONE vocabulary,
+# no translation table:
+#   velocity / acceleration -> engine-integrated (per-set order agreement enforced);
+#   mpm_acceleration        -> an acceleration routed to the MPM substep (p2g reads it as
+#                              a_ext), NOT engine-integrated -- same order as acceleration,
+#                              differs only in routing.
+# `None` (the default) means the operator emits no set delta at all (rewire / structural /
+# field / exchange-into-field). Spatial field math (grad/laplacian/sample, Axis B) is a
+# SEPARATE axis and lives on the Field, not here.
+EMITS = ("velocity", "acceleration", "mpm_acceleration")
 
 
 # --------------------------------------------------------------------------- #
@@ -281,7 +294,7 @@ class Hierarchy(nn.Module):
     and integrates each set once at the end of the tick. Use
     `zero_delta`/`add_delta`/`delta` so operators and the engine share one
     convention. The delta is a velocity or an acceleration depending on the
-    operator's `PREDICTION`; it is not necessarily an acceleration, hence `delta`.
+    operator's `EMIT`; it is not necessarily an acceleration, hence `delta`.
     """
 
     def __init__(self):
@@ -360,11 +373,14 @@ class Operator(nn.Module):
 
     KIND: Optional[str] = None
     LEVEL: Optional[str] = None
-    # What this operator's returned delta IS, so the engine knows how to integrate
-    # it: "first_derivative" (the delta is a velocity -> x += dt*delta) or
-    # "second_derivative" (an acceleration -> v += dt*delta; x += dt*v). None for
-    # operators that emit no force (rewire/structural/exchange-into-field).
-    PREDICTION: Optional[str] = None
+    # What this operator's returned delta IS, so the engine knows how to integrate it.
+    # One vocabulary (Axis A; = the spec `emit:` value on merged operators), see EMITS:
+    #   "velocity"         -- delta is dx/dt     -> engine: x += dt*delta
+    #   "acceleration"     -- delta is d2x/dt2   -> engine: v += dt*delta; x += dt*v
+    #   "mpm_acceleration" -- a d2x/dt2 body accel routed to the MPM substep (a_ext), NOT
+    #                         engine-integrated; same order as acceleration, differs in routing.
+    # None: emits no set delta at all (rewire / structural / field / exchange-into-field).
+    EMIT: Optional[str] = None
     REQUIRES_PARAMS: list = []          # param keys this operator must be given
     REQUIRES_TYPE_PROPS: list = []      # per-type node properties it reads (e.g. "youngs")
     # Spatial dimensions this operator supports. The language/container is dimension-

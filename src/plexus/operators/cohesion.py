@@ -14,7 +14,7 @@ from plexus.geometry import neighbour_mean
 
 @register_operator("cohesion", level="particle", kind="lateral")
 class Cohesion(Lateral):
-    PREDICTION = "second_derivative"
+    EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
     REQUIRES_TYPE_PROPS = ["cohesion"]
     MECHANISM_TAGS = ["cohesion", "collective_motion"]

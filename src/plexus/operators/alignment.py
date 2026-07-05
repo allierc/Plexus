@@ -45,7 +45,7 @@ from plexus.geometry import minimum_image
 
 @register_operator("alignment", level="particle", kind="lateral")
 class Alignment(Lateral):
-    PREDICTION = "second_derivative"            # emits an acceleration
+    EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic
     OPTIONAL_TYPE_PROPS = ["alignment"]        # read per-receiver only when `per_type: true` (boids)
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion", "vicsek"]

@@ -8,7 +8,7 @@ world units), pinning the edges so the sheet cannot globally breathe/translate w
 moves freely -- the condition that exposes whether LOCAL loops come from material structure rather
 than a global mode. `mode: substrate` anchors EVERY particle (global self-relaxation, as p1_aniso).
 
-`PREDICTION=None`: not engine-integrated; enters mechanics only through the MPM substep body force.
+`EMIT=None`: not engine-integrated; enters mechanics only through the MPM substep body force.
 Rest positions are captured on the first call (frame 0 = the undeformed sheet).
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("mpm_anchor", level="particle", kind="lateral")
 class MPMAnchor(Lateral):
-    PREDICTION = None                 # consumed by the MPM substep as a body force, not engine-integrated
+    EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["k"]
     MECHANISM_TAGS = ["substrate_anchor", "boundary_condition", "rest_restoring"]

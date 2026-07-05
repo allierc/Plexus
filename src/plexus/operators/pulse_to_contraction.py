@@ -12,7 +12,7 @@ points toward the centre, so
 contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
 mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).
 
-`kind=exchange` (field -> set); `PREDICTION=None`, so the engine never integrates the
+`kind=exchange` (field -> set); `EMIT=None`, so the engine never integrates the
 particle set (g2p owns advection) -- the force enters mechanics only through the MPM
 substep. The engine's `zero_delta` resets the delta each outer tick, and the substep
 loop reads that constant body force on each of its iterations.
@@ -28,7 +28,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("pulse_to_contraction", level="particle", kind="exchange")
 class PulseToContraction(Exchange):
-    PREDICTION = None                         # force is consumed by the MPM substep, not engine-integrated
+    EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
     REQUIRES_PARAMS = ["from"]                # the activation field to read
     MECHANISM_TAGS = ["active_contraction", "field_gradient_force", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "contraction_strength", "mode": "gradient_or_directional"}
@@ -83,6 +83,6 @@ class PulseToContraction(Exchange):
         if mask is not None:
             acc = acc * mask[:, None].float()
         # return a per-particle force delta; the engine sums it (with mpm_drag's) into
-        # H.delta(mpm_particle), which p2g consumes as the MPM body force. PREDICTION=None,
+        # H.delta(mpm_particle), which p2g consumes as the MPM body force. EMIT=None,
         # so the engine never integrates the particle set (g2p owns advection).
         return {self.at: acc}

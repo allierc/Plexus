@@ -26,7 +26,7 @@ import yaml
 
 # importing plexus populates base + registry; operator modules register themselves
 from plexus.models import registry
-from plexus.models.base import KINDS
+from plexus.models.base import KINDS, EMITS
 
 _SELECTOR_RE = re.compile(r"^(?P<set>\w+)(?:\[(?P<attr>\w+)=(?P<val>\w+)\])?$")
 
@@ -144,6 +144,17 @@ def load(path: str) -> Spec:
             raise ValueError(
                 f"operator {name!r} supports dims {supported}, not dim={dim} "
                 f"(set general.dim, or use a dimension-generic / *_3d operator).")
+        # integration-order vocabulary (Axis A): the class default and the optional spec
+        # override must both name a recognised state (one vocabulary, no synonyms).
+        cls_emit = getattr(cls, "EMIT", None)
+        if cls_emit is not None and cls_emit not in EMITS:
+            raise ValueError(
+                f"operator {name!r} has invalid EMIT {cls_emit!r}; "
+                f"expected one of {EMITS} or None.")
+        emit = o.get("emit")
+        if emit is not None and emit not in EMITS:
+            raise ValueError(
+                f"operator {name!r} sets emit: {emit!r}, not one of {EMITS}.")
         sel = Selector.parse(o["at"])
         # `at:` names a SET (set/exchange operators) or a FIELD (field-internal
         # operators like diffuse/decay, which read & write the field at `at:`).

@@ -15,7 +15,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("broadcast", level="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
-    PREDICTION = "first_derivative"            # emits a velocity; the engine integrates
+    EMIT = "velocity"            # emits a velocity; the engine integrates
     REQUIRES_PARAMS = ["stiffness"]
 
     def __init__(self, params, device="cpu"):

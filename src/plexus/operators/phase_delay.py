@@ -37,7 +37,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("phase_delay_pulse", level="field", kind="field")
 class PhaseDelayPulse(FieldUpdate):
-    PREDICTION = None                       # writes a prescribed field; never engine-integrated
+    EMIT = None                       # writes a prescribed field; never engine-integrated
     REQUIRES_PARAMS = ["delay_from"]
     SUPPORTED_DIMS = [2]
     MECHANISM_TAGS = ["activation_field", "phase_delay", "travelling_wave", "spatial_clock"]

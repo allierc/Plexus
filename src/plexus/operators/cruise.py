@@ -26,7 +26,7 @@ from plexus.models.registry import register_operator
 
 @register_operator("cruise", level="particle", kind="lateral")
 class Cruise(Lateral):
-    PREDICTION = "second_derivative"            # emits an acceleration
+    EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic
     REQUIRES_PARAMS = ["v0"]
     MECHANISM_TAGS = ["self_propulsion", "vicsek", "active_matter"]

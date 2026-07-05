@@ -10,7 +10,7 @@ reserve dormant slots; when the buffer is full, division stops (contact-inhibite
 Per-cell division probability this tick is `1 - exp(-rate*dt)`, with `rate` taken from a per-type
 `div_rate` buffer if present (so types proliferate at different rates), else the `rate` param.
 `max_occ` caps the live fraction of the buffer (homeostatic ceiling). `kind=structural`,
-`PREDICTION=None`; mutates occ/state in place and returns {}.
+`EMIT=None`; mutates occ/state in place and returns {}.
 """
 from __future__ import annotations
 
