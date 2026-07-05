@@ -20,7 +20,6 @@ loop reads that constant body force on each of its iterations.
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as Fnn
 
 from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
@@ -48,36 +47,22 @@ class PulseToContraction(Exchange):
                              "(a vector_grid field giving the contraction direction)")
         self.at = params.get("_at", "particle")
 
-    def _sample(self, field_grid, pos, W):
-        """Bilinear-sample a `[C, nx, ny]` field at particle positions -> `[N, C]`."""
-        gxn = (pos[:, 0] / W) * 2 - 1
-        gyn = (pos[:, 1] / 1.0) * 2 - 1
-        grid = torch.stack([gyn, gxn], -1)[None, None]              # grid_sample expects (x=ny, y=nx)
-        return Fnn.grid_sample(field_grid[None], grid, mode="bilinear",
-                               padding_mode="border", align_corners=True)[0, :, 0].t()
-
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
-        W = float(getattr(H, "world_width", 1.0))
 
         if self.mode == "directional":
             # F_i = amplitude * a(x_i) * d(x_i): uniform activation sets WHEN/how much,
             # the vector field sets WHERE to push (the active-stress orientation map).
-            a = self._sample(fld.grid[self.channel:self.channel + 1], pos, W)[:, 0]   # [N]
-            d = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2]
+            a = fld.sample(pos, self.channel)                             # [N] activation
+            d = H.fields[self.direction_from].sample(pos)                 # [N, 2] direction
             d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
             acc = self.amplitude * a[:, None] * d
         else:
-            # gradient mode: direction = +/- grad(activation), bilinear-sampled (chemotaxis idiom).
-            g = fld.grid[self.channel]                                  # [nx, ny]
-            pad = "circular" if getattr(H, "periodic", False) else "replicate"
-            gp = Fnn.pad(g[None, None], (1, 1, 1, 1), mode=pad)[0, 0]
-            gx = (gp[2:, 1:-1] - gp[:-2, 1:-1]) * 0.5 * (fld.nx / W)    # d a/d x
-            gy = (gp[1:-1, 2:] - gp[1:-1, :-2]) * 0.5 * fld.ny          # d a/d y
-            grad = torch.stack([gx, gy], 0)                            # [2, nx, ny]
-            acc = self.sign * self.amplitude * self._sample(grad, pos, W)  # inward for sign>0
+            # gradient mode: direction = +/- grad(activation), sampled at each particle.
+            grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))  # [N, 2]
+            acc = self.sign * self.amplitude * grad                       # inward for sign>0
 
         acc = acc * lvl.occ[:, None]
         if mask is not None:

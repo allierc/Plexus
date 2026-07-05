@@ -301,6 +301,21 @@ class Field(nn.Module):
         return F.grid_sample(grad, grid, mode="bilinear", padding_mode="border",
                              align_corners=True)[0, :, 0].t()                     # [N, D]
 
+    def sample(self, pos, channel=None):
+        """bilinear read of the grid at world positions `pos` [N, D]. `channel=None`
+        -> [N, C] (all channels); `channel=k` -> [N] (that one channel). Border
+        padding; same coordinate convention as `grad_at`. 2D grid fields. Replaces
+        the bilinear grid_sample block the field-coupled operators used inline."""
+        import torch.nn.functional as F
+        data = self.grid if channel is None else self.grid[int(channel):int(channel) + 1]   # [C, nx, ny]
+        W = self.width
+        gxn = (pos[:, 0] / W) * 2 - 1
+        gyn = (pos[:, 1] / 1.0) * 2 - 1
+        g = torch.stack([gyn, gxn], -1)[None, None]
+        out = F.grid_sample(data[None], g, mode="bilinear", padding_mode="border",
+                            align_corners=True)[0, :, 0].t()                      # [N, C']
+        return out[:, 0] if channel is not None else out
+
 
 # --------------------------------------------------------------------------- #
 #  Container: Hierarchy
