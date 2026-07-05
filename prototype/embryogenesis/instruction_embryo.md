@@ -30,12 +30,17 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 - **1E — two-type partitioning.** The two types segregate (e.g. left/right; `segregation` ↑).
 State which stage the batch targets in the analysis entry; only one stage-transition per batch.
 
-**PER-STAGE BUDGET — ≤2 DAYS (48h) OR ≤48 batches per sub-phase (1A/1B/1C/1D/1E), whichever first.** The driver injects a `>>> TIME CAP HIT` directive into your prompt when the 48h is up — when you see it, advance immediately. In STAGE STATUS record the batch
-each stage STARTED. If a stage's gate is not met within its 2-day / 48-batch budget, STOP grinding it: log the
-blocker as `[open]` in the ledger, ADOPT the best clean (escape-free) point achieved as that stage's
-operating spec, and ADVANCE to the next stage — or, if the gate is physically unreachable with the
-current operator set, relax the numeric target to the best value found and move on. Never spend >48
-batches on one rung; breadth across the ladder beats perfecting one. **Each batch, write the target sub-phase (e.g. `1B`) to `current_stage.txt`** — the loop uses it to name archive dirs `embryo_<stage>_b<NN>_<slot>`. (1B started at Batch 2; with the 48-batch stage cap it may run to the campaign's end at Batch 48.)
+**PER-STAGE BUDGET — ≤2 DAYS (48h) OR ≤10 batches per sub-phase, whichever first.** The driver injects a
+`>>> TIME CAP HIT` or `>>> BATCH CAP HIT` directive into your prompt when either budget is up — when you
+see it, advance IMMEDIATELY (adopt the best clean point, log any open blocker, write the next stage to
+`current_stage.txt`). **1E (two-type partitioning) is HARD — it is HARD-CAPPED at 10 batches: 1E started
+at Batch 24, so advance to INT no later than Batch 33.** In STAGE STATUS record the batch each stage
+STARTED. If a stage's gate is not met within its budget, STOP grinding it: log the blocker as `[open]`,
+ADOPT the best clean (escape-free) point achieved as that stage's operating spec, and ADVANCE — or, if the
+gate is physically unreachable with the current operator set, relax the numeric target to the best value
+found and move on. Never spend >10 batches on one rung; breadth across the ladder beats perfecting one.
+**Each batch, write the target sub-phase (e.g. `1E`) to `current_stage.txt`** — the loop uses it to name
+archive dirs `embryo_<stage>_b<NN>_<slot>` and to count the per-stage batch budget.
 
 ## The QUANTITATIVE SCORECARD — decide on NUMBERS, not on the movie
 Every slot writes **`scorecard.json`** (+ a `scorecard.png` evolution panel) via `scorecard.py`, with
