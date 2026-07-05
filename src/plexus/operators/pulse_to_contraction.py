@@ -2,7 +2,7 @@
 
 Reads the activation field a(x,t) (the `from:` field) and converts its gradient into
 a per-particle body force, RETURNED as a particle delta. The engine sums it (with any
-`mpm_drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
+`drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
 as the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counterpart
 of the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)
 points toward the centre, so
@@ -10,7 +10,7 @@ points toward the centre, so
     F_i = sign * amplitude * grad(a)(x_i)          sign = +1 (inward) / -1 (outward)
 
 contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
-mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).
+mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`activation_pulse`).
 
 `kind=exchange` (field -> set); `EMIT=None`, so the engine never integrates the
 particle set (g2p owns advection) -- the force enters mechanics only through the MPM
@@ -67,7 +67,7 @@ class PulseToContraction(Exchange):
         acc = acc * lvl.occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()
-        # return a per-particle force delta; the engine sums it (with mpm_drag's) into
+        # return a per-particle force delta; the engine sums it (with drag's) into
         # H.delta(mpm_particle), which p2g consumes as the MPM body force. EMIT=None,
         # so the engine never integrates the particle set (g2p owns advection).
         return {self.at: acc}

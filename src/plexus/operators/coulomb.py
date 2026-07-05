@@ -25,7 +25,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("Coulomb", level="particle", kind="lateral")
+@register_operator("coulomb", level="particle", kind="lateral")
 class Coulomb(Lateral):
     EMIT = "acceleration"            # emits an acceleration (charges have inertia)
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])

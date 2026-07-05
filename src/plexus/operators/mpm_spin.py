@@ -8,7 +8,7 @@ A proportional controller toward the rigid-rotation velocity field about a centr
 
 Returned as a particle-level delta the engine sums into `H.delta(mpm_particle)`; the MLS-MPM
 `p2g` scatter consumes it as an external body force (`a_ext += H.delta(particle)`), exactly like
-`mpm_drag` and `gravity`. `EMIT=None` (the engine does not integrate the particle set; g2p
+`drag` and `gravity`. `EMIT=mpm_acceleration` (the engine does not integrate the particle set; g2p
 owns advection), so the spin enters mechanics only through the substep. The `-v_i` term damps
 toward the target rate, so a disc started at rest spins UP to `omega` and then rotates steadily
 -- a single "rotate the disc slowly" knob, no external swirl map or pacemaker needed. Self-

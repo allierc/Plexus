@@ -1,14 +1,14 @@
 """mpm_anchor -- a substrate/boundary rest-anchor body force for MLS-MPM particles.
 
 acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle)
-and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward
+and the p2g scatter consumes as a body force (same idiom as drag). It pulls particles back toward
 their REST positions -- the cultured-sheet "attached substrate" of the cardio prototype (p1_aniso's
 `k_anchor`). `mode: boundary` (default) anchors only the outer RING of the tissue (width `ring` in
 world units), pinning the edges so the sheet cannot globally breathe/translate while the interior
 moves freely -- the condition that exposes whether LOCAL loops come from material structure rather
 than a global mode. `mode: substrate` anchors EVERY particle (global self-relaxation, as p1_aniso).
 
-`EMIT=None`: not engine-integrated; enters mechanics only through the MPM substep body force.
+`EMIT=mpm_acceleration`: not engine-integrated; enters mechanics only through the MPM substep body force.
 Rest positions are captured on the first call (frame 0 = the undeformed sheet).
 """
 from __future__ import annotations
