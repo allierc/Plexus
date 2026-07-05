@@ -4,7 +4,7 @@ general: {name: material_central_contraction, seed: 0, n_frames: 450, dt: 0.002,
 # is contracted toward its centre by a periodically pulsed active force. The force is
 # decomposed into three single-concern operators:
 #   pacemaker            (when)  -- a periodic scalar clock p(t) -> H.signals["beat"]
-#   pulse_stimulus       (where) -- p(t) x Gaussian(centre,radius) -> activation field
+#   activation_pulse       (where) -- p(t) x Gaussian(centre,radius) -> activation field
 #   pulse_to_contraction (what)  -- amplitude * grad(activation) -> H.part_accel (MPM body force)
 # and MPM (mpm_strain / p2g / mpm_grid_update / g2p) is HOW the material responds.
 sets:
@@ -22,7 +22,7 @@ fields:
 operators:
 - {op: aggregate, at: cell}
 - {op: pacemaker, at: activation, name: beat, period: 150, duration: 30, phase: 0}
-- {op: pulse_stimulus, at: activation, clock: beat, center: [0.5, 0.5], radius: 0.12}
+- {op: activation_pulse, at: activation, clock: beat, center: [0.5, 0.5], radius: 0.12}
 - {op: pulse_to_contraction, at: mpm_particle, from: activation, amplitude: 20.0, mode: inward}
 - {op: drag, emit: mpm_acceleration, at: mpm_particle, k: 30.0}
 - {op: mpm_strain, at: mpm_particle}
@@ -33,7 +33,7 @@ operators:
 schedule:
 - aggregate
 - pacemaker
-- pulse_stimulus
+- activation_pulse
 - pulse_to_contraction
 - drag
 - {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}

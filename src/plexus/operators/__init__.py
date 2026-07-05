@@ -31,8 +31,7 @@ from . import chemotax              # noqa: F401  field -> set gradient coupling
 from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
 # active-stimulus decomposition (clock -> activation field -> contraction -> MPM):
 from . import pacemaker             # noqa: F401  periodic scalar clock p(t) -> H.signals (field)
-from . import pulse_stimulus        # noqa: F401  clock x Gaussian -> activation field (field)
-from . import phase_delay           # noqa: F401  spatial phase-delay clock tau(x,y) -> activation field (field)
+from . import activation_pulse      # noqa: F401  clocked activation field: shared-clock profile OR per-pixel delayed wave (merges pulse_stimulus+phase_delay_pulse)
 from . import pulse_to_contraction  # noqa: F401  activation gradient -> per-particle force (exchange)
 from . import pulse_to_active_stress  # noqa: F401  activation -> per-particle active stress -A nn^T (exchange)
 from . import mpm_spin              # noqa: F401  drive MPM body toward slow solid-body rotation (lateral)
@@ -57,7 +56,7 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
            "cohesion", "alignment", "separation", "cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "prescribed_field", "chemotax", "gravity",
-           "pacemaker", "pulse_stimulus", "phase_delay", "pulse_to_contraction", "pulse_to_active_stress",
+           "pacemaker", "activation_pulse", "pulse_to_contraction", "pulse_to_active_stress",
            "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
            "agent_to_mpm", "mpm_to_agent", "agent_remodel", "flow_align", "heading_align"]

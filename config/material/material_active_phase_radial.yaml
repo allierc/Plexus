@@ -6,7 +6,7 @@ fields:
 general: {boundary: wall, dt: 0.002, n_frames: 250, name: material_active_phase_radial, seed: 0}
 operators:
 - {at: cell, op: aggregate}
-- {op: phase_delay_pulse, at: activation, delay_from: delay_map, max_delay: 60.0, period: 150.0, duration: 30.0}
+- {op: activation_pulse, at: activation, delay_from: delay_map, max_delay: 60.0, period: 150.0, duration: 30.0}
 - {amplitude: 10.0, at: mpm_particle, direction_from: direction, from: activation, op: pulse_to_active_stress}
 - {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
 - {at: mpm_particle, op: mpm_strain}
@@ -15,7 +15,7 @@ operators:
 - {at: mpm_particle, from: mpm_grid, op: g2p, wall_contact: 0.06, wall_damp: 0.5}
 schedule:
 - aggregate
-- phase_delay_pulse
+- activation_pulse
 - pulse_to_active_stress
 - drag
 - substep_dt: 0.0002
