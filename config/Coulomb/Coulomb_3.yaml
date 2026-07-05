@@ -15,8 +15,8 @@ sets:
 fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
-  - {op: Coulomb,      at: particle, clamp: 1000000.0}
-schedule: [radius_graph, Coulomb]
+  - {op: coulomb,      at: particle, clamp: 1000000.0}
+schedule: [radius_graph, coulomb]
 plotting:
   background: black
   size_by: charge          # point size ~ |charge|

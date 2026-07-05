@@ -54,7 +54,7 @@ class P2G(Exchange):
         if part_accel is not None:
             a_ext = a_ext + part_accel
         # per-particle body force from particle-level force operators (e.g. pulse_to_contraction,
-        # mpm_drag) -- the symmetric counterpart of the parent-delta path above (gravity).
+        # drag) -- the symmetric counterpart of the parent-delta path above (gravity).
         a_ext = a_ext + torch.nan_to_num(H.delta(p.name))
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 

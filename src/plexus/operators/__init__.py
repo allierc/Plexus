@@ -12,7 +12,7 @@ from . import graph                 # noqa: F401  registers radius_graph (rewire
 from . import aggregate             # noqa: F401  children -> parent reduction (centroid)
 from . import broadcast             # noqa: F401  parent -> children lift (containment)
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
-from . import Coulomb                # noqa: F401  registers Coulomb (lateral, 2nd-derivative, charged particles)
+from . import coulomb                # noqa: F401  registers coulomb (lateral, 2nd-derivative, charged particles)
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
 from . import alignment             # noqa: F401  Vicsek velocity alignment (nominal); boids = special case
 from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
@@ -52,7 +52,7 @@ from . import flow_align            # noqa: F401  mpm_grid -> agent heading (pol
 from . import heading_align         # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment)
 from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
 
-__all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "Coulomb",
+__all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "coulomb",
            "cohesion", "alignment", "separation", "cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "prescribed_field", "chemotax", "gravity",
