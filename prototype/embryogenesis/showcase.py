@@ -2,7 +2,6 @@
 """showcase -- the FINAL render for an embryogenesis spec: one simulation, captured with the
 engine's per-frame hook (stress & deformation are NOT in the trajectory), producing
 
-  * blob.mp4          -- cells-in-a-blob overlay (blue material + coloured cells)
   * summary2x2.mp4    -- the 2x2 summary:  a) blob (+n_cells/n_mpm)  b) stress
                          c) deformation + cell tracks   d) material flow field
   * *_evolution.png   -- static montages of both
@@ -226,13 +225,7 @@ def main():
         draw2x2(fig, k); fig.tight_layout()
         fig.savefig(os.path.join(tmp, f"f{k:05d}.png"), dpi=100, facecolor="black"); plt.close(fig)
     _mp4(tmp, os.path.join(d, "summary2x2.mp4"))
-    # blob-only movie (panel a) + evolution montage
-    for k in range(T):
-        fig, ax = plt.subplots(figsize=(5, 5)); fig.patch.set_facecolor("black")
-        lv = occ[k] > 0
-        _draw(ax, mX[k], aX[k][lv], at[lv], colors, blob, W, mem_mask=mem)
-        fig.savefig(os.path.join(tmp, f"f{k:05d}.png"), dpi=100, facecolor="black"); plt.close(fig)
-    _mp4(tmp, os.path.join(d, "blob.mp4"))
+    # blob evolution montage (5 timepoints) -- the blob-only movie (blob.mp4) is intentionally NOT rendered
     fig, axes = plt.subplots(1, 5, figsize=(15, 3.2)); fig.patch.set_facecolor("black")
     for i, k in enumerate(ks):
         lv = occ[k] > 0
@@ -282,7 +275,7 @@ def main():
 
     # archive
     adir = os.path.join(ARCHIVE, sim.name); os.makedirs(adir, exist_ok=True)
-    for f in ("spec.yaml", "summary2x2.mp4", "summary2x2_final.png", "blob.mp4", "blob_evolution.png",
+    for f in ("spec.yaml", "summary2x2.mp4", "summary2x2_final.png", "blob_evolution.png",
               "metrics.json", "scorecard.json", "scorecard.png"):
         src = os.path.join(d, f)
         if os.path.isfile(src):
@@ -290,7 +283,7 @@ def main():
 
     # VLM caption (always, unless suppressed)
     if not no_cap:
-        _caption([os.path.join(d, "blob.mp4"), os.path.join(d, "summary2x2.mp4")], d)
+        _caption([os.path.join(d, "summary2x2.mp4")], d)
         for cf in ("video_descriptions.txt",):
             src = os.path.join(graphs_data_path(), cf)
     print(f"[showcase] archived -> {adir}", flush=True)
