@@ -1350,7 +1350,7 @@ _Tags added 2026-06-25 in a one-time retro-pass; entries below were written befo
    to the detected real onsets (period ≈ 50). The differentiable window = the full inter-onset interval
    so the fitted loop CLOSES (matches `gt_compare.png`).
 3. `[engineering]` **Amplitude was applied twice (fixed).** The activation must be the gate `env·spatial` (~[0,1]);
-   `pulse_to_contraction.amplitude` does the scaling. Double-applying gave ~25× overshoot (R²≈−34087);
+   `active_force.amplitude` does the scaling. Double-applying gave ~25× overshoot (R²≈−34087);
    fixing it → R²≈−20 at init. Amplitude is now a single, sweepable knob.
 4. `[engineering]` **The honest metric is interior R²** (motion-normalised, boundary EXCLUDED, moving nodes). A small
    absolute RMSE is meaningless here (real motion ~6e-4); R²≤0 = worse than predicting no motion.
@@ -1495,7 +1495,7 @@ _Tags added 2026-06-25 in a one-time retro-pass; entries below were written befo
     for UNIFORM material, so loops are "available dynamics"; structure modulates their SHAPE. New objective
     = inverse-tune loop MORPHOLOGY (size/axis/chirality/openness/spatial pattern) to the real beat with
     PARAMETRIC active-stress patterns, NOT rotary. Files: `archive/aniso_loop_test/`. New op `mpm_anchor`
-    (boundary/substrate rest-anchor); per-particle gain in `pulse_to_active_stress`; spec
+    (boundary/substrate rest-anchor); per-particle gain in `active_stress`; spec
     `material_aniso_cardio`.
 
 29. `[mechanism]` **MORPHOLOGY ATLAS (Phase 1, b11): pattern params decouple along morphology axes; fibre WAVELENGTH controls ellipticity/axis-angle; STIFFNESS wavelength is INERT; AMPLITUDE collapses without inverse structure; DRAG trades openness for size (Est.#Q22, Phase 1). [FORWARD ATLAS ONLY — Phase 2 inverse shows DIFFERENT ranking, see Est.#30.]** The 2×2 test falsified "structure required for loops" — loops are inertial, available without structure, so the objective pivots to: learn which ANISOTROPIC ACTIVE-STRESS patterns generate the REAL loop MORPHOLOGY. Forward-sweep `cardio_mpm_atlas.py` on `material_aniso_cardio` base (stiff_wl 8, gain_wl 26, fibre_wl 16, fibre_angle 0.6, amp 10, drag 30): (s0) base → openness 0.258, aspect 0.23, angle 1.54, size 5.32e-03, chirality 0.47. (s1) fibre_angle=0 → open↑ 0.303, chir↓ 0.42 — fibre rotation couples openness/chirality. (s2 WINNER) fibre_wl=32 → aspect↑ 0.34, angle↑ 2.29, open 0.276, chir↑ 0.51 — **coarser fibre INCREASES ellipticity and major-axis rotation.** (s3) stiff_wl=24 → no visible morphology change — stiffness wavelength is INACTIVE. (s4 FAILED) amp=25 → collapsed (open raw 0.013, size 1.09e-03) — naive forward cannot harness high amplitude; inverse inverse-training context is required (Est.#27 showed amp25 was best there). (s5) drag=300 → open↑ 0.306, angle↑ 2.77, size↓ 1.95e-03 — extreme drag maximizes openness/angle but shrinks absolute size (inertial→quasi-static, open-thin vs closed-fat trade-off). **Finding: Pattern parameters decouple cleanly — fibre wavelength controls loop SHAPE (ellipticity/rotation), NOT just size; drag-amplitude-stiffness have secondary/non-linear effects. Phase-2 inverse will tune the best atlas family (fibre_wl40 leading from Phase 1 batches 11–15) to real per-node morphology distribution.**
@@ -1583,7 +1583,7 @@ _Tags added 2026-06-25 in a one-time retro-pass; entries below were written befo
   rotary) → they COEXIST (UNet out=3+phase+rfield). So a rotary+phase "spiral" slot is valid (b10 s1 spiral_md40).
 
 ### Mechanism: active stress (M1) -- IMPLEMENTED + VALIDATED
-- `pulse_to_active_stress` writes `sigma_act = +amplitude*a(x)*n n^T` to `H.active_stress`; `p2g` adds
+- `active_stress` writes `sigma_act = +amplitude*a(x)*n n^T` to `H.active_stress`; `p2g` adds
   it to the elastic stress before the affine scatter (additive, default-off; snow/liquid untouched).
   Trainer toggle `--mechanism {force,stress}`; stress-gain amplitude needs its OWN calibration (amp 200
   on real-data scale overshoots ~7x; ~amp 30 ballpark).

@@ -162,7 +162,7 @@ def set_maps(H, lvl, youngs_p, dir_grid, gain_p):
     contraction-axis direction grid, and the per-particle active-stress gain."""
     mu, la = _lame(youngs_p)
     lvl.mu, lvl.la = mu, la
-    lvl.gain = gain_p                                                   # read by pulse_to_active_stress
+    lvl.gain = gain_p                                                   # read by active_stress
     H.fields["direction"].grid = dir_grid
 
 
@@ -584,9 +584,9 @@ def main():
 
     # fixed per-slot mechanism knobs (swept by the plan -- not differentiated, exactly like train.py)
     ops = _ops_by_name(spec, str(dev))
-    ops["pulse_to_active_stress"].amplitude = float(args.amplitude)
+    ops["active_stress"].amplitude = float(args.amplitude)
     ops["drag"].k = float(args.drag_k)            # op renamed mpm_drag -> drag (emit: mpm_acceleration) by M2 refactor
-    force_ops = ["pulse_to_active_stress", "drag"]
+    force_ops = ["active_stress", "drag"]
     mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]
     spatial = _spatial_profile(profile, center, radius, dev)
     # TRAVELLING-WAVE activation phase tau(x,y): a coarse PLANE WAVE (action-potential propagation).

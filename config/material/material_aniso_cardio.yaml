@@ -18,7 +18,7 @@ operators:
 - {op: apply_material_map, at: mpm_particle, from: gain_map, target: gain, min: 0.4, max: 1.6}
 - {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
 - {at: activation, center: [0.5, 0.5], clock: beat, op: activation_pulse, radius: 0.12, profile: uniform}
-- {amplitude: 10.0, at: mpm_particle, from: activation, op: pulse_to_active_stress, direction_from: direction}
+- {amplitude: 10.0, at: mpm_particle, from: activation, op: active_stress, direction_from: direction}
 - {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
 - {at: mpm_particle, op: mpm_strain}
 - {a_max: 200, at: mpm_particle, drag: 0.0, op: p2g, to: mpm_grid}
@@ -29,7 +29,7 @@ schedule:
 - apply_material_map
 - pacemaker
 - activation_pulse
-- pulse_to_active_stress
+- active_stress
 - drag
 - substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]
