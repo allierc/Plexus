@@ -77,7 +77,13 @@ def operators_of_kind(kind: str) -> dict[str, type]:
 
 
 def catalog_summary() -> str:
-    """Human-readable table of everything registered — printed by docs/CLI."""
+    """Human-readable table of everything registered — printed by docs/CLI.
+
+    Each operator also surfaces its declarative metadata: MECHANISM_TAGS (a capability
+    index — "find every operator that does long_range") and PARAM_ROLES (a per-knob
+    glossary — what each tunable param *means*). This is the single consumer that makes
+    that metadata live rather than dead: it feeds the operator catalog the docs and the
+    agentic mechanism-search layer read, so declaring the metadata now has an effect."""
     def tag(c, name):
         return str(getattr(c, name, None))
     lines = ["# entities"]
@@ -86,6 +92,13 @@ def catalog_summary() -> str:
     lines.append("# operators")
     for n, c in sorted(_OPERATOR_REGISTRY.items()):
         lines.append(f"  {n:18s} level={tag(c, 'LEVEL'):10s} kind={tag(c, 'KIND')}")
+        tags = getattr(c, "MECHANISM_TAGS", None)
+        if tags:
+            lines.append(f"      tags:  {', '.join(tags)}")
+        roles = getattr(c, "PARAM_ROLES", None)
+        if roles:
+            for p, role in roles.items():
+                lines.append(f"      · {p:11s} {role}")
     lines.append("# fields")
     for n, c in sorted(_FIELD_REGISTRY.items()):
         lines.append(f"  {n:18s} couples_to={tag(c, 'COUPLES_TO'):10s} frame={tag(c, 'FRAME')}")
