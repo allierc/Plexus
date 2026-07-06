@@ -5,15 +5,23 @@
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{hyperref}
-\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
 \usepackage{caption}
+\usepackage{subcaption}
 \captionsetup{font=small}
 
 \newcommand{\op}[1]{\texttt{#1}}
 \graphicspath{{../archive/}}
 
-\title{\textbf{Active Matter $\times$ MPM: Cells in a Deformable Blob}\\[2pt]
-\large A Plexus prototype toward embryogenesis / morphogenesis}
+% --- one panel of a 5x1 montage: image dir + short sub-label ---
+\newcommand{\mpanel}[2]{%
+  \begin{minipage}[t]{0.192\textwidth}\centering
+    \includegraphics[width=\linewidth]{#1/summary2x2_final.png}\\[1pt]
+    {\scriptsize #2}\par
+  \end{minipage}\hfill}
+
+\title{\textbf{Discovering Developmental Mechanisms by Operator Composition:\\[2pt]
+An Active-Matter $\times$ MPM Embryo in Plexus}}
 \author{Plexus prototype \texttt{prototype/embryogenesis}}
 \date{\today}
 
@@ -21,134 +29,213 @@
 \maketitle
 
 \begin{abstract}
-We couple \emph{active-matter agents} (self-propelled, aligning ``cells'') to a \emph{Material
-Point Method} (MLS-MPM) continuum ``blob'' of water or elastic tissue. The two subsystems talk
-through the shared MPM background grid: the material \emph{drags} the cells and its
-surface-tension interface \emph{confines} them; the cells scatter momentum back and
-\emph{deform} the material. The blob rotates slowly. Everything is built from Plexus operators;
-the only new physics is three small operators (\op{mpm\_to\_agent}, \op{agent\_to\_mpm},
-\op{mpm\_spin}). We show stable 2D prototypes for a water disc, an elastic disc, and a
-four-cell-type showcase, and document the confinement (``escape'') failure and its fix. The
-system is the substrate for an agentic exploration loop that maps its morphogenetic regimes.
+Embryonic development emerges from the interplay of mechanics, active migration, proliferation and
+biochemical signalling across multiple spatial and temporal scales. Rather than prescribing these
+behaviours, we ask whether they can \emph{emerge} from a small library of reusable physical operators
+composed within a common differentiable simulation framework. This reframes modelling: instead of
+fitting parameters inside a fixed simulator, we treat the operator set itself as the object of
+discovery, searching over \emph{mechanisms}---their presence, absence, and composition---with parameter
+tuning only after a candidate mechanism exists. The scientific objective is to identify the minimal
+combinations of operators that generate successive developmental phenomena, which requires a
+compositional substrate in which mechanisms can be systematically recombined while sharing a common
+physics. Using Plexus, we progressively construct an active-matter $\times$ MPM embryo in which each
+developmental capability is established and quantitatively validated in isolation before being
+integrated into a complete system. Organized as a staged mechanistic program---each stage answering one
+biological question before the next---this strategy transforms embryogenesis from a
+parameter-optimization problem into a causal investigation of developmental mechanisms.
 \end{abstract}
 
-\section{Goal}
-Multi-type cells migrate collectively inside a large disc of MPM material (water or elastic).
-The material drags the cells; the cells create stress/deformation in the material; the cells
-cannot leave the disc, which is held together by surface tension. Ultimately we want to
-reproduce embryogenesis / morphogenesis dynamics. This note records the working prototypes and
-the code they required.
+\section{Introduction}
+Developmental biology is inherently multi-mechanistic: shape, motion, pattern and growth arise together
+from mechanics, active cell motility, proliferation and diffusible signalling. Most computational models
+of morphogenesis begin by \emph{fixing} the governing mechanisms---a purpose-built vertex model, a
+reaction--diffusion system, a tissue-mechanics solver---and then calibrate parameters to match an
+observation. The mechanisms are assumptions; only their coefficients are inferred.
 
-\section{Model}
-Two node sets share one world and one clock.
+We take the opposite stance and regard the \emph{set of mechanisms} as the primary unknown. The search
+space is over operators (Does confinement help or hurt? Is division a growth mechanism or a mixing one?
+Which coupling actually deforms the tissue?), and parameter tuning is a secondary refinement applied
+only \emph{after} a candidate mechanism has been shown to matter. This is a substantially different
+modelling philosophy, and it requires a substrate that makes mechanisms first-class, interchangeable
+objects rather than hard-wired assumptions.
 
-\paragraph{Cells (active matter).} A set \op{agent} of self-propelled particles carrying a unit
-heading $\mathbf n_i$. Motion is heading-kinematic (overdamped, first order): the heading is
-steered by polar alignment (Vicsek), chemotaxis, and angular noise, while \op{glide} moves each
-cell along its heading at speed $v_0^{(\tau_i)}$ (per type $\tau_i$) and \op{repel} enforces a
-hard core:
-\begin{equation}
-\dot{\mathbf r}_i = v_0^{(\tau_i)}\,\mathbf n_i + \sum_j \mathbf f_{ij}, \qquad
-\dot{\mathbf n}_i = \Gamma\!\!\sum_{j\in\partial i}\!\frac{\mathbf n_j-(\mathbf n_j\!\cdot\!\mathbf n_i)\mathbf n_i}{r_{ij}}
-+ \omega\,\widehat{\nabla c} + \sqrt{2D_r}\,\xi_i .
-\end{equation}
+Plexus is such a substrate: a compositional, differentiable simulation framework in which every
+biological process is a \emph{reusable operator} acting on shared physical state, and simulations are
+assembled by composing operators rather than by writing a bespoke solver. Here, self-propelled
+active-matter \emph{agents} (cells) are embedded in a Material Point Method (MPM) \emph{continuum} (the
+embryonic tissue), and the two subsystems communicate through a shared background grid. Because
+operators can be added, removed and recombined while sharing one physics, the same framework lets us ask
+causal questions---introduce one operator, ablate another, and measure the effect on a common set of
+observables. A staged, hypothesis-driven exploration then walks the embryo up a ladder of developmental
+capabilities, each established before the next is attempted. Plexus is therefore not merely a simulator
+for this problem but the medium in which the mechanistic search itself is expressed.
 
-\paragraph{Material (MLS-MPM).} A disc of material points (set \op{mpm\_particle}, child of a
-\op{cell}) with deformation gradient $F$ and affine velocity $C$. The decomposed solver is the
-standard cycle \op{mpm\_strain} $\to$ \op{p2g} $\to$ \op{mpm\_grid\_update} $\to$ \op{g2p}, run
-for $\lfloor \Delta t/\Delta t_\mathrm{sub}\rfloor$ substeps per frame. Water is a liquid band
-($\mu=0$, pressure only); elastic tissue is fixed-corotated with a thin liquid \emph{skin}. The
-liquid colour field $c$ drives the continuum surface force (CSF) that holds the blob's boundary.
+\section{Methods}
+All experiments are performed in Plexus. Cells are modelled as active agents embedded within a continuum
+(MLS-)MPM representation of the embryo. Agent operators govern migration, chemotaxis, proliferation and
+growth; continuum operators govern elasticity, momentum transfer and large deformation. Rather than
+implementing a dedicated embryo simulator, developmental behaviours are obtained by composing generic
+operators---chemotaxis, active migration, division, growth, and agent--continuum coupling---so that no
+mechanism is hard-wired into the solver.
 
-\paragraph{Two-way coupling (new).} Both directions route through the MPM grid velocity
-$\mathbf v_g$ and mass/momentum $m_g,\,\mathbf p_g$:
-\begin{align}
-\text{material}\to\text{cell:}\quad
-&\dot{\mathbf r}_i \mathrel{+}= k\,\mathbf v_g(\mathbf r_i) \;+\; \kappa\,\nabla c(\mathbf r_i)
-&&(\op{mpm\_to\_agent}) \label{eq:m2a}\\
-\text{cell}\to\text{material:}\quad
-&m_g \mathrel{+}= \textstyle\sum_i w\,\mu_a,\quad
-\mathbf p_g \mathrel{+}= \textstyle\sum_i w\,\mu_a v_0\mathbf n_i
-&&(\op{agent\_to\_mpm}) \label{eq:a2m}
-\end{align}
-using the \emph{same} quadratic B-spline weights $w$ MPM uses for its own transfers. In
-\eqref{eq:m2a} the first term is fluid drag (the cell is advected by the flow, $k{=}1$ = fully
-carried) and the second is the \textbf{surface-tension confinement}: $c$ is $\sim\!1$ inside the
-fluid and $\sim\!0$ outside, so $\nabla c$ points \emph{inward} at the interface and pushes cells
-back in --- a soft membrane, not a hard wall. In \eqref{eq:a2m} cells have no physical mass, so an
-effective mass $\mu_a$ (times a gain $k$) sets the push; scattering onto $m_g,\mathbf p_g$
-\emph{after} \op{p2g} but \emph{before} \op{mpm\_grid\_update} makes the grid solve on the
-combined (material $+$ cell) momentum, so \op{g2p} carries the cells' push into real deformation.
-Rotation is \op{mpm\_spin}: a body force driving the disc toward solid-body rotation
-$\mathbf v_\mathrm{rot}=\omega\,\hat{\mathbf z}\times(\mathbf r-\mathbf c)$.
-
-\paragraph{One clock.} The engine integrates on a single global $\Delta t$; we make the MPM clock
-master ($\Delta t=2\!\times\!10^{-3}$, $\Delta t_\mathrm{sub}=2\!\times\!10^{-4}$) and express the
-cell gains in that time unit.
+The investigation follows a strictly staged protocol. Each batch tests a single mechanistic hypothesis
+and advances only after the previous developmental capability has been \emph{quantitatively} established
+against a fixed scorecard (shape, organization, flow, partition, coupling) and gated by hard-failure
+constraints (no collapse, no escape, exclusion respected, balance-bounded acceleration). This avoids
+confounding later phenomena with failures of earlier prerequisites and produces a cumulative map of
+causal relationships between operators and emergent developmental behaviour.
 
 \section{Results}
-All panels: cells are coloured dots by type, the MPM material is the translucent blue blob,
-black background. Time runs left$\to$right.
+The program is a ladder: a stable blastula, membrane deformation, division, collective flow, partition,
+integration, orientation, growth, patterning, and morphogenesis. We summarize each in turn.
 
-\begin{figure}[h]\centering
-\includegraphics[width=\linewidth]{agent_mpm_disc_water_v3/blob_evolution.png}
-\caption{\textbf{Water disc.} Two cell types swim in a cohesive rotating water blob, form
-aligned streams, and gently lobe the boundary. $0\%$ escape.}
+\paragraph{Stable blastula.}
+The first objective was to determine whether a mechanically stable blastula could exist without
+pathological collapse or cell escape. By progressively separating the effects of confinement, repulsion
+and density, a reproducible operating point was established in which cells remained evenly distributed
+while continuously interacting with the surrounding continuum (Fig.~\ref{fig:blastula}). Over-confinement
+crushed cells together (collapse); removing it sprayed them out of the core (escape). A narrow low-press
+window with strong short-range exclusion held both hard-failures at bay.
+
+\begin{figure}[t]
+\centering
+\mpanel{embryo_1A_b01_s0_base_ref}{division flood $\to$ collapse}%
+\mpanel{embryo_1A_b01_s4_confine_hi}{over-confinement $\to$ collapse}%
+\mpanel{embryo_1A_b01_s1_confine_lo}{under-confinement $\to$ escape}%
+\mpanel{embryo_1A_b03_s0_confine_0p3}{confine $0.3$ (borderline)}%
+\mpanel{embryo_1A_b03_s2_confine_0p1}{\textbf{stable operating point}}%
+\caption{From unstable initial conditions to the stable blastula operating point: representative failure
+modes (division flood, over-confinement collapse, under-confinement escape) alongside the reproducible
+low-press, strong-exclusion configuration that remains collapse- and escape-free. Each panel shows cells
+(dots) over the deformable material, with stress, deformation and material-flow readouts.}
+\label{fig:blastula}
 \end{figure}
 
-\begin{figure}[h]\centering
-\includegraphics[width=\linewidth]{agent_mpm_disc_elastic_v3/blob_evolution.png}
-\caption{\textbf{Elastic disc.} A deformable tissue with a liquid skin holds a rounder shape; a
-coherent stream of cells (polar order $\approx0.46$) migrates across it. $0.25\%$ escape.}
+\paragraph{Membrane deformation.}
+Once stability was achieved, we asked whether internal cellular activity could mechanically deform the
+surrounding tissue. Systematic exploration showed that deformation is generated primarily through the
+agent--continuum coupling (momentum scattered from cells into the material) rather than by membrane
+softening or rotational forcing. The resulting shell deformation established the first mechanically
+active blastula while preserving stability.
+
+\paragraph{Division is mixing, not growth.}
+We next asked whether proliferation alone could generate developmental growth. Division robustly
+increased population size and deformed the embryo, but repeated experiments demonstrated that
+proliferation fundamentally behaves as a mechanical \emph{mixing} process: increasing division
+progressively destroyed previously established spatial organization. Division is therefore not a true
+developmental growth mechanism---a conclusion that later motivates a dedicated growth primitive.
+
+\paragraph{Collective flow.}
+Attention then shifted to collective motion. Several first-order alignment mechanisms and
+continuum-mediated feedbacks were explored. While coherent migration could be generated transiently,
+sustained collective flow proved fundamentally limited by a trade-off between coherence and mechanical
+containment. The integrated operating point nevertheless demonstrated the coexistence of continuous
+motion, bounded proliferation and mechanical deformation.
+
+\paragraph{Partition.}
+Having established a mechanically active blastula, we addressed tissue partitioning. Differential
+self-adhesion produced only weak and irreproducible segregation. In contrast, heterotypic two-channel
+chemotactic cross-repulsion generated robust lateral demixing that replicated across seeds and
+established the first stable multicellular pattern within the embryo (Fig.~\ref{fig:partition}).
+
+\begin{figure}[t]
+\centering
+\mpanel{embryo_1E_b24_s0_adh_a06}{adhesion (weak demix)}%
+\mpanel{embryo_1E_b24_s1_adh_a03}{adhesion (weaker)}%
+\mpanel{embryo_1E_b24_s2_adh_a10}{adhesion (stronger)}%
+\mpanel{embryo_1E_b24_s3_adh_sig05}{adhesion $+$ range}%
+\mpanel{embryo_1E_b24_s4_adh_n88}{chemotactic cross-repulsion}%
+\caption{Tissue partitioning. Differential self-adhesion yields only weak, irreproducible segregation
+(left); heterotypic two-channel chemotactic cross-repulsion (right) produces robust, seed-replicable
+lateral demixing---the first stable pattern in the embryo.}
+\label{fig:partition}
 \end{figure}
 
-\begin{figure}[h]\centering
-\includegraphics[width=\linewidth]{agent_mpm_disc_4types_show/blob_evolution.png}
-\caption{\textbf{Four-type showcase} ($4000$ cells). Per-type behaviour via masked operator
-instances: a\,(red) flocker, b\,(gold) disperser, c\,(green) chemotactic aggregator, d\,(white)
-noisy. All confined and carried by the rotating water blob.}
+\paragraph{Integration.}
+The integration stage asked whether deformation, proliferation, flow and partition could coexist within
+a single embryo. A compatible operating regime was identified, demonstrating a flowing, dividing and
+self-partitioning blastula. The principal limitation revealed here was a hard trade-off between
+increasing proliferation and maintaining organization, with division again acting as a mechanical source
+of mixing.
+
+\paragraph{Programmable orientation.}
+The next stage introduced embryonic polarity. Uniform external forces oriented only the global body,
+whereas \emph{differential} sedimentation between cell types generated a reproducible animal--vegetal
+axis. Changing the direction of the imposed differential drift continuously steered the axis,
+establishing a controllable developmental polarity (Fig.~\ref{fig:orientation}).
+
+\begin{figure}[t]
+\centering
+\mpanel{embryo_ORI_b46_s0_grav_g1}{uniform force (global only)}%
+\mpanel{embryo_GRO_b50_s0_a22_s0}{differential drift $22^\circ$}%
+\mpanel{embryo_GRO_b50_s2_a67_s0}{differential drift $67^\circ$}%
+\mpanel{embryo_GRO_b50_s4_diag_s2}{differential drift (diagonal)}%
+\mpanel{embryo_GRO_b50_s5_aonly_s2}{single-type drift (control)}%
+\caption{Programmable axis formation. A uniform force orients only the whole body, but differential
+sedimentation between cell types yields a reproducible axis whose orientation is continuously steered by
+the imposed drift direction ($22^\circ$, $67^\circ$, diagonal), demonstrating a controllable
+developmental axis.}
+\label{fig:orientation}
 \end{figure}
 
-\section{The escape problem and its fix}
-The first attempt let nearly all cells leak out and the water disc foam apart
-(Fig.~\ref{fig:fail}). Two coupled causes: (i) an under-resolved liquid (too few particles per
-grid cell) with \emph{zero} viscous drag, agitated by spin and cell push, fragments; (ii) once
-the interface is ragged and the confinement gain is weak, cells walk straight through it. The fix
-is a combination, summarised in Table~\ref{tab:tune}: fewer grid cells (more particles/cell),
-viscous drag, stronger surface tension, gentler spin/push, and a much stronger confinement gain.
+\paragraph{Continuous growth as a new primitive.}
+These results exposed a conceptual limitation of proliferation-based development: increasing cell number
+alone cannot produce genuine tissue expansion. We therefore introduced a new developmental primitive,
+\op{cell\_grow}, which performs continuous rest-volume growth of the \emph{cell} independently of
+division; particle addition is merely its numerical realization. An initial density-only implementation
+failed to expand the envelope; inserting \emph{prestretched} reserve material---woken particles that
+carry outward pressure and relax by pushing their neighbours apart---converted growth into genuine
+volumetric expansion. This established continuous growth as a biological mechanism distinct from
+proliferation.
 
-\begin{figure}[h]\centering
-\includegraphics[width=0.85\linewidth]{water_v1_ESCAPE_HIST/fig_mpm_particle_evolution.png}
-\caption{\textbf{Failure kept on purpose (v1).} The water disc foams, fragments and spreads;
-cells escape to the walls.}\label{fig:fail}
+\paragraph{Growth preserves pattern.}
+With continuous growth available, we asked whether spatial patterning survives tissue expansion. Unlike
+proliferation, which mechanically remixes neighbours, continuous growth preserved the previously
+established chemotactic domains; differential sedimentation alone then sufficed to orient and complete
+the growing pattern, showing that growth and pattern formation are compatible (Fig.~\ref{fig:growth}).
+
+\begin{figure}[t]
+\centering
+\mpanel{embryo_PAT_b64_s0_nochem_ctrl}{no pattern (control)}%
+\mpanel{embryo_PAT_b64_s1_demix_nogrow}{pattern, no growth}%
+\mpanel{embryo_PAT_b64_s2_demix_grow_s0}{\textbf{grow $+$ pattern} (seed 0)}%
+\mpanel{embryo_PAT_b64_s3_demix_grow_s1}{grow $+$ pattern (seed 1)}%
+\mpanel{embryo_PAT_b64_s4_demix_grow_s2}{grow $+$ pattern (seed 2)}%
+\caption{Growth versus proliferation for pattern maintenance. Proliferation remixes cells and destroys
+organization; continuous \op{cell\_grow} preserves the chemotactic domains during expansion, reproducibly
+across seeds.}
+\label{fig:growth}
 \end{figure}
 
-\begin{table}[h]\centering
-\begin{tabular}{lccccl}
-\toprule
-run & escaped & disc growth & aniso & polar & key change \\
-\midrule
-water v1 (fail) & $\sim0.95$ & $0.30$ & $0.60$ & --- & baseline: n\_grid 96, drag 0, confine 30 \\
-water v2 & $0.025$ & $0.042$ & $0.14$ & $0.14$ & n\_grid 64, drag 0.25, ST 120, confine 70 \\
-water v3 & $\mathbf{0.000}$ & $0.057$ & $0.14$ & $0.14$ & drag 0.4, ST 160--300, confine 140 \\
-elastic v3 & $0.003$ & $0.049$ & $0.08$ & $\mathbf{0.46}$ & elastic core $+$ liquid skin \\
-\bottomrule
-\end{tabular}
-\caption{Confinement / stability sweep. ``escaped'' = fraction of cells outside the blob at the
-end; ``aniso'' = blob boundary roughness (0 = perfect disc).}\label{tab:tune}
-\end{table}
+\paragraph{Morphogenesis.}
+The final stage explored morphogenesis through anisotropic growth. Directionally biased growth produced
+reproducible body buds while maintaining the molecular pattern (Fig.~\ref{fig:morphogenesis}).
+Unexpectedly, elongation \emph{parallel} to the developmental polarity destabilized the partition,
+whereas growth \emph{perpendicular} to the polarity yielded the most stable body geometry---suggesting
+that morphology and molecular organization interact geometrically, with elongation preferentially
+orthogonal to the polarity axis.
 
-\section{Compute budget}
-On one RTX~A6000, the four-type showcase ($4000$ cells, $16{,}000$ material points, $n_\mathrm{grid}=64$)
-simulates $1500$ frames in $\approx100$\,s. This leaves ample headroom for the $\le 20$\,min-per-job
-L4 budget of the agentic exploration loop.
+\begin{figure}[t]
+\centering
+\mpanel{embryo_MOR_b68_s0_iso_ctrl}{isotropic (control)}%
+\mpanel{embryo_MOR_b68_s1_aniso04}{anisotropy $0.4$}%
+\mpanel{embryo_MOR_b68_s2_aniso08}{anisotropy $0.8$}%
+\mpanel{embryo_MOR_b68_s3_aniso10}{anisotropy $1.0$ (bud)}%
+\mpanel{embryo_MOR_b68_s5_tip_y}{tip-localized growth}%
+\caption{Pattern-compatible morphogenesis. Increasing growth anisotropy produces reproducible body buds
+that round by elastic relaxation; the most stable geometry arises when elongation is orthogonal to the
+established polarity axis.}
+\label{fig:morphogenesis}
+\end{figure}
 
-\section{Next: agentic exploration}
-The prototype is the substrate for an autonomous loop (a clone of \op{prototype/active\_matter2})
-in which an agent proposes parameter variations, runs $8$ jobs in parallel on L4, and maps the
-morphogenetic regimes (mixing vs.\ segregation, blob rounding vs.\ lobing, engulfment,
-rotation-shear banding), with a batch montage as the visual feedback. In 3D the same operators
-drive a 2$\times$2 summary movie: cell trajectories with tails, a transparent deformation volume,
-the affine-velocity field, and a combined view.
+\section{Conclusion}
+The complete developmental program identifies a hierarchy of compatible mechanisms: stable blastula
+formation enabled mechanical deformation, which enabled reproducible partitioning, which enabled
+programmable orientation, which enabled continuous growth, which in turn enabled morphogenesis. The only
+persistently incompatible component was sustained proliferation, which consistently acted as a mechanical
+mixing process that limits organization. Rather than producing a single optimized embryo, the study
+delivers a \emph{causal map} relating individual physical operators to successive stages of embryonic
+development---and, more broadly, demonstrates a modelling philosophy in which the mechanisms themselves,
+not merely their parameters, are the object of discovery.
 
 \end{document}
