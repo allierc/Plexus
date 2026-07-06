@@ -650,7 +650,8 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \midrule
 \multicolumn{4}{@{}l}{\emph{Dynamics --- move a set's state (return a delta)}}\\
 \code{attraction\_repulsion} & lateral & velocity & per-type difference-of-Gaussians interaction law \\
-\code{coulomb}               & lateral & acceleration & electrostatic inverse-square law (per-type \code{charge}) \\
+\code{squared\_law}          & lateral & acceleration & inverse-square law: Coulomb electrostatics \emph{or} Newtonian gravity (\code{law}: \code{charge}/\code{mass}) \\
+\code{disk\_ic}              & structural & --- & frame-0 IC: rotating self-gravitating disk (near-circular orbits + central mass) \\
 \code{cohesion},\,\code{alignment},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
 \code{cruise}                & lateral & acceleration & Vicsek self-propulsion toward cruising speed $v_0$ \\
 \code{drag}                  & lateral & accel.\,$|$\,mpm\_accel. & viscous friction $-\kappa v$ (\code{emit:} routes to the engine or the MPM substep) \\
@@ -1324,7 +1325,25 @@ originating prototype on a representative spec; new mechanisms require a no-op/a
 test, schema validation, and at least one minimal live spec. The operator catalog and
 this manuscript are then regenerated or reconciled so the paper describes the live
 registry rather than an older prototype.
+
+\item \textbf{Cite the source paper and repository.} Because a prototype begins by
+cloning a published model, the promoted operator must carry that provenance: the
+originating paper and code repository are recorded in the operator's docstring and in
+this manuscript, so a reader can trace each core primitive back to the science it was
+built from. Promotion inherits credit, it does not erase it.
 \end{enumerate}
+
+As a worked example, the inverse-square \code{squared\_law} operator is a single such
+promotion: it unifies the electrostatic Coulomb law (ported from ParticleGraph's
+\code{PDE\_E}) with softened Newtonian gravity (from Philip Mocz, \emph{Create Your
+Own N-body Simulation (With Python)}, 2020, vendored under \code{papers/nbody-python/})
+into one \code{law}-switched operator. Both are the same contract --- an
+add-aggregated pairwise $1/r^2$ force emitted as an acceleration --- differing only in
+the source charge (\code{charge} vs.\ \code{mass}), the sign/receiver convention
+(like-repel vs.\ attract), and the summation range (neighbour graph vs.\ all-pairs).
+The Coulomb path is byte-identical to the pre-merge operator; the gravity path
+reproduces the prototype's force exactly. The galaxy prototype is thereby retired into
+the core as a spec, not a fork.
 
 This promotion discipline is the same reconvergence process the repository was built
 for: sibling prototype frameworks that had drifted apart are pulled back into one
