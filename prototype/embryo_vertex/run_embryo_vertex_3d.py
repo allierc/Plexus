@@ -52,7 +52,7 @@ def presets():
         ("s0_590", dict(s0=5.90, v0=0.15)),   # deep fluid
         ("passive", dict(s0=5.60, v0=0.0)),   # control: no motility -> frozen
     ]
-    return [(n, dict(frames=300, dt=0.05, Dr=1.0, **d)) for n, d in P]
+    return [(n, dict(frames=600, dt=0.0125, Dr=1.0, **d)) for n, d in P]   # dt/4: slower, smoother 3D
 
 
 def make_sim(p):
@@ -79,45 +79,87 @@ def _shape_index(xy):
     return q, vol
 
 
-def render(pos, outdir, name, seconds=16.0, max_frames=140):
+def _slice_polygon(tris, z0):
+    """Cross-section polygon of a convex polyhedron (given as hull triangles [F,3,3]) by the
+    plane z=z0: intersect each triangle edge, collect points, order around the centroid."""
+    pts = []
+    for tri in tris:
+        z = tri[:, 2]
+        for a, b in ((0, 1), (1, 2), (2, 0)):
+            if (z[a] - z0) * (z[b] - z0) < 0:
+                t = (z0 - z[a]) / (z[b] - z[a])
+                pts.append((tri[a] + t * (tri[b] - tri[a]))[:2])
+    if len(pts) < 3:
+        return None
+    pts = np.array(pts); c = pts.mean(0)
+    return pts[np.argsort(np.arctan2(pts[:, 1] - c[1], pts[:, 0] - c[0]))]
+
+
+def render(pos, outdir, name, diag=None, seconds=28.0, max_frames=250):
+    """2x1 panel per frame: LEFT = transparent 3D Voronoi tissue, RIGHT = a Voronoi cross-section
+    slice at z=L/2, both coloured by cell shape index; a caption prints the live values."""
     os.makedirs(outdir, exist_ok=True)
     T = pos.shape[0]
     stride = max(1, -(-T // max_frames)); idx = list(range(0, T, stride))
     fps = max(1, round(len(idx) / seconds))
+    z0 = L / 2.0
+    dtxt = "" if diag is None else f"   Deff={diag.get('deff','?')}   {diag.get('state','?')}"
 
-    def draw(ax, t, azim):
-        ax.clear(); ax.set_facecolor("black")
+    def draw(fig, t, azim):
+        fig.clf(); fig.patch.set_facecolor("black")
         faces, svals = V3.cell_faces(pos[t].astype(np.float64) % L, L, N)
-        # keep cells whose centre is inside the box (the central tissue), drop boundary-crossers
-        tris, cols = [], []
-        for cell_tris, s in zip(faces, svals):
-            centroid = cell_tris.reshape(-1, 3).mean(0)
-            if np.any(centroid < -0.5) or np.any(centroid > L + 0.5):
+        # LEFT: transparent 3D polyhedra
+        ax1 = fig.add_subplot(1, 2, 1, projection="3d"); ax1.set_facecolor("black")
+        tris3d, cols3d = [], []
+        for ct, s in zip(faces, svals):
+            cen = ct.reshape(-1, 3).mean(0)
+            if np.any(cen < -0.5) or np.any(cen > L + 0.5):
                 continue
-            c = CMAP(np.clip((s - 5.0) / 1.0, 0, 1))
-            rgba = (c[0], c[1], c[2], 0.30)                   # translucent -> see through the tissue
-            for tri in cell_tris:
-                tris.append(tri); cols.append(rgba)
-        pc = Poly3DCollection(tris, facecolors=cols, edgecolors=(1, 1, 1, 0.12), linewidths=0.15)
-        ax.add_collection3d(pc)
-        ax.set_xlim(0, L); ax.set_ylim(0, L); ax.set_zlim(0, L)
-        ax.set_box_aspect((1, 1, 1)); ax.set_axis_off()
-        ax.view_init(elev=22, azim=azim)
+            c = CMAP(np.clip((s - 5.0) / 1.0, 0, 1)); rgba = (c[0], c[1], c[2], 0.30)
+            for tri in ct:
+                tris3d.append(tri); cols3d.append(rgba)
+        ax1.add_collection3d(Poly3DCollection(tris3d, facecolors=cols3d, edgecolors=(1, 1, 1, 0.10),
+                                              linewidths=0.12))
+        ax1.set_xlim(0, L); ax1.set_ylim(0, L); ax1.set_zlim(0, L)
+        ax1.set_box_aspect((1, 1, 1)); ax1.set_axis_off(); ax1.view_init(elev=20, azim=azim)
+        # RIGHT: cross-section at z0
+        ax2 = fig.add_subplot(1, 2, 2); ax2.set_facecolor("black")
+        ncut = 0
+        for ct, s in zip(faces, svals):
+            poly = _slice_polygon(ct, z0)
+            if poly is not None and len(poly) >= 3:
+                c = CMAP(np.clip((s - 5.0) / 1.0, 0, 1))
+                ax2.fill(poly[:, 0], poly[:, 1], facecolor=c, alpha=0.9, edgecolor="white", lw=0.5)
+                ncut += 1
+        ax2.set_xlim(0, L); ax2.set_ylim(0, L); ax2.set_aspect("equal"); ax2.axis("off")
+        # params printed in panel-2 top-left, small font (not in a title)
+        q = float(np.nanmean(svals))
+        info = (f"{name}\ns0={diag.get('s0','?') if diag else '?'}  v0={diag.get('v0','?') if diag else '?'}"
+                f"\n<s>={q:.3f}   z={z0:.1f}\ncells cut={ncut}"
+                f"\nDeff={diag.get('deff','?') if diag else '?'}\n{diag.get('state','') if diag else ''}")
+        ax2.text(0.02, 0.98, info, transform=ax2.transAxes, color="white", fontsize=6,
+                 va="top", ha="left", family="monospace")
 
-    fig = plt.figure(figsize=(4.8, 4.8)); fig.patch.set_facecolor("black")
-    ax = fig.add_subplot(111, projection="3d"); ax.set_facecolor("black")
-    fig.subplots_adjust(0, 0, 1, 1)
+    fig = plt.figure(figsize=(8.6, 4.5)); fig.patch.set_facecolor("black")
+    # strip: cross-section snapshots over time
     picks = [int(round(fr * (T - 1))) for fr in (0.0, 0.33, 0.66, 1.0)]
-    sfig = plt.figure(figsize=(4 * 2.4, 2.5)); sfig.patch.set_facecolor("black")
-    for k, t in enumerate(picks):
-        sax = sfig.add_subplot(1, 4, k + 1, projection="3d")
-        draw(sax, t, 30 + 20 * k); sax.set_title(f"{int(100*t/max(T-1,1))}%", color="white", fontsize=9)
-    sfig.subplots_adjust(0.01, 0.01, 0.99, 0.9, wspace=0.02)
+    sfig, sax = plt.subplots(1, len(picks), figsize=(len(picks) * 2.3, 2.4)); sfig.patch.set_facecolor("black")
+    for a, tt in zip(sax, picks):
+        a.set_facecolor("black")
+        fc, sv = V3.cell_faces(pos[tt].astype(np.float64) % L, L, N)
+        for ct, s in zip(fc, sv):
+            poly = _slice_polygon(ct, z0)
+            if poly is not None and len(poly) >= 3:
+                a.fill(poly[:, 0], poly[:, 1], facecolor=CMAP(np.clip((s - 5.0) / 1.0, 0, 1)),
+                       alpha=0.9, edgecolor="white", lw=0.4)
+        a.set_xlim(0, L); a.set_ylim(0, L); a.set_aspect("equal"); a.axis("off")
+        a.set_title(f"{int(100*tt/max(T-1,1))}%", color="white", fontsize=9)
+    sfig.subplots_adjust(0.01, 0.01, 0.99, 0.9, wspace=0.05)
     sfig.savefig(os.path.join(outdir, "strip.png"), dpi=110, facecolor="black"); plt.close(sfig)
     w = FFMpegWriter(fps=fps, metadata={"title": name})
     with w.saving(fig, os.path.join(outdir, "movie.mp4"), dpi=100):
         for j, t in enumerate(idx):
-            draw(ax, t, 20 + 100 * j / max(len(idx) - 1, 1))     # slow camera orbit
+            draw(fig, t, 20 + 100 * j / max(len(idx) - 1, 1))
             w.grab_frame()
     plt.close(fig)
 
@@ -150,8 +192,8 @@ def run_share(rank, nproc, device):
                 yaml.safe_dump(cfg, sf, sort_keys=False)
             _, out = engine_run(sim, device=device)
             pos = out["sets"]["cell"]["pos"]
-            render(pos, odir, name)
             diag = diagnostics(pos); diag.update({k: p[k] for k in ("s0", "v0")})
+            render(pos, odir, name, diag=diag)
             json.dump(diag, open(os.path.join(odir, "diag.json"), "w"), indent=1)
         except Exception:
             print(f"[rank {rank}] {name} FAILED\n{traceback.format_exc()}", flush=True)

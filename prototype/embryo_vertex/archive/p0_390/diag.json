@@ -1,8 +1,8 @@
 {
- "msd": 0.3876,
- "deff": 0.000967,
- "shape_index": 3.926,
- "t1_changes": 87,
+ "msd": 0.3917,
+ "deff": 0.000977,
+ "shape_index": 3.921,
+ "t1_changes": 111,
  "state": "fluid",
  "p0": 3.9,
  "v0": 0.2

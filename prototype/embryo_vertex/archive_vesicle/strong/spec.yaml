@@ -1,0 +1,41 @@
+general:
+  name: vesicle
+  seed: 1
+  n_frames: 500
+  dt: 1.0
+  boundary: free
+  dim: 3
+  world:
+  - 16.0
+  - 16.0
+  - 16.0
+sets:
+  cell:
+    n: 300
+    spawn: random
+    types:
+      a:
+        fraction: 1.0
+fields: {}
+operators:
+- op: vesicle_seed
+  at: cell
+  radius: 2.3
+  before_frame: 1
+- op: radius_graph
+  at: cell
+  radius: 1.4
+- op: vesicle_mechanics
+  at: cell
+  shell: 2.3
+  adhesion: 1.0
+  sigma: 0.9
+  r_adh: 1.4
+  k_rep: 40.0
+  k_r: 0.6
+  mu: 0.02
+  noise: 0.01
+schedule:
+- vesicle_seed
+- radius_graph
+- vesicle_mechanics

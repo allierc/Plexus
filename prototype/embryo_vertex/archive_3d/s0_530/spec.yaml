@@ -1,8 +1,8 @@
 general:
   name: spv3
   seed: 1
-  n_frames: 300
-  dt: 0.05
+  n_frames: 600
+  dt: 0.0125
   boundary: periodic
   dim: 3
   world:
@@ -27,6 +27,6 @@ operators:
   K_S: 1.0
   V0: 1.0
   mu: 1.0
-  dt: 0.05
+  dt: 0.0125
 schedule:
 - vertex_tension_3d
