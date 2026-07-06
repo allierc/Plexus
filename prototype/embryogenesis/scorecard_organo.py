@@ -181,7 +181,10 @@ def branches(body, dx, body_radius):
     bpt = (deg >= 3) & skel
     tip = (deg == 1) & skel
     res["skeleton_length"] = float(skel.sum()) * dx
-    # cluster thick junction pixels -> ONE bifurcation each
+    # cluster adjacent junction pixels -> one bifurcation. NOTE: n_branchpoints reliably separates
+    # UNBRANCHED (0: round body / single bud) from BRANCHED (>=1), and tracks the branching TREND; the
+    # exact integer is +-1 for thick/complex junctions (raster-skeleton loops) -> read it as "branching
+    # present + relative count", not a precise bifurcation number.
     n_bpt = int(ndimage.label(bpt, structure=np.ones((3, 3)))[1])
     # segments = skeleton minus junctions; PRUNE short spurs (skeletonization noise on a round blob)
     seg = skel & (~bpt)
@@ -295,6 +298,28 @@ def _one(mX_live, birth_pts, pattern_pts, strain_vals, W, res):
             br[k] = 0.0
     loc = localization(body, birth_pts, pattern_pts, strain_vals, mX_live, W, dx, budmask)
     return {**o, **b, **br, **loc}
+
+
+def panel_data(mX_live, W=1.0, res=170):
+    """Intermediate rasters for a diagnostic panel: body mask, skeleton, tip/branchpoint masks,
+    main contour, and the metric dict -- so a viewer can SEE what the numbers measured."""
+    mask, dx = tissue_mask(mX_live, W=W, res=res)
+    o, body = outline(mask, dx)
+    b, budmask = buds(body, dx, o["body_radius"])
+    br = branches(body, dx, o["body_radius"])
+    if o["solidity"] > 0.90:
+        for k in ("n_tips", "n_branchpoints", "branch_score", "tree_depth"):
+            br[k] = 0.0
+    skel = morphology.skeletonize(body) if body.sum() >= 30 else np.zeros_like(body)
+    tips = np.zeros_like(body); bpts = np.zeros_like(body)
+    if skel.sum() >= 5:
+        deg = (ndimage.convolve(skel.astype(int), np.ones((3, 3), int), mode="constant") - 1) * skel
+        tips = (deg == 1) & skel
+        bpts = ndimage.binary_dilation((deg >= 3) & skel, iterations=1) & skel
+    cont = measure.find_contours(body.astype(float), 0.5)
+    cont = max(cont, key=len) if cont else None
+    return dict(body=body, skel=skel, tips=tips, bpts=bpts, contour=cont, dx=dx,
+                metrics={**o, **b, **br})
 
 
 def compute(caps, W=1.0, fracs=FRACS, res=170):

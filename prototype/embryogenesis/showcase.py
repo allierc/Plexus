@@ -112,6 +112,41 @@ _PANEL_KEYS = [
 ]
 
 
+def _organo_panel(mX, mocc, W, name, path):
+    """Diagnostic panel for the Phase-3 organogenesis geometry: what the mask/skeleton/buds SAW.
+    Left: body outline + skeleton (cyan) with tips (red) + branchpoints (yellow). Right: growth
+    localization (grown material green over original blue). Plus the headline metrics."""
+    import scorecard_organo as ORG
+    lm = mocc[-1] > 0
+    pd = ORG.panel_data(mX[-1][lm], W=W)
+    grown = lm & (~(mocc[0] > 0))
+    fig, axs = plt.subplots(1, 2, figsize=(9, 4.6)); fig.patch.set_facecolor("black")
+    ext = [0, W, 0, 1]
+    for ax in axs:
+        ax.set_facecolor("black"); ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
+    # left: geometry
+    axs[0].imshow(pd["body"].T, origin="lower", extent=ext, cmap="Greys_r", alpha=0.35, vmin=0, vmax=1)
+    if pd["skel"].any():
+        sy, sx = np.nonzero(pd["skel"].T); axs[0].scatter(sx / pd["skel"].shape[0] * W, sy / pd["skel"].shape[1],
+                                                          s=0.5, c="#38e0e0")
+    for m, col in ((pd["bpts"], "#ffd21e"), (pd["tips"], "#ff4d4d")):
+        if m.any():
+            yy, xx = np.nonzero(m.T); axs[0].scatter(xx / m.shape[0] * W, yy / m.shape[1], s=14, c=col, edgecolors="none")
+    if pd["contour"] is not None:
+        c = pd["contour"]; axs[0].plot(c[:, 0] / pd["body"].shape[0] * W, c[:, 1] / pd["body"].shape[1], "w-", lw=0.7)
+    g = pd["metrics"]
+    axs[0].set_title(f"geometry  n_buds={int(g['n_buds'])}  bpts={int(g['n_branchpoints'])}  "
+                     f"solid={g['solidity']:.2f}", color="white", fontsize=9)
+    # right: growth localization
+    axs[1].scatter(mX[-1][lm & ~grown, 0], mX[-1][lm & ~grown, 1], s=1.5, c="#4a7fff", edgecolors="none")
+    if grown.any():
+        axs[1].scatter(mX[-1][grown, 0], mX[-1][grown, 1], s=1.5, c="#37d67a", edgecolors="none")
+    axs[1].set_title(f"growth (green=new)  bud_score={g['bud_score']:.2f}  brn_score={g['branch_score']:.1f}",
+                     color="white", fontsize=9)
+    fig.suptitle(f"organogenesis geometry — {name}", color="white", fontsize=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.95]); fig.savefig(path, dpi=110, facecolor="black"); plt.close(fig)
+
+
 def _scorecard_panel(sc, name, path):
     """Grid of metric-EVOLUTION line plots (value vs 5/25/50/75/100% of the run)."""
     ev = sc["evolution"]; pcts = sc["pcts"]
@@ -270,6 +305,10 @@ def main():
         json.dump({"name": sim.name, "pcts": sc["pcts"], "final": sc["final"], "evolution": sc["evolution"],
                    "organo": og}, fh, indent=2)
     _scorecard_panel(sc, sim.name, os.path.join(d, "scorecard.png"))
+    try:
+        _organo_panel(mX, mocc, W, sim.name, os.path.join(d, "organo.png"))
+    except Exception as e:
+        print(f"[showcase] organo panel skipped: {e}", flush=True)
     print(f"[showcase] {sim.name}: " + "  ".join(f"{k}={v}" for k, v in list(m.items())[:14]), flush=True)
 
     # save the EFFECTIVE run spec (base yaml + this slot's overrides) so every archive is self-documenting
@@ -291,7 +330,7 @@ def main():
     # archive
     adir = os.path.join(ARCHIVE, sim.name); os.makedirs(adir, exist_ok=True)
     for f in ("spec.yaml", "summary2x2.mp4", "summary2x2_final.png", "blob_evolution.png",
-              "metrics.json", "scorecard.json", "scorecard.png"):
+              "metrics.json", "scorecard.json", "scorecard.png", "organo.png"):
         src = os.path.join(d, f)
         if os.path.isfile(src):
             shutil.copy2(src, adir)
