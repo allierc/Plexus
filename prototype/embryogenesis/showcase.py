@@ -296,8 +296,8 @@ def main():
     og = ORG.compute({"mX": mX, "mocc": mocc, "fnorm": fnorm, "aX": aX, "at": at, "occ": occ}, W=W)
     _ogkeys = ("n_buds", "bud_score", "bud_len_bodyR", "bud_neck_ratio", "bud_persistence",
                "n_tips", "n_branchpoints", "branch_score", "branch_persistence", "tree_depth",
-               "fragment_count", "solidity", "convexity", "aspect_ratio", "circularity",
-               "growth_bud_overlap", "pattern_growth_overlap")
+               "hierarchy_depth", "fragment_count", "solidity", "convexity", "aspect_ratio", "circularity",
+               "growth_bud_overlap", "pattern_growth_overlap", "independent_growth_domains", "program_stability")
     m.update({f"org_{k}": og["final"].get(k) for k in _ogkeys})   # headline organo scores ride along
     with open(os.path.join(d, "metrics.json"), "w") as fh:
         json.dump({"name": sim.name, **m}, fh, indent=2)
