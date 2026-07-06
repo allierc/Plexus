@@ -1206,6 +1206,48 @@ removed: morphology is set by the \emph{parameters} of a spec, not by the operat
 the same operator yields a bound cluster, a featureless disc, or a spiral disc
 depending on its couplings.)
 
+\section{Operator naming rule}
+\label{sec:naming}
+
+An operator's name states its \emph{mechanism}, never its \emph{wiring}. Which entities
+an operator connects is already declared per invocation --- \code{from:} and \code{to:}
+name the source and target set or field, and \code{EMIT} names the state its delta
+updates --- so encoding the endpoints in the name (\code{agent\_to\_mpm},
+\code{pulse\_to\_active\_stress}, \code{field\_to\_agent}) is redundant and does not scale:
+every new pair of endpoints would mint a new name (\code{particle\_to\_grid},
+\code{grid\_to\_mesh}, \code{field\_to\_particle}, \ldots). Name the algorithm and let the
+spec route it:
+
+\begin{lstlisting}[style=yaml]
+- op: scatter          # mechanism: particle -> grid transfer
+  from: cell
+  to: mpm_particle
+- op: gather           # the same transfer, wired the other way
+  from: mpm_particle
+  to: cell
+\end{lstlisting}
+
+Thus the transport pair \code{agent\_to\_mpm}/\code{mpm\_to\_agent} is really
+\code{scatter}/\code{gather} (one particle$\leftrightarrow$grid transfer, wired by
+\code{from:}/\code{to:}), and \code{pulse\_to\_active\_stress}/\code{pulse\_to\_contraction}
+are \code{active\_stress}/\code{active\_force} --- two constitutive laws distinguished by
+the quantity they emit (a stress tensor $-A\,\hat n\hat n^{\!\top}$ vs.\ a body force), not
+by their input: the activation source may be calcium, voltage, or a morphogen, so the name
+must not hard-code \code{pulse}. The families \code{scatter}/\code{gather}/\code{deposit}/
+\code{sample}/\code{aggregate}/\code{broadcast} are mechanisms; the graph already knows who
+talks to whom.
+
+\begin{quote}
+\textbf{Naming rule.} Operator names describe mechanisms; \code{from:} and \code{to:}
+describe routing. A directional \code{X\_to\_Y} name is admissible only when $X\!\to\!Y$
+is itself the scientific mechanism, not merely its endpoints.
+\end{quote}
+
+The test: if two operators differ only in their endpoints and share a mechanism, they are
+\emph{one} operator wired two ways, not two names --- exactly the merge-by-contract rule of
+\S\ref{sec:promotion} read through the routing lens. The name answers only ``what does this
+compute?''; \code{from:}/\code{to:}/\code{EMIT} answer ``between what, in which direction.''
+
 \section{Build loop for a coding agent}
 
 A coding agent must follow this loop for every new capability.
