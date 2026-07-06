@@ -36,8 +36,8 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
   PERSISTS (stable orientation, the 1E partition aligned to it), the substrate Phase 2 builds on.
 
 ## PHASE 2 — MORPHOGENESIS. Causal chain: **Blastula → Orientation → GROWTH → PATTERN → MORPHOGENESIS.** Do
-## NOT attempt morphogenesis before the model can actually grow tissue. **After MOR the campaign is COMPLETE —
-## STOP (no invented stages, no off-mission operators).** Same gate discipline + hard failures throughout.
+## NOT attempt morphogenesis before the model can actually grow tissue. Phase 2 feeds directly into Phase 3
+## (organogenesis) below — do NOT jump ahead. Same gate discipline + hard failures throughout.
 ##
 ## GROWTH-vs-DIVISION ROLES (Phase 2 — do NOT make division the growth mechanism):
 ##   `cell_grow`   INCREASES tissue volume + creates protrusions (continuous, anisotropic material addition).
@@ -51,20 +51,50 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 - **PAT — patterning.** Stable chemical/mechanical identities on the GROWING tissue — domains persist during
   growth, and growth fields become spatially programmable (a chemical field gates WHERE `cell_grow` acts).
   Gate: `mi_type_x` ↑, domains persistent (low late-time `mixing_entropy` drift) even under active growth.
-- **MOR — morphogenesis (terminus).** PATTERN CONTROLS GROWTH: localized anisotropic `cell_grow` (gated by the
-  PAT field) creates buds / folds / elongation / branching; remodeling rounds + stabilizes. Targets:
-  gastrulation, convergence/extension, epiboly, lumen formation. Gate: directional, pattern-localized reshaping
-  (anisotropic strain bands, `t1_rate` fluidity, area growth, or a lumen) traceable to the PAT domains.
+- **MOR — morphogenesis.** PATTERN CONTROLS GROWTH: localized anisotropic `cell_grow` (gated by the PAT field)
+  creates buds / folds / elongation / branching; remodeling rounds + stabilizes. Targets: gastrulation,
+  convergence/extension, epiboly, lumen formation. Gate: directional, pattern-localized reshaping (anisotropic
+  strain bands, `t1_rate` fluidity, area growth, or a lumen) traceable to the PAT domains.
+
+## PHASE 3 — ORGANOGENESIS. Phase 1 gave a stable, oriented embryo; Phase 2 gave continuous growth, persistent
+## pattern and body-scale morphogenesis. Phase 3 no longer asks WHETHER the embryo can grow — it asks **which
+## operator COMPOSITIONS produce complex organ-like morphologies**: the mapping `growth laws + mechanical
+## feedback + pattern fields → organ morphology`, NOT parameter optimization. **NEVER introduce a dedicated
+## "branch"/"organ"/"fold" operator** — organogenesis must EMERGE from composing the existing primitives
+## (`cell_grow`, pattern fields via `deposit`/`diffuse`/`chemotax`, mechanics, continuum elasticity, growth
+## feedback `stress_gain`, remodeling `agent_remodel`). **ORG is the TERMINUS — after ORG the campaign is
+## COMPLETE, STOP.** The contribution is a mechanistic ATLAS: operator composition → growth law → morphological
+## program → organ geometry.
+- **BUD — localized morphogenesis.** Introduce SPATIALLY LOCALIZED growth; find the mechanism that makes a
+  stable tissue bud WITHOUT rupture or loss of pattern. Compose: `cell_grow(mode=anisotropic|tip)`, `prestretch`
+  (growth-pressure magnitude), PATTERN-GATED `cell_grow` (growth only inside one domain), growth-rate /
+  anisotropy modulation. Question: does localized growth NATURALLY produce a reproducible protrusion that then
+  ROUNDS by elastic relaxation (emergent, not a scripted bud)? Gate: one reproducible localized bud · embryo
+  integrity preserved (collapsed=0, escape=0) · developmental pattern preserved · reproducible strain localization.
+- **BRN — branching morphogenesis.** With a stable bud, find which minimal FEEDBACK law turns ONE growing tip
+  into MULTIPLE stable branches (branching must EMERGE from feedback, never an explicit branch operator).
+  Compose: stress-dependent growth (`stress_gain`), curvature-dependent growth, tip inhibition, growth
+  competition, morphogen-controlled growth fields, multiple interacting growth centres, anisotropic remodeling.
+  Branch number, spacing, bifurcation angle and stability are EMERGENT observables, not prescribed targets.
+  Gate: reproducible bifurcation · stable branch persistence · tissue continuity preserved · controlled branch spacing.
+- **ORG — organogenesis (terminus).** Let MULTIPLE developmental programs COEXIST in one embryo — growth
+  controlled simultaneously by tissue identity, morphogen fields, mechanics and developmental timing, so
+  different regions run different growth programs (e.g. lung-like branching, glandular budding, gut folding,
+  vascular arborization, epithelial invagination, repeated appendages). Goal: discover which operator
+  combinations generate different CLASSES of organ morphology — not one specific organ. Gate: multiple
+  simultaneous morphogenetic programs · persistent developmental identities · stable organ-level structures ·
+  reproducible morphology across seeds.
 
 State which stage the batch targets in the analysis entry; only one stage-transition per batch.
 
 **PER-STAGE BUDGET — ≤2 DAYS (48h) OR ≤10 batches per sub-phase, whichever first.** The driver injects a
 `>>> TIME CAP HIT` or `>>> BATCH CAP HIT` directive into your prompt when either budget is up — when you
 see it, advance IMMEDIATELY (adopt the best clean point, log any open blocker, write the next stage to
-`current_stage.txt`). Every stage — Phase 1 AND Phase 2 (GRO/PAT/MOR) — is hard-capped at 10 batches.
-**Ladder order: 1A→1B→1C→1D→1E→INT→ORI→GRO→PAT→MOR, then STOP.** Phase 1 (through ORI) is COMPLETE; the
-campaign is now in Phase 2 starting at **GRO** (growth — the prerequisite). When the cap fires on **MOR**
-(the terminus), do NOT advance to any new stage — STOP designing experiments; the campaign is done. In STAGE STATUS record the batch each stage
+`current_stage.txt`). Every stage — Phase 1, Phase 2 (GRO/PAT/MOR) AND Phase 3 (BUD/BRN/ORG) — is hard-capped
+at 10 batches. **Ladder order: 1A→1B→1C→1D→1E→INT→ORI→GRO→PAT→MOR→BUD→BRN→ORG, then STOP.** Phase 1 (through
+ORI) and Phase 2 (through MOR) are the substrate; the campaign then enters Phase 3 (organogenesis) at **BUD**.
+When the cap fires on **ORG** (the terminus), do NOT advance to any new stage — STOP designing experiments;
+the campaign is done. In STAGE STATUS record the batch each stage
 STARTED. If a stage's gate is not met within its budget, STOP grinding it: log the blocker as `[open]`,
 ADOPT the best clean (escape-free) point achieved as that stage's operating spec, and ADVANCE — or, if the
 gate is physically unreachable with the current operator set, relax the numeric target to the best value
