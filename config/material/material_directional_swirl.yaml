@@ -49,3 +49,5 @@ descriptions:
   movie_mpm_particle:
     description: The video shows a large collection of blue particles distributed within a square boundary. Over time, the entire set of particles undergoes a subtle rotation around its center. The distribution of the particles remains relatively uniform throughout the sequence. The overall shape of the cluster maintains its integrity while tilting slightly.
     objects: The scene contains thousands of small, individual blue dots. These particles are arranged in a dense, roughly square-shaped cluster. Each dot is uniform in size and color, creating a speckled texture. The particles are not connected but are packed closely together to form a coherent field.
+plotting:
+  background: black

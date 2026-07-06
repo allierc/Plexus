@@ -34,3 +34,6 @@ descriptions:
   movie_mpm_particle:
     description: A collection of blue particles is initially concentrated in a dense, rectangular block at the bottom of the frame. Over time, the particles begin to move upward, causing the top surface of the mass to rise and fluctuate. The upper boundary of the particle group develops a wavy, undulating shape as the particles spread out. By the final frame, the particles have reached a higher level, maintaining a textured, granular appearance.
     objects: The scene contains a large number of small, individual blue particles. These particles are arranged in a dense, roughly rectangular cluster at the base of the image. Each particle is a tiny, irregular speck of a consistent medium-blue color. The overall mass of particles forms a continuous, granular field that occupies the lower portion of the white background.
+
+plotting:
+  background: black

@@ -40,3 +40,5 @@ descriptions:
   movie_mpm_particle:
     description: A large circular cluster of light blue particles is initially positioned on the left side of the frame. As the simulation progresses, this cluster rapidly disintegrates and moves downward toward the bottom edge. The particles eventually settle into a horizontal, elongated shape along the bottom of the screen. A vertical grey bar remains stationary throughout the entire duration of the sequence.
     objects: The primary object is a large, circular cluster composed of numerous small, light blue particles. A solid, vertical grey bar is positioned on the right side of the frame, extending from the top to the bottom. The light blue particles are small and densely packed in the first frame but become more dispersed as they move. The grey bar is uniform in width and maintains a constant position and color throughout the video.
+plotting:
+  background: black

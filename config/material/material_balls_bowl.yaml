@@ -45,3 +45,5 @@ descriptions:
   movie_mpm_particle:
     description: A cluster of multi-colored particles is initially positioned in the upper left quadrant of the frame. Over time, this cluster moves downward and toward the center of the image. Simultaneously, a separate green cluster of particles moves from the upper right toward the center. The two groups eventually converge and overlap in the lower central region of the scene.
     objects: The first set of objects is a cluster of four overlapping circular regions in orange, brown, purple, and red. These regions are medium-sized and appear to be composed of many small, dense particles. The second set of objects is a single, distinct green circular region located to the right of the first cluster. This green region is similar in size and texture to the individual components of the first cluster.
+plotting:
+  background: black

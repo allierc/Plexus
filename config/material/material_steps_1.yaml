@@ -58,3 +58,5 @@ descriptions:
   movie_mpm_particle:
     description: A large cluster of blue particles is initially located in the upper-left corner of the frame. As the simulation progresses, these particles begin to descend and spread out across the lower half of the screen. They interact with a grey, stepped geometric structure, accumulating along its upper edges. By the final frame, the particles have mostly settled into a thin layer following the downward slope of the steps.
     objects: The primary objects are numerous small, blue circular particles that form a dense cloud. A large, solid grey geometric shape occupies the bottom-left area, consisting of a series of descending rectangular steps. The background is a plain, solid white field that provides high contrast for the moving elements. The blue particles vary in density, appearing as a concentrated mass at the start and a dispersed layer at the end.
+plotting:
+  background: black

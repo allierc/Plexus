@@ -33,3 +33,5 @@ descriptions:
   movie_mpm_particle:
     description: A dense cluster of blue particles initially forms a large, roughly circular shape at the top of the frame. This cluster then rapidly collapses and flattens into a thin horizontal layer near the top. Simultaneously, a stream of sparse particles falls vertically from this top layer toward the bottom of the frame. These falling particles accumulate at the base, forming a growing, irregular mound of blue material.
     objects: The primary objects are small, individual blue particles that aggregate into larger structures. Initially, these particles form a large, dense, circular cluster at the top of the scene. As time progresses, they reorganize into a thin, elongated horizontal band at the top and a growing, jagged mound at the bottom. The particles are uniformly blue in color and vary in density, ranging from sparse individual dots to thick, opaque clusters.
+plotting:
+  background: black

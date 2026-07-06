@@ -43,3 +43,5 @@ descriptions:
   movie_mpm_particle:
     description: The simulation shows a dense field of blue particles distributed uniformly across a square domain. Over the course of the video, the particles exhibit a high-frequency, stochastic jittering motion. There is no discernible global flow or large-scale structural evolution in the distribution. The overall density and spatial occupancy of the particles remain constant throughout the sequence.
     objects: The scene contains a large number of small, individual blue dots. These particles are arranged in a random, non-connected distribution across the entire frame. Each particle is approximately the same size and maintains a consistent blue hue. The particles do not form clusters or chains, appearing as a homogeneous point cloud.
+plotting:
+  background: black

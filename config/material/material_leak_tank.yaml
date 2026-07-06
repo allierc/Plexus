@@ -43,3 +43,5 @@ descriptions:
   movie_mpm_particle:
     description: A large volume of blue particles is initially contained within a vessel with a gap in the right wall. As time progresses, the particles flow through the gap into a smaller adjacent chamber. The flow rate decreases as the level of the particles in the main chamber drops. Eventually, the particles fill the smaller chamber and the flow from the main chamber slows significantly.
     objects: The scene contains a large main chamber and a smaller side chamber connected by a gap. The main chamber is bounded by thick grey vertical walls on the left and right. The particles are small, blue, and densely packed within the chambers. The side chamber is located at the bottom right and is partially filled by the flowing particles.
+plotting:
+  background: black

@@ -34,3 +34,5 @@ descriptions:
   movie_mpm_particle:
     description: A dense rectangular block of blue particles is initially positioned on the left side of the frame. Over time, the block undergoes a dramatic transformation, breaking apart and flowing toward the bottom and right edges of the screen. The particles eventually settle into a thin, undulating layer across the bottom of the frame. The final state shows a sparse, wavy distribution of blue dots against a white background.
     objects: The primary objects are thousands of small, blue circular particles. Initially, they are arranged in a compact, vertical rectangular formation. As the simulation progresses, the particles disperse into a fluid-like, horizontal layer. The final arrangement consists of a continuous but irregular band of blue dots along the bottom edge.
+plotting:
+  background: black

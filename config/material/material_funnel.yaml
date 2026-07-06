@@ -47,3 +47,5 @@ descriptions:
   movie_mpm_particle:
     description: A large circular cluster of blue particles is initially centered in the upper half of the frame. The cluster then rapidly collapses and flows downward into a narrow, vertical channel. As it descends, the particles spread out horizontally to fill the wider sections of the channel. Finally, the particles settle into a steady, narrow stream at the bottom of the structure.
     objects: The primary objects are numerous small, light-blue particles that form a dense, circular cluster. These particles are contained within a white, geometric structure that has a wide top and a narrow bottom. The white structure is set against a solid, neutral gray background. The particles transition from a large, concentrated mass to a thin, elongated column as they move through the white conduit.
+plotting:
+  background: black

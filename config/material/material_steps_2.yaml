@@ -56,3 +56,5 @@ descriptions:
   movie_mpm_particle:
     description: A large cluster of blue particles is initially positioned above a grey stepped structure. As time progresses, the cluster breaks apart and flows downward, following the contours of the steps. The particles spread out across the lower levels, forming a thin layer that coats the surface. By the end of the sequence, the particles have settled into a steady state across the bottom-most steps.
     objects: The scene contains a large, dense cluster of small blue particles. These particles are arranged in a semi-circular shape at the beginning of the simulation. A solid grey structure with a stepped, staircase-like topology serves as the base. The grey steps are large and uniform in color, providing a stable surface for the blue particles to interact with.
+plotting:
+  background: black

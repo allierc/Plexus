@@ -40,3 +40,5 @@ descriptions:
   movie_mpm_particle:
     description: Two separate blue and orange circular clusters of particles initially exist side-by-side. They begin to move toward each other and merge into a single, unified spherical mass. As they merge, the blue and orange particles intermix to form a composite globe-like structure. The final frames show a stable, integrated sphere where the two colors are distributed across the surface.
     objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
+plotting:
+  background: black

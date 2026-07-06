@@ -34,3 +34,5 @@ descriptions:
   movie_mpm_particle:
     description: A dense cluster of blue particles begins at the bottom of the frame and gradually expands upward and to the right. As time progresses, the particles form a distinct wave-like structure that rises more steeply toward the end of the sequence. The overall shape transitions from a flat, horizontal band into a large, triangular mass. By the final frame, the particles have occupied a significant portion of the right side of the image.
     objects: The scene consists of a large collection of small, individual blue dots. These particles are densely packed together to form a continuous, textured mass. The dots are uniform in size and color, creating a cohesive visual field. They are arranged in a dynamic, evolving shape that moves from a low horizontal position to a high vertical peak.
+plotting:
+  background: black

@@ -53,3 +53,5 @@ descriptions:
   movie_mpm_particle:
     description: The simulation shows a large collection of blue particles distributed across a white square field. Over time, the particles appear to move randomly, maintaining a relatively uniform density throughout the space. There is no significant clustering or large-scale structural change visible across the keyframes. The overall distribution remains consistent, suggesting a stochastic or diffusive process.
     objects: The scene contains thousands of small, blue, point-like particles. These particles are arranged in a sparse, non-connected distribution across the entire area. Each individual particle is uniform in size and color. The particles are bounded within a square frame, creating a high-contrast visual against the white background.
+plotting:
+  background: black

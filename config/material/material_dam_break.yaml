@@ -34,3 +34,5 @@ descriptions:
   movie_mpm_particle:
     description: A dense rectangular block of blue particles is initially positioned on the left side of the frame. Over time, the block undergoes a dramatic transformation, breaking apart and spreading across the bottom of the screen. The particles eventually form a thin, irregular layer that stretches horizontally across the entire base. By the final frame, the particles have settled into a low-profile, undulating shape with a slight peak on the left.
     objects: The scene contains a large collection of small, blue circular particles. Initially, these particles are tightly packed into a vertical rectangular formation. As the simulation progresses, the particles disperse and lose their original geometric structure. In the final state, the particles form a continuous, horizontal band of varying thickness along the bottom edge.
+plotting:
+  background: black

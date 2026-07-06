@@ -51,3 +51,5 @@ descriptions:
   movie_mpm_particle:
     description: The orange sphere starts high in the sky and descends toward the blue textured surface. As it moves downward, the blue surface develops undulating waves that rise to meet the sphere. The sphere eventually makes contact with the surface and becomes partially submerged. By the final frame, the sphere is mostly below the surface, with only its top portion visible.
     objects: The orange sphere is a large, circular cluster of orange particles located in the upper half of the frame. The blue surface is a wide, rectangular field of small blue particles at the bottom of the frame. The blue surface is connected to the sphere as it moves into the blue field. The orange sphere remains a consistent size and color throughout the entire sequence.
+plotting:
+  background: black

@@ -40,3 +40,5 @@ descriptions:
   movie_mpm_particle:
     description: The video shows two circular clusters of particles that remain stationary throughout the duration. The blue cluster is positioned on the left, while the orange cluster is on the right. There is no movement, expansion, or contraction of the particles over time. The scene remains completely static across all four keyframes.
     objects: There are two distinct circular clusters composed of many small, individual particles. The left cluster is blue and the right cluster is orange. Both clusters are approximately the same size and are positioned side-by-side. The particles within each cluster are densely packed to form a roughly spherical shape.
+plotting:
+  background: black

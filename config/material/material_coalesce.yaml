@@ -40,3 +40,5 @@ descriptions:
   movie_mpm_particle:
     description: The simulation begins with two distinct rectangular blocks of particles, one blue and one orange, positioned side-by-side. As time progresses, the sharp boundaries of the rectangles begin to blur and deform into irregular, rounded shapes. The particles shift and reorganize, causing the two masses to merge slightly at their center. By the final frame, the two clusters have settled into a cohesive, pill-shaped formation with a clearly defined interface.
     objects: There are two primary clusters of particles in the scene. The left cluster is composed of blue particles and starts as a rectangle before becoming an irregular blob. The right cluster is composed of orange particles and undergoes a similar transformation from a rectangle to a rounded shape. Both clusters are roughly equal in size and maintain a side-by-side arrangement throughout the simulation.
+plotting:
+  background: black

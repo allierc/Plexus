@@ -59,3 +59,5 @@ descriptions:
   movie_mpm_particle:
     description: A large circular cluster of blue particles is initially suspended in the upper half of the frame. As the simulation progresses, this cluster rapidly disintegrates and falls downward. The particles settle into a stepped, symmetrical formation at the bottom of the frame. Finally, the particles stabilize into a solid, tiered structure against a gray background.
     objects: The primary objects are thousands of small, blue, circular particles. These particles are initially arranged in a dense, spherical cluster in the center. They then transition into a structured, symmetrical, stepped formation at the bottom. The background consists of a white upper region and a gray, stepped lower region.
+plotting:
+  background: black
