@@ -49,7 +49,6 @@ class Alignment(Lateral):
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic
     OPTIONAL_TYPE_PROPS = ["alignment"]        # read per-receiver only when `per_type: true` (boids)
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion", "vicsek"]
-    MORPHOLOGY_PRIOR = ["flock", "bands", "swirl", "streams"]
     PARAM_ROLES = {"a": "alignment_strength", "gate": "neighbour_weighting",
                    "r": "contact_radius", "noise": "orientation_noise"}
 

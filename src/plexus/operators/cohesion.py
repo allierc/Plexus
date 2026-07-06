@@ -18,7 +18,6 @@ class Cohesion(Lateral):
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
     REQUIRES_TYPE_PROPS = ["cohesion"]
     MECHANISM_TAGS = ["cohesion", "collective_motion"]
-    MORPHOLOGY_PRIOR = ["flock", "cluster"]
     PARAM_ROLES = {"scale": "cohesion_strength"}
 
     def __init__(self, params, device="cpu"):

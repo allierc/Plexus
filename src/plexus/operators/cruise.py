@@ -30,7 +30,6 @@ class Cruise(Lateral):
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic
     REQUIRES_PARAMS = ["v0"]
     MECHANISM_TAGS = ["self_propulsion", "vicsek", "active_matter"]
-    MORPHOLOGY_PRIOR = ["flock", "bands", "swirl", "disorder"]
     PARAM_ROLES = {"v0": "cruising_speed", "noise": "orientation_noise", "chirality": "rotational_bias"}
 
     def __init__(self, params, device="cpu"):
