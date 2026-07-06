@@ -651,8 +651,8 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \multicolumn{4}{@{}l}{\emph{Dynamics --- move a set's state (return a delta)}}\\
 \code{attraction\_repulsion} & lateral & velocity & per-type difference-of-Gaussians interaction law \\
 \code{squared\_law}          & lateral & acceleration & inverse-square law: Coulomb electrostatics \emph{or} Newtonian gravity (\code{law}: \code{charge}/\code{mass}) \\
-\code{cohesion},\,\code{alignment},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
-\code{cruise}                & lateral & acceleration & Vicsek self-propulsion toward cruising speed $v_0$ \\
+\code{cohesion},\,\code{velocity\_align},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
+\code{velocity\_cruise}                & lateral & acceleration & Vicsek self-propulsion toward cruising speed $v_0$ \\
 \code{drag}                  & lateral & accel.\,$|$\,mpm\_accel. & viscous friction $-\kappa v$ (\code{emit:} routes to the engine or the MPM substep) \\
 \code{glide}                 & lateral & velocity & active self-propulsion along the \code{heading} \\
 \code{gravity},\,\code{mpm\_anchor},\,\code{mpm\_spin} & lateral & mpm\_accel. & uniform / rest-anchor / solid-spin body forces (MPM substep) \\
@@ -660,7 +660,7 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \code{chemotax}              & exchange & vel.\,$|$\,mpm\_accel. & climb/flee a field's gradient (\code{emit:} routes) \\
 \code{sense}                 & exchange & --- & Physarum 3-sensor pheromone steering (writes \code{heading}) \\
 \code{deposit}               & exchange & --- & secrete/deposit set state into a field \\
-\code{heading\_align},\,\code{flow\_align} & exchange & --- & align \code{heading} to neighbours / to solved MPM flow \\
+\code{polarity\_align},\,\code{polarity\_flow\_align} & exchange & --- & align \code{heading} to neighbours / to solved MPM flow \\
 \code{active\_force} & exchange & mpm\_accel. & activation-gradient body force (cardiac contraction) \\
 \code{active\_stress} & exchange & --- & activation $\to$ active-stress tensor (\code{H.active\_stress}) \\
 \code{apply\_material\_map}  & exchange & --- & image field $\to$ per-particle material (\code{youngs}) \\
@@ -695,7 +695,7 @@ structure), it follows fixed rules; the most useful:
 \item ``made of $K$ X per cell'' $\to$ a contained set with \code{parent}/\code{per\_parent} (two levels).
 \item ``two types differing by $P$'' $\to$ \code{types:} with $P$ as a per-type property.
 \item ``mechanical/elastic/rigid'' $\to$ particles $+$ the MPM operators; map stiffness to \code{youngs}.
-\item ``moves by boids / flock'' $\to$ \code{cohesion}$+$\code{alignment}$+$\code{separation}; ``wanders / motile'' $\to$ \code{glide}.
+\item ``moves by boids / flock'' $\to$ \code{cohesion}$+$\code{velocity\_align}$+$\code{separation}; ``wanders / motile'' $\to$ \code{glide}.
 \item ``creates/secretes a chemical'' $\to$ a \code{field} $+$ \code{deposit};
       ``follows a gradient / chemotaxis'' $\to$ \code{chemotax}; ``ant / pheromone trails'' $\to$ \code{sense} (Physarum 3-sensor).
 \item ``particles attract/repel, interact by type'' $\to$ a \code{radius\_graph}

@@ -9,9 +9,9 @@ sets:
 fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.05}
-  - {op: alignment,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
-  - {op: cruise,  at: particle, v0: 0.005, noise: 0.015, chirality: 0.0}
-schedule: [radius_graph, alignment, cruise]
+  - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
+  - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.015, chirality: 0.0}
+schedule: [radius_graph, velocity_align, velocity_cruise]
 plotting:
   background: black
   marker: triangle

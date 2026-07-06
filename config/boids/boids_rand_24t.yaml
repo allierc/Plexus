@@ -33,9 +33,9 @@ fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
   - {op: cohesion,     at: particle}
-  - {op: alignment,    at: particle, per_type: true }
+  - {op: velocity_align,    at: particle, per_type: true }
   - {op: separation,   at: particle}
-schedule: [radius_graph, cohesion, alignment, separation]
+schedule: [radius_graph, cohesion, velocity_align, separation]
 plotting:
   background: black
   colormap: tab20

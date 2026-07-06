@@ -14,9 +14,9 @@ from . import broadcast             # noqa: F401  parent -> children lift (conta
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
 from . import squared_law                # noqa: F401  registers squared_law (lateral, 2nd-derivative: Coulomb electrostatics OR Newtonian gravity)
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
-from . import alignment             # noqa: F401  Vicsek velocity alignment (nominal); boids = special case
+from . import velocity_align       # noqa: F401  Vicsek velocity alignment (nominal); boids = special case (was alignment)
 from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
-from . import cruise               # noqa: F401  Vicsek self-propulsion: cruise to speed v0 (2nd-order; active matter, The Well)
+from . import velocity_cruise      # noqa: F401  Vicsek self-propulsion to speed v0 (2nd-order; was cruise)
 from . import drag                  # noqa: F401  registers drag (lateral, 2nd-derivative)
 # field-coupled primitives (the slime/Physarum decomposition: 1 set + 1 scalar field)
 from . import scalar_field          # noqa: F401  registers the `grid` scalar field
@@ -49,16 +49,16 @@ from . import g2p                   # noqa: F401  mpm_grid -> particle    (gathe
 from . import agent_to_mpm          # noqa: F401  agent set -> mpm_grid   (agents deform material)
 from . import mpm_to_agent          # noqa: F401  mpm_grid  -> agent set  (material drags + confines agents)
 from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (cells soften/rigidify tissue)
-from . import flow_align            # noqa: F401  mpm_grid -> agent heading (polarity-velocity/flow alignment)
-from . import heading_align         # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment)
+from . import polarity_flow_align  # noqa: F401  mpm_grid -> agent heading (polarity-flow alignment; was flow_align)
+from . import polarity_align       # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment; was heading_align)
 from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
 from . import cell_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law",
-           "cohesion", "alignment", "separation", "cruise", "drag",
+           "cohesion", "velocity_align", "separation", "velocity_cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "prescribed_field", "chemotax", "gravity", "sediment",
            "pacemaker", "activation_pulse", "active_force", "active_stress",
            "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
-           "agent_to_mpm", "mpm_to_agent", "agent_remodel", "flow_align", "heading_align"]
+           "agent_to_mpm", "mpm_to_agent", "agent_remodel", "polarity_flow_align", "polarity_align"]
