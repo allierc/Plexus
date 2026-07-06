@@ -20,8 +20,8 @@ fields: {}
 operators:
 - op: vertex_tension_3d
   at: cell
-  s0: 5.0
-  v0: 0.15
+  s0: 5.6
+  v0: 0.0
   Dr: 1.0
   K_V: 1.0
   K_S: 1.0

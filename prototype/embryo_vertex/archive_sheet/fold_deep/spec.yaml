@@ -1,0 +1,44 @@
+general:
+  name: sheet
+  seed: 0
+  n_frames: 1000
+  dt: 0.02
+  boundary: free
+  world:
+  - 10.0
+  - 6.0
+sets:
+  cell:
+    n: 98
+    spawn: random
+    types:
+      a:
+        fraction: 1.0
+fields: {}
+operators:
+- op: sheet_seed
+  at: cell
+  width: 8.0
+  height: 1.0
+  bow: 0.3
+  before_frame: 1
+- op: cell_polarity
+  at: cell
+  constrict: 0.6
+  elongate: 1.4
+  patch_center: 0.5
+  patch_half: 0.12
+- op: epithelium
+  at: cell
+  K_A: 2.0
+  A0: 0.16666666666666666
+  k_ap: 3.0
+  k_ba: 2.0
+  k_lat: 1.0
+  h0: 1.0
+  mu: 0.4
+  pin: basal
+schedule:
+- sheet_seed
+- cell_polarity
+- epithelium

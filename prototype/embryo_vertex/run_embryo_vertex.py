@@ -81,7 +81,7 @@ def make_sim(p):
     return sim, cfg
 
 
-def render(pos, outdir, name, occ=None, seconds=16.0, max_frames=300):
+def render(pos, outdir, name, occ=None, seconds=30.0, max_frames=450):
     os.makedirs(outdir, exist_ok=True)
     T = pos.shape[0]
     stride = max(1, -(-T // max_frames)); idx = list(range(0, T, stride))
