@@ -23,7 +23,10 @@ class DiskIC(Structural):
     """Frame-0 initial condition: make a disc of particles a ROTATING disk in near-circular
     orbits (v_circ from the enclosed mass), + an optional central point mass (node 0).
     Gate it with `before_frame: 1` so it fires once. Writes pos/vel/mass in place."""
+    EMIT = None                                  # structural frame-0 IC: writes pos/vel/mass in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                          # no required params — all knobs optional (defaults in __init__)
+    MECHANISM_TAGS = ["initial_condition", "rotating_disk", "circular_orbits", "self_gravity"]
     MAY_MUTATE_INTEGRATED_STATE = True           # sets the initial pos/vel directly
     PARAM_ROLES = {"G": "gravitational_constant (matches squared_law k)",
                    "softening": "force_softening_length",

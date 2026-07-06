@@ -22,7 +22,9 @@ from plexus.models.registry import register_operator
 
 @register_operator("cell_divide", level="cell", kind="structural")
 class CellDivide(Structural):
+    EMIT = None                                       # structural: wakes dormant slots, mutates occ+state in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                              # no required params — `rate` falls back to per-type div_rate else 0
     MECHANISM_TAGS = ["proliferation", "mitosis", "growth"]
     PARAM_ROLES = {"rate": "division_rate", "max_occ": "homeostatic_ceiling"}
 

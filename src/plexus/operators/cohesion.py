@@ -16,6 +16,7 @@ from plexus.geometry import neighbour_mean
 class Cohesion(Lateral):
     EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
+    REQUIRES_PARAMS = []                             # no required params — `scale` optional
     REQUIRES_TYPE_PROPS = ["cohesion"]
     MECHANISM_TAGS = ["cohesion", "collective_motion"]
     PARAM_ROLES = {"scale": "cohesion_strength"}

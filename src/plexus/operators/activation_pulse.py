@@ -34,6 +34,7 @@ from plexus.models.registry import register_operator
 class ActivationPulse(FieldUpdate):
     EMIT = None                       # writes a prescribed field; never engine-integrated
     SUPPORTED_DIMS = [2]
+    REQUIRES_PARAMS = []              # no required params — field target from `at:`; all timing knobs optional
     MECHANISM_TAGS = ["activation_field", "gaussian_source", "phase_delay", "travelling_wave", "spatial_clock"]
     PARAM_ROLES = {"radius": "stimulus_width", "center": "stimulus_site", "clock": "pacemaker_signal",
                    "period": "beat_interval", "duration": "active_width",

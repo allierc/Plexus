@@ -22,9 +22,13 @@ from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 @register_operator("p2g", level="particle", kind="exchange")
 class P2G(Exchange):
+    EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional
     REQUIRES_TYPE_PROPS = ["youngs"]
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress"]
+    PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
+                   "a_max": "external-acceleration clamp"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

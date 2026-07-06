@@ -87,6 +87,7 @@ def _get_inv_square_sum(compile):
 class SquaredLaw(Lateral):
     EMIT = "acceleration"                        # emits an acceleration (charges/masses have inertia)
     SUPPORTED_DIMS = [2, 3]                       # dimension-generic (reads D = pos.shape[-1])
+    REQUIRES_PARAMS = []                          # no required params — all knobs optional (defaults in __init__)
     OPTIONAL_TYPE_PROPS = ["charge", "mass"]     # reads ONE (self.coupling), chosen by `law`
     MECHANISM_TAGS = ["inverse_square", "electrostatics", "gravity", "newtonian_gravity",
                       "long_range", "self_gravity"]

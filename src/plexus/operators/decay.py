@@ -14,7 +14,11 @@ from plexus.models.registry import register_operator
 class Decay(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
+    EMIT = None                                # field->field: writes the grid in place (evaporation); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                     # elementwise evaporation, dimension-agnostic
+    REQUIRES_PARAMS = []                        # no required params — field target from `at:`; `rate` optional
+    MECHANISM_TAGS = ["evaporation", "field_decay", "stigmergy"]
+    PARAM_ROLES = {"rate": "evaporation_rate"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

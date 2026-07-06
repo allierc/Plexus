@@ -219,6 +219,10 @@ class MLSMPMMechanics(Exchange):
     `ARCHITECTURAL_DEBT` for the decomposition roadmap.
     """
 
+    EMIT = None                          # substep advects pos/vel in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
+    SUPPORTED_DIMS = [2]                  # the MLS-MPM kernel hard-codes 2D (eye(2), 3x3 stencil, nx*ny grid)
+    REQUIRES_PARAMS = []                  # no required params — all knobs optional (defaults in __init__)
+
     # --- the fence ------------------------------------------------------- #
     TRANSITIONAL = True
     MAY_MUTATE_INTEGRATED_STATE = True   # the substep advects particles in place (opt out of the guard)

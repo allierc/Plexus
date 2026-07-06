@@ -21,6 +21,7 @@ class Drag(Lateral):
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
+    MECHANISM_TAGS = ["viscous_drag", "friction", "damping"]
     PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}
 
     def __init__(self, params, device="cpu"):

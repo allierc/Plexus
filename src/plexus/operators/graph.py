@@ -18,8 +18,11 @@ class RadiusGraph(Rewire):
     """Set `Level.edge_index` to all live pairs within `radius` (optionally beyond
     `min_radius`). Blockwise build -> scales to 1e4-1e5 nodes; minimum-image under
     periodic BC. Run before a pairwise lateral operator in the schedule."""
+    EMIT = None                                 # rewire: rebuilds edge_index; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                      # pairwise distances are dimension-generic
     REQUIRES_PARAMS = ["radius"]
+    MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire"]
+    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

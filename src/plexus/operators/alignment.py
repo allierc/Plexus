@@ -47,6 +47,7 @@ from plexus.geometry import minimum_image
 class Alignment(Lateral):
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic
+    REQUIRES_PARAMS = []                        # no required params — all knobs optional (defaults in __init__)
     OPTIONAL_TYPE_PROPS = ["alignment"]        # read per-receiver only when `per_type: true` (boids)
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion", "vicsek"]
     PARAM_ROLES = {"a": "alignment_strength", "gate": "neighbour_weighting",

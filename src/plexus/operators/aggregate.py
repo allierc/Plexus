@@ -15,7 +15,11 @@ from plexus.models.registry import register_operator
 
 @register_operator("aggregate", level="cell", kind="aggregate")
 class Centroid(Aggregate):
+    EMIT = None                                    # readout: writes parent `pos` in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
+    REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
+    MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]
+    PARAM_ROLES = {"child": "source_child_set"}
     MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
 
     def __init__(self, params, device="cpu"):
