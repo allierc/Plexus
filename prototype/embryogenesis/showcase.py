@@ -256,10 +256,19 @@ def main():
                      "saxis": np.array(caps["saxis"]) if caps["saxis"] else None},
                     W=W, r0=r0, dt=float(getattr(sim, "dt", 0.002)))
     m.update(sc["final"])                                     # final scorecard metrics ride along for ranking
+    # PHASE-3 ORGANOGENESIS geometry (outline / bud / branch / localization) from the live tissue mask
+    import scorecard_organo as ORG
+    og = ORG.compute({"mX": mX, "mocc": mocc, "fnorm": fnorm, "aX": aX, "at": at, "occ": occ}, W=W)
+    _ogkeys = ("n_buds", "bud_score", "bud_len_bodyR", "bud_neck_ratio", "bud_persistence",
+               "n_tips", "n_branchpoints", "branch_score", "branch_persistence", "tree_depth",
+               "fragment_count", "solidity", "convexity", "aspect_ratio", "circularity",
+               "growth_bud_overlap", "pattern_growth_overlap")
+    m.update({f"org_{k}": og["final"].get(k) for k in _ogkeys})   # headline organo scores ride along
     with open(os.path.join(d, "metrics.json"), "w") as fh:
         json.dump({"name": sim.name, **m}, fh, indent=2)
     with open(os.path.join(d, "scorecard.json"), "w") as fh:
-        json.dump({"name": sim.name, "pcts": sc["pcts"], "final": sc["final"], "evolution": sc["evolution"]}, fh, indent=2)
+        json.dump({"name": sim.name, "pcts": sc["pcts"], "final": sc["final"], "evolution": sc["evolution"],
+                   "organo": og}, fh, indent=2)
     _scorecard_panel(sc, sim.name, os.path.join(d, "scorecard.png"))
     print(f"[showcase] {sim.name}: " + "  ".join(f"{k}={v}" for k, v in list(m.items())[:14]), flush=True)
 

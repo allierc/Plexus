@@ -112,6 +112,18 @@ steady-state are visible — the 3000-vs-6000-frame trap):
 - **topology** — `t1_rate` (neighbour-exchange / fluidity).
 - **partition** — `segregation_index`, `mixing_entropy`, `mi_type_x`, `interface_frac`.
 - **coupling** — `stress_cell_corr`, `deform_cell_corr`, `flow_deform_lag`, `div_stress_angle` (division axis vs principal-stress, Campinho 2013).
+- **organogenesis-geometry** (PHASE 3 decision basis; `scorecard_organo.py`, in `scorecard.json["organo"]`,
+  same 5 timepoints; headline values also ride along in `metrics.json` as `org_*`). Computed from the LIVE
+  tissue mask (dormant `grow_reserve` excluded) at three levels + localization + persistence:
+  *outline* `area`,`perimeter`,`circularity`,`aspect_ratio`,`convexity`,`solidity`,`major_axis`,`minor_axis`,
+  `orientation`,`body_radius`,`fragment_count`; *bud* `n_buds`,`bud_score` (protrusion-area×neck-sharpness×
+  persistence),`bud_area_frac`,`bud_len_bodyR`,`bud_neck_ratio`,`bud_roundness`,`bud_persistence`; *branch*
+  (skeleton graph) `n_tips`,`n_branchpoints`,`branch_len_mean`/`_cv`,`branch_width_mean`,`branch_angle_mean`/`_sd`,
+  `tree_depth`,`skeleton_length`,`branch_score` (bifurcations×continuity×persistence),`branch_persistence`;
+  *localization/causality* `growth_bud_overlap`,`pattern_growth_overlap`,`strain_growth_overlap`,
+  `tip_growth_enrichment` (did the bud appear WHERE the operator drove growth?). All dimensions are relative
+  to `body_radius`/`body_area` so a bigger embryo is not scored as better. **Use this family — NOT the movie —
+  to gate BUD/BRN/ORG; persistence matters as much as final shape (round→protrusion→necked bud→branch→stable).**
 `metrics.json` = the hard-failure gate PLUS the final scorecard. **Read the numbers AND their 5-point
 trajectory; the mp4 / 2×2 only PROPOSE a hypothesis — the scorecard DECIDES whether it survives.**
 
