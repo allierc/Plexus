@@ -1,0 +1,57 @@
+# embryo_GRO_pb_noag -- STAGE GRO batch 6. LINCHPIN ANCHOR for the b56 agent-suppression diagnostic.
+# Identical to the WORKING pureball base (embryo_GRO_pb: radius 0.15, reserve 12000, target 2.5, rate 1.1,
+# y90, confine 0.03, repel 150) EXCEPT the agent set is reduced to n=2 -> negligible agent_to_mpm mass
+# feedback (~0). Question: does the continuum inflate (disc_R / area grow ~5.7x like the AGENT-FREE b52
+# pureball) in THIS confine-0.03 embryo base at all? If YES but the coupled 44-agent slots stay flat ->
+# the AGENTS suppress epiboly. If this ALSO stays flat -> continuum growth is broken in this base
+# (target/reserve/frames regressed from b52) -> re-scope the continuum, not the agents.
+general: {name: embryo_GRO_pb_noag, seed: 0, n_frames: 12000, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 2
+    buffer: 3000
+    spawn: sunflower
+    spawn_radius: 0.09
+    vmax: 0.6
+    types:
+      a: {fraction: 0.5, move_speed: 0.12, div_rate: 0.0}
+      b: {fraction: 0.5, move_speed: 0.12, div_rate: 0.0}
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 90
+        layers:
+          - {frac: 1.0, youngs: 90, material: elastic}     # uniform free elastic ball, NO stiff membrane
+  mpm_particle: {parent: cell, per_parent: 8000, grow_reserve: 12000, radius: 0.15, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: radius_graph, at: agent, radius: 0.05}
+  - {op: repel, at: agent, strength: 150.0, r0: 0.02}
+  - {op: glide, at: agent}
+  - {op: cell_divide, at: agent, rate: 0.0, max_occ: 0.95, offset: 0.004}
+  - {op: cell_grow, at: cell, rate: 1.1, target: 2.5, mode: isotropic, aniso: 0.0, offset: 0.011}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 2.0e-6, k: 1.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.95}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.95, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.3, confine: 0.03, field: colour}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 40.0}
+schedule:
+  - radius_graph
+  - repel
+  - glide
+  - cell_divide
+  - cell_grow
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.01
