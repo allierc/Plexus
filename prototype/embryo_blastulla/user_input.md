@@ -1,23 +1,31 @@
 # User directives (read + acknowledge each batch; apply going forward)
 
-## ⚠️ ADVANCE TO PHASE 3 NOW (2026-07-06) — MOR is COMPLETE; enter BUD this batch.
-MOR (body-scale morphogenesis) has run **~16 batches (b69–b84), far past the 10-batch stage cap** — its
-budget is spent and the automatic cap directive is not firing on this running process. **THIS BATCH you MUST:**
-adopt MOR's best clean (collapsed=0, escape=0) point as MOR's operating spec, log any open MOR blocker as
-`[open]`, **write `BUD` to `current_stage.txt`, and design the first Phase-3 BUD batch.** Do NOT run another
-MOR batch. Ladder: …→MOR→**BUD**→BRN→ORG (ORG = terminus).
+## ⚠️ CAMPAIGN REOPENED — NEW TERMINUS STAGE **REG** (2026-07-06)
+The campaign had self-declared COMPLETE at ORG. **It is REOPENED.** ORG is the established, LOCKED capstone
+(`embryo_ORG_swap_anisoY_sed13.yaml`, two coexisting growth programs, n=6) — do NOT re-run ORG. The ladder now
+ends one rung later: `…→BUD→BRN→ORG→**REG**, then STOP`. `current_stage.txt` is already set to `REG`.
 
-The first BUD batch = an ISOLATED localized-growth mechanism-validation: a zero-growth no-op control + a small
-sweep of localized / pattern-gated `cell_grow` (`mode=anisotropic|tip`, `prestretch`, pattern-gated growth).
-**Decide on the NEW organogenesis-geometry family** (`scorecard.json["organo"]` / `org_*` in metrics.json):
-`n_buds`, `bud_score`, `bud_len_bodyR`, `bud_neck_ratio`, `bud_persistence`, and `growth_bud_overlap`
-(causality) — NOT the movie. Hard-failures (collapsed/escape/nn_min/accel) and the INHERIT-CAPABILITIES rule
-still apply: a bud must form WITHOUT rupturing the blastula or scrambling the established pattern.
+**THIS BATCH (106) you MUST design the FIRST REG batch** — do NOT report COMPLETE, do NOT re-close ORG.
 
-## Earlier directives (still apply):
+**REG = perturbation robustness / regeneration.** Take the LOCKED ORG organism and PERTURB it mid-development,
+then test whether its developmental programs RECOVER on their own. There is **NO scripted repair operator** —
+healing must EMERGE from the existing primitives, exactly as budding/branching did (R1: minimal mechanism first).
+Build the perturbation from primitives ONLY:
+- a developmental-TIMING gate that transiently HALTS one growth program (`cell_grow` rate->0 over a window, then resume);
+- a mechanical INSULT (a transient `repel`/force burst that displaces or ablates a region);
+- a transient identity/pattern disruption (drop a `deposit`/`chemotax` channel for a window).
 
-1. **Cell movement baseline `move_speed` 0.12**; you may go up to ~0.24 when a stage needs faster flow/migration.
+**Decision basis = the ORG/organo metrics recovering after the insult** (`org_independent_growth_domains` back to 2,
+`org_program_stability` back above gate, `fragment_count`->1, pattern/branch skeleton restored) — reproducibly across
+seeds, judged vs BOTH (a) an UNPERTURBED control and (b) a PERTURBED-but-frozen control (proves healing is active,
+not passive). Hard failures (collapsed/escape/nn_min/accel) and INHERIT-CAPABILITIES still apply: a REG slot must
+NOT permanently rupture the organism or scramble the established ORG pattern. Same 8-slot / <=10-batch / <=48h / L4
+(<20-min, <=15k particles, ~12000f) budget as every stage.
+
+## Standing directives (still apply):
+
+1. **Cell movement baseline `move_speed` 0.12**; up to ~0.24 when a stage needs faster flow/migration.
 2. **Growth is `cell_grow`, NOT `cell_divide`.** `cell_grow` drives tissue volume + protrusions; `cell_divide`
-   only REPOPULATES grown volume (division mixes and destroys pattern above ~1.5×). There is NO fixed division
-   multiplier — grow via `cell_grow`, bounded only by what the deforming domain physically holds at `repel.r0`.
+   only REPOPULATES grown volume (division mixes and destroys pattern above ~1.5x). Grow via `cell_grow`,
+   bounded only by what the deforming domain physically holds at `repel.r0`.
 3. **~12000 frames** per run so slow dynamics develop; keep each job within the L4 wall (raise `stride` if render grows).

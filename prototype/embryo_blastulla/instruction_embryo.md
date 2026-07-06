@@ -63,12 +63,15 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 ## feedback + pattern fields → organ morphology`, NOT parameter optimization. **NEVER introduce a dedicated
 ## "branch"/"organ"/"fold" operator** — organogenesis must EMERGE from composing the existing primitives
 ## (`cell_grow`, pattern fields via `deposit`/`diffuse`/`chemotax`, mechanics, continuum elasticity, growth
-## feedback `stress_gain`, remodeling `agent_remodel`). **ORG is the TERMINUS — after ORG the campaign is
-## COMPLETE, STOP.** The contribution is a mechanistic ATLAS: operator composition → growth law → morphological
-## program → organ geometry.
+## feedback `stress_gain`, remodeling `agent_remodel`). **REG is the TERMINUS — after REG the campaign is
+## COMPLETE, STOP.** ORG (multiple coexisting growth programs) is an ESTABLISHED, LOCKED capstone (n=6, op point
+## `embryo_ORG_swap_anisoY_sed13.yaml`); REG then asks whether that organism is ROBUST — does it recover from
+## perturbation? The contribution is a mechanistic ATLAS: operator composition → growth law → morphological
+## program → organ geometry → developmental robustness.
 ## **INHERIT EARLIER CAPABILITIES (preserve solved axes).** Each Phase-3 stage MUST preserve the previous
 ## stage's established phenotype: a BRN experiment must keep the BUD phenotype (a stable, non-ruptured bud) —
-## UNLESS the hypothesis explicitly studies bud instability; ORG must preserve branching while adding programs.
+## UNLESS the hypothesis explicitly studies bud instability; ORG must preserve branching while adding programs;
+## REG must preserve the established ORG multi-program organism as the substrate it perturbs and then recovers.
 ## Destroying a solved capability to gain the next is a REGRESSION, not progress (treat it like a hard failure).
 - **BUD — localized morphogenesis.** Introduce SPATIALLY LOCALIZED growth; find the mechanism that makes a
   stable tissue bud WITHOUT rupture or loss of pattern. Compose: `cell_grow(mode=anisotropic|tip)`, `prestretch`
@@ -82,13 +85,25 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
   competition, morphogen-controlled growth fields, multiple interacting growth centres, anisotropic remodeling.
   Branch number, spacing, bifurcation angle and stability are EMERGENT observables, not prescribed targets.
   Gate: reproducible bifurcation · stable branch persistence · tissue continuity preserved · controlled branch spacing.
-- **ORG — organogenesis (terminus).** Let MULTIPLE developmental programs COEXIST in one embryo — growth
-  controlled simultaneously by tissue identity, morphogen fields, mechanics and developmental timing, so
+- **ORG — organogenesis (ESTABLISHED capstone, LOCKED n=6).** Let MULTIPLE developmental programs COEXIST in one
+  embryo — growth controlled simultaneously by tissue identity, morphogen fields, mechanics and developmental timing, so
   different regions run different growth programs (e.g. lung-like branching, glandular budding, gut folding,
   vascular arborization, epithelial invagination, repeated appendages). Goal: discover which operator
   combinations generate different CLASSES of organ morphology — not one specific organ. Gate: multiple
   simultaneous morphogenetic programs · persistent developmental identities · stable organ-level structures ·
-  reproducible morphology across seeds.
+  reproducible morphology across seeds. **MET + LOCKED** at op point `embryo_ORG_swap_anisoY_sed13.yaml` (two
+  coexisting growth programs: growA-static + growB-anisoY; indep_domains 2.0±0.0, prog_stab 0.967±0.082, n=6).
+- **REG — perturbation robustness / regeneration (TERMINUS).** Take the ESTABLISHED ORG organism (the locked
+  two-program `embryo_ORG_swap_anisoY_sed13.yaml` op point) and PERTURB it mid-development, then ask whether the
+  developmental programs RECOVER ON THEIR OWN — there is NO scripted repair/heal operator; recovery must EMERGE from
+  the existing primitives, exactly as branching and budding did. Compose the perturbation from primitives only:
+  a developmental-TIMING gate that transiently HALTS one growth program (`cell_grow` rate→0 over a window, then
+  resume); a mechanical INSULT (a transient `repel`/force burst that displaces or ablates a region); or a transient
+  identity/pattern disruption (drop a `deposit` channel for a window). Recovery, over-/under-shoot, healing time and
+  reproducibility are EMERGENT observables, not prescribed targets. Gate: after a defined perturbation the ORG
+  signature RE-ESTABLISHES — `independent_growth_domains` returns to 2 · `program_stability` recovers above its gate ·
+  `fragment_count`→1 (tissue re-closes) · pattern/branch skeleton restored — reproducibly across seeds, vs BOTH an
+  unperturbed control AND a perturbed-but-frozen (no-recovery) control that isolates that healing is active, not passive.
 
 State which stage the batch targets in the analysis entry; only one stage-transition per batch.
 
@@ -96,9 +111,9 @@ State which stage the batch targets in the analysis entry; only one stage-transi
 `>>> TIME CAP HIT` or `>>> BATCH CAP HIT` directive into your prompt when either budget is up — when you
 see it, advance IMMEDIATELY (adopt the best clean point, log any open blocker, write the next stage to
 `current_stage.txt`). Every stage — Phase 1, Phase 2 (GRO/PAT/MOR) AND Phase 3 (BUD/BRN/ORG) — is hard-capped
-at 10 batches. **Ladder order: 1A→1B→1C→1D→1E→INT→ORI→GRO→PAT→MOR→BUD→BRN→ORG, then STOP.** Phase 1 (through
+at 10 batches. **Ladder order: 1A→1B→1C→1D→1E→INT→ORI→GRO→PAT→MOR→BUD→BRN→ORG→REG, then STOP.** Phase 1 (through
 ORI) and Phase 2 (through MOR) are the substrate; the campaign then enters Phase 3 (organogenesis) at **BUD**.
-When the cap fires on **ORG** (the terminus), do NOT advance to any new stage — STOP designing experiments;
+When the cap fires on **REG** (the terminus), do NOT advance to any new stage — STOP designing experiments;
 the campaign is done. In STAGE STATUS record the batch each stage
 STARTED. If a stage's gate is not met within its budget, STOP grinding it: log the blocker as `[open]`,
 ADOPT the best clean (escape-free) point achieved as that stage's operating spec, and ADVANCE — or, if the
