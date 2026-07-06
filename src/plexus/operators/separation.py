@@ -19,7 +19,6 @@ class Separation(Lateral):
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
     REQUIRES_TYPE_PROPS = ["separation"]
     MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]
-    MORPHOLOGY_PRIOR = ["even_spacing"]
     PARAM_ROLES = {"scale": "separation_strength"}
 
     def __init__(self, params, device="cpu"):

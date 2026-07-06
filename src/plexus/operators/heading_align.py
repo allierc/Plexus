@@ -34,7 +34,6 @@ from plexus.models.registry import register_operator
 class HeadingAlign(Exchange):
     SUPPORTED_DIMS = [2, 3]
     MECHANISM_TAGS = ["vicsek", "polar_alignment", "collective_motion", "flocking"]
-    MORPHOLOGY_PRIOR = ["flock", "bands", "swirl", "streams"]
     PARAM_ROLES = {"gain": "alignment_rate", "noise": "orientation_noise"}
 
     def __init__(self, params, device="cpu"):

@@ -32,7 +32,6 @@ class Chemotax(Exchange):
     SUPPORTED_DIMS = [2]                         # Field.grad_at is 2D for now (N-D is a follow-up)
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation", "field_templated_flow"]
-    MORPHOLOGY_PRIOR = ["single_cluster", "field_outline"]
     PARAM_ROLES = {"gain": "field_sensitivity", "noise": "exploration_noise"}
 
     def __init__(self, params, device="cpu"):

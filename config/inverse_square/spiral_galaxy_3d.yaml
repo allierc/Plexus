@@ -1,29 +1,32 @@
 # spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS
 # (out-of-plane scatter) + a central point mass, on the same `squared_law` (law: gravity,
 # all_pairs). disk_ic rotates in the xy-plane (axes 0,1) and scatters along z (`thickness`).
-# N=20000 stars; the all-pairs O(N^2) force is fused with torch.compile (`compile: true`,
-# ~22x, ~4 ms/frame on an A6000). Same disk mass (~1.8) and BH (1.0) as the 2D spec.
-# Built from Mocz, "Create Your Own N-body Simulation (With Python)" (2020), papers/nbody-python/ (MIT).
-general: {name: spiral_galaxy_3d, seed: 2, n_frames: 1200, dt: 0.004, boundary: free, dim: 3, world: [6.0, 6.0, 6.0]}
+#
+# TWIN of the galaxy prototype's 3D config (prototype/galaxy/galaxy3d.py): identical physics
+# (N=25000, cubic world 8, disc_R 1.5, m_bh 0.5, disk mass 1.0, spin 0.9, jitter 0.06,
+# thickness 0.08, softening 0.08, dt 0.004, 10000 frames) so the ONLY difference from the
+# prototype movie is the pipeline+renderer (codebase splat vs prototype inclined 3D camera).
+# The all-pairs force is torch.compile-fused (`compile: true`, ~22x at N=25000).
+general: {name: spiral_galaxy_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3, world: [8.0, 8.0, 8.0]}
 sets:
   star:
-    n: 20000
-    types: {s: {fraction: 1.0, mass: 0.00009}}      # disk mass ~1.8
+    n: 25000
+    types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
 fields: {}
 operators:
-  - {op: disk_ic,     at: star, G: 1.0, softening: 0.08, disc_radius: 1.6, spin: 0.90, m_bh: 1.0, vel_jitter: 0.02, thickness: 0.08, before_frame: 1}
+  - {op: disk_ic,     at: star, G: 1.0, softening: 0.08, disc_radius: 1.5, spin: 0.90, m_bh: 0.5, vel_jitter: 0.06, thickness: 0.08, before_frame: 1}
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
 schedule: [disk_ic, squared_law]
-plotting: {background: black, colors: {s: [0.85, 0.9, 1.0]}, splat_size: 1.2, splat_res: 820}
+plotting: {background: black, colors: {s: [0.86, 0.9, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
-    description: A dense, circular cluster of particles begins as a solid, uniform disk. Over time, a
-      dark ring forms within the cluster and begins to expand outward. The internal structure becomes
-      increasingly turbulent as the particles spiral and fragment into distinct arms. Finally, the cluster
-      completely disintegrates into a chaotic, expanding spray of individual points.
-    objects: The primary objects are thousands of small, light-blue and white particles. They are initially
-      arranged in a compact, circular topology with a high density at the center. As the simulation progresses,
-      they form a spiral pattern with several radiating arms. By the end, the particles are scattered
-      into a sparse, irregular cloud across the black background.
+    description: A small, solid sphere appears in the center of a black void. Over time, the sphere begins
+      to fragment and disintegrate into a cloud of smaller particles. These particles expand outward from
+      the center, forming a swirling, spiral-like pattern. The cloud continues to grow and diffuse until
+      it occupies a larger area of the frame.
+    objects: The primary object is a light gray sphere located in the center of the scene. As the simulation
+      progresses, this sphere breaks into hundreds of tiny, white and gray particles. These particles
+      are arranged in a loose, rotating spiral formation around the central point. The overall size of
+      the particle cloud increases significantly as it spreads across the black background.

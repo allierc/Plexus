@@ -245,7 +245,6 @@ class MLSMPMMechanics(Exchange):
     MECHANISM_TAGS = ["elastic_mechanics", "material_point_method",
                       "fixed_corotated_stress", "incompressible_volume",
                       "surface_tension", "plastic_flow"]
-    MORPHOLOGY_PRIOR = ["deformable_blob", "rigid_aggregate", "liquid_droplet", "snow_pile"]
     PARAM_ROLES = {
         "n_grid": "background_grid_resolution",
         "substeps": "cfl_subcycling",

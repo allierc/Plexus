@@ -1,31 +1,35 @@
-# spiral_galaxy (2D) -- a ROTATING self-gravitating disk (+ central point mass) on the SAME
-# `squared_law` (law: gravity, all_pairs) as the nbody cluster. The spiral is not imposed:
-# it emerges from ANGULAR MOMENTUM (disk_ic seeds near-circular orbits from the enclosed
-# mass) + self-gravity (swing-amplified density waves). disk_ic fires once (before_frame: 1).
-# N=20000 stars: the all-pairs O(N^2) force is fused with torch.compile (`compile: true`,
-# ~26x, ~2.4 ms/frame on an A6000) so a dense disk runs in seconds. Total disk mass ~1.8 is
-# held constant (mass/star = 1.8/20000) so the dynamics match the smaller working disk.
-# Built from Mocz, "Create Your Own N-body Simulation (With Python)" (2020), papers/nbody-python/ (MIT).
-general: {name: spiral_galaxy, seed: 2, n_frames: 1200, dt: 0.004, boundary: free, world: [6.0, 6.0]}
+# spiral_galaxy (2D) -- a rotating self-gravitating disk (+ central point mass) on the SAME
+# `squared_law` (law: gravity, all_pairs) as the nbody cluster. The spiral emerges from ANGULAR
+# MOMENTUM (disk_ic seeds near-circular orbits from the enclosed mass) + self-gravity (swing-
+# amplified density waves). disk_ic fires once (before_frame: 1).
+#
+# TWIN of the galaxy prototype's sweep winner `bh0.5_m1_j0.06_s0.9`
+# (prototype/galaxy/galaxy_sweep.py): identical physics (N=25000, world 8, disc_R 1.5, m_bh 0.5,
+# disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames) so the ONLY
+# difference from the prototype movie is the pipeline+renderer -- a like-for-like comparison of
+# the codebase against the prototype. The all-pairs force is torch.compile-fused (`compile: true`,
+# ~26x). movie_max_frames/fps match the prototype's ~40 s / 1000-frame render.
+general: {name: spiral_galaxy, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, world: [8.0, 8.0]}
 sets:
   star:
-    n: 20000
-    types: {s: {fraction: 1.0, mass: 0.00009}}      # disk mass ~1.8
+    n: 25000
+    types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
 fields: {}
 operators:
-  - {op: disk_ic,     at: star, G: 1.0, softening: 0.08, disc_radius: 1.6, spin: 0.90, m_bh: 1.0, vel_jitter: 0.02, before_frame: 1}
+  - {op: disk_ic,     at: star, G: 1.0, softening: 0.08, disc_radius: 1.5, spin: 0.90, m_bh: 0.5, vel_jitter: 0.06, before_frame: 1}
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
 schedule: [disk_ic, squared_law]
-plotting: {background: black, point_size: 1, colors: {s: [0.85, 0.9, 1.0]}}
+plotting: {background: black, point_size: 1, colors: {s: [0.86, 0.9, 1.0]}, movie_max_frames: 1000, fps: 25}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
-    description: A cluster of white particles initially appears in the center of a black field. The particles
-      begin to move outward, expanding into a larger, more diffuse cloud. As time progresses, the cloud
-      continues to spread and thin out across the frame. Finally, the particles become very sparse and
-      faint as they reach the edges of the space.
-    objects: The scene contains a large set of small, white particles. These particles are initially arranged
-      in a dense, roughly spherical cluster. As the simulation evolves, the topology changes from a compact
-      group to a scattered, irregular distribution. The individual particles remain consistent in size
-      and color throughout the entire sequence.
+    description: A large, dense cluster of white particles begins as a perfectly circular, uniform sphere.
+      Over time, the sphere begins to rotate and stretch, developing distinct spiral arms that extend
+      outward. The structure becomes increasingly asymmetrical as the arms twist and the central core
+      becomes more elongated. By the final frame, the cluster has transformed into a complex, multi-armed
+      spiral galaxy shape.
+    objects: The primary object is a large, dense collection of white particles forming a galactic structure.
+      It starts as a compact, circular sphere and evolves into a sprawling spiral shape with multiple
+      arms. The particles are small and white, set against a solid black background. Several smaller,
+      isolated clusters of white particles appear in the periphery during the later stages of the simulation.

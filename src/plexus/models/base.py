@@ -437,7 +437,6 @@ class Operator(nn.Module):
     # Declarative, optional: what mechanism this operator embodies, what morphologies it
     # tends to produce, and what each tunable param *means* mechanistically.
     MECHANISM_TAGS: list = []           # e.g. ["long_range_attraction", "coarsening"]
-    MORPHOLOGY_PRIOR: list = []         # e.g. ["single_cluster", "filaments"]
     PARAM_ROLES: dict = {}              # e.g. {"sigma": "interaction_length", "gain": "field_sensitivity"}
 
     # --- the transitional fence (plexus.tex Part IV) ----------------------- #

@@ -1193,15 +1193,18 @@ explicitly marked experimental features.
 \section{Mechanism metadata rule}
 
 Every operator should be captionable; this supports the mechanism-search ledger.
-Operators may declare \code{MECHANISM\_TAGS}, \code{MORPHOLOGY\_PRIOR}, and
-\code{PARAM\_ROLES}. These are not used by the engine --- they are used by
-documentation, the simulation ledger, and agentic mechanism search:
+Operators may declare \code{MECHANISM\_TAGS} and \code{PARAM\_ROLES}. These are not
+used by the engine --- they are used by documentation, the simulation ledger, and
+agentic mechanism search:
 \begin{lstlisting}[style=yaml]
 MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening"]
-MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice"]
 PARAM_ROLES = {"sigma": "interaction_length"}
 \end{lstlisting}
-The goal is to make every spec translatable into mechanistic language.
+The goal is to make every spec translatable into mechanistic language. (An earlier
+\code{MORPHOLOGY\_PRIOR} field --- a fixed per-operator guess at emergent shape --- was
+removed: morphology is set by the \emph{parameters} of a spec, not by the operator, so
+the same operator yields a bound cluster, a featureless disc, or a spiral disc
+depending on its couplings.)
 
 \section{Build loop for a coding agent}
 

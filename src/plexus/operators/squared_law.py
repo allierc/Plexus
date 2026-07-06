@@ -35,7 +35,7 @@ graph's `min_radius`, or the diagonal guard in the all-pairs kernel, keeps it fi
 
 Dimension-generic (SUPPORTED_DIMS [2,3]) -- the law reads D = pos.shape[-1].
 
-Provenance (promotion cites its sources, cf. "From prototypes to the Plexus core"):
+Provenance:
   * Coulomb branch ported from ParticleGraph `PDE_E` (electrostatic inverse-square).
   * gravity branch ported from Philip Mocz, "Create Your Own N-body Simulation (With
     Python)" (2020), vendored at papers/nbody-python/ (MIT) -- his softened `getAcc`.
@@ -49,36 +49,38 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-def _field_all_pairs(pos, src, soft2):
-    """All-pairs inverse-square FIELD at each particle: field_i = Σ_j src_j (r_j-r_i)/denom,
-    denom = (|r_j-r_i|^2 + soft2)^(3/2). Per-dimension so only [N,N] matrices appear; pulled
-    out as a free function so torch.compile can FUSE the reduction (the [N,N] r2/inv_r3 never
-    materialise). `src` folds in occupancy (dormant = 0). The receiver's coupling and the
-    signed strength are applied by the caller. (Mocz getAcc generalised to any source charge.)"""
+def _inv_square_sum(pos, src, soft2):
+    """All-pairs inverse-square PULL at each particle: pull_i = Σ_j src_j (r_j-r_i)/denom,
+    denom = (|r_j-r_i|^2 + soft2)^(3/2). This is a per-particle VECTOR (the summed inverse-square
+    interaction), NOT a Plexus `Field` (grid entity) -- no grid is involved; the caller scales it
+    by the signed strength and the receiver's coupling to get the acceleration. Per-dimension so
+    only [N,N] matrices appear; a free function so torch.compile can FUSE the reduction (the [N,N]
+    r2/inv_r3 never materialise). `src` folds in occupancy (dormant = 0). (Mocz getAcc generalised
+    to any source charge.)"""
     N, D = pos.shape
     r2 = torch.full((N, N), soft2, device=pos.device, dtype=pos.dtype)
     for k in range(D):
         dk = pos[:, k].unsqueeze(0) - pos[:, k].unsqueeze(1)       # dk[i,j] = pos[j]-pos[i]
         r2 = r2 + dk * dk
     inv_r3 = r2.clamp(min=1e-12).pow(-1.5)                          # diagonal dk=0 -> 0 contribution
-    field = torch.empty(N, D, device=pos.device, dtype=pos.dtype)
+    pull = torch.empty(N, D, device=pos.device, dtype=pos.dtype)
     for k in range(D):
         dk = pos[:, k].unsqueeze(0) - pos[:, k].unsqueeze(1)
-        field[:, k] = (dk * inv_r3) @ src
-    return field
+        pull[:, k] = (dk * inv_r3) @ src
+    return pull
 
 
-_field_compiled = None
+_inv_square_sum_compiled = None
 
 
-def _get_field(compile):
-    """Return the (optionally torch.compiled) all-pairs field kernel, compiling at most once."""
-    global _field_compiled
+def _get_inv_square_sum(compile):
+    """Return the (optionally torch.compiled) all-pairs inverse-square-sum kernel, compiling once."""
+    global _inv_square_sum_compiled
     if not compile:
-        return _field_all_pairs
-    if _field_compiled is None:
-        _field_compiled = torch.compile(_field_all_pairs)
-    return _field_compiled
+        return _inv_square_sum
+    if _inv_square_sum_compiled is None:
+        _inv_square_sum_compiled = torch.compile(_inv_square_sum)
+    return _inv_square_sum_compiled
 
 
 @register_operator("squared_law", level="particle", kind="lateral")
@@ -88,8 +90,6 @@ class SquaredLaw(Lateral):
     OPTIONAL_TYPE_PROPS = ["charge", "mass"]     # reads ONE (self.coupling), chosen by `law`
     MECHANISM_TAGS = ["inverse_square", "electrostatics", "gravity", "newtonian_gravity",
                       "long_range", "self_gravity"]
-    MORPHOLOGY_PRIOR = ["plasma", "ionic_lattice", "charge_neutral_clusters",
-                        "bound_cluster", "spiral_disk"]
     PARAM_ROLES = {"law": "coulomb (signed charge, like-repel) | gravity (mass, attract)",
                    "k": "strength constant (Coulomb constant / Newton's G)",
                    "coupling": "per-type source property (charge|mass)",
@@ -127,14 +127,14 @@ class SquaredLaw(Lateral):
                              f"{self.coupling!r} on {self.at!r}; declare it in the set's `types`.")
 
         if self.all_pairs:
-            # --- long-range O(N^2): field_i = Σ_j src_j (r_j-r_i)/denom ; a_i = sign*k*recv_i*field_i
+            # --- long-range O(N^2): pull_i = Σ_j src_j (r_j-r_i)/denom ; a_i = sign*k*recv_i*pull_i
             if getattr(H, "periodic", False):
                 raise ValueError("squared_law all_pairs=True supports only open/free boundaries "
                                  "(no minimum-image over all pairs); use a neighbour graph if periodic.")
             src = s * occ                                          # dormant particles contribute nothing
-            field = _get_field(self.compile)(pos, src, self.soft ** 2)
+            pull = _get_inv_square_sum(self.compile)(pos, src, self.soft ** 2)
             recv = s if self._recv_coupled else torch.ones(N, device=pos.device, dtype=pos.dtype)
-            acc = (self.sign * self.k) * recv[:, None] * field
+            acc = (self.sign * self.k) * recv[:, None] * pull
         else:
             # --- neighbour graph O(E) over Level.edge_index (row0 = receiver i, row1 = source j)
             ei = lvl.edge_index

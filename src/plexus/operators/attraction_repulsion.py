@@ -34,7 +34,6 @@ class AttractionRepulsion(Lateral):
     # mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the
     # short-range Gaussian (p3,p4) the push; their balance sets the phase.
     MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
-    MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice", "filaments"]
     PARAM_ROLES = {"sigma": "interaction_length", "noise": "exploration_noise",
                    "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
 
