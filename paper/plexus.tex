@@ -664,10 +664,10 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \code{active\_force} & exchange & mpm\_accel. & activation-gradient body force (cardiac contraction) \\
 \code{active\_stress} & exchange & --- & activation $\to$ active-stress tensor (\code{H.active\_stress}) \\
 \code{apply\_material\_map}  & exchange & --- & image field $\to$ per-particle material (\code{youngs}) \\
-\code{agent\_to\_mpm},\,\code{mpm\_to\_agent},\,\code{agent\_remodel} & exchange & --- / vel. & two-way agent\,$\leftrightarrow$\,material coupling \\
+\code{agent\_scatter},\,\code{agent\_gather},\,\code{agent\_remodel} & exchange & --- / vel. & two-way agent\,$\leftrightarrow$\,material coupling \\
 \code{aggregate}             & aggregate & --- & parent state $=$ mass-weighted mean of children ($\uparrow$) \\
 \code{broadcast}             & broadcast & velocity & lift parent state onto its children ($\downarrow$) \\
-\code{mpm\_strain},\,\code{p2g},\,\code{mpm\_grid\_update},\,\code{g2p} & lat./exch./field & --- & the decomposed MLS-MPM cycle (strain\,$\to$\,P2G\,$\to$\,grid solve\,$\to$\,G2P) \\
+\code{mpm\_strain},\,\code{mpm\_scatter},\,\code{mpm\_grid\_update},\,\code{mpm\_gather} & lat./exch./field & --- & the decomposed MLS-MPM cycle (strain\,$\to$\,scatter\,$\to$\,grid solve\,$\to$\,gather) \\
 \code{mls\_mpm\_mechanics}   & exchange & --- & the same cycle as one fenced \emph{transitional} oracle (Section~\ref{sec:roadmap}) \\
 \midrule
 \multicolumn{4}{@{}l}{\emph{Fields --- a field's own dynamics (\code{kind=field}; write the grid, return \{\})}}\\
@@ -1226,9 +1226,12 @@ spec route it:
   to: cell
 \end{lstlisting}
 
-Thus the transport pair \code{agent\_to\_mpm}/\code{mpm\_to\_agent} is really
-\code{scatter}/\code{gather} (one particle$\leftrightarrow$grid transfer, wired by
-\code{from:}/\code{to:}), and \code{pulse\_to\_active\_stress}/\code{pulse\_to\_contraction}
+Thus the MLS-MPM transport pair \code{p2g}/\code{g2p} becomes \code{mpm\_scatter}/
+\code{mpm\_gather}, and the agent$\leftrightarrow$grid pair \code{agent\_to\_mpm}/
+\code{mpm\_to\_agent} becomes \code{agent\_scatter}/\code{agent\_gather} (subsystem-qualified,
+since their scatter/gather kernels differ from the MLS-MPM ones --- same mechanism family,
+different contract, so kept separate rather than merged), while
+\code{pulse\_to\_active\_stress}/\code{pulse\_to\_contraction}
 are \code{active\_stress}/\code{active\_force} --- two constitutive laws distinguished by
 the quantity they emit (a stress tensor $-A\,\hat n\hat n^{\!\top}$ vs.\ a body force), not
 by their input: the activation source may be calcium, voltage, or a morphogen, so the name
