@@ -5557,3 +5557,50 @@ Best scientific slot: the DOSE LADDER as a whole (s5/s1/s0/s2/s3) — proves fib
 Verdict: SUPPORTED — fibre_dev is a real LS lever [mechanism@LoopScore, 2399it, rot1.0, dose-confirmed], peak dev~0.18; spatial SCALE inert. Residual re-attributed to SIZE (peak 0.49×), enclosure SOLVED (loopiness≥real). `provisional operating point = dev18 (LS≈0.49)`.
 Batch outcome: BOTH — improved LS (0.473→0.492 op point) AND improved the morphology map (dev dose-response mapped; residual re-attributed enclosure→size).
 Next (Batch 33): parent=dev18. ONE question — in the enclosure-solved rotating regime, does a SIZE lever now convert to loop SIZE (raise peak_ratio 0.49→real), reviving facts #24/#25 as regime-bound? Fan out: amp12/amp14 (drive), gain_hi2.0 (ceiling), stiff_lo20 (compliance), dev20 (nail dose peak), + dev18 replicate (control).
+
+---
+
+## Batch 34 — 2026-07-06 — SIZE-IN-ROTATION RESOLVED: the GAIN CEILING is the size/uniformity lever (NEW RECORD LS=0.509)
+
+Parent = dev18 (rot1.0, soft-floor stiff[30,300] ω5, drag40, amp10, gain[0.2,1.5] gain0=0.5, SIREN fibre-ON
+dev0.18, dur_hi11, substeps10). B33 asked: in the enclosure-solved rotating regime, does a SIZE lever now
+convert to loop SIZE (raise peak_ratio ~0.49→real), reviving facts #24/#25 as regime-bound to rot=0?
+
+**BIGGEST SURPRISE: `gain_hi` 1.5→2.0 (ghi20) is the batch WINNER AND a NEW RECORD (LS=0.509 > B32 0.492),
+directly OVERTURNING fact #28** ("raising the gain ceiling above 1.5 buys NOTHING, size flat, LS flat"). Fact
+#28 was established in the soft-floor NON-rotating regime; it is regime-bound. In the rotating regime the gain
+ceiling is a genuine size+uniformity lever. Equally, `fibre_dev` 0.18→0.20 (dev20) reproduces the lift
+(LS=0.505). BUT base amplitude (amp12/amp14) and floor softening (slo20) do NOT — so the size gate opens for
+LOCAL/per-region drive (gain ceiling, fibre), not for GLOBAL drive (base amplitude, still overshoots per #4/#25).
+
+Per-slot (rank by LS; all 2399it converged, all TIER-safe, chir≈0.85):
+
+| slot | Δ from parent | LS | LS_SD | peak_ratio | area_ratio | energy | minor | note |
+|------|---------------|------|-------|-----------|-----------|--------|-------|------|
+| **ghi20** | gain_hi 1.5→**2.0** | **0.509** | 0.294 | **0.533** | 0.387 | 0.873 | 0.780 | **WINNER/RECORD** |
+| dev20 | fibre_dev 0.18→**0.20** | 0.505 | 0.301 | **0.535** | 0.388 | 0.824 | 0.773 | fibre size lever confirmed |
+| slo20 | stiff_lo 30→20 | 0.482 | 0.307 | 0.494 | 0.349 | 0.834 | 0.786 | floor inert (#31a holds) |
+| amp14 | amp 10→14 | 0.478 | 0.301 | 0.514 | 0.345 | 0.858 | 0.826 | drive→overshoot |
+| dev18 | (parent) | 0.474 | 0.302 | 0.501 | 0.339 | 0.841 | 0.751 | 1 neg node (−0.07) |
+| amp12 | amp 10→12 | 0.472 | 0.327 | 0.492 | 0.353 | 0.827 | 0.818 | worst uniformity |
+
+**Dashboard reading (ghi20 vs dev18 3×3 zoom):** the ghi20 lift is a UNIFORMITY rescue of the small/radial
+nodes — dev18 had per-node LS {+0.01, +0.11, +0.14, −0.07} at its weak nodes; ghi20 turned the SAME nodes to
+{+0.20, +0.36, +0.42, +0.45}, ALL-POSITIVE, min +0.20. Raising the gain ceiling let the SIREN gain field push
+harder LOCALLY at the radial-stub nodes; because the axis rotates, that extra local drive became loop AREA
+(peak 0.50→0.53, area 0.34→0.39) instead of overshoot. The gain-field panel shows more contrast.
+
+Winner (optimizer): **ghi20, LS=0.509** (new record). Winner (scientific): **ghi20** — it resolves the
+size-in-rotation open question and overturns fact #28: SIZE is movable @rot1.0, but via the LOCAL gain ceiling
+(and fibre_dev), NOT base amplitude or floor. Verdict: OVERTURN — facts #24/#25/#28 ("size/gain-ceiling
+invariant") are REGIME-BOUND to rot=0; rotation reopens per-region drive as a size channel. Caveat: ghi20 and
+dev20 are SINGLE DRAWS (campaign law: 9+ single-draw clean points have regressed) → B34 must replicate before
+promotion.
+
+Batch outcome: BOTH — new record (0.492→0.509) AND the morphology map advanced (size-in-rotation resolved;
+gain-ceiling causal lever isolated).
+
+Next (Batch 34): parent=ghi20. Confirm + push the gain ceiling. ghi20 replicate (net the lottery), ghi22
+(does peak keep rising?), ghi25 (does rotation raise the runaway-tolerance edge that fact #28 put at ~2.0–2.5
+@soft-floor-non-rot?), dev20-on-ghi20 (do the two size levers STACK?), glo30 (raise gain FLOOR → attack
+remaining small nodes from below), ghi15 (=dev18, causal control confirming the +0.035 is the ceiling).
