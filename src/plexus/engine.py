@@ -39,15 +39,21 @@ _DEFAULT_FIELD_COLORS = [
 ]
 
 
-def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
+def _spawn(mode: str, n: int, box, radius: float, rng, device: str):
     """Initial positions + headings for a self-propelled set (Lague's SpawnMode).
+
+    Placement is framed to the actual world box `[W, H]` -- the disc/point/ring are
+    centred at `(W/2, H/2)` and clamped to `[0,W] x [0,H]`. (A unit-height world H=1 is
+    byte-identical to the old hard-coded `cy=0.5` / `[0,1]` clamp.)
 
     Heading is a [n, 2] unit VECTOR (the universal orientation representation, the
     same [N, D] convention as `_spawn3d`), not a scalar angle -- so `glide`,
     `bounce`, and `sense` are one dimension-generic operator each."""
-    cx, cy = W / 2.0, 0.5
+    box = box.float() if torch.is_tensor(box) else torch.as_tensor(box, dtype=torch.float32, device=device)
+    W = float(box[0]); Hh = float(box[1]) if box.numel() > 1 else 1.0
+    cx, cy = W / 2.0, Hh / 2.0
     if mode == "random":
-        pos = torch.rand(n, 2, generator=rng, device=device); pos[:, 0] *= W
+        pos = torch.rand(n, 2, generator=rng, device=device); pos[:, 0] *= W; pos[:, 1] *= Hh
         a = torch.rand(n, generator=rng, device=device) * 2 * math.pi
     elif mode in ("point", "center"):
         pos = torch.stack([torch.full((n,), cx, device=device), torch.full((n,), cy, device=device)], 1)
@@ -70,16 +76,17 @@ def _spawn(mode: str, n: int, W: float, radius: float, rng, device: str):
         a = (a + math.pi) if mode == "ring_in" else a
     else:
         raise ValueError(f"unknown spawn mode {mode!r}")
-    pos[:, 0] = pos[:, 0].clamp(0, W - 1e-6); pos[:, 1] = pos[:, 1].clamp(0, 1 - 1e-6)
+    pos[:, 0] = pos[:, 0].clamp(0, W - 1e-6); pos[:, 1] = pos[:, 1].clamp(0, Hh - 1e-6)
     head = torch.stack([torch.cos(a), torch.sin(a)], dim=1)        # [n, 2] unit heading
     return pos, head
 
 
-def _spawn3d(mode: str, n: int, box, radius: float, rng, device: str):
+def _spawn3d(mode: str, n: int, box, radius: float, rng, device: str, thickness: float = 0.0):
     """Initial 3D positions + a unit-vector heading for a self-propelled set -- the
-    3D counterpart of `_spawn`. `disc`/`ball`/`sphere` seed a solid ball of `radius`
-    about the box centre; `point`/`center` a jittered centre; `random` fills the box.
-    Heading is a random unit 3-vector (the 3D agent steers a vector, not an angle)."""
+    3D counterpart of `_spawn`. `ball`/`sphere`/`disc` seed a solid ball of `radius`
+    about the box centre; `disk` seeds a FLAT disc in the xy-plane (radius `radius`) with
+    out-of-plane Gaussian `thickness` along z (a thin rotating disc); `point`/`center` a
+    jittered centre; `random` fills the box. Heading is a random unit 3-vector."""
     box = torch.as_tensor(box, dtype=torch.float32, device=device)
     c = box * 0.5
     if mode == "random":
@@ -91,12 +98,80 @@ def _spawn3d(mode: str, n: int, box, radius: float, rng, device: str):
         d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
         r = torch.rand(n, generator=rng, device=device).pow(1.0 / 3.0) * radius   # uniform in the ball
         pos = c.expand(n, 3) + d * r[:, None]
+    elif mode in ("disk", "flat_disc"):
+        r = torch.sqrt(torch.rand(n, generator=rng, device=device)) * radius       # uniform-area xy disc
+        th = torch.rand(n, generator=rng, device=device) * 2 * math.pi
+        pos = c.expand(n, 3).clone()
+        pos[:, 0] = c[0] + r * torch.cos(th)
+        pos[:, 1] = c[1] + r * torch.sin(th)
+        if thickness > 0:
+            pos[:, 2] = c[2] + thickness * torch.randn(n, generator=rng, device=device)
     else:
         raise ValueError(f"unknown 3D spawn mode {mode!r}")
     pos = torch.minimum(pos.clamp(min=0.0), box - 1e-6)
     head = torch.randn(n, 3, generator=rng, device=device)
     head = head / head.norm(dim=1, keepdim=True).clamp(min=1e-9)
     return pos, head
+
+
+def _init_velocity(vinit, lvl, world_size, rng, device):
+    """Initial velocity for a top-level set from its `vel_init` spec (a DICT mode).
+
+    Initialization is a spec concern, not an operator: placement lives in `spawn`, and a
+    computed initial VELOCITY lives here -- a physics-aware IC that may read all positions
+    and masses. Modes:
+      rest            v = 0
+      random          v ~ U(-speed, speed) per axis (the dict form of the legacy scalar)
+      circular_orbit  near-circular orbital speed v = spin*sqrt(G*M(<r)/r) from the enclosed
+                      mass (+ an optional `central_mass` point mass at node 0), tangential in
+                      the xy-plane -- the config-driven replacement for the old `disk_ic` op
+      solid_body      rigid rotation omega x r in the xy-plane
+      radial          v = speed * r_hat (outward >0 / inward <0)
+    Returns [n, D] velocity (n = live count). Mass-dependent modes read `lvl.mass`, so this
+    runs AFTER `_assign_types`."""
+    n = int((lvl.occ > 0).sum().item())                # top-level: the first n slots are live
+    pos = lvl.get("pos")[:n]; D = pos.shape[-1]
+    mode = str(vinit.get("mode", "random"))
+    c = 0.5 * world_size[:D]
+    R = pos - c; r = R.norm(dim=-1, keepdim=True).clamp(min=1e-9); rr = r.squeeze(-1)
+    if mode == "rest":
+        return torch.zeros(n, D, device=device)
+    if mode == "random":
+        v = float(vinit.get("speed", 0.0))
+        return (torch.rand(n, D, generator=rng, device=device) - 0.5) * (2 * v)
+    if mode == "circular_orbit":
+        G = float(vinit.get("G", 1.0)); spin = float(vinit.get("spin", 1.0))
+        soft = float(vinit.get("softening", 0.05)); jitter = float(vinit.get("jitter", 0.0))
+        mbuf = getattr(lvl, "mass", None)
+        m = mbuf[:n].clone() if mbuf is not None else torch.ones(n, device=device)
+        cmass = float(vinit.get("central_mass", 0.0))  # optional central point mass at node 0, parked at centre
+        if cmass > 0.0:
+            m[0] = cmass
+            if mbuf is not None:
+                lvl.mass[0] = cmass
+            st = lvl.state.clone(); st[0, :D] = c; lvl.state = st
+            pos = lvl.get("pos")[:n]; R = pos - c
+            r = R.norm(dim=-1, keepdim=True).clamp(min=1e-9); rr = r.squeeze(-1)
+        order = torch.argsort(rr)                       # enclosed mass M(<r) per particle
+        m_cum = torch.zeros(n, device=device); m_cum[order] = torch.cumsum(m[order], 0)
+        v_circ = spin * torch.sqrt((G * m_cum.clamp(min=0)) / rr.clamp(min=soft))
+        tang = torch.zeros(n, D, device=device)         # CCW tangent in the xy-plane (axes 0,1)
+        tang[:, 0] = -R[:, 1] / rr; tang[:, 1] = R[:, 0] / rr
+        vel = v_circ[:, None] * tang
+        if jitter > 0.0:
+            vel = vel + jitter * torch.randn(n, D, generator=rng, device=device)
+        if cmass > 0.0:
+            vel[0] = 0.0
+        return vel
+    if mode == "solid_body":
+        omega = float(vinit.get("omega", 1.0))
+        tang = torch.zeros(n, D, device=device)
+        tang[:, 0] = -R[:, 1]; tang[:, 1] = R[:, 0]     # omega x r in the xy-plane
+        return omega * tang
+    if mode == "radial":
+        speed = float(vinit.get("speed", 1.0))          # outward >0 / inward <0
+        return speed * (R / r)
+    raise ValueError(f"unknown vel_init mode {mode!r}")
 
 
 def _field_colors(H: Hierarchy, sim: Spec, fld) -> np.ndarray:
@@ -267,21 +342,24 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         # carries a per-agent `heading`; otherwise positions are seeded across the domain.
         head = None
         if "spawn" in s:
-            if D == 3:                                          # 3D agent: vector heading, ball spawn
+            if D == 3:                                          # 3D agent: vector heading; ball / thin `disk` spawn
                 pos, head = _spawn3d(s["spawn"], n, H.world_size,
-                                     float(s.get("spawn_radius", 0.3)), H.rng, device)
-            else:
-                pos, head = _spawn(s["spawn"], n, H.world_width,
+                                     float(s.get("spawn_radius", 0.3)), H.rng, device,
+                                     thickness=float(s.get("spawn_thickness", 0.0)))
+            else:                                               # 2D: framed to the world box (not height-1)
+                pos, head = _spawn(s["spawn"], n, H.world_size,
                                    float(s.get("spawn_radius", 0.3)), H.rng, device)
         elif "start" in s:
             pos = _start_centers(s["start"], n, H.rng, device)      # known locations (e.g. an MPM blob)
         else:
             pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
         state[:n, px0:px1] = pos
-        vinit = float(s.get("vel_init", 0.0))               # random initial speed (e.g. boids start moving)
-        if vinit > 0 and "vel" in schema:
+        # legacy SCALAR vel_init -> random initial velocity, drawn HERE to stay byte-identical
+        # (a dict-mode vel_init is a computed IC applied after _assign_types, below).
+        vinit = s.get("vel_init", 0.0)                      # random initial speed (e.g. boids start moving)
+        if not isinstance(vinit, dict) and float(vinit or 0.0) > 0 and "vel" in schema:
             vx0, vx1 = schema["vel"]
-            state[:n, vx0:vx1] = (torch.rand(n, D, generator=H.rng, device=device) - 0.5) * (2 * vinit)
+            state[:n, vx0:vx1] = (torch.rand(n, D, generator=H.rng, device=device) - 0.5) * (2 * float(vinit))
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
@@ -294,6 +372,11 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             lvl.register_buffer("heading", hbuf)
         _assign_types(lvl, s, H, device)
         lvl.types_raw = s.get("types")          # raw per-type config (layers/material/block) for child provisioning
+        # computed velocity IC (dict `vel_init`, e.g. circular_orbit) -- after types so lvl.mass exists
+        if isinstance(vinit, dict) and "vel" in schema:
+            vx0, vx1 = schema["vel"]
+            vel = _init_velocity(vinit, lvl, H.world_size, H.rng, device)
+            st = lvl.state.clone(); st[:vel.shape[0], vx0:vx1] = vel; lvl.state = st
         H.add_level(lvl)
 
     # pass 2: contained sets -- the typed containment graph. Each child set is

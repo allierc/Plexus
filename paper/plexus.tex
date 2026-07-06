@@ -651,7 +651,6 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \multicolumn{4}{@{}l}{\emph{Dynamics --- move a set's state (return a delta)}}\\
 \code{attraction\_repulsion} & lateral & velocity & per-type difference-of-Gaussians interaction law \\
 \code{squared\_law}          & lateral & acceleration & inverse-square law: Coulomb electrostatics \emph{or} Newtonian gravity (\code{law}: \code{charge}/\code{mass}) \\
-\code{disk\_ic}              & structural & --- & frame-0 IC: rotating self-gravitating disk (near-circular orbits + central mass) \\
 \code{cohesion},\,\code{alignment},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
 \code{cruise}                & lateral & acceleration & Vicsek self-propulsion toward cruising speed $v_0$ \\
 \code{drag}                  & lateral & accel.\,$|$\,mpm\_accel. & viscous friction $-\kappa v$ (\code{emit:} routes to the engine or the MPM substep) \\

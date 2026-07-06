@@ -13,7 +13,6 @@ from . import aggregate             # noqa: F401  children -> parent reduction (
 from . import broadcast             # noqa: F401  parent -> children lift (containment)
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
 from . import squared_law                # noqa: F401  registers squared_law (lateral, 2nd-derivative: Coulomb electrostatics OR Newtonian gravity)
-from . import disk_ic                # noqa: F401  registers disk_ic (structural frame-0 IC: rotating self-gravitating disk)
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
 from . import alignment             # noqa: F401  Vicsek velocity alignment (nominal); boids = special case
 from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
@@ -56,7 +55,6 @@ from . import cell_divide           # noqa: F401  agent set structural: prolifer
 from . import cell_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law",
-           "disk_ic",
            "cohesion", "alignment", "separation", "cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "prescribed_field", "chemotax", "gravity", "sediment",

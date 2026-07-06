@@ -1,35 +1,21 @@
-# spiral_galaxy (2D) -- a rotating self-gravitating disk (+ central point mass) on the SAME
-# `squared_law` (law: gravity, all_pairs) as the nbody cluster. The spiral emerges from ANGULAR
-# MOMENTUM (disk_ic seeds near-circular orbits from the enclosed mass) + self-gravity (swing-
-# amplified density waves). disk_ic fires once (before_frame: 1).
+# spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
+# Initialization is a SPEC concern (no operator): `spawn: disc` places the disc, and
+# `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds v = spin*sqrt(G*M(<r)/r)
+# from the enclosed mass, plus an optional central point mass (`central_mass`). This replaces the
+# former `disk_ic` operator -- placement lives in `spawn`, velocity in `vel_init`.
 #
-# TWIN of the galaxy prototype's sweep winner `bh0.5_m1_j0.06_s0.9`
-# (prototype/galaxy/galaxy_sweep.py): identical physics (N=25000, world 8, disc_R 1.5, m_bh 0.5,
-# disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames) so the ONLY
-# difference from the prototype movie is the pipeline+renderer -- a like-for-like comparison of
-# the codebase against the prototype. The all-pairs force is torch.compile-fused (`compile: true`,
-# ~26x). movie_max_frames/fps match the prototype's ~40 s / 1000-frame render.
+# TWIN of the galaxy prototype's sweep winner bh0.5_m1_j0.06_s0.9 (N=25000, world 8, disc_R 1.5,
+# central mass 0.5, disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames).
 general: {name: spiral_galaxy, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, world: [8.0, 8.0]}
 sets:
   star:
     n: 25000
+    spawn: disc                                     # flat disc, centred in the world box
+    spawn_radius: 1.5
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 0.5, jitter: 0.06}
     types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
 fields: {}
 operators:
-  - {op: disk_ic,     at: star, G: 1.0, softening: 0.08, disc_radius: 1.5, spin: 0.90, m_bh: 0.5, vel_jitter: 0.06, before_frame: 1}
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
-schedule: [disk_ic, squared_law]
+schedule: [squared_law]
 plotting: {background: black, point_size: 1, colors: {s: [0.86, 0.9, 1.0]}, movie_max_frames: 1000, fps: 25}
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_star:
-    description: A large, dense cluster of white particles begins as a perfectly circular, uniform sphere.
-      Over time, the sphere begins to rotate and stretch, developing distinct spiral arms that extend
-      outward. The structure becomes increasingly asymmetrical as the arms twist and the central core
-      becomes more elongated. By the final frame, the cluster has transformed into a complex, multi-armed
-      spiral galaxy shape.
-    objects: The primary object is a large, dense collection of white particles forming a galactic structure.
-      It starts as a compact, circular sphere and evolves into a sprawling spiral shape with multiple
-      arms. The particles are small and white, set against a solid black background. Several smaller,
-      isolated clusters of white particles appear in the periphery during the later stages of the simulation.
