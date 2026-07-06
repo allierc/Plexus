@@ -24,3 +24,15 @@ plotting:
     q_n1: [1, 0, 0]
   splat_size: 1.9
   splat_res: 820
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: A dense cluster of particles is centered in a black void. The particles exhibit a subtle
+      outward expansion and internal reorganization as time progresses. The distribution remains relatively
+      stable, maintaining a roughly diamond-shaped boundary. The overall motion is characterized by high-frequency
+      jittering within a confined spatial volume.
+    objects: The scene contains a large population of small, point-like particles. These particles are
+      colored in a mix of white, red, and blue. They are arranged in a dense, stochastic cluster with
+      no visible connections between them. The size of each individual particle remains constant throughout
+      the simulation.

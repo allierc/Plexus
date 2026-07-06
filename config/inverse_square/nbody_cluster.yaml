@@ -16,3 +16,14 @@ operators:
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.1, all_pairs: true}
 schedule: [squared_law]
 plotting: {background: black, point_size: 4, colors: {s: [0.7, 0.7, 1.0]}}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A cluster of white particles appears in the center of a black field. The particles gradually
+      expand outward from the center as they move. They continue to disperse across the frame until they
+      are widely scattered. The simulation ends with the particles distributed across the entire black
+      space.
+    objects: The objects are small, white, point-like particles. They are initially arranged in a dense,
+      central cluster. As time progresses, the topology changes from a cluster to a sparse, scattered
+      distribution. The particles maintain a consistent size and color throughout the entire simulation.

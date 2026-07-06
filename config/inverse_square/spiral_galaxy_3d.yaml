@@ -1,0 +1,29 @@
+# spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS
+# (out-of-plane scatter) + a central point mass, on the same `squared_law` (law: gravity,
+# all_pairs). disk_ic rotates in the xy-plane (axes 0,1) and scatters along z (`thickness`).
+# N=20000 stars; the all-pairs O(N^2) force is fused with torch.compile (`compile: true`,
+# ~22x, ~4 ms/frame on an A6000). Same disk mass (~1.8) and BH (1.0) as the 2D spec.
+# Built from Mocz, "Create Your Own N-body Simulation (With Python)" (2020), papers/nbody-python/ (MIT).
+general: {name: spiral_galaxy_3d, seed: 2, n_frames: 1200, dt: 0.004, boundary: free, dim: 3, world: [6.0, 6.0, 6.0]}
+sets:
+  star:
+    n: 20000
+    types: {s: {fraction: 1.0, mass: 0.00009}}      # disk mass ~1.8
+fields: {}
+operators:
+  - {op: disk_ic,     at: star, G: 1.0, softening: 0.08, disc_radius: 1.6, spin: 0.90, m_bh: 1.0, vel_jitter: 0.02, thickness: 0.08, before_frame: 1}
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
+schedule: [disk_ic, squared_law]
+plotting: {background: black, colors: {s: [0.85, 0.9, 1.0]}, splat_size: 1.2, splat_res: 820}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A dense, circular cluster of particles begins as a solid, uniform disk. Over time, a
+      dark ring forms within the cluster and begins to expand outward. The internal structure becomes
+      increasingly turbulent as the particles spiral and fragment into distinct arms. Finally, the cluster
+      completely disintegrates into a chaotic, expanding spray of individual points.
+    objects: The primary objects are thousands of small, light-blue and white particles. They are initially
+      arranged in a compact, circular topology with a high density at the center. As the simulation progresses,
+      they form a spiral pattern with several radiating arms. By the end, the particles are scattered
+      into a sparse, irregular cloud across the black background.
