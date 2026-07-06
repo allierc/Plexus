@@ -16,7 +16,7 @@ from plexus.models.registry import register_operator
 @register_operator("broadcast", level="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
     EMIT = "velocity"            # emits a velocity; the engine integrates
-    SUPPORTED_DIMS = [2]                        # lift math is N-D, but the no-parent fallback returns a hard-coded 2D zero delta
+    SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D
     REQUIRES_PARAMS = ["stiffness"]
     MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]
     PARAM_ROLES = {"stiffness": "containment_strength"}
@@ -31,7 +31,7 @@ class BroadcastLift(Broadcast):
         dev = child.state.device
         pname = getattr(child, "parent_name", None)
         if pname is None:
-            return {self.at: torch.zeros(child.n, 2, device=dev)}
+            return {self.at: torch.zeros_like(child.get("pos"))}   # no parent -> zero delta (matches pos dim, 2D/3D)
         parent = H.level(pname)
         ppos = parent.get("pos")[child.parent]     # each child's parent position
         vel = self.k * (ppos - child.get("pos")) * child.occ[:, None]
