@@ -14,7 +14,7 @@ operators:
   op: activation_pulse
   radius: 0.12
   profile: uniform
-- {amplitude: 25.0, at: mpm_particle, from: activation, mode: directional, op: pulse_to_contraction, direction_from: direction}
+- {amplitude: 25.0, at: mpm_particle, from: activation, mode: directional, op: active_force, direction_from: direction}
 - {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
 - {at: mpm_particle, op: mpm_strain}
 - {a_max: 200, at: mpm_particle, drag: 0.0, op: p2g, to: mpm_grid}
@@ -25,7 +25,7 @@ schedule:
 - apply_material_map
 - pacemaker
 - activation_pulse
-- pulse_to_contraction
+- active_force
 - drag
 - substep_dt: 0.0002
   steps: [mpm_strain, p2g, mpm_grid_update, g2p]

@@ -1,4 +1,7 @@
-"""pulse_to_contraction -- the FORCE half: activation field -> per-particle MPM force.
+"""active_force -- the FORCE constitutive law: an activation field -> per-particle MPM body force.
+
+(Renamed from `pulse_to_contraction`, kept as a transitional alias: the operator names the
+MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
 
 Reads the activation field a(x,t) (the `from:` field) and converts its gradient into
 a per-particle body force, RETURNED as a particle delta. The engine sums it (with any
@@ -25,8 +28,8 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("pulse_to_contraction", level="particle", kind="exchange")
-class PulseToContraction(Exchange):
+@register_operator("active_force", "pulse_to_contraction", level="particle", kind="exchange")
+class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
     EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field
     REQUIRES_PARAMS = ["from"]                # the activation field to read
@@ -44,7 +47,7 @@ class PulseToContraction(Exchange):
         self.sign = {"inward": 1.0, "outward": -1.0}.get(self.mode, 1.0)
         self.direction_from = params.get("direction_from")
         if self.mode == "directional" and self.direction_from is None:
-            raise ValueError("pulse_to_contraction mode: directional needs `direction_from:` "
+            raise ValueError("active_force mode: directional needs `direction_from:` "
                              "(a vector_grid field giving the contraction direction)")
         self.at = params.get("_at", "particle")
 

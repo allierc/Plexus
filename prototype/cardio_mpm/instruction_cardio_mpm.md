@@ -221,7 +221,7 @@ operator actually TOUCHED — together they turn "LS went up" into a mechanism.
 ## The model — what is learned vs fixed
 
 Forward = `pacemaker → uniform activation pulse → parametric stiffness/gain/fibre fields →
-pulse_to_active_stress → mpm_drag → [mpm_strain → p2g → mpm_grid_update → g2p]×substeps`, on a 128² elastic
+active_stress → mpm_drag → [mpm_strain → p2g → mpm_grid_update → g2p]×substeps`, on a 128² elastic
 sheet filling `[0.15,0.85]²`. NO rotary, NO phase delay, NO directional body force. The MPM is a stable
 elastic limit cycle: warm-up settles `no_grad` past one cycle, then backprop runs one full beat. The outer
 band is Dirichlet-anchored to the real GT every frame (`--bwidth`); the interior is free; the fit adds an

@@ -662,8 +662,8 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \code{sense}                 & exchange & --- & Physarum 3-sensor pheromone steering (writes \code{heading}) \\
 \code{deposit}               & exchange & --- & secrete/deposit set state into a field \\
 \code{heading\_align},\,\code{flow\_align} & exchange & --- & align \code{heading} to neighbours / to solved MPM flow \\
-\code{pulse\_to\_contraction} & exchange & mpm\_accel. & activation-gradient body force (cardiac contraction) \\
-\code{pulse\_to\_active\_stress} & exchange & --- & activation $\to$ active-stress tensor (\code{H.active\_stress}) \\
+\code{active\_force} & exchange & mpm\_accel. & activation-gradient body force (cardiac contraction) \\
+\code{active\_stress} & exchange & --- & activation $\to$ active-stress tensor (\code{H.active\_stress}) \\
 \code{apply\_material\_map}  & exchange & --- & image field $\to$ per-particle material (\code{youngs}) \\
 \code{agent\_to\_mpm},\,\code{mpm\_to\_agent},\,\code{agent\_remodel} & exchange & --- / vel. & two-way agent\,$\leftrightarrow$\,material coupling \\
 \code{aggregate}             & aggregate & --- & parent state $=$ mass-weighted mean of children ($\uparrow$) \\
@@ -1339,8 +1339,8 @@ same contract and differ solely in routing, source field, or mode --- for exampl
 \code{mpm\_drag}$+$\code{drag}$\to$\code{drag} with an \code{emit} option, and
 \code{pulse\_stimulus}$+$\code{phase\_delay\_pulse}$\to$\code{activation\_pulse}. When
 the contract differs they stay separate and share only backend utilities:
-\code{pulse\_to\_contraction} emits an \code{mpm\_acceleration}, whereas
-\code{pulse\_to\_active\_stress} writes an active stress and emits nothing --- those
+\code{active\_force} emits an \code{mpm\_acceleration}, whereas
+\code{active\_stress} writes an active stress and emits nothing --- those
 must not become one muddy mode-dependent operator. Merging is thus governed by
 physical and computational semantics, never by superficial code similarity.
 

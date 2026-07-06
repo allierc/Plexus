@@ -1,6 +1,9 @@
-"""pulse_to_active_stress -- the STRESS half: activation field -> per-particle active stress.
+"""active_stress -- the STRESS constitutive law: an activation field -> per-particle active stress.
 
-The mechanical alternative to `pulse_to_contraction` (the FORCE half). Instead of injecting a
+(Renamed from `pulse_to_active_stress`, kept as a transitional alias: the operator names the
+MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+
+The mechanical alternative to `active_force` (the FORCE law). Instead of injecting a
 per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
 elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
 
@@ -25,8 +28,8 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("pulse_to_active_stress", level="particle", kind="exchange")
-class PulseToActiveStress(Exchange):
+@register_operator("active_stress", "pulse_to_active_stress", level="particle", kind="exchange")
+class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
     SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
     REQUIRES_PARAMS = ["from", "direction_from"]
@@ -40,7 +43,7 @@ class PulseToActiveStress(Exchange):
         self.channel = int(params.get("channel", 0))
         self.direction_from = params.get("direction_from")
         if self.direction_from is None:
-            raise ValueError("pulse_to_active_stress needs `direction_from:` "
+            raise ValueError("active_stress needs `direction_from:` "
                              "(a vector_grid field giving the contraction axis n)")
         self.at = params.get("_at", "particle")
 
