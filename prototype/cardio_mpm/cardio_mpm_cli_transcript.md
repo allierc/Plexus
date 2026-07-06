@@ -1623,3 +1623,29 @@ All three files are updated. Batch 33 is designed. Summary:
 3. **The residual flipped back to SIZE.** Rotation solved enclosure (loopiness ≥ real everywhere); the clean gap is now peak_ratio ≈ 0.49 (sim = half real). Dashboard confirms: red loops loopy + correctly-chiral but *inside* green.
 
 **Batch 33 (parent = dev18, new op point):** one question — *in the enclosure-solved rotating regime, is the SIZE residual now drive-limited?* Facts #24/#25 killed drive/gain/compliance as size levers, but only at rot=0. Six slots, each changing one flag: **amp12, amp14** (drive), **ghi20** (gain ceiling), **slo20** (compliance) — 3 exploit / 2 explore — plus **dev18 replicate** (control) and **dev20** (pin the fibre-dose peak). The read is on `peak_ratio`/`area_ratio`, not LS alone (a bigger loop that overshoots lowers LS). A clean null → size is structural (boundary/constitutive); any lever raising peak_ratio while holding LS → #24/#25 are regime-bound to rot=0.
+
+
+================================================================================
+## DESIGN 34 -- 2026-07-06 11:36:42
+================================================================================
+Batch 34 complete. Here's the summary.
+
+## Batch 34 — the gain ceiling is the size lever (NEW RECORD LS=0.509)
+
+**What surprised me:** B33's winner `ghi20` (raising `gain_hi` 1.5→2.0) set a **new record LS=0.509** (prior best 0.492) — directly overturning fact #28, which had declared "raising the gain ceiling above 1.5 buys nothing." That conclusion was established in the *non-rotating* regime; it's regime-bound.
+
+**The science (size-in-rotation, RESOLVED):** In the enclosure-solved rotating regime, loop SIZE is finally movable — but **only via per-region drive**, not global drive:
+
+| lever | LS | peak_ratio | verdict |
+|---|---|---|---|
+| **gain_hi 1.5→2.0** | **0.509** | 0.50→0.53 | ✅ size + uniformity lever |
+| fibre_dev 0.18→0.20 | 0.505 | →0.535 | ✅ reproduces it |
+| stiff_lo 30→20 | 0.482 | 0.494 | ✗ floor inert |
+| amp 10→14 | 0.478 | 0.514 | ✗ overshoots |
+| amp 10→12 | 0.472 | 0.492 | ✗ overshoots |
+
+The dashboards showed the mechanism cleanly: raising the ceiling **rescued the small radial-stub nodes** (dev18's weak nodes {+0.01, −0.07, +0.11, +0.14} → ghi20's {+0.20, +0.45, +0.36, +0.42}, all-positive). Extra *local* gain headroom becomes loop area because the rotating axis circulates it; extra *global* amplitude just overshoots (facts #4/#25 hold under rotation).
+
+**Files updated:** analysis log (Batch 34 section), knowledge ledger (record + facts #28/#31 overturned, new rejected line, SIZE axis ✗→◐), slots.md, and persistent memory.
+
+**Batch 34 design** (parent = ghi20; one variable each): `ghi20` (replicate the single-draw record), `ghi22` (push the ceiling — monotone?), `dev20` (stack the two per-region size levers), `ghi25` (does rotation raise the old runaway edge?), `glo30` (raise the gain *floor* — attack small nodes from below), `ghi15` (=dev18 causal control). **Falsifier:** ghi20 replicate < ~0.48 or ghi22 diverges → the record was seed-luck / 2.0 is the edge even under rotation.
