@@ -239,6 +239,11 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         tri_lw = float(style.get("triangle_lw", 0.6))              # outline thickness
         periodic = (getattr(sim, "boundary", "wall") == "periodic")
         wsize = getattr(sim, "world_size", [W, 1.0])
+        # the true 2D world box: frame the axes to [0,wx] x [0,wy] with equal aspect, so a
+        # SQUARE world (e.g. a galaxy's [6,6]) renders square/centred instead of being stretched
+        # into a W:1 strip clipped at y=1 (the old xlim(0,W)/ylim(0,1) assumed a height-1 world).
+        wx, wy = float(wsize[0]), float(wsize[1] if len(wsize) > 1 else 1.0)
+        ar = wx / wy                                   # panel aspect (width : height)
 
         def _draw(ax, i):
             if container is not None:
@@ -259,11 +264,11 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
                 sz = (s[live] if np.ndim(s) else s)   # per-node size (e.g. ~|charge|) or scalar
                 ax.scatter(pos[i, live, 0], pos[i, live, 1], s=sz, c=c, linewidths=0)
             _draw_obstacles(ax, obstacles)
-            ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off")
+            ax.set_xlim(0, wx); ax.set_ylim(0, wy); ax.set_aspect("equal"); ax.axis("off")
 
         # evolution montage
         idx = [0, T // 5, 2 * T // 5, 3 * T // 5, T - 1]
-        fig, axes = plt.subplots(1, len(idx), figsize=(len(idx) * W * 3.2, 3.4))
+        fig, axes = plt.subplots(1, len(idx), figsize=(len(idx) * ar * 3.4, 3.4))
         fig.patch.set_facecolor(bg)
         for ax, i in zip(np.atleast_1d(axes), idx):
             _draw(ax, i)
@@ -272,7 +277,7 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
         plt.savefig(evo, dpi=100, facecolor=bg); plt.close(fig)
 
         # final frame
-        fig, ax = plt.subplots(figsize=(6 * W, 6))
+        fig, ax = plt.subplots(figsize=(6 * ar, 6))
         fig.patch.set_facecolor(bg)
         _draw(ax, T - 1)
         plt.tight_layout()
@@ -983,8 +988,11 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
     from matplotlib.animation import FuncAnimation
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
-    # render large (8in) at high dpi so the dense cloud stays crisp through H.264.
-    fig, ax = plt.subplots(figsize=(8 * W, 8)); ax.set_xlim(0, W); ax.set_ylim(0, 1)
+    # frame the axes to the true world box [0,wx] x [0,wy] with equal aspect, so a square world
+    # (e.g. a galaxy's [6,6]) renders square/centred rather than a W:1 strip clipped at y=1.
+    wx, wy = (float(world[0]), float(world[1])) if (world is not None and len(world) > 1) else (W, 1.0)
+    # render large (~8in on the long side) at high dpi so the dense cloud stays crisp through H.264.
+    fig, ax = plt.subplots(figsize=(8 * wx / wy, 8)); ax.set_xlim(0, wx); ax.set_ylim(0, wy)
     ax.set_aspect("equal"); ax.axis("off"); ax.set_facecolor(bg); fig.patch.set_facecolor(bg)
     fig.tight_layout(pad=0)
     if marker == "triangle":
