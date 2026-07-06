@@ -1,4 +1,4 @@
-"""coulomb -- the electrostatic inverse-square law between charged particles.
+"""squared_law -- the inverse-square law between particles: electrostatics (Coulomb) OR gravity (Newton).
 
 A Lateral, second-derivative operator over a neighbour graph (the Plexus port of
 ParticleGraph's `PDE_E`). For a receiver particle i of charge q_i, summed over its
@@ -25,12 +25,12 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("coulomb", level="particle", kind="lateral")
-class Coulomb(Lateral):
+@register_operator("squared_law", level="particle", kind="lateral")
+class SquaredLaw(Lateral):
     EMIT = "acceleration"            # emits an acceleration (charges have inertia)
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
     REQUIRES_TYPE_PROPS = ["charge"]            # per-type charge q (signed scalar)
-    MECHANISM_TAGS = ["electrostatics", "coulomb", "inverse_square", "long_range"]
+    MECHANISM_TAGS = ["inverse_square", "electrostatics", "gravity", "long_range"]
     MORPHOLOGY_PRIOR = ["plasma", "ionic_lattice", "charge_neutral_clusters"]
     PARAM_ROLES = {"clamp": "max |acceleration| (0 = unbounded; the radius graph's "
                             "min_radius already bounds 1/r^3)"}
