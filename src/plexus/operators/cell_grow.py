@@ -34,7 +34,9 @@ from plexus.models.registry import register_operator
 
 @register_operator("cell_grow", level="cell", kind="structural")
 class CellGrow(Structural):
+    EMIT = None                                           # structural: advances `grow_V` + wakes reserve child particles in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                                  # no required params — `rate`<=0 is a no-op; all knobs optional
     MECHANISM_TAGS = ["tissue_growth", "rest_volume_growth", "anisotropic_growth", "budding"]
     PARAM_ROLES = {"rate": "growth_rate", "target": "size_inhibition",
                    "aniso": "growth_anisotropy", "tip": "tip_localization",
@@ -50,6 +52,13 @@ class CellGrow(Structural):
         self.aniso = float(params.get("aniso", 0.0))          # 0 round .. 1 fully along `axis`
         self.tip = float(params.get("tip", 0.0))              # 0 uniform .. large = seed only the leading edge
         self.offset = float(params.get("offset", 0.01))       # placement distance from the seed (world units)
+        # prestretch: woken-particle rest state F = prestretch * I. 1.0 = the old density-only realization
+        # (F=I -> zero corotated stress -> new material co-locates, adds DENSITY not VOLUME: byte-identical
+        # no-op). prestretch < 1 inserts each woken particle PRE-COMPRESSED (J = prestretch^D < 1) so the
+        # fixed-corotated law gives it outward pressure -> it relaxes toward rest by pushing neighbours out
+        # -> the envelope genuinely INFLATES. This is what realizes cell rest-VOLUME growth (b57 proved the
+        # F=I realization cannot: grow_ratio pinned at 1.000 across the whole offset/reserve ladder).
+        self.prestretch = float(params.get("prestretch", 1.0))
         self.stress_gain = float(params.get("stress_gain", 0.0))  # >0 slows growth in deformed tissue
         ax = params.get("axis", None)
         self.axis = [float(a) for a in ax] if ax is not None else None
@@ -78,7 +87,8 @@ class CellGrow(Structural):
         dirv = dirv / dirv.norm(dim=1, keepdim=True).clamp(min=1e-9)
         jit = 0.25 * self.offset * torch.randn(k, D, generator=rng, device=dev)
         newpos = X[seeds] + self.offset * dirv + jit
-        # inherit the seed's material; the fresh material starts at REST (F=I, C=0)
+        # inherit the seed's material; the fresh material starts PRE-COMPRESSED (F=prestretch*I, C=0) so it
+        # carries outward pressure and inflates the envelope (prestretch=1 -> F=I -> old density-only no-op)
         buf = part.occ.shape[0]
         part.state[slots] = part.state[seeds].clone()
         for _n, b in list(part.named_buffers()):
@@ -87,7 +97,7 @@ class CellGrow(Structural):
             b[slots] = b[seeds].clone()
         part.state[slots, px0:px1] = newpos
         if hasattr(part, "F") and part.F is not None:
-            part.F[slots] = torch.eye(D, device=dev).expand(k, D, D).clone()
+            part.F[slots] = (self.prestretch * torch.eye(D, device=dev)).expand(k, D, D).clone()
         if hasattr(part, "C") and part.C is not None:
             part.C[slots] = 0.0
         part.occ[slots] = 1.0
@@ -115,6 +125,12 @@ class CellGrow(Structural):
         # --- 1. BIOLOGY: advance grow_V by the logistic growth law (+ optional mechano-inhibition) ---
         V = cell.grow_V
         live_cell = (cell.occ > 0).float()
+        # `at:` may restrict growth to a SUBSET of cells (e.g. cell[type=bud]): the engine
+        # passes that per-cell boolean mask, so gate the growth law by it -> only the selected
+        # cells advance grow_V and wake reserve; the rest stay at birth size. For a plain
+        # `at: cell` the mask is all-live -> live_cell unchanged -> byte-identical to before.
+        if mask is not None:
+            live_cell = live_cell * mask.to(live_cell.dtype)
         smod = torch.ones(ncell, device=dev)
         if self.stress_gain > 0.0 and getattr(part, "F", None) is not None:
             eye = torch.eye(part.F.shape[-1], device=dev)

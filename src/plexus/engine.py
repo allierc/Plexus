@@ -208,6 +208,13 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
         perm = torch.nonzero(lvl.occ > 0, as_tuple=False).flatten()
         perm = perm[torch.argsort(lvl.state[perm, 0])]
         total = int(perm.numel())
+    elif layout == "split_y":
+        # Same as split_x but tiles the per-type fractions bottom->top (type a = low
+        # y, last type = high y). Lets a y-axis growth split be tested against the
+        # y-axis sediment/demix (ORG b102 growsplit_y). Same live-index guard as split_x.
+        perm = torch.nonzero(lvl.occ > 0, as_tuple=False).flatten()
+        perm = perm[torch.argsort(lvl.state[perm, 1])]
+        total = int(perm.numel())
     else:
         perm = torch.randperm(lvl.n, generator=H.rng, device=device)
         total = lvl.n
