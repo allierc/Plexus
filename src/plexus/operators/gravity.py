@@ -29,6 +29,7 @@ class GravityOperator(Lateral):
     # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never
     # enters H.emit_order and the engine never advects it under gravity.
     SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
+    REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
     PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
     MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
 

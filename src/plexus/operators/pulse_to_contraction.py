@@ -28,6 +28,7 @@ from plexus.models.registry import register_operator
 @register_operator("pulse_to_contraction", level="particle", kind="exchange")
 class PulseToContraction(Exchange):
     EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
+    SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field
     REQUIRES_PARAMS = ["from"]                # the activation field to read
     MECHANISM_TAGS = ["active_contraction", "field_gradient_force", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "contraction_strength", "mode": "gradient_or_directional"}

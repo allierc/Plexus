@@ -27,7 +27,9 @@ from plexus.models.registry import register_operator
 
 @register_operator("pacemaker", level="field", kind="field")
 class Pacemaker(FieldUpdate):
+    EMIT = None                 # writes `H.signals[name]` scalar in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
     MECHANISM_TAGS = ["periodic_source", "clock", "pacemaker"]
     PARAM_ROLES = {"period": "beat_interval", "duration": "active_width", "phase": "beat_offset"}
 

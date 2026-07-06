@@ -17,6 +17,7 @@ from plexus.geometry import neighbour_mean
 class Separation(Lateral):
     EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
+    REQUIRES_PARAMS = []                             # no required params — `scale` optional (separation is a type prop)
     REQUIRES_TYPE_PROPS = ["separation"]
     MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]
     PARAM_ROLES = {"scale": "separation_strength"}

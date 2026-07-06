@@ -18,7 +18,11 @@ from plexus.models.registry import register_operator
 class Diffuse(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
+    EMIT = None                                # field->field: writes the grid in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                     # 3x3 (2D) / 3x3x3 (3D) box-blur step
+    REQUIRES_PARAMS = []                        # no required params — target field comes from `at:` (engine-injected)
+    MECHANISM_TAGS = ["diffusion", "field_smoothing", "laplacian"]
+    PARAM_ROLES = {"rate": "diffusion_rate"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

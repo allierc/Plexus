@@ -22,9 +22,13 @@ from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 @register_operator("g2p", level="particle", kind="exchange")
 class G2P(Exchange):
+    EMIT = None                                    # advects pos/vel inside the MPM substep (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                           # no required params — all optional (source grid defaults to `mpm_grid`)
     MAY_MUTATE_INTEGRATED_STATE = True             # advects pos/vel inside the substep (like the oracle)
     MECHANISM_TAGS = ["grid_to_particle", "advection"]
+    PARAM_ROLES = {"dt_sub": "substep_timestep", "wall_damp": "wall_restitution",
+                   "wall_contact": "contact_layer_thickness", "vmax": "speed_cap"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

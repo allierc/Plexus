@@ -22,8 +22,12 @@ from plexus.operators.mpm_grid import sub_dt
 
 @register_operator("mpm_grid_update", level="field", kind="field")
 class MPMGridUpdate(FieldUpdate):
+    EMIT = None                                 # field->field grid solve: writes grid velocity in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                        # no required params — all optional (grid from `at:`, engine-injected)
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions"]
+    PARAM_ROLES = {"dt_sub": "substep_timestep", "surface_tension": "interface_cohesion",
+                   "wall_damp": "wall_restitution"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

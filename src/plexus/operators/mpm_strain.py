@@ -21,8 +21,11 @@ from plexus.operators.mpm_grid import sub_dt
 
 @register_operator("mpm_strain", level="particle", kind="lateral")
 class MPMStrain(Lateral):
+    EMIT = None                 # particle->particle: updates F + material in place; returns {} — no delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
     MECHANISM_TAGS = ["elastic_strain", "plastic_flow", "incompressible_volume"]
+    PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

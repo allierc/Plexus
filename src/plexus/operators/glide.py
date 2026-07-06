@@ -25,6 +25,8 @@ from plexus.models.registry import register_operator
 class Glide(Lateral):
     EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
+    REQUIRES_PARAMS = []                        # no required params — speed from `move_speed` type prop; noise optional
+    MECHANISM_TAGS = ["self_propulsion", "motility", "active_brownian"]
     REQUIRES_TYPE_PROPS = ["move_speed"]
     PARAM_ROLES = {"noise": "translational_noise"}
 

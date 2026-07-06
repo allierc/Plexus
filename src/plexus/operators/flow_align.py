@@ -24,6 +24,7 @@ from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 @register_operator("flow_align", level="cell", kind="exchange")
 class FlowAlign(Exchange):
+    EMIT = None                                 # writes `heading` in place (flow-alignment steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["polarity_velocity_alignment", "flow_alignment"]

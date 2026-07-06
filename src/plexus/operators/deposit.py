@@ -16,8 +16,11 @@ from plexus.models.registry import register_operator
 class Deposit(Exchange):
     """object -> field. Writes `to:` field in place; returns {}."""
 
+    EMIT = None                                # set->field: scatters onto the grid in place (stigmergy write); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
     REQUIRES_PARAMS = ["to"]
+    MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]
+    PARAM_ROLES = {"amount": "deposit_rate"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

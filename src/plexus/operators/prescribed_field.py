@@ -52,6 +52,12 @@ class Playback(FieldUpdate):
     """field <- data: set the field grid to the current tick's video frame (looping).
     Reads the engine's current frame from `H.frame`. Mutates the field, returns {}."""
 
+    EMIT = None                 # field->field: writes the grid in place from the video; returns {} — no integrable delta
+    SUPPORTED_DIMS = [2]        # 2D grid field playback
+    REQUIRES_PARAMS = []        # no required params — `_at` (the field to advance) is engine-injected
+    MECHANISM_TAGS = ["prescribed_field", "video_playback", "data_driven_field"]
+    PARAM_ROLES = {}            # reads no tunable params (only the structural `_at`)
+
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("_at")

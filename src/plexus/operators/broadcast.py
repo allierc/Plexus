@@ -16,7 +16,10 @@ from plexus.models.registry import register_operator
 @register_operator("broadcast", level="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
     EMIT = "velocity"            # emits a velocity; the engine integrates
+    SUPPORTED_DIMS = [2]                        # lift math is N-D, but the no-parent fallback returns a hard-coded 2D zero delta
     REQUIRES_PARAMS = ["stiffness"]
+    MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]
+    PARAM_ROLES = {"stiffness": "containment_strength"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

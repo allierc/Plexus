@@ -29,6 +29,7 @@ from plexus.models.registry import register_operator
 class Sediment(Lateral):
     EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic
+    REQUIRES_PARAMS = []                             # no required params — all knobs optional (defaults in __init__)
     PARAM_ROLES = {"g": "sediment_magnitude", "gx": "sediment_x", "gy": "sediment_y"}
     MECHANISM_TAGS = ["body_force", "differential_sedimentation"]
 

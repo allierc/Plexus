@@ -28,6 +28,7 @@ from plexus.models.registry import register_operator
 @register_operator("pulse_to_active_stress", level="particle", kind="exchange")
 class PulseToActiveStress(Exchange):
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
+    SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
     REQUIRES_PARAMS = ["from", "direction_from"]
     MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}

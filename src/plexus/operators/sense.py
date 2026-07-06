@@ -92,6 +92,7 @@ def _read(fld, centers, weights, ssz):
 
 @register_operator("sense", level="cell", kind="exchange")
 class Sense(Exchange):
+    EMIT = None                                 # writes `heading` in place (steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_PARAMS = ["from"]
     REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]

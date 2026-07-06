@@ -32,7 +32,9 @@ from plexus.models.registry import register_operator
 
 @register_operator("heading_align", level="cell", kind="exchange")
 class HeadingAlign(Exchange):
+    EMIT = None                                 # writes `heading` in place (Vicsek steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                        # no required params — gain/noise optional (defaults in __init__)
     MECHANISM_TAGS = ["vicsek", "polar_alignment", "collective_motion", "flocking"]
     PARAM_ROLES = {"gain": "alignment_rate", "noise": "orientation_noise"}
 

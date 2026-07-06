@@ -45,7 +45,10 @@ def _random_unit(n, D, rng, device):
 
 @register_operator("bounce", level="cell", kind="lateral")
 class Bounce(Lateral):
+    EMIT = None                                 # writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection
+    REQUIRES_PARAMS = []                         # no required params — `noise` optional
+    MECHANISM_TAGS = ["boundary_condition", "wall_reflection", "obstacle_avoidance", "steering"]
     REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
     PARAM_ROLES = {"noise": "obstacle_reheading_randomness"}
 
