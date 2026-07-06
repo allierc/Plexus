@@ -48,9 +48,9 @@ descriptions:
     description: The simulation shows a large number of small particles distributed across a black background.
       Over time, the particles appear to move and shift positions, though the overall density remains
       relatively constant. There is no significant change in the global structure or the distribution
-      of colors throughout the sequence. The motion appears stochastic, with individual points flickering
-      and drifting slightly in each frame.
-    objects: The scene contains thousands of tiny, circular points of varying colors. The primary colors
-      present are blue, orange, and green, which are scattered randomly across the space. The particles
-      are arranged in a sparse, non-connected distribution with no clear geometric patterns. Each individual
-      point is uniform in size, appearing as a single pixel or a small cluster of pixels.
+      of colors throughout the sequence. The motion is subtle, creating a flickering effect as individual
+      points change their coordinates.
+    objects: The scene contains thousands of tiny, point-like particles scattered randomly across the
+      frame. These particles are primarily colored in shades of blue, orange, and green. They are not
+      connected to one another, forming a sparse and disconnected point cloud. The size of each individual
+      particle is uniform and very small relative to the total area.

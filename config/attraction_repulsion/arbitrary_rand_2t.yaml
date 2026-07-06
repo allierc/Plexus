@@ -19,11 +19,11 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The video shows a static field of numerous small particles distributed across a black
-      background. There is no visible movement or evolution of the particles between the frames. The distribution
-      of the points remains constant throughout the entire sequence. The scene represents a steady-state
-      distribution of discrete elements.
-    objects: The scene contains two distinct sets of small, point-like particles. One set of particles
-      is colored orange, while the other set is colored blue. The particles are distributed randomly across
-      the entire frame without any specific geometric arrangement or connection. Each individual particle
-      is very small and uniform in size relative to the overall field.
+    description: The video shows a dense field of orange and blue particles against a black background.
+      The particles appear to be moving in a chaotic, jittery fashion across the entire frame. There is
+      no discernible global flow or large-scale structure forming over time. The distribution of the particles
+      remains relatively uniform throughout the duration of the sequence.
+    objects: The scene contains two distinct sets of small, point-like particles. One set is colored orange,
+      while the other set is colored blue. The particles are distributed randomly and are not connected
+      to one another in any way. Each individual particle is very small and occupies only a few pixels
+      in size.
