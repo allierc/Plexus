@@ -1262,6 +1262,75 @@ A new operator or capability is complete only when all of the following are true
 If any item is missing, the feature is not part of Plexus yet --- it is only
 prototype code.
 
+\section{From prototypes to the Plexus core}
+\label{sec:promotion}
+
+Plexus is developed through scientific prototypes: embryo, cardio, active matter,
+and other domain-specific campaigns routinely introduce operators before their final
+abstraction is known. A prototype clones an existing model --- a vertex tissue, a
+reaction--diffusion patterner, a self-propelled-Voronoi sheet --- reproduces it as a
+throwaway operator set, and explores it freely. Code is therefore \emph{not} moved
+into the core merely because it works in one prototype. Moving code from a prototype
+into Plexus is not copying useful files; it is \textbf{promoting a mechanism into a
+stable operator language}. Promotion happens only after the mechanism's family,
+contract, naming, dimensional assumptions, and tests have stabilized. The rule is
+simple: \emph{prototype freely, promote conservatively}.
+
+Promotion passes through five gates.
+
+\begin{enumerate}\itemsep3pt
+\item \textbf{Promote families, not isolated operators.} Before a mechanism is moved,
+it is assigned to a family --- motion/migration, chemical signalling, field sampling,
+continuum (MPM) mechanics, growth, activation, coupling, measurement/scorecard, or
+visualization. An operator enters the core only when its family is clear. This keeps
+the registry a small set of reusable physical primitives rather than a flat pile of
+one-off biological events.
+
+\item \textbf{Merge by contract, not by surface similarity.} Two prototype operators
+collapse into one canonical operator with explicit options only when they share the
+same contract and differ solely in routing, source field, or mode --- for example
+\code{chemotaxis}$+$\code{chemo\_force}$\to$\code{chemotax},
+\code{mpm\_drag}$+$\code{drag}$\to$\code{drag} with an \code{emit} option, and
+\code{pulse\_stimulus}$+$\code{phase\_delay\_pulse}$\to$\code{activation\_pulse}. When
+the contract differs they stay separate and share only backend utilities:
+\code{pulse\_to\_contraction} emits an \code{mpm\_acceleration}, whereas
+\code{pulse\_to\_active\_stress} writes an active stress and emits nothing --- those
+must not become one muddy mode-dependent operator. Merging is thus governed by
+physical and computational semantics, never by superficial code similarity.
+
+\item \textbf{Stabilize names before promotion.} Every promoted operator receives one
+canonical name and one canonical vocabulary: its Python class, registry key, YAML
+name, emitted prediction type, state fields, schema path, scorecard metric names, and
+the terminology in this manuscript must all agree. The \code{EMIT} refactor is the
+model --- \code{velocity}, \code{acceleration}, \code{mpm\_acceleration}, with no
+synonyms, no legacy aliases, and no \code{first\_derivative}/\code{second\_derivative}
+drift. Legacy synonyms are removed \emph{at} promotion time rather than preserved
+indefinitely, so that Plexus stays a language and not a collection of historical
+aliases.
+
+\item \textbf{Require 2D\,$\to$\,3D design at promotion time.} The 3D implementation
+need not exist immediately, but the interface must make 3D possible. Each promoted
+operator declares \code{SUPPORTED\_DIMS} ($[2]$ or $[2,3]$) and records which
+quantities are scalars, vectors, and tensors, which assumptions are 2D-only, and what
+the 3D generalization would be. A planar angle~$\theta$ or a signed chirality is
+2D-specific and must state its axis/vector/handedness generalization; \code{Field.sample}
+and \code{Field.grad\_at} are naturally dimension-generic. The goal is to prevent 2D
+geometry from silently entering the core abstraction.
+
+\item \textbf{Promotion requires tests and paper reconciliation.} A promotion is
+complete only when code, specifications, tests, and documentation move together.
+Behaviour-preserving migrations require a byte-identical trajectory check against the
+originating prototype on a representative spec; new mechanisms require a no-op/ablation
+test, schema validation, and at least one minimal live spec. The operator catalog and
+this manuscript are then regenerated or reconciled so the paper describes the live
+registry rather than an older prototype.
+\end{enumerate}
+
+This promotion discipline is the same reconvergence process the repository was built
+for: sibling prototype frameworks that had drifted apart are pulled back into one
+shared vocabulary, one operator at a time. Prototypes are where mechanisms are
+discovered; the core is where they become a language.
+
 \section{The principle}
 
 Plexus grows by expanding its vocabulary, not by weakening its grammar.
