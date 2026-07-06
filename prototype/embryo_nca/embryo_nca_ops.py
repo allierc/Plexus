@@ -22,7 +22,8 @@ frames, so the rollout is just the schedule running):
                  local rule can be shown re-growing the missing tissue.
 
 The update net is reimplemented here (not imported from the paper's lib) and simply loads
-the pretrained parameters -- the same "rebuild it in Plexus" discipline as `galaxy_ops`.
+the pretrained parameters -- the same "rebuild it in Plexus" discipline that promoted the
+galaxy prototype into the core `squared_law` (gravity) operator.
 """
 from __future__ import annotations
 

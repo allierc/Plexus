@@ -1,0 +1,16 @@
+# spiral_galaxy -- a ROTATING self-gravitating disk (+ central point mass) on the SAME
+# `squared_law` (law: gravity, all_pairs) as the nbody cluster. The spiral is not imposed:
+# it emerges from ANGULAR MOMENTUM (disk_ic seeds near-circular orbits from the enclosed
+# mass) + self-gravity (swing-amplified density waves). disk_ic fires once (before_frame: 1).
+# Built from Mocz, "Create Your Own N-body Simulation (With Python)" (2020), papers/nbody-python/ (MIT).
+general: {name: spiral_galaxy, seed: 2, n_frames: 2600, dt: 0.004, boundary: free, world: [6.0, 6.0]}
+sets:
+  star:
+    n: 1500
+    types: {s: {fraction: 1.0, mass: 0.0012}}       # disk mass ~1.8
+fields: {}
+operators:
+  - {op: disk_ic,     at: star, G: 1.0, softening: 0.05, disc_radius: 1.6, spin: 0.95, m_bh: 1.0, vel_jitter: 0.02, before_frame: 1}
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.05, all_pairs: true}
+schedule: [disk_ic, squared_law]
+plotting: {background: black, point_size: 2, colors: {s: [0.85, 0.9, 1.0]}}
