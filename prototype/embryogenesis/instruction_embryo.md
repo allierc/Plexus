@@ -51,10 +51,11 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 - **PAT — patterning.** Stable chemical/mechanical identities on the GROWING tissue — domains persist during
   growth, and growth fields become spatially programmable (a chemical field gates WHERE `cell_grow` acts).
   Gate: `mi_type_x` ↑, domains persistent (low late-time `mixing_entropy` drift) even under active growth.
-- **MOR — morphogenesis.** PATTERN CONTROLS GROWTH: localized anisotropic `cell_grow` (gated by the PAT field)
-  creates buds / folds / elongation / branching; remodeling rounds + stabilizes. Targets: gastrulation,
-  convergence/extension, epiboly, lumen formation. Gate: directional, pattern-localized reshaping (anisotropic
-  strain bands, `t1_rate` fluidity, area growth, or a lumen) traceable to the PAT domains.
+- **MOR — morphogenesis (BODY-SCALE only).** PATTERN CONTROLS GROWTH: localized anisotropic `cell_grow` (gated
+  by the PAT field) creates LARGE-SCALE whole-body morphology — elongation, epiboly, gastrulation,
+  convergence/extension, lumen formation; remodeling stabilizes. **Buds and branches are NOT MOR — they are
+  Phase-3 (BUD / BRN); MOR stops at whole-body shaping.** Gate: directional, pattern-localized BODY reshaping
+  (anisotropic strain bands, `t1_rate` fluidity, area growth, or a lumen) traceable to the PAT domains.
 
 ## PHASE 3 — ORGANOGENESIS. Phase 1 gave a stable, oriented embryo; Phase 2 gave continuous growth, persistent
 ## pattern and body-scale morphogenesis. Phase 3 no longer asks WHETHER the embryo can grow — it asks **which
@@ -65,6 +66,10 @@ THEN judge the target phenomenon. If a slot hard-fails, that is the finding to e
 ## feedback `stress_gain`, remodeling `agent_remodel`). **ORG is the TERMINUS — after ORG the campaign is
 ## COMPLETE, STOP.** The contribution is a mechanistic ATLAS: operator composition → growth law → morphological
 ## program → organ geometry.
+## **INHERIT EARLIER CAPABILITIES (preserve solved axes).** Each Phase-3 stage MUST preserve the previous
+## stage's established phenotype: a BRN experiment must keep the BUD phenotype (a stable, non-ruptured bud) —
+## UNLESS the hypothesis explicitly studies bud instability; ORG must preserve branching while adding programs.
+## Destroying a solved capability to gain the next is a REGRESSION, not progress (treat it like a hard failure).
 - **BUD — localized morphogenesis.** Introduce SPATIALLY LOCALIZED growth; find the mechanism that makes a
   stable tissue bud WITHOUT rupture or loss of pattern. Compose: `cell_grow(mode=anisotropic|tip)`, `prestretch`
   (growth-pressure magnitude), PATTERN-GATED `cell_grow` (growth only inside one domain), growth-rate /
@@ -119,9 +124,12 @@ steady-state are visible — the 3000-vs-6000-frame trap):
   `orientation`,`body_radius`,`fragment_count`; *bud* `n_buds`,`bud_score` (protrusion-area×neck-sharpness×
   persistence),`bud_area_frac`,`bud_len_bodyR`,`bud_neck_ratio`,`bud_roundness`,`bud_persistence`; *branch*
   (skeleton graph) `n_tips`,`n_branchpoints`,`branch_len_mean`/`_cv`,`branch_width_mean`,`branch_angle_mean`/`_sd`,
-  `tree_depth`,`skeleton_length`,`branch_score` (bifurcations×continuity×persistence),`branch_persistence`;
-  *localization/causality* `growth_bud_overlap`,`pattern_growth_overlap`,`strain_growth_overlap`,
-  `tip_growth_enrichment` (did the bud appear WHERE the operator drove growth?). All dimensions are relative
+  `tree_depth`,`hierarchy_depth` (branching GENERATIONS gen0→gen1→gen2, for repeated branching),`skeleton_length`,
+  `branch_score` (bifurcations×continuity×persistence),`branch_persistence`; *localization/causality*
+  `growth_bud_overlap`,`pattern_growth_overlap`,`strain_growth_overlap`,`tip_growth_enrichment` (did the bud
+  appear WHERE the operator drove growth?); *ORG developmental programs* `independent_growth_domains` (spatially
+  separated growth centres = coexisting programs),`program_stability` (do those domains persist over the run).
+  All dimensions are relative
   to `body_radius`/`body_area` so a bigger embryo is not scored as better. **Use this family — NOT the movie —
   to gate BUD/BRN/ORG; persistence matters as much as final shape (round→protrusion→necked bud→branch→stable).**
 `metrics.json` = the hard-failure gate PLUS the final scorecard. **Read the numbers AND their 5-point

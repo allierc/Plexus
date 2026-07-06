@@ -169,7 +169,7 @@ def branches(body, dx, body_radius):
     import networkx as nx
     res = dict(n_tips=0.0, n_branchpoints=0.0, branch_len_mean=0.0, branch_len_cv=0.0,
                branch_width_mean=0.0, branch_angle_mean=0.0, branch_angle_sd=0.0,
-               tree_depth=0.0, skeleton_length=0.0, branch_score=0.0)
+               tree_depth=0.0, hierarchy_depth=0.0, skeleton_length=0.0, branch_score=0.0)
     if body.sum() < 30:
         return res
     skel = morphology.skeletonize(body)
@@ -235,6 +235,27 @@ def branches(body, dx, body_radius):
                 lengths = nx.single_source_dijkstra_path_length(G, a, weight="w")
                 depth = max(depth, max((v for k, v in lengths.items()), default=0))
             res["tree_depth"] = float(depth * dx)
+        # hierarchy_depth = max # of BIFURCATION GENERATIONS on any root->tip path (gen0->gen1->gen2 ...),
+        # root = skeleton node nearest the body centroid. Counts consecutive branchpoint pixels as ONE.
+        degd = dict(G.degree())
+        tipsn = [k for k in G.nodes if degd[k] == 1]
+        if tipsn:
+            cen = np.array(np.nonzero(body)).mean(1)
+            root = int(np.argmin(((ij - cen) ** 2).sum(1)))
+            hd = 0
+            for tp in tipsn[:12]:
+                try:
+                    path = nx.shortest_path(G, root, tp)
+                except Exception:
+                    continue
+                cnt = 0; prev = False
+                for k in path:
+                    b = degd[k] >= 3
+                    if b and not prev:
+                        cnt += 1
+                    prev = b
+                hd = max(hd, cnt)
+            res["hierarchy_depth"] = float(hd)
     except Exception:
         pass
     # branch_score: bifurcations x continuity (1 fragment=1.0, penalize islands); persistence at compute()
@@ -248,7 +269,7 @@ def branches(body, dx, body_radius):
 def localization(body, birth_pts, pattern_pts, strain_vals, mX_live, W, dx, budmask):
     """Overlap of GROWTH (newly-woken material) with buds / pattern / strain / tips."""
     res = dict(growth_bud_overlap=0.0, pattern_growth_overlap=0.0,
-               strain_growth_overlap=0.0, tip_growth_enrichment=0.0)
+               strain_growth_overlap=0.0, tip_growth_enrichment=0.0, independent_growth_domains=0.0)
     res_shape = body.shape
     def raster(pts):
         m = np.zeros(res_shape, float)
@@ -261,6 +282,12 @@ def localization(body, birth_pts, pattern_pts, strain_vals, mX_live, W, dx, budm
     g = raster(birth_pts)                                    # where growth added material
     if g.sum() > 0:
         gi = g > 0
+        # ORG: spatially-separated growth centres = coexisting developmental programs
+        gc = ndimage.binary_closing(gi, iterations=2)
+        glab, gn = ndimage.label(gc)
+        if gn:
+            gs = ndimage.sum(np.ones_like(glab), glab, index=np.arange(1, gn + 1))
+            res["independent_growth_domains"] = float((gs >= 0.10 * gs.max()).sum())
         if budmask.any():
             res["growth_bud_overlap"] = float((gi & budmask).sum() / (gi.sum() + 1e-9))
         p = raster(pattern_pts)
@@ -284,8 +311,9 @@ _KEYS = ["fragment_count", "area", "perimeter", "circularity", "aspect_ratio", "
          "solidity", "major_axis", "minor_axis", "orientation", "body_radius",
          "n_buds", "bud_score", "bud_area_frac", "bud_len_bodyR", "bud_neck_ratio", "bud_roundness",
          "n_tips", "n_branchpoints", "branch_len_mean", "branch_len_cv", "branch_width_mean",
-         "branch_angle_mean", "branch_angle_sd", "tree_depth", "skeleton_length", "branch_score",
-         "growth_bud_overlap", "pattern_growth_overlap", "strain_growth_overlap", "tip_growth_enrichment"]
+         "branch_angle_mean", "branch_angle_sd", "tree_depth", "hierarchy_depth", "skeleton_length",
+         "branch_score", "growth_bud_overlap", "pattern_growth_overlap", "strain_growth_overlap",
+         "tip_growth_enrichment", "independent_growth_domains"]
 
 
 def _one(mX_live, birth_pts, pattern_pts, strain_vals, W, res):
@@ -352,12 +380,16 @@ def compute(caps, W=1.0, fracs=FRACS, res=170):
 
     # persistence -> fold into the *_score keys (round->bud->branch->stable needs the shape to LAST)
     nb = np.array(ev["n_buds"]); nbp = np.array(ev["n_branchpoints"])
+    igd = np.array(ev["independent_growth_domains"])
     bud_pers = float((nb >= 1).mean()); brn_pers = float((nbp >= 1).mean())
+    prog_stab = float((igd >= 2).mean())                             # ORG: multiple programs coexist persistently
     final = {k: ev[k][-1] for k in _KEYS}
     final["bud_persistence"] = bud_pers
     final["branch_persistence"] = brn_pers
+    final["program_stability"] = prog_stab
     final["bud_score"] = float(final["bud_score"] * bud_pers)         # persistence-weighted
     final["branch_score"] = float(final["branch_score"] * brn_pers)
     ev["bud_persistence"] = [bud_pers] * len(idxs)
     ev["branch_persistence"] = [brn_pers] * len(idxs)
+    ev["program_stability"] = [prog_stab] * len(idxs)
     return {"final": final, "evolution": ev, "pcts": [round(f * 100) for f in fracs]}
