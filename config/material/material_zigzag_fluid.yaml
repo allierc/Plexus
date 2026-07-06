@@ -42,3 +42,5 @@ descriptions:
   movie_mpm_particle:
     description: A blue sphere sits on a dark grey platform at the beginning of the simulation. As time progresses, the sphere begins to deform and flatten against the surface. The sphere eventually loses its spherical shape and spreads out into a thin, irregular layer. Finally, the blue material flows off the edge of the platform and settles onto a lower level.
     objects: The primary object is a blue, textured sphere that occupies the upper left portion of the frame. There are three dark grey rectangular platforms arranged at different heights and horizontal positions. The top platform is the widest and supports the initial blue sphere. The lower platforms are smaller and serve as landing surfaces for the flowing material.
+plotting:
+  background: black

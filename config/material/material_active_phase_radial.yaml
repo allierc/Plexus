@@ -43,3 +43,5 @@ descriptions:
   movie_mpm_particle:
     description: The simulation shows a large collection of blue particles distributed across a square field. Over the course of the video, the particles undergo subtle shifts in their spatial positions. The overall density and distribution of the particles remain relatively constant throughout the sequence. There is no significant emergence of large-scale structures or patterns as time progresses.
     objects: The scene contains thousands of small, individual blue dots. These particles are arranged in a stochastic, non-uniform distribution across a white background. Each particle is roughly the same size and maintains a distinct, point-like appearance. The particles are not connected to one another, forming a discrete set of independent entities.
+plotting:
+  background: black

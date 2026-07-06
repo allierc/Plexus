@@ -50,3 +50,5 @@ descriptions:
   movie_mpm_particle:
     description: The simulation begins with a uniform distribution of blue particles across a square field. Over time, the particles begin to cluster toward the center of the frame, creating a denser core. This central concentration becomes increasingly prominent as the particles move inward from the edges. By the final frame, a distinct, high-density cluster is visible in the middle of the field.
     objects: The scene contains a large number of small, individual blue particles. These particles are initially arranged in a sparse, random distribution across the entire area. As the simulation progresses, they form a dense, interconnected cluster in the center. The particles maintain a consistent size and color throughout the entire duration of the video.
+plotting:
+  background: black

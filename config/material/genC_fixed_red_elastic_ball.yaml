@@ -36,4 +36,4 @@ schedule:
 - {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   colormap: Set1                    # Set1(0) = red -> the single body renders red
-  background: white
+  background: black

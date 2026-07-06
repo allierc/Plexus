@@ -56,3 +56,5 @@ descriptions:
       The blue particles are numerous and small, creating a granular texture throughout the simulation.
 
       The grey bars are solid, rectangular, and significantly larger in height than the individual blue particles.'
+plotting:
+  background: black

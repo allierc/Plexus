@@ -40,3 +40,5 @@ descriptions:
   movie_mpm_particle:
     description: A large cluster of blue particles initially forms a circular shape on the left side of the frame. As time progresses, the particles rapidly disperse and fall toward the bottom of the container. The particles eventually settle into a horizontal layer at the base, with a small amount remaining on the right wall. A vertical grey bar remains stationary throughout the entire duration of the simulation.
     objects: The blue particles are small, individual dots that form a large, dense cluster in the first frame. These particles are light blue in color and move independently to fill the bottom of the space. A single, thick grey bar is positioned vertically in the center-right of the frame. The background is a plain white surface that provides a high-contrast environment for the moving particles.
+plotting:
+  background: black

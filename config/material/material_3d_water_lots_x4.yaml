@@ -1,7 +1,7 @@
-# material_3d_water_lots -- a BIG body of water: 27 liquid cubes (3x3x3), ~94500 particles,
+# material_3d_water_lots_x4 -- 27 liquid cubes (3x3x3), per_parent=14000 -> ~378000 particles,
 # each cube a DISTINCT colour (same material -> colour just tags the cube so you can watch
 # them merge/mix), launched with per-cube velocity and dropped in a box -> a large splash.
-general: {name: material_3d_water_lots, seed: 0, n_frames: 320, dt: 0.0036, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: material_3d_water_lots_x4, seed: 0, n_frames: 1280, dt: 0.0036, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   cell:
     n: 27
@@ -33,7 +33,7 @@ sets:
       w24: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.61, 0.19, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
       w25: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.61, 0.44, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
       w26: {fraction: 0.037038, youngs: 200, block: [0.61, 0.61, 0.61, 0.69, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
-  mpm_particle: {parent: cell, per_parent: 3500, radius: 0.05, density: 1.0, vel_init: 2.5}
+  mpm_particle: {parent: cell, per_parent: 14000, radius: 0.05, density: 1.0, vel_init: 2.5}
 fields:
   mpm_grid: {frame: mpm_grid, n_grid: 96}
 operators:
@@ -91,14 +91,13 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_mpm_particle:
-    description: The simulation begins with a collection of distinct, isolated clusters of particles distributed
-      throughout a 3D volume. Over time, these clusters begin to migrate toward the bottom of the container
-      and start to merge with one another. As the simulation progresses, the individual clusters lose
-      their distinct boundaries and form a large, interconnected mass at the base. In the final frames,
-      the particles settle into a dense, layered structure with some vertical plumes extending upward.
-    objects: The scene contains multiple clusters of particles, each represented by a unique vibrant color
-      such as red, blue, green, yellow, and magenta. Initially, these clusters are small, spherical, and
-      spatially separated from each other within the bounding box. As time passes, the clusters expand
-      in size and begin to overlap, forming complex, irregular shapes. By the end of the sequence, the
-      objects have merged into a single large, multi-colored mass that occupies the bottom portion of
-      the space.
+    description: The simulation begins with a sparse, three-dimensional distribution of large, multi-colored
+      hexagonal particles. Over time, these particles rapidly collapse toward the bottom plane of the
+      bounding box, transitioning into a dense, continuous field of tiny points. The initial volumetric
+      structure flattens into a complex, swirling pattern of colors on the base. By the final frames,
+      the field stabilizes into a highly organized, multi-layered distribution with distinct color gradients.
+    objects: The scene contains a set of large, discrete hexagonal particles that are initially scattered
+      throughout a 3D space. These particles feature a variety of vibrant colors, including magenta, blue,
+      green, and orange. As the simulation progresses, the objects transform into a massive collection
+      of microscopic points forming a dense, interconnected field. This final field exhibits a swirling
+      topology with distinct color zones arranged in concentric and overlapping layers.

@@ -49,3 +49,5 @@ descriptions:
   movie_mpm_particle:
     description: A dense cluster of blue particles begins as a solid sphere at the top of the frame. The sphere rapidly collapses downward, transitioning into a fluid-like state as it interacts with a gray stepped boundary. As it descends, the particles spread out horizontally across the steps before funneling into a narrow vertical channel. By the final frame, the particles have mostly settled into the bottom channel, leaving a mostly empty white space above.
     objects: The primary objects are numerous small, light-blue particles that form a cohesive group. These particles initially form a large, circular cluster with a diameter roughly half the width of the frame. A gray, stepped geometric structure serves as a container, featuring a wide top and a narrow bottom outlet. The background is a plain white field that provides high contrast for the blue and gray elements.
+plotting:
+  background: black

@@ -42,3 +42,5 @@ descriptions:
   movie_mpm_particle:
     description: A large mass of blue particles begins as a single concentrated sphere at the top left. The mass then flows horizontally to the right, spilling over the edge of a gray platform. As it falls, it splits and spreads across multiple lower gray platforms in a cascading motion. By the final frame, the particles have distributed themselves across three distinct levels, forming horizontal layers.
     objects: The primary objects are thousands of small blue particles that form a fluid-like mass. There are three solid gray rectangular platforms arranged in a staggered, descending formation. The top platform is the longest and positioned at the highest elevation. The middle and bottom platforms are shorter and shifted to the right, creating a stepped structure for the particles to fall onto.
+plotting:
+  background: black

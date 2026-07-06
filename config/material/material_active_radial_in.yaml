@@ -53,3 +53,5 @@ descriptions:
   movie_mpm_particle:
     description: A large collection of blue particles is distributed uniformly across a white square field. Over time, a small void or gap begins to form and expand in the center of the particle distribution. This central void grows larger and more irregular as the simulation progresses. By the final frame, the void has reached its maximum size, creating a distinct empty space amidst the blue dots.
     objects: The scene contains thousands of small, blue, circular particles. These particles are arranged in a dense, stochastic distribution that fills a square area. The particles are uniform in size and color throughout the entire simulation. A central void emerges as a negative space, characterized by the absence of particles in the middle of the field.
+plotting:
+  background: black

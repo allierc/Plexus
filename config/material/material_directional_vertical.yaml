@@ -49,3 +49,5 @@ descriptions:
   movie_mpm_particle:
     description: The video shows a static distribution of blue particles on a white background. There is no visible movement or evolution of the particles across the four keyframes. The spatial arrangement of the dots remains constant throughout the sequence. The simulation appears to be in a steady state or represents a single snapshot of a random field.
     objects: The scene contains a large number of small, blue circular particles. These particles are distributed randomly across a square white field. They are not connected to each other and maintain a uniform density throughout the area. Each individual particle is very small relative to the overall dimensions of the frame.
+plotting:
+  background: black

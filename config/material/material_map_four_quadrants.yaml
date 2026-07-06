@@ -50,3 +50,5 @@ descriptions:
   movie_mpm_particle:
     description: The simulation shows a large collection of blue particles distributed within a square boundary. Over time, the particles exhibit a subtle inward migration toward the center of the frame. The density of the particles increases slightly in the middle region as the simulation progresses. The overall distribution remains largely stochastic, with no significant structural formation or large-scale movement.
     objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
+plotting:
+  background: black

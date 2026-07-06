@@ -44,3 +44,5 @@ descriptions:
   movie_mpm_particle:
     description: A large cluster of blue particles begins as a spherical mass in the upper left of the frame. As time progresses, the cluster descends and spreads out across a series of grey steps. The particles flow downward, following the contours of the steps while maintaining a dense, fluid-like structure. By the final frame, the particles have settled into a thick layer covering the lower steps and the bottom right corner.
     objects: The primary objects are numerous small, light-blue particles that form a cohesive, granular mass. These particles are arranged in a dynamic, flowing formation that changes from a sphere to a descending stream. A set of four large, grey rectangular blocks is arranged in a descending staircase pattern at the bottom of the frame. The grey blocks are solid, opaque, and significantly larger than the individual blue particles.
+plotting:
+  background: black

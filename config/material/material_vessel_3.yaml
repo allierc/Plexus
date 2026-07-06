@@ -40,3 +40,5 @@ descriptions:
   movie_mpm_particle:
     description: A large cluster of blue particles initially forms a spherical shape in the upper left of the frame. The sphere then rapidly collapses and falls toward the bottom of the container, spreading out into a thin layer. As the particles settle, they form a wavy, uneven bed across the bottom of the space. A vertical grey bar remains stationary throughout the entire duration of the simulation.
     objects: The primary objects are numerous small blue particles that behave like a fluid or granular material. These particles are initially concentrated into a large, dense sphere before dispersing into a flat, horizontal layer. A single, thick grey vertical bar is positioned in the center-right of the frame. The background is a plain white space that serves as the container for the simulation.
+plotting:
+  background: black

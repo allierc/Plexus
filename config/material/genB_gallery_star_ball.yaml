@@ -35,7 +35,7 @@ schedule:
 - {substep_dt: 0.0001326, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
 plotting:
   colors: {star_v: [0.9, 0.12, 0.12], star_h: [0.9, 0.12, 0.12]}
-  background: white
+  background: black
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
