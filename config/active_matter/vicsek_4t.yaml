@@ -15,9 +15,9 @@ sets:
 fields: {}
 operators:
   - {op: radius_graph, at: particle, radius: 0.05}
-  - {op: alignment,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
-  - {op: cruise,  at: particle, v0: 0.005, noise: 0.0015}
-schedule: [radius_graph, alignment, cruise]
+  - {op: velocity_align,    at: particle, a: 0.6, per_type: true}   # boids special case: per-type weight
+  - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.0015}
+schedule: [radius_graph, velocity_align, velocity_cruise]
 plotting: {background: black, marker: triangle, triangle_size: 0.01, colormap: tab10}
 
 # --- auto: video descriptions (gemma-4-12B) ---

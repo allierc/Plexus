@@ -20,3 +20,17 @@ operators:
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
 schedule: [squared_law]
 plotting: {background: black, colors: {s: [0.86, 0.9, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A small, dense cluster of white particles begins as a compact, spherical mass in the
+      center of a black void. As time progresses, the cluster begins to expand outward, losing its initial
+      symmetry and becoming more irregular. The particles spread further into the surrounding space, forming
+      a larger, more diffuse cloud with visible internal structures. By the final frame, the mass has
+      significantly elongated and fragmented into a wide, sprawling distribution of individual points.
+    objects: The primary objects are numerous small, white particles that appear as distinct points of
+      light. Initially, these particles are tightly packed together to form a single, cohesive, and roughly
+      circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
+      irregular cloud with trailing filaments. The size of the individual particles remains constant,
+      but the overall volume occupied by the group increases dramatically over time.
