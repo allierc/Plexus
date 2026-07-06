@@ -29,8 +29,27 @@ L.PLAN = "cardio_mpm_slots.md"                                         # the age
 L.STATE = "cardio_mpm_loop_state.json"
 L.TRANSCRIPT = "cardio_mpm_cli_transcript.md"
 L.INSTR = "instruction_cardio_mpm.md"
+L.PHASE = "current_phase.txt"                                          # PHASE1/PHASE2/PHASE3 -- the scientific QUESTION gate
 ARCH_PREFIX = "p3"
 SPEC = "material/material_aniso_cardio"
+
+
+def _phase():
+    """The current campaign phase (PHASE1/2/3) from current_phase.txt; default PHASE2 if absent.
+    The agent ADVANCES it (writes PHASE3) only when the Phase-2->3 checklist in the instruction is met."""
+    try:
+        p = open(L.PHASE).read().strip().split()[0].upper()
+        return p if p in ("PHASE1", "PHASE2", "PHASE3") else "PHASE2"
+    except (OSError, IndexError):
+        return "PHASE2"
+
+
+_PHASE_Q = {
+    "PHASE1": "Can the active-stress model generate realistic cardiomyocyte loops at all, and what controls their morphology?",
+    "PHASE2": "What is the MINIMAL physical mechanism controlling each remaining trajectory morphology axis "
+              "(magnitude, enclosure, direction, shape, uniformity, size) -- completing the causal decomposition of LoopScore?",
+    "PHASE3": "What FAMILIES of trajectories can active stress generate, and which operator compositions create each?",
+}
 
 
 def _slots(batch):
@@ -84,9 +103,14 @@ def design_prompt(batch, n_batches):
                    "prior R²-objective conclusions are PROVISIONAL hypotheses under LoopScore -- do NOT discard them) "
                    "and design Batch 1 from the open frontier it identifies.")
         step1 = "1. (First batch -- no previous results; begin from the cumulative knowledge ledger.)"
-    return f"""CARDIO-MPM -- BATCH {batch}/{n_batches}. You are a SCIENTIST discovering which physical mechanisms produce
-the real cardiomyocyte trajectories -- NOT a hyperparameter optimizer. Training is your experimental instrument; this
-batch is ONE experiment answering ONE question.
+    phase = _phase()
+    return f"""CARDIO-MPM -- BATCH {batch}/{n_batches}  [{phase}]. You are a SCIENTIST discovering which physical mechanisms
+produce the real cardiomyocyte trajectories -- NOT a hyperparameter optimizer. Training is your experimental instrument;
+this batch is ONE experiment answering ONE question.
+
+CURRENT PHASE = {phase}. The scientific QUESTION you are answering this phase: "{_PHASE_Q[phase]}"
+The phases are a STAGE-GATED ladder (see the "Campaign phases" section of the instruction) -- do NOT run one endless
+optimization. Frame this batch at the current phase's altitude, and obey its exit gate before advancing.
 
 OBJECTIVE: maximize the LoopScore (LS) -- per-node loop-morphology (mean = objective, LS_SD = uniformity). It is the
 trainer's DEFAULT `--loss` (omit the flag). R² is now a DIAGNOSTIC ONLY: a mechanism that improves LoopScore while
@@ -102,7 +126,8 @@ hasn't found it yet"). Keep stiffness/direction fields COARSE (low --siren_omega
 wavelength is inert -- coarsen before concluding a lever doesn't matter.
 
 Your MEMORY (read EVERY batch):
-  instruction (the RULES / method): {L.INSTR}
+  instruction (the RULES / method + the PHASE definitions and the PHASE 2->3 checklist): {L.INSTR}
+  current phase (the scientific question gate): {L.PHASE}  [= {phase}]
   knowledge ledger (CUMULATIVE working memory -- read + UPDATE, never erase; reclassify R² conclusions as provisional): {L.LEDGER}
   analysis log (human narrative; append a dated section): {L.ANALYSIS}
   user input (read + acknowledge if non-empty): {L.USERIN}
@@ -124,7 +149,14 @@ Do ALL of the following, in order, AUTO-UPDATING the files:
    2 EXPLORE (reveal a DIFFERENT morphology family, even if LS may drop) · 1 CONTROL/ABLATION. Report TWO winners:
    best optimizer slot (highest LS) AND best scientific slot (most informative morphology/mechanism). A batch
    succeeds if it improves LS OR improves the morphology map. Keep amplitude in [10,15].
-You MAY edit cardio_mpm_train.py to add a mechanism. A slot with done=NO / LS=na FAILED -- design around it."""
+You MAY edit cardio_mpm_train.py to add a mechanism. A slot with done=NO / LS=na FAILED -- design around it.
+5. PHASE GATE. Re-evaluate the "PHASE {phase[-1]} -> PHASE {int(phase[-1])+1}" checklist in {L.INSTR} against the ledger,
+   updating each axis's confidence (✓ established / ◐ provisional / ✗ open). An axis counts DONE only at ✓ ESTABLISHED
+   -- dose-confirmed solved OR structural limitation established (a dose-confirmed null result counts; ◐ single-draw
+   highs do NOT). Also apply the FREEZE rule: confirm no ✓ axis REGRESSED this batch (a regressed axis reverts to ◐).
+   If and ONLY if EVERY axis is ✓ AND none regressed, declare the phase COMPLETE, note it in {L.ANALYSIS}, and OVERWRITE
+   {L.PHASE} with the next phase token (e.g. `PHASE3`). Otherwise leave {L.PHASE} unchanged and state in {L.ANALYSIS}
+   which axis(es) remain OPEN/◐ -- that open axis sets the next batch's agenda."""
 
 
 def main(n_batches, fresh, local):

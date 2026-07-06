@@ -1,0 +1,40 @@
+general:
+  name: cs
+  seed: 1
+  n_frames: 1500
+  dt: 1.0
+  boundary: free
+  world:
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 900
+    spawn: disc
+    spawn_radius: 0.32
+    types:
+      A:
+        fraction: 0.5
+      B:
+        fraction: 0.5
+fields: {}
+operators:
+- op: radius_graph
+  at: cell
+  radius: 0.048
+- op: differential_adhesion
+  at: cell
+  adhesion:
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  sigma: 0.03
+  r_adh: 0.048
+  k_rep: 90.0
+  mu: 0.0008
+  confine: 0.001
+  noise: 0.0004
+schedule:
+- radius_graph
+- differential_adhesion

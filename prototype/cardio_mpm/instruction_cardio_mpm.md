@@ -22,10 +22,109 @@ This makes the optimization interpretable and the knowledge transferable to futu
 a knob changes LoopScore, your finding is *which loop-family change it caused* (size / openness / chirality
 / axis), not the numeric optimum.
 
+## Campaign phases — the question EVOLVES; do not run one endless optimization
+
+This campaign is **staged**, like embryogenesis. The scientific question is not fixed at "fit the
+trajectories" — it advances as mechanisms are established. **The current phase is the single token in
+`current_phase.txt` (`PHASE1`/`PHASE2`/`PHASE3`)** — the loop reads it and injects it into your prompt each
+batch. Know which phase you are in, frame the batch's question at that phase's altitude, and advance the file
+ONLY when that phase's exit checklist is fully met. Each phase answers a DIFFERENT scientific question:
+
+- **PHASE1** — *Can the model generate realistic loops at all, and what controls their morphology?*
+- **PHASE2** — *What minimal mechanism controls each residual morphology axis?* ← **current**
+- **PHASE3** — *What trajectory families can active stress generate?*
+
+### Phase 1 — Fundamental loop mechanics  **(COMPLETE)**
+> *Which physical mechanisms produce cardiomyocyte loops at all?*
+
+Established the causal toolkit (distilled in `knowledge_cardio_mpm.md` — do not re-derive): **active stress**
+makes loops; **gain** and **stiffness** set loop MAGNITUDE/overshoot; **duration** (sharp pulse) is required
+for a loop vs a radial stub; **drag** is the overdamped regime; **fibre heterogeneity** sets uniformity/axis;
+**rotation** (`--rot_stress`, swinging the contraction axis over the beat) FILLS enclosure; the **travelling
+wave** was FALSIFIED. **Deliverable: a mechanistic account of why loops exist and what controls their
+morphology.** Do not re-open Phase-1 questions unless new evidence shows a conclusion was optimization- or
+regime-limited (see NEVER-TRUST-OPTIMIZATION).
+
+### Phase 2 — Residual decomposition  **(CURRENT)**
+> *What is the MINIMAL mechanism that controls each remaining morphology axis, independently?*
+
+The search is no longer over arbitrary parameters. It is:  **mechanism → morphology axis → LoopScore.**
+Attack the residual **one axis at a time**, in the standard vocabulary (MAGNITUDE / ENCLOSURE / DIRECTION /
+SHAPE / UNIFORMITY / SIZE). Each axis carries a **confidence level** — the quality of evidence, not just
+presence of a mechanism:
+
+> **✓ established** — dose-confirmed (a monotone dose ladder OR a batch-scale reproduction).
+> **◐ provisional** — a single-draw high or an untested hypothesis (NOT yet closable — the campaign law is
+>   that lottery draws regress).
+> **✗ open** — no controlling mechanism identified yet.
+>
+> An axis progresses through these, e.g. SIZE: `✗ open` → `◐ structural hypothesis` → `✓ structural limitation
+> established`. **Only ✓ counts toward the phase-exit checklist.** Do not close an axis at ◐.
+
+| morphology axis | controlling mechanism | confidence |
+|---|---|---|
+| MAGNITUDE (total motion, overshoot) | **gain** + **stiffness** (amplitude/overshoot levers) | ✓ established |
+| ENCLOSURE (area, loopiness)         | axis **rotation** (`--rot_stress`)                   | ✓ established — dose ladder, loopiness_ratio ≥ real |
+| DIRECTION (chirality)               | rotation + fibre                                     | ✓ established — chir_match ≈ 0.85 |
+| SHAPE (2-D vs radial)               | rotation + fibre heterogeneity                       | ✓ established — minor-axis ≈ 0.79 |
+| UNIFORMITY (cross-node LS SD)       | **fibre heterogeneity**                              | ✓ established — dose-confirmed dev ladder |
+| **SIZE** (absolute peak/area — sim sits INSIDE real) | **UNKNOWN**                         | ✗ **open — the live residual** |
+
+The current gap is **SIZE**: with enclosure solved, the sim loops are correctly-shaped and correctly-chiral
+but sit *inside* the real ones (peak_ratio ≈ 0.49, area_ratio ≈ 0.35 — sim ≈ half real). **Immediate Phase-2
+task: find the minimal mechanism that controls absolute loop SIZE in the rotating regime.** Candidate
+mechanisms to distinguish (one per slot, causally): gain ceiling, amplitude, stiffness-floor softening (looked
+inert @rot1.0 — re-test at converged depth), pulse duration, or a NEW operator.
+
+**FREEZE SOLVED AXES (no-regression rule).** When an axis reaches ✓, it is a *capability the campaign has
+earned* — later batches must PRESERVE it while attacking the remaining residual, exactly as a developmental
+program builds on earlier stages rather than sacrificing them. So evaluate every experiment as *"does this new
+mechanism improve the OPEN axis (SIZE) **while preserving** the ✓ axes (ENCLOSURE, SHAPE, DIRECTION,
+UNIFORMITY, MAGNITUDE)?"* — read the `enclosure_row` for the solved axes too. A slot that lifts SIZE but
+regresses enclosure/chirality is NOT progress; demote it and prefer the mechanism that holds the solved axes.
+An axis that silently regresses **reverts to ◐** and re-opens.
+
+**Phase-2 exit gate = CAUSAL COMPLETENESS, not "everything improved."** Phase 2 ends when EVERY morphology
+axis has an *identified controlling mechanism* — **either solved OR demonstrated structurally limited.** A
+dose-confirmed **null result is a valid scientific answer** ("size cannot exceed X in this active-stress model
+because …") — do NOT spend 50 batches chasing an axis that has been shown structural. "Identified" requires a
+*dose-confirmed* mechanism (a monotone dose ladder or a batch-scale reproduction), never a single-draw high —
+the campaign law is that lottery draws regress. When the checklist below is fully checked, declare Phase 2
+COMPLETE and advance `current_phase.txt`.
+
+```
+PHASE 2 → PHASE 3 CHECKLIST   (advance current_phase.txt: PHASE2 → PHASE3 only when ALL are ✓ established)
+  [✓] MAGNITUDE  established   (gain + stiffness)
+  [✓] ENCLOSURE  established   (axis rotation)
+  [✓] DIRECTION  established   (rotation + fibre)
+  [✓] SHAPE      established   (rotation + fibre heterogeneity)
+  [✓] UNIFORMITY established   (fibre heterogeneity)
+  [ ] SIZE       open          (needs ✓: solved OR structural limitation ESTABLISHED — a dose-confirmed null result counts)
+Gate: every axis ✓ established (◐ provisional does NOT count) AND no ✓ axis has regressed.
+When met: declare Phase 2 COMPLETE in analysis_cardio_mpm.md, then write `PHASE3` to current_phase.txt.
+```
+
+### Phase 3 — Generative cardiomyocyte mechanics  **(NEXT)**
+> *Which trajectory families are generable by reusable operator compositions?*
+
+Once every morphology axis has a controlling mechanism, the question stops being "how do I match this one
+dataset?" and becomes the **morphology manifold**: the scientific object is **operator composition →
+trajectory family → minimal generating mechanism** (not parameter optimization). Phase 3 asks which trajectory
+families are generable by reusable operator compositions. **Characterize the morphology manifold of
+active-stress systems, identify the minimal operators generating each family, and only then relate these
+families to physiological or pathological phenotypes.** (Concrete families to map are an OUTPUT of that
+characterization — e.g. figure-eight, spiral, multi-lobed loops, and later re-entry / conduction phenotypes —
+not the starting agenda; the campaign stays operator-first, phenotype-second.) This mirrors embryogenesis
+Phase 3 (organogenesis): compose the established operators and *characterize what they generate*, rather than
+fit a target. **Enter Phase 3 only when Phase 2's residual-axis map is complete (all axes ✓).**
+
 ## Objective
 
 The primary objective is to **maximize the LoopScore (LS)** — the per-node loop-morphology metric — because
-the scientific object is the **trajectory loop**, not the framewise displacement.
+the scientific object is the **trajectory loop**, not the framewise displacement. LoopScore is the
+**operational metric that serves the current phase's question** (Phase 2: does a candidate mechanism close
+the SIZE residual without regressing the solved axes?) — it is how you measure progress, not a substitute for
+the phase objective above.
 
 > **A mechanism that improves LoopScore while degrading R² is a SUCCESS.**
 > **LoopScore defines success. R² is now a diagnostic only.**
@@ -241,6 +340,23 @@ result updates one of three classes:
 - **`[optimization@<regime>]`** — claims about convergence ("plateau at 600it", "still improving", "frozen
   fibre beats learned"). **Never confuse these with mechanistic conclusions.**
 
+**Confidence notation — the project's universal language of scientific maturity (`✓ / ◐ / ✗`).** The `class`
+says what KIND of claim it is; the confidence marker says HOW STRONG THE EVIDENCE IS. **Prefix EVERY claim in
+the ledger with one** — this is not Phase-2-only; it is the shared vocabulary of the whole project (and of
+embryogenesis), so a reader sees a claim's maturity at a glance:
+
+- **✓ established** — dose-confirmed: a monotone dose–response ladder OR an independent/batch-scale
+  reproduction. Safe to build on and to freeze.
+- **◐ provisional** — one attractive run or a plausible-but-untested hypothesis. **Cannot close an axis or a
+  question** (the campaign law: single-draw highs regress). A story is ◐ until dose-confirmed.
+- **✗ open / refuted** — no controlling mechanism yet (`✗ open`), or a dose-confirmed negative (`✗ refuted` —
+  itself a ✓-strength *result* about that lever). 
+
+A claim carries all three coordinates, e.g. `✓ [mechanism@LoopScore,2400it] rotation fills enclosure` ·
+`◐ [mechanism] prestretch controls size` · `✗ [mechanism] amplitude controls size (dose-flat)`. The marker is
+promoted/demoted as evidence accrues (◐→✓ on dose confirmation; ✓→◐ if it regresses — the freeze rule). This
+composes WITH regime tags below, it does not replace them.
+
 **Regime tagging (mandatory).** Tag every conclusion with the regime it was established in — optimization
 depth, **loss function (R² vs LoopScore)**, mechanism, parent config, pulse duration, amplitude, fibre init.
 Never write a bare `FALSIFIED`/`CLOSED`. Write e.g. `FALSIFIED @ LoopScore, 1200it, dur30`. **A conclusion
@@ -279,6 +395,7 @@ converge to? A slot with `done=NO` / `LS=na` FAILED — say so, design around it
 | File | Role |
 |---|---|
 | `instruction_cardio_mpm.md` | **this file** — the method / RULES |
+| `current_phase.txt` | the campaign PHASE gate (`PHASE1`/`PHASE2`/`PHASE3`) — read it FIRST; it sets the scientific question. Advance it ONLY when the phase's exit checklist is fully met. |
 | `knowledge_cardio_mpm.md` | the WORKING MEMORY / LEDGER — cumulative, classified, regime-tagged; read + UPDATE every batch. Carries forward all prior knowledge (reclassified, never erased). |
 | `analysis_cardio_mpm.md` | the human-readable narrative LOG (append-only) — one dated section per batch; never overwrite earlier batches. |
 | `cardio_mpm_slots.md` | the next-batch slots you DESIGN (≤6 lines) |
@@ -286,7 +403,8 @@ converge to? A slot with `done=NO` / `LS=na` FAILED — say so, design around it
 
 ## Each batch — the full workflow (do ALL, in order; AUTO-UPDATE the files)
 
-1. Read `instruction_cardio_mpm.md` (this file — the rules).
+1. Read `instruction_cardio_mpm.md` (this file — the rules) AND `current_phase.txt` (the PHASE gate — it sets
+   this batch's scientific question; frame the whole batch at that phase's altitude).
 2. Read `user_input.md`; acknowledge any pending items.
 3. Read `knowledge_cardio_mpm.md` (the distilled paper).
 4. Read `analysis_cardio_mpm.md` (recent chronological context).
@@ -319,8 +437,17 @@ converge to? A slot with `done=NO` / `LS=na` FAILED — say so, design around it
 13. **Write the next slots** to `cardio_mpm_slots.md` (`name : --flag val ...`; spec always
     `material/material_aniso_cardio`, omit it; objective default LoopScore, omit `--loss`). You MAY edit
     `cardio_mpm_train.py` to add a mechanism, then sweep it with an ablation.
+14. **PHASE GATE.** Re-evaluate the current phase's exit checklist (the `PHASE N → PHASE N+1 CHECKLIST` in the
+    Campaign-phases section) against the ledger, updating each axis's confidence (✓ established / ◐ provisional
+    / ✗ open). An axis counts DONE only at **✓ established** — dose-confirmed solved OR structural limitation
+    established (a dose-confirmed null result counts; ◐ single-draw highs do NOT). Also confirm **no ✓ axis has
+    regressed** this batch (the freeze rule; a regressed axis reverts to ◐ and re-opens). If and ONLY if EVERY
+    axis is ✓ AND none regressed, declare the phase COMPLETE in `analysis_cardio_mpm.md` and OVERWRITE
+    `current_phase.txt` with the next token (`PHASE3`). Otherwise leave it unchanged and record which axis(es)
+    remain OPEN/◐ — the open axis sets the next batch's agenda.
 
-Note the emphasis in step 12: **distill** knowledge, do not merely append.
+Note the emphasis in step 12: **distill** knowledge, do not merely append; and in step 14: advance the phase on
+**causal completeness** (every axis ✓ established, none regressed), NOT on "everything improved."
 
 ### `analysis_cardio_mpm.md` — batch entry template
 
@@ -380,13 +507,16 @@ raw per-batch detail down into `analysis_cardio_mpm.md`. Causal statements, not 
 
 > Objective: LoopScore (LS) — R² is diagnostic. Prior R²-objective conclusions are provisional@R²→LS.
 
-## Current objective          (the morphology-manifold goal in one line)
+> Every claim is prefixed with a confidence marker **✓ established / ◐ provisional / ✗ open|refuted**
+> (project-wide notation) IN ADDITION to its `[class@regime]` tag. ◐ cannot close an axis or question.
+
+## Current objective          (the morphology-manifold goal + per-axis ✓/◐/✗ status in one line)
 ## Current best result        (best LoopScore; + best R² as a diagnostic)
-## Established mechanisms      [mechanism], causal statements, regime + provisional tags
+## Established mechanisms      ✓/◐ prefixed `[mechanism]` causal statements, regime + provisional tags
 ## Optimization facts          [optimization@regime] — incl. the NEVER-TRUST-OPTIMIZATION evidence
-## Engineering facts           [engineering] — stable, almost never revisit
-## Rejected hypotheses         (distilled; regime-tagged; re-openable)
-## Open questions
+## Engineering facts           ✓ [engineering] — stable, almost never revisit
+## Rejected hypotheses         ✗ refuted (distilled; regime-tagged; re-openable)
+## Open questions              ✗ open / ◐ provisional — the live frontier
 
 ---
 ## Previous theme summaries    (last 4, oldest→newest; MUST precede ## Current theme)

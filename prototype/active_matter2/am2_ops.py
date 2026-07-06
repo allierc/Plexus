@@ -150,11 +150,16 @@ class PolarAlign(Lateral):
 # --------------------------------------------------------------------------- #
 #  Eq 2, term 2:  chemotactic reorientation toward grad c
 # --------------------------------------------------------------------------- #
-@register_operator("chemotax", level="cell", kind="exchange")
+@register_operator("chemo_reorient", level="cell", kind="exchange")
 class Chemotax(Exchange):
     """Rotate the heading toward the local chemical gradient `omega sin(phi_c-phi_i)`
     -- chemotaxis as a REORIENTATION (the stock `chemotaxis` is a velocity). Reads
-    the field named by `from:`. Mutates `heading`; returns {}."""
+    the field named by `from:`. Mutates `heading`; returns {}.
+
+    NOTE: registered as `chemo_reorient` (NOT `chemotax`) since the M1 refactor
+    (commit 8409136) took `chemotax` for the canonical VELOCITY operator in
+    src/plexus/operators/chemotax.py -- registering both under one name collides
+    at import. This heading-turn op is semantically distinct (reads/writes heading)."""
 
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["from"]
@@ -391,7 +396,7 @@ class Repel(Lateral):
     apart linearly, keeping aggregates from collapsing. A first-derivative velocity,
     summed by the engine with `glide`. Reads `edge_index` (radius_graph)."""
 
-    PREDICTION = "first_derivative"              # a velocity, added to glide
+    PREDICTION = "velocity"                      # a velocity, added to glide
     SUPPORTED_DIMS = [2, 3]
     PARAM_ROLES = {"strength": "repulsion_strength", "r0": "core_radius"}
 

@@ -1,0 +1,33 @@
+general:
+  name: embryo3
+  seed: 0
+  n_frames: 700
+  dt: 1.0
+  boundary: periodic
+  world:
+  - 1.0
+  - 1.0
+sets:
+  seed_cell:
+    n: 1
+    types:
+      a:
+        fraction: 1.0
+fields:
+  rd:
+    frame: grid
+    res: 200
+    components: 2
+operators:
+- op: rd_seed
+  at: rd
+  before_frame: 1
+- op: gray_scott
+  at: rd
+  f: 0.026
+  k: 0.051
+  substeps: 20
+  dt: 1.0
+schedule:
+- rd_seed
+- gray_scott

@@ -1,0 +1,10 @@
+{
+ "final_live": 673,
+ "max_live": 678,
+ "final_frac_of_max": 0.993,
+ "live_10": 293,
+ "live_50": 670,
+ "frames": 320,
+ "fire": 0.25,
+ "dmg": null
+}

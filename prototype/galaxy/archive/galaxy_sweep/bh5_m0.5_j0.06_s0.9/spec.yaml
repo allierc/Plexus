@@ -1,0 +1,35 @@
+general:
+  name: g
+  seed: 2
+  n_frames: 2500
+  dt: 0.004
+  boundary: free
+  world:
+  - 8.0
+  - 8.0
+sets:
+  star:
+    n: 25000
+    types:
+      s:
+        fraction: 1.0
+        mass: 2.0e-05
+fields: {}
+operators:
+- op: disk_ic
+  at: star
+  G: 1.0
+  softening: 0.08
+  disc_radius: 1.5
+  spin: 0.9
+  m_bh: 5.0
+  vel_jitter: 0.06
+  before_frame: 1
+- op: nbody_gravity
+  at: star
+  G: 1.0
+  softening: 0.08
+  compile: true
+schedule:
+- disk_ic
+- nbody_gravity

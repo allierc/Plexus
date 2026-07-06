@@ -5,40 +5,36 @@
 #   - each slot changes EXACTLY ONE variable from the current best parent
 #   - keep stiffness/direction COARSE (low --siren_omega, larger --fibre_wl); amplitude in [10,15]
 #
-# BATCH 28 — ROTATING CONTRACTION AXIS (attack the AREA-ENCLOSURE residual, take 2).
+# BATCH 33 — DOES A SIZE LEVER CONVERT TO LOOP SIZE IN THE ROTATING (enclosure-solved) REGIME?
 #
-# WHAT B27 SETTLED: the travelling-wave hypothesis (fact #29) is FALSIFIED. Over tw_amp 0->6->12->20 the
-#   real-referenced enclosure_row moved the WRONG way, monotonically: area_ratio 0.130->0.085, loopiness_ratio
-#   0.503->0.365, energy 0.94->0.66, ampL 0.004->0.114, LS 0.360->0.249. Staggered timing DECOHERES a still-uniaxial
-#   contraction (Dirichlet-pinned interior regions fire out of phase and partly cancel) -- it does NOT rotate a
-#   particle's FORCE DIRECTION, so loops get THINNER not fatter. Optimizer anchor reconfirmed: hi400 LS=0.369,
-#   ampL=0.001 (lowest overshoot ever), zero negatives.
+# PARENT = dev18 (NEW op point, B32 best LS=0.492): rot1.0 + soft-floor stiff[30,300] ω5, drag40, amp10,
+#   gain[0.2,1.5] gain0=0.5, SIREN fibre-ON dev0.18, dur_hi11, substeps10.
 #
-# THE QUESTION: enclosure requires the contraction AXIS to ROTATE DURING the beat. A single axis n(x,y) with a
-#   near-symmetric temporal envelope is TIME-REVERSIBLE (contract along n -> release back along n -> retrace ->
-#   ~zero area; the ~0.13 area we see is only inertial/damping lag = thin loops). If the axis rotates over the
-#   beat, the contraction and release half-cycles push along DIFFERENT directions -> the trajectory opens into an
-#   ellipse -> area rises.
+# SURPRISE (B32): with rotation, ENCLOSURE is SOLVED (loopiness_ratio 1.06-1.18, at/ABOVE real) — so the
+#   dominant residual FLIPPED BACK to SIZE: clean real-referenced peak_ratio ~0.49 (sim peak = HALF real),
+#   area_ratio ~0.35. Dashboard: red loops loopy + correctly-chiral but INSIDE green. SIZE was declared
+#   "invariant to every lever" (facts #24/#25) — but ONLY at rot=0 (radial/time-reversible, drive->overshoot).
+#   (Also: fibre_dev is a REAL monotone lever peaking ~0.18; fibre_wl SCALE inert.)
 #
-# MECHANISM: --rot_stress (radians, FIXED knob): each frame the contraction axis = theta(x,y) +
-#   rot_stress*sin(2*pi*(fr-onset)/period) -- a mean-zero, phase-locked axis SWING over the beat. 0=OFF (fixed
-#   axis, byte-identical to the old path). Code (train.py, dir_at() + 4 frame-stepping sites), differentiable in
-#   the fibre theta. READ the enclosure_row area_ratio/loopiness_ratio/minor_axis_ratio (want them to RISE with
-#   |rot_stress|) and chir_match (sign test). rot= now logged in progress.txt.
+# HYPOTHESIS: in the rotating regime (which redistributes radial motion into circulation), extra
+#   drive/gain/compliance may now CONVERT to loop SIZE (raise peak_ratio) instead of overshooting.
+#   FALSIFIER: all size levers leave peak_ratio ~0.49 + lower LS -> size is capped INDEPENDENT of rotation
+#   (structural: boundary --bwidth compliance / constitutive strain). OVERTURN: any lever raises peak_ratio
+#   while holding LS+chir -> facts #24/#25 are regime-bound to rot=0.
 #
-#   PARENT = b27_ctrl record family: stiff[50,300] SIREN w5, drag40, amp10, gain[0.2,1.5], fibre-ON dev005,
-#   dur_hi11, substeps10, tw0, rot0. Balance: 1 CONTROL . 4 EXPLORE (rot dose + sign) . 1 EXPLOIT.
+#   Balance: 3 EXPLOIT (amp12, ghi20, dev20) . 2 EXPLORE (amp14, slo20) . 1 CONTROL (dev18 replicate).
+#   Read peak_ratio + area_ratio from RESIDUAL_MORPHOLOGY, not LS alone (a bigger loop that overshoots LOWERS LS).
 #
-#   b28_ctrl   [CONTROL]        : rot_stress 0 (exact parent) -- enclosure_row reference + lottery anchor
-#   b28_rot03  [EXPLORE/loop]   : rot_stress 0.3  -- mild axis swing (~17 deg): does area_ratio/loopiness rise? (dose 1)
-#   b28_rot06  [EXPLORE/loop]   : rot_stress 0.6  -- stronger swing (~34 deg) (dose 2)
-#   b28_rot10  [EXPLORE/loop]   : rot_stress 1.0  -- strong swing (~57 deg); find the overshoot/instability edge (dose 3)
-#   b28_rotneg [EXPLORE/chir]   : rot_stress -1.0 -- SIGN test (ref=rot10): does reversing the swing flip chirality/enclosure?
-#   b28_hi400  [EXPLOIT]        : stiff_hi 300->400 (rot 0) -- reconfirm the 0.369 clean-overshoot optimizer anchor
+#   b33_dev18   [CONTROL/REPLICATE] : exact dev18 -- reproduce LS=0.492 (single draw), net the lottery in-batch.
+#   b33_amp12   [EXPLOIT/size]      : amplitude 10->12 -- does more drive now GROW peak (revisit fact #25 @rot1.0)?
+#   b33_ghi20   [EXPLOIT/size]      : gain_hi 1.5->2.0 -- raise the gain ceiling to push bigger loops (fact #28 @soft-floor+rot).
+#   b33_dev20   [EXPLOIT/dose]      : fibre_dev 0.18->0.20 -- nail the fibre-dose peak / pin the operating point.
+#   b33_amp14   [EXPLORE/size]      : amplitude 10->14 -- push magnitude; reveal the size-vs-overshoot boundary.
+#   b33_slo20   [EXPLORE/size]      : stiff_lo 30->20 -- softer floor; clean peak_ratio read (revisit fact #26 in rotating regime).
 #
-b28_ctrl : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.05 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 50 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11
-b28_rot03 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.05 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 50 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 0.3
-b28_rot06 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.05 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 50 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 0.6
-b28_rot10 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.05 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 50 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
-b28_rotneg : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.05 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 50 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress -1.0
-b28_hi400 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.05 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 50 --stiff_hi 400 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11
+b33_dev18 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.18 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+b33_amp12 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.18 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 12 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+b33_ghi20 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 2.0 --siren_fibre 1 --fibre_dev 0.18 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+b33_dev20 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.20 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+b33_amp14 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.18 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 14 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+b33_slo20 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.18 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 20 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0

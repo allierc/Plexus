@@ -1,0 +1,46 @@
+general:
+  name: ff
+  seed: 1
+  n_frames: 1000
+  dt: 1.0
+  boundary: free
+  world:
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 3000
+    spawn: random
+    types:
+      red:
+        fraction: 0.34
+      white:
+        fraction: 0.33
+      blue:
+        fraction: 0.33
+fields:
+  morphogen:
+    frame: grid
+    res: 32
+    components: 1
+operators:
+- op: morphogen_source
+  at: morphogen
+  width: 0.04
+  value: 0.0
+- op: diffuse
+  at: morphogen
+  rate: 0.8
+- op: decay
+  at: morphogen
+  rate: 0.0005
+- op: french_flag
+  at: cell
+  from: morphogen
+  t1: 0.12
+  t2: 0.44
+schedule:
+- morphogen_source
+- diffuse
+- decay
+- french_flag

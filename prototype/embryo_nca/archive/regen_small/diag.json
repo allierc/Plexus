@@ -1,0 +1,15 @@
+{
+ "final_live": 668,
+ "max_live": 702,
+ "final_frac_of_max": 0.952,
+ "live_10": 286,
+ "live_50": 484,
+ "frames": 460,
+ "fire": 0.5,
+ "dmg": [
+  {
+   "frame": 230,
+   "radius": 0.12
+  }
+ ]
+}

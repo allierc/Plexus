@@ -1,0 +1,30 @@
+general:
+  name: embryo2
+  seed: 0
+  n_frames: 260
+  dt: 1.0
+  boundary: free
+  world:
+  - 1.0
+  - 1.0
+sets:
+  seed_cell:
+    n: 1
+    types:
+      a:
+        fraction: 1.0
+fields:
+  nca:
+    frame: grid
+    res: 72
+    components: 16
+operators:
+- op: nca_seed
+  at: nca
+  before_frame: 1
+- op: growing_nca
+  at: nca
+  fire_rate: 0.75
+schedule:
+- nca_seed
+- growing_nca

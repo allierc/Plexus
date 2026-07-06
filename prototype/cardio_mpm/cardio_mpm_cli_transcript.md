@@ -1494,3 +1494,132 @@ The `--rot_stress` code is intact and audited-sound (argparse + `dir_at()` + all
 - **Appended** a concise "Re-invocation #2" stamp to `analysis_cardio_mpm.md` documenting that the conditions still hold and the slots stand.
 
 **fact #30 (rotating-contraction-axis → area-enclosure) remains PENDING** — the re-submit is a clean test. No in-sandbox action can renew the credential or restart the driver.
+
+
+================================================================================
+## DESIGN 29 -- 2026-07-05 09:28:34
+================================================================================
+Done. Batch 29 complete — all files auto-updated.
+
+## Summary
+
+**The b28 rotating-axis batch RAN (first real data since b27) and delivered the biggest win of the campaign.**
+
+**The surprise:** the area-enclosure residual — which every prior batch (facts #24–#29) declared invariant to *every* in-model magnitude lever, and where B27's travelling wave moved it the *wrong* way — is moved **decisively and monotonically** by `--rot_stress` (swinging the contraction axis over the beat), which *also* breaks the 2-month LS≈0.365 ceiling:
+
+| rot | 0 | 0.3 | 0.6 | 1.0 |
+|-----|-----|-----|-----|-----|
+| **LS** | 0.332 | 0.430 | 0.461 | **0.481 (RECORD)** |
+| area_ratio | 0.100 | 0.189 | 0.284 | 0.360 (3.6×) |
+| loopiness_ratio | 0.424 | 0.712 | 0.992 | 1.107 (→real) |
+| minor_axis_ratio | 0.446 | 0.513 | 0.666 | 0.794 |
+
+Dashboards confirm it: rot0 red sim loops are thin radial stubs *inside* the green real loops; rot10 red loops are **fat closed ellipses superposing on green** (per-node LS up to +0.87). Mechanism: rotation **redistributes** radial motion into circulation (energy flat ~0.85, peak *drops*) — it works where "more force" never did, confirming fact #29's time-reversibility prediction. Sign is weak (rotneg ≈ rot+1.0).
+
+**Files updated:**
+- `analysis_cardio_mpm.md` — dated Batch 29 section (surprise, per-slot table, mechanism, winners, verdict).
+- `knowledge_cardio_mpm.md` — record → LS=0.481; fact #30 upgraded HYPOTHESIS→**ESTABLISHED**; new fact #31 (residual shifted to absolute size); fact #29 marked confirmed; open questions + theme sections distilled.
+- `cardio_mpm_slots.md` — Batch 29 (parent = rot10): **replicate** rot10 (single draw; campaign law), push dose (rot1.5/2.0), **re-open size levers** @rot1.0 (amp12/slo30 — falsified only at rot=0), **fibre ablation** @rot1.0.
+- Memory `cardio-ssh-restart-resolved.md` — stale "rot_stress PENDING/unrun" line refreshed to "RAN, decisive win."
+
+**Two winners:** best optimizer = rot10 (LS 0.481); best scientific = the whole monotone dose ladder (first mechanism to fill the enclosure residual). The key next question: now that enclosure *shape* is solved (loopiness ≈ real) but absolute area/peak still lag ~0.4–0.5, do the size levers **convert to area** in the rotating regime where they were falsified only at rot=0?
+
+
+================================================================================
+## DESIGN 30 -- 2026-07-05 09:44:54
+================================================================================
+All done. Here's the summary.
+
+## Batch 30 — diagnosis and actions
+
+**What surprised me:** the previous batch (B29, the critical replication of the single-draw LS=0.481 rot_stress record) produced **zero data** — all 6 slots archived only `config.json`. But this was **not** the SSH/submit loss that dominated this campaign. Each slot left a `.out`/`.err` pair, ran on the cluster, and died in ~15 s — the **code-crash signature**.
+
+**Root cause (read the `.err` first, per my triage rule):**
+```
+cardio_mpm_train.py:588  ops["mpm_drag"].k = ...   →  KeyError: 'mpm_drag'
+```
+The recent Plexus operator refactor (commit `6737189`, "merge mpm_drag into drag via emit / M2") renamed the drag op `mpm_drag`→`drag`. The **spec** was migrated (`op: drag`), but `cardio_mpm_train.py` still keyed the old name. Since `drag` is in every cardio slot, all 6 died identically. Same class as the embryo campaign's b35/b41/b42 crashes — first time it hit cardio's own `train.py` rather than a spec.
+
+**Fix (verified statically; python is approval-blocked in-sandbox):**
+- `train.py:588` and `:589` (force_ops) `"mpm_drag"` → `"drag"` — fixed *both* (the second would have crashed at the next line). Behaviorally identical: the new `Drag` exposes `.k` and returns `{mpm_particle: −k·v}` that `step_frame` routes exactly as before.
+- Swept for the sibling M3 refactor: renamed 3 harmless `p_op("pulse_stimulus",…)` → `activation_pulse` fallbacks (defaults already matched the spec, so no behavior change). Grep-clean of all stale tokens.
+
+**Scientific state is unchanged — last real data = B28** (rot_stress = the area-enclosure mechanism, single-draw record 0.481). The B29 questions are still the highest-priority experiment, so I **re-issued the B29 design verbatim as Batch 30** (`b30_` prefix to match `state={batch:30}`): 1 replicate (rot10) · 2 explore (rot20 edge, nofib ablation) · 3 exploit (rot15 dose, amp12 & slo30 — do size levers reopen now that the axis rotates? fact #31).
+
+**Files updated:** `cardio_mpm_train.py` (fix), `analysis_cardio_mpm.md` (Batch 30 section), `knowledge_cardio_mpm.md` (code-crash triage as a distinct loss mode), `cardio_mpm_slots.md` (re-issue), plus my persistent memory + index. A clean falsification-of-infra-null → code fix is the batch's deliverable; the rot_stress replication should now actually run.
+
+
+================================================================================
+## DESIGN 31 -- 2026-07-05 16:05:53
+================================================================================
+Batch 31 complete. All four deliverables updated (analysis appended, knowledge distilled, 6 slots written). Summary:
+
+## What surprised me in b30 (two-headed)
+
+1. **`rot_stress` SATURATES for LoopScore at 1.0 — even though enclosed AREA keeps climbing.** Over rot 1.0→1.5→2.0, area_ratio rises monotone (0.308→0.357→0.435) but LS does *not* (0.462→0.430→0.438). Past rot1.0 the extra swing degrades chirality-match (0.838→0.809) — LS decouples from raw area once loopiness≈real. **rot operating point = 1.0.**
+
+2. **The soft floor reopened as a size lever *only because the axis rotates*.** `slo30` (stiff_lo 50→30) — a lever that HURT at rot=0 (B24: 0.321, 3 negs) — **WON the batch (LS=0.475)** with the best loopiness (1.118), chirality (0.846), and area (0.355). Softer material converts the rotating stress into circulation instead of recoil overshoot.
+
+## Verdicts
+- **rot10 replicated** (0.462 vs B28 0.481, within ±0.05) → the rotating-axis mechanism (#30) is **stable, not a fluke.**
+- Fact #31 (do size levers reopen under rotation?) **RESOLVED as a split:** softening reopens (compliance→circulation), **amplitude does not** (amp12 still overshoots, area↓).
+- Fibre stays **load-bearing under rotation** — nofib was the worst slot (0.394, area 0.230).
+
+## New best / residual
+New best config = **slo30** (LS 0.475). Median loop is now a fat closed ellipse; the live bottleneck shifted to **per-node uniformity** (LS_SD 0.306 — node 0 and a few nodes still radial) + absolute area (0.35 vs 1.0). The fibre quiver is still near-uniaxial horizontal.
+
+## Batch 31 design (parent = slo30, one variable each)
+- `slo30` CONTROL/replicate · `slo20`/`slo40` bracket the floor optimum @rot1.0 · `rot14` tests whether the soft floor absorbs higher rotation without the chir loss (floor×rot) · `fdev12` attacks the radial-node uniformity residual via spatial fibre heterogeneity · `rotneg` tests whether sign is truly weak on the best config.
+
+No code changes were needed (all levers are existing flags).
+
+
+================================================================================
+## DESIGN 32 -- 2026-07-05 22:34:18
+================================================================================
+All four steps are complete. Summary of Batch 32:
+
+## What surprised me in B31
+The slot designed as an **EXPLORE for uniformity** — `fdev12` (SIREN fibre heterogeneity 0.05→0.12) — was the outright **batch winner at LS=0.493**, the campaign's highest corrected-metric LS. Meanwhile the batch's whole **EXPLOIT thesis failed**: the stiffness-floor ladder (slo20/30/40 = 0.456/0.453/0.459) is flat, and B30's slo30=0.475 did **not** reproduce (0.453). So **fact #31(a) "softening reopens under rotation" was a single-draw lottery artifact** — the live lever is fibre, not the material floor.
+
+**B31 ranking:** fdev12 0.493 > slo40 0.459 > slo20 0.456 > slo30 0.453 (replicate) > rot14 0.448 > rotneg 0.432. Dashboards confirm fat closed red loops on green (per-node LS to +0.82/+0.93); fdev12's fibre quiver is visibly wavier and it has only one weak node vs the parent's two.
+
+## Files updated
+- **analysis** — dated Batch 32 section (surprise, per-slot table, verdicts).
+- **knowledge** — new best (fdev12 0.493); fact #5 elevated (fibre heterogeneity = live LS lever under rotation); fact #30 saturation reconfirmed by rot14/rotneg; **fact #31 overturned** (floor softening inert @[20,40]); rejected-hypothesis + theme/iterations refreshed.
+
+## Batch 32 design (parent = b31_fdev12)
+One hypothesis, smallest distinguishing experiment: **is fdev12=0.493 a real dev lever or a lucky ±0.05 fibre-SIREN draw?** A monotone dev→LS trend confirms it; a flat/regressing dose says luck.
+- `fdev12` [REPLICATE] — is 0.493 reproducible?
+- `fdev08`, `fdev18` [EXPLOIT/dose] — fill the dev dose curve
+- `fdev25` [EXPLORE] — high-heterogeneity family / breaking point
+- `fwl20` [EXPLORE] — finer fibre scale: is the win about dev magnitude or spatial scale?
+- `dev05` [CONTROL] — fresh low-dev anchor, pairs in-batch against fdev12 to net out the lottery
+
+Each slot changes exactly one variable from the parent. No code change needed.
+
+
+================================================================================
+## DESIGN 33 -- 2026-07-06 04:54:58
+================================================================================
+All three files are updated. Batch 33 is designed. Summary:
+
+## Batch 33 — analysis complete
+
+**Read of B32** (the fibre dev dose-response batch, all 6 slots CONVERGED@2399it). Ranked by LS:
+
+| slot | fibre_dev | LS | peak_ratio | area | loopiness | chir |
+|---|---|---|---|---|---|---|
+| **fdev18** | 0.18 | **0.492** | 0.487 | 0.354 | 1.149 | 0.853 ← winner |
+| fdev25 | 0.25 | 0.482 | 0.483 | 0.348 | 1.177 | 0.855 |
+| fdev12 | 0.12 | 0.473 | 0.503 | 0.349 | 1.131 | 0.849 |
+| fwl20 | 0.12 (wl20) | 0.473 | 0.489 | 0.321 | 1.091 | 0.835 |
+| fdev08 | 0.08 | 0.465 | 0.489 | 0.306 | 1.065 | 0.839 |
+| dev05 | 0.05 | 0.447 | 0.456 | 0.314 | 1.142 | 0.827 |
+
+**Three surprises, distilled into the ledger:**
+1. **The "0.493" fdev12 regressed to 0.473** (9th single-draw regression) — but the **independent fibre_dev dose ladder is monotone** (0.447→0.465→0.473→0.492), so fibre heterogeneity is a **confirmed real lever** peaking ~dev0.18. *First time a regressed single-draw was rescued by a dose ladder* — recorded as a durable lesson.
+2. **fwl20 = fdev12 exactly** → spatial SCALE inert; the win is dev MAGNITUDE.
+3. **The residual flipped back to SIZE.** Rotation solved enclosure (loopiness ≥ real everywhere); the clean gap is now peak_ratio ≈ 0.49 (sim = half real). Dashboard confirms: red loops loopy + correctly-chiral but *inside* green.
+
+**Batch 33 (parent = dev18, new op point):** one question — *in the enclosure-solved rotating regime, is the SIZE residual now drive-limited?* Facts #24/#25 killed drive/gain/compliance as size levers, but only at rot=0. Six slots, each changing one flag: **amp12, amp14** (drive), **ghi20** (gain ceiling), **slo20** (compliance) — 3 exploit / 2 explore — plus **dev18 replicate** (control) and **dev20** (pin the fibre-dose peak). The read is on `peak_ratio`/`area_ratio`, not LS alone (a bigger loop that overshoots lowers LS). A clean null → size is structural (boundary/constitutive); any lever raising peak_ratio while holding LS → #24/#25 are regime-bound to rot=0.
