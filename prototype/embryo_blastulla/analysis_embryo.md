@@ -7959,3 +7959,71 @@ embryo_BUD_tip5_noanch, one change each). READ order: FIRST replication (noanch_
 THEN surface-tension trend (st8→st5→st3: bud_score, organo circularity/aspect_ratio, neck<1), screen st3 for
 fragment_count>1 / nn_min<0.016. Judge bud by score/len/neck/persistence (NOT overlap=0), pattern by
 mi_type_y, growth by organo area. All 12000f (~800-830 s) < 20-min L4.
+
+## Batch 89 (read of b88) — WEAK TIP-BUD REPLICATES (0.072±0.010); surface_tension NO-OP; rounding is the ceiling
+
+OBSERVE vs b88 prediction ("lowering surface_tension 8→5→3 lets the bud stand off / neck; tip5_noanch winner
+replicates ≥0.05"): the REPLICATION side CONFIRMED (weak bud is real, 3 seeds) but the SURFACE-TENSION side is
+a NON-TEST — the lever is inert. All 8 slots TIER-1 clean (collapsed 0, nn_min 0.0180–0.0186 ≈0.9·r0) and
+pattern-preserving (mi_type_y 1.0, segregation_index 1.0 EVERYWHERE — INHERIT-CAPABILITIES met). No runaway.
+
+### 1. THE tip5_noanch WINNER REPLICATES as a TIGHT ~0.072 WEAK BUD; the b87 single-seed 0.099 did NOT hold.
+The three tip5_noanch seeds (all target 1.8, rate 0.4, tip 5, offset 0.03, prestretch 0.75, anchor OFF):
+- **seed0 (s2 noanch_st5; surface_tension inert so ≡ plain tip5_noanch seed0):** org_bud_score 0.0797, len 0.470, neck 0.370.
+- **seed1 (s0 noanch_s1):** org_bud_score 0.0573, len 0.321, neck 0.381.
+- **seed2 (s1 noanch_s2):** org_bud_score 0.0787, len 0.203, neck 0.233.
+- → **bud_score = 0.072 ± 0.010** (n=3), persistence 1.0 all, neck <0.40 all. |Δ| vs ctrl_nogrow (bud_score
+  0.0, s7) = 0.072/0.010 = 7·SD over 3 seeds → tip-localized anchor-free growth makes a REAL weak necked bud
+  **[established]**. But the b87 seed0 high (0.099) REGRESSED to the 0.072 mean — 9th single-seed clean point
+  to fall on replication (durable campaign law). bud_len is noisy (0.20–0.47) — score is the tight readout.
+
+### 2. mpm_grid_update.surface_tension IS A NO-OP on this substrate [engineering, reconfirms MOR b73].
+Byte-identical outputs across the tension sweep prove the parameter never entered the sim:
+- **st5 (5.0, s2) == st3 (3.0, s4):** IDENTICAL bud_score 0.07970581296896076, len 0.46966137168900146, neck
+  0.37025802685895637 (16 digits) AND identical montage deform_rms 0.3348.
+- **tip8 (8.0, s3) == st5_tip8 (5.0, s6):** IDENTICAL bud_score 0.09464946486924859, len 0.26111758439819527,
+  neck 0.17769944406582786 AND identical montage deform 0.3541.
+→ changing surface_tension 8→5→3 changes NOTHING; the b88 de-rounding hypothesis was UNTESTED (dead lever).
+This RECONFIRMS the MOR-1 b73 [engineering, established] "surface_tension INERT at usable values". DO NOT use
+surface_tension again. (tip DOES move things: tip5 st-pair 0.0797 ≠ tip8 st-pair 0.0946, so cell_grow.tip is live.)
+
+### 3. tip8 > tip5 (monotone tip lever, single-seed batch-max) but ROUNDING is the hard ceiling.
+- **tip8 (s3):** org_bud_score **0.0946** (batch-max), neck **0.178** (tightest), len 0.261, persistence 1.0.
+  → sharper tip STILL the monotone bud lever (tip5 0.072 → tip8 0.095), single-seed → needs 3-seed lock.
+- **BUT the body inflates ROUND:** shape area 0.156(ctrl)→0.96 (6× body) yet shape circularity RISES
+  0.87→0.96 and org_aspect_ratio only 1.07 → growth makes a BIGGER SPHERE, not a discrete lobe. The bud_score
+  0.09 comes from a ROUGH organo MEMBRANE mask (org_circularity 0.262 vs nogrow 0.933) at the tip, not a
+  standing-off finger. Surface_tension (dead) can't de-round; youngs was EXHAUSTED in MOR (b74–76: up deflates
+  the bud, doesn't round). Rounding of a single elastic MPM cell may be a FUNDAMENTAL ceiling.
+- **ps60 (s5, prestretch 0.60):** bud_score 0.0355 < tip5 0.072 → MORE pre-compression ROUNDS (over-inflates
+  uniformly); prestretch is NOT a de-round lever (reconfirms MOR b75 "prestretch amplifies bud but ⊥ roundness").
+
+### 4. INTERPRETATION. b88 delivered a clean [established] weak-bud replication (0.072±0.010, pattern-held,
+TIER-1) and closed one dead lever (surface_tension). The BUD gate (a DISCRETE causal protrusion) remains
+UNMET: the mechanism produces a tip-rough but geometrically ROUND inflated blastula (circ 0.96, aspect 1.07),
+not a standing-off organ. Every roundness lever tried across MOR+BUD is exhausted (surface_tension inert,
+youngs deflates, prestretch amplifies-not-rounds, rate-down worsens, rate-up shatters). The one remaining
+frontier ON THIS SINGLE-CELL SUBSTRATE is pushing tip SHARPNESS + placement OFFSET to their bud-vs-bulge
+sweet spot (b88 tip10_noanch_off06 overshot to a neck-1.47 BULGE; tip8 is below that). If even sharp tip +
+moderate offset caps at ~0.10, the single-cell tip-growth bud is fundamentally limited and the route to a
+DISCRETE organ is a MULTI-CELL domain (grow a SUBSET of cells) — the true "pattern-gated growth" the user
+directive names, which n=1 cannot express.
+
+### 5. HYPOTHESIS (Batch 89). On the anchor-free substrate, org_bud_score keeps rising with tip SHARPNESS past
+tip8 and with a MODERATE placement offset, peaking before it overshoots into a non-necked bulge (neck>1):
+tip12/tip16 and tip8_off05 exceed tip8's 0.0946 while holding neck<1, and the tip8 winner replicates ≥0.07
+across seeds. FALSIFIER: tip12/tip16 bud_score ≤ tip8 (~0.095) AND off05/k2 do not break past 0.10 AND the
+tip8 seeds spread <0.06 → the single-cell tip-growth bud is CAPPED at ~0.09 → report the weak reproducible
+tip-bud (0.072±0.010) as the BUD [open] deliverable and OPEN the multi-cell-domain path (grow a subset of
+cells) as the only route to a discrete organ. Runaway arm: any slot neck_ratio>1 (bulge) OR nn_min<0.016 OR
+collapsed>0 → sweet-spot overshoot / rupture, retreat to tip8.
+
+### 6. Batch-89 slots — TIP-SHARPNESS × OFFSET FRONTIER + tip8 3-SEED LOCK (see embryo_slots.md).
+Exploit(4): tip8_s1, tip8_s2 (3-seed the 0.0946 winner with b88 s3=seed0), tip12 (sharpness push), tip8_off05
+(finger reach on moderate tip, below the off06-bulge risk). Explore(3): tip16 (sharpness ceiling), tip8_k2
+(agent_to_mpm k 1→2 — agents extrude the tip, NEW mechanism probe), tip12_off05 (combined sharpen+reach,
+bulge falsifier). Control(1): ctrl_nogrow (reuse embryo_BUD_noanch_nogrow, byte-identical baseline). NEW specs
+forked from embryo_BUD_noanch_tip8 (one change each; dotted overrides wash out so every change is a full
+spec). READ order: FIRST tip8 3-seed spread (s1/s2 vs 0.0946), THEN sharpness trend (tip8→12→16: bud_score,
+neck<1), THEN offset (off05, off05+tip12), screen every slot for neck_ratio>1 / nn_min<0.016. Judge bud by
+score/neck/persistence (NOT overlap=0), pattern by mi_type_y, growth by organo area. All 12000f <20-min L4.

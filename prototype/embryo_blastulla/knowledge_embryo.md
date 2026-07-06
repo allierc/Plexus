@@ -1314,6 +1314,28 @@ flow / collective migration · 1E two-type partition. Then INT (integrate all).
           off/neck (bud_score↑, organo circularity↓/aspect_ratio↑). FALSIFIER: bud_score flat/falling vs
           surface_tension OR winner fails replication (s1/s2 <0.05) → accept weak-tip-bud [open] deliverable,
           pivot to pattern-gated growth. Runaway arm: st3 fragments (fragment_count>1 OR nn_min<0.016).
+        - **Batch 89 read: b88 = WEAK TIP-BUD REPLICATES [established]; surface_tension NO-OP; ROUNDING is the
+          hard ceiling.** (1) **tip5_noanch = a REAL weak bud, 3 seeds: org_bud_score 0.072±0.010** (seed0 0.0797,
+          seed1 0.0573, seed2 0.0787; persistence 1.0, neck <0.40, pattern held mi_type_y 1.0, TIER-1 clean) —
+          |Δ| vs ctrl 0.0 = 7·SD/3 seeds. The b87 single-seed 0.099 REGRESSED to 0.072 (9th single-seed clean
+          point to fall on replication — durable law). (2) **[engineering, reconfirms MOR b73] mpm_grid_update
+          .surface_tension is a NO-OP:** st5(5.0)==st3(3.0) byte-identical (bud_score 0.07970581296896076 to 16
+          digits, montage deform 0.3348); tip8(8.0)==st5_tip8(5.0) identical (0.09464946486924859, deform 0.3541).
+          The b88 de-rounding hypothesis was NEVER TESTED — dead lever, do NOT use surface_tension. cell_grow.tip
+          IS live (tip5 0.0797 ≠ tip8 0.0946). (3) **tip8 (0.0946, neck 0.178) > tip5 (0.072) = monotone tip lever,
+          single-seed batch-max** → needs 3-seed lock. (4) **ROUNDING is the ceiling:** body inflates 6× (shape
+          area 0.156→0.96) but circularity RISES 0.87→0.96, org_aspect_ratio 1.07 → a BIGGER SPHERE not a lobe;
+          bud_score comes from a rough organo membrane mask (org_circularity 0.262) at the tip, not a standing-off
+          finger. ps60 (prestretch 0.60) 0.0355 < tip5 = over-compression ROUNDS (reconfirms MOR b75). **Every
+          roundness lever is now EXHAUSTED across MOR+BUD: surface_tension inert (b73/b88), youngs deflates-not-
+          rounds (b74–76), prestretch amplifies-not-rounds (b75/b88), rate-down worsens buckle (b75), rate-up
+          shatters (b76).** The single elastic MPM cell rounds by energy minimization — a discrete organ likely
+          needs a MULTI-CELL domain (grow a SUBSET of cells = the user's "pattern-gated growth", n=1 cannot express
+          it). **Batch 89 = TIP-SHARPNESS × OFFSET FRONTIER + tip8 3-seed lock:** tip8_s1/s2 (lock 0.0946), tip12/
+          tip16 (sharpness push), tip8_off05 + tip12_off05 (finger reach, bulge falsifier), tip8_k2 (agent-extrusion
+          probe), ctrl_nogrow. FALSIFIER: tip12/16 ≤ tip8 (~0.095) AND off05/k2 <0.10 AND tip8 seeds spread <0.06 →
+          single-cell tip-bud CAPPED ~0.09 → report weak-bud (0.072±0.010) as BUD [open] deliverable, OPEN the
+          multi-cell-domain path. Runaway: neck_ratio>1 (bulge) OR nn_min<0.016 OR collapsed>0.
     Batch 46 = minimal axis-cue probe (R1, ONE new operator family = `gravity`, a uniform membrane-cell body force
     wired into the MPM substep via p2g `a_ext` [p2g.py:45-50], default −y), built on the [established] INT op point.
     Slots = g magnitude ladder g1/g2/g4/g8 + g2 ×3 seeds (axis reproducibility) + gx horizontal-pull direction

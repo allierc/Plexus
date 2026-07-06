@@ -11,15 +11,50 @@
 > objective are marked `provisional@R²→LS` — they are HYPOTHESES to re-evaluate under LoopScore, carried
 > forward (not erased). `[engineering]` facts carry over unchanged.
 
-## Current objective
+> **Confidence notation (project-wide):** prefix EVERY claim with **✓ established** (dose-confirmed: monotone
+> ladder or independent reproduction) · **◐ provisional** (single-draw high or untested hypothesis — cannot
+> close an axis/question) · **✗ open|refuted** (no mechanism yet, or a dose-confirmed negative). This composes
+> with the `[class@regime]` tag (e.g. `✓ [mechanism@LoopScore,2400it]`). Promote ◐→✓ on dose confirmation;
+> demote ✓→◐ if a frozen axis regresses. On each distill (step 12), add/refresh the marker on every line.
 
-Discover which anisotropic active-stress material mechanisms produce the real cardiomyocyte loop
-**morphology** — i.e. learn the mapping `parameters → loop family → LoopScore`, not merely find one
-optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
+## Current objective  (Phase 2 — see `current_phase.txt`)
+
+**Identify the minimal physical mechanism controlling each remaining trajectory morphology axis** —
+magnitude, enclosure, direction, shape, uniformity, size — thereby **completing the causal decomposition of
+LoopScore** before entering generative trajectory discovery (Phase 3). LoopScore is the operational metric;
+the deliverable is a mechanism *per axis* (solved OR demonstrated structurally limited — a dose-confirmed null
+result counts). Confidence: **✓ established** (dose-confirmed) · **◐ provisional** (single-draw/hypothesis, not
+closable) · **✗ open**. Axis status: magnitude ✓ (gain+stiffness) · enclosure ✓ (rotation) · direction ✓ ·
+shape ✓ · uniformity ✓ (fibre heterogeneity) · **SIZE ✗ (OPEN — sim loops sit inside real, peak_ratio ≈
+0.49)**. **FREEZE solved axes:** every experiment must improve SIZE *while preserving* the ✓ axes (a slot that
+lifts size but regresses enclosure/chirality is not progress; the regressed axis reverts to ◐). Phase 2
+completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `current_phase.txt` → `PHASE3`.
 
 ## Current best result
 
-- **Under LoopScore (corrected metric, floor=0.02): LS = 0.365** (B23 slo50, NEW RECORD, CONVERGED@2400it).
+- **Under LoopScore (corrected metric, floor=0.02): LS = 0.492** (B32 dev18 = rot1.0 + soft-floor stiff[30,300] +
+  SIREN fibre_dev 0.18, CONVERGED@2399it) — batch best, best area_ratio (0.354) + chir_match (0.853). This is the
+  PEAK of a DOSE-CONFIRMED fibre lever, not a lottery draw: the fibre_dev ladder rises MONOTONE — dev0.05=0.447,
+  dev0.08=0.465, dev0.12=0.473, dev0.18=0.492 — then rolls off at dev0.25=0.482 (peak dev~0.18–0.20). **The prior
+  "LS=0.493 fdev12" was a SINGLE-DRAW HIGH: its B32 replicate REGRESSED to 0.473 (9th single-draw regression) — but
+  the independent monotone dose ladder RESCUED the lever (fibre heterogeneity is REAL, see #5).** fibre_wl 28.8→20
+  (finer SCALE) = 0.473 ≡ fdev12 → the win is dev MAGNITUDE, not spatial scale. New provisional OPERATING POINT =
+  dev18. **RESIDUAL FLIPPED BACK TO SIZE:** rotation SOLVED enclosure (loopiness_ratio 1.06–1.18, at/ABOVE real),
+  so the dominant gap is now MAGNITUDE — peak_ratio ≈0.49 (sim peak = half real), area_ratio ≈0.35; dashboard red
+  loops are loopy+correctly-chiral but sit INSIDE green. See #5 (fibre dose-confirmed + scale-inert), #30 (rot
+  saturates at 1.0), #31 (residual=size in the rotating regime; size-in-rotation is the LIVE B33 question).
+- **B31 slo30 = 0.475 was a LOTTERY HIGH DRAW — did NOT reproduce (B32 replicate 0.453).** The B31 stiffness-floor
+  ladder (slo20/30/40 = 0.456/0.453/0.459) is FLAT within noise: softening is inert @rot1.0 (see #31).
+- **Prior single-draw record: LS = 0.481** (B28 rot10, CONVERGED@2399it) —
+  the rotating-contraction-axis breakthrough. Config = the b27 record family (stiff[50,300] ω5, drag40, amp10,
+  gain[0.2,1.5], fibre-ON dev005, dur_hi11, substeps10) PLUS `--rot_stress 1.0` (contraction axis swings
+  θ(x,y)+1.0·sin(2π(fr−onset)/period) over the beat). Lifts LS **+0.11 / +30% over the 2-month 0.365 ceiling** by
+  FILLING the area-enclosure residual, not by adding force: the rot dose ladder (0→0.3→0.6→1.0) is MONOTONE in LS
+  (0.332→0.430→0.461→0.481), area_ratio (0.100→0.189→0.284→0.360, 3.6×), loopiness_ratio (0.424→0.712→0.992→1.107,
+  hits real at rot0.6), and minor_axis_ratio (0.446→0.794). Dashboards: rot0 red loops are thin radial stubs inside
+  green; rot1.0 red loops are FAT closed ellipses superposing on green (per-node LS up to +0.87). **SINGLE DRAW —
+  B29 replicates (campaign law: single-seed clean points routinely regress).** See fact #30 (ESTABLISHED) + #29.
+- **Prior record (rot-OFF radial regime): LS = 0.365** (B23 slo50, CONVERGED@2400it).
   Config: stiff[50,300] (SOFTENED floor, SIREN ω=5) + narrow gain[0.2,1.5] + SIREN fibre dev=0.05,
   gain0=0.5, amp=10, drag=40, dur_hi=11→dur≈9.4. ZERO negative nodes; **lowest overshoot ever ampL=0.004**;
   learned gain field HALVED vs stiff[80,300]. Beats the old 0.358 fibre-lottery peak with LOW variance.
@@ -100,7 +135,15 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
    That is exactly what an anisotropic constitutive law should do — set how displacement is DISTRIBUTED across
    directions, not how much there is. This makes fibre architecture the leading lever for the real residual
    (enclosure, fact #29), and reframes "fibre is load-bearing" as "fibre is the directionality/enclosure
-   channel." `[mechanism@LoopScore, 2400it converged, B14+B21; enclosure role from 2026-07-04 audit]`.
+   channel." **B31 CONFIRMS fibre stays load-bearing UNDER ROTATION:** dropping fibre from `--learn` at rot=1.0
+   (nofib) is the WORST B31 slot (LS=0.394, area_ratio 0.230 — lowest) — the rotating axis does NOT make the
+   spatial fibre redundant. **B32 ELEVATES fibre to the LIVE LS LEVER under rotation — DOSE-CONFIRMED:** the SIREN
+   fibre_dev ladder is MONOTONE in LS (dev 0.05/0.08/0.12/0.18 → 0.447/0.465/0.473/0.492, rolling off at 0.25→0.482),
+   so more per-region axis variation genuinely rescues the radial-node uniformity residual under the rotating axis
+   (peak dev~0.18–0.20; the quiver gets wavier). REAL, not lottery: the prior single "fdev12=0.493" REGRESSED to 0.473
+   on replicate, but the independent dose ladder validated the lever. **The win is dev MAGNITUDE, not spatial SCALE:
+   fibre_wl 28.8→20 (finer) = 0.473 ≡ fdev12 replicate (scale-inert).**
+   `[mechanism@LoopScore, 2400it converged, B14+B21+B31+B32; dose-confirmed@B32; enclosure/directionality role from 2026-07-04 audit + B32]`.
 6. **Coarse SIREN stiffness is CRITICAL, and WIDER CONTRAST WINS @drag40 — [80,300] was NOT the hard
    optimum; the RANGE IS DRAG-GATED.** SIREN (ω=5) converges to a binary spatial pattern; stiffness adds
    ~0.10 LS. NARROWING [100,200] and floor-RAISING [100,300] both HURT (B12) — contrast is essential.
@@ -316,18 +359,53 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
     loops get THINNER not fatter. **DEEPER: radial motion is TIME-REVERSIBILITY-intrinsic — a single axis n(x,y)
     with a near-symmetric envelope contracts along n then releases back along n → retraces → ~zero area; the ~0.13
     area is only inertial/damping lag (thin loops). Enclosure REQUIRES the contraction axis to ROTATE during the
-    beat** (contract and release push along DIFFERENT directions). → B28 tests `--rot_stress` (#30). `[ESTABLISHED:
-    residual=enclosure, fibre-gated, parametrically-unfixed, radial=time-reversibility-intrinsic | travelling-wave
-    hypothesis FALSIFIED@B27 2399it — timing decoheres, does not rotate — 2400it, B26+B27+2026-07-04 audit].`
+    beat** (contract and release push along DIFFERENT directions). **CONFIRMED@B28: `--rot_stress` (a rotating axis,
+    fact #30) raises enclosure MONOTONE (area_ratio 0.10→0.36, loopiness→real) AND breaks the LS ceiling
+    (0.332→0.481) — the time-reversibility prediction is validated; rotation works where staggered timing (B27)
+    failed.** `[ESTABLISHED: residual=enclosure, fibre-gated, radial=time-reversibility-intrinsic, ROTATION-fixable
+    (#30) | travelling-wave FALSIFIED@B27 — timing decoheres, does not rotate — 2399it, B26+B27+B28+2026-07-04 audit].`
 
-30. **ROTATING CONTRACTION AXIS (`--rot_stress`) is the enclosure candidate B28 tests — HYPOTHESIS, UNRUN.**
-    Because enclosure requires the FORCE DIRECTION to rotate over the beat (fact #29), B28 sweeps a mean-zero,
-    phase-locked axis swing `theta(x,y) + rot_stress·sin(2π(fr−onset)/period)` (radians; 0=OFF, byte-identical to
-    the fixed-axis path; code applied at all four frame-stepping sites, differentiable in the fibre theta). PREDICTION:
-    area_ratio/loopiness RISE with |rot_stress| (the metric tw LOWERED), and the sign of rot_stress sets the induced
-    chirality (rotneg test). A null (area flat/down, overshoot up) closes the in-model rotation route and points to
-    biaxial/time-varying stress MAGNITUDE (two phase-offset orthogonal contraction terms) or a static CURL fibre
-    field. `[HYPOTHESIS(B28), UNRUN — 2400it, parent=b27_ctrl record family stiff_hi300].`
+30. **ROTATING CONTRACTION AXIS (`--rot_stress`) IS THE AREA-ENCLOSURE MECHANISM — ESTABLISHED, and it is the
+    RECORD-BREAKING LS lever.** A mean-zero, phase-locked axis swing `theta(x,y) + rot_stress·sin(2π(fr−onset)/period)`
+    (radians; 0=OFF byte-identical, applied at all four frame-stepping sites, differentiable in θ) moves the residual
+    the whole campaign called invariant (facts #24–#29), MONOTONE and large, AND breaks the 2-month LS≈0.365 ceiling:
+    over rot 0→0.3→0.6→1.0, LS 0.332→0.430→0.461→0.481 (RECORD), area_ratio 0.100→0.189→0.284→0.360 (3.6×),
+    loopiness_ratio 0.424→0.712→0.992→1.107 (hits REAL at rot0.6, overshoots at rot1.0), minor_axis_ratio
+    0.446→0.794, chir_match 0.789→0.844. **MECHANISM: rotation REDISTRIBUTES, it does not add force** — energy_ratio
+    stays ~0.85 flat and peak_ratio DROPS (0.544→0.488), so radial (in-and-out) motion is converted into circulation.
+    This is exactly why the enclosure residual was invariant to every MAGNITUDE lever (drive/stiff/dur/drag/waveform)
+    but yields to a DIRECTIONAL one, and it directly CONFIRMS fact #29's deep prediction (a fixed axis with a
+    symmetric envelope is time-reversible → retraces → ~0 area; the axis must ROTATE during the beat). SIGN is WEAK:
+    rotneg (−1.0) gives LS 0.441 ≈ rot +1.0, chir_match 0.833 vs 0.844 — magnitude dominates, sign barely flips
+    chirality. LS still RISING at rot=1.0 (not peaked); optimizer shortens the pulse (dur 9.6→6.4–7.7). Caveat:
+    rot10 (0.481) is a SINGLE draw → B29 replicates. **B31 REPLICATES + adds SATURATION:** rot10 redrew LS=0.462
+    (within ±0.05 of 0.481) → mechanism STABLE. But rot is a SATURATING enclosure knob for LoopScore — over rot
+    1.0→1.5→2.0, area_ratio keeps climbing MONOTONE (0.308→0.357→0.435) while LS does NOT (0.462→0.430→0.438): past
+    rot1.0 the extra swing DEGRADES chir_match (0.838→0.809) and dips loopiness, so more raw area does NOT buy LS. LS
+    is decoupled from area once loopiness≈real (hit at rot1.0). rot_stress OPERATING POINT = 1.0. **B32 RECONFIRMS the
+    saturation at an intermediate dose:** rot14 (rot 1.0→1.4 @soft-floor) gave the HIGHEST area_ratio (0.402) + minor_axis
+    (0.906) of B32, yet LS=0.448 ≤ the rot1.0 replicate (0.453), chir flat (0.837). Sign weak-but-NOT-neutral: B32 rotneg
+    (−1.0) is the WORST slot (LS=0.432), the ONLY one with loopiness BELOW real (0.844) + lowest chir (0.817) — reversing
+    the swing slightly degrades BOTH enclosure and chirality (not pure magnitude). `[mechanism@LoopScore,
+    2399it converged, ESTABLISHED@B28, REPLICATED+SATURATION@B31+B32 — rotating axis = enclosure channel via redistribution,
+    LS peaks at rot1.0 (area saturates above); parent=b27 record family stiff[50,300]].`
+31. **SIZE-LEVER × ROTATING-REGIME — RESOLVED@B31→OVERTURNED@B32: NEITHER softening NOR drive is a robust LS lever
+    @rot1.0; the residual is per-node UNIFORMITY, and FIBRE HETEROGENEITY (not the material floor) is what moves it.**
+    In the rot=1.0 regime the median loop is a fat closed ellipse; the residual is absolute AREA (~0.35 vs real 1.0) +
+    per-node UNIFORMITY (LS_SD ~0.30, a handful of still-radial nodes). **(a) stiff_lo SOFTENING does NOT reopen — B31's
+    slo30 "win" (0.475) was a LOTTERY HIGH DRAW.** B32 replicated it at 0.453 and the whole floor ladder is FLAT within
+    noise: slo20/slo30/slo40 = 0.456/0.453/0.459 (area drifts mildly UP with a FIRMER floor, 0.323/0.286/0.351, but LS
+    is flat). So softening is INERT across stiff_lo∈[20,40] @rot1.0 — the B31 "compliance→circulation" story is
+    RETRACTED. **(b) AMPLITUDE does NOT reopen either** (B31 amp12: LS 0.443<rot10, still overshoot — facts #4/#25 hold
+    under rotation). **(c) The LIVE lever is SIREN FIBRE HETEROGENEITY (fact #5):** raising fibre_dev 0.05→0.12 (fdev12)
+    WON B32 by rescuing radial nodes — DOSE-CONFIRMED (fibre_dev 0.05→0.18 monotone 0.447→0.492, peak dev~0.18; #5), more
+    per-region orientation variation, NOT softer material, cuts the uniformity residual under the rotating axis. **B33
+    RE-ATTRIBUTES the residual: enclosure is now SOLVED (loopiness_ratio 1.06–1.18 ≥ real across all B32 slots), so the
+    dominant gap is back to MAGNITUDE/SIZE — clean real-referenced peak_ratio ≈0.49 (sim peak = HALF real), area_ratio
+    ≈0.35; dashboard red loops loopy+correctly-chiral but INSIDE green.** SIZE was declared "invariant to every lever"
+    (#24/#25) but ONLY at rot=0 (radial/time-reversible) — with the axis now rotating, whether drive/gain/compliance
+    converts to size is the LIVE B33 question (see Open-Q #1-NEW). `[mechanism@LoopScore, 2399it, OVERTURNED@B32 (floor
+    inert @[20,40]), dose-confirmed fibre@B32; residual RE-ATTRIBUTED enclosure→size@B33 — size-in-rotation is the open question].`
 
 ## Optimization facts  `[optimization@<regime>]` — depth-dependent, never promote to mechanism
 
@@ -451,9 +529,28 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
   `p3_b27_*` config-only stubs = design-step re-invocation): NOT logged as science, NOT redesigned; the completed
   travelling-wave slots LEFT VERBATIM (b27_*) so the loop re-submits batch 27 into the same dirs. Confirms the
   blocker is still INTERMITTENT and operator-gated.
+- **CODE-CRASH is a DISTINCT 0-data loss mode from the SSH/submit loss — TRIAGE by the presence of `.out`/`.err`.**
+  `[engineering/ops, 2026-07-05, B30 (=b29 code-crash)]` A whole batch with only `config.json` per slot is NOT
+  automatically an SSH loss. Two signatures: (a) SUBMIT loss — NO `.out`/`.err` at all (bsub never launched the job);
+  (b) CODE-CRASH — a `.out`/`.err` PAIR exists, the job ran on a host and died in ~10–15 s (`Run time ~15 s`,
+  `Max Memory ~600 MB`, exit 1). **ALWAYS read a slot's `.err` FIRST** (`loop_logs/p3_b{N}_s*_*.err`): a Python
+  traceback ⇒ code-crash; renew-the-credential does nothing, you must FIX code + re-issue. **B30 instance:** the M2
+  operator refactor (commit 6737189) merged the drag op `mpm_drag`→`drag` (`emit: mpm_acceleration`); the spec was
+  migrated but `cardio_mpm_train.py` still keyed `ops["mpm_drag"]` (lines 588 AND 589 — force_ops too) →
+  `KeyError 'mpm_drag'` ~15 s ×6. FIXED (both keys → `"drag"`; behaviorally identical — new `Drag` exposes `.k` and
+  returns `{mpm_particle: -k·v}` that `step_frame` routes as before). Sibling M3 refactor
+  (`pulse_stimulus`+`phase_delay_pulse`→`activation_pulse`) left 3 HARMLESS `p_op("pulse_stimulus",…)` fallbacks at
+  train.py:512–514 (defaults matched the spec) — renamed for correctness. **DURABLE RULE: after ANY operator refactor
+  in the Plexus src, grep cardio's OWN `cardio_mpm_train.py` (not just specs/am2_ops) for every renamed op token —
+  train.py has hardcoded `ops["…"]` and `p_op("…")` string lookups that a src rename silently breaks.** Was an
+  EXECUTION LOSS, not science: last real data stays B28; the b29 rot_stress replication is re-issued as Batch 30.
 
 ## Rejected hypotheses (distilled — regime-tagged; re-openable)
 
+- "Stiffness-floor softening REOPENS as a size/enclosure lever in the rotating regime (fact #31a)" —
+  **OVERTURNED@B32.** B31's slo30=0.475 was a lottery high draw; the B32 replicate came in at 0.453 and the floor
+  ladder is FLAT (slo20/30/40 = 0.456/0.453/0.459). Softening is INERT across stiff_lo∈[20,40] @rot1.0. The live
+  uniformity lever is FIBRE heterogeneity, not material compliance. Moved to fact #31/#5. `B31→B32, CLOSED for floor.`
 - "Structure is necessary for loops" / "rotary force is required" — **FALSIFIED** (2×2; loops inertial;
   rotary was a scaffold for a force-based model, not a cardiomyocyte property).
 - "Spatial stiffness lifts the fit" — **FALSIFIED@R²; OVERTURNED@LoopScore.** SIREN stiffness converged to
@@ -647,17 +744,24 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
   or duration does.** Softening stiff_lo lifts LS (record 0.365) but via OVERSHOOT reduction, not size —
   `size` stayed flat (fact #26). dur_hi13 neutral. So drive (B22), stiffness AND duration (B23) all leave
   size invariant (fact #24). `CLOSED — the mapped mechanisms do not move size.`
-- **#1 — Does a TRAVELLING-WAVE activation phase create ENCLOSED AREA (raise loopiness toward real)? (B27, LIVE.)**
-  The audit + fact #29 identify the dominant residual as area-enclosure (ESTABLISHED): the sim moves near-radially
-  (loopiness ~0.21 vs real ~0.50). WORKING HYPOTHESIS (B27 tests): this is because global synchronous activation
-  acts through a largely UNIAXIAL fibre architecture → in-and-out along ~one line. B27 adds a coarse plane-wave
-  activation delay `--tw_amp`/`--tw_angle` (staggered regional
-  contraction = action-potential propagation) as a FIXED swept knob; the operator's real-referenced enclosure_row
-  (area_ratio/loop_ratio/minor_ratio, sim|real|ratio on `mov`) is now the instrument, and B27 sweeps a dose
-  (0/6/12/20) + a direction. PREDICTION: staggered firing pulls a node along a rotating force → its trajectory
-  encloses area → area_ratio/loop_ratio rise toward 1. If loopiness does NOT rise with any tw_amp,
-  radial motion is intrinsic to this uniaxial-active-stress forward model and the mechanism must change (e.g. a
-  time-varying / biaxial stress tensor, or a rotational fibre field).
+- ~~**#1 — Does a mechanism create ENCLOSED AREA (raise loopiness toward real)?**~~ **ANSWERED — YES, a ROTATING
+  contraction axis (`--rot_stress`) does it (B28, fact #30); the travelling-wave route was FALSIFIED (B27).** Timing
+  decoheres a uniaxial pull; ROTATION redistributes radial motion into circulation → area_ratio 0.10→0.36,
+  loopiness→real, LS 0.332→0.481 (RECORD). `CLOSED — enclosure is rotation-fixable.`
+- **#1 (NEW) — Does a SIZE lever now convert to loop SIZE in the ROTATING regime? (B33, LIVE — now with clean evidence.)**
+  With enclosure SOLVED (loopiness ≥ real, B32), the dominant residual is a CLEAN real-referenced peak_ratio ≈0.49 (sim
+  peak = half real) + area_ratio ≈0.35 on the mov set. Every size lever (amp, gain_hi, stiff_lo) was falsified ONLY at
+  rot=0 (radial/time-reversible, where drive→overshoot, facts #24/#25). PREDICTION: with the axis rotating, extra
+  drive/gain/compliance may now ENLARGE the loop (raise peak_ratio) instead of dissipating as radial recoil, because
+  rotation redistributes radial motion into circulation. **B33 tests amp12/amp14 (drive) + gain_hi2.0 (ceiling) + stiff_lo20
+  (compliance) @rot1.0, dev18 parent.** A clean null (all leave peak≈0.49 + lower LS) → absolute size is capped INDEPENDENT
+  of rotation → structural (boundary Dirichlet compliance `--bwidth`, or a bigger-strain constitutive change), not a
+  drive/material lever. An overturn (any lever raises peak_ratio while holding LS+chir) → facts #24/#25 are regime-bound to rot=0.
+- **#1b (NEW) — Where is the fibre_dev LS peak, dev0.18 or 0.20? (B33.)** The dose ladder rises to dev0.18 (0.492) and rolls
+  off at dev0.25 (0.482); dev0.20 fills the peak and pins the operating point.
+- **#2 (NEW) — Where is the rot_stress LS optimum, and is fibre still load-bearing under rotation? (B29.)** LS still
+  RISING at rot=1.0 (find the peak: rot1.5/2.0). And does the LEARNED fibre SIREN still add value once rot swings the
+  axis, or has rotation made it redundant (nofib ablation)?
 - ~~**What STRUCTURAL mechanism sets loop SIZE? (was THE #1 question, B25–B26.)**~~ **RETIRED — wrong question.**
   The `size` diagnostic that framed it was unsound (audit); the two remaining structural leads closed @B26 —
   boundary `--bwidth` a tiny lottery-band effect (not interior enlargement) and settle `--warmup` FALSIFIED with
@@ -691,51 +795,56 @@ optimum. Maximize node-mean LoopScore (with low LS SD = uniform tissue).
 
 ## Previous theme summaries (last 4, oldest→newest; MUST precede ## Current theme)
 
-- **Batch 23 (2026-07-03, CONVERGED@2400it):** Stiffness softening WORKED — NEW RECORD LS=0.365 (slo50,
-  stiff_lo 80→50) — but NOT via size. `size` stayed flat; OVERSHOOT collapsed (ampL 0.023→0.004, gain
-  field halved). Softening = an OVERSHOOT/SHAPE lever, drag40-gated (drag30 loses it). Two rejected
-  hypotheses OVERTURNED: [80,300] not a hard optimum (floor-lowering wins), stiff_hi=400 not catastrophic
-  (drag-limited, +0.022 @drag40). Size residual now invariant to drive+stiffness+duration → likely
-  integrator/structural. → B24 re-probes size in the tamed regime + tests contrast stacking.
-- **Batch 24 (reissue, CONVERGED@2400it):** First real data since B23 (14-batch infra burn resolved by driver
-  restart). Both remaining size leads REFUTED: amp12 left size flat + LS down; gain_hi=2.5 DIVERGED (ampL=16.5,
-  2 nodes −1.00) — revealing the gain-ceiling is stiffness-floor-gated. Record (0.365) did NOT reproduce (ctrl
-  0.343). Parametric size frontier declared EXHAUSTED → B25 goes structural.
-- **Batch 25 (2026-07-04, CONVERGED@2400it):** BOTH structural size sub-leads FALSIFIED. Finer integration
-  (substeps=14) left size flat, LS down, one −0.40 node; activation asymmetry (pulse_skew=2.0) left size
-  flat/smaller and instead raised overshoot + openness (a shape lever, not size). Size is now invariant to ALL
-  in-model levers (fact #24). stiff_hi400 (wide400) matched the 0.365 record with ampL=0.002 (cleanest ever).
-  gain_hi=2.0 safe (edge is 2.0–2.5). → B26 tests the last structural constraints: boundary anchor + settle window.
-- **Batch 26 (2026-07-04, CONVERGED@2400it):** the last two structural SIZE leads CLOSED. Settle window
-  `--warmup=100` FALSIFIED with OPPOSITE sign (worst slot, LS 0.267, highest overshoot — a longer settle
-  accumulates recoil, does not enlarge the stable cycle). Boundary `--bwidth` monotone (0.03/0.06/0.10 →
-  0.341/0.336/0.308) but within lottery + contaminated `size` trend — a mild EXPLOIT, not a size lever. Acting on
-  the 2026-07-04 audit: the real residual is AREA-ENCLOSURE, NOT size (established); the radial-motion-from-
-  synchronous-pulse root is a working hypothesis. → B27 tests it via a travelling-wave activation phase.
+- **Batch 27 (2026-07-04, CONVERGED@2399it):** the TRAVELLING-WAVE hypothesis is FALSIFIED — staggered timing
+  LOWERS enclosure monotonically (area_ratio 0.130→0.085, loopiness 0.503→0.365, LS 0.360→0.249, ampL up ~28×).
+  Desync DECOHERES a still-uniaxial pull (Dirichlet-pinned regions cancel); timing does not rotate the force
+  direction. DEEPER: radial motion is TIME-REVERSIBILITY-intrinsic — enclosure REQUIRES the contraction axis to
+  ROTATE during the beat. → B28 tests `--rot_stress` (a phase-locked axis swing).
+- **Batch 28 (2026-07-05, CONVERGED@2399it) — DECISIVE WIN:** `--rot_stress` (rotating contraction axis) IS the
+  area-enclosure mechanism (fact #30, ESTABLISHED) and it BREAKS the 2-month LS≈0.365 ceiling. rot 0→0.3→0.6→1.0:
+  LS 0.332→0.481 (RECORD), area_ratio 0.10→0.36 (3.6×), loopiness→real, minor_axis→0.79 — all MONOTONE. Rotation
+  REDISTRIBUTES radial motion into circulation (energy flat ~0.85, peak DROPS) — it works where every magnitude
+  lever failed, confirming fact #29's time-reversibility prediction. Sign weak (rotneg ≈ rot+1.0). rot10 single
+  draw → B29 replicates + maps the SHIFTED residual (absolute size, now in the rotating regime).
+- **Batch 31 (2026-07-05, CONVERGED@2399it):** rot10 mechanism REPLICATED (fact #30 stable). rot is a SATURATING
+  enclosure knob — over 1.0→2.0 area climbs while LS does not (peaks at 1.0). Fact #31 SPLIT (later overturned by
+  B32): slo30 drew the batch high (LS=0.475), amp12 did not reopen. Residual = per-node uniformity (LS_SD ~0.30);
+  fibre quiver still near-uniaxial. → B31/32 tests floor curve (slo20/40), higher rot (rot14), fibre heterogeneity
+  (fdev12), rotation sign (rotneg).
+- **Batch 32 (2026-07-05→06, CONVERGED@2399it):** FIBRE HETEROGENEITY is a DOSE-CONFIRMED live LS lever under rotation.
+  The fibre_dev ladder rises MONOTONE (dev 0.05/0.08/0.12/0.18 → 0.447/0.465/0.473/0.492, rolls off 0.25→0.482; peak
+  dev~0.18, new op point dev18 LS=0.492). The earlier single "fdev12=0.493" REGRESSED to 0.473 on replicate (campaign
+  law) but the dose ladder rescued the lever. The win is dev MAGNITUDE not spatial SCALE (fibre_wl20 inert = 0.473).
+  **Residual RE-ATTRIBUTED: rotation SOLVED enclosure (loopiness ≥ real everywhere), so the dominant gap flips BACK to
+  SIZE — clean peak_ratio ≈0.49, area ≈0.35, red loops loopy-but-inside-green.** → B33 re-opens size in the rotating
+  regime (does drive/gain/compliance now convert to peak excursion?).
 
 ---
 
 ## Current theme
 ### Current hypothesis
-"ESTABLISHED: the dominant residual is AREA-ENCLOSURE (loopiness), NOT size — the reframe from the 2026-07-04
-audit, supported by B26 closing the last two structural size leads (settle FALSIFIED opposite-sign, boundary a
-tiny lottery effect, fact #29), and fibre gates enclosure (no-fibre ablation halves area). WORKING HYPOTHESIS
-(B27 tests it, not yet established): global SYNCHRONOUS activation, acting through a LARGELY UNIAXIAL fibre
-architecture (the learned quiver looks roughly single-axis in the montages), may bias each particle toward
-in-and-out motion along ~one line → near-RADIAL motion
-that encloses little area (sim loopiness ~0.21 vs real ~0.50). IF that is the root, it would explain why
-enclosure was invariant to every in-model lever tried (drive/stiff/dur/drag/integrator/waveform/boundary/settle)
-— none breaks the temporal/directional symmetry — and spatial activation timing should raise enclosed area.
-**B27 puts this to the test: a TRAVELLING-WAVE
-activation phase τ(x,y)** (`--tw_amp` peak-to-peak frame delay across the domain, `--tw_angle` direction; a
-coarse mean-zero plane wave = action-potential propagation), a FIXED swept knob (the old learnable-τ went to
-zero under R²). PREDICTION: staggered regional contraction pulls a node along a rotating force so its trajectory
-ENCLOSES area → the operator's real-referenced enclosure_row (area_ratio, loop_ratio, minor_ratio on `mov`)
-RISE toward 1. Sweep a dose (0/6/12/20) + a direction (90°) + a tw-OFF stiff_hi400 LS anchor. Read the
-montage loop FATNESS, not LS alone — this batch maps a NEW morphology family. If loopiness does NOT rise at any
-tw_amp, radial motion is intrinsic to the uniaxial-active-stress model and the mechanism must change (time-varying
-/ biaxial stress, or a rotational fibre field). Settled context: substeps=10, fibre-ON, drag40, gain_hi=1.5,
-amp=10, stiff[50,300]. Parent = b26 record family (bwidth default 0.06, tw OFF)."
+"ESTABLISHED (B28, replicated B31): a ROTATING contraction axis (`--rot_stress`) IS the area-enclosure mechanism —
+it filled the residual the whole campaign called invariant AND broke the 2-month LS≈0.365 ceiling (fact #30). rot is
+a SATURATING knob: LS peaks at 1.0 (rot OPERATING POINT), area keeps climbing above but LS does not. Enclosure SHAPE
+is solved (loopiness≈real); the residual SHIFTED to per-node UNIFORMITY (LS_SD ~0.30: a handful of still-radial
+nodes) + absolute AREA (~0.35 vs real 1.0).
+**B32 CONFIRMED the fibre lever by DOSE-RESPONSE and RE-ATTRIBUTED the residual to SIZE.** (1) FIBRE HETEROGENEITY is
+REAL, not lottery: the fibre_dev ladder rises MONOTONE (dev 0.05/0.08/0.12/0.18 → 0.447/0.465/0.473/0.492), rolling off
+at dev0.25 (0.482) → peak dev~0.18–0.20 (fact #5). The earlier single 'fdev12=0.493' REGRESSED to 0.473 on replicate
+(9th single-draw regression) but the independent monotone dose ladder rescued the lever. The win is dev MAGNITUDE, not
+spatial SCALE — fibre_wl 28.8→20 (finer) = 0.473 ≡ replicate (scale-inert). New op point = dev18 (LS=0.492).
+(2) **THE RESIDUAL FLIPPED BACK TO SIZE.** Rotation SOLVED enclosure: loopiness_ratio is 1.06–1.18 (at/ABOVE real) in
+every B32 slot. So the dominant gap is now MAGNITUDE — a CLEAN real-referenced peak_ratio ≈0.49 (sim peak = HALF real),
+area_ratio ≈0.35; the dev18 dashboard shows red loops loopy + correctly-chiral but sitting INSIDE the green.
+**B33 HYPOTHESIS (the ONE question): in the enclosure-solved rotating regime, is the SIZE residual now DRIVE-limited?**
+Facts #24/#25 ('drive→overshoot, not size') were established ONLY at rot=0 (radial/time-reversible). With the axis
+rotating — which redistributes radial motion into circulation — extra drive/gain/compliance may now CONVERT to loop
+size (raise peak_ratio) instead of overshooting. B33 fans out the causal candidates: amp12/amp14 (drive), gain_hi2.0
+(ceiling), stiff_lo20 (compliance), each vs a dev18 replicate control; plus dev20 to pin the fibre-dose peak. A clean
+NULL (all leave peak≈0.49 + lower LS) → size is capped INDEPENDENT of rotation → structural (boundary `--bwidth`
+compliance or a constitutive strain change); an OVERTURN (any lever raises peak_ratio holding LS+chir) → #24/#25 are
+regime-bound to rot=0. Settled context: substeps=10, rot1.0, drag40, gain[0.2,1.5], amp10, stiff[30,300], dur_hi11.
+Parent = dev18 (fibre_dev0.18)."
 ### Iterations this theme
 - Batches 1–12: scalar levers + SIREN architecture saturated at LS≈0.20 plateau.
 - Batch 13: SIREN capacity hypothesis FALSIFIED. Spatial gain implemented.
@@ -774,9 +883,42 @@ amp=10, stiff[50,300]. Parent = b26 record family (bwidth default 0.06, tw OFF).
   `--tw_amp`/`--tw_angle` (coarse plane-wave activation delay = AP propagation); the operator's enclosure_row
   (area_ratio/loop_ratio/minor_ratio) is the real-referenced instrument. Sweep tw dose 0/6/12/20 + direction + a
   tw-OFF LS anchor. Read the enclosure ratios + montage loop fatness, not LS alone.
+- **Batch 27: travelling-wave FALSIFIED (fact #29→#30 pivot).** Staggered timing LOWERS enclosure monotonically —
+  it decoheres a uniaxial pull rather than rotating the force. DEEPER: radial motion is time-reversibility-intrinsic;
+  enclosure REQUIRES the axis to ROTATE during the beat. Added `--rot_stress` (phase-locked axis swing). → B28.
+- **Batch 28: DECISIVE WIN — `--rot_stress` (rotating axis) is the enclosure mechanism (fact #30, ESTABLISHED).**
+  rot 0→1.0: LS 0.332→0.481 (NEW RECORD, +30% over the 0.365 ceiling), area_ratio 0.10→0.36, loopiness→real, all
+  MONOTONE. Rotation redistributes radial motion into circulation (energy flat, peak drops). Enclosure SHAPE solved;
+  the residual SHIFTS to absolute SIZE (area/peak still ~0.4–0.5). → B29 replicates + re-opens size in the rotating regime.
+- **Batch 29→31: rotating-axis mechanism REPLICATED + mapped.** rot10 redrew within noise (fact #30 stable). rot
+  SATURATES for LS (peaks at 1.0; area climbs above, LS does not). B31 size-lever split (slo30 wins, amp12 doesn't)
+  looked like "softening reopens" — but see B32.
+- **Batch 32 (CONVERGED@2399it): FIBRE HETEROGENEITY is a DOSE-CONFIRMED lever; residual FLIPS to SIZE.** The
+  fibre_dev ladder rises MONOTONE (dev 0.05/0.08/0.12/0.18 → 0.447/0.465/0.473/0.492, rolls off 0.25→0.482; peak
+  dev~0.18, new op point dev18 LS=0.492). The earlier "fdev12=0.493" REGRESSED to 0.473 on replicate but the dose
+  ladder rescued the lever (win = dev MAGNITUDE; fibre_wl20 SCALE inert = 0.473). Rotation SOLVED enclosure
+  (loopiness ≥ real everywhere) → dominant gap is now SIZE (peak_ratio ≈0.49, area ≈0.35, loops loopy-but-inside-green).
+- **Batch 33: RE-OPEN SIZE in the rotating regime.** Enclosure solved → the clean residual is peak_ratio 0.49 (sim =
+  half real). Facts #24/#25 killed drive/gain/compliance as size levers but ONLY at rot=0 (radial/time-reversible).
+  Test amp12/amp14 (drive) + gain_hi2.0 (ceiling) + stiff_lo20 (compliance) @rot1.0, dev18 parent + dev20 (dose peak).
+  Null → size structural (boundary/constitutive); overturn → #24/#25 regime-bound to rot=0.
 ### Emerging observations
-- **LS=0.365** is the NEW record (B23 slo50, stiff_lo50, CONVERGED, ZERO negatives, ampL=0.004) — a
-  reproducible-family record that beats the old 0.358 fibre-lottery peak. Softening + drag40 is the config.
+- **LS=0.492** is the campaign best (B32 dev18 = rot1.0 + soft-floor + fibre_dev0.18, CONVERGED@2399it), the PEAK of a
+  DOSE-CONFIRMED fibre lever (monotone dev0.05→0.18: 0.447→0.492; win = dev magnitude, fibre_wl SCALE inert). Prior
+  record LS=0.481 (B28 rot10) was the rotating-axis breakthrough (enclosure fill, not more force).
+- **FIBRE-DOSE lesson: a regressed single-draw can still be a REAL lever — validate with an independent DOSE LADDER, not
+  a replicate alone.** "fdev12=0.493" regressed to 0.473 (would have been called luck), but the monotone dev ladder
+  proved fibre heterogeneity real. Report dose-response, not point estimates.
+- **RESIDUAL RE-ATTRIBUTED enclosure→SIZE (B32):** with rotation, loopiness_ratio is 1.06–1.18 (≥ real) everywhere —
+  enclosure is SOLVED. The clean real-referenced residual is now peak_ratio ≈0.49 (sim peak = half real) + area ≈0.35.
+  This REVIVES the size question (facts #24/#25 killed drive/gain/compliance as size levers ONLY at rot=0) → B33 tests
+  whether rotation makes size drive-limited.
+- **rot_stress works by REDISTRIBUTION, not more force** (energy flat ~0.85, peak DROPS 0.544→0.488) — it converts
+  radial (in-and-out) motion into circulation. This is why magnitude levers (drive/stiff/dur/waveform) all failed on
+  enclosure but a DIRECTIONAL lever succeeds. The rot dose is MONOTONE in LS + area + loopiness + minor_axis.
+- **rot_stress SIGN is weak:** rotneg (−1.0) LS 0.441 ≈ rot +1.0 (0.481), chir_match 0.833 vs 0.844 — the swing
+  magnitude sets enclosure, the sign barely flips chirality. Optimizer SHORTENS the pulse under rotation (dur 9.6→6.4).
+- **LS=0.365** was the prior record (B23 slo50, rot-OFF radial regime, ampL=0.004) — now superseded by rot10.
 - **THREE spatial control channels confirmed:** stiffness (elastic response), gain (contraction
   amplitude), fibre dθ (orientation fine-tuning). Each is SIREN-based at ω=5.
 - **Spatial gain STABILIZES both stiffness AND fibre SIRENs** — the key enabler.

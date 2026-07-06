@@ -1,52 +1,41 @@
 # Slots designed by the agent each batch.
 # Format: name : SPEC specs/<file>.yaml [key val ...]  (dotted keys = op.param overrides)
 #
-# Batch 88 slots -- PHASE 3 / STAGE BUD, batch 3. NOANCH SURFACE-TENSION SWEEP + WINNER REPLICATION.
+# Batch 89 slots -- PHASE 3 / STAGE BUD, batch 4. TIP-SHARPNESS x OFFSET FRONTIER + tip8 3-SEED LOCK.
 #
-# WHY THIS BATCH: b87's REAL tip-sharpness sweep ran (separate specs, all differed). Findings:
-#   (1) ANCHORED tip ladder is MONOTONE but tiny -- org_bud_score 0.0144(tip1.5)->0.0275(tip5)->0.0405(tip10),
-#       bud_len_bodyR 0.210->0.264->0.376; b87 falsifier ("FLAT") did NOT fire, but bud_score stays <0.05
-#       anchored = a WEAK bud, failure mode = ROUNDING (shape circularity 0.90), NOT rupture/pattern loss.
-#   (2) DROPPING mpm_anchor is the DOMINANT lever: tip5_noanch (b87 s3) -> bud_score 0.0994 (7x ctrl, MOST
-#       necked neck 0.225, persistence 1.0, biggest body shape-area 0.961) -- the anchor resists BOTH tip
-#       extension AND body inflation. n=1.
-#   (3) CEILING = the aggressive combo OVERSHOOTS: tip10_noanch_off06 (s5) -> bud_score 0.0, neck 1.469 (>1 =
-#       a BULGE not a necked bud). Sweet spot = anchor-off + MODERATE tip.
-#   Pattern HELD everywhere (mi_type_y 1.0, seg_index 1.0); TIER-1 clean everywhere (collapsed 0, nn_min
-#   0.0177-0.0186); NO runaway. [engineering] org_growth_bud_overlap = 0.0 in ALL 8 slots = BROKEN metric.
+# WHY THIS BATCH (b88 read):
+#   (1) tip5_noanch = a REAL WEAK BUD, 3 seeds: org_bud_score 0.072+/-0.010 (seed0 0.0797, seed1 0.0573,
+#       seed2 0.0787; persistence 1.0, neck<0.40, pattern held mi_type_y 1.0, TIER-1 clean) = 7-SD over ctrl
+#       -> [established]. The b87 single-seed 0.099 REGRESSED to 0.072 (9th single-seed clean point to fall).
+#   (2) [engineering] mpm_grid_update.surface_tension is a NO-OP: st5(5.0)==st3(3.0) byte-identical bud
+#       metrics; tip8(8.0)==st5_tip8(5.0) identical. The b88 de-rounding hypothesis was NEVER TESTED (dead
+#       lever, reconfirms MOR b73). cell_grow.tip IS live (tip5 0.0797 != tip8 0.0946).
+#   (3) tip8 (0.0946, neck 0.178) > tip5 = monotone tip lever, single-seed batch-max -> needs 3-seed lock.
+#   (4) ROUNDING is the ceiling: body inflates 6x (area 0.156->0.96) but circularity RISES 0.87->0.96,
+#       aspect 1.07 = a bigger SPHERE not a lobe. ps60 (prestretch 0.60) 0.0355 = over-compression rounds.
+#       Every roundness lever now exhausted (surface_tension inert, youngs deflates, prestretch amplifies,
+#       rate-down worsens, rate-up shatters). A discrete organ likely needs a MULTI-CELL domain (n=1 can't).
 #
-# HYPOTHESIS (Batch 88): on the anchor-free substrate, LOWERING MPM surface_tension (8->5->3) is the
-#   discreteness lever -- surface tension rounds the nascent bud back into the sphere; lowering it lets the
-#   tip-localized growth STAND OFF and NECK. Predict org_bud_score UP + organo circularity DOWN / aspect_ratio
-#   UP as surface_tension falls, while the tip5_noanch winner (bud_score 0.099) replicates across 3 seeds.
-#   FALSIFIER: bud_score FLAT/FALLING vs surface_tension (rounding not the limiter) OR winner fails to
-#   replicate (s1/s2 bud_score <0.05, seed luck) -> accept the weak monotone-tip bud as BUD [open] deliverable
-#   and PIVOT to pattern-gated growth. RUNAWAY ARM: st3 fragments (fragment_count>1 sustained OR nn_min<0.016
-#   OR collapsed>0) -> surface tension floor found, retreat to st5.
+# HYPOTHESIS (Batch 89): on the anchor-free substrate org_bud_score keeps rising with tip SHARPNESS past tip8
+#   and with a MODERATE placement offset, peaking before it overshoots into a non-necked bulge (neck>1):
+#   tip12/tip16 and tip8_off05 exceed tip8's 0.0946 while holding neck<1, and the tip8 winner replicates.
+#   FALSIFIER: tip12/tip16 <= tip8 (~0.095) AND off05/k2 <0.10 AND tip8 seeds spread <0.06 -> single-cell
+#   tip-bud CAPPED ~0.09 -> report the weak reproducible tip-bud (0.072+/-0.010) as the BUD [open] deliverable
+#   and OPEN the multi-cell-domain path (grow a SUBSET of cells) as the only route to a discrete organ.
+#   Runaway arm: any slot neck_ratio>1 (bulge) OR nn_min<0.016 OR collapsed>0 -> overshoot/rupture, retreat.
 #
-# READ ORDER (organo family from scorecard.json / org_* in metrics.json, NOT the movie): FIRST the WINNER
-#   REPLICATION -- noanch_s1/s2 org_bud_score vs the b87 s3 0.099 (compute mean+/-SD over the 3 seeds; <0.05 =
-#   seed luck). THEN the SURFACE-TENSION TREND at seed 0: st8 (b87 s3 = anchor) -> st5 -> st3, read org_bud_
-#   score, organo circularity/aspect_ratio (stand-off), org_bud_neck_ratio (<1 = necked, >1 = bulge),
-#   org_bud_persistence. SCREEN st3 FIRST for the fragment signature (org_fragment_count>1 sustained, nn_min<
-#   0.016, collapsed>0). Judge bud by score/len/neck/persistence (NOT overlap=0), growth by organo area/
-#   body_radius (NOT grow_ratio), pattern by mi_type_y (must stay 1.0). escape~1.0 = body-drift artifact ALONE.
+# READ order: FIRST tip8 3-seed spread (s1/s2 vs b88 s3=seed0 0.0946); THEN sharpness trend (tip8->12->16:
+#   bud_score, neck<1); THEN offset (off05, tip12_off05); screen EVERY slot for neck_ratio>1 / nn_min<0.016.
+#   Judge bud by score/neck/persistence (NOT overlap=0, broken), pattern by mi_type_y, growth by organo area.
+#   All 12000f (~800-830 s on L4) < 20-min wall.
 #
-# GOTCHAs (durable): dotted cell_grow.*/mpm_grid_update.* overrides DON'T apply to flow-style op lines ->
-#   SEPARATE SPECS authored (this batch); general.seed override also risky on the flow map -> seed variants
-#   are separate spec files (noanch_s1 seed 1, noanch_s2 seed 2). all `at:'agent[type=x]'` single-quoted;
-#   cp/sed/>>/heredoc/python3/loop-for sandbox-blocked -> Write/Edit + Read; nn_min ~0.018 = clean floor.
-#   12000f (~800-830 s) < 20-min L4.
-#
-# Roles: 4 exploit (noanch_s1 + noanch_s2 = 3-seed the winner / noanch_st5 = de-round / noanch_tip8 = sharper
-#   tip) / 3 explore (noanch_st3 aggressive de-round+runaway probe / noanch_ps60 stronger local pressure /
-#   noanch_st5_tip8 best-guess combo) / 1 control (ctrl_nogrow = noanch rate-0 no-op, pattern/shape baseline).
+# 4 exploit (tip8_s1, tip8_s2, tip12, tip8_off05) / 3 explore (tip16, tip8_k2, tip12_off05) / 1 control.
 
-noanch_s1      : SPEC specs/embryo_BUD_noanch_s1.yaml
-noanch_s2      : SPEC specs/embryo_BUD_noanch_s2.yaml
-noanch_st5     : SPEC specs/embryo_BUD_noanch_st5.yaml
-noanch_tip8    : SPEC specs/embryo_BUD_noanch_tip8.yaml
-noanch_st3     : SPEC specs/embryo_BUD_noanch_st3.yaml
-noanch_ps60    : SPEC specs/embryo_BUD_noanch_ps60.yaml
-noanch_st5_tip8: SPEC specs/embryo_BUD_noanch_st5_tip8.yaml
-ctrl_nogrow    : SPEC specs/embryo_BUD_noanch_nogrow.yaml
+tip8_s1     : SPEC specs/embryo_BUD_noanch_tip8_s1.yaml
+tip8_s2     : SPEC specs/embryo_BUD_noanch_tip8_s2.yaml
+tip12       : SPEC specs/embryo_BUD_noanch_tip12.yaml
+tip8_off05  : SPEC specs/embryo_BUD_noanch_tip8_off05.yaml
+tip16       : SPEC specs/embryo_BUD_noanch_tip16.yaml
+tip8_k2     : SPEC specs/embryo_BUD_noanch_tip8_k2.yaml
+tip12_off05 : SPEC specs/embryo_BUD_noanch_tip12_off05.yaml
+ctrl_nogrow : SPEC specs/embryo_BUD_noanch_nogrow.yaml

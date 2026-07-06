@@ -1,0 +1,37 @@
+general:
+  name: spv
+  seed: 1
+  n_frames: 800
+  dt: 0.05
+  boundary: periodic
+  world:
+  - 16.0
+  - 16.0
+sets:
+  cell:
+    n: 90
+    spawn: random
+    types:
+      a:
+        fraction: 1.0
+    buffer: 300
+fields: {}
+operators:
+- op: vertex_tension
+  at: cell
+  p0: 3.85
+  v0: 0.1
+  Dr: 1.0
+  K_A: 1.0
+  K_P: 1.0
+  A0: 1.0
+  mu: 1.0
+  dt: 0.05
+- op: cell_divide
+  at: cell
+  rate: 0.025
+  offset: 0.25
+  max_occ: 0.95
+schedule:
+- vertex_tension
+- cell_divide

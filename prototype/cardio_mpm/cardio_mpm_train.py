@@ -509,9 +509,9 @@ def main():
 
     spec = load(resolve_config(args.spec)[0])
     p_op = lambda op, k, d: next((o.params.get(k, d) for o in spec.operators if o.op == op), d)
-    center = p_op("pulse_stimulus", "center", [0.5, 0.5])
-    radius = float(p_op("pulse_stimulus", "radius", 0.12))
-    profile = str(p_op("pulse_stimulus", "profile", "uniform"))
+    center = p_op("activation_pulse", "center", [0.5, 0.5])   # pulse_stimulus -> activation_pulse (M3 merge)
+    radius = float(p_op("activation_pulse", "radius", 0.12))
+    profile = str(p_op("activation_pulse", "profile", "uniform"))
     dt_sub = float(p_op("p2g", "dt_sub", 2e-4) or 2e-4)
 
     # build engine + map the real data (1 model frame = 1 real frame)
@@ -585,8 +585,8 @@ def main():
     # fixed per-slot mechanism knobs (swept by the plan -- not differentiated, exactly like train.py)
     ops = _ops_by_name(spec, str(dev))
     ops["pulse_to_active_stress"].amplitude = float(args.amplitude)
-    ops["mpm_drag"].k = float(args.drag_k)
-    force_ops = ["pulse_to_active_stress", "mpm_drag"]
+    ops["drag"].k = float(args.drag_k)            # op renamed mpm_drag -> drag (emit: mpm_acceleration) by M2 refactor
+    force_ops = ["pulse_to_active_stress", "drag"]
     mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]
     spatial = _spatial_profile(profile, center, radius, dev)
     # TRAVELLING-WAVE activation phase tau(x,y): a coarse PLANE WAVE (action-potential propagation).

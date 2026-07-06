@@ -1,0 +1,32 @@
+general:
+  name: spv3
+  seed: 1
+  n_frames: 300
+  dt: 0.05
+  boundary: periodic
+  dim: 3
+  world:
+  - 5.0
+  - 5.0
+  - 5.0
+sets:
+  cell:
+    n: 125
+    spawn: random
+    types:
+      a:
+        fraction: 1.0
+fields: {}
+operators:
+- op: vertex_tension_3d
+  at: cell
+  s0: 5.0
+  v0: 0.15
+  Dr: 1.0
+  K_V: 1.0
+  K_S: 1.0
+  V0: 1.0
+  mu: 1.0
+  dt: 0.05
+schedule:
+- vertex_tension_3d

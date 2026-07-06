@@ -1,0 +1,15 @@
+# nbody_cluster -- strict-Plexus reproduction of Mocz, "Create Your Own N-body
+# Simulation (With Python)" (papers/nbody-python/). 100 stars, total mass 20,
+# softened Newtonian gravity (G=1, eps=0.1), OPEN boundary. Stars start spread in the
+# box with random velocities and collapse into a bound, orbiting cluster (energy stable).
+general: {name: nbody_cluster, seed: 17, n_frames: 1000, dt: 0.01, boundary: free, world: [4.0, 4.0]}
+sets:
+  star:
+    n: 100
+    vel_init: 1.0
+    types: {s: {fraction: 1.0, mass: 0.2}}          # 20 total mass / 100 stars
+fields: {}
+operators:
+  - {op: nbody_gravity, at: star, G: 1.0, softening: 0.1}
+schedule: [nbody_gravity]
+plotting: {background: black, point_size: 4, colors: {s: [0.7, 0.7, 1.0]}}
