@@ -1,0 +1,67 @@
+# embryo_ORG_demix20 -- ORG b100 (capstone): the integrated organism (crossfork_y120_g3) with DEMIX pushed
+# chemotax gain -0.10 -> -0.20 (both channels). Q: does stronger heterotypic cross-repulsion sharpen segregation
+# (seg->1 faster, mixing_entropy lower) WITHOUT overpacking (nn_min>r0) or perturbing the branch tips? gain BAKED
+# (chemotax caches self.gain in __init__ -> dotted override is inert).
+general: {name: embryo_ORG_demix20, seed: 0, n_frames: 12000, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 44
+    buffer: 44
+    spawn: sunflower
+    spawn_radius: 0.09
+    vmax: 0.6
+    types:
+      a: {fraction: 0.5, move_speed: 0.18, div_rate: 0.0, p: [0.0, 1.0, 0.0, 1.0]}
+      b: {fraction: 0.5, move_speed: 0.18, div_rate: 0.0, p: [0.0, 1.0, 0.0, 1.0]}
+  cell:
+    n: 7
+    start: [[0.50, 0.50], [0.50, 0.30], [0.30, 0.50], [0.70, 0.50], [0.50, 0.66], [0.40, 0.78], [0.60, 0.78]]
+    types:
+      body:
+        fraction: 1.0
+        youngs: 120
+        layers:
+          - {frac: 1.0, youngs: 120, material: elastic}
+  mpm_particle: {parent: cell, per_parent: 900, grow_reserve: 1550, radius: 0.10, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+  chem: {frame: grid, res: 64, components: 2}
+operators:
+  - {op: radius_graph, at: agent, radius: 0.05}
+  - {op: repel, at: agent, strength: 150.0, r0: 0.02}
+  - {op: attraction_repulsion, at: agent, sigma: 0.03}
+  - {op: deposit, at: agent, to: chem, amount: 0.5}
+  - {op: diffuse, at: chem, rate: 0.1}
+  - {op: decay, at: chem, rate: 0.2}
+  - {op: chemotax, at: 'agent[type=a]', from: chem, channel: 1, gain: -0.20}
+  - {op: chemotax, at: 'agent[type=b]', from: chem, channel: 0, gain: -0.20}
+  - {op: sediment, at: 'agent[type=a]', gy: -0.10}
+  - {op: sediment, at: 'agent[type=b]', gy: 0.10}
+  - {op: glide, at: agent}
+  - {op: cell_grow, at: cell, rate: 0.4, target: 3.0, mode: isotropic, offset: 0.03, prestretch: 0.7, stress_gain: 0.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 2.0e-6, k: 1.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 8.0, wall_damp: 0.95}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.95, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.3, confine: 0.03, field: colour}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 40.0}
+schedule:
+  - radius_graph
+  - repel
+  - attraction_repulsion
+  - deposit
+  - diffuse
+  - decay
+  - chemotax
+  - sediment
+  - glide
+  - cell_grow
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {a: [1.0, 0.28, 0.28], b: [1.0, 0.85, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.01

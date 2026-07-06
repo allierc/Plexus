@@ -984,9 +984,11 @@ flow / collective migration · 1E two-type partition. Then INT (integrate all).
       partition). FALSIFIER: seed2 +x circ still <0.75 (uncorrectable) OR any paired Δm1 ≤0 → CLOSE MOR-1 on the ANGLE
       decoupling (b71) with the buckle caveat; campaign rests on PAT + MOR angle-decoupling.
       **MOR-1 — batch-73 VERDICT [MAGNITUDE gate MET on the PAIRED test; surface_tension INERT; residual buckle unmet].**
-      Two decisive results. (1) **[engineering, established] surface_tension is INERT at usable values on the
-      youngs-200 elastic shell:** s5(ST8)=s6(ST0)=s7(ST20) BIT-IDENTICAL on ALL metrics (m1 0.20116, circ 0.7658,
-      msd 0.016667, enstrophy 1.91e-6). ST 0→20 does NOTHING → the b73 "damp wrinkle, spare bud" premise FALSIFIED;
+      Two decisive results. (1) **[engineering — RETRACTED at Batch 98: CONTAMINATED by the dotted-override caching
+      bug, NOT a real test] "surface_tension INERT on the youngs-200 elastic shell":** s5(ST8)=s6(ST0)=s7(ST20)
+      BIT-IDENTICAL — but s6/s7 used dotted overrides `surface_tension=0.0/20.0` whose archived spec.yaml line 53
+      STILL reads 8.0; all three secretly ran ST8 (op caches ST in __init__). ST 0→20 was NEVER applied. The
+      "damp wrinkle, spare bud" premise remains UNTESTED, not falsified. (orig, now unsupported:) msd 0.016667;
       youngs is the ONLY working roundness lever (TESTS.md ST works only on WATER bodies at 120–460, not against a
       stiff membrane at 8–20). (2) **PAIRED Δm1 (aniso1−iso, matched seed, youngs 200): seed0 +0.049, seed1 +0.088,
       seed2 +0.064 = +0.067±0.020, ALL 3 POSITIVE, 3.4·SD → magnitude gate MET.** youngs 200 FLIPPED the b72/y90
@@ -1318,10 +1320,11 @@ flow / collective migration · 1E two-type partition. Then INT (integrate all).
           hard ceiling.** (1) **tip5_noanch = a REAL weak bud, 3 seeds: org_bud_score 0.072±0.010** (seed0 0.0797,
           seed1 0.0573, seed2 0.0787; persistence 1.0, neck <0.40, pattern held mi_type_y 1.0, TIER-1 clean) —
           |Δ| vs ctrl 0.0 = 7·SD/3 seeds. The b87 single-seed 0.099 REGRESSED to 0.072 (9th single-seed clean
-          point to fall on replication — durable law). (2) **[engineering, reconfirms MOR b73] mpm_grid_update
-          .surface_tension is a NO-OP:** st5(5.0)==st3(3.0) byte-identical (bud_score 0.07970581296896076 to 16
-          digits, montage deform 0.3348); tip8(8.0)==st5_tip8(5.0) identical (0.09464946486924859, deform 0.3541).
-          The b88 de-rounding hypothesis was NEVER TESTED — dead lever, do NOT use surface_tension. cell_grow.tip
+          point to fall on replication — durable law). (2) **[engineering — RETRACTED at Batch 98: this is NOT a
+          physics no-op, it is the DOTTED-OVERRIDE CACHING BUG] mpm_grid_update.surface_tension "NO-OP":** st5(5.0)==
+          st3(3.0) byte-identical (bud_score 0.07970581296896076 to 16 digits) — but byte-identity across ST values is
+          the SIGNATURE of the inert override (op caches ST in __init__; the dotted override never reaches forward, see
+          Batch 98). ST was NEVER actually varied here; the "dead lever" conclusion is UNSUPPORTED — bake ST to test it. cell_grow.tip
           IS live (tip5 0.0797 ≠ tip8 0.0946). (3) **tip8 (0.0946, neck 0.178) > tip5 (0.072) = monotone tip lever,
           single-seed batch-max** → needs 3-seed lock. (4) **ROUNDING is the ceiling:** body inflates 6× (shape
           area 0.156→0.96) but circularity RISES 0.87→0.96, org_aspect_ratio 1.07 → a BIGGER SPHERE not a lobe;
@@ -1336,6 +1339,242 @@ flow / collective migration · 1E two-type partition. Then INT (integrate all).
           probe), ctrl_nogrow. FALSIFIER: tip12/16 ≤ tip8 (~0.095) AND off05/k2 <0.10 AND tip8 seeds spread <0.06 →
           single-cell tip-bud CAPPED ~0.09 → report weak-bud (0.072±0.010) as BUD [open] deliverable, OPEN the
           multi-cell-domain path. Runaway: neck_ratio>1 (bulge) OR nn_min<0.016 OR collapsed>0.
+        - **Batch 90 read: b89 = SINGLE-CELL TIP-BUD CLOSED — the b89 falsifier FIRED on every clause.** (1) tip8
+          3-seed lock FAILED: {0.0946 [b88 s0], **0.0** [s1, neck_ratio 2.0 = a BULGE], 0.0606 [s2]} = bud_score
+          **0.052±0.048** (SD≈mean; b88's 0.0946 = seed-luck, ~10th single-seed clean point to regress). (2)
+          sharpness does NOT push past tip8: tip12 0.0436, tip16 0.0767 — both ≤ tip8's single-seed 0.095, trend
+          NON-monotone. tip16 IS the only slot to break roundness (circularity 0.94→0.774, **bud_len_bodyR 0.605**
+          batch-max, **fourier_m1 0.408** batch-max dipole) BUT that is WHOLE-BODY pear elongation that SCRAMBLES
+          the pattern (**mi_type_y 1.0→0.8627**, only slot <1.0), a tradeoff not a bud-on-a-body. (3) offset/agent-
+          extrusion inert: tip8_off05 0.0257, tip12_off05 0.0235, tip8_k2 (agent_to_mpm k2) 0.0614 — none >0.10.
+          ctrl_nogrow 0.0. All 8 TIER-1 clean (collapsed 0, nn_min 0.0174–0.0186). **CONCLUSION [open deliverable]:
+          a single elastic MPM cell rounds any local growth and caps bud_score ~0.05–0.08, seed-unreliable; the ONE
+          length route (tip16) scrambles the pattern → the single-cell tip-bud CANNOT make a discrete organ that
+          inherits the pattern. The BUD [open] deliverable is the single-cell weak-bud (0.072±0.010 [established
+          b88]).** ENABLEMENT [engineering]: **cell_grow made MASK-AWARE** (`if mask is not None: live_cell *= mask`,
+          cell_grow.py:126) so `at: 'cell[type=bud]'` grows ONLY the selected cells — byte-identical for every
+          existing `at: cell` spec (that mask is all-live). Unlocks the "grow a SUBSET" route both the b89 plan and
+          the user directive name. **Batch 90 = MULTI-CELL SUBSET-GROWTH PIVOT:** cell.n=2, `type_layout: split_x`
+          (body=low-x static, bud=high-x grows), two adjacent elastic balls (start 0.40/0.60, radius 0.13) form a
+          peanut; cell_grow inflates ONLY the bud cell → a discrete lobe. Bud axis +x ⟂ y-demix axis (test pattern-
+          inheritance). Slots: multi_aniso (+s1/s2 3-seed) / multi_tip / multi_iso / multi_gap (0.34/0.66) / multi_big
+          (target 2.5) / multi_ctrl0 (rate 0 static-peanut control). HYP: growing one of two cells → bud_score ≫
+          single-cell cap 0.08 AND ≫ ctrl0, neck<1, mi_type_y >0.8, 3 seeds. FALSIFIER: bud_score ≤0.08 OR ≈ctrl0 OR
+          cells merge round (n_buds 0) OR mi_type_y<0.5 OR TIER-1 fail → subset-growth buys no organ here, reconsider
+          cell-cell adhesion / distinct-material bud. **NEW substrate + new mask-gate = ELEVATED execution risk; if
+          0-archive read a slot .err FIRST (code-crash vs infra).**
+        - **Batch 91 read: b90 = MULTI-CELL SUBSET-GROWTH GEOMETRY-FAILS (bud_score≈0 in 7/8) — but the mask-gate
+          & growth WORK; the failure is GEOMETRIC and fixable [open].** (1) TWO EQUAL side-by-side cells (start
+          0.40/0.60) = a PEANUT: multi_aniso 3 seeds org_bud_score **0.0**, n_buds 0, org_aspect_ratio 1.86/1.92/1.88
+          ≈ static ctrl0 **1.812** — growing the bud cell ~1.8× only lopsides the peanut, the detector reads ONE
+          elongated body (two comparable lobes), so bud_score=0. NOT a growth failure: grow_ratio 1.049 is the
+          WHOLE-BODY ratio DILUTED by the static body cell (bud cell itself ~1.8×, radius ×1.34 hidden in the 2-lobe
+          metric). (2) No route off 2-equal-cells buds: multi_tip grow_ratio 1.0004 (no growth) + n_buds 4/hier_depth
+          5/indep_domains 11 = DETECTOR ARTIFACTS on a rough faint mask (organo circ 0.453); multi_gap (0.34/0.66)
+          org_fragment_count **2.0** = the cells DETACH into 2 round balls (no neck); multi_big (target 2.5) SHATTERS
+          (circ 0.93→0.515, shape_index 4.94, flings a fragment). (3) Pattern eroded by demix SHEAR — mi_type_y aniso
+          0.77/0.65/**0.36**, the 2 loosely-coupled cells shear vertically under sediment (no cohesive core to resist).
+          All 8 TIER-1 clean (collapsed 0, nn_min 0.0173–0.0188; escape 0.43–1.0 = sediment body-drift ARTIFACT). **PRINCIPLE
+          [open→body-dominant]: two EQUAL cells cannot present "round body + minority protrusion"; the "grow a subset"
+          route needs a BODY-DOMINANT cluster (many body cells = round cohesive core + ONE small peripheral bud cell).**
+          **Batch 91 = BODY-DOMINANT CLUSTER:** 7 MPM cells (6 body hex + 1 bud at +x edge via type_layout split_x),
+          per_parent 1500, grow_reserve 3500; cell_grow grows ONLY the bud cell (aniso +x). Slots hex7_aniso(+s1/s2
+          3-seed)/hex7_tip/hex7_big(target 3.0)/hex7_nosed(drop sediment=shear isolation)/merge2(2-cell start 0.50/0.55)/
+          hex7_ctrl0(rate 0). HYP: small bud cell off a round multi-cell core → bud_score>0.05 & >ctrl0, n_buds≥1,
+          neck<1, core cohesive (fragment_count 1), mi_type_y>0.6, 3 seeds. FALSIFIER: bud_score≈ctrl0≈0 OR cluster
+          fragments OR mi_type_y<0.5 → subset-growth buds NOWHERE on this substrate → adopt single-cell weak-bud
+          (0.072±0.010 [established b88]) as BUD [open] deliverable, ADVANCE to BRN (batch 7/10 of BUD).
+        - **Batch 92 read: b91 = BODY-DOMINANT CLUSTER GEOMETRY-FAILS to bud (falsifier FIRED) → BUD CLOSED,
+          ADVANCE to BRN.** All 8 slots `org_bud_score` 0.0 / `org_n_buds` 0 (ctrl0 floor 0.00014/2). Growing
+          the +x bud cell only LOPSIDES the cluster into a mode-2 ELLIPSE — `org_aspect_ratio` monotone in dose
+          (ctrl0 1.025 → aniso {1.337,1.315,1.303} → big 1.465) — which the bud detector's mode-0..3 low-pass
+          reference ABSORBS → 0 protrusion. The ONE thing hex7 fixed vs b90: `org_fragment_count`=1.0 in ALL 8
+          (body-dominant core resists detachment; b90 gap/big fragmented). Pattern seed-variable (mi_type_y
+          aniso {0.870,0.168,0.665}=0.568±0.29; nosed 0.0; loose cells shear under sediment). tip mode STILL
+          did not realize on multi-cell (grow_ratio 1.0). TIER-1 clean (collapsed 0, nn_min 0.017–0.019;
+          escape 0.43–1.0 = sediment body-drift ARTIFACT). **[engineering, DURABLE — why subset-inflation caps
+          at 0]:** `scorecard_organo.py:94-150` `buds()` low-passes radial FFT modes 0–3, counts a lobe only
+          where `prot>0.12·body_R` — so a BUD MUST BE A NARROW mode-≥4 NECKED FINGER; a broad mode-1/2 bulge
+          (a whole grown cell, a lopsided cluster) is absorbed → structurally 0. Single-cell TIP mode makes
+          such a finger (0.072); multi-cell INFLATION cannot. **BUD CLOSED [established weak-bud + open
+          blocker]: OP POINT = `embryo_BUD_noanch_tip8.yaml`** (single elastic cell, tip 8, anchor OFF;
+          org_bud_score 0.072±0.010 [established b88, 3 seeds], pattern mi_type_y 1.0, TIER-1 clean). **[open]
+          BUD BLOCKER: a STRONG discrete organ (bud_score≫0.1, clean neck) is UNREACHABLE on the elastic-MPM
+          substrate** — single cell rounds all local growth (every roundness lever exhausted MOR+BUD:
+          surface_tension inert, youngs deflates, prestretch amplifies, rate-down buckles, rate-up shatters);
+          multi-cell subset = low-mode lopsiding (bud_score 0). `current_stage.txt`=BRN.
+        - **BRN (branching morphogenesis — Phase 3, stage 8) — STARTED Batch 92 (2026-07-06). Gate:
+          reproducible bifurcation (branching EMERGES from feedback, never a branch operator) · stable branch
+          persistence · tissue continuity preserved · controlled branch spacing.** Decision surface = organo
+          BRANCH family (`org_branch_score`, `org_n_tips`, `org_n_branchpoints`, `org_hierarchy_depth`,
+          `org_tree_depth`, `org_independent_growth_domains`, `org_branch_persistence`); branches() zeroes on a
+          convex round body (solidity>0.90) → a branch signal REQUIRES a low-solidity fingered outline.
+          **[engineering, DURABLE — the BRN mechanism constraint, from `cell_grow.py:133-139`]: `stress_gain`
+          (mechano-inhibition) modulates a PER-CELL-MEAN deformation → a GLOBAL per-cell rate brake; on ONE
+          cell it CANNOT spatially redistribute growth → cannot tip-split. BRANCHING FEEDBACK THEREFORE NEEDS
+          MULTIPLE GROWTH CENTRES COMPETING** — the b91 cohesive cluster with ALL cells growing: compressed
+          interior cells self-inhibit, low-stress peripheral cells keep growing → fingering → emergent multi-tip
+          outgrowth (= the "growth competition / multiple interacting growth centres" route the instruction
+          names). BRN batch 1 = ISOLATED stress_gain-competition validation on the hex7 cohesive cluster (all
+          cells grow isotropically, per_parent 1500 + reserve 3500): stress_gain SWEEP 0(ctrl)/2/5/10 + big-dose
+          + seed replicate + line-substrate explore + rate-0 static ctrl. HYP: stress_gain>0 → fingered outline
+          (org_solidity↓, org_branch_score/n_tips>0) vs sg0 round blob (branch_score~0). FALSIFIER: branch_score
+          flat/0 across the stress_gain sweep (competition doesn't finger, elastic rounds) OR any slot ruptures
+          (collapsed>0/nn_min<0.016/fragment_count>2) → competition-fingering fails on this substrate, pivot to
+          a distinct branching driver (curvature-gated growth field, morphogen-controlled growth). GOTCHAs
+          carried: dotted `cell_grow.*` overrides SILENTLY IGNORED on flow-style op lines → AUTHOR separate
+          specs per growth config (b87); escape is a sediment ARTIFACT under any body force; NEW substrate =
+          execution risk, if 0-archive read a slot .err FIRST (code-crash vs infra).
+        - **Batch 93 read: b92 = GROWTH-COMPETITION FINGERING [rejected] — the b92 falsifier FIRED (elastic
+          rounds the confluent cluster convex).** All 8 slots `org_branch_score` 0.0 / `org_n_tips` 0 /
+          `org_n_branchpoints` 0, `org_solidity` 0.961–0.980 (branches() zeroes above 0.90), fragment_count 1,
+          TIER-1 clean (collapsed 0, nn_min 0.018–0.019) — the "elastic rounds into a bigger blob" arm, NOT
+          rupture. `stress_gain` works as documented (per-cell-MEAN mechano-inhibition: sg10 grow_ratio 1.074
+          = LOWEST = strongest brake) but it is a GLOBAL per-cell rate brake → cannot spatially redistribute
+          growth WITHIN a confluent mass → smaller-but-still-CONVEX blob. Higher-mode boundary content rises
+          with growth (sg10 fourier_m3 0.0615/m4 0.0366/m5 0.0150 vs sg0 m3 0.0114) but stays a SHALLOW
+          ripple (solidity pinned 0.96–0.98) — surface_tension 8.0 + mpm_to_agent confine round every notch
+          back out. Even a 2:1 filament (line slot, aspect 1.98) is a SMOOTH convex ellipse (solidity 0.970,
+          branch_score 0, no branch at its ends). SAME rounding blocker that closed BUD; confluent multi-cell
+          growth inherits it. **[engineering, DURABLE — the Phase-3 substrate law]: the elastic-MPM +
+          surface_tension substrate is a CONVEXITY ATTRACTOR — it rounds ALL local/confluent growth (single
+          cell → bud rounds; 7 confluent cells → blob rounds; 2:1 rod → ellipse) so any organ metric gated on
+          low solidity / mode-≥4 necks (bud_score>0.1, branch_score>0) is structurally hard to reach.** PIVOT
+          (b93) → SPATIALLY SEPARATED multi-centre growth: pre-place a hub + N satellite growth cells APART
+          (radius d 0.16–0.20, per_parent 900 + reserve 2100, radius 0.10) so the tissue is a BUSH of lobes
+          joined by NECKS — testing whether pre-placed separation gives concave necks (solidity<0.90,
+          branch_score>0) that confluent growth cannot, while staying connected (fragment_count 1). Falsifier:
+          solidity>0.90 across ALL separated configs (substrate rounds the necks too → relax BRN gate) OR any
+          fragments (fragment_count>2 → separation buys concavity only by losing continuity). GOTCHAs (b93,
+          verified in tune.py:41-72): generic dotted `op.param` overrides set `o.params[param]` and WORK for
+          normal ops, but `general.seed` (no matching op → silently ignored) AND `cell_grow` mode-dependent
+          params (tip needs mode+axis) do NOT → AUTHOR a full spec for every seed change AND every cell_grow
+          config change; `>>`/heredoc redirect still sandbox-blocked → Edit/Write only.
+        - **Batch 94 read: b93 = BRANCHING ACHIEVED via SPATIALLY-SEPARATED multi-centre placement [open, n≤2].
+          The b93 falsifier did NOT fire.** Pre-placing a hub + N satellite growth cells APART (radius d) and
+          growing all isotropically yields a concave N-lobe star the detector scores, where the b92 confluent
+          mass could not. `org_solidity` confluent-ctrl 0.972 → tri16(d0.16) 0.796 → tri20(d0.20) **0.703**
+          (deepest, all <0.90 gate); `org_n_tips` == N satellites EXACTLY (tri 3 / cross 4 / penta 5 — directly
+          PROGRAMMABLE topology); `org_branch_score` 1.0–2.4 (ctrl 0.0); `org_fragment_count` 1.0 ALL 8
+          (connected — hub holds lobes even at d0.20); pattern held (tri16 mi_type_y 0.699, seg 0.897);
+          TIER-1 clean (collapsed 0, nn_min 0.0176–0.0187). More lobes RAISE solidity back toward convex
+          (tri 0.70–0.80 → cross 0.861 → penta 0.900 = rosette fills its own necks) — a soft upper bound on N.
+          **[engineering, DURABLE] branching here is a PLACEMENT PROGRAM, not a growth-competition instability:**
+          tri16_nogrow (STATIC, rate 0.0) ALREADY reads solidity 0.788 / n_tips 2 / branch 2.0, and tri16
+          solidity is FLAT over time [0.799→0.796] — growth does NOT carve or fill the necks. Growth's causal
+          role = organo AREA ~doubles (nogrow 0.100 → grow 0.172, +72%) + n_tips sharpens 2→3; the substrate
+          (convexity attractor) neither deepens nor rounds the placement-set concavity, growth just scales it up
+          and connects it. n=1–2 → tri20 needs 3 seeds + a clean grow/nogrow area contrast to promote. Batch 94
+          = tri20 s0/s1/s2 (establish) + tri20_nog s0/s1 (causal growth-isolation) + tri24 (d0.24 deepen/
+          fragment falsifier) + cross20 (4-lobe at d0.20) + tgt30 (does target 3.0 fill or deepen necks?).
+          FALSIFIER: tri20 solidity >0.90 on any seed OR grow≈nogrow on AREA too OR tri24 fragment_count>2.
+        - **Batch 95 read: b94 = SEPARATED-BRANCH [ESTABLISHED, 3 seeds] + growth causally separated (SCALE not
+          topology) + separation UPPER BOUND found + cross throws first real bud_score.** The b94 falsifier did
+          NOT fire on the establish/growth arms; the tri24 fragmentation arm fired AS DESIGNED (bounds the window).
+          (1) **tri20 3-seed:** `org_solidity` {0.7031,0.7044,0.7015}=**0.7030±0.0012** vs confluent-ctrl 0.972
+          (Δ 0.269 ≫200·SD below the 0.90 gate); `org_n_tips` 3/4/3; `org_branch_score` 2/2/3; `org_fragment_count`
+          1 all three; pattern held (mi_type_y 0.64/0.96/0.67, seg 0.75/1.0/1.0); TIER-1 clean (collapsed 0,
+          nn_min 0.0176–0.0185). SEPARATED-MULTI-CENTRE BRANCH = **[established]**. (2) **GROWTH = SCALE, PLACEMENT
+          = TOPOLOGY [established, n=2/arm]:** grow vs matched-seed nogrow at IDENTICAL d0.20 placement → grow_ratio
+          1.17 vs 1.001, body area 0.324 vs 0.245 (**+32%**), but org_solidity 0.703 vs 0.695 (EQUAL, Δ~0.008).
+          Growth inflates the star to organ scale; it neither rounds nor carves the placement-set necks. (nogrow
+          carries big sediment body-drift: fourier_m1 0.38/0.39 & deform_rms 0.14 vs grow 0.07–0.10 & 0.06 — the
+          branch metric solidity is robust to it.) (3) **SEPARATION WINDOW BOUNDED ABOVE: tri24 (d0.24) FRAGMENTS**
+          — org_fragment_count **4.0**, solidity 0.955 (convex remnant), n_tips/branch_score 0, grow_ratio 0.774
+          (shrank). Branch window = d ≈ 0.16–0.20 (b93 tri16→tri20 connected; d0.24 detaches). (4) **cross20 (4
+          satellites, d0.20) = RICHEST + FIRST real bud_score:** n_tips **5**, branch_score **3**, n_branchpoints 3,
+          fragment 1, **org_bud_score 0.271** (batch max; the whole BUD stage never cleared ~0.1), solidity 0.745,
+          pattern held (mi_type_y 0.812) — n=1. (5) **tgt30 (target 3.0) DEEPENS the tree at constant solidity:**
+          grow_ratio 1.27, body area 0.384 (biggest), `org_tree_depth` **0.825** (deepest), n_tips 5, branch_score 3,
+          solidity 0.704 (unchanged) — more growth = more tips + deeper skeleton WITHOUT rounding. **BRN STATUS
+          [engineering, DURABLE]:** branching = a PLACEMENT PROGRAM framed by two hard bounds — BELOW the elastic
+          rounds a confluent mass convex (b92 growth-competition [rejected]), ABOVE d≈0.24 the lobes detach
+          (fragment_count 4); window d≈0.16–0.20; n_tips programmable by satellite count; growth sharpens/deepens
+          the tree without altering topology. **Batch 95 = HIERARCHY + cross-establish:** hierY (hub+3 primary, TOP
+          arm forked into 2 secondary = Y-of-Y; does org_hierarchy_depth reach 3 / tree_depth > 0.825?) + hierY_s1 +
+          hiertgt30 [hierarchy]; cross20_s1/s2 (3-seed establish richest topology) + crosstgt30 (deep growth on
+          cross) [establish]; tri22 (d0.22 fragmentation-boundary bracket) [explore]; tri20_ctrl [control]. New
+          specs embryo_BRN_{cross20_s1,cross20_s2,hierY,hierY_s1,tri22}.yaml + cell_grow.target 3.0 dotted overrides.
+          FALSIFIER: hierY hierarchy_depth stays 2 (fork lobes merge, no sub-branchpoint) OR any hierY/cross
+          fragments OR the 6-lobe pack rounds solidity >0.90. ANCHOR: last real data = b94.
+        - **Batch 96 read (b95): cross20 richest-topology ESTABLISHED (3 seeds); HIERARCHY CAPS AT DEPTH 2 (b95
+          falsifier FIRED — the Y-of-Y fork MERGES); fragmentation bound TIGHTENED to d≤0.20.**
+          (1) **cross20 (4 diagonal satellites + hub, d0.20) [ESTABLISHED, 3 seeds]:** org_solidity 0.737±0.009,
+          **org_bud_score 0.269±0.002** (the BUD stage never cleared ~0.1 → strongest discrete-protrusion signal of
+          the campaign, now 3-seed), org_n_tips {5,4,5}, org_branch_score {3,2,2}, org_fragment_count 1 all, pattern
+          held (seg ~0.95–1.0, mi_type_y 0.51–0.81). cross = the MANY-TIP established branch.
+          (2) **RECURSIVE HIERARCHY BLOCKED [open→likely rejected]:** the forked Y-of-Y arm (2 sublobes 0.20 apart,
+          0.156 from primary) MERGED into one fat tip — hierY hierarchy_depth 2 (NOT 3), n_tips 3 (unchanged), both
+          seeds; the surface_tension rounds the two sublobes inside one convex hull. The placement program carries a
+          radial STAR faithfully but does NOT carry a TREE. What the fork DOES buy = a DEEPER/BRANCHIER skeleton:
+          hierY reads the batch's lowest solidity (0.698–0.701), most n_branchpoints (3–4), highest branch_score
+          (3–4); hiertgt30 (target 3.0) = deepest tree_depth of the campaign 0.863 (growth deepens the skeleton but
+          still can't resolve the fork or round the necks — reconfirms growth=SCALE, placement=TOPOLOGY). A topology
+          TRADE: cross maximizes TIPS (5), hierY maximizes BRANCHPOINTS/DEPTH (bp 4, tree_depth 0.86).
+          (3) **FRAGMENTATION BOUND TIGHTENED to d≤0.20:** tri22 (d0.22) FRAGMENTS (fragment_count 4, solidity 0.946
+          convex remnant, area collapsed to 0.050) — d0.22 already detaches (b94 had only bounded d0.24), so the
+          connected branch window upper bound is d≈0.20. tri20_ctrl anchor EXACT (solidity 0.7031 == 0.7030±0.0012).
+          TIER-1 clean 37th straight (collapsed 0 all 8; only fragment is the intended tri22 probe; escape = sediment
+          body-drift artifact). **Batch 96 = HIERARCHY-RESOLUTION-OR-REJECT:** widen/lengthen/recurse the fork —
+          hierwide (sublobes 0.26 apart) + hierwide_s1 + hierwide_g3 (wide + target 3.0) + hierlong (fork radially
+          isolated at y=0.85) [exploit]; hierdbl (7-centre depth-2 binary tree) + crossfork (cross with one forked
+          arm) + hierwide_frag (0.226 detach probe) [explore]; hierY [control]. New specs embryo_BRN_{hierwide,
+          hierlong,hierwide_frag,hierdbl,crossfork}.yaml + seed/target dotted overrides. FALSIFIER: all fork variants
+          still hierarchy_depth 2 / n_tips ≤3 until they DETACH → recursive branching [rejected] on this rounding
+          substrate; BRN deliverable = first-order programmable stars (tri/cross) + deep-skeleton endpoint (hierY).
+          ANCHOR: last real data = b95.
+        - **Batch 97 read (b96): the b96 FALSIFIER ESSENTIALLY FIRED — recursive/2nd-generation branching NOT
+          robustly achievable by PLACEMENT geometry [open→likely rejected]; hierarchy_depth is a NOISY 1-frame
+          metric [engineering, DURABLE].** No fork variant reached a STABLE hierarchy_depth 3 with co-moving n_tips↑:
+          (1) WIDEN (hierwide 0.26 apart) → final hierarchy_depth 1 (traj [1,2,3,2,1] — transient-3 spike), n_tips 4
+          (traj [4,2,3,3,4]); hierwide_s1 depth 2/n_tips 3; hierwide_g3 (target 3.0) depth 2 STABLE [2,2,2,2,2]/n_tips
+          3 (growth DEEPENS tree_depth 0.833 + bud_score 0.230 but never resolves the fork = growth-SCALE /
+          placement-TOPOLOGY reconfirmed). (2) LENGTHEN (hierlong y=0.85) → n_tips 2 (fork became ONE long arm),
+          depth 2. (3) DENSIFY (hierdbl 7-centre recursive binary tree) → HARD GEOMETRY FAIL: rounds to a convex
+          BLOB (solidity 0.919, n_tips 0, everything 0) — densest placement merges completely; denser≠branchier. (4)
+          crossfork (cross + 1 forked arm) = RICHEST SKELETON (n_branchpoints 6, branch_score 6 both batch-max) but
+          final hierarchy_depth 3 is a LONE last-frame spike [2,2,2,2,3] and n_tips 3 (traj [4,5,3,5,3] flickers).
+          hierwide_frag (0.226) DETACHES (fragment 3) → reconfirms connected window d≤~0.20. hierY_ctrl EXACT b95
+          anchor (depth 2, n_tips 3, solidity 0.698, tree_depth 0.727). Pattern held all (seg 0.92–1.01). TIER-1
+          clean 45th straight. **hierarchy_depth/n_tips flicker ±1 per pct → a depth-3 FINAL from one slot is NOT a
+          resolved 2nd generation; needs STABLE (≥3 pcts) + co-moving n_tips↑, which NO slot shows.** MECHANISM
+          [engineering]: three failure modes bound the window — merge-under-convex-hull (widen), one-long-arm
+          (lengthen), round-to-blob (densify); NO geometry between "merges into one tip" and "detaches into
+          fragments" gives a connected 2nd-gen branchpoint. The merge force = SURFACE-TENSION rounding in
+          mpm_grid_update (surface_tension: 8.0), the convex-hull attractor smoothing concavities narrower than tip
+          spacing — the ONE untried BRN lever. **Batch 97 = surface_tension DE-ROUNDING sweep (decisive test): is
+          rounding SEPARABLE from cohesion?** crossfork ST ladder 8(ctrl)/4/2/1 + hierwide_st4 + crossfork_st4_g3
+          (low-round+deep growth) + hierdbl_st3 (rescue the blob?) + crossfork_s1 (replicate the depth-3 spike). All
+          dotted `mpm_grid_update.surface_tension` overrides on existing specs. FALSIFIER: no low-ST slot achieves
+          STABLE hierarchy_depth 3 AND n_tips ≥5 AND fragment_count 1 → recursive branching [REJECTED] (rounding
+          inseparable from cohesion), CLOSE BRN, advance to ORG next batch. BRN deliverable already banked =
+          first-order programmable stars (tri/cross, tips=#satellites, cross20 [established] 3 seeds solidity
+          0.737±0.009 bud_score 0.269±0.002) + deep-skeleton endpoint (hierY/hiertgt30 tree_depth 0.86). ANCHOR:
+          last real data = b96.
+        - **Batch 98 read: b97 was a SILENT ENGINEERING WASH — the surface_tension sweep NEVER RAN.** [engineering,
+          DURABLE — supersedes/CORRECTS the "surface_tension inert [established]" claim] crossfork_st4/st2/st1/s1(seed1)
+          all came back BIT-IDENTICAL to ST8 seed0 ctrl (montage strings to 6 sig figs; organo.final bit-identical,
+          bud_score 0.1463718296038669, hierarchy_depth 3.0). ROOT CAUSE — dotted overrides via tune._apply
+          (showcase.py:179, AFTER S.load): (a) `mpm_grid_update.surface_tension` is INERT because the op CACHES
+          `self.surface_tension` in __init__ (mpm_grid_update.py:36) at load, before _apply mutates params; forward
+          reads the stale attr. Same for wall_damp/dt_sub (all __init__-cached). (b) `general.seed` is INERT — no
+          operator named 'general', so the `for o in sim.operators` loop never matches (silent, no warning). Only ops
+          that read params at RUNTIME (cell_grow.target — g3 differed) respond to dotted overrides. **⇒ BAKE ST + seed
+          + youngs into authored spec YAMLs; NEVER dotted-override an __init__-cached scalar or general.*.**
+          **BIGGER: the "surface_tension INERT" claim across MOR b73 / BUD b88 / BRN b97 is a CONTAMINATED ARTIFACT of
+          THIS bug — b73 s6 ('ST0', override `surface_tension=0.0`) has spec.yaml line 53 STILL reading 8.0; s5=s6=s7
+          were bit-identical because all three secretly ran ST8. b88 st5==st3 byte-identical = same signature. ST has
+          NEVER been cleanly varied [claim RETRACTED → re-open as UNTESTED].** Only valid b97 datum: crossfork_st4_g3
+          (=ST8 + cell_grow.target 3.0) — deeper growth gives STABLE n_tips 5 [5,5,5,5,4] but hierarchy_depth STUCK 2
+          [1,1,2,2,2] → a stiffer first-order 5-tip STAR, not a recursive tree. hierwide_st4/hierdbl_st3 (ST override
+          void) merely re-ran b96 ST8 baselines (n_tips 4/depth 1/solidity 0.654; blob solidity 0.919/n_tips 0). TIER-1
+          clean 46th straight. **Batch 98 = DE-ROUNDING DONE RIGHT (all BAKED):** the real rounding/cohesion lever on
+          this youngs-200 ELASTIC body is MEMBRANE STIFFNESS (ST negligible vs a stiff membrane per TESTS.md 120-460 on
+          water). youngs ladder 120/90/60 + y120_g3 (soft+deep grow) to test if softening opens a de-rounding window
+          (resolve top fork → STABLE hierarchy_depth 3 + n_tips≥5, fragment 1) vs buckle/fragment; + BAKED st20/st2/st1
+          to settle whether ST is a genuine dead lever or was always the artifact; + ctrl. FALSIFIER: no youngs slot
+          hits stable depth-3 + n_tips≥5 fragment-1 AND baked ST inert → rounding inseparable from cohesion → recursive
+          branching [REJECTED], CLOSE BRN, advance to ORG (terminus). ANCHOR: last real data = b96/b97-ctrl (same ST8 point).
     Batch 46 = minimal axis-cue probe (R1, ONE new operator family = `gravity`, a uniform membrane-cell body force
     wired into the MPM substep via p2g `a_ext` [p2g.py:45-50], default −y), built on the [established] INT op point.
     Slots = g magnitude ladder g1/g2/g4/g8 + g2 ×3 seeds (axis reproducibility) + gx horizontal-pull direction
@@ -2391,3 +2630,164 @@ search 2026-07; open-access PDFs (arXiv only, egress-restricted env) in `/worksp
    ecto-outside / mesendo-inside sorting and its reversal under reduced adhesion. Test: two populations with
    tunable interfacial tension; measure envelopment order and mixing index over time (cf. Schötz 2008, Krens 2017).
    Metric: segregation/mixing index vs ΔTST, envelopment correctness.
+
+## BRN de-rounding / recursive branching (Phase 3, b93–b99)
+
+- **surface_tension is a DEAD morphology lever [established-engineering, SETTLED b98].** On a youngs-200 ELASTIC
+  membrane, CSF `mpm_grid_update.surface_tension` does not bite (bites water only at 120–460). Proven by BAKED
+  variation: `st20` (2.5× ctrl) → organo.final bud_score 0.1463718296038669 + solidity 0.7468 BIT-IDENTICAL to
+  ctrl. The old "ST inert" claim was a contaminated override-cache artifact (mpm_grid_update caches
+  self.surface_tension in __init__ before tune._apply mutates params → dotted overrides silently no-op); baking
+  settles it as a genuine dead lever. RETIRE ST. GOTCHA [durable]: dotted overrides work ONLY for ops that read
+  params at runtime (cell_grow.target); ops caching scalars in __init__ (surface_tension/wall_damp/dt_sub) AND
+  `general.seed` silently ignore overrides → BAKE those into the spec YAML.
+- **MEMBRANE STIFFNESS (`youngs`) IS the real de-rounding lever — NON-MONOTONE, y120 optimal [established-mech b98].**
+  Softening the elastic membrane relaxes the convex-hull rounding (MOR b73 merge-force) that fuses sub-forks. On
+  crossfork: ctrl y200 n_tips flicker [4,5,3,5,3]/hier stuck 2; y120 STABLE 5-tip star [5,5,5,5,3]; y90 over-soft
+  reverts to 4 [4,5,4,4,4]; y60 still 4-ish but fragment_count=1 throughout (cohesion floor NOT reached to y60).
+  → rounding IS SEPARABLE from cohesion; softer≠sharper (window peaks at y120).
+- **RECURSIVE 2nd-generation branching is SEED-DEPENDENT / INTERMITTENT — NOT robustly reproducible [open, SETTLED b100].**
+  The b98 single-seed winner `crossfork_y120_g3` (youngs 120 + cell_grow.target 3.0) did NOT replicate across 3 fresh
+  seeds (b99): hierarchy_depth trajectories seed1 [3,2,3,2,3] (flickers, hits 3 thrice but no ≥3-consec run),
+  seed2 [1,2,3,3,3] (STABLE, only clean replicate), seed3 [1,2,2,2,2] (STUCK at 2). Incl. b98 s0 [1,2,3,3,4] the
+  tally = 2 stable / 1 intermittent / 1 failed ≈ 50% → falsifier FIRED, fails the [established] gate. This is the
+  **9th single-seed clean point to regress on replication** (DURABLE campaign law). The soft-membrane + deep-growth
+  route reaches a 2nd-generation branch, but on this MPM+elastic substrate it is a coin-flip on seed, not a regime.
+- **BRN DELIVERABLE [established, 3 seeds b99]: a deep-growth programmable multi-tip STAR.** crossfork skeleton +
+  cell_grow.target 3.0 → n_tips 5–7 over 4 draws {6,7,5,6}, fragment_count 1 throughout, segregation_index →1.0
+  (pattern held), TIER-1 clean (collapsed 0, nn_min ≥0.0092). CRITICAL: the ~5 tips come from DEEP GROWTH, not
+  softness — the stiff mech-ctrl `y200_g3` also held n_tips [5,5,5,5,4]. Growth=SCALE resolves first-order tips;
+  softness (youngs 120) only intermittently adds a 2nd hierarchy level. Youngs is NON-MONOTONE (y120 best, y150
+  stuck ≤2, y90 over-soft reverts) but the peak is not seed-stable. BRN CLOSED b100 → advance to ORG (terminus).
+- **ORG (Phase-3 terminus) op point = `embryo_BRN_crossfork_y120_g3.yaml`** — the richest INTEGRATED organism:
+  heterotypic 2-channel chemotactic demix (1E) + differential sediment orientation (ORI) + cell_grow epiboly (GRO)
+  + motility flow_align move0.18/gain40 (INT) + MPM continuum deform + multi-centre branch skeleton (BRN),
+  division OFF (cell_grow is the growth driver per user directive; cell_divide destroys pattern >1.5×). ORG batch 1
+  = capstone integration STRESS: push each of the 5 established capabilities (FLOW/DEMIX/ORIENT/GROW/BRANCH) to its
+  edge in the ONE body and read out all 5 metric families — do they coexist (additive) or interfere (antagonistic)?
+
+- **>>> CAMPAIGN REOPENED 2026-07-06 (user directive): ORG is DONE + LOCKED, but a NEW terminus stage REG
+  (perturbation robustness / regeneration) is now OPEN on the ladder. The "campaign ENDS at ORG / no further stages"
+  language below is SUPERSEDED — ORG remains the established, locked capstone (do not re-run it), and REG is the
+  substrate it feeds. Ladder is now 1A→…→ORG→REG, then STOP. Design the first REG batch (see user_input.md). <<<**
+- **ORG (Phase-3 capstone) — STARTED Batch 100, GATE MET + CLOSED Batch 105 / b104 (2026-07-06). ===== ORG LOCKED
+  (n=6); REG now the terminus =====.** Gate (multiple SIMULTANEOUS growth programs · persistent identities · stable organ structures ·
+  reproducible across seeds) MET by the sed13 op point over 3 seeds (see the b104 [ESTABLISHED] entry below):
+  prog_stab 1.0±0.0 / indep_domains 2.0±0.0 / mi_type_y 0.856±0.147 / seg 0.975±0.043 / net_circ 0.0103>0, TIER-1 clean.
+  The ladder segment 1A→…→BUD→BRN→ORG is CLOSED; the campaign now advances to REG (robustness of this organism).
+  ORG OP POINT = `embryo_ORG_swap_anisoY_sed13.yaml` (+_s1/_s2) — REG PERTURBS this locked organism. Batch 105 = the
+  closing robustness lock (n→6 on the headline); the [established] gate is met at n=6.
+  - **[established-integration, Batch 101 / b100] THE INTEGRATED ORGANISM COEXISTS — all 5 established capabilities hold
+    simultaneously in ONE body, TIER-1 clean (falsifier did NOT fire for the baseline).** ctrl (crossfork_y120_g3, n=1):
+    DEMIX segregation_index 1.0 · ORIENT mi_type_y 0.926 / type_dipole 0.736 · BRANCH n_tips 6 / branch_score 5 /
+    hierarchy_depth 4 / fragment_count 1 · FLOW net_circ 0.0092 / msd 0.049 · GROW area 0.438; collapsed 0. The
+    full-organism capstone is a real, simultaneously-readable object. (escape 0.59–1.0 = sediment body-drift artifact,
+    ignore — judge TIER-1 by collapsed/nn_min/montage.)
+  - **[established, Batch 101 / b100] the 5 capabilities sit on PAIRWISE PARETO ANTAGONISMS (edge-pushing one erodes
+    another) — the campaign's recurring sort↔flow frontier, generalized.** FLOW↑ (flow24) → n_tips 6→4 + nn_min→0.0076
+    (BRANCH↓, tighter pack); FLOW+ORIENT (flow_orient) → net_circ 0.084 (9× max) but mi_type_y→0.717 (ORIENT↓);
+    DEMIX↑ (demix20) → net_circ→0.0014 + hierarchy_depth 4→1 (FLOW+BRANCH↓); ORIENT↑ (orient15, stronger sediment) →
+    mi_type_y DOWN 0.926→0.810 (OVER-driven destabilizes). Additive integration works at the BASELINE; pushing any
+    single lever to its edge costs a neighbor.
+  - **[established, Batch 101 / b100] the multi-centre BRANCH skeleton is the STRUCTURAL SCAFFOLD.** Skeleton-ablation
+    (flat_g3, no crossfork) → area 0.438→0.159 (−64%), deform_rms 0.025→0.130 (5×), net_circ→0, type_dipole 0.736→0.129
+    (orientation dipole collapses with the body). The skeleton keeps the body expanded + holds orientation.
+  - **[established, Batch 101 / b100] GROWTH IS RESERVE/PACKING-LIMITED, not target-limited.** grow4 (target 4.0) →
+    grow_ratio 1.246 ≈ ctrl target-3.0's 1.254, area LOWER (0.408 vs 0.438). Raising cell_grow.target past 3 adds no
+    area on this substrate (reserve 1550/cell + repel/membrane packing cap it). Best morphology corner = stiff_deep
+    (stiffer membrane + deep grow): area 0.487 (max), deform 0.045, all families held, TIER-1 clean.
+  - **[established, Batch 102 / b101] DIFFERENTIAL TYPED GROWTH makes a REPRODUCIBLE body ASYMMETRY while holding the 5
+    capabilities.** type_layout split_x → growA(low-x) grows isotropic target 3.0 / growB(high-x) static (diffgrow).
+    3 seeds aspect_ratio {1.425,1.422,1.439}=1.428±0.008 vs uniform-ctrl 1.28 (Δ 0.15 ≈ 18·SD); org_program_stability
+    0.2 (vs ctrl 0.0). Capabilities held (seg {1.0,1.0,0.928}, mi_type_y {0.875,0.906,0.567-wobble}, net_circ >0,
+    n_tips {7,6,3}, frag 1, collapsed 0). Growth axis x ⊥ demix axis y → demix preserved, as predicted.
+  - **[open, Batch 102 / b101 — THE ORG-DEFINING SIGNAL] SUSTAINED independent growth domains met by ONE slot (swap,
+    n=1) but at the COST of orientation → sustain-vs-orient may be a hard trade-off.** swap (mirror of diffgrow:
+    growB(high-x) grows / growA static): org_program_stability 1.0 (constant) + org_independent_growth_domains 2.0
+    SUSTAINED [2,2,2,2,2] — the ONLY config (of all 16 b100+b101 slots) that maintains 2 distinct growth programs the
+    whole run. BUT mi_type_y COLLAPSED 0.926→0.113 (orientation destroyed, type_axis flips −131°→−16°); seg 0.939
+    (demix held), aspect only 1.16, net_circ 0.0101 (flow held), TIER-1 clean. In diffgrow (transient domains
+    [3,1,1,1,1], prog_stab 0.2) the domains MERGE but orientation HOLDS — mirror configs give opposite domain+orient
+    behaviour. Hyp: the growing lobe's large-scale advection scrambles the y-demix ⇒ sustained domains ⊥ orientation.
+    n=1 swap HIGHLY suspect (campaign law: 10+ single-seed clean points have regressed). b102 = replicate swap 3 seeds
+    + test orientation-recovery (stronger sediment / grow ALONG orient axis) + geometric test (rotate growth split onto
+    sediment axis) + both-grow route.
+  - **[rejected, Batch 102 / b101] deepshallow (graded size) and isoaniso (round-vs-finger) do NOT produce a strong or
+    sustained regional program.** deepshallow ≈ NULL (prog_stab 0.0, indep pinned 1.0, aspect 1.31 ≈ ctrl); isoaniso
+    aspect 1.19 < ctrl (aniso-x finger did not elongate the body), indep collapses [2,1,1,1,1]. tipiso (elongate/round)
+    is EXTREME but DEGENERATE — aspect 1.69 / n_tips 14 BUT area 0.44→0.118 (body thins to fingers), not a clean point.
+  - **[rejected, Batch 103 / b102] the b101 "sustained domains DESTROY orientation" trade-off was a SEED-0 FLUKE —
+    sustain and orient are COMPATIBLE.** Base swap over 3 seeds {b101 s0, b102 s1, b102 s2}: prog_stab {1.0, 0.2, 0.6},
+    mi_type_y {0.113, 0.897, 0.764}. The mi_type_y 0.113 orientation-collapse (b101's whole ORG-trade-off narrative)
+    did NOT reproduce — seeds 1&2 HELD orientation (0.897, 0.764); swap_s2 carries prog_stab 0.6 AND mi_y 0.764 at once.
+    ~11th single-seed clean point to regress (DURABLE campaign law). BUT base swap's prog_stab is itself seed-noisy
+    {1.0,0.2,0.6} → base swap does not RELIABLY sustain 2 domains. TIER-1: all 8 b102 slots collapsed 0, frag 1.
+  - **[open, Batch 103 / b102 — the ORG SUSTAINED-MULTI-PROGRAM CANDIDATE] swap_anisoY (grow the growB lobe ANISOTROPIC
+    along +y = parallel to the demix axis) is the SOLE clean slot with FULLY SUSTAINED 2 growth domains at partial
+    orientation.** prog_stab 1.0 (constant), org_independent_growth_domains 2.0 (constant), fourier_m1 0.085 (5× ctrl,
+    m2_growth 2.376 = real +y elongation), aspect 1.29 = ctrl, mi_type_y 0.571 (eroded but >0.5, vs the iso-swap seed0's
+    0.113 → growing ALONG the demix axis PROTECTS orientation), seg 0.930, net_circ 0.0047, TIER-1 clean (nn_min 0.0181).
+    n=1 → Batch 103 replicates to 3 seeds. If it holds, THIS is the ORG deliverable (integrated organism + two persistent
+    simultaneous growth programs). Falsifier: prog_stab/indep_domains do not replicate → fall back to diffgrow asymmetry.
+  - **[established-engineering, Batch 103 / b102] orientation-recovery levers on swap: MODERATE wins, extremes fail.**
+    swap_sedhi (sediment gy ±0.16) recovers orientation best (mi_type_y 0.781, type_dipole 0.5745 batch-max) BUT
+    OVERPACKS (nn_min 0.0073 soft TIER-1 fail, area 0.395→0.223 body-thin, deform 0.101) — strong sediment squeezes the
+    body. swap_slow (rate 0.2) HOLDS orientation (mi_type_y 0.877) + net_circ 0.0169 (batch-max flow) + prog_stab 0.4,
+    TIER-1 clean = gentle differential preserves orient+flow, partial sustain. growsplit_y (growth split rotated onto the
+    sediment y-axis) gave grow_ratio 0.9968 = NO net growth → geometric sustain-vs-merge test inconclusive (growth
+    didn't realize). [established b102] a MAGNITUDE contrast does NOT sustain domains — bothgrow (both iso, target 2.2 vs
+    3.2) merges to indep 1.0 / prog_stab 0.0; the domain detector needs one STATIC region OR an orthogonal DIRECTION
+    contrast (crossaniso, tested b103) to read 2 programs.
+  - **[ESTABLISHED, Batch 104 / b103 — THE ORG DELIVERABLE] SUSTAINED two independent simultaneous growth programs in
+    one integrated body, 3 seeds, zero variance.** swap_anisoY (grow growB ANISOTROPIC along +y = the demix axis, growA
+    STATIC) gives program_stability **1.0** CONSTANT [1,1,1,1,1] and independent_growth_domains **2.0** CONSTANT
+    [2,2,2,2,2] across ALL THREE base seeds {s0 b102, s1, s2} AND every anisoY variant (sed13/slow/deep) = 6/6 slots, vs
+    uniform ctrl (0.0 / 1.0). The b103 falsifier did NOT fire. The ANISOTROPY (not the type split alone) makes the
+    2-domain program robust: base ISO swap is domain-noisy (prog_stab {1.0,0.2,0.6,0.8}=0.65±0.30 over 4 seeds, indep
+    collapses to 1); crossaniso (TWO active orthogonal programs growA+x/growB+y) MERGES (prog_stab 0.2 / indep 1.0) — the
+    detector needs ONE STATIC region; a direction-contrast between two ACTIVE programs is NOT enough (confirms b102
+    bothgrow). [rejected] crossaniso as a 2-program object.
+  - **[ESTABLISHED-mech, Batch 104 / b103] the anisoY 2-domain program ERODES orientation (growth advects tissue up the
+    demix axis), and MODERATE SEDIMENT (gy0.13) recovers+sustains it → the FULL clean ORG op point.** Base anisoY
+    (gy0.10) mi_type_y {0.571,0.395,0.104}=0.357±0.191; every trajectory RISES to ~0.7–0.85 by 25–50% then DECLINES (the
+    +y growth re-mixes the y-oriented type gradient; strongest draw s2 also lost demix seg 0.58). **anisoY_sed13 (gy0.13)
+    is the ORG OP POINT [n=1 → replicating b104]:** prog_stab 1.0 + indep 2.0 + mi_type_y SUSTAINED 0.706 (traj
+    0.25→1.0→0.75→0.80→0.71, does NOT decline) + seg 1.0 + net_circ 0.0069 + type_dipole 0.420 + nn_min 0.0145 (CLEAN,
+    not overpacked like b102 sedhi gy0.16's 0.0073) = the FIRST config holding {sustained-2-domains + oriented mi_y>0.7 +
+    demixed + flowing + TIER-1 clean} ALL AT ONCE. The +0.03 sediment supplies a continuous y-restoring force countering
+    the growth advection below the sedhi overpack. DEEPER growth also helps: anisoY_deep (target 3.5, gy0.10) mi_type_y
+    0.662 + net_circ 0.022 (batch-max FLOW — sustained directional growth becomes coherent circulation) + prog_stab 1.0.
+    Orientation is dose-able by BOTH the restoring force (sediment) and the advection rate (grow depth/rate).
+    ORG OP POINT = embryo_ORG_swap_anisoY_sed13.yaml.
+  - **[ESTABLISHED, Batch 106 / b105 — THE FULL ORG DELIVERABLE, CAMPAIGN TERMINUS, LOCKED n=6] The sed13 integrated
+    organism holds {2 persistent growth programs + demix + flow + branch skeleton + TIER-1 safety} SIMULTANEOUSLY over
+    SIX seeds; ORIENTATION is present on all 6 but seed-variable in strength.** sed13 (anisoY +y growth on growB +
+    moderate sediment gy0.13) over seeds {s0 b103, s1/s2 b104, s3/s4/s5 b105}:
+    org_independent_growth_domains **2.0 ± 0.0** (ZERO variance, 6 seeds; vs uniform ctrl 1.0) — BULLETPROOF headline;
+    org_program_stability **0.967 ± 0.082** (5/6 at 1.0, one seed 0.8; all ≥0.8 — sustained on every seed);
+    segregation_index (demix) **0.942 ± 0.082** (all demixed); net_circulation (flow) **0.0110** (all >0, range
+    0.0041–0.0255); TIER-1 clean (collapsed 0, frag 1 on all 6; two SOFT overpacks nn_min 0.0073/0.0092 = cosmetic, no
+    hard fail); branch n_branchpoints ~6–8 / hierarchy_depth 3–4. The b105 falsifier did NOT fire (no seed prog_stab
+    <0.8, none mi_type_y <0.5). **REFINEMENT vs the b104 n=3 claim:** mi_type_y (orient) is **0.794 ± 0.188** at n=6
+    (all 6 oriented, >0.5, type_axis consistent; but 2/6 seeds dip to 0.58/0.62, so the b104 "all ≥0.7" softens →
+    orientation is reliably PRESENT but seed-variable in STRENGTH, consistent with the established mechanism: anisoY +y
+    growth erodes the y-oriented gradient, moderate sediment recovers it dose/seed-dependently). Core (2 programs +
+    demix + flow + safety) carries NO such caveat. **This MEETS the ORG gate (multiple simultaneous morphogenetic
+    programs · persistent identities · stable organ structures · reproducible across seeds) → ORG GATE MET,
+    LOCKED at n=6 (this is the REG substrate; campaign continues to REG, the new terminus).** Causal anchor: uniform ctrl prog_stab 0.0 / indep 1.0 (no 2-domain signature)
+    → the sustained domains require the typed growA-static/growB-anisoY split. Documented ALT op points, both 3-seed:
+    sed13_deep (target 3.5) = higher-flow (net_circ 0.0203 ± 0.0104 ~2–3× base, prog_stab 1.0/3, mi_type_y all ≥0.7;
+    deep_s2 soft-overpacks nn_min 0.0092); sed13_slow (rate 0.2) = gentle, prog_stab {0.8,1.0,1.0} (the b104 0.8 dip did
+    NOT persist). Rejected: sed16/gy0.16 overpacks, anisoX thins the body. **ORG OP POINT (final) =
+    embryo_ORG_swap_anisoY_sed13.yaml. Ladder segment 1A→…→ORG CLOSED + LOCKED; campaign REOPENED to REG
+    (perturbation robustness of THIS organism) as the new terminus — REG perturbs embryo_ORG_swap_anisoY_sed13.yaml.**
+  - **[established-mech, Batch 105 / b104] axis DIRECTION is NOT the domain-sustain requirement — the STATIC growA region
+    is; +y (along-demix) growth is the direction that keeps a FULL rounded body.** anisoX_sed13 (grow growB +x
+    PERPENDICULAR to the demix axis): prog_stab 1.0 / indep 2.0 (domains sustained regardless of axis) + mi_type_y
+    **0.955** (BEST orient — perpendicular growth never advects up the y-demix, so it can't re-mix the y-gradient), BUT
+    area **0.190** (−57% vs ctrl 0.438, deform 0.110) = +x finger over-thins the body → degenerate (like b102 tipiso).
+    [rejected] anisoX as a clean op point. Reconfirms: sed16 (gy0.16) OVERPACKS (nn_min 0.0086, 3rd confirmation of the
+    sedhi soft-fail); moderate sediment 0.13 is the sweet spot. Clean higher-flow ALT op point = sed13_deep (target 3.5):
+    net_circ 0.0201 (~3× base sed13) at prog_stab 1.0 / indep 2.0 / mi_type_y 0.727 / seg 0.905, TIER-1 clean. deep_s1
+    (anisoY_deep without sed13's moderate sediment, seed1) mi_type_y 0.315 → it is the MODERATE SEDIMENT, not deep growth
+    alone, that stabilizes orientation across seeds.
