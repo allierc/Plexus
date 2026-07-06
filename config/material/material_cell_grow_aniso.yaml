@@ -13,12 +13,12 @@ operators:
   # anisotropy -> a FAT bud (not a jet) that grows upward then ROUNDS as growth saturates + elasticity relaxes.
   - {op: cell_grow, at: cell, rate: 0.9, target: 2.8, mode: tip, axis: [0.0, 1.0], aniso: 0.5, tip: 2.5, offset: 0.013}
   - {op: mpm_strain, at: mpm_particle}
-  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+  - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
   - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.95}
-  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.95, wall_contact: 0.04, vmax: 1000000000.0}
+  - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.95, wall_contact: 0.04, vmax: 1000000000.0}
 schedule:
   - cell_grow
-  - {substep_dt: 0.0001, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+  - {substep_dt: 0.0001, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
 plotting:
   background: black
   colors: {body: [0.40, 0.85, 0.55]}   # tissue green

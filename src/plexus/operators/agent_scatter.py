@@ -1,4 +1,4 @@
-"""agent_to_mpm (agent set -> mpm_grid): the agents deform the material.
+"""agent_scatter (was agent_to_mpm) (agent set -> mpm_grid): the agents deform the material.
 
 The symmetric counterpart of `mpm_to_agent`. Active-matter agents are NOT MLS-MPM particles
 (they have no F/C/mass buffers), so they cannot go through p2g. Instead this scatters each
@@ -27,8 +27,8 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_to_mpm", level="cell", kind="exchange")
-class AgentToMPM(Exchange):
+@register_operator("agent_scatter", "agent_to_mpm", level="cell", kind="exchange")
+class AgentScatter(Exchange):              # (alias `agent_to_mpm`, one migration cycle)
     EMIT = None                               # writes the grid; consumed by the MPM substep
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["to"]

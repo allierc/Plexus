@@ -15,9 +15,9 @@ operators:
 - {amplitude: 20.0, at: mpm_particle, from: activation, mode: inward, op: active_force}
 - {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
 - {at: mpm_particle, op: mpm_strain}
-- {a_max: 200, at: mpm_particle, drag: 0.0, op: p2g, to: mpm_grid}
+- {a_max: 200, at: mpm_particle, drag: 0.0, op: mpm_scatter, to: mpm_grid}
 - {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
-- {at: mpm_particle, from: mpm_grid, op: g2p, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, from: mpm_grid, op: mpm_gather, wall_contact: 0.06, wall_damp: 0.5}
 schedule:
 - aggregate
 - apply_material_map
@@ -26,7 +26,7 @@ schedule:
 - active_force
 - drag
 - substep_dt: 0.0002
-  steps: [mpm_strain, p2g, mpm_grid_update, g2p]
+  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
 sets:
   cell:
     n: 1

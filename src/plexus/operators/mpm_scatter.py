@@ -1,4 +1,4 @@
-"""p2g (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter.
+"""mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatter.
 
 Computes the fixed-corotated stress (with snow hardening from Jp) -> affine momentum
 matrix, applies the external body force + Stokes drag to the local velocity, then
@@ -20,8 +20,8 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
-@register_operator("p2g", level="particle", kind="exchange")
-class P2G(Exchange):
+@register_operator("mpm_scatter", "p2g", level="particle", kind="exchange")
+class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []        # no required params — `to` defaults to mpm_grid, all knobs optional

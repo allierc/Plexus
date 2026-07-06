@@ -1,4 +1,4 @@
-"""g2p (mpm_grid -> particle): the MLS-MPM grid-to-particle gather + advection.
+"""mpm_gather (was g2p) (mpm_grid -> particle): the MLS-MPM grid-to-particle gather + advection.
 
 Gathers the grid velocity back onto particles (new velocity + new affine matrix C),
 applies the inelastic wall-contact restitution and the CFL velocity cap, then advects
@@ -20,8 +20,8 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
-@register_operator("g2p", level="particle", kind="exchange")
-class G2P(Exchange):
+@register_operator("mpm_gather", "g2p", level="particle", kind="exchange")
+class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
     EMIT = None                                    # advects pos/vel inside the MPM substep (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []                           # no required params — all optional (source grid defaults to `mpm_grid`)

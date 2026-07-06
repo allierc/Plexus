@@ -1,4 +1,4 @@
-"""mpm_to_agent (mpm_grid -> agent set): the material drags the agents, and the fluid's
+"""agent_gather (was mpm_to_agent) (mpm_grid -> agent set): the material drags the agents, and the fluid's
 surface (its colour-field interface) confines them.
 
 The symmetric counterpart of `agent_to_mpm`. After the MLS-MPM substep has solved the grid
@@ -27,8 +27,8 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("mpm_to_agent", level="cell", kind="exchange")
-class MPMToAgent(Exchange):
+@register_operator("agent_gather", "mpm_to_agent", level="cell", kind="exchange")
+class AgentGather(Exchange):               # (alias `mpm_to_agent`, one migration cycle)
     EMIT = "velocity"                 # emits an advection velocity; engine integrates pos
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["from"]

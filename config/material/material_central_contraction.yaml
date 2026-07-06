@@ -6,7 +6,7 @@ general: {name: material_central_contraction, seed: 0, n_frames: 450, dt: 0.002,
 #   pacemaker            (when)  -- a periodic scalar clock p(t) -> H.signals["beat"]
 #   activation_pulse       (where) -- p(t) x Gaussian(centre,radius) -> activation field
 #   active_force (what)  -- amplitude * grad(activation) -> H.part_accel (MPM body force)
-# and MPM (mpm_strain / p2g / mpm_grid_update / g2p) is HOW the material responds.
+# and MPM (mpm_strain / mpm_scatter / mpm_grid_update / mpm_gather) is HOW the material responds.
 sets:
   cell:
     n: 1
@@ -26,9 +26,9 @@ operators:
 - {op: active_force, at: mpm_particle, from: activation, amplitude: 20.0, mode: inward}
 - {op: drag, emit: mpm_acceleration, at: mpm_particle, k: 30.0}
 - {op: mpm_strain, at: mpm_particle}
-- {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
 - {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.5, wall_contact: 0.06}
-- {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06}
 
 schedule:
 - aggregate
@@ -36,7 +36,7 @@ schedule:
 - activation_pulse
 - active_force
 - drag
-- {substep_dt: 0.0002, steps: [mpm_strain, p2g, mpm_grid_update, g2p]}
+- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:

@@ -42,12 +42,12 @@ from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: ML
 # Phase-3 decomposition of the oracle -- one file per operator + the shared grid field:
 from . import mpm_grid              # noqa: F401  the mpm_grid background FIELD + B-spline kernel
 from . import mpm_strain            # noqa: F401  particle -> particle  (F + material update)
-from . import p2g                   # noqa: F401  particle -> mpm_grid   (scatter)
+from . import mpm_scatter        # noqa: F401  particle -> mpm_grid   (scatter; was p2g)
 from . import mpm_grid_update       # noqa: F401  mpm_grid -> mpm_grid    (grid solve + BCs)
-from . import g2p                   # noqa: F401  mpm_grid -> particle    (gather + advect)
+from . import mpm_gather         # noqa: F401  mpm_grid -> particle    (gather + advect; was g2p)
 # active-matter <-> MPM two-way coupling (agents dragged/confined by + deforming the material):
-from . import agent_to_mpm          # noqa: F401  agent set -> mpm_grid   (agents deform material)
-from . import mpm_to_agent          # noqa: F401  mpm_grid  -> agent set  (material drags + confines agents)
+from . import agent_scatter      # noqa: F401  agent set -> mpm_grid   (agents deform material; was agent_to_mpm)
+from . import agent_gather       # noqa: F401  mpm_grid  -> agent set  (material drags + confines agents; was mpm_to_agent)
 from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (cells soften/rigidify tissue)
 from . import polarity_flow_align  # noqa: F401  mpm_grid -> agent heading (polarity-flow alignment; was flow_align)
 from . import polarity_align       # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment; was heading_align)
@@ -60,5 +60,5 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_l
            "prescribed_field", "chemotax", "gravity", "sediment",
            "pacemaker", "activation_pulse", "active_force", "active_stress",
            "mpm_spin", "mpm_anchor", "material_map", "mpm",
-           "mpm_grid", "mpm_strain", "p2g", "mpm_grid_update", "g2p",
-           "agent_to_mpm", "mpm_to_agent", "agent_remodel", "polarity_flow_align", "polarity_align"]
+           "mpm_grid", "mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather",
+           "agent_scatter", "agent_gather", "agent_remodel", "polarity_flow_align", "polarity_align"]
