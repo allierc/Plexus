@@ -30,3 +30,16 @@ plotting:
     q_n3: [0.5, 0.5, 0.5]
   splat_size: 1.9
   splat_res: 820
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cluster of particles centered in the frame against a black
+      background. Over time, the particles exhibit subtle fluctuations in their spatial distribution while
+      maintaining a cohesive, roughly spherical shape. The red and blue particles appear to be interspersed
+      within the larger population of grey particles. There is no significant expansion or contraction
+      of the overall cluster throughout the sequence.
+    objects: 'The scene contains three distinct sets of small, point-like particles: red, blue, and grey.
+      The grey particles are the most numerous and form the primary bulk of the central cluster. The red
+      and blue particles are scattered throughout the grey mass, appearing as smaller subsets. All particles
+      are uniform in size and are arranged in a disordered, stochastic distribution.'
