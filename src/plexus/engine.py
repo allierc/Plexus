@@ -615,8 +615,10 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
-            for lvlname, d in ob(H, _selector_mask(H, sel)).items():
-                H.add_delta(lvlname, d)   # call operator
+            deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})
+            for lvlname, d in deltas.items():        # break here to inspect `deltas`; empty for EMIT=None ops
+                H.add_delta(lvlname, d)              # record each returned delta for end-of-tick integration
+
             if snap is not None:
                 for n, before in snap.items():
                     if not torch.equal(before, H.levels[n].state):
