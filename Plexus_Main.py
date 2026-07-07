@@ -40,7 +40,7 @@ def main():
     # Ignored as soon as any real CLI argument is passed.
     if len(sys.argv) == 1:
         sys.argv += ["-o", "generate",
-                     "/workspace/Plexus/config/attraction_repulsion/arbitrary_2.yaml",
+                     "/workspace/Plexus/config/material/material_3balls_bouncy.yaml",
                      "--device", "cuda:0", "--movie", "--grid"]
 
     parser = argparse.ArgumentParser(description="plexus")
