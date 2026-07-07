@@ -86,8 +86,8 @@ def main():
     # MPM grid-dt CFL: auto-correct the SPEC (not the engine) so dt_sub respects the
     # Courant condition before we generate; idempotent for non-MPM / already-stable specs.
     if "generate" in task:
-        from plexus.generators.mpm_cfl import enforce_grid_cfl
-        enforce_grid_cfl(yaml_file)
+        from plexus.generators.mpm_cfl import Courant_Friedrichs_Lewy_condition
+        Courant_Friedrichs_Lewy_condition(yaml_file)
     sim = load(yaml_file)
 
     # self-describing run dir: snapshot the spec into log/<type>/<name>/

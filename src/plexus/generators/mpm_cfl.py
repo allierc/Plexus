@@ -48,7 +48,7 @@ def _max_wave_speed(spec, rho) -> float:
     return cmax
 
 
-def enforce_grid_cfl(yaml_path: str, write: bool = True):
+def Courant_Friedrichs_Lewy_condition(yaml_path: str, write: bool = True):
     """Check (and, if needed, correct in place) the grid-dt CFL of an MPM spec.
 
     Returns (changed: bool, info: dict|None). A spec with no `mls_mpm_mechanics`
