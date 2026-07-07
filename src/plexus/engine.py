@@ -315,6 +315,16 @@ def _assign_types(lvl: Level, s: dict, H: Hierarchy, device: str) -> None:
 
 
 def build(sim: Spec, device: str = "cpu") -> Hierarchy:
+    """Construct the Hierarchy (levels + fields) from a validated `sim`, in three passes.
+
+    Pass 1 -- TOP-LEVEL sets (no parent): place each set's particles across the world box
+    (a `spawn` mode / explicit `start` / uniform fill), assign per-type properties, and set
+    the initial velocity (a scalar random kick, or a computed `vel_init` mode after types).
+    Pass 2 -- CONTAINED sets (children): map each to its parent index and scatter it inside,
+    then let the entity provision domain-specific per-node buffers (e.g. mpm_particle's F/C/mass).
+    Pass 3 -- continuous FIELDS: a pure-state grid bound to one set (one channel per coupled
+    type) whose dynamics live entirely in the deposit/diffuse/decay/sense operators.
+    """
     H = Hierarchy()
     H.config = sim
     H.rng = torch.Generator(device=device).manual_seed(sim.seed)
