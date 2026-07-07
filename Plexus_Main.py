@@ -1,4 +1,4 @@
-"""Plexus entry point (mirrors connectome-gnn's GNN_Main).
+"""Plexus entry point.
 
     python Plexus_Main.py -o <task> <config_name> [--output_root ROOT] [--force]
 
@@ -15,7 +15,7 @@ explicitly. The data root defaults to the shared GraphData area; override with
 --output_root or $PLEXUS_OUTPUT_ROOT / $GNN_OUTPUT_ROOT.
 
 Only `generate` is implemented today (the forward simulator); train/test/plot are
-stubbed for the inverse-problem stages and fail loudly until built.
+stubbed for the inverse-problem stages and fail until built.
 """
 from __future__ import annotations
 
