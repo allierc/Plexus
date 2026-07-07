@@ -23,7 +23,6 @@ place; returns {}.
 from __future__ import annotations
 
 import math
-import itertools
 import torch
 
 from plexus.models.base import Exchange
@@ -65,29 +64,37 @@ def _ring_dirs(h, ca, sa):
 
 
 def _read(fld, centers, weights, ssz):
-    """Windowed, species-weighted trail read at one D-dim sensor (field->scalar/agent).
+    """Windowed, species-weighted trail read at a BATCH of sensors (field -> [N, S]).
 
-    Sums dot(weights, grid[:, *window]) over a (2k+1)^D voxel window around each
-    sensor centre [N, D]; per-agent `ssz` masks offsets outside that agent's own
-    window (the 2D `sensor_size` semantics, generalised to N-D)."""
-    D = centers.shape[1]
-    gidx = fld.pix(*[centers[:, k] for k in range(D)])     # D-tuple of [N] index tensors
+    Sums dot(weights, grid[:, *window]) over a (2k+1)^D voxel window around each of the
+    S sensor centres [N, S, D]; per-agent `ssz` masks offsets outside that agent's own
+    window (the 2D `sensor_size` semantics, generalised to N-D). Vectorised over BOTH
+    the S sensors and the (2k+1)^D window voxels -- one gather, no Python voxel/sensor
+    loop (was 27 gathers per tick in 2D: 3 sensors x 9 voxels)."""
+    N, S, D = centers.shape
+    dev = centers.device
     g = fld.grid                                           # [C, *shape]
-    N = centers.shape[0]
-    out = centers.new_zeros(N)
-    ssz = ssz if torch.is_tensor(ssz) else centers.new_full((N,), float(ssz))
-    ks = int(ssz.max().item())
     shape = fld.shape
     per = getattr(fld, "periodic", False)                  # torus field: wrap the window across the seam
-    for off in itertools.product(range(-ks, ks + 1), repeat=D):
-        idx = tuple((torch.remainder(gidx[k] + off[k], shape[k]) if per
-                     else (gidx[k] + off[k]).clamp(0, shape[k] - 1)) for k in range(D))
-        inwin = torch.ones(N, dtype=torch.bool, device=centers.device)
-        for o in off:
-            inwin = inwin & (abs(o) <= ssz)
-        vals = g[(slice(None),) + idx].t()                 # [N, C]
-        out = out + (weights * vals).sum(1) * inwin.float()
-    return out
+    ssz = ssz if torch.is_tensor(ssz) else centers.new_full((N,), float(ssz))
+    ks = int(ssz.max().item())
+
+    flat = centers.reshape(N * S, D)
+    gidx = torch.stack(fld.pix(*[flat[:, k] for k in range(D)]), dim=-1).reshape(N, S, D)   # [N, S, D]
+    rng = torch.arange(-ks, ks + 1, device=dev)
+    offs = torch.stack(torch.meshgrid(*([rng] * D), indexing="ij"), dim=-1).reshape(-1, D)  # [W, D] window
+    W = offs.shape[0]
+
+    # per-axis wrapped/clamped voxel index for the whole [N, S, W] window (D=2/3, not a hot loop)
+    axes = []
+    for k in range(D):
+        col = gidx[:, :, None, k] + offs[None, None, :, k]                 # [N, S, W]
+        axes.append(torch.remainder(col, shape[k]) if per else col.clamp(0, shape[k] - 1))
+    vals = g[(slice(None),) + tuple(axes)].permute(1, 2, 3, 0)             # [N, S, W, C]
+
+    inwin = (offs.abs()[None, :, :] <= ssz[:, None, None]).all(-1)         # [N, W] offset inside agent window
+    contrib = (weights[:, None, None, :] * vals).sum(-1)                   # [N, S, W]
+    return (contrib * inwin[:, None, :].float()).sum(-1)                   # [N, S]
 
 
 @register_operator("sense", family="fields", level="cell", kind="exchange")
@@ -126,10 +133,13 @@ class Sense(Exchange):
         w = torch.full((N, C), self.cross, device=dev)
         w[torch.arange(N, device=dev), nt] = 1.0
 
-        centre = _read(fld, pos + h * sd, w, ssz)          # [N] sensor straight ahead
         dirs = _ring_dirs(h, ca, sa)                       # list of [N, D] tilted directions
-        ring = torch.stack([_read(fld, pos + d * sd, w, ssz) for d in dirs], dim=1)   # [N, K]
         stacked = torch.stack(dirs, dim=1)                 # [N, K, D]
+        # centre sensor (heading) + K ring sensors -> one batched windowed read [N, 1+K]
+        dir_all = torch.cat([h[:, None, :], stacked], dim=1)           # [N, 1+K, D]
+        centers = pos[:, None, :] + dir_all * sd[:, None, :]           # [N, 1+K, D] sensor centres
+        reads = _read(fld, centers, w, ssz)                # [N, 1+K]
+        centre, ring = reads[:, 0], reads[:, 1:]           # [N] centre, [N, K] ring
 
         best_val, best_idx = ring.max(1)                   # strongest fan sensor
         target = stacked[torch.arange(N, device=dev), best_idx]        # [N, D]
