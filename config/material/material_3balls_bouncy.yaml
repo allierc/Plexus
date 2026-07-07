@@ -1,33 +1,56 @@
-# material_3balls_bouncy -- three stiff ELASTIC balls dropped in 2D, damping near-off
-# (drag 0, wall_damp 1.0) so they bounce many times; the rebound is the fixed-corotated
-# elastic spring-back (high youngs).
+# material_3balls_bouncy_v2 -- like material_3balls_bouncy but each ball gets a DIFFERENT
+# launch velocity (vel_init, per-cell), so they fly off in different directions and bounce
+# around the box. Damping near-off (drag 0, wall_damp 1.0); stiff elastic rebound.
 #
-# `general.dt` is the sim-time advanced per FRAME -- LOWER IT FOR SLOW-MOTION (gravity
-# unchanged). `substep_dt` is the single CFL-stable MPM micro-step; the engine runs
-# round(dt / substep_dt) substeps per frame (here 0.0015 / 0.0001 = 15).
-general: {name: material_3balls_bouncy, seed: 0, n_frames: 1500, dt: 0.0015, boundary: wall}
+# `general.dt` = sim-time per FRAME (lower for slow-motion, gravity unchanged); `substep_dt`
+# = the single CFL-stable MPM micro-step (substeps = round(dt / substep_dt) = 15 here).
+general:
+  {
+    name: material_3balls_bouncy,
+    seed: 1,
+    n_frames: 1500,
+    dt: 0.0015,
+    boundary: wall,
+  }
 sets:
   cell:
     n: 3
-    start: [[0.22, 0.72], [0.5, 0.84], [0.78, 0.72]]
+    start: [[0.25, 0.6], [0.5, 0.78], [0.75, 0.58]]
     types:
-      a: {fraction: 0.3334, youngs: 600}
-      b: {fraction: 0.3333, youngs: 600}
-      c: {fraction: 0.3333, youngs: 600}
-  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.085, density: 1.0}
+      a: { fraction: 0.3334, youngs: 600 }
+      b: { fraction: 0.3333, youngs: 600 }
+      c: { fraction: 0.3333, youngs: 600 }
+  mpm_particle:
+    {
+      parent: cell,
+      per_parent: 3000,
+      radius: 0.085,
+      density: 1.0,
+      vel_init: 0.45,
+    }
 fields:
-  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  mpm_grid: { frame: mpm_grid, n_grid: 128 }
 operators:
-- {op: aggregate, at: cell}
-- {op: gravity, at: cell, g: 9.0}
-- {op: mpm_strain, at: mpm_particle}
-- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200}
-- {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 1.0}
-- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+  - { op: aggregate, at: cell }
+  - { op: gravity, at: cell, g: 9.0 }
+  - { op: mpm_strain, at: mpm_particle }
+  - { op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.0, a_max: 200 }
+  - { op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 1.0 }
+  - {
+      op: mpm_gather,
+      at: mpm_particle,
+      from: mpm_grid,
+      wall_damp: 1.0,
+      wall_contact: 0.04,
+      vmax: 1000000000.0,
+    }
 schedule:
-- aggregate
-- gravity
-- {substep_dt: 0.0001, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+  - aggregate
+  - gravity
+  - {
+      substep_dt: 0.0001,
+      steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather],
+    }
 plotting:
   background: black
   colormap: tab10
@@ -35,19 +58,26 @@ plotting:
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_cell:
-    description: The orange circle starts at the top center and moves downward toward the bottom center.
-      The blue circle remains stationary on the left side of the frame throughout the sequence. The green
-      circle remains stationary on the right side of the frame throughout the sequence. The orange circle
-      completes its downward path by the final frame.
-    objects: There are three circular objects arranged in a triangular formation. The circle on the left
-      is blue and has a medium diameter. The circle on the right is green and has a medium diameter. The
-      circle in the center is orange and has a medium diameter.
+    description:
+      The three colored clusters begin in a triangular formation with the orange cluster at
+      the top. Over time, the orange cluster moves downward and to the right, while the blue cluster moves
+      slightly upward and to the right. The green cluster remains relatively stationary but shifts slightly
+      toward the center. By the final frame, the three clusters have converged into a much tighter, nearly
+      linear arrangement.
+    objects:
+      The scene contains three distinct circular clusters of particles. The blue cluster is located
+      on the left, the orange cluster is in the center, and the green cluster is on the right. Each cluster
+      is roughly the same size and maintains a dense, spherical shape throughout the simulation. The colors
+      are vibrant and distinct against the solid black background.
   movie_mpm_particle:
-    description: The three clusters of particles begin in a triangular formation with the orange cluster
-      at the top. Over the course of the simulation, the orange cluster moves downward while the blue
-      and green clusters remain relatively stationary. The orange cluster eventually passes through the
-      center of the triangle and settles at the bottom. By the final frame, the three clusters form an
-      inverted triangle with the orange cluster at the base.
-    objects: The scene contains three distinct clusters of small particles. Each cluster is roughly spherical
-      in shape and approximately the same size. The clusters are colored blue, orange, and green. They
-      are arranged in a triangular configuration that changes orientation as the orange cluster moves.
+    description:
+      The three clusters of particles begin in a triangular formation with the orange cluster
+      at the top. Over time, the orange cluster moves downward and to the right, while the blue cluster
+      moves slightly upward and to the right. The green cluster remains relatively stationary but shifts
+      slightly to the right. By the final frame, the three clusters have aligned into a nearly horizontal
+      row.
+    objects:
+      There are three distinct clusters of small particles, each forming a roughly spherical shape.
+      The cluster on the left is blue, the cluster in the middle is orange, and the cluster on the right
+      is green. All three clusters are approximately equal in size and density. The clusters are initially
+      arranged in a triangle and transition into a linear horizontal arrangement.
