@@ -93,7 +93,7 @@ def main():
     # self-describing run dir: snapshot the spec into log/<type>/<name>/
     run_log_dir = log_path(pre_folder.rstrip("/"), name)
     os.makedirs(run_log_dir, exist_ok=True)
-    shutil.copy2(yaml_file, os.path.join(run_log_dir, "config.yaml"))
+    shutil.copy2(yaml_file, os.path.join(run_log_dir, "spec.yaml"))   # same name as the data-dir copy (line ~104)
 
     describe = not args.no_describe
     data_dir = None
