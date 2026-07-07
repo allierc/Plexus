@@ -14,7 +14,7 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("diffuse", level="field", kind="field")
+@register_operator("diffuse", family="fields", level="field", kind="field")
 class Diffuse(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 

@@ -1,4 +1,4 @@
-"""heading_align (agent set -> agent heading): FIRST-ORDER Vicsek polar alignment.
+"""polarity_align (was heading_align) (agent set -> agent heading): FIRST-ORDER Vicsek polar alignment.
 
 The orientational half of the Vicsek model, realised as a HEADING-STEER (like
 `flow_align`/`chemotax`) so it composes with the first-derivative embryo cell set
@@ -30,8 +30,8 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("heading_align", level="cell", kind="exchange")
-class HeadingAlign(Exchange):
+@register_operator("polarity_align", "heading_align", family="polarity", level="cell", kind="exchange")
+class PolarityAlign(Exchange):                   # (alias `heading_align`, one migration cycle)
     EMIT = None                                 # writes `heading` in place (Vicsek steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = []                        # no required params — gain/noise optional (defaults in __init__)

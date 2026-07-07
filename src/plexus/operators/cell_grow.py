@@ -32,7 +32,7 @@ from plexus.models.base import Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("cell_grow", level="cell", kind="structural")
+@register_operator("cell_grow", family="growth", level="cell", kind="structural")
 class CellGrow(Structural):
     EMIT = None                                           # structural: advances `grow_V` + wakes reserve child particles in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

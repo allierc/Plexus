@@ -25,7 +25,7 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("pacemaker", level="field", kind="field")
+@register_operator("pacemaker", family="fields", level="field", kind="field")
 class Pacemaker(FieldUpdate):
     EMIT = None                 # writes `H.signals[name]` scalar in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

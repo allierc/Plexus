@@ -13,7 +13,7 @@ from plexus.models.base import Aggregate
 from plexus.models.registry import register_operator
 
 
-@register_operator("aggregate", level="cell", kind="aggregate")
+@register_operator("aggregate", family="hierarchy", level="cell", kind="aggregate")
 class Centroid(Aggregate):
     EMIT = None                                    # readout: writes parent `pos` in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic

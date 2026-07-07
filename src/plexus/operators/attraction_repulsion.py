@@ -25,7 +25,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("attraction_repulsion", level="particle", kind="lateral")
+@register_operator("attraction_repulsion", family="interaction", level="particle", kind="lateral")
 class AttractionRepulsion(Lateral):
     EMIT = "velocity"             # emits a velocity (overdamped law)
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
