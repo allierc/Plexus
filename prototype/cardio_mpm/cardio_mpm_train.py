@@ -512,7 +512,7 @@ def main():
     center = p_op("activation_pulse", "center", [0.5, 0.5])   # pulse_stimulus -> activation_pulse (M3 merge)
     radius = float(p_op("activation_pulse", "radius", 0.12))
     profile = str(p_op("activation_pulse", "profile", "uniform"))
-    dt_sub = float(p_op("p2g", "dt_sub", 2e-4) or 2e-4)
+    dt_sub = float(p_op("mpm_scatter", "dt_sub", 2e-4) or 2e-4)   # op renamed p2g -> mpm_scatter by the M?/948ff60 transfer-family refactor
 
     # build engine + map the real data (1 model frame = 1 real frame)
     H = E.build(spec, dev)
@@ -587,7 +587,7 @@ def main():
     ops["active_stress"].amplitude = float(args.amplitude)
     ops["drag"].k = float(args.drag_k)            # op renamed mpm_drag -> drag (emit: mpm_acceleration) by M2 refactor
     force_ops = ["active_stress", "drag"]
-    mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]
+    mpm_ops = ["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"]   # p2g->mpm_scatter, g2p->mpm_gather (948ff60 transfer-family rename)
     spatial = _spatial_profile(profile, center, radius, dev)
     # TRAVELLING-WAVE activation phase tau(x,y): a coarse PLANE WAVE (action-potential propagation).
     # Per-pixel activation delay in frames = tw_amp * projection onto the wave direction, centered so the
