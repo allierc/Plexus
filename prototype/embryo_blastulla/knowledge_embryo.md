@@ -1,5 +1,23 @@
 # Embryogenesis (active matter × MPM) — knowledge ledger (v2, SCORECARD-driven, restart 2026-07-03)
 
+## ★ CAMPAIGN CLOSED — REG [established]-POSITIVE (Batch 122, terminal). Ladder 1A→1E→INT→ORI→GRO→PAT→MOR→BUD→BRN→ORG→REG COMPLETE. STOP.
+- **[established, Batch 122 / b121] EMERGENT ACTIVE-PARTITION REGENERATION FROM PRIMITIVES ONLY.** A developmental-timing
+  gate (native chemotax demix + sediment drivers transiently OFF over an insult window, then RESUMED — NO scripted repair
+  operator) lets the LOCKED ORG organism (`embryo_ORG_swap_anisoY_sed13.yaml`) re-sort a DEEPLY scrambled type-partition
+  after a mechanical+identity insult (mix +0.50 / repel-burst str200 r0 0.070). **Fresh independent seeds 9/10/11 (n=3):**
+  segregation_index recover {0.420, 0.965, 0.942} vs frozen-drivers-OFF twin {0.044, 0.288, 0.393}; **mean Δ +0.534 ±
+  0.151 (SD), 3.5·SD, paired t=6.1, 3/3 positive**, co-metrics agree 3/3 (interface_frac AND mixing_entropy both lower in
+  every recover run), frozen<0.4 3/3. Clears the strict per-batch |Δ|>2·SD bar. Healing is ACTIVE not passive (frozen twin
+  = identical insult, drivers off → stays mixed ~0.24). **POOLED 18/21 seed-pairs directional-positive** across b115–b121;
+  deep-uniform arm n=6 pooled Δ +0.379 ± 0.295, t=3.14 (df=5) p≈0.026. **BODY INVARIANT across all 16 REG insult batches**
+  (collapsed 0 / fragment_count 1 / independent_growth_domains 2 / program_stability 1.0 / nn_min never sustained < r0):
+  the ORG architecture (2 growth domains, 5 buds, branch skeleton) NEVER ruptured under any insult. REG OP POINT =
+  `embryo_REG_puremix_deeprec` on the LOCKED ORG. **Campaign terminus reached — no further batches (pre-registered STOP).**
+  [engineering] Judge REG TIER-1 by collapsed + nn_min + org body signature, NOT raw escape/r_cell_max (body-drift
+  artifact under insult forces); deform=nan on deep-mix frames = contour-fit artifact, not a gate. Montage `seg=` title is
+  a DIFFERENT quantity that inverts vs scorecard segregation_index — read seg from scorecard.json ONLY.
+
+
 Cumulative, curated working memory. CUMULATIVE: add/curate, never erase. Tags: **[established]**
 (≥3 seeds, |Δ|>2·SD vs control) · **[open]** (hypothesis to test) · **[rejected]** (falsified) ·
 **[engineering]** (tooling/metric). **Findings are decided on the QUANTITATIVE SCORECARD numbers +
@@ -2677,6 +2695,353 @@ search 2026-07; open-access PDFs (arXiv only, egress-restricted env) in `/worksp
   The ladder segment 1A→…→BUD→BRN→ORG is CLOSED; the campaign now advances to REG (robustness of this organism).
   ORG OP POINT = `embryo_ORG_swap_anisoY_sed13.yaml` (+_s1/_s2) — REG PERTURBS this locked organism. Batch 105 = the
   closing robustness lock (n→6 on the headline); the [established] gate is met at n=6.
+- **REG (regeneration / perturbation robustness — NEW TERMINUS) — STARTED Batch 106 (2026-07-06, campaign REOPENED by
+  user). Gate: the locked ORG organism, PERTURBED mid-development from PRIMITIVES ONLY (no scripted repair op — healing
+  must EMERGE), RECOVERS its ORG signature (indep_growth_domains→2, program_stability≥gate, fragment_count→1,
+  pattern/branch restored) reproducibly across seeds, vs BOTH an unperturbed control AND a perturbed-but-FROZEN control
+  (proves healing is ACTIVE, not passive).** Perturbations built from three primitive families (see harness below):
+  developmental-TIMING gate (cell_grow rate→0 over a window then resume), mechanical INSULT (transient force/repel
+  burst), identity/pattern DROPOUT (drop chemotax/deposit for a window). After REG the ladder STOPS.
+  - **[engineering, Batch 106] PERTURBATION HARNESS = the engine's per-op frame gate.** Any operator line accepts
+    `after_frame`/`before_frame` (ints); the engine gates each instance to the window `[after_frame, before_frame)`
+    (engine.py:464-493) and a schedule token fires ALL instances of that op name (`_run_token`, engine.py:487). So a
+    TRANSIENT insult = ADD one frame-gated copy of an existing op (no schedule edit); a HALT-then-RESUME = SPLIT one op
+    into two gated copies with a gap; a permanent (FROZEN) insult = one gated copy with only `after_frame`. Zero new
+    operators needed → satisfies R1 (minimal mechanism). All REG specs are copies of `embryo_ORG_swap_anisoY_sed13.yaml`
+    with exactly one such gated perturbation added.
+  - **[established, Batch 107 / b106] the ORG BODY signature is PASSIVELY/STRUCTURALLY ROBUST — primitive agent-level
+    insults do NOT damage it, so body-level "regeneration" is UNTESTABLE at this op point.** Across ALL 8 b106 slots
+    (4 insult families × recover/frozen + repel-ablate + ctrl, seed 0) `org_independent_growth_domains`=2.0,
+    `org_program_stability`=1.0, `org_fragment_count`=1.0 are IDENTICAL to control — including the never-released FROZEN
+    controls; bud/branch scores scatter within control-run range (branch_score 3–6, n_tips 4–8) but are NOT ordered by
+    insult severity (the harshest insult, sed_insult deform_rms 0.113, keeps branch_score 6.0 = ctrl). The ORG signature
+    lives in the anchored MPM tissue body + fixed 7-cell topology, which agent-level (chemotax/sediment/grow-halt/repel)
+    insults can't reach. → the b106 REG decision-basis (org_* recovery) is INSENSITIVE; the literal REG gate
+    (domains→2, prog_stab, frag→1) never leaves its control value. The ONLY damageable+recoverable ORG feature is the
+    AGENT-level type PARTITION. **REG RE-SCOPED (b107) to PARTITION regeneration** (readout = legacy `segregation`
+    [montage 'seg'; `segregation_index` is saturated 1.0 = useless] + `mi_type_y` + `type_axis`).
+  - **[established, Batch 107 / b106] the ORG type PARTITION is a self-maintaining STABLE ATTRACTOR — removing its cue
+    does NOT de-sort it (demix-DROP is a NULL insult).** demix_drop_rec (chemotax OFF [3000,5400) then RESTORED) and
+    demix_drop_froz (OFF forever) are BIT-IDENTICAL in every metric (seg 0.4796, deform_rms 0.05768, mi_type_y 0.8636,
+    msd 0.044673 — specs verified different by diff). Once sorted, cells sit at the chemical-trail extrema where the
+    chemotax gradient force ≈ 0, so the ongoing cue is dispensable (pattern memory / hysteresis; demix seg 0.4796 even
+    ABOVE ctrl 0.4153). CONSEQUENCE: a de-mixing insult must be ACTIVE (drive mixing), not cue-removal.
+  - **[open, Batch 107 / b106] insult efficacy triage (all n=1, seed 0):** (a) halt-grow gives the only recover/frozen
+    seg split (rec 0.440≈ctrl 0.415 vs froz 0.166, 2.7×) but CONFOUNDED — grow_ratio barely moves (rec 1.113 vs ctrl
+    1.114; the ORG grows only ~11%/run so halting growth halts ~nothing) and seg⊥mi_type_y (froz mi_type_y 0.853 >
+    rec 0.601 while froz seg LOWER) → seg 0.166 is partition noise, inconclusive. (b) one-sided sediment insult (a
+    gy-0.5) is the ONLY mechanically damaging one (sed_rec area 0.191 vs ctrl 0.435 −56%, deform_rms 0.113 3.6×, msd
+    0.161 2.7×) but makes a BAD frozen control: held a-down drift AIDS the a-down/b-up sort (froz seg 0.422 > rec 0.297,
+    mi_type_y 1.0) → directional-insult artifact. (c) repel_ablate only quiets the body (migration 0.43→0.168,
+    fourier_m1 0.029→0.012), no damage. LESSON: use a SYMMETRIC/cue-based insult with a frozen control that can't
+    artificially re-sort. **b107 = chemotax SIGN-FLIP (−0.10→+0.10, active mixing) recover/frozen ×seeds + a mechanical
+    axis-reversal (a+0.5/b−0.5) cross-check. Predict flip_rec seg→~0.40, flip_froz seg<0.25, |Δ|>2·SD over 3 seeds;
+    falsifier = flip null like demix-drop (partition too stable to de-mix even by cue reversal = stronger robustness).**
+  - **[established, Batch 108 / b107] the partition is TISSUE-LOCKED, not cue-held — the chemotax SIGN-FLIP is a NULL
+    insult (b107 falsifier FIRED, joins b106 cue-drop).** flip_rec seg 0.4323 == flip_froz seg 0.4315 == ctrl 0.4153
+    (mi_type_y 0.8182 both); reversing the demix chemotax to +0.10 (cross-ATTRACTION, types chase each other) over
+    [3000,6000) AND holding it forever BOTH leave the partition intact. Cue-drop (b106) + cue-flip (b107) both null →
+    **chemotax at |gain|=0.10 is too WEAK to move agents mechanically locked into the MPM tissue architecture**; the
+    partition is held by the tissue, not the live chemical cue. The ONLY insult that de-mixes is a strong MECHANICAL
+    burst.
+  - **[open→n=1, Batch 108 / b107] the transient MECHANICAL axis-reversal (sedrev) is the one working de-mixer, but the
+    HELD frozen control HARD-FAILS + confounds.** sedrev_rec (a+0.5/b−0.5 burst [3000,4200) then removed): seg 0.1102
+    (3.8× below ctrl 0.4153 = real de-mix), msd 0.1338 (2.2× ctrl), type_dipole dips to 0.118@50% then partially
+    recovers to 0.357@100%; TIER-1 CLEAN (nn_min 0.0175, collapsed 0, escape 0.2955 = body-drift artifact). sedrev_froz
+    (held forever): **nn_min 0.0046 << r0 0.02 + escape 1.0 = HARD FAIL** AND over-sorts the inverted axis (seg 0.2742,
+    mi_type_y 1.0, type_dipole 1.005 batch-max) → an axial mechanical insult makes a USELESS frozen control (ruptures +
+    artificially re-sorts). ⇒ the clean recover-vs-no-recover contrast must come from a RECOVERY-side lever.
+  - **[engineering, DURABLE, Batch 108] the `general.seed N` DOTTED OVERRIDE IS SILENTLY IGNORED by the driver — SEEDS
+    MUST BE SEPARATE SPEC FILES with `seed:` baked into the `general:` block.** b107 flip_rec_s0/s1/s2 (`... general.seed
+    1`/`2`) came out BIT-IDENTICAL to 4 dp (seg 0.4323, deform_rms 0.06444, msd 0.058976, all three) → that 3-seed arm
+    was effectively n=1. Prior genuinely-varying ORG seed runs (b104/b105) used separate files (embryo_ORG_..._s1.yaml
+    `seed: 1`, _s2 `seed: 2`). Op-param dotted overrides (e.g. `chemotax.gain`) DO still work; only the nested
+    `general.seed` key is dropped. (Adds to the sandbox-blocked list: `>>`, cp, sed, python3, loop-for → use Write/Edit
+    + Read.)
+  - **[established, Batch 109 / b108 — REG PARTITION DELIVERABLE] the mechanically-scrambled ORG type-PARTITION is a
+    robust WRITE-ONCE (NON-regenerating) developmental pattern — it does NOT spontaneously re-sort AND boosting the sorting
+    force does NOT rescue it (b108 falsifier FIRED).** After the transient sedrev burst [3000,4200) scrambles it: (1)
+    baseline recovery (chemotax −0.10) legacy seg = s0 0.1102, s2 0.0293 (2 clean seeds; s1 0.3347 HARD-FAIL collapsed
+    0.0455 nn_min 0.0 excluded) = mean 0.070 vs ctrl 0.4153, Δ ≈ 6·SD → no spontaneous re-sort; (2) recovery-window
+    chemotax gain ladder is FLAT and non-monotone, all ≪ ctrl: g10 0.1102 → g25 0.0601 → g50 0.1223 (net −0.10/−0.25/−0.50);
+    even net −0.50 stays seg <0.13; (3) adding mobility (g50move, move_speed 0.24) fails harder — seg 0.0511 AND HARD-FAILS
+    (nn_min 0.0089 < r0). MECHANISM: the cells are re-locked into the MPM tissue architecture at scrambled positions faster
+    than any chemotax (≤5× baseline, ±move) can re-sort them — same tissue-lock that made cue-drop (b106) + cue-flip (b107)
+    null. This is the clean NEGATIVE REG deliverable for the partition axis: robust but non-regenerating (cf. mammalian
+    body-axis, not re-specifiable once set). ORG body signature (indep_domains 2.0, prog_stab 1.0, frag 1.0, branch_score
+    5–8) UNTOUCHED across all 8 slots (5th batch of structural-robustness confirmation).
+  - **[open→n=1, Batch 109 / b108 — THE POSITIVE REG CHANNEL] the anchored elastic MPM BODY SHAPE recovers after a
+    transient insult, but the directional sedrev confounds its frozen control.** g10_s0 deform_rms trajectory
+    (5/25/50/75/100%) = 0.065 → 0.116 (PEAK during insult) → 0.058 → 0.073 → 0.030 (final ≈ ctrl 0.0316); area recovers
+    0.177→0.425 (ctrl 0.434); fourier_m1 0.0262 ≈ ctrl 0.0293. So the elastic+surface_tension+anchor restoring forces
+    RE-ROUND the body while the partition stays scrambled. BUT the recovery is SEED-DEPENDENT under the directional insult
+    (s2 stayed distorted: fourier_m1 0.0865, area 0.288 −34%, deform_rms 0.0746) AND the frozen control ruptures/drifts
+    (directional artifact) → a clean active-vs-passive body-regen contrast needs a SYMMETRIC insult. b109 = transient 6×
+    `agent_to_mpm.k` spike (topology-preserving continuum deformer, b34; frozen stays TIER-1 clean + centered) recover vs
+    frozen vs ctrl, 3 seeds — the first clean elastic body-shape REGENERATION test.
+  - **[Batch 110 / b109 read — SYMMETRIC k-spike body insult]. (a) the agent_to_mpm.k 1→6 spike over [3000,6000) is
+    TOPOLOGY-PRESERVING (partition HELD: seg 0.35–0.67 ~ ctrl 0.42 on 7/8 slots; only k6_rec_s0 dipped 0.087 = seed
+    fluctuation), unlike the sedrev burst which scrambled seg to 0.11 → a CLEAN body-shape insult. (b) THE POSITIVE
+    SIGNAL replicates in DIRECTION but stays [open]: final deform_rms recover arm (k6, 3 seeds) 0.075±0.024 {0.074,
+    0.100,0.052} < frozen (k6, n=1) 0.131 > ctrl 0.032 — frozen re-rounds LESS than recover as elastic-regen predicts,
+    but frozen n=1 (no |Δ|>2SD test yet) and recover still 2.4× ctrl (INCOMPLETE). (c) deform_rms is NOISE-DOMINATED at
+    single sampled frames: the UNPERTURBED ctrl itself PULSES [0.065,0.116,0.053,0.116,0.032] (the two cell_grow programs
+    pulse the anchored body); the k10 severity pair INVERTS incoherently (k10_froz 0.038 < k6_froz 0.131 — stronger held
+    spike gives LESS final deform) = sampling noise, not a real ordering; the k-spike is largely ABSORBED in real time by
+    the anchor (deform at 50% = insult-release ≈ ctrl 0.05). (d) org body signature UNTOUCHED, 6th batch (indep_domains
+    2.0, prog_stab 1.0, frag 1.0). VERDICT: elastic body re-rounding is the ONLY live regen channel but INCONCLUSIVE.**
+  - **[Batch 111 / b110 read — elastic body-regen DECISIVE 3-seed BOTH-ARMS test RESOLVED NEGATIVE]. BOTH pre-registered
+    falsifiers FIRED.** (a) final deform_rms recover (k6 3 seeds) 0.075±0.024 {0.074,0.100,0.052} vs frozen (k6 3 seeds)
+    0.112±0.049 {0.131,0.148,0.056} — Δ 0.037 < 2·SD_froz 0.098, frozen range fully ENCLOSES recover; the b109 n=1 frozen
+    0.131 did NOT replicate (9th single-seed clean point to regress). (b) short-window recover (7500f recovery) deform
+    0.091 ≥ long-window 0.074 → extra recovery time buys NOTHING. LATE-WINDOW-MEAN deform (mean of 50/75/100%) ctrl 0.067
+    ≈ froz_s0 0.071 ≈ rec_s0 0.075 = INDISTINGUISHABLE → a HELD k6 insult NEVER lifts time-averaged deform above the ctrl
+    intrinsic pulse band 0.03–0.12. ROOT CAUSE: the body's restoring physics (`surface_tension` 8.0 + elastic youngs 120)
+    ABSORBS any continuum k insult every frame → NO persistent-damage state exists → no active-vs-passive recovery to
+    measure; the k-lever FIGHTS the restorer and loses. Area readout fails identically (froz 0.224±0.114 vs rec 0.318±0.077,
+    seed-2 inverts, ctrl area itself pulses 0.18–0.43). k topology-preserving (partition held, seg straddles ctrl). org
+    signature UNTOUCHED 7th batch (indep 2.0/prog_stab 1.0/frag 1.0). **elastic body re-rounding is NOT cleanly demonstrable
+    via a continuum-ADD (k) insult.**
+  - **[established-engineering, Batch 112 / b111 read — surface_tension is INERT for the all-elastic ORG body]. The
+    ST-softening insult was a COMPLETE NO-OP: all 5 soften_* slots (ST 4/2/1/0.5 held + ST1 recover) are BIT-IDENTICAL to
+    ctrl_unpert across the ENTIRE scorecard (deform_rms, area, organo, partition — every digit).** ROOT CAUSE (code-traced):
+    `mpm_grid_update`'s CSF surface-tension force fires only `if surf>0 and (gc>0).any()` (mpm_grid_update.py:99), acting on
+    the grid COLOUR field `gc`; `gc` is populated ONLY for `is_liquid` particles (mpm_scatter.py:112–117). The ORG body is
+    `material: elastic` everywhere → no liquid → `gc≡0` → the ST term is NEVER evaluated → ST 8→0.5 is dead code. **This
+    FALSIFIES (mechanism-level) the b110/b111 belief that surface_tension is a restoring force: the ORG restoring force is
+    PURELY elastic (youngs 120) + wall_damp; surface_tension is a dead lever on any all-elastic body.** (Consistent with the
+    older [established-engineering b98] "surface_tension is a dead morphology lever on a youngs-200 elastic membrane" — now
+    generalized + root-caused: CSF needs `is_liquid`.) The gate HARNESS is correct (engine.py:573–577 self-gates each copy,
+    identical to the WORKING agent_to_mpm k-harness) — the no-op is the parameter's inertness. **DURABLE GOTCHA: `surface_tension`
+    / `mpm_grid_update` CSF does NOTHING unless a material layer is `is_liquid`; never use ST as an insult/lever on the elastic
+    ORG body.** The b111 falsifier fired in its STRONGEST form → no persistent-damage state is reachable via ST removal. Real
+    slots: grow_k30_froz (k30 held) deform 0.077 still ABSORBED (< ctrl ceiling 0.12), grow_ratio 1.11=ctrl; repel_inflate_froz
+    ejects agents (escape 0.70, seg 0.42→0.21) — org body signature UNTOUCHED in both (indep 2.0/prog_stab 1.0/frag 1.0, 7th batch).
+  - **[established, Batch 113 / b112 read — growth is NOT ORG-preservingly amplifiable → growth-halt regeneration UNTESTABLE;
+    both b112 falsifier limbs fired].** (a) EVERY growth-amplifying slot MERGED the two programs: org_independent_growth_domains
+    2.0→**1.0** and org_program_stability 1.0→{grow_iso 0.4, iso_r08 0.2, iso_pre05 0.2, rate16 0.4, bothAB 0.0} in all six —
+    pushing growth REGRESSES the ORG capability recovery would score. (b) grow_ratio is realization-capped BELOW the ≥1.4 a
+    real deficit needs: ctrl 1.1137 → iso 1.13, iso_r08 1.13, iso_pre05 1.20, rate16 1.14, bothAB **1.27** (max, but at
+    prog_stab 0.0). The "grow_ratio 1.11 is an anisotropy artifact, iso lifts it ≥1.4 preserving ORG" hypothesis is FALSIFIED —
+    iso lifts it only to ≤1.20 at prog_stab≥0.2 AND merges the domains. (c) halt_rec_iso ≡ halt_froz_iso **BIT-IDENTICAL across
+    the ENTIRE scorecard** (grow_ratio 1.1279, area 0.42697, org 1.0/0.6, every digit) → the growth-halt recover/frozen split
+    is a total NO-OP; the b106 halt seg 0.44 vs 0.17 split is RETIRED as a seed fluctuation on a growth that halts nothing.
+    ctrl_baseline body signature 2.0/1.0/1.0 (8th consecutive batch). ⇒ per the pre-registered plan, LOCK the REG NEGATIVE.
+  - **[established, Batch 114 / b113 read — REG NEGATIVE holds on the mechanical-ablation modality, but UNDER-POWERED; the
+    b113 falsifier did NOT fire].** 3-seed recover/frozen triad (extra repel str250 r0 0.045 over [3000,6000); recover=burst
+    removed at 6000, frozen=held). Recover-arm final `segregation_index` 0.759/0.975/0.667 = **0.800±0.158**; frozen-arm
+    0.722/0.692/0.610 = **0.675±0.058**; Δ +0.125 < 2·SD(0.316) → recover≈frozen (the +0.125 is entirely the rec_s1 0.975
+    outlier). Body signature INVARIANT in all 8 slots (indep_domains 2.0, prog_stab 1.0, fragment 1.0, all checkpoints; TIER-1
+    clean, collapsed 0, nn_min ≥0.012). **LOOPHOLE [engineering]: the mechanical repel burst NEVER scattered the SCORECARD
+    partition — `segregation_index` stayed 0.6–1.0 through the entire [3000,6000) window in BOTH arms (rec_s0 [0.218,1.0,0.959,
+    0.952,0.759]; froz_s0 [0.218,1.0,0.959,0.588,0.722]), because chemotax(-0.10)+sediment(±0.13) RE-PIN mechanically-displaced
+    cells within-frame; the burst only drops the LEGACY montage seg + trips escape (~0.7 body-drift artifact).** ⇒ "recover≈frozen,
+    no re-sort" is trivially true here — almost nothing was scattered to re-sort. To make the NEGATIVE airtight, the insult must
+    DISABLE the sorting drivers (not just mechanically push) → b114 HARDMIX.
+  - **REG STATE (entering b114, batch 9/10 — TERMINUS LOOPHOLE-CLOSER): REG NEGATIVE established on 3 modalities but the
+    partition write-once claim needs ONE meaningful-scramble confirmation.** Mechanical bursts (b108/b113) scatter LEGACY seg
+    but NOT scorecard seg (drivers re-pin within-frame). b114 = two-factor HARDMIX insult that genuinely mixes scorecard seg:
+    over [3000,6000) FLIP chemotax demix cue -0.10→+0.10 AND gate sediment gy ±0.13 → 0 (both sorting drivers disabled);
+    recover restores both at 6000, frozen leaves both OFF; 3 seeds/arm + ctrl + single-factor chemflip contrast (sediment stays
+    on). Engine frame-gate is generic (engine.py:547/573) so gating sediment works. Confirm: (i) scorecard seg <0.6 at 50%
+    checkpoint = a real scramble; (ii) recover final seg ≈ frozen final seg within 2·SD = no active re-sort → LOCK terminus.
+    FALSIFIER→REOPEN: recover seg > frozen seg by |Δ|>2·SD (genuinely-mixed partition actively re-sorts) OR hardmix fails to
+    depress seg <0.6 at 50% (insult too weak) OR body rupture. Specs embryo_REG_hardmix_rec[/_s1/_s2]/_froz[/_s1/_s2].yaml.
+    [SUPERSEDES the entering-b113 REG STATE below.]
+  - **[open→INDECISIVE, Batch 115 / b114 read — HARDMIX genuinely scattered the partition (b113 loophole CLOSED) but
+    UNDER-POWERED: only seed0 deeply, and the re-sort signal does NOT clear 2·SD].** Two-factor HARDMIX (chemotax cue
+    FLIPPED −0.10→+0.10 AND sediment gy ±0.13 GATED→0 over [3000,6000)) DID depress scorecard `segregation_index` at the
+    50% checkpoint — unlike b113's mechanical burst. (a) Depth seed-variable, only seed0 hit target <0.6: 50%-seg by seed
+    (rec/froz share pre-6000) s0 **0.429**, s1 0.636, s2 0.672 → passive gate-to-0 under-scatters most seeds in one 3000f
+    window. (b) Re-sort test: final seg recover {1.00,0.625,0.815}=**0.813±0.188** vs frozen {0.343,0.547,0.723}=
+    **0.538±0.190**, Δ **+0.276 < 2·SD 0.38 → NOT significant**; entirely seed0 (rec 1.00 vs froz 0.343, Δ +0.66), seeds
+    1&2 both arms wobble together (never scattered deeply enough for a re-sort to show). (c) frozen did NOT stay mixed on
+    the shallow seeds (froz_s2 0.672→0.723 RISING with drivers OFF; only deeply-scattered froz_s0 0.429 stayed mixed 0.34)
+    → confirms under-power: need all seeds <~0.5 so frozen can't passively climb. (d) **chemflip-alone contrast pins the
+    scatter driver = the SEDIMENT gate, NOT the chemotax flip: chemflip_rec (chemotax +0.10 but sediment left ON) never
+    moved seg (50% 1.00 vs hardmix 0.429) → the ±0.13 sediment demix force is the dominant sorter; the weak 0.10 chemotax
+    flip is inert. A deeper insult must REVERSE/boost the SEDIMENT.** (e) body signature INVARIANT all 8 slots (indep 2.0,
+    prog_stab 1.0, frag 1.0; 9th batch), TIER-1 clean (collapsed 0, nn_min 0.0145–0.019); `deform` NaN on 4 slots =
+    scorecard contour-fit artifact, not a hard-fail. VERDICT: b114 falsifier limb1 (recover>frozen by 2·SD) did NOT fire,
+    limb2 (fails <0.6 at 50%) fired on 2/3 seeds → INDECISIVE. NEGATIVE not overturned but the lock can't rest on a
+    seed0-driven ambiguous case → b115 = ONE decisive powered batch (active-counter-sorting HARDMIX2).
+  - **[OVERTURN → POSITIVE, Batch 116 / b115 read — the REG NEGATIVE is OVERTURNED: EMERGENT PARTITION REGENERATION,
+    3 seeds, Δ ≫ 2·SD].** DEEP active-counter-sort HARDMIX2 (over [3000,6000): sediment SWAPPED a gy +0.13 / b gy −0.13 =
+    reversed demix polarity + chemotax cross-chase boosted +0.10→+0.20) scattered the partition; recover restored BOTH
+    native demix drivers at 6000, frozen left them OFF. **Recover final seg {1.00, 0.957, 0.811} = 0.923 ± 0.096 vs frozen
+    {0.217, 0.111, 0.405} = 0.244 ± 0.149, Δ +0.68 ≫ 2·SD (per-seed Δ +0.78/+0.85/+0.41, EVERY seed positive)** — the b115
+    pre-registered falsifier limb1 FIRED. The actively-mixed ORG partition RE-SORTS to ~ctrl fidelity (0.92 ≈ ctrl 1.00)
+    once the native sediment+chemotax primitives resume, while the drivers-OFF frozen arm stays deeply mixed and keeps
+    drifting mixed (froz_s0 0.910→0.403→0.217) → healing is ACTIVE/driver-dependent, NOT passive relaxation. No repair
+    operator: recovery is the SAME primitives that built the pattern, re-run (the sanctioned developmental-timing-gate
+    route). The ORG partition is thus a dynamical RE-ATTRACTOR, not write-once. −0.20 boosted restore adds nothing (re-sort
+    already saturated at −0.10; the ±0.13 sediment gate does the work). CAVEAT: insult under-scattered at the 50% checkpoint
+    (s0 0.910, s2 0.50; only s1 <0.5) — seed0's frozen only mixed AFTER the window → the FINAL contrast is airtight but the
+    50%-depth was non-uniform. Body INVARIANT all 8 (indep 2.0, prog_stab 1.0, frag 1.0; 10th structural-robustness batch),
+    TIER-1 clean (collapsed 0, nn_min 0.0145–0.0182). → b116 = ONE decisive replication (fresh seeds 3/4/5, uniformly-deeper
+    HARDMIX3 insult) to promote to [established]-POSITIVE and LOCK the terminus. [SUPERSEDES the entering-b115 REG STATE.]
+  - **[REG TERMINAL VERDICT, Batch 121 / b120 read — DEEP-UNIFORM test → pre-registered clause (b) fires → REG CLOSES
+    DIRECTIONAL-[open]].** Deep-uniform insult (mix +0.50, burst str200 r0 0.070) at seeds 6/7/8, deeprec vs deepfroz.
+    seg_idx (scorecard.json): recover {s6 0.5510, s7 0.2529, s8 0.9192}, frozen {s6 0.2636, s7 0.4074, s8 0.3796}; paired
+    Δ {+0.287, **−0.155**, +0.540} = **+0.224 ± 0.351**, 2·SD_Δ **0.703**, paired t **1.10** (n.s.). **Clause (a) CANNOT
+    fire:** mean Δ ≪ 2·SD AND only 2/3 positive (seed7 is a GENUINE inversion — interface_frac rec 0.374 > froz 0.296 and
+    mixing_entropy rec 0.920 > froz 0.536 both confirm the s7 "recover" run ended MORE mixed than its frozen twin) AND
+    frozen<0.4 only 2/3 (s7 froz 0.407 resisted). The homoscedasticity fix half-worked (2/3 frozen driven low) but the
+    residual variance is now a real ~1/6 recovery-failure rate, not just frozen scatter depth. xdeep dose-ceiling (rec s6,
+    mix +0.60/burst str220 r0 0.080) seg **0.853** → recovery is NOT dose-limited on a clean seed; the ceiling is the
+    frozen-contrast luck, not recovery capacity. Body INVARIANT all 8 (collapsed 0 / frag 1 / indep 2 / prog_stab 1.0 /
+    nn_min 0.0145–0.0190) = **15th structural-robustness batch**. **POOLED recover>frozen = b115 3/3 + b116 2/3 + b117 2/3 +
+    b118 3/3 + b119 3/3 + b120 2/3 = 15/18 seed-pairs** (prior pool t=4.53 p≈0.006).
+    **DECISION (pre-registered, TERMINAL): clause (b) → LOCK DIRECTIONAL-[open] + STOP.** REG DELIVERABLE:
+    *emergent active partition regeneration from PRIMITIVES ONLY* (developmental-timing gate re-runs native chemotax
+    demix + sediment; no repair operator) is established **directionally** — 15/18 seed-pairs recover>frozen, pooled
+    paired t=4.5 p≈0.006, recovery robust to deep & extra-deep insults, body never ruptures — but does NOT clear the
+    strict per-batch |mean Δ|>2·SD_Δ effect-size proxy because (i) the drivers-OFF frozen control is heteroscedastic and
+    (ii) ~1/6 of seeds genuinely fail to re-sort. The ONE remaining non-p-hacking move = independent fresh-seed
+    replication (n=6 deep) with a HARD stop → b121. If b121 (seeds 9/10/11) clears strict → promote [established]; else
+    the DIRECTIONAL-[open] lock STANDS and the campaign STOPS at REG regardless. [SUPERSEDES the entering-b120 STATE.]
+  - **REG STATE (entering b120, TERMINUS): the b118 active-recovery POSITIVE REPLICATED in DIRECTION at fresh seeds
+    6/7/8 (3/3 recover>frozen) but MISSED the strict per-batch |Δ|>2·SD_Δ bar due to seed-dependent scatter DEPTH → one
+    variance-tightening deep-uniform batch, then LOCK either way.** b119 (seg_idx from scorecard.json; montage seg=
+    INVERTS): recover finals {s6 0.8961, s7 0.7730, s8 0.9341}=**0.868±0.084**, frozen finals {0.5443, 0.6026, 0.1373}=
+    **0.428±0.254**, paired Δ {+0.352,+0.170,+0.797}=**+0.440±0.322**, 2·SD_Δ 0.644 → mean Δ < 2·SD_Δ (FAILS strict
+    clause) though ALL 3 positive. Δ tracks frozen scatter DEPTH: seed7 froz barely scattered (0.603) → tiny Δ +0.170 +
+    co-metrics invert; seed8 froz scattered deepest (0.137) → Δ +0.797. interface_frac LOWER in recover on ALL 3 (rec
+    0.052/0.114/0.033 vs froz 0.228/0.199/0.431); mixing_entropy/type_dipole agree on 2/3 (seed7 the outlier).
+    **POOLED b118+b119 = 6/6 seed-pairs positive, Δ +0.4525±0.245, paired t=4.53 df=5 p≈0.006 — the effect is REAL and
+    replicated; only its magnitude is noisy (crude "mean>2·SD" proxy penalizes scatter-depth spread, misses by a hair
+    even pooled 2·SD 0.490 vs mean 0.4525).** DEEP-recover (mix+0.50/str200 r0 0.070) reached seg_idx 0.551 = recovery
+    robust to deeper insult but dose-limited (deeper scatter → lower recovered plateau). Body INVARIANT all 8 (frag 1 /
+    indep 2 / prog_stab 1.0 / collapsed 0; nn_min 0.0169–0.0188; 14th structural-robustness batch). Pooled recover>frozen
+    now b115 3/3 + b116 2/3 + b117 2/3 + b118 3/3 + b119 3/3 = **13/15 seed-pairs**. **b120 = DEEP-UNIFORM insult (mix+0.50,
+    burst str200 r0 0.070) at seeds 6/7/8 (deeprec+deepfroz pairs) to drive frozen to a CONSISTENT low floor (predict froz
+    seg_idx <0.4 all 3) → homoscedastic Δ → clean >2·SD test; + xdeep dose-ceiling probe + ctrl.** DECISION (terminal):
+    froz-deep <0.4 on ≥2/3 AND recover>frozen mean Δ > 2·SD_Δ AND ≥2/3 positive → LOCK POSITIVE [established] + STOP
+    (emergent active partition regeneration from PRIMITIVES ONLY, three 3-seed batches, 9/9 directional, pooled t≫2);
+    else LOCK pooled 13/15+ DIRECTIONAL [open] (robust direction, doesn't clear the strict per-batch 2·SD proxy) + STOP.
+    Specs embryo_REG_puremix_deeprec_s7/_s8, _deepfroz_s6/_s7/_s8, _rec_s6_xdeep.yaml (+ reuse _rec_s6_deep, ctrl).
+    [SUPERSEDES the entering-b119 state below.]
+  - **REG STATE (entering b119, TERMINUS): the b118 PUREMIX insult staged the campaign's FIRST clean 3-seed
+    active-recovery POSITIVE (recover>frozen, Δ +0.465 > 2·SD, all 3 seeds) → ONE independent fresh-seed replication
+    then LOCK.** b118 pure-mix (chemotax MIX +0.35 + repel BURST str170 r0 0.060 over [3000,6000), sediment gy=0 in
+    window = swap deleted; recover restores −0.10/±0.13 at 6000, frozen leaves both OFF). seg (scorecard.json, seeds
+    3/4/5): recover finals {0.7714, 0.9825, 0.7949}=**0.850±0.116**, frozen finals {0.5327, 0.3218, 0.2989}=**0.385±
+    0.128**, paired Δ {+0.239,+0.661,+0.496}=**+0.465±0.213**, 2·SD_Δ 0.425 → mean Δ > 2·SD, ALL 3 seeds positive
+    (t=3.79, p≈0.03). Co-metrics corroborate: recover LOWERS mixing_entropy (0.26/0.19/0.51 vs froz 0.39/0.64/0.49) and
+    interface_frac (0.11/0.01/0.10 vs froz 0.23/0.34/0.35) on every seed. **[established-instrument] frozen seg[50%] =
+    0.60/0.70/0.61 (deep probe 0.675) — NONE <0.5, so the b118 rule's "AND seg[50%]<0.5" clause is UNMET; but that is
+    an INSTRUMENT-PLACEMENT artifact — the 6000f checkpoint is the window-END, and pure-mix homogenization DEVELOPS
+    POST-window (frozen arms decay 0.60→0.30 over 6000–12000f; deep probe final 0.41). The real scatter evidence is the
+    frozen DECAY to 0.30–0.53 vs ctrl locked 1.0 = 40–70% disruption that HOLDS without drivers. seg[50%]<0.5 RETIRED
+    as a decision gate.** Body INVARIANT all 8 (frag 1 / indep 2 / prog_stab 0.8–1.0, collapsed 0, nn_min 0.016–0.0193;
+    13th structural-robustness batch). Pooled recover>frozen now b115 3/3 + b116 2/3 + b117 2/3 + b118 3/3 = **10/12
+    seed-pairs**. **b119 = fresh seeds 6/7/8 (rec+froz pairs) + deep-recover probe + ctrl; byte-identical puremix
+    specs.** DECISION (terminal): replicates (mean Δ > 2·SD_Δ AND ≥2/3 positive, co-metrics agree, body intact) → LOCK
+    POSITIVE [established] + STOP (emergent active partition regeneration from PRIMITIVES ONLY, two 3-seed batches);
+    fails to replicate → b118 seed-luck → LOCK pooled 10/12 DIRECTIONAL [open] + STOP. Specs embryo_REG_puremix_rec_s6/
+    _s7/_s8, _froz_s6/_s7/_s8, _rec_s6_deep.yaml + ctrl. [SUPERSEDES the entering-b118 state below.]
+  - **REG STATE (entering b118, TERMINUS): the "un-scatterable" read is an INSTRUMENT ARTIFACT — the substrate IS
+    scatterable, but the HARDMIX insult was SELF-DEFEATING at the 50% checkpoint → corrected PUREMIX insult (b118).**
+    b117 HARDMIX4 (swap ±0.30 + chemotax mix +0.35 + burst str170 r0 0.060, gated [3000,6000)) STILL held frozen
+    seg[50%] = 1.00/1.00/0.579 (seeds 3/4/5), and even the xdeep probe (±0.42 swap, burst str220 r0 0.075) held
+    seg[50%]=1.00 — literal falsifier branch (c) fired. **BUT every frozen arm ENDS deeply mixed** (froz finals
+    0.338/0.298/0.184; xdeep seg −0.057, mixing_entropy 0.936, mi_type_x/y 0.16 = full homogenization by 100%) → the
+    ORG partition CAN be scattered; the metric just never caught it at 6000f. **[established-mech, b117] MECHANISTIC
+    ROOT CAUSE: `segregation_index` is AXIS-AGNOSTIC (measures same-type contact / partition purity, not orientation),
+    so the sediment-SWAP insult term (reverse gy sign ±0.13→±0.30) is SEGREGATION-PRESERVING — it flips WHICH pole each
+    type sinks to but still SEPARATES them, RE-SORTING faster than the chemotax +0.35 mix homogenizes. The two insult
+    terms fight; at the window-end checkpoint the re-sort wins (seg≈1.0); the true mix only emerges post-window once the
+    swap is removed.** type_axis_angle flips sign across the window (rec_s3 −107.6°@25%→+99.4°@50%) = reorient not
+    dissolve. So the 3-batch b115–b117 "insult under-scatters" chase was measuring a re-sorting insult at the one frame
+    it re-sorts. Final recover-vs-frozen (paired): seed3 +0.233✓ / seed4 +0.195✓ / seed5 −0.068✗ → recover
+    0.393±0.243 vs frozen 0.273±0.080, Δ +0.120 n.s.; pooled b115+b116+b117 = **7/9 seed-pairs recover>frozen** but no
+    single batch meets the strict bar. Body INVARIANT all 8 (frag 1 / indep 2 / prog_stab 0.8–1.0, collapsed 0, nn_min
+    ≥0.0116; 12th structural-robustness batch). **b118 CORRECTION = PUREMIX: DELETE the segregation-preserving
+    sediment-swap term (sediment gy=0 in the window; normal ±0.13 before, restored ±0.13 after), keep ONLY the mixing
+    terms (chemotax +0.35 attract-opposite + isotropic burst str170 r0 0.060).** Predict frozen seg[50%]<0.5 on ≥2/3
+    seeds (test finally reachable AT the checkpoint) and recover>frozen by >2·SD. DECISION (terminal): scatter+recover>frozen
+    >2·SD → LOCK POSITIVE; scatter but recover≤frozen within 2·SD → LOCK NEGATIVE; even deep pure-mix (chemotax +0.50,
+    burst str200 r0 0.070) can't push frozen seg[50%]<0.5 → un-mixable → LOCK pooled 7/9 DIRECTIONAL [open] and STOP.
+    Specs embryo_REG_puremix_rec_s3/_s4/_s5, _froz_s3/_s4/_s5, _froz_s3_deep.yaml + ctrl. **[DELIBERATE DEVIATION from the
+    b117 literal-STOP rule: its "un-scatterable" premise is falsified by xdeep→−0.057; one corrected batch then LOCK.]**
+    [SUPERSEDES the entering-b117 state below.]
+  - **REG STATE (entering b117, TERMINUS): the b115 partition-regeneration POSITIVE did NOT replicate at the strict bar
+    (b116) → emergent active partition maintenance is DIRECTIONALLY SUPPORTED but [open], NOT [established].** b116 HARDMIX3
+    (sediment swap ±0.18 + chemotax mix +0.20 + repel-BURST str110 r0 0.040, gated [3000,6000); restore ORG-fidelity) on
+    fresh seeds 3/4/5: the insult UNDER-SCATTERED on 3/3 seeds — frozen seg[50%] = 0.9535/0.8605/0.7544, NONE <0.5 → the
+    deep-scatter falsifier branch FIRED (test unreachable). Final recover {0.792, 0.256, 0.708}=0.585±0.293 vs frozen
+    {0.558, 0.483, 0.143}=0.394±0.220, Δ +0.191 < 2·SD, seed4 INVERTED (rec 0.256 < froz 0.483) → NOT significant. Direction
+    positive 2/3 (pooled b115+b116 = 5/6 seed-pairs recover>frozen) but strict [established] bar unmet → **b115's Δ+0.68 was
+    the 9th single-batch clean point to fail replication**. Body INVARIANT all 8 (frag 1 / indep 2 / prog_stab 0.8–1.0,
+    collapsed 0, nn_min ≥0.0085; 11th structural-robustness batch). noburst ablation: burst LOWERS recover fidelity (seed3
+    with-burst 0.79 vs noburst 1.0) without deepening the scatter. ROOT OBSTACLE: the ORG partition is too robust — a
+    3000-frame reversed-driver+burst insult can't drive frozen seg <0.5, so a clean scatter→held contrast has never actually
+    been staged (frozen "decay" is passive drift, not scattered→held). b117 = HARDMIX4, insult magnitudes escalated (swap
+    ±0.18→±0.30, mix +0.20→+0.35, burst str110→170/r0 0.040→0.060; window+restore+body UNCHANGED) + an xdeep probe (±0.42
+    swap, burst str220 r0 0.075) to test whether the substrate CAN be scattered <0.5 at all. DECISION: frozen seg[50%]<0.5 on
+    ≥2 seeds AND recover final > frozen by >2·SD → LOCK POSITIVE; scattered but recover ≤ frozen within 2·SD → LOCK NEGATIVE;
+    even xdeep can't scatter <0.5 → un-scatterable → adopt the pooled 5/6 DIRECTIONAL [open] terminus and STOP. Specs
+    embryo_REG_hardmix4_rec_s3/_s4/_s5, _froz_s3/_s4/_s5, _froz_s3_xdeep.yaml + ctrl. [SUPERSEDES the entering-b116 state below.]
+  - **REG STATE (entering b116, batch 11 = TERMINUS CONFIRMATION): REG resolved POSITIVE on the PARTITION modality —
+    emergent, active regeneration (b115, Δ +0.68 across 3 seeds); body robust-by-construction across 10 insult batches
+    (indep 2.0 / prog_stab 1.0 / frag 1.0 invariant).** [b116 read RETIRED this to [open] — see entering-b117 above.] The earlier "REG NEGATIVE on 4 modalities / write-once partition"
+    framing is RETIRED for the partition: with an insult deep enough to genuinely mix scorecard seg (active sediment SWAP),
+    restoring the native drivers re-sorts it to control fidelity, significantly above a drivers-off frozen control. b116 =
+    HARDMIX3 (sediment swap ±0.13→±0.18 + mechanical repel-BURST str110 r0 0.040, both gated [3000,6000); restore at ORG
+    fidelity ±0.13/−0.10) on FRESH seeds 3/4/5 to make the 50%-depth uniform and REPLICATE the re-sort. REPLICATES (recover
+    final > frozen by |Δ|>2·SD, recover ≈ ctrl) → LOCK REG terminus POSITIVE, campaign COMPLETE. FALSIFIER: recover ≤ frozen
+    within 2·SD (b115 fluke → LOCK NEGATIVE) OR HARDMIX3 still fails seg <0.5 at 50% on ≥2 seeds (adopt b115 final-contrast)
+    OR body rupture. Specs embryo_REG_hardmix3_rec_s3/_s4/_s5, _froz_s3/_s4/_s5, _rec_s3_noburst.yaml. **TERMINAL batch —
+    campaign STOPS after b116 regardless of outcome.** [SUPERSEDES the entering-b115 REG STATE below.]
+  - **REG STATE (entering b115, batch 10/10 — TERMINUS DECISION): REG NEGATIVE established on 4 modalities (cue-drop b106,
+    cue-flip b107, mechanical-scramble b108/b113, elastic-body-shape b110/b111); ST/growth-halt UNTESTABLE (b111/b112);
+    the partition write-once claim now needs ONE properly-POWERED meaningful-scramble confirmation.** b114 HARDMIX
+    scattered scorecard seg (closing the b113 loophole) but under-scattered 2/3 seeds via passive gate-to-0, so the
+    recover-vs-frozen re-sort test was under-powered (Δ +0.276 < 2·SD, seed0-driven). b115 = DEEP active-counter-sorting
+    HARDMIX2: over [3000,6000) SWAP sediment (a gy +0.13 / b gy −0.13, reversed demix polarity) AND boost chemotax cross-
+    chase +0.20 → drives all 3 seeds <0.5 at 50%; recover restores both drivers at 6000, frozen leaves both OFF; 3 seeds/
+    arm + boosted-recover explore (restored chemotax −0.20) + ctrl. Confirm: (i) seg <0.5 at 50% on all 3 seeds = a real
+    powered scramble; (ii) recover final seg ≈ frozen final within 2·SD = no active re-sort → LOCK terminus NEGATIVE.
+    FALSIFIER→REOPEN: recover > frozen by |Δ|>2·SD across 3 deeply-scattered seeds (emergent re-sort) OR HARDMIX2 still
+    fails <0.5 at 50% on ≥2 seeds OR body rupture. Specs embryo_REG_hardmix2_rec[/_s1/_s2]/_froz[/_s1/_s2]/_rec_boost.yaml.
+    [SUPERSEDES the entering-b114 REG STATE above.]
+  - **REG STATE (entering b113, batch 8/10 — TERMINUS LOCK): the ORG organism is ROBUST-BY-CONSTRUCTION on ALL THREE insult
+    modalities → REG NEGATIVE, ready to lock.** (1) timing-HALT: growth un-amplifiable-without-destroying-ORG + halt no-op
+    [b106/b112]; (2) MECHANICAL: body un-damageable (elastic youngs120+wall_damp shape-memory + fixed 7-cell topology; k-add
+    absorbed b110; surface_tension inert b111) AND partition WRITE-ONCE (sedrev/k/repel bursts scatter seg but no chemotax gain
+    re-sorts it, b108 3 seeds); (3) identity/pattern-DROP: partition write-once [b106/b108]. The literal REG gate metrics
+    (indep_domains/prog_stab/fragment) never leave control across 7 batches. **b113 = the LOCK batch — run the central
+    active-vs-passive claim as ONE clean 3-seed recover/frozen triad on the mechanical-ablation modality** (extra repel str250
+    r0 0.045 over [3000,6000) = b111-validated inflate, seg 0.42→0.21, body untouched): recover (burst removed) vs frozen (held)
+    vs unperturbed ctrl. LOCK criterion: recover final seg ≈ frozen final seg within 2·SD (write-once, passive) AND org body
+    signature 2.0/~1.0/1.0 in all 6 insult slots. FALSIFIER→REOPEN: recover seg > frozen seg by |Δ|>2·SD (partition actively
+    re-sorts) OR body rupture. New specs embryo_REG_ablate_rec[/_s1/_s2]/_froz[/_s1/_s2]/_rec_strong.yaml. [SUPERSEDED: the
+    entering-b112 QUADRUPLY-ROBUST line below.]
+  - **REG STATE (entering b112, batch 7/10): the ORG organism is QUADRUPLY ROBUST — (1) org BODY-PROGRAM signature locked
+    (indep_domains/prog_stab/fragment never leave control, 7 batches → literal REG gate untestable), (2) type PARTITION
+    WRITE-ONCE [established b108], (3) body SHAPE not persistently distendable by a continuum-ADD (k) insult [b110], (4)
+    surface_tension lever INERT (no liquid) [b111]. THE ONE UNTESTED recover/frozen channel = growth-HALT regeneration:** the
+    only split ever seen was b106 halt (seg 0.44 rec vs 0.17 froz), dismissed ONLY because baseline grow_ratio 1.11 (growth
+    too small). Mechanism read: baseline growB is `mode: anisotropic` (thin y-finger → barely raises mean radius → grow_ratio
+    pinned). b112 = amplify growth via ISOTROPIC mode (aniso 0) + rate/target↑/prestretch↓ to lift grow_ratio ≥1.4 while
+    preserving ORG (indep_domains 2, no rupture), then preview a transient growth-HALT (recover resume vs frozen permanent-halt)
+    to create the first candidate POSITIVE regeneration deficit. FALSIFIER: grow_ratio ≤1.15 across the whole iso/rate/target
+    /prestretch ladder OR iso growth ruptures/merges domains → growth-halt regen untestable → LOCK the REG NEGATIVE (robust,
+    non-regenerating on body, partition AND growth axes) as the TERMINUS deliverable. New specs embryo_REG_grow_iso/_bothAB/
+    _halt_rec/_halt_froz.yaml. [SUPERSEDED lines below are the pre-b111 entering-b111 state.]
+  - **REG STATE (entering b111, batch 6/10): the ORG organism is TRIPLY ROBUST — (1) org BODY-PROGRAM signature locked
+    (indep_domains/prog_stab/fragment never leave control, 7 batches → literal REG gate untestable), (2) type PARTITION is
+    WRITE-ONCE [established b108], (3) body SHAPE cannot be PERSISTENTLY distended by a continuum-ADD insult — surface_tension
+    +elastic absorb it every frame [b110].** The elastic-regen channel stays [open-negative]: no persistent damage → no
+    recovery to measure. PIVOT (b111): stop FIGHTING the restorer with k; ABLATE it — transiently DROP `surface_tension`
+    (mpm_grid_update) so the cell_grow programs slump/distend the body PERSISTENTLY (held-low-ST frozen arm = reliably
+    damaged), then RESTORE ST (recover arm) to re-stiffen and re-round. b111 = mechanism-map the ST-softening ladder
+    (ST 4/2/1/0.5 HELD, single seed): which ST persistently distends (late-window-mean deform > ctrl ceiling ~0.12) WITHOUT
+    rupture, vs a k30-held control (should stay absorbed). FALSIFIER: even ST0.5 held stays in the ctrl pulse band OR every
+    distending ST ruptures (nn_min<r0) → no clean persistent-damage regime with the current operators → ORG body is
+    ROBUST-BY-CONSTRUCTION, active-vs-passive body regen structurally UNTESTABLE → LOCK the REG NEGATIVE (robust,
+    non-regenerating on BOTH partition and body axes) as the TERMINUS deliverable. If an ST persistently distends cleanly →
+    b112 runs the clean 3-seed restore(recover)-vs-hold(frozen) elastic-regen test on it.
   - **[established-integration, Batch 101 / b100] THE INTEGRATED ORGANISM COEXISTS — all 5 established capabilities hold
     simultaneously in ONE body, TIER-1 clean (falsifier did NOT fire for the baseline).** ctrl (crossfork_y120_g3, n=1):
     DEMIX segregation_index 1.0 · ORIENT mi_type_y 0.926 / type_dipole 0.736 · BRANCH n_tips 6 / branch_score 5 /
