@@ -551,20 +551,16 @@ def _integrate(H: Hierarchy, dt: float) -> None:
 # --------------------------------------------------------------------------- #
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False) -> tuple[Hierarchy, dict]:
-    H = build(sim, device)
-    H.emit_order = _resolve_emit(sim)         # set -> integration order (from the operators)
-    # (op_name, instance, selector, frame-window); params carry the field refs + the set name (_at).
-    # The frame gate (after_frame/before_frame) is enforced HERE for every op, not re-implemented
-    # inside each operator -- so any op line can carry it and no operator special-cases the clock.
+    H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
+    H.emit_order = _resolve_emit(sim)         # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
+    # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
+    #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)
+    #    is enforced HERE by the engine, so no operator special-cases the clock.
     inst = [(o.op,
              get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on,
              (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
             for o in sim.operators]
-
-    # SET positions are recorded at a stride that caps the trajectory at ~`record_cap`
-    # frames, so an ultra-long run (e.g. 120k/240k frames) does not blow up RAM/disk.
-    # n_frames <= record_cap -> stride 1 -> every frame recorded (unchanged).
     set_cap = int(getattr(sim, "record_cap", 1500))
     sstride = max(1, (sim.n_frames + set_cap) // set_cap)
     rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})
