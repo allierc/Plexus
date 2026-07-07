@@ -564,18 +564,20 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # --- recording buffers: the trajectory is DECIMATED (strided), not stored every frame, to
     #     bound memory/disk on long runs. If n_frames <= the cap the stride is 1 -> EVERY frame is
     #     kept; otherwise it sub-samples down to ~cap frames. The FINAL frame is always included.
-    set_cap = int(getattr(sim, "record_cap", 1500))          # max recorded SET frames (positions); raise in the spec for denser sampling
+    set_cap = int(getattr(sim, "record_cap", 10000))          # max recorded SET frames (positions); raise in the spec for denser sampling
     sstride = max(1, (sim.n_frames + set_cap) // set_cap)     # 1 if n_frames <= cap, else the sub-sampling step -> ~set_cap frames
     rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})   # the ticks we actually record (last always in)
     rec_index = {t: i for i, t in enumerate(rec_ticks)}      # tick -> row index in the recording arrays
     n_rec = len(rec_ticks)
     rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32) for name, lvl in H.levels.items()}  # positions [n_rec, N, D]
     occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}               # live mask  [n_rec, N]
-    # fields are large [C,nx,ny(,nz)] GRIDS -> a much tighter cap (~160 frames), decimated more
+    # fields are large [C,nx,ny(,nz)] GRIDS -> a much tighter cap (~256 frames), decimated more
     # aggressively than sets because each field frame is far bigger. This cap is hard-coded, not from the spec.
-    field_cap = 160
+    field_cap = 256
     fstride = max(1, (sim.n_frames + field_cap) // field_cap)
     rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
+    print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride {sstride}), "
+          f"fields every {fstride} steps (<= {field_cap})", flush=True)
 
     def _run_token(token, tick):
         """Run every operator instance named `token` (one schedule token) once,
