@@ -22,13 +22,15 @@ class RadiusGraph(Rewire):
     SUPPORTED_DIMS = [2, 3]                      # pairwise distances are dimension-generic
     REQUIRES_PARAMS = ["radius"]
     MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire"]
-    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size"}
+    PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size",
+                   "compile": "torch.compile the O(N^2) block distance+mask kernel"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.r_max = float(params["radius"])
         self.r_min = float(params.get("min_radius", 0.0))
         self.block = int(params.get("block", 2048))
+        self.compile = bool(params.get("compile", False))    # torch.compile the O(N^2) distance kernel
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
@@ -36,6 +38,7 @@ class RadiusGraph(Rewire):
         lvl.edge_index = edges_radius_blockwise(
             lvl.get("pos"), lvl.occ, self.r_min, self.r_max,
             periodic=getattr(H, "periodic", False),
-            world_width=getattr(H, "world_size", getattr(H, "world_width", 1.0)), block=self.block,
+            world_width=getattr(H, "world_size", getattr(H, "world_width", 1.0)),
+            block=self.block, compile=self.compile,
         )
         return {}
