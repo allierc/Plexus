@@ -71,6 +71,8 @@ class Spec:
     dim: int = 2                                     # spatial dimensions (the global dimension contract)
     world_size: list = field(default_factory=lambda: [1.0, 1.0])   # per-axis box [w0 .. w_{D-1}]
     plotting: dict = field(default_factory=dict)     # render STYLE (colormap, point_size, ...) — read by plexus.plot
+    record_cap: int = 10000                          # max recorded SET (position) frames; the trajectory is strided if n_frames exceeds it
+    field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
 
 
 _RESERVED = {"op", "at", "to", "from"}
@@ -249,4 +251,6 @@ def load(path: str) -> Spec:
         dim=dim,
         world_size=world_size,
         plotting=raw.get("plotting", {}),
+        record_cap=int(gv("record_cap", 10000)),
+        field_record_cap=int(gv("field_record_cap", 256)),
     )

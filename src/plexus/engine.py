@@ -546,6 +546,29 @@ def _integrate(H: Hierarchy, dt: float) -> None:
         lvl.state = new
 
 
+def _setup_recording(sim: Spec, H: Hierarchy):
+    """Allocate the DECIMATED trajectory buffers and announce the recording plan.
+
+    The trajectory is strided (sub-sampled), not stored every frame, to bound memory/disk on
+    long runs: SET frames (positions) keep <= `record_cap` (spec, default 10000); FIELD frames
+    -- each a full [C,nx,ny(,nz)] grid, so far larger -- keep <= `field_record_cap` (spec,
+    default 256). The stride is 1 (EVERY frame kept) when n_frames <= the cap, and the FINAL
+    frame is always recorded. Returns (rec_index, rec_sets, occ_sets, fstride, rec_fields)."""
+    set_cap = int(getattr(sim, "record_cap", 10000))          # max recorded SET (position) frames (spec-tunable)
+    sstride = max(1, (sim.n_frames + set_cap) // set_cap)     # 1 if n_frames <= cap, else sub-sample to ~set_cap frames
+    rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})   # ticks recorded (last always in)
+    rec_index = {t: i for i, t in enumerate(rec_ticks)}      # tick -> row index in the recording arrays
+    n_rec = len(rec_ticks)
+    rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32) for name, lvl in H.levels.items()}  # positions [n_rec, N, D]
+    occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}               # live mask  [n_rec, N]
+    field_cap = int(getattr(sim, "field_record_cap", 256))   # fields are large grids -> a tighter, spec-tunable cap
+    fstride = max(1, (sim.n_frames + field_cap) // field_cap)
+    rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
+    print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride {sstride}), "
+          f"fields every {fstride} steps (<= {field_cap})", flush=True)
+    return rec_index, rec_sets, occ_sets, fstride, rec_fields
+
+
 # --------------------------------------------------------------------------- #
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
@@ -561,23 +584,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              o.on,
              (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
             for o in sim.operators]
-    # --- recording buffers: the trajectory is DECIMATED (strided), not stored every frame, to
-    #     bound memory/disk on long runs. If n_frames <= the cap the stride is 1 -> EVERY frame is
-    #     kept; otherwise it sub-samples down to ~cap frames. The FINAL frame is always included.
-    set_cap = int(getattr(sim, "record_cap", 10000))          # max recorded SET frames (positions); raise in the spec for denser sampling
-    sstride = max(1, (sim.n_frames + set_cap) // set_cap)     # 1 if n_frames <= cap, else the sub-sampling step -> ~set_cap frames
-    rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})   # the ticks we actually record (last always in)
-    rec_index = {t: i for i, t in enumerate(rec_ticks)}      # tick -> row index in the recording arrays
-    n_rec = len(rec_ticks)
-    rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32) for name, lvl in H.levels.items()}  # positions [n_rec, N, D]
-    occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}               # live mask  [n_rec, N]
-    # fields are large [C,nx,ny(,nz)] GRIDS -> a much tighter cap (~256 frames), decimated more
-    # aggressively than sets because each field frame is far bigger. This cap is hard-coded, not from the spec.
-    field_cap = 256
-    fstride = max(1, (sim.n_frames + field_cap) // field_cap)
-    rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
-    print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride {sstride}), "
-          f"fields every {fstride} steps (<= {field_cap})", flush=True)
+    rec_index, rec_sets, occ_sets, fstride, rec_fields = _setup_recording(sim, H)
 
     def _run_token(token, tick):
         """Run every operator instance named `token` (one schedule token) once,
@@ -659,6 +666,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
            "world": H.world_width,
            "world_size": H.world_size.cpu().numpy(),   # per-axis box [w0..w_{D-1}] (3D plotter reads it)
            "name": sim.name}
+    
     if out_path is not None:
         import zarr
         root = zarr.open_group(out_path, mode="w")
