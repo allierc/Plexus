@@ -20,7 +20,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
-@register_operator("mpm_scatter", "p2g", level="particle", kind="exchange")
+@register_operator("mpm_scatter", "p2g", family="mpm", level="particle", kind="exchange")
 class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

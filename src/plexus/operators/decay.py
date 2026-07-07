@@ -10,7 +10,7 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("decay", level="field", kind="field")
+@register_operator("decay", family="fields", level="field", kind="field")
 class Decay(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 

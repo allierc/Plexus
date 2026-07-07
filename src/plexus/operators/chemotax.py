@@ -26,7 +26,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("chemotax", level="particle", kind="exchange")
+@register_operator("chemotax", family="fields", level="particle", kind="exchange")
 class Chemotax(Exchange):
     EMIT = "velocity"                           # default routing; override in the spec with `emit: mpm_acceleration`
     SUPPORTED_DIMS = [2]                         # Field.grad_at is 2D for now (N-D is a follow-up)

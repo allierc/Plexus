@@ -43,7 +43,7 @@ def _random_unit(n, D, rng, device):
     return v / v.norm(dim=1, keepdim=True).clamp(min=1e-9)
 
 
-@register_operator("bounce", level="cell", kind="lateral")
+@register_operator("bounce", family="motion", level="cell", kind="lateral")
 class Bounce(Lateral):
     EMIT = None                                 # writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection

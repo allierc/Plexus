@@ -19,7 +19,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import sub_dt
 
 
-@register_operator("mpm_strain", level="particle", kind="lateral")
+@register_operator("mpm_strain", family="mpm", level="particle", kind="lateral")
 class MPMStrain(Lateral):
     EMIT = None                 # particle->particle: updates F + material in place; returns {} — no delta
     SUPPORTED_DIMS = [2, 3]

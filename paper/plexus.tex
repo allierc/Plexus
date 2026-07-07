@@ -1328,11 +1328,19 @@ Promotion passes through five gates.
 
 \begin{enumerate}\itemsep3pt
 \item \textbf{Promote families, not isolated operators.} Before a mechanism is moved,
-it is assigned to a family --- motion/migration, chemical signalling, field sampling,
-continuum (MPM) mechanics, growth, activation, coupling, measurement/scorecard, or
-visualization. An operator enters the core only when its family is clear. This keeps
-the registry a small set of reusable physical primitives rather than a flat pile of
-one-off biological events.
+it is assigned to a \code{family} --- a closed taxonomy declared in the registry
+(\code{motion}, \code{interaction}, \code{polarity}, \code{fields}, \code{mechanics},
+\code{mpm}, \code{coupling}, \code{hierarchy}, \code{growth}, \code{topology}). The family
+is a keyword on \code{@register\_operator(..., family=...)}, and \code{OPERATOR\_FAMILIES}
+is the closed set an operator's family must belong to. An operator enters the core only
+when its family is clear; this keeps the registry a browsable set of reusable physical
+primitives (\code{operators\_by\_family("mechanics")}) rather than a flat pile of one-off
+biological events. A single check, \code{tools/audit\_operator\_registry.py}, enforces the
+whole contract at once --- every operator has a valid family and explicitly declares the
+five class attributes (\S\ref{sec:naming}), \code{EMIT} is one of the canonical values,
+\code{SUPPORTED\_DIMS} is a subset of $\{2,3\}$, no deprecated alias appears in a source
+spec, and every \code{config/} spec still resolves --- so the vocabulary cannot silently
+drift as the registry grows.
 
 \item \textbf{Merge by contract, not by surface similarity.} Two prototype operators
 collapse into one canonical operator with explicit options only when they share the

@@ -13,7 +13,7 @@ from plexus.models.base import Broadcast
 from plexus.models.registry import register_operator
 
 
-@register_operator("broadcast", level="particle", kind="broadcast")
+@register_operator("broadcast", family="hierarchy", level="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
     EMIT = "velocity"            # emits a velocity; the engine integrates
     SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D

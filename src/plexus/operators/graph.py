@@ -13,7 +13,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import edges_radius_blockwise
 
 
-@register_operator("radius_graph", level="particle", kind="rewire")
+@register_operator("radius_graph", family="topology", level="particle", kind="rewire")
 class RadiusGraph(Rewire):
     """Set `Level.edge_index` to all live pairs within `radius` (optionally beyond
     `min_radius`). Blockwise build -> scales to 1e4-1e5 nodes; minimum-image under

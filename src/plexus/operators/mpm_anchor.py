@@ -19,7 +19,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("mpm_anchor", level="particle", kind="lateral")
+@register_operator("mpm_anchor", family="mechanics", level="particle", kind="lateral")
 class MPMAnchor(Lateral):
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]

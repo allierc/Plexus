@@ -1,4 +1,4 @@
-"""alignment -- Vicsek-style neighbour velocity alignment (the NOMINAL model);
+"""velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the NOMINAL model);
 Reynolds' boids alignment rule is recovered as a SPECIAL CASE.
 
 Each receiver i steers toward the (weighted) mean velocity of its graph neighbours
@@ -43,8 +43,8 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("alignment", level="particle", kind="lateral")
-class Alignment(Lateral):
+@register_operator("velocity_align", "alignment", family="interaction", level="particle", kind="lateral")
+class VelocityAlign(Lateral):                    # (alias `alignment`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic
     REQUIRES_PARAMS = []                        # no required params — all knobs optional (defaults in __init__)

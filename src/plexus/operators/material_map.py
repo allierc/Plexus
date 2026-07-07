@@ -93,7 +93,7 @@ class VectorGrid(Field):
         self.register_buffer("grid", vt)                       # [2, nx, ny]
 
 
-@register_operator("apply_material_map", level="particle", kind="exchange")
+@register_operator("apply_material_map", family="mpm", level="particle", kind="exchange")
 class ApplyMaterialMap(Exchange):
     """field -> set: sample the map at each particle and write a per-particle material
     parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the

@@ -1,4 +1,4 @@
-"""flow_align (mpm_grid -> agent heading): polarity-velocity alignment to the tissue FLOW.
+"""polarity_flow_align (was flow_align) (mpm_grid -> agent heading): polarity-velocity alignment to the tissue FLOW.
 
 The orientational rule that dominates self-propelled-Voronoi / active-vertex models of
 epithelia (Bi--Manning SPV; Barton et al. Active Vertex Model; the "polarity-velocity
@@ -22,8 +22,8 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("flow_align", level="cell", kind="exchange")
-class FlowAlign(Exchange):
+@register_operator("polarity_flow_align", "flow_align", family="polarity", level="cell", kind="exchange")
+class PolarityFlowAlign(Exchange):               # (alias `flow_align`, one migration cycle)
     EMIT = None                                 # writes `heading` in place (flow-alignment steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["from"]

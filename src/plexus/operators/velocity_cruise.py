@@ -1,4 +1,4 @@
-"""cruise -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`).
+"""velocity_cruise (was cruise) -- Vicsek active-matter self-propulsion: drive the velocity toward a cruising speed (inertial, second-order; the velocity-dynamic sibling of `glide`).
 
 Drive each particle toward a constant cruising speed v0 and inject orientation
 noise. Paired with `alignment` (neighbour velocity alignment) over a `radius_graph`,
@@ -24,8 +24,8 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("cruise", level="particle", kind="lateral")
-class Cruise(Lateral):
+@register_operator("velocity_cruise", "cruise", family="motion", level="particle", kind="lateral")
+class VelocityCruise(Lateral):                   # (alias `cruise`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic
     REQUIRES_PARAMS = ["v0"]

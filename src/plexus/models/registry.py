@@ -76,6 +76,32 @@ def operators_of_kind(kind: str) -> dict[str, type]:
     return {n: c for n, c in _OPERATOR_REGISTRY.items() if getattr(c, "KIND", None) == kind}
 
 
+# The closed set of operator FAMILIES -- a conceptual taxonomy over the registry (not a
+# directory layout). Every core operator declares `family=` in @register_operator; the
+# audit (tools/audit_operator_registry.py) fails if a family is missing or not in this set,
+# so families do not proliferate. This turns the flat registry into a browsable taxonomy:
+#   operators_by_family("mechanics") -> {active_force, active_stress, gravity, ...}
+OPERATOR_FAMILIES = {
+    "motion",       # individual self-propulsion + kinematics (glide, drag, bounce, velocity_cruise, sediment)
+    "interaction",  # neighbour/pairwise forces (attraction_repulsion, squared_law, cohesion, separation, velocity_align)
+    "polarity",     # heading steering (polarity_align, polarity_flow_align)
+    "fields",       # scalar/vector field ops (diffuse, decay, deposit, sense, chemotax, activation_pulse, pacemaker, playback)
+    "mechanics",    # body forces / active stress on the continuum (active_force, active_stress, gravity, mpm_anchor, mpm_spin)
+    "mpm",          # the MLS-MPM substep machinery (mpm_strain/scatter/gather/grid_update, mls_mpm_mechanics, apply_material_map)
+    "coupling",     # cross-substrate transfer (agent_scatter, agent_gather, agent_remodel)
+    "hierarchy",    # parent<->child plumbing (aggregate, broadcast)
+    "growth",       # structural population change (cell_divide, cell_grow)
+    "topology",     # graph rewire (radius_graph)
+}
+
+
+def operators_by_family(family: str) -> dict[str, type]:
+    """All CANONICAL operators in `family` (aliases excluded)."""
+    return {n: c for n, c in _OPERATOR_REGISTRY.items()
+            if getattr(c, "FAMILY", None) == family
+            and getattr(c, "REGISTERED_NAMES", [n])[0] == n}
+
+
 def catalog_summary() -> str:
     """Human-readable table of everything registered — printed by docs/CLI.
 
@@ -89,16 +115,28 @@ def catalog_summary() -> str:
     lines = ["# entities"]
     for n, c in sorted(_ENTITY_REGISTRY.items()):
         lines.append(f"  {n:18s} level={tag(c, 'LEVEL')}")
-    lines.append("# operators")
-    for n, c in sorted(_OPERATOR_REGISTRY.items()):
-        lines.append(f"  {n:18s} level={tag(c, 'LEVEL'):10s} kind={tag(c, 'KIND')}")
-        tags = getattr(c, "MECHANISM_TAGS", None)
-        if tags:
-            lines.append(f"      tags:  {', '.join(tags)}")
-        roles = getattr(c, "PARAM_ROLES", None)
-        if roles:
-            for p, role in roles.items():
-                lines.append(f"      · {p:11s} {role}")
+    lines.append("# operators (by family; canonical names, aliases in parens)")
+    canon = [(n, c) for n, c in _OPERATOR_REGISTRY.items()
+             if getattr(c, "REGISTERED_NAMES", [n])[0] == n]        # skip aliases
+    for fam in sorted(OPERATOR_FAMILIES):
+        ops = sorted((n, c) for n, c in canon if getattr(c, "FAMILY", None) == fam)
+        if not ops:
+            continue
+        lines.append(f"## {fam}")
+        for n, c in ops:
+            al = getattr(c, "REGISTERED_NAMES", [n])[1:]
+            alias = f"  (alias {', '.join(al)})" if al else ""
+            lines.append(f"  {n:20s} level={tag(c, 'LEVEL'):10s} kind={tag(c, 'KIND'):10s} emit={tag(c, 'EMIT')}{alias}")
+            tags = getattr(c, "MECHANISM_TAGS", None)
+            if tags:
+                lines.append(f"      tags:  {', '.join(tags)}")
+            roles = getattr(c, "PARAM_ROLES", None)
+            if roles:
+                for p, role in roles.items():
+                    lines.append(f"      · {p:11s} {role}")
+    orphan = sorted(n for n, c in canon if getattr(c, "FAMILY", None) not in OPERATOR_FAMILIES)
+    if orphan:
+        lines.append(f"## (NO/UNKNOWN FAMILY -- audit will fail): {', '.join(orphan)}")
     lines.append("# fields")
     for n, c in sorted(_FIELD_REGISTRY.items()):
         lines.append(f"  {n:18s} couples_to={tag(c, 'COUPLES_TO'):10s} frame={tag(c, 'FRAME')}")

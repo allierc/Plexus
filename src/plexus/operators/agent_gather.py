@@ -27,7 +27,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_gather", "mpm_to_agent", level="cell", kind="exchange")
+@register_operator("agent_gather", "mpm_to_agent", family="coupling", level="cell", kind="exchange")
 class AgentGather(Exchange):               # (alias `mpm_to_agent`, one migration cycle)
     EMIT = "velocity"                 # emits an advection velocity; engine integrates pos
     SUPPORTED_DIMS = [2, 3]

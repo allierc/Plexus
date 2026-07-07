@@ -12,7 +12,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("deposit", level="cell", kind="exchange")
+@register_operator("deposit", family="fields", level="cell", kind="exchange")
 class Deposit(Exchange):
     """object -> field. Writes `to:` field in place; returns {}."""
 
