@@ -569,6 +569,24 @@ def _setup_recording(sim: Spec, H: Hierarchy):
     return rec_index, rec_sets, occ_sets, fstride, rec_fields
 
 
+def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
+    """One-time neat banner: the world, the sets (with live counts), the fields, and the
+    operators (grouped by family) of this run -- so a glance shows what is being simulated."""
+    ws = "[" + ", ".join(f"{float(w):g}" for w in H.world_size.tolist()) + "]"
+    print(f"[engine] === {sim.name} ===  dim={H.dim}  world={ws}  boundary={sim.boundary}  "
+          f"dt={sim.dt:g}  frames={sim.n_frames}", flush=True)
+    sets = "  ".join(f"{n}({int((l.occ > 0).sum().item())})" for n, l in H.levels.items())
+    print(f"[engine] sets:      {sets or '—'}", flush=True)
+    print(f"[engine] fields:    {'  '.join(H.fields) or '—'}", flush=True)
+    # operators grouped by their registry family (motion / interaction / mpm / ...), in spec order
+    by_fam: dict[str, list[str]] = {}
+    for o in sim.operators:
+        fam = getattr(get_operator(o.op), "FAMILY", "?")
+        by_fam.setdefault(fam, []).append(o.op)
+    groups = "   ".join(f"{fam}: {', '.join(ops)}" for fam, ops in by_fam.items())
+    print(f"[engine] operators: {groups}", flush=True)
+
+
 # --------------------------------------------------------------------------- #
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
@@ -585,6 +603,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
             for o in sim.operators]
     rec_index, rec_sets, occ_sets, fstride, rec_fields = _setup_recording(sim, H)
+    _print_run_summary(sim, H)
 
     def _run_token(token, tick):
         """Run every operator instance named `token` (one schedule token) once,
@@ -619,7 +638,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
             for step in sim.schedule:                # operators accumulate per-set deltas
-                # A micro-loop `{substep_dt: <dt_sub>, steps: [...]}`: run the inner operators
+                # a micro-loop `{substep_dt: <dt_sub>, steps: [...]}`: run the inner operators
                 # once per substep at `dt_sub` (e.g. the MPM strain->P2G->grid->G2P cycle). The
                 # count is derived as round(general.dt / dt_sub), so `general.dt` is the sim-time
                 # advanced per FRAME (lower it for slow-motion; dt_sub stays CFL-stable). Deltas
