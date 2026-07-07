@@ -25,22 +25,33 @@ LoopScore** before entering generative trajectory discovery (Phase 3). LoopScore
 the deliverable is a mechanism *per axis* (solved OR demonstrated structurally limited — a dose-confirmed null
 result counts). Confidence: **✓ established** (dose-confirmed) · **◐ provisional** (single-draw/hypothesis, not
 closable) · **✗ open**. Axis status: magnitude ✓ (gain+stiffness) · enclosure ✓ (rotation) · direction ✓ ·
-shape ✓ · uniformity ✓ (fibre heterogeneity) · **SIZE ◐ (REOPENED@B33 — the GAIN CEILING + fibre_dev raise
-peak_ratio 0.49→0.53 @rot1.0; single-draw, B34 replicates)**. **FREEZE solved axes:** every experiment must improve SIZE *while preserving* the ✓ axes (a slot that
+shape ✓ · uniformity ✓ (fibre heterogeneity) · **SIZE ◐ (movable @rot1.0 via FIBRE_DEV only — GAIN CEILING
+RETRACTED@B34 as inert 1.5→2.5; peak_ratio still capped ~0.51 = sim half real; B35 doses fibre_dev to close/cap the axis)**. **FREEZE solved axes:** every experiment must improve SIZE *while preserving* the ✓ axes (a slot that
 lifts size but regresses enclosure/chirality is not progress; the regressed axis reverts to ◐). Phase 2
 completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `current_phase.txt` → `PHASE3`.
 
 ## Current best result
 
-- **Under LoopScore (corrected metric, floor=0.02): LS = 0.509** (B33 ghi20 = dev18 + gain_hi 1.5→**2.0**,
-  CONVERGED@2399it) — NEW RECORD, ALL-POSITIVE nodes (min +0.20), best peak_ratio (0.533) + area_ratio (0.387) +
-  energy (0.873) of the batch. **SIZE-IN-ROTATION RESOLVED: the GAIN CEILING is a per-region size+uniformity lever
-  @rot1.0** — raising gain_hi lets the SIREN gain field push harder LOCALLY at the small radial-stub nodes, and
-  because the axis rotates that extra local drive becomes loop AREA (peak 0.50→0.53) not overshoot. `fibre_dev`
-  0.18→0.20 (dev20, LS=0.505) reproduces the lift; base amplitude (amp12/amp14) and floor softening (slo20) do NOT
-  (global drive still overshoots, #4/#25). This OVERTURNS fact #28 ("gain_hi>1.5 buys nothing") as regime-bound to
-  rot=0. **SINGLE DRAW — B34 replicates (campaign law: 9+ single-draw clean points have regressed).** See #28
-  (overturned), #31 (size reopened), #30 (rotation is the enclosure channel that gates this).
+- **⚠ B35 = 0-ARCHIVE EXECUTION LOSS (code-crash, NOT science) — last REAL data = B34 (dev20 0.505).** The
+  `948ff60` transfer-family refactor renamed `p2g`→`mpm_scatter`, `g2p`→`mpm_gather` in the registry AND the
+  cardio spec YAML, but `cardio_mpm_train.py` still hardcoded `p2g`/`g2p` (`mpm_ops` line 590, `p_op` line 515)
+  → `KeyError: 'p2g'` at `step_frame`, all 6 slots died ~10–19s. FIXED@B36 (rename both sites); B36 = exact B35
+  re-issue. `[engineering]` **DURABLE TRIAGE: 0-archive + `KeyError:'<op>'` in a slot `.err` ~10–20s = a src op
+  RENAME the campaign missed; after any `src/plexus/operators` refactor, grep BOTH train.py AND the spec YAML
+  for renamed tokens (a spec that builds via `_ops_by_name` can still crash at frame-step on a stale `mpm_ops`
+  entry).** No science this batch; SIZE stays ◐, agenda unchanged (fibre_dev dose to close/cap SIZE).
+- **LS PLATEAU ≈0.50 @rot1.0 (best = B34 dev20 = 0.505, ties B33 0.509 within noise).** The B33 "record" 0.509
+  (ghi20) REGRESSED to 0.469 on B34 replicate (Nth single-draw regression). Best stable config = **dev20** (dev18
+  + fibre_dev 0.20, gain_hi 2.0, rot1.0, soft-floor stiff[30,300] ω5, drag40, amp10, gain[0.2,2.0] g0=0.5, dur_hi11,
+  substeps10): LS 0.505, peak_ratio 0.507, area_ratio 0.389, ampL 0.013, LS_SD 0.296. **GAIN-CEILING SIZE LEVER
+  RETRACTED (B34):** the gain_hi ladder is INERT — LS {ghi15 0.478, ghi20 0.469, ghi22 0.452, ghi25 0.498} flat/
+  non-monotone AND peak_ratio DEAD FLAT {0.496, 0.492, 0.495, 0.492}; the control ghi15 (1.5) ≥ ghi20 (2.0). The
+  B33 "+0.035 gain win" was fibre_dev + lottery misattributed to gain (see #28, now RETRACTED). **The per-region
+  SIZE lever @rot1.0 is FIBRE_DEV** (dev18→dev20 at fixed gain_hi 2.0: peak 0.492→0.507, area 0.323→0.389; dose-
+  confirmed via fact #5). SIZE residual persists (peak_ratio ~0.51 = sim half real). Two side-findings: rotation
+  RAISES the gain runaway edge (gain_hi 2.5 stable here, was catastrophic @rot=0/#28); raising the gain FLOOR
+  (glo30) HURTS (global drive → overshoot). **SINGLE DRAW — dev20 0.505, B35 replicates + doses fibre_dev.** See
+  #28 (retracted), #31 (fibre=size lever), #5 (fibre dose), #30 (rotation gates enclosure).
 - **Prior record: LS = 0.492** (B32 dev18 = rot1.0 + soft-floor stiff[30,300] +
   SIREN fibre_dev 0.18, CONVERGED@2399it) — batch best, best area_ratio (0.354) + chir_match (0.853). This is the
   PEAK of a DOSE-CONFIRMED fibre lever, not a lottery draw: the fibre_dev ladder rises MONOTONE — dev0.05=0.447,
@@ -335,17 +346,18 @@ completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `cur
     (#26): a shape/overshoot channel, not a size channel. LS=0.331 (mid-batch, within lottery). So neither the
     integrator (#23) NOR the activation-waveform shape moves the size residual. `[mechanism@LoopScore, 2400it,
     B26, NEW — waveform asymmetry = shape/overshoot lever, size-invariant].`
-28. **THE GAIN CEILING IS A PER-REGION SIZE+UNIFORMITY LEVER @rot1.0 — OVERTURNED@B33 (was "buys nothing" @rot=0).**
-    B24/B26 (soft-floor, NON-rotating): raising gain_hi above 1.5 bought NOTHING (size flat, LS flat) and 2.5 was
-    RUNAWAY (ghi25 ampL=16.5, 2 nodes −1.00). **B33 OVERTURN @rot1.0:** gain_hi 1.5→2.0 (ghi20) is the RECORD
-    (LS=0.474→0.509, +0.035), raising peak_ratio 0.50→0.53 and area 0.34→0.39 by rescuing the small radial-stub
-    nodes to ALL-POSITIVE (min +0.20). MECHANISM: in the rotating (enclosure-solved) regime the extra LOCAL gain
-    headroom converts to loop AREA, not overshoot — the same energy the fixed-axis regime dissipated as recoil is
-    now circulated. So "gain-ceiling invariant / 2.0 is the edge" (old #28) was REGIME-BOUND to rot=0. Whether
-    gain_hi>2.0 keeps helping or hits the old runaway edge is the B34 question (ghi22/ghi25 @rot1.0). Global drive
-    (base amplitude) still overshoots (#4/#25) — the size gate opens only for PER-REGION drive (gain ceiling,
-    fibre_dev). `[mechanism@LoopScore, 2399it, rot1.0, OVERTURNED@B33 — gain ceiling = size/uniformity lever,
-    regime-bound; single-draw, replicating@B34].`
+28. **THE GAIN CEILING IS INERT ON SIZE @rot1.0 — the B33 "gain-ceiling size lever" is RETRACTED@B34; it was a
+    misattributed fibre_dev+lottery win.** B24/B26 (soft-floor, NON-rotating): gain_hi>1.5 bought NOTHING and 2.5
+    was RUNAWAY (ampL=16.5, 2 nodes −1.00). B33 CLAIMED gain_hi 1.5→2.0 raised peak 0.50→0.53 (RECORD 0.509).
+    **B34 RETRACTS IT:** the ghi20 "record" replicate REGRESSED to 0.469, and the gain_hi ladder is INERT on both
+    LS (ghi15 0.478 ≥ ghi20 0.469, ghi22 0.452, ghi25 0.498 — flat/non-monotone) AND peak_ratio (DEAD FLAT 0.496/
+    0.492/0.495/0.492 across 1.5→2.5). The paired control ghi15 (1.5) ≥ ghi20 (2.0) → no gain-ceiling effect. The
+    B33 win was carried by dev18-vs-dev20 (fibre_dev) plus a lottery high draw. **What DOES survive B34 @rot1.0:**
+    (i) rotation RAISES the gain runaway edge — gain_hi 2.5 (ghi25) is stable here (ampL 0.025), catastrophic at
+    rot=0 (contrast #21); (ii) raising the gain FLOOR (glo30, gain_lo 0.2→0.3) HURTS (worst peak/area — global
+    drive → overshoot). So the size gate opens only for PER-REGION ORIENTATION structure (fibre_dev, #31), never
+    for gain magnitude (ceiling OR floor) or base amplitude (#4/#25). `[mechanism@LoopScore, 2399it, rot1.0,
+    RETRACTED@B34 — gain ceiling inert on size 1.5→2.5; only side-effects are runaway-tolerance↑ & floor→overshoot].`
 29. **THE RESIDUAL IS AREA-ENCLOSURE (loopiness), NOT size — ESTABLISHED. The radial-motion ROOT CAUSE is a
     WORKING HYPOTHESIS that B27 tests, NOT yet an established mechanism.** What the 2026-07-04 audit + B26
     ESTABLISH (three claims, well-supported): (i) the residual is area-enclosure — the audit reframed it off
@@ -419,14 +431,17 @@ completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `cur
     dominant gap is back to MAGNITUDE/SIZE — clean real-referenced peak_ratio ≈0.49 (sim peak = HALF real), area_ratio
     ≈0.35; dashboard red loops loopy+correctly-chiral but INSIDE green.** SIZE was declared "invariant to every lever"
     (#24/#25) but ONLY at rot=0 (radial/time-reversible) — with the axis now rotating, whether drive/gain/compliance
-    converts to size is the LIVE B33 question (see Open-Q #1-NEW). **B33 RESOLVES IT: SIZE IS MOVABLE @rot1.0, but
-    ONLY via PER-REGION drive — the GAIN CEILING (gain_hi 1.5→2.0 = record, #28) and fibre_dev (0.18→0.20) both raise
-    peak_ratio 0.50→0.53 + area 0.34→0.39 by rescuing the small radial nodes; GLOBAL drive (base amplitude amp12/amp14)
-    and floor softening (slo20) do NOT (amp still overshoots per #4/#25, floor inert per #31a).** So facts #24/#25/#28
-    ("size/gain-ceiling invariant to every lever") are REGIME-BOUND to rot=0: the fixed axis dissipates extra drive as
-    recoil; the rotating axis circulates the same energy into loop area. Size is now ◐ (single-draw, replicating@B34),
-    not ✗. `[mechanism@LoopScore, 2399it, OVERTURNED@B32 (floor inert), RESOLVED@B33 (size = per-region-drive lever
-    @rot1.0, gain-ceiling+fibre; amp/floor null); single-draw].`
+    converts to size is the LIVE B33 question. **B33→B34 RESOLVE IT: SIZE IS MOVABLE @rot1.0, but ONLY via PER-REGION
+    ORIENTATION heterogeneity (FIBRE_DEV) — NOT the gain ceiling.** B33 claimed both gain_hi AND fibre_dev; **B34
+    RETRACTS the gain-ceiling half (#28): gain_hi is INERT 1.5→2.5 on peak_ratio (dead flat ~0.49) and LS.** The sole
+    surviving per-region size lever is FIBRE_DEV — dev18→dev20 at fixed gain_hi 2.0 raises peak_ratio 0.492→0.507,
+    area 0.323→0.389 (dose-consistent with #5). GLOBAL drive (base amplitude amp12/amp14, gain floor glo30) and floor
+    softening (slo20) do NOT (amp/floor → overshoot per #4/#25/#31a). So facts #24/#25 ("size invariant") are
+    REGIME-BOUND to rot=0: the fixed axis dissipates extra drive as recoil; the rotating axis converts per-region
+    orientation variation into loop area. Size is ◐ — movable via fibre_dev but peak_ratio still caps ~0.51 (sim half
+    real); B35 doses fibre_dev to decide solvable-vs-structurally-capped. `[mechanism@LoopScore, 2399it, OVERTURNED@B32
+    (floor inert), RESOLVED@B33→CORRECTED@B34 (size = FIBRE_DEV per-region lever @rot1.0; gain-ceiling RETRACTED,
+    amp/floor null); single-draw, dosing@B35].`
 
 ## Optimization facts  `[optimization@<regime>]` — depth-dependent, never promote to mechanism
 
