@@ -344,15 +344,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
         _, render, level = _entity_meta(sname)         # render hints + level from the registry
-        schema = _dim_schema(D)                         # pos/vel sized to the dimension contract
+        schema = _dim_schema(D)                        # pos/vel sized to the dimension contract
         dim = max(b for _, b in schema.values())
         state = torch.zeros(buffer, dim, device=device)
         px0, px1 = schema["pos"]
-        # a self-propelled set declares a `spawn` mode (disc/point/ring/random; 2D) and
-        # carries a per-agent `heading`; otherwise positions are seeded across the domain.
         head = None
         if "spawn" in s:
-            if D == 3:                                          # 3D agent: vector heading; ball / thin `disk` spawn
+            if D == 3:                                 # 3D agent: vector heading; ball / thin `disk` spawn
                 pos, head = _spawn3d(s["spawn"], n, H.world_size,
                                      float(s.get("spawn_radius", 0.3)), H.rng, device,
                                      thickness=float(s.get("spawn_thickness", 0.0)))
@@ -364,13 +362,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         else:
             pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
         state[:n, px0:px1] = pos
-        # legacy SCALAR vel_init -> random initial velocity, drawn HERE to stay byte-identical
-        # (a dict-mode vel_init is a computed IC applied after _assign_types, below).
         vinit = s.get("vel_init", 0.0)                      # random initial speed (e.g. boids start moving)
         if not isinstance(vinit, dict) and float(vinit or 0.0) > 0 and "vel" in schema:
             vx0, vx1 = schema["vel"]
             state[:n, vx0:vx1] = (torch.rand(n, D, generator=H.rng, device=device) - 0.5) * (2 * float(vinit))
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
+        # the runtime SET object: wraps the state tensor [buffer, 2D] (pos|vel columns per the
+        # schema) + the live-mask `occ` + the schema; operators read/write it via H.level(name).
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
@@ -382,7 +380,6 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             lvl.register_buffer("heading", hbuf)
         _assign_types(lvl, s, H, device)
         lvl.types_raw = s.get("types")          # raw per-type config (layers/material/block) for child provisioning
-        # computed velocity IC (dict `vel_init`, e.g. circular_orbit) -- after types so lvl.mass exists
         if isinstance(vinit, dict) and "vel" in schema:
             vx0, vx1 = schema["vel"]
             vel = _init_velocity(vinit, lvl, H.world_size, H.rng, device)
