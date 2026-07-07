@@ -1649,3 +1649,56 @@ The dashboards showed the mechanism cleanly: raising the ceiling **rescued the s
 **Files updated:** analysis log (Batch 34 section), knowledge ledger (record + facts #28/#31 overturned, new rejected line, SIZE axis ✗→◐), slots.md, and persistent memory.
 
 **Batch 34 design** (parent = ghi20; one variable each): `ghi20` (replicate the single-draw record), `ghi22` (push the ceiling — monotone?), `dev20` (stack the two per-region size levers), `ghi25` (does rotation raise the old runaway edge?), `glo30` (raise the gain *floor* — attack small nodes from below), `ghi15` (=dev18 causal control). **Falsifier:** ghi20 replicate < ~0.48 or ghi22 diverges → the record was seed-luck / 2.0 is the edge even under rotation.
+
+
+================================================================================
+## DESIGN 35 -- 2026-07-07 03:16:52
+================================================================================
+
+
+================================================================================
+## DESIGN 35 -- 2026-07-07 03:21:15
+================================================================================
+
+
+================================================================================
+## DESIGN 35 -- 2026-07-07 03:29:43
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All files updated. Let me verify the phase gate outcome — no need to change `current_phase.txt`.
+
+**Phase gate (PHASE 2 → PHASE 3):** magnitude ✓ · enclosure ✓ · direction ✓ · shape ✓ · uniformity ✓ · **SIZE ◐ (still open)**. No ✓ axis regressed this batch (enclosure loopiness ≥ real, chir ~0.85, LS_SD ~0.29 all held). SIZE remains ◐ — movable but capped. **Phase stays PHASE2** (left `current_phase.txt` unchanged); SIZE sets Batch 35's agenda.
+
+## Batch 35 — summary
+
+**Biggest surprise:** the B33 "gain-ceiling size lever" **evaporated on replication**. The 0.509 "record" (ghi20) regressed to 0.469, and the whole gain_hi ladder is **dead flat on peak_ratio** (0.496/0.492/0.495/0.492 over 1.5→2.5) — the control ghi15 (1.5) actually ≥ ghi20 (2.0). Fact #28's B33 overturn is **retracted**: gain_hi is inert on size.
+
+**What survived:** FIBRE_DEV is the sole per-region size lever @rot1.0 — at fixed gain_hi 2.0, dev18→dev20 raised peak 0.492→0.507, area 0.323→0.389, making **dev20 the winner (LS=0.505)** — but the campaign is on an LS≈0.50 plateau with peak_ratio still ~0.51 (sim = half real). Two side-findings: rotation raises the gain-runaway edge (2.5 stable, was catastrophic @rot=0); raising the gain *floor* hurts (global drive → overshoot).
+
+**Files updated:** analysis (Batch 34 section), knowledge (best-result block, axis-status line, fact #28 retracted, fact #31 corrected to fibre-only), slots (Batch 35).
+
+**Batch 35 design** — FIBRE_DEV dose ladder to decide the SIZE axis (does peak_ratio keep rising = solvable, or cap ~0.51 = structurally limited): 2 EXPLOIT (dev20 replicate, dev22) · 3 EXPLORE (dev25, dev30, fwl40 coarser scale) · 1 CONTROL (ghi15 confirms gain inert at the new fibre point). Each slot = one variable off the dev20 parent.
+
+
+================================================================================
+## DESIGN 36 -- 2026-07-07 03:40:50
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Everything is in place. Here's the summary of **Batch 36**.
+
+## Batch 36 — B35 was a code-crash execution loss, diagnosed → fixed → re-issued
+
+**What surprised me:** B35 produced *zero science* — all 6 slots archived only `config.json`. This is the 4th-type loss (code crash), not a morphology result.
+
+**Triage (read a slot `.err` first):** `KeyError: 'p2g'` at `cardio_mpm_train.py:156` (`step_frame`), all slots dead ~10–19s, ~898 MB, LSF exit 1 — the code-crash fingerprint.
+
+**Root cause:** git commit `948ff60` ("rename transfer family: p2g/g2p → mpm_/agent_ scatter/gather") renamed `p2g`→`mpm_scatter` and `g2p`→`mpm_gather` in **both** the operator registry and the cardio spec YAML. `_ops_by_name` keys the `ops` dict by the spec's op name, so it built the new keys fine (the `.out` header printed) — but `cardio_mpm_train.py` still hardcoded the old tokens at two sites (`mpm_ops` line 590, `p_op` line 515). This is the exact spec-renamed-op pattern from the embryo campaign.
+
+**Fix:** renamed both sites → `mpm_scatter`/`mpm_gather` with provenance comments; grep-verified 0 remaining stale transfer tokens in train/cluster/loop py. `mpm_strain`/`mpm_grid_update`/`active_stress`/`drag`/`activation_pulse` all survive unchanged. Statically sound (python3 approval-blocked, so no live smoke-run; verified by static trace against the successfully-built `ops` dict).
+
+**Files updated:**
+- `analysis_cardio_mpm.md` — dated Batch 35→36 section (loss, root cause, fix, durable triage rule).
+- `knowledge_cardio_mpm.md` — compact `[engineering]` note at top of "Current best result": last real data = B34; the p2g/g2p triage rule.
+- `cardio_mpm_slots.md` — **exact B35 re-issue** as 6 `b36_*` slots (fibre_dev dose ladder dev20/22/25/30 + fwl40 scale + ghi15 gain control), specs unchanged.
+
+**Phase gate:** unchanged — no data landed, so SIZE stays ◐ (movable via fibre_dev, peak_ratio capped ~0.51), no ✓ axis could regress. `current_phase.txt` remains `PHASE2`. The open SIZE axis still sets the agenda: does fibre_dev dosing push `peak_ratio` past 0.51 (solves SIZE) or cap it (dose-confirmed structural ceiling)?

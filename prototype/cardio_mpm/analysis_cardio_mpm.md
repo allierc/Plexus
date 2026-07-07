@@ -5604,3 +5604,107 @@ Next (Batch 34): parent=ghi20. Confirm + push the gain ceiling. ghi20 replicate 
 (does peak keep rising?), ghi25 (does rotation raise the runaway-tolerance edge that fact #28 put at ~2.0–2.5
 @soft-floor-non-rot?), dev20-on-ghi20 (do the two size levers STACK?), glo30 (raise gain FLOOR → attack
 remaining small nodes from below), ghi15 (=dev18, causal control confirming the +0.035 is the ceiling).
+
+---
+
+## Batch 34 (2026-07-07) — GAIN-CEILING RETRACTED; the per-region SIZE lever @rot1.0 is FIBRE_DEV, not the gain ceiling
+
+**Parent = ghi20** (B33 "record" 0.509: dev18 + gain_hi 2.0, rot1.0, soft-floor stiff[30,300] ω5, drag40,
+amp10, gain[0.2,2.0] g0=0.5, fibre-ON dev0.18, dur_hi11, substeps10). Question: does the gain ceiling replicate
+as a monotone per-region SIZE knob, or was it lottery?
+
+**BIGGEST SURPRISE — the record REGRESSED and the gain-ceiling lever EVAPORATED.** The ghi20 replicate came in
+at **LS=0.469** (was 0.509 — the Nth single-draw regression, campaign law). Worse for the B33 story: the whole
+gain_hi ladder is FLAT/non-monotone and, critically, `peak_ratio` (the size axis) is **DEAD FLAT** across it —
+ghi15(1.5)=0.496, ghi20(2.0)=0.492, ghi22(2.2)=0.495, ghi25(2.5)=0.492. The paired CONTROL ghi15 (gain_hi→1.5)
+scored 0.478, *above* the ghi20 replicate (0.469). So gain_hi is INERT on both LS and peak_ratio over 1.5→2.5.
+The B33 "+0.035 gain-ceiling win" was fibre_dev (ghi20 carried dev18; the real win was the dev20 slot) plus
+lottery, MISATTRIBUTED to gain. → fact #28's B33 overturn is RETRACTED.
+
+**The real lever is FIBRE_DEV.** dev20 (fibre_dev 0.18→0.20, gain_hi held at 2.0) WON the batch: LS=0.505, best
+peak_ratio 0.507, best area_ratio 0.389, lowest ampL 0.013, best LS_SD 0.296. Within-batch clean contrast (both
+at gain_hi 2.0): dev18(=ghi20) peak 0.492 / area 0.323 → dev20 peak 0.507 / area 0.389. Consistent with the
+dose-confirmed fibre ladder (fact #5, B32) — per-region orientation heterogeneity, not local gain, is what
+rescues the small radial-stub nodes into loop area.
+
+**Two other clean readings:**
+- **Rotation RAISES the gain runaway edge.** gain_hi 2.5 (ghi25) is NOT catastrophic here (LS=0.498, ampL 0.025,
+  stable) — at rot=0/soft-floor it was RUNAWAY (fact #28/#21, ampL 16.5, 2 nodes −1.00). Rotation tolerates the
+  high ceiling; it just buys no size (peak flat).
+- **Raising the gain FLOOR HURTS.** glo30 (gain_lo 0.2→0.3) is the worst slot (LS 0.450, worst peak 0.461 + area
+  0.303) — lifting the floor is GLOBAL drive → overshoot, shrinks loops. Confirms the size gate opens only for
+  PER-REGION structure (fibre_dev), never global drive.
+
+| slot | Δ from parent | LS | LS_SD | peak_r | area_r | chir | minor | ampL | note |
+|------|---------------|------|-------|--------|--------|------|-------|------|------|
+| **dev20** | fibre_dev .18→**.20** | **0.505** | 0.296 | **0.507** | **0.389** | 0.858 | 0.729 | 0.013 | **WINNER — fibre size lever** |
+| ghi25 | gain_hi 2.0→**2.5** | 0.498 | 0.292 | 0.492 | 0.389 | 0.864 | 0.783 | 0.025 | high draw; NOT runaway under rot |
+| ghi15 | gain_hi 2.0→**1.5** (ctrl) | 0.478 | 0.296 | 0.496 | 0.365 | 0.844 | 0.768 | 0.035 | ≥ ghi20 → gain inert |
+| ghi20 | replicate record (2.0) | 0.469 | 0.308 | 0.492 | 0.323 | 0.841 | 0.768 | 0.025 | REGRESSED from 0.509 |
+| ghi22 | gain_hi 2.0→**2.2** | 0.452 | 0.336 | 0.495 | 0.343 | 0.827 | 0.809 | 0.031 | worst uniformity |
+| glo30 | gain_lo 0.2→**0.3** | 0.450 | 0.312 | 0.461 | 0.303 | 0.834 | 0.708 | 0.024 | floor raise → overshoot |
+
+**Dashboards (dev20, ghi20):** red loops are closed + correctly-chiral (loopiness≥real) but sit INSIDE green —
+the residual is pure MAGNITUDE (peak_ratio ~0.50, sim ≈ half real size). dev20's fibre quiver is visibly wavier
+than ghi20's. Enclosure/chirality/shape all look right; SIZE is the sole open gap.
+
+Winner (optimizer): **dev20, LS=0.505** (ties the B33 0.509 within noise — no real LS gain; the campaign is on an
+LS≈0.50 plateau with peak_ratio capped ~0.51). Winner (scientific): **the ghi15 vs ghi20/22/25 flat contrast** —
+it cleanly RETRACTS the gain-ceiling lever and RE-ATTRIBUTES the size channel to fibre_dev.
+
+Verdict: RETRACTION/RE-ATTRIBUTION. The per-region SIZE lever @rot1.0 is FIBRE heterogeneity (dose-confirmed),
+NOT the gain ceiling (inert 1.5→2.5). SIZE stays ◐: movable via fibre_dev but peak_ratio still ~0.51.
+
+Batch outcome: morphology map ADVANCED (gain-ceiling lever falsified/retracted; fibre_dev isolated as the sole
+per-region size channel); no LS improvement (plateau).
+
+Next (Batch 35): parent=dev20. FIBRE_DEV DOSE LADDER to decide the SIZE axis — dev22/dev25/dev30: does
+peak_ratio keep rising past 0.20 (fibre solves size) or cap ~0.51 (structural size ceiling → close SIZE as
+dose-confirmed-limited)? + dev20 replicate (net lottery) + fibre_wl 40 (coarser scale — is size scale-sensitive?)
++ ghi15 control (confirm gain inert at the new fibre point).
+
+---
+
+## Batch 35 → 36 (2026-07-07) — EXECUTION LOSS (code-crash: p2g/g2p transfer-family rename); diagnosed, fixed, RE-ISSUED
+
+**Not science — a full 0-archive execution loss.** All 6 B35 slots (dev20/dev22/dev25/dev30/fwl40/ghi15)
+archived only `config.json` (no `progress.txt`, no checkpoints). Last REAL data remains B34 (dev20 = 0.505).
+
+**TRIAGE (read a slot `.err` FIRST):** signature = code-crash, NOT infra. `p3_b35_s5_b35_ghi15.err` shows
+`KeyError: 'p2g'` at `cardio_mpm_train.py:156` (`ops[nm](H, None)` inside `step_frame`), Run time ~19s,
+Max Memory ~898MB (LSF exit code 1). All slots died identically ~8–19s in — the code-crash fingerprint
+(vs infra: an infra loss leaves NO python traceback and a `.sh`/SSH failure).
+
+**ROOT CAUSE — a src refactor renamed an op the campaign code still hardcodes (same pattern as the embryo
+campaign's spec-renamed-op crash).** Git commit `948ff60` ("rename transfer family: p2g/g2p/agent_to_mpm/
+mpm_to_agent -> mpm_/agent_ scatter/gather") renamed `p2g`→`mpm_scatter` and `g2p`→`mpm_gather` in BOTH the
+operator registry (`src/plexus/operators/mpm_scatter.py`, `mpm_gather.py`) AND the spec YAML
+(`config/material/material_aniso_cardio.yaml` now lists `op: mpm_scatter` / `op: mpm_gather`). `_ops_by_name`
+(train.py:131) keys the `ops` dict by the SPEC's op name → `ops` now has keys `mpm_scatter`/`mpm_gather`, but
+`cardio_mpm_train.py` still asked for the old tokens at two sites:
+- line 590: `mpm_ops = ["mpm_strain", "p2g", "mpm_grid_update", "g2p"]` (the frame-step loop → the KeyError)
+- line 515: `dt_sub = float(p_op("p2g", "dt_sub", 2e-4) ...)` (silent — default 2e-4 masked it, but stale)
+
+`mpm_strain`/`mpm_grid_update`/`active_stress`/`drag` all survived (they resolved before the crash; the `.out`
+header line printed, proving `_ops_by_name` at line 586 successfully BUILT all ops including the new
+scatter/gather keys). So only `p2g`/`g2p` were stale.
+
+**FIX (Batch 36):** renamed both sites → `mpm_scatter`/`mpm_gather` (train.py:515, 590) with inline provenance
+comments. Grep-verified 0 remaining `p2g`/`g2p`/`agent_to_mpm`/`mpm_to_agent` in train/cluster/loop py.
+Statically sound: the `ops` dict already contains those exact keys (header printed), so the frame loop now
+indexes real ops. `python3` is approval-blocked so no live smoke-run; verified by static trace.
+
+**DURABLE TRIAGE (carry forward):** a 0-archive batch with a python `KeyError: '<opname>'` in a slot `.err`
+~10–20s in = a src operator RENAME the campaign code/spec missed. After ANY operator-family refactor in
+`src/plexus/operators`, grep `cardio_mpm_train.py` AND `config/material/material_aniso_cardio.yaml` for every
+renamed token — a spec that survives `_ops_by_name` build can still die at frame-step if train.py hardcodes an
+old op name in `mpm_ops`/`force_ops`/`p_op(...)`.
+
+**Batch 36 = exact B35 RE-ISSUE** (same 6 slots, specs/args unchanged and well-formed; only train.py fixed).
+Science axis UNCHANGED: SIZE is the sole open Phase-2 axis (◐). The B35/36 question stands — dose fibre_dev
+(dev20 replicate, dev22, dev25, dev30) to decide whether `peak_ratio` keeps rising past 0.20 (fibre SOLVES
+size → close SIZE positive) or caps ~0.51 (structural size ceiling → close SIZE as dose-confirmed-limited),
++ fwl40 (coarser scale) + ghi15 (gain-inert control). No LS/morphology change this batch (no data landed).
+
+**Phase gate:** UNCHANGED. No new data → SIZE stays ◐ (movable via fibre_dev, peak_ratio capped ~0.51); no ✓
+axis could regress (nothing ran). `current_phase.txt` stays `PHASE2`. Open axis (SIZE) still sets the agenda.
