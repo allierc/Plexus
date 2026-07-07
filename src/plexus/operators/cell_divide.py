@@ -67,7 +67,7 @@ class CellDivide(Structural):
             b[slots] = b[parents].clone()
         # place the daughter beside the mother
         px0, px1 = lvl.state_schema["pos"]
-        jitter = (torch.rand(cap, px1 - px0, generator=getattr(H, "rng", None), device=dev) - 0.5) * (2 * self.offset)
+        jitter = (torch.rand(cap, H.dim, generator=getattr(H, "rng", None), device=dev) - 0.5) * (2 * self.offset)
         lvl.state[slots, px0:px1] = lvl.state[parents, px0:px1] + jitter
         lvl.occ[slots] = 1.0
         if hasattr(lvl, "birth"):

@@ -68,7 +68,7 @@ class MPMParticle:
         rho = float(s.get("density", 1.0)); rad = float(s.get("radius", 0.02))
         ppc = int(s["per_parent"])
         px0, px1 = lvl.state_schema["pos"]
-        D = px1 - px0                                            # particle dimension (2D or 3D)
+        D = H.dim                                                # particle dimension (2D or 3D; the global dim contract)
         pos = lvl.state[:, px0:px1].clone()
         cpos = parent.get("pos")[pidx]                           # each particle's parent center
         r = (pos - cpos).norm(dim=1)                             # radial distance (for layer bands)
