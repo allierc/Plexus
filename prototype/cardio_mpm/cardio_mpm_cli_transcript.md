@@ -1702,3 +1702,29 @@ Everything is in place. Here's the summary of **Batch 36**.
 - `cardio_mpm_slots.md` — **exact B35 re-issue** as 6 `b36_*` slots (fibre_dev dose ladder dev20/22/25/30 + fwl40 scale + ghi15 gain control), specs unchanged.
 
 **Phase gate:** unchanged — no data landed, so SIZE stays ◐ (movable via fibre_dev, peak_ratio capped ~0.51), no ✓ axis could regress. `current_phase.txt` remains `PHASE2`. The open SIZE axis still sets the agenda: does fibre_dev dosing push `peak_ratio` past 0.51 (solves SIZE) or cap it (dose-confirmed structural ceiling)?
+
+
+================================================================================
+## DESIGN 37 -- 2026-07-07 10:16:23
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All files updated. Phase gate: SIZE remains **◐ (near-✓)** — the B36 dose ladder is clean, but dev25 is a single draw and the ~0.53 cap rests on one ladder, so by the campaign's single-draw law it can't close yet. No ✓ axis regressed (enclosure loopiness ≥ real, chir 0.84–0.86, minor best-at-dev25). `current_phase.txt` stays **PHASE2**.
+
+## Batch 37 summary
+
+**B36 read (the real data after the B35 code-crash re-issue) — two surprises:**
+
+1. **The falsifier didn't fire — fibre_dev IS a dose-confirmed SIZE lever.** peak_ratio rose monotone `0.482(dev20) → 0.500(dev22) → 0.534(dev25)`, area_ratio `0.326 → 0.418`, then both rolled off at dev0.30. So per-region orientation heterogeneity genuinely *converts to loop size* @rot1.0 (confirms B34's single draw), peaking at dev~0.25 — **but peak_ratio caps ~0.53 (sim ≈ half real)**.
+2. **The control topped the batch.** ghi15 (gain_hi 2.0→1.5) got the best LS (0.516) and best uniformity (LS_SD 0.281) while leaving SIZE flat (peak 0.493) → gain_hi is a **uniformity** lever, cleanly separate from the fibre_dev **size** channel. fwl40 (coarser fibre) was inert → size is dev *magnitude*, not spatial scale.
+
+**Ranking (LS):** ghi15 0.516 > dev25 0.512 > dev30 0.504 > dev22 0.487 > fwl40 0.474 > dev20 0.466.
+- Best optimizer: **ghi15** · Best scientific: **dev25 + the dose ladder**.
+
+**B37 designed (parent = dev25) — CLOSE the SIZE axis. One question: is the ~0.53 cap fibre-limited or structural?**
+- 3 EXPLOIT: `dev25` (net the single-draw peak), `dev27` (locate peak vs roll-off), `d25g15` (combine size + uniformity wins)
+- 2 EXPLORE / cap-tests: `bwnar` (release Dirichlet boundary 0.06→0.03 — does the pinned band compress interior excursion?), `durhi13` (longer contraction travel — untested size candidate @rot1.0)
+- 1 CONTROL: `dev20` (dose anchor)
+
+If dev25 replicates ~0.53 and neither cap-test exceeds it → SIZE is dose-confirmed structurally-capped → ✓ → **Phase 2 completes next batch** (Batch 38). An overturn keeps SIZE open with a new mechanism.
+
+Files updated: `analysis_cardio_mpm.md` (dated B36→B37 section), `knowledge_cardio_mpm.md` (objective SIZE status, best-result block, fact #31, current hypothesis + iterations), `cardio_mpm_slots.md` (6 slots).

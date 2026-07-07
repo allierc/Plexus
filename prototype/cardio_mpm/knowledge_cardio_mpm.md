@@ -25,22 +25,28 @@ LoopScore** before entering generative trajectory discovery (Phase 3). LoopScore
 the deliverable is a mechanism *per axis* (solved OR demonstrated structurally limited — a dose-confirmed null
 result counts). Confidence: **✓ established** (dose-confirmed) · **◐ provisional** (single-draw/hypothesis, not
 closable) · **✗ open**. Axis status: magnitude ✓ (gain+stiffness) · enclosure ✓ (rotation) · direction ✓ ·
-shape ✓ · uniformity ✓ (fibre heterogeneity) · **SIZE ◐ (movable @rot1.0 via FIBRE_DEV only — GAIN CEILING
-RETRACTED@B34 as inert 1.5→2.5; peak_ratio still capped ~0.51 = sim half real; B35 doses fibre_dev to close/cap the axis)**. **FREEZE solved axes:** every experiment must improve SIZE *while preserving* the ✓ axes (a slot that
+shape ✓ · uniformity ✓ (fibre heterogeneity) · **SIZE ◐→near-✓ (DOSE-CONFIRMED@B36: fibre_dev moves peak_ratio
+0.48→0.53 MONOTONE dev0.20→0.25, rolls off dev0.30; area_ratio tracks 0.33→0.42→0.37; gain ceiling inert@B34; peak
+still CAPS ~0.53 = sim ≈half real. B37 replicates the dev0.25 peak + tests whether boundary-release/duration break the
+~0.53 cap → then close SIZE as either partly-solved or dose-confirmed structurally-limited)**. **FREEZE solved axes:** every experiment must improve SIZE *while preserving* the ✓ axes (a slot that
 lifts size but regresses enclosure/chirality is not progress; the regressed axis reverts to ◐). Phase 2
 completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `current_phase.txt` → `PHASE3`.
 
 ## Current best result
 
-- **⚠ B35 = 0-ARCHIVE EXECUTION LOSS (code-crash, NOT science) — last REAL data = B34 (dev20 0.505).** The
-  `948ff60` transfer-family refactor renamed `p2g`→`mpm_scatter`, `g2p`→`mpm_gather` in the registry AND the
-  cardio spec YAML, but `cardio_mpm_train.py` still hardcoded `p2g`/`g2p` (`mpm_ops` line 590, `p_op` line 515)
-  → `KeyError: 'p2g'` at `step_frame`, all 6 slots died ~10–19s. FIXED@B36 (rename both sites); B36 = exact B35
-  re-issue. `[engineering]` **DURABLE TRIAGE: 0-archive + `KeyError:'<op>'` in a slot `.err` ~10–20s = a src op
-  RENAME the campaign missed; after any `src/plexus/operators` refactor, grep BOTH train.py AND the spec YAML
-  for renamed tokens (a spec that builds via `_ops_by_name` can still crash at frame-step on a stale `mpm_ops`
-  entry).** No science this batch; SIZE stays ◐, agenda unchanged (fibre_dev dose to close/cap SIZE).
-- **LS PLATEAU ≈0.50 @rot1.0 (best = B34 dev20 = 0.505, ties B33 0.509 within noise).** The B33 "record" 0.509
+- **✓ B36 RAN (real data) — FIBRE_DEV IS A DOSE-CONFIRMED SIZE LEVER; new op point dev0.25.** Best LS = **ghi15
+  0.516** (LS_SD 0.281 best-uniformity, chir 0.861 best; gain_hi 2.0→1.5 at dev0.20 — SIZE FLAT peak 0.493, so
+  gain_hi is a UNIFORMITY lever) ≈ **dev25 0.512** (peak_ratio **0.534**, area 0.418, minor 0.819 — the SIZE
+  PEAK). The B35 loss (code-crash, p2g/g2p rename) was fixed and re-issued; last data B34 → now B36. **The
+  fibre_dev SIZE dose ladder is CLEAN:** peak_ratio 0.482(dev20)→0.500(dev22)→0.534(dev25)→0.504(dev30 roll-off),
+  area_ratio 0.326→0.379→0.418→0.374 — monotone rise to dev0.25, roll-off at dev0.30 (mirrors the LS roll-off at
+  dev0.25 @rot0/#5). So fibre heterogeneity CONVERTS to loop SIZE @rot1.0 (confirms the B34 single-draw), peaking
+  at dev~0.25, BUT peak_ratio still CAPS ~0.53 (sim ≈half real). fwl40 (coarser fibre) INERT (peak 0.489, worst
+  ampL 0.031) → size is dev MAGNITUDE not spatial SCALE (reconfirms #5). B34 dev20 0.505 was a high draw (nets
+  0.466 here) — the RATIO ladder, not point LS, carries the lever. See #31 (fibre=size lever, dose-confirmed@B36),
+  #28 (gain_hi = uniformity, size-inert), #5 (fibre dose + scale-inert). **SIZE ◐→near-✓; B37 replicates dev25 +
+  cap-tests (boundary/duration).**
+- **LS PLATEAU ≈0.50 @rot1.0 (prior best = B34 dev20 = 0.505, ties B33 0.509 within noise).** The B33 "record" 0.509
   (ghi20) REGRESSED to 0.469 on B34 replicate (Nth single-draw regression). Best stable config = **dev20** (dev18
   + fibre_dev 0.20, gain_hi 2.0, rot1.0, soft-floor stiff[30,300] ω5, drag40, amp10, gain[0.2,2.0] g0=0.5, dur_hi11,
   substeps10): LS 0.505, peak_ratio 0.507, area_ratio 0.389, ampL 0.013, LS_SD 0.296. **GAIN-CEILING SIZE LEVER
@@ -438,10 +444,16 @@ completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `cur
     area 0.323→0.389 (dose-consistent with #5). GLOBAL drive (base amplitude amp12/amp14, gain floor glo30) and floor
     softening (slo20) do NOT (amp/floor → overshoot per #4/#25/#31a). So facts #24/#25 ("size invariant") are
     REGIME-BOUND to rot=0: the fixed axis dissipates extra drive as recoil; the rotating axis converts per-region
-    orientation variation into loop area. Size is ◐ — movable via fibre_dev but peak_ratio still caps ~0.51 (sim half
-    real); B35 doses fibre_dev to decide solvable-vs-structurally-capped. `[mechanism@LoopScore, 2399it, OVERTURNED@B32
-    (floor inert), RESOLVED@B33→CORRECTED@B34 (size = FIBRE_DEV per-region lever @rot1.0; gain-ceiling RETRACTED,
-    amp/floor null); single-draw, dosing@B35].`
+    orientation variation into loop area. **B36 DOSE-CONFIRMS the fibre_dev size lever (◐→near-✓):** the peak_ratio
+    ladder is MONOTONE 0.482(dev20)→0.500(dev22)→0.534(dev25), area_ratio 0.326→0.379→0.418, then BOTH roll off at
+    dev0.30 (peak 0.504, area 0.374) — a clean rise-and-roll-off peaking at dev~0.25 (the SIZE op point; mirrors the
+    LS roll-off@dev0.25 from #5). So fibre heterogeneity genuinely CONVERTS to loop SIZE @rot1.0, NOT just LS. BUT
+    peak_ratio still CAPS ~0.53 (sim ≈half real) — a suggested structural cap on absolute size. fwl40 (coarser)
+    inert (peak 0.489) → dev MAGNITUDE not SCALE. B37 replicates the dev25 peak + tests whether boundary-release
+    (`--bwidth`) or longer duration (`--dur_hi`) break the ~0.53 cap → close SIZE as partly-solved-but-capped
+    (dose-confirmed structural) if neither does. `[mechanism@LoopScore, 2399it, OVERTURNED@B32 (floor inert),
+    RESOLVED@B33→CORRECTED@B34→DOSE-CONFIRMED@B36 (size = FIBRE_DEV per-region lever @rot1.0, peaks dev0.25,
+    peak_ratio caps ~0.53; gain-ceiling RETRACTED = uniformity lever #28, amp/floor null)].`
 
 ## Optimization facts  `[optimization@<regime>]` — depth-dependent, never promote to mechanism
 
@@ -862,7 +874,24 @@ completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `cur
 ---
 
 ## Current theme
-### Current hypothesis
+### Current hypothesis (B37 — CLOSE the SIZE axis)
+"SIZE is the LAST open Phase-2 axis, now ◐→near-✓. B33→B34→B36 RESOLVED it: absolute loop SIZE IS movable @rot1.0,
+and the SOLE lever is PER-REGION ORIENTATION heterogeneity (`--fibre_dev`) — gain ceiling (#28), base amplitude,
+gain floor and stiffness-floor all inert/overshoot (#4/#25/#31). **B36 DOSE-CONFIRMED it:** peak_ratio rises MONOTONE
+0.482(dev20)→0.534(dev25), area 0.326→0.418, then rolls off at dev0.30 — fibre heterogeneity CONVERTS to loop size,
+peaking at dev~0.25. BUT peak_ratio caps ~0.53 (sim ≈half real): a SUGGESTED structural cap. Second B36 finding:
+gain_hi 2.0→1.5 (ghi15) is a UNIFORMITY lever (best LS_SD 0.281 + LS 0.516) that leaves SIZE flat — cleanly separate
+channel. **B37 HYPOTHESIS (the ONE question): is the ~0.53 peak_ratio cap a fibre-lever limit that a DIFFERENT
+mechanism breaks, or a structural cap of the active-stress model?** (1) net the dev25 single-draw (replicate — is
+peak 0.534 real?); (2) dev27 locates the exact peak between dev25 and the dev30 roll-off; (3) d25g15 combines the two
+B36 wins (dev25 size + gain_hi1.5 uniformity); and CRUCIALLY the cap-tests: (4) bwnar (release the Dirichlet boundary
+0.06→0.03 — does the pinned outer band compress interior peak excursion?), (5) durhi13 (longer contraction travel,
+untested size candidate @rot1.0). Prediction: dev25 replicates ~0.53 and NEITHER bwnar nor durhi13 exceeds it →
+SIZE is dose-confirmed structurally-capped → ✓ → Phase 2 COMPLETE next batch. An overturn (bwnar/durhi13 raises
+peak_ratio holding LS+chir) → a new size mechanism, keep SIZE open. Settled context: substeps=10, rot1.0, drag40,
+gain[0.2,2.0], amp10, stiff[30,300], dur_hi11. Parent = dev25 (fibre_dev0.25)."
+
+### (archived) B33 hypothesis
 "ESTABLISHED (B28, replicated B31): a ROTATING contraction axis (`--rot_stress`) IS the area-enclosure mechanism —
 it filled the residual the whole campaign called invariant AND broke the 2-month LS≈0.365 ceiling (fact #30). rot is
 a SATURATING knob: LS peaks at 1.0 (rot OPERATING POINT), area keeps climbing above but LS does not. Enclosure SHAPE
@@ -942,6 +971,18 @@ Parent = dev18 (fibre_dev0.18)."
   half real). Facts #24/#25 killed drive/gain/compliance as size levers but ONLY at rot=0 (radial/time-reversible).
   Test amp12/amp14 (drive) + gain_hi2.0 (ceiling) + stiff_lo20 (compliance) @rot1.0, dev18 parent + dev20 (dose peak).
   Null → size structural (boundary/constitutive); overturn → #24/#25 regime-bound to rot=0.
+- **Batch 33→34: SIZE IS MOVABLE @rot1.0, but ONLY via FIBRE_DEV.** B33 claimed both gain_hi + fibre_dev raise peak;
+  B34 RETRACTED the gain-ceiling half (#28: gain_hi INERT 1.5→2.5, peak dead-flat) and isolated FIBRE_DEV as the sole
+  per-region size lever (dev18→dev20: peak 0.492→0.507). Base amp/gain-floor/stiff-floor all null (drive→overshoot).
+  Best stable dev20 LS=0.505 (single draw). → B35 doses fibre_dev to close/cap SIZE.
+- **Batch 35→36: EXECUTION LOSS then RE-ISSUE (code-crash, p2g/g2p transfer-family rename in train.py; NOT science).**
+  B35 0-archived (KeyError:'p2g' at frame-step); fixed both hardcoded sites; B36 = exact re-issue. Last data B34 → B36.
+- **Batch 36 (CONVERGED@2399it): FIBRE_DEV DOSE-CONFIRMED as the SIZE lever (◐→near-✓).** peak_ratio MONOTONE
+  0.482(dev20)→0.500(dev22)→0.534(dev25), area 0.326→0.418, rolls off dev0.30 — fibre heterogeneity converts to loop
+  SIZE, peaks dev~0.25, but peak CAPS ~0.53 (sim ≈half real). SURPRISE: control ghi15 (gain_hi1.5) TOPPED the batch
+  (LS 0.516, best LS_SD 0.281) with SIZE flat → gain_hi is a UNIFORMITY lever (#28), cleanly separate from the size
+  channel. fwl40 coarser fibre INERT → dev magnitude not scale. → B37 CLOSES SIZE: replicate dev25 + test whether
+  boundary-release (`--bwidth`) or duration (`--dur_hi`) break the ~0.53 cap.
 ### Emerging observations
 - **LS=0.492** is the campaign best (B32 dev18 = rot1.0 + soft-floor + fibre_dev0.18, CONVERGED@2399it), the PEAK of a
   DOSE-CONFIRMED fibre lever (monotone dev0.05→0.18: 0.447→0.492; win = dev magnitude, fibre_wl SCALE inert). Prior

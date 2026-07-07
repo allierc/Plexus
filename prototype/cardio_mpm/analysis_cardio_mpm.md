@@ -5708,3 +5708,59 @@ size → close SIZE positive) or caps ~0.51 (structural size ceiling → close S
 
 **Phase gate:** UNCHANGED. No new data → SIZE stays ◐ (movable via fibre_dev, peak_ratio capped ~0.51); no ✓
 axis could regress (nothing ran). `current_phase.txt` stays `PHASE2`. Open axis (SIZE) still sets the agenda.
+
+---
+
+## Batch 36 RAN (real data) → Batch 37 design (2026-07-07) — FIBRE_DEV IS A DOSE-CONFIRMED SIZE LEVER (peak_ratio 0.48→0.53, rolls off at dev0.30)
+
+Parent: dev20 = fibre_dev 0.20, gain_hi 2.0, rot1.0 + soft-floor stiff[30,300] ω5, drag40, amp10,
+gain[0.2,2.0] g0=0.5, SIREN fibre-ON, dur_hi11, substeps10, 2400it converged.
+
+Surprise (from the previous batch): **the B35/36 falsifier "dev22/dev25 leave peak_ratio flat ~0.51 → size
+capped" DID NOT FIRE.** peak_ratio rose MONOTONE dev20→dev25 (0.482→0.500→0.534), area_ratio rose in lockstep
+(0.326→0.379→0.418), then BOTH rolled off at dev30 (peak 0.504, area 0.374). So the B34 single-draw "fibre_dev
+moves size" is now DOSE-CONFIRMED: fibre heterogeneity IS the per-region SIZE lever @rot1.0, peaking at
+dev~0.25. Second surprise (bigger): **the CONTROL slot ghi15 (meant only to reconfirm the gain ceiling inert
+on size) TOPPED the batch — LS 0.516 (best), LS_SD 0.281 (best uniformity), chir_match 0.861 (best) — while
+leaving peak_ratio FLAT (0.493 ≈ dev20's 0.482).** So gain_hi 2.0→1.5 is inert on SIZE (confirms #28/#34) but
+is a clean UNIFORMITY/overshoot lever. The two channels separate cleanly: **fibre_dev = size, gain_hi =
+uniformity.** Third: fwl40 (coarser fibre) did NOT help (LS 0.474, peak 0.489, WORST ampL 0.031) → size is dev
+MAGNITUDE not spatial SCALE (reconfirms #5 scale-inert; coarsening past wl28.8 slightly hurts).
+
+Observation (systematic failure): with fibre_dev now moving peak_ratio, the residual is that peak_ratio still
+CAPS at ~0.53 (sim ≈ half real) at the dev25 peak — energy_ratio ~0.88 (motion amount ~right) but peak
+excursion only half. The gap is now: is that ~0.53 a fibre-lever limit that a DIFFERENT mechanism breaks, or a
+structural cap of the active-stress model?
+
+Hypothesis (B36, from B35 spec): dosing fibre_dev decides SIZE. RESULT: **fibre_dev moves size (dose-confirmed
+monotone rise) but SATURATES/rolls off at dev0.25–0.30, peak_ratio capped ~0.53.** SUPPORTED (lever real) +
+suggests a structural cap (single dose ladder — needs replicate + a cross-mechanism cap test).
+
+Per-slot (ranked by LS; all 2400it converged, rot1.0, dur settled ~7.0–7.5):
+- Slot 5 [b36_ghi15]  role=control  gain_hi 2.0→1.5 (dev0.20)  **LS=0.516 LS_SD=0.281** peak=0.493 area=0.373 chir=0.861 minor=0.778 ampL=0.022 — BEST LS+uniformity+chir; peak FLAT → gain_hi = uniformity lever, inert on size.
+- Slot 2 [b36_dev25]  role=explore  fibre_dev 0.25  **LS=0.512 LS_SD=0.296 peak=0.534 area=0.418** chir=0.856 minor=0.819 ampL=0.014 — the SIZE PEAK (highest peak/area/minor of the batch); dur 7.0.
+- Slot 3 [b36_dev30]  role=explore  fibre_dev 0.30  LS=0.504 LS_SD=0.295 peak=0.504 area=0.374 chir=0.858 minor=0.784 ampL=0.014 — ROLL-OFF (peak/area drop back below dev25); LS holds via chir.
+- Slot 1 [b36_dev22]  role=exploit  fibre_dev 0.22  LS=0.487 LS_SD=0.302 peak=0.500 area=0.379 chir=0.843 minor=0.738 ampL=0.022 — mid-ladder, monotone.
+- Slot 4 [b36_fwl40]  role=explore  fibre_wl 28.8→40 (dev0.20)  LS=0.474 LS_SD=0.294 peak=0.489 area=0.360 chir=0.847 minor=0.731 ampL=0.031 — coarser scale INERT/slightly worse (worst ampL); size is dev-magnitude not scale.
+- Slot 0 [b36_dev20]  role=exploit/replicate  fibre_dev 0.20  LS=0.466 LS_SD=0.310 peak=0.482 area=0.326 chir=0.836 minor=0.772 ampL=0.024 — dose ANCHOR; B34's 0.505 was a high draw (nets 0.466 here), but the RATIO ladder is clean.
+
+Best optimizer slot: **ghi15, LS=0.516** (best uniformity + chirality) — but its SIZE is unmoved.
+Best scientific slot: **dev25** (+ the whole dev20→25→30 ladder) — it DOSE-CONFIRMS fibre_dev as the size
+lever AND locates its peak/roll-off. The ghi15 vs dev-ladder contrast cleanly SEPARATES the size channel
+(fibre_dev) from the uniformity channel (gain_hi).
+
+Verdict: SUPPORTED + dose-confirmed — fibre_dev is the SIZE lever @rot1.0 (peak_ratio 0.48→0.53, peaks dev0.25,
+rolls off dev0.30); the ~0.53 peak cap is SUGGESTED structural (single ladder). `[mechanism@LoopScore,2399it,
+rot1.0,soft-floor]`. No regression of any ✓ axis (enclosure loopiness 1.04–1.21 ≥ real, chir 0.84–0.86, minor
+0.73–0.82 all held/best-at-dev25).
+
+Batch outcome: BOTH — LS +0.011 over the B34 plateau (dev25/ghi15 ≈0.51) AND the morphology map advanced
+(fibre_dev = dose-confirmed size lever with a located peak+roll-off; gain_hi re-cast as a uniformity lever).
+
+Next (Batch 37): parent = **dev25** (new size operating point). CLOSE the SIZE axis — (1) REPLICATE dev25
+(net the single-draw peak_ratio 0.534, campaign law), (2) dose dev27 (locate the peak between dev25 and the
+dev30 roll-off), (3) combine the two B36 wins d25g15 (dev25 size + gain_hi1.5 uniformity), and CRUCIALLY test
+whether a DIFFERENT mechanism breaks the ~0.53 peak cap: (4) bwnar (release the Dirichlet boundary anchor
+0.06→0.03 — does the pinned outer band compress interior peak excursion?) and (5) durhi13 (longer contraction
+travel — untested size candidate @rot1.0). If dev25 replicates its peak AND neither bwnar nor durhi13 exceeds
+~0.53, SIZE is dose-confirmed structurally-capped → ✓ → Phase 2 completes next batch.
