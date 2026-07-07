@@ -37,7 +37,7 @@ class Centroid(Aggregate):
         if pidx.numel() == 0:
             return {}
         dev = parent.state.device
-        px0, px1 = parent.state_schema["pos"]; D = px1 - px0
+        px0, px1 = parent.state_schema["pos"]; D = H.dim   # spatial dim (the global contract; == px1 - px0)
         cpos = child.get("pos"); cocc = child.occ
         s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
         w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)

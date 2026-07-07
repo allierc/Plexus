@@ -407,7 +407,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
         state = torch.zeros(Np, dim, device=device)
         px0, px1 = schema["pos"]
-        D = px1 - px0                                             # the child's own pos dimension
+        D = H.dim                                                # the child's pos dimension (the global dim contract)
         ppos = parent.get("pos")[parent_idx][:, :D]              # parent position, projected to the child's dim
         # scatter each child uniformly in a ball of `radius` about its parent. The 2D
         # polar path is kept verbatim (bit-identical MPM particle seeding); 3D+ uses a
