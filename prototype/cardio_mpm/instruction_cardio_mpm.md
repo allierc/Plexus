@@ -104,19 +104,40 @@ Gate: every axis ✓ established (◐ provisional does NOT count) AND no ✓ axi
 When met: declare Phase 2 COMPLETE in analysis_cardio_mpm.md, then write `PHASE3` to current_phase.txt.
 ```
 
-### Phase 3 — Generative cardiomyocyte mechanics  **(NEXT)**
+### Phase 3 — Residual-driven operator discovery  **(NEXT)**
+> *When a residual cannot be explained by the current operator language, propose a NEW operator.*
+
+This is the core Plexus principle. Phase 2 proved the causal decomposition is complete **within the current
+operator language** — 5 axes ✓, and **SIZE is capped at peak_ratio ~0.53** (fibre_dev is the size lever, B36
+dosed it, B37's boundary/duration cap-tests didn't exceed it). "The current language cannot exceed 0.53" is a
+valid ✓ (structural-limit-established-within-current-language) — and it is precisely the **license** to extend
+the language. Phase 3 introduces ONE new operator/material property at a time, each proposed to break a
+specific Phase-2 residual, and each held to the **freeze rule** (break the residual *while preserving* the ✓
+axes — enclosure/chirality/shape/uniformity/magnitude). An operator that breaks the cap → the residual reopens
+as *solved*; one that doesn't → it joins the rejected-operator record (a dose-confirmed negative is a ✓ result).
+
+**Operator library for the SIZE cap** (classify by the Brückner–Hannezo symmetry of the active term —
+isotropic / nematic / chiral; cardio's base is nematic active stress + a chiral rotation):
+
+| operator | knob | mechanism (why it may break the ~0.53 cap) | status |
+|---|---|---|---|
+| **residual stress / prestress** | `--residual_stress 1 --residual_amp` | learned SIREN rest tensor `F_res=I+α·tanh(dF)`; tissue enters each beat PRE-STRESSED → contraction rides a biased reference → larger loop *without more force* (Noll 2017 "active mechanical state"; Box 2 stress-state ⊥ rheology) | **engine-ready, dose-test first** |
+| **viscoelastic (Maxwell)** | `--tau` | F relaxes toward isotropic by `exp(-dt/τ)` → rest state DRIFTS between beats → EMERGENT residual stress (the dynamic counterpart; Ranft 2010 "viscous over long timescales") | **engine-ready** |
+| nonlinear / anisotropic active stress | (new) | saturating or biaxial `σ_act` | candidate |
+| active damping / anisotropic viscosity | (new) | directional dissipation | candidate |
+
+**Method is unchanged** — one operator per experiment, dose-swept, ranked by whether peak_ratio exceeds 0.53
+with the ✓ axes held (read the full `enclosure_row`, not LS alone). Both `residual_stress` and `tau` default
+OFF and reproduce today's model exactly (α=0 / τ=∞), so a control slot is the current best config verbatim.
+
+### Phase 4 — Generative cardiomyocyte mechanics  **(LATER)**
 > *Which trajectory families are generable by reusable operator compositions?*
 
-Once every morphology axis has a controlling mechanism, the question stops being "how do I match this one
-dataset?" and becomes the **morphology manifold**: the scientific object is **operator composition →
-trajectory family → minimal generating mechanism** (not parameter optimization). Phase 3 asks which trajectory
-families are generable by reusable operator compositions. **Characterize the morphology manifold of
-active-stress systems, identify the minimal operators generating each family, and only then relate these
-families to physiological or pathological phenotypes.** (Concrete families to map are an OUTPUT of that
-characterization — e.g. figure-eight, spiral, multi-lobed loops, and later re-entry / conduction phenotypes —
-not the starting agenda; the campaign stays operator-first, phenotype-second.) This mirrors embryogenesis
-Phase 3 (organogenesis): compose the established operators and *characterize what they generate*, rather than
-fit a target. **Enter Phase 3 only when Phase 2's residual-axis map is complete (all axes ✓).**
+Once the operator language is complete (all axes ✓, no residual the language can't reach), the question stops
+being "match this dataset" and becomes the **morphology manifold**: **operator composition → trajectory family
+→ minimal generating mechanism**. Characterize what the enriched operator set generates (figure-eight, spiral,
+multi-lobed loops; later re-entry / conduction phenotypes as *outputs*, phenotype-second), mirroring
+embryogenesis organogenesis. **Enter Phase 4 only when Phase 3 has closed the operator language.**
 
 ## Objective
 

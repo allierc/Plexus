@@ -17,23 +17,54 @@
 > with the `[class@regime]` tag (e.g. `✓ [mechanism@LoopScore,2400it]`). Promote ◐→✓ on dose confirmation;
 > demote ✓→◐ if a frozen axis regresses. On each distill (step 12), add/refresh the marker on every line.
 
-## Current objective  (Phase 2 — see `current_phase.txt`)
+## Current objective  (Phase 3 — see `current_phase.txt`)
 
-**Identify the minimal physical mechanism controlling each remaining trajectory morphology axis** —
-magnitude, enclosure, direction, shape, uniformity, size — thereby **completing the causal decomposition of
-LoopScore** before entering generative trajectory discovery (Phase 3). LoopScore is the operational metric;
-the deliverable is a mechanism *per axis* (solved OR demonstrated structurally limited — a dose-confirmed null
-result counts). Confidence: **✓ established** (dose-confirmed) · **◐ provisional** (single-draw/hypothesis, not
-closable) · **✗ open**. Axis status: magnitude ✓ (gain+stiffness) · enclosure ✓ (rotation) · direction ✓ ·
-shape ✓ · uniformity ✓ (fibre heterogeneity) · **SIZE ◐→near-✓ (DOSE-CONFIRMED@B36: fibre_dev moves peak_ratio
-0.48→0.53 MONOTONE dev0.20→0.25, rolls off dev0.30; area_ratio tracks 0.33→0.42→0.37; gain ceiling inert@B34; peak
-still CAPS ~0.53 = sim ≈half real. B37 replicates the dev0.25 peak + tests whether boundary-release/duration break the
-~0.53 cap → then close SIZE as either partly-solved or dose-confirmed structurally-limited)**. **FREEZE solved axes:** every experiment must improve SIZE *while preserving* the ✓ axes (a slot that
-lifts size but regresses enclosure/chirality is not progress; the regressed axis reverts to ◐). Phase 2
-completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `current_phase.txt` → `PHASE3`.
+**PHASE 2 COMPLETE (closed B38, reads b37).** All six morphology axes ✓: magnitude ✓ (gain+stiffness) ·
+enclosure ✓ (rotation) · direction ✓ (rot chirality) · shape ✓ (minor-axis via rot/stiff) · uniformity ✓
+(fibre heterogeneity / gain_hi) · **SIZE ✓-capped** — dose-confirmed CAPPED at peak_ratio ~0.52 within the
+current operator language (fibre_dev saturates dev0.25–0.27; NO alternative lever exceeds it: B37 dev25
+replicate REGRESSED to peak 0.501 [10th single-draw law], durhi13 cap-test overshoots OPEN (peak 0.520 but
+area 0.342), bwnar boundary-release COLLAPSES enclosure (area 0.344, chir 0.838) — the Dirichlet anchor HELPS
+enclosure). A structural-limit-established-within-current-language counts as ✓. The causal decomposition of
+LoopScore is complete. `[mechanism@LoopScore,2400it,rot1.0]`.
+
+**PHASE 3 = residual-driven OPERATOR DISCOVERY.** Question: *is the ~0.52 size cap an active-stress amplitude
+limit, or a missing PRE-STRESS / residual-stress state?* The residual is one the current language can't break
+→ per the Plexus principle, EXTEND the language. Two engine-ready operators (both default-OFF = EXACT baseline,
+wired+unit-tested in `cardio_mpm_train.py`): **prestress** `--residual_stress 1 --residual_amp α [--residual_hidden
+128 --residual_omega 5]` + `residual` in `--learn` (learned SIREN rest tensor F_res=I+α·tanh(dF(x,y)); fixed-
+corotated stress taken RELATIVE to F_res via Fe=F@F_res⁻¹ → tissue enters each beat PRE-STRESSED → may enlarge
+the loop WITHOUT more active force; α=0 = exact today) · **viscoelasticity** `--tau τ` (Maxwell: F relaxes toward
+isotropic by exp(−dt/τ) each substep → rest state DRIFTS between beats → *emergent* residual stress; τ=0 = OFF/
+pure elastic, smaller τ = more fluid). HYPOTHESIS: prestress (imposed) and viscoelasticity (emergent) are the two
+faces of the missing state. **FREEZE rule holds:** a slot counts only if it raises peak_ratio WHILE holding
+enclosure/chir/shape/uniformity (read the enclosure_row, not LS alone). Verdict: any slot pushes peak_ratio past
+~0.53 with ✓ axes intact → operator is the missing mechanism, SIZE reopens as *solved*; a clean dose-confirmed
+null → the cap is deeper (constitutive nonlinearity) and both operators join the rejected record (still a ✓).
 
 ## Current best result
 
+- **⚙ B41 (2026-07-08): DATA-LOSS BLOCKER RESOLVED — Phase-3 batch re-issued for its FIRST real run.** B38→B39→B40
+  were consecutive EXECUTION LOSSES from ONE `../cardio` deletion: B38 = lost `cardio_unet` import (cosmetic,
+  git-restorable, fixed); B39/B40 = lost the gitignored REAL TARGET `cardio_real.npz` (hard, NOT git-restorable →
+  needed a human). **A human restored it 2026-07-08 03:52 at the resolver's preferred self-contained slot
+  `cardio_mpm/cardio_real.npz` (54 MB ≈ `pos[~360,137²,2]` float32).** B40 ran 2026-07-07 17:12 (before the restore)
+  so it still 0-archived; B41 is the first batch since B37 to produce LS/morphology data. Phase-3 operators verified
+  wired (`--residual_stress/_amp/_hidden/_omega` + `residual` in `--learn`; `--tau`→is_visco; both default-OFF = exact
+  baseline) — no code landmine. **The Phase-3 QUESTION is UNTOUCHED since B37** (is the ~0.52 SIZE cap an amplitude
+  limit or a missing pre-stress state?). `[engineering — data pipeline self-healing via candidate-list resolver;
+  a fresh 0-archive .err distinguishes data-miss (re-restore) from code-crash (grep train.py+data.py)].`
+- **✓ B37 RAN (real data) — SIZE CAP DOSE-CONFIRMED, PHASE 2 CLOSED; Phase-3 anchor = d25g15.** Best LS =
+  **d25g15 0.504** (gain_hi 2.0→1.5 @dev0.25, combining B36's two wins): peak_ratio **0.521**, area **0.437**
+  (both batch-best), chir 0.860, minor 0.716, loopi 1.222, LS_SD 0.305 — the reproducible SIZE op point.
+  gain_hi is NOT a size lever (dose-inert B34/B36) but LOWERING it trims overshoot → enclosure+peak firm up.
+  **The ~0.52 cap is now dose-confirmed by THREE independent tests:** (1) dev25 replicate regressed to peak
+  0.501 (B36's 0.534 was a lottery draw, 10th single-draw regression); (2) durhi13 raised peak (0.520) but
+  COLLAPSED area (0.342) — longer travel overshoots OPEN, doesn't enclose; (3) bwnar (Dirichlet band 0.06→0.03)
+  gave WORST area (0.344) + chir (0.838) — the boundary anchor HELPS enclosure, releasing hurts. Ratio ladder
+  dev20→25→27 = peak 0.496→0.501→0.514 (all ≤0.52). → **SIZE ✓-capped, Phase-3 opens with prestress+viscoelastic
+  operators (see Current objective).** Phase-3 anchor config = **d25g15**: fibre_dev 0.25, gain_hi 1.5, gain[0.2,1.5]
+  g0=0.5, SIREN fibre-ON, rot1.0, soft-floor stiff[30,300] ω5, drag40, amp10, dur_hi11, substeps10, 2400it.
 - **✓ B36 RAN (real data) — FIBRE_DEV IS A DOSE-CONFIRMED SIZE LEVER; new op point dev0.25.** Best LS = **ghi15
   0.516** (LS_SD 0.281 best-uniformity, chir 0.861 best; gain_hi 2.0→1.5 at dev0.20 — SIZE FLAT peak 0.493, so
   gain_hi is a UNIFORMITY lever) ≈ **dev25 0.512** (peak_ratio **0.534**, area 0.418, minor 0.819 — the SIZE
@@ -592,6 +623,42 @@ completes only when SIZE is ✓ AND no ✓ axis has regressed; then advance `cur
   in the Plexus src, grep cardio's OWN `cardio_mpm_train.py` (not just specs/am2_ops) for every renamed op token —
   train.py has hardcoded `ops["…"]` and `p_op("…")` string lookups that a src rename silently breaks.** Was an
   EXECUTION LOSS, not science: last real data stays B28; the b29 rot_stress replication is re-issued as Batch 30.
+- **CODE-CRASH #2 = a MISSING cross-dir IMPORT after a sibling-dir cleanup (not an operator rename).**
+  `[engineering/ops, 2026-07-07, B39 (=b38 dep-crash)]` All 6 B38 slots produced ONLY `config.json`; every `.err`
+  (~12 s, identical) was `ModuleNotFoundError: No module named 'cardio_unet'` at `cardio_mpm_train.py:44`. Cause:
+  the sibling `prototype/cardio/` dir was DELETED wholesale (session `git status` = dozens of `D ../cardio/*`), and
+  `cardio_mpm_train.py:33` puts `../cardio` on `sys.path` to import `UNet, load_image` from `cardio_unet` (which
+  lived ONLY there). Scientifically inert: `UNet` is built only when `nuo>0` (legacy image fields, REJECTED
+  Falsified#8/#9) so it's never instantiated under `--stiff_src siren` (`nuo=0`); `load_image` feeds ONLY the
+  cosmetic dashboard `corr(microscope)` panel, never the loss/fields. (`cardio_harmonic`, line 45, has a LOCAL
+  copy in cardio_mpm/ — never the culprit.) FIXED durably: wrapped the import in `try/except ModuleNotFoundError`
+  with a self-contained fallback (importable `UNet` stub + neutral-radial-blob `load_image`) so cardio_mpm no
+  longer depends on `../cardio` (train.py:44–61). **DURABLE RULE (extends the refactor rule above): after ANY
+  sibling-dir cleanup, grep `cardio_mpm_train.py` imports for modules resolved via the fragile `../cardio`
+  sys.path insert (line 33) — a deleted dir silently breaks them. Signature = 0 archives + ~12 s + identical
+  `ModuleNotFoundError` in every `.err`.** EXECUTION LOSS, not science: last real data stays B37 (SIZE ✓-capped);
+  b38's 6-slot prestress/viscoelastic design is re-issued VERBATIM as Batch 39.
+- **CODE-CRASH #2b = the SAME `../cardio` deletion also took the REAL DATA `cardio_real.npz` — a HARD, NON-git
+  dependency; B38's fix was INCOMPLETE (cleared the import landmine, not the data one).**
+  `[engineering/ops, 2026-07-07, B40 (=b39 data-loss)]` All 6 B39 slots produced ONLY `config.json`; every `.err`
+  (~13 s, identical) MOVED past the fixed import to `FileNotFoundError: .../cardio/cardio_real.npz` at
+  `cardio_mpm_data.py:29` (called from `train.py:559 D.load_real`). `cardio_real.npz` (137²-node real
+  cardiomyocyte tracks) is the ENTIRE inverse-fit TARGET — no data ⇒ no loss ⇒ no run. **Worse than #2:
+  `git ls-files ../cardio/` = only code/specs/.md → the `.npz` was GITIGNORED, NOT restorable by `git checkout`;
+  no `.npz` survives in `archive/` (the only cardio `.npz` on-box are the SIM `material_*_cardio/trajectory.npz`,
+  a different array). The AGENT CANNOT restore/regenerate the fit target — needs a HUMAN on the cluster.** FIXES:
+  (1) `cardio_mpm_data.py` — `resolve_npz`/`_require_npz` candidate-list resolver (`$CARDIO_REAL_NPZ` →
+  `cardio_mpm/cardio_real.npz` → `cardio_mpm/data/` → legacy `../cardio/`) with an ACTIONABLE FileNotFoundError
+  (self-diagnosing loss); (2) guarded the 2nd latent `../cardio` landmine at `train.py:745` (`from
+  cardio_real_render import select_grid_nodes` + a 2nd npz read) with a self-contained `select_grid_nodes`
+  reconstruction. **DURABLE (extends #2): the 0-archive `.err` NAMES which `../cardio` dep broke —
+  `ModuleNotFoundError`@import = lost CODE (git-restorable, cosmetic); `FileNotFoundError`@`cardio_real.npz`
+  (line 559) = lost DATA (hard, NOT git-restorable). After ANY `../cardio` cleanup grep BOTH `train.py` AND
+  `data.py` for imports AND `../cardio` path literals — a fix clearing the first landmine can die on the next.**
+  ⚠ ACTION REQUIRED (human, cluster): restore `cardio_real.npz` → `cardio_mpm/cardio_real.npz` (or set
+  `$CARDIO_REAL_NPZ`, or `git checkout -- prototype/cardio` for CODE + restore the `.npz` from backup). Until
+  then every batch 0-archives. EXECUTION LOSS, not science: last real data stays B37; b39's design re-issued
+  VERBATIM as Batch 40.
 
 ## Rejected hypotheses (distilled — regime-tagged; re-openable)
 
@@ -990,6 +1057,20 @@ Parent = dev18 (fibre_dev0.18)."
 - **FIBRE-DOSE lesson: a regressed single-draw can still be a REAL lever — validate with an independent DOSE LADDER, not
   a replicate alone.** "fdev12=0.493" regressed to 0.473 (would have been called luck), but the monotone dev ladder
   proved fibre heterogeneity real. Report dose-response, not point estimates.
+- **Batch 37: SIZE ✓-CAPPED, PHASE 2 CLOSED.** dev25 replicate REGRESSED (0.534→0.501, single-draw law) and no
+  alternative lever exceeded fibre_dev's cap (durhi13 peak up but AREA COLLAPSES 0.342=overshoot-open; bwnar
+  boundary-release WORST area/chir). peak_ratio dose-confirmed capped ~0.52 within the current operator language →
+  ✓ structural-limit-established. All six morphology axes ✓ → `current_phase.txt`→PHASE3.
+- **Batch 38→39: EXECUTION LOSS then RE-ISSUE (dep-crash #2, deleted ../cardio ⇒ ModuleNotFoundError:'cardio_unet';
+  NOT science).** B38 0-archived (import crash ~12 s ×6, see Engineering CODE-CRASH #2); fixed via self-contained
+  try/except fallback (UNet stub + neutral load_image); B39 = exact re-issue of the prestress/viscoelastic design.
+  Last data B37 → B39.
+- **Batch 39→40: EXECUTION LOSS #3 (SAME ../cardio rm, but the DATA file — B38's fix was INCOMPLETE; NOT science).**
+  B39 0-archived AGAIN, ~13 s ×6, traceback MOVED past the fixed import to `FileNotFoundError: cardio_real.npz`
+  (the fit TARGET) at data.py:29 — a HARD, GITIGNORED (non-restorable) dependency the AGENT CANNOT regenerate
+  (see Engineering CODE-CRASH #2b). Fixed the CODE (candidate-list npz resolver + self-diagnosing error + guarded
+  the 2nd `../cardio` landmine at train.py:745) but the data itself needs a HUMAN restore on the cluster. B40 =
+  exact re-issue. Last data B37 → B40. ⚠ NO batch can run until `cardio_real.npz` is restored.
 - **RESIDUAL RE-ATTRIBUTED enclosure→SIZE (B32):** with rotation, loopiness_ratio is 1.06–1.18 (≥ real) everywhere —
   enclosure is SOLVED. The clean real-referenced residual is now peak_ratio ≈0.49 (sim peak = half real) + area ≈0.35.
   This REVIVES the size question (facts #24/#25 killed drive/gain/compliance as size levers ONLY at rot=0) → B33 tests
