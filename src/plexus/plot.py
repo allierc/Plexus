@@ -556,7 +556,7 @@ def gaussian_splat_2d(points, rgb, W: float, res: int = 520, sigma: float = 2.6,
 def gaussian_splat_3d(points, rgb, box, res: int = 520, sigma: float = 2.6,
                       azim: float = 0.7, elev: float = 0.5, bg="black",
                       gamma: float = 0.85, fog: float = 0.55, density: float = 0.16,
-                      intensity=None, zoom: float = 1.0):
+                      intensity=None, zoom: float = 1.0, pan=(0.0, 0.0)):
     """Render 3D points as a depth-shaded gaussian splat from an orbiting camera.
 
     points : [N,3] world coordinates inside `box` ([bx,by,bz])
@@ -577,8 +577,8 @@ def gaussian_splat_3d(points, rgb, box, res: int = 520, sigma: float = 2.6,
     screen, depth = _rot_camera(P, azim, elev)
     dn = (depth - depth.min()) / (np.ptp(depth) + 1e-9)   # 0 = farthest, 1 = nearest
     span = (float(np.linalg.norm(box)) * 0.5 + 1e-9) / max(zoom, 1e-6)   # half-diag / zoom (>1 = zoom in)
-    sx = (screen[:, 0] / (2 * span) + 0.5) * res
-    sy = (screen[:, 1] / (2 * span) + 0.5) * res
+    sx = (screen[:, 0] / (2 * span) + 0.5 + pan[0]) * res
+    sy = (screen[:, 1] / (2 * span) + 0.5 + pan[1]) * res
     w = (0.4 + 0.6 * dn).astype(np.float32)               # nearer -> heavier (brighter) splat
     if intensity is not None:
         w = w * np.asarray(intensity, np.float32)         # denser points splat brighter
@@ -590,7 +590,7 @@ def gaussian_splat_3d(points, rgb, box, res: int = 520, sigma: float = 2.6,
 def gaussian_splat_3d_tight(points, rgb, box, res: int = 600, azim: float = 0.7,
                             elev: float = 0.5, bg="black", sprite_sigma: float = 2.0,
                             fog: float = 0.55, peak: float = 0.92, intensity=None,
-                            zoom: float = 1.0, size_scale=None):
+                            zoom: float = 1.0, size_scale=None, pan=(0.0, 0.0)):
     """Sharp 3D gaussian splat: stamp a TIGHT per-point gaussian sprite, depth-sorted
     and alpha-over-composited (far drawn first, so near points occlude far) -- unlike
     `gaussian_splat_3d`, which blurs the whole density grid and reads soft/mushy. Each
@@ -609,8 +609,8 @@ def gaussian_splat_3d_tight(points, rgb, box, res: int = 600, azim: float = 0.7,
     screen, depth = _rot_camera(P, azim, elev)
     dn = (depth - depth.min()) / (np.ptp(depth) + 1e-9)   # 0 = far, 1 = near
     span = (float(np.linalg.norm(box)) * 0.5 + 1e-9) / max(zoom, 1e-6)   # half-diag / zoom (>1 = zoom in)
-    sx = (screen[:, 0] / (2 * span) + 0.5) * res
-    sy = (screen[:, 1] / (2 * span) + 0.5) * res
+    sx = (screen[:, 0] / (2 * span) + 0.5 + pan[0]) * res
+    sy = (screen[:, 1] / (2 * span) + 0.5 + pan[1]) * res
     shade = (1.0 - fog) + fog * dn                        # near -> full colour, far -> fades to bg
     if intensity is not None:
         shade = shade * np.clip(np.asarray(intensity, np.float32), 0, None)
@@ -688,14 +688,15 @@ def _splat_style(style: dict) -> dict:
     )
 
 
-def _project_points(points, box, azim, elev, res, zoom):
+def _project_points(points, box, azim, elev, res, zoom, pan=(0.0, 0.0)):
     """Project centred world points to screen pixels (sx, sy) + camera depth, the same
-    camera the splat uses (box-centred, half-diagonal span / zoom)."""
+    camera the splat uses (box-centred, half-diagonal span / zoom). `pan` is a Ken-Burns
+    screen-fraction offset (dx, dy) that slides the whole frame (used for a slow drift)."""
     P = np.asarray(points, np.float32) - 0.5 * np.asarray(box, np.float32)[None, :]
     screen, depth = _rot_camera(P, azim, elev)
     span = (float(np.linalg.norm(box)) * 0.5 + 1e-9) / max(zoom, 1e-6)
-    sx = (screen[:, 0] / (2 * span) + 0.5) * res
-    sy = (screen[:, 1] / (2 * span) + 0.5) * res
+    sx = (screen[:, 0] / (2 * span) + 0.5 + pan[0]) * res
+    sy = (screen[:, 1] / (2 * span) + 0.5 + pan[1]) * res
     return sx, sy, depth
 
 
@@ -706,11 +707,11 @@ def _box_corners_edges(box):
     return corners, edges
 
 
-def _draw_edges(img, corners, box, azim, elev, res, zoom, color, mix, which="all"):
+def _draw_edges(img, corners, box, azim, elev, res, zoom, color, mix, which="all", pan=(0.0, 0.0)):
     """Draw the wireframe edges of an 8-corner box into `img` (faint blended line).
     `which`: 'all', or 'far'/'near' to draw only edges on the far/near side of the box
     centre (so the near edges can be drawn AFTER the points -> proper occlusion)."""
-    cx, cy, cd = _project_points(corners, box, azim, elev, res, zoom)   # cd = camera depth
+    cx, cy, cd = _project_points(corners, box, azim, elev, res, zoom, pan)   # cd = camera depth
     _, edges = _box_corners_edges(np.ones(3))            # the 12 edge index pairs (adjacency only)
     med = float(np.median(cd)); color = np.asarray(color, np.float32)
     for a, b in edges:
@@ -732,32 +733,32 @@ def _aabb_corners(lo, hi):
 
 
 def render_points_3d(points, rgb, box, res=600, azim=0.7, elev=1.18, bg="black",
-                     size=2.0, fog=0.5, zoom=1.0, frame=False, obstacles=None):
+                     size=2.0, fog=0.5, zoom=1.0, frame=False, obstacles=None, pan=(0.0, 0.0)):
     """Render 3D points as SIMPLE flat dots (depth-ordered, painter's algorithm; near
     overwrites far) -- the 3D analogue of the 2D MPM scatter, no soft gaussian blur.
     `frame=True` draws the box as thin white wireframe edges; `obstacles` (already in the
     render frame: box [x0,y0,z0,x1,y1,z1] / sphere [cx,cy,cz,r]) are drawn as grey solids.
-    Returns an [res,res,3] image."""
+    `pan` is a Ken-Burns screen-fraction drift. Returns an [res,res,3] image."""
     from matplotlib.colors import to_rgb
     box = np.asarray(box, np.float32)
     img = np.tile(np.asarray(to_rgb(bg), np.float32), (res, res, 1))
     fcorners = _box_corners_edges(box)[0] if frame else None
     if frame:                                            # FAR box edges go behind the points
-        _draw_edges(img, fcorners, box, azim, elev, res, zoom, (1, 1, 1), 0.55, which="far")
+        _draw_edges(img, fcorners, box, azim, elev, res, zoom, (1, 1, 1), 0.55, which="far", pan=pan)
     for o in (obstacles or []):                          # grey obstacle solids (drawn under the particles)
         v = [float(x) for x in o]
         if len(v) == 6:                                  # box: wireframe + faint fill of surface dots
-            _draw_edges(img, _aabb_corners(v[:3], v[3:6]), box, azim, elev, res, zoom, (0.55, 0.55, 0.6), 0.8)
+            _draw_edges(img, _aabb_corners(v[:3], v[3:6]), box, azim, elev, res, zoom, (0.55, 0.55, 0.6), 0.8, pan=pan)
         elif len(v) == 4:                                # sphere: a shell of grey dots (Fibonacci sphere)
             m = 700; k = np.arange(m); ph = np.arccos(1 - 2 * (k + 0.5) / m); th = np.pi * (1 + 5 ** 0.5) * k
             shell = v[3] * np.stack([np.cos(th) * np.sin(ph), np.sin(th) * np.sin(ph), np.cos(ph)], 1) + np.array(v[:3])
-            sxo, syo, dep = _project_points(shell.astype(np.float32), box, azim, elev, res, zoom)
+            sxo, syo, dep = _project_points(shell.astype(np.float32), box, azim, elev, res, zoom, pan)
             for sxx, syy in zip(sxo.astype(int), syo.astype(int)):
                 if 0 <= sxx < res and 0 <= syy < res:
                     img[syy, sxx] = (0.5, 0.5, 0.55)
     if len(points):
         rgb = np.broadcast_to(np.asarray(rgb, np.float32), (len(points), 3))
-        sx, sy, depth = _project_points(points, box, azim, elev, res, zoom)
+        sx, sy, depth = _project_points(points, box, azim, elev, res, zoom, pan)
         dn = (depth - depth.min()) / (np.ptp(depth) + 1e-9)        # 1 = nearest
         cols = np.clip(rgb * ((1 - fog) + fog * dn)[:, None], 0, 1)
         order = np.argsort(depth)[::-1]                  # far first; near painted last -> on top
@@ -770,7 +771,7 @@ def render_points_3d(points, rgb, box, res=600, azim=0.7, elev=1.18, bg="black",
                 gx = np.clip(sxo + ox, 0, res - 1); gy = np.clip(syo + oy, 0, res - 1)
                 img[gy, gx] = colo
     if frame:                                            # NEAR box edges go IN FRONT of the points
-        _draw_edges(img, fcorners, box, azim, elev, res, zoom, (1, 1, 1), 0.55, which="near")
+        _draw_edges(img, fcorners, box, azim, elev, res, zoom, (1, 1, 1), 0.55, which="near", pan=pan)
     return np.clip(img, 0, 1)[::-1]
 
 
@@ -785,29 +786,41 @@ def _splat3d_renderer(style, box, obstacles=None):
     turns = float(style.get("camera_turns", 0.1))         # revolutions over the movie (slow constant drift)
     rock = float(style.get("camera_rock", 0.0))           # gentle back-and-forth wobble (rad); off by default
     zoom_amp = float(style.get("camera_zoom", 0.12))      # slow zoom-in over the clip (fractional, e.g. 0.12 = +12%)
-    elev = float(style.get("camera_elev", 0.5))
+    elev = float(style.get("camera_elev", 0.5))           # camera pitch: 0 = top/face-on, ~pi/2 = side/edge-on
+    # optional pitch SWEEP: elev ramps camera_elev -> camera_elev_end over the movie
+    # (e.g. top-down 0.0 -> almost side-on 1.35). None = fixed pitch (default).
+    _ee = style.get("camera_elev_end", None)
+    elev_end = None if _ee is None else float(_ee)
+    # Ken-Burns pan: total screen-fraction drift (dx, dy) applied linearly over the movie,
+    # on top of the `camera_zoom` slow push-in. `[0, 0]` (default) = no drift.
+    _pan = style.get("camera_pan", [0.0, 0.0]) or [0.0, 0.0]
+    pan_end = (float(_pan[0]), float(_pan[1]))
     mode = style.get("render_3d", "tight")
+    # each render closure takes an optional per-frame `el` pitch override + `pan` screen
+    # drift (used by the movie to sweep/pan the camera); stills/montages use the fixed
+    # `elev` and no pan.
     if mode == "dots":                                    # simple flat dots (2D-MPM look) + frame/obstacles
         res = int(style.get("splat_res", 600))
         dot = float(style.get("dot_size", style.get("splat_size", 2.0)))
         fog = float(style.get("splat_fog", 0.4))
         frame = bool(style.get("box_frame", False))
-        def render(pts, c, az, zoom=1.0, size=None):
-            return render_points_3d(pts, c, box, res=res, azim=az, elev=elev, bg=bg,
-                                     size=dot, fog=fog, zoom=zoom, frame=frame, obstacles=obstacles)
+        def render(pts, c, az, zoom=1.0, size=None, el=None, pan=(0.0, 0.0)):
+            return render_points_3d(pts, c, box, res=res, azim=az, elev=elev if el is None else el,
+                                     bg=bg, size=dot, fog=fog, zoom=zoom, frame=frame, obstacles=obstacles, pan=pan)
     elif mode == "splat":                                 # soft grid-blur splat (the original)
         kw = _splat_style(style)
-        def render(pts, c, az, zoom=1.0, size=None):
-            return gaussian_splat_3d(pts, c, box, azim=az, zoom=zoom, **kw)
+        def render(pts, c, az, zoom=1.0, size=None, el=None, pan=(0.0, 0.0)):
+            k = kw if el is None else {**kw, "elev": el}
+            return gaussian_splat_3d(pts, c, box, azim=az, zoom=zoom, pan=pan, **k)
     else:                                                 # `tight` (default): sharp per-point sprites
         res = int(style.get("splat_res", 600))
         size = float(style.get("splat_size", style.get("splat_sigma", 2.6)))
         sprite_sigma = max(1.4, 0.62 * size)              # blob radius ~ splat_size
         fog = float(style.get("splat_fog", 0.55))
-        def render(pts, c, az, zoom=1.0, size=None):
-            return gaussian_splat_3d_tight(pts, c, box, res=res, azim=az, elev=elev, bg=bg,
-                                           sprite_sigma=sprite_sigma, fog=fog, zoom=zoom, size_scale=size)
-    return render, bg, azim0, turns, rock, zoom_amp, elev
+        def render(pts, c, az, zoom=1.0, size=None, el=None, pan=(0.0, 0.0)):
+            return gaussian_splat_3d_tight(pts, c, box, res=res, azim=az, elev=elev if el is None else el,
+                                           bg=bg, sprite_sigma=sprite_sigma, fog=fog, zoom=zoom, size_scale=size, pan=pan)
+    return render, bg, azim0, turns, rock, zoom_amp, elev, elev_end, pan_end
 
 
 def _cam_zoom(zoom_amp, i, n):
@@ -827,17 +840,33 @@ def _cam_azim(azim0, turns, rock, i, n):
     return azim0 + rock * np.sin(2 * np.pi * t)
 
 
+def _cam_elev(elev0, elev_end, i, n):
+    """Camera pitch at movie frame i of n: a linear ramp elev0 -> elev_end over the clip
+    (e.g. top-down 0.0 -> almost side-on 1.35), or the fixed `elev0` when elev_end is None."""
+    if elev_end is None:
+        return elev0
+    t = i / max(n - 1, 1)
+    return elev0 + (elev_end - elev0) * t
+
+
+def _cam_pan(pan_end, i, n):
+    """Ken-Burns screen-fraction pan at movie frame i of n: a linear ramp (0,0) -> pan_end
+    over the clip (a slow drift). (0,0) for the still frames / when no pan is configured."""
+    t = i / max(n - 1, 1)
+    return (pan_end[0] * t, pan_end[1] * t)
+
+
 def _splat3d_outputs(pos, occ, rgb, box, data_dir, sname, style, movie, T, size_scale=None, obstacles=None):
     """Evolution montage + final frame + (optional) movie for a 3D set. The renderer
     (`plotting.render_3d`: `tight` sharp sprites [default] or `splat` soft grid-blur)
     and its appearance come from the `plotting:` block. `size_scale` ([N], optional)
     scales each point's sprite (e.g. ~|charge|). Mirrors the 2D set outputs."""
-    render, bg, azim0, turns, rock, zoom_amp, _elev = _splat3d_renderer(style, box, obstacles=obstacles)
+    render, bg, azim0, turns, rock, zoom_amp, elev0, elev_end, pan_end = _splat3d_renderer(style, box, obstacles=obstacles)
 
-    def img(i, az, zoom=1.0):
+    def img(i, az, zoom=1.0, el=None, pan=(0.0, 0.0)):
         live = occ[i]
         ss = size_scale[live] if size_scale is not None else None
-        return render(pos[i, live], rgb[live], az, zoom, ss)
+        return render(pos[i, live], rgb[live], az, zoom, ss, el, pan)
 
     idx = [0, T // 5, 2 * T // 5, 3 * T // 5, T - 1]
     fig, axes = plt.subplots(1, len(idx), figsize=(len(idx) * 3.2, 3.4))
@@ -856,14 +885,17 @@ def _splat3d_outputs(pos, occ, rgb, box, data_dir, sname, style, movie, T, size_
 
     if movie:
         _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T,
-                       os.path.join(data_dir, f"movie_{sname}"), fps=int(style.get("fps", 15)))
+                       os.path.join(data_dir, f"movie_{sname}"), fps=int(style.get("fps", 15)),
+                       elev0=elev0, elev_end=elev_end, pan_end=pan_end)
 
 
 def _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T, out_base,
-                   max_frames: int = 180, fps: int = 15) -> None:
-    """3D-splat movie from a frame renderer `img(i, azim, zoom)`. The camera does a slow
-    constant-speed turntable (`turns` revolutions over the clip) or a `rock` wobble, plus
-    a slow `zoom_amp` zoom-in. ~`max_frames`/`fps` seconds per clip (a slow rotation)."""
+                   max_frames: int = 180, fps: int = 15, elev0: float = 0.5,
+                   elev_end=None, pan_end=(0.0, 0.0)) -> None:
+    """3D-splat movie from a frame renderer `img(i, azim, zoom, elev, pan)`. The camera does a
+    slow constant-speed turntable (`turns` revolutions over the clip) or a `rock` wobble, plus
+    a Ken-Burns move: a slow `zoom_amp` push-in + `pan_end` screen drift, and an optional
+    `elev0 -> elev_end` pitch sweep (e.g. top-down -> side-on). ~`max_frames`/`fps` s per clip."""
     from matplotlib.animation import FuncAnimation
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
@@ -871,7 +903,8 @@ def _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T, out_base,
     fig.tight_layout(pad=0)
 
     def render(i):
-        return img(i, _cam_azim(azim0, turns, rock, i, T), _cam_zoom(zoom_amp, i, T))
+        return img(i, _cam_azim(azim0, turns, rock, i, T), _cam_zoom(zoom_amp, i, T),
+                   _cam_elev(elev0, elev_end, i, T), _cam_pan(pan_end, i, T))
 
     im = ax.imshow(render(0))
 
