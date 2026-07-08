@@ -45,3 +45,8 @@ config/material/gainsweep_*.yaml
 config/material/material_gainsweep_*.yaml
 config/material/material_stiffsweep_*.yaml
 config/material/material_stiffcoarse_*.yaml
+
+# machine-specific data + local artifacts (never push data)
+graphs_data
+*.npz
+*.bak_*
