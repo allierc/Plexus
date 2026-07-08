@@ -29,10 +29,10 @@ def data_generate(
     erase: bool = False,
     save: bool = True,
 ) -> tuple[str, dict]:
-    """Forward-simulate `sim` and write its trajectory under
+    """forward-simulate `sim` and write its trajectory under
     graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out).
 
-    Generation writes DATA ONLY -- the trajectory + metadata. Visualization is a
+    generation writes DATA ONLY -- the trajectory + metadata. Visualization is a
     separate, external concern (plexus.plot, run as `Plexus_Main -o plot`); the
     generator never imports matplotlib, so adding simulations never grows a plot
     switch in here (the ParticleGraph anti-pattern)."""

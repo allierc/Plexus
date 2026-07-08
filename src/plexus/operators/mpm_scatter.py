@@ -63,6 +63,16 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         V = V + dt * (a_ext - self.drag * V)                       # body force + Stokes drag (local; G2P resets V)
 
         F, C, mass = p.F, p.C, p.mass
+        # RESIDUAL STRESS / PRESTRESS (optional, default OFF): compute the fixed-corotated stress
+        # relative to a non-identity per-particle REST tensor F_res (multiplicative morphoelastic split
+        # F = Fe . F_res, so Fe = F @ F_res_inv is the elastic part). At the mesh rest state F=I this
+        # leaves Fe = F_res_inv != I -> a STANDING PRELOAD; an incompatible F_res(x,y) holds a
+        # self-equilibrated residual-stress field. Absent buffer -> byte-identical; F_res=I (alpha=0) ->
+        # F @ I = F exactly, so the operator truly ablates. Only the STRESS reference shifts; the
+        # kinematic F (updated in mpm_strain) is untouched.
+        Fres_inv = getattr(p, "F_res_inv", None)
+        if Fres_inv is not None:
+            F = F @ Fres_inv
         eye = torch.eye(D, device=dev).expand(p.n, D, D)
         if D == 2:
             a, b, c, d = F[:, 0, 0], F[:, 0, 1], F[:, 1, 0], F[:, 1, 1]
