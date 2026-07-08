@@ -27,6 +27,7 @@ import yaml
 # importing plexus populates base + registry; operator modules register themselves
 from plexus.models import registry
 from plexus.models.base import KINDS, EMITS
+from plexus.models.state import INTEGRATIONS
 
 _SELECTOR_RE = re.compile(r"^(?P<set>\w+)(?:\[(?P<attr>\w+)=(?P<val>\w+)\])?$")
 
@@ -125,6 +126,44 @@ def load(path: str) -> Spec:
                 raise ValueError(
                     f"set {sname!r} buffer={buf} is smaller than its initial size {live0}; "
                     f"a structural (divide/duplicate) run needs buffer >= initial.")
+        # optional `state:` block -- the set's StateSchema (the fifth primitive). Absent =>
+        # the spatial pos/vel default. Each entry is a width (int) or {width, integration,
+        # boundary, role, record}. Validate here so a malformed schema fails at load.
+        st = s.get("state")
+        if st is not None:
+            if not isinstance(st, dict) or not st:
+                raise ValueError(f"set {sname!r} `state:` must be a non-empty mapping of block -> width|dict")
+            for bname, decl in st.items():
+                if isinstance(decl, dict):
+                    if int(decl.get("width", 1)) < 1:
+                        raise ValueError(f"set {sname!r} state block {bname!r}: width must be >= 1")
+                    integ = decl.get("integration", "first_order")
+                    if integ not in INTEGRATIONS:
+                        raise ValueError(f"set {sname!r} state block {bname!r}: integration {integ!r} "
+                                         f"not one of {INTEGRATIONS}")
+                    bnd = decl.get("boundary", "free")
+                    if bnd not in ("free", "world"):
+                        raise ValueError(f"set {sname!r} state block {bname!r}: boundary {bnd!r} "
+                                         f"must be 'free' or 'world'")
+                elif int(decl) < 1:
+                    raise ValueError(f"set {sname!r} state block {bname!r}: width must be >= 1")
+        # optional `edge_set` -- a set whose elements are connections, joined to endpoint
+        # sets by `pre`/`post` incidence maps. Requires a containing `parent`, both endpoint
+        # sets, and an inline `edges: [[pre, post], ...]` list (PR2: inline for determinism).
+        if s.get("edge_set"):
+            if "parent" not in s:
+                raise ValueError(f"edge-set {sname!r} needs a `parent:` (its containing set, e.g. network)")
+            for role in ("pre", "post"):
+                if role not in s:
+                    raise ValueError(f"edge-set {sname!r} needs a `{role}:` endpoint set")
+                if s[role] not in raw["sets"]:
+                    raise ValueError(f"edge-set {sname!r} `{role}: {s[role]}` is not a declared set")
+            if "edges" not in s or not isinstance(s["edges"], list) or not s["edges"]:
+                raise ValueError(f"edge-set {sname!r} needs a non-empty inline `edges: [[pre, post], ...]` list")
+            for e in s["edges"]:
+                if not (isinstance(e, (list, tuple)) and len(e) in (2, 3)):
+                    raise ValueError(f"edge-set {sname!r}: each edge must be [pre, post] or "
+                                     f"[pre, post, weight], got {e!r}")
 
     # --- operators: names registered, valid KIND, selectors + fields exist -- #
     ops = []
