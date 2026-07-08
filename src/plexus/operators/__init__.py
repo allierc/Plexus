@@ -38,6 +38,7 @@ from . import active_stress         # noqa: F401  activation -> per-particle act
 from . import mpm_spin              # noqa: F401  drive MPM body toward slow solid-body rotation (lateral)
 from . import mpm_anchor            # noqa: F401  substrate/boundary rest-anchor k*(rest-pos) (lateral)
 from . import material_map          # noqa: F401  image field + apply_material_map (per-particle stiffness)
+from . import signal               # noqa: F401  passive connectome signalling (lateral, 1st-order voltage ODE)
 from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: MLS-MPM mechanics (mls_mpm_mechanics)
 # Phase-3 decomposition of the oracle -- one file per operator + the shared grid field:
 from . import mpm_grid              # noqa: F401  the mpm_grid background FIELD + B-spline kernel

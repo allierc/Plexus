@@ -30,8 +30,7 @@
 \newcommand{\code}[1]{\texttt{#1}}
 
 \title{\textbf{Plexus}\\[3pt]
-\large A blueprint for differentiable tissue: hierarchical sets, operators,\\
-and a formal simulation language}
+\large A blueprint for differentiable tissue}
 \author{Janelia Research Campus}
 \date{\today}
 
@@ -39,20 +38,37 @@ and a formal simulation language}
 \maketitle
 
 \begin{abstract}
-Living tissues couple biochemical signalling, cellular interaction, mechanical
-force, and collective dynamics across scales. The frameworks built so far
-(\textsc{CellGraph}, \textsc{NeuralGraph}, \textsc{MPMGraph},
-\textsc{MetabolismGraph}) each implement \emph{one} graph type; a tissue needs
-them coexisting. This document is a single blueprint, distilled from a working
-prototype, for building one repository that unifies them. It has three parts:
-(i) the missing primitive --- a \textbf{hierarchical graph container} stated in
-the language of \textbf{sets} and \textbf{operators}; (ii) a \textbf{formal
-intermediate representation} --- a typed, declarative spec language compiled to a
-calculus of registered operators --- that turns intent into a runnable simulation
-and that a person or a language model can drive; and (iii) the
-\textbf{experiment} --- ten distinct simulations and an emergent ant-trail model,
-all produced from the same code by changing only the simulation file --- with the
-lessons that follow for how to construct the repository.
+Living systems are simultaneously mechanical, chemical, electrical, and
+developmental, yet existing computational frameworks each specialize in one aspect
+--- particle mechanics, reaction--diffusion, graph neural networks, or multicellular
+dynamics. Plexus starts from the observation that these are not different simulators
+but different \emph{operators} acting on the same biological objects.
+
+We introduce Plexus, a formal language whose objects are five primitives:
+\emph{sets} of discrete entities across scales; the \emph{state} each element
+carries; \emph{fields} of continuous quantities over space; \emph{maps}, index
+relations between sets (containment and incidence alike); and \emph{operators} that
+transform state along maps. State is what makes the sets interchangeable: a particle
+carrying $\{\code{pos},\code{vel}\}$ and a neuron carrying
+$\{\code{voltage},\code{calcium}\}$ are the \emph{same} object under different
+schemas. An operator is a \emph{contract} --- \code{neuron\_voltage} names ``membrane
+state $\to$ its derivative,'' which Hodgkin--Huxley, Izhikevich, a Neural ODE, or an
+MLP all satisfy interchangeably --- so choosing biophysical or learned dynamics is
+choosing an implementation, never editing the engine.
+
+Plexus is therefore not another simulator but a typed \emph{intermediate
+representation} for biological computation: models written for \textsc{Neuron},
+Jaxley, or a connectome GNN compile to the same sets, states, maps, fields, and
+operators, and existing simulators become \emph{backends} that implement one family
+of operator contracts --- Plexus is to a biophysics simulator what \textsc{LLVM} is
+to a C compiler. This single representation unifies mechanics, signalling, transport,
+growth, and neural computation, and is also a foundation for automated discovery.
+Because mechanisms
+are explicit, composable operators, inverse modelling can search not only parameter
+values but competing mechanistic explanations, and a persistent residual is read as
+evidence for a \emph{missing} operator --- so the language itself expands as new
+mechanisms are found. Simulation, inference, and hypothesis generation become stages
+of constructing an increasingly expressive language for living systems.
 \end{abstract}
 
 \part*{Part I --- The abstraction}
@@ -111,11 +127,134 @@ other child sets (Section~\ref{sec:graph}).}
 \label{fig:hier}
 \end{figure}
 
-\section{Containment: a graph of sets}
+\section{State: what each element carries}
+\label{sec:state}
+
+A set says \emph{what exists}; its \textbf{state} says \emph{what each element
+carries}. State is a first-class concept, not an implementation detail: every set
+declares a typed record of named quantities --- its \emph{state schema} --- and that
+record is the sole interface between the set and every operator, plotter, and
+integrator that touches it. A particle carries \code{pos}, \code{vel}, and the MPM
+continuum blocks \code{F}, \code{C}; a neuron carries \code{voltage}, \code{calcium},
+\code{adaptation}; a cell carries \code{polarity}, \code{stiffness}, \code{growth}; a
+synapse carries its gating and plastic weight. A field carries state too --- its grid
+values --- but the per-element record is what makes the sets interchangeable.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{set} & \textbf{state (named blocks)} & \textbf{operators that transform it} \\
+\midrule
+\code{particle} & \code{pos}, \code{vel}, \code{F}, \code{C}          & MPM strain/scatter/gather, boids \\
+\code{neuron}   & \code{voltage}, \code{calcium}, \code{adaptation}   & \code{neuron\_voltage}, \code{signal} \\
+\code{cell}     & \code{polarity}, \code{stiffness}, \code{growth}    & division, adhesion, polarity align \\
+\code{synapse}  & \code{g} (gating), \code{plastic\_w}                & \code{synapse\_ode} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two consequences make state the pivot of the whole language.
+
+\paragraph{Operators are state $\to$ state.} An operator reads some named blocks of a
+set's state and returns a derivative on others --- nothing else.
+\code{neuron\_voltage} reads \code{voltage} and the aggregated synaptic current and
+returns $d\,\code{voltage}$; \code{mpm\_strain} reads \code{F} and returns its update;
+a boid rule reads \code{pos}/\code{vel} and returns an acceleration. Because the
+engine integrates whatever block the schema declares dynamical
+(Section~\ref{sec:schedule}), a new kind of dynamics is a new state block plus an
+operator that returns its derivative --- never an engine change. This is why
+\code{pos}/\code{vel} is not privileged: it is simply the state a moving particle
+happens to carry.
+
+\paragraph{The frameworks become specifications.} Once state is first-class, the
+sibling frameworks stop being separate code and become different \emph{states} over
+the same five concepts. connectome-cx is the specification with sets
+\code{network}, \code{neuron}, \code{synapse} and operators \code{neuron\_voltage},
+\code{synapse\_ode}; an embryogenesis model reuses the identical set machinery with
+operators \code{cell\_grow}, \code{active\_stress}, and a cardiac model swaps in
+\code{active\_force} --- same language, different vocabulary.
+The engine, the maps, and the schedule are identical; only the state schemas and the
+operator list change. The whole framework is then five concepts --- \textbf{sets},
+\textbf{state}, \textbf{fields}, \textbf{maps}, \textbf{operators} --- and everything
+else is a specification written in them.
+
+\paragraph{Anatomy is structure; assemblies are emergent.} Structure stays
+anatomical: the neural hierarchy is
+\code{network}$\to$\code{region}$\to$\code{column}$\to$\code{neuron}$\to$\code{compartment},
+each a set contained in the next. A functional \emph{assembly} is deliberately
+\emph{not} a level in this tree --- it is an emergent subset selected by a map or a
+state (\code{neuron[active=1]}), computed on demand --- so anatomy and computation
+are never conflated inside the containment graph.
+
+\paragraph{Operators are contracts; implementations are backends.} A
+state\,$\to$\,state operator is a \emph{contract}, not a piece of biophysics.
+\code{neuron\_voltage} is the contract ``membrane state $\to$ its derivative''; its
+implementations --- Hodgkin--Huxley, Izhikevich, Morris--Lecar, FitzHugh--Nagumo, a
+Neural ODE, an MLP, a Transformer --- are interchangeable, and the spec selects one
+without touching the maps, the schedule, or the rest of the model
+(\code{\{op: neuron\_voltage, implementation: hodgkin\_huxley\}}). Likewise
+\code{synapse\_ode} is a contract with conductance, alpha, plastic, and complex-phase
+implementations. The two most developed neural frameworks are then two
+\emph{backends} of the \emph{same} contracts, not two engines: \textbf{Jaxley}
+implements \code{neuron\_voltage} as multicompartment Hodgkin--Huxley and
+\code{synapse\_ode} as a conductance synapse, differentiating through an implicit
+solver; a connectome \textbf{GNN} implements the same contracts as learned message
+functions, promoting the scalar voltage to a coupled $(v,c)$ state and rotating the
+postsynaptic response by a broadcast neuromodulator $\alpha$.
+
+\paragraph{Morphology is Sets, not an embedding.} The two differ only in
+\emph{resolution}, and even that is structural. Plexus keeps morphology as multiscale
+sets --- \code{neuron}$\to$\code{compartment}$\to$\code{ion\_channel} --- so Jaxley's
+explicit compartments are the fine-grained end of the same containment hierarchy and
+its channels are operators on the \code{compartment} set. The GNN's geometry
+embedding $s_i$ is a \emph{model reduction} of that hierarchy: one implementation that
+summarises the compartment tree in a frozen per-neuron feature. Explicit compartments
+and a geometry embedding are thus two \emph{resolutions} of one hierarchy, not two
+data models --- which is what makes mechanism search well posed: holding the sets,
+states, and maps fixed, the search ranges over the implementation of each contract
+and the resolution of each hierarchy.
+
+\paragraph{An intermediate representation, not a simulator.} Taken together this is
+the thesis of Plexus. It is not another simulator but a typed \emph{intermediate
+representation} for biological computation: a model expressed in \textsc{Neuron},
+Jaxley, Flyvis, connectome-cx, an embryogenesis solver, or a cardiac model compiles
+to the same sets, states, maps, fields, operators, and schedule, and each existing
+simulator becomes a \emph{backend} implementing one family of operator contracts.
+Plexus is to a biophysics simulator what \textsc{LLVM} is to a C compiler --- the
+payoff is portability (one model, many backends) and mechanism search, not a faster
+solver.
+
+\section{Maps between sets}
 \label{sec:graph}
 
-Section~\ref{sec:entities} named the sets and joined them with parent maps. Two
-points make the container precise, and they are what keep the engine free of
+Section~\ref{sec:entities} named the sets; this section connects them. Sets are
+connected by named \textbf{maps}, and there is only one primitive here: a map
+$m:S_a\to S_b$ is an index relation sending each element of one set to an element of
+another. Hierarchy, connectivity, signalling, transport, and compartmental
+organization are all expressed through collections of such maps; the engine
+manipulates maps uniformly, and only their biological interpretation differs. This is
+the third primitive, on the same footing as sets and fields, and it is what lets the
+framework grow without special cases: the container is not $(S,F,\pi)$ --- sets,
+fields, and a single hardcoded parent map --- but $(S,F,M)$, sets and fields over an
+\emph{open collection of named maps}. An operator names the map it traverses
+(\code{via: parent}, \code{via: post}) and never branches on which.
+
+We name a map by the role it plays --- a convention for the reader, not a distinction
+the engine makes. A \textbf{parent map} $\pi:S_k\to S_{k+1}$ sends a child to the one
+parent that owns it; stacked across scales the parent maps form the hierarchy (an
+acyclic tree), and biologists call this relation \emph{containment}. A \textbf{pre}
+or \textbf{post map} $\iota:S_e\to S_k$ sends an \emph{edge-entity} (a synapse, a
+junction, a vessel segment) to one of its endpoints, so a stateful connection carries
+several such maps at once; biologists call this \emph{incidence}. The parent map
+builds the tree; pre/post maps overlay a graph on it. We take the parent map first,
+since it defines the hierarchy, then pre/post maps, which let recurrent circuits and
+other stateful connections live inside that hierarchy without breaking the tree.
+
+\subsection*{The parent map: the hierarchy}
+
+Two points make the parent map precise, and they are what keep the engine free of
 branching.
 
 \paragraph{One set per kind of object.} Rather than a single set whose elements
@@ -126,13 +265,13 @@ state schema, operators, and fields. An operator then names the one set it acts 
 (\code{at: nucleus}) and never branches. This is the same discipline an
 entity--component system or a relational database already uses.
 
-\paragraph{Joined by containment maps.} The sets are joined by parent maps,
-declared simply by naming the parent,
+\paragraph{Joined by parent maps.} The sets are joined by parent maps, declared
+simply by naming the parent,
 \[
   \pi : S_k \longrightarrow S_{k+1},
 \]
 which send every element to the parent that contains it. A parent may have many
-children, so containment is a \textbf{graph}, not a chain: one cell gathers several
+children, so the parent map is a \textbf{graph}, not a chain: one cell gathers several
 child sets at once (Fig.~\ref{fig:graph}). The engine needs only two things ---
 \code{Level.parent} (which parent each element has) and \code{Level.parent\_name}
 (which set that parent belongs to) --- so new biological structure is just a new
@@ -203,11 +342,128 @@ sets:
   metabolite:         {parent: cell, per_parent: 50,  role: metabolite}
 \end{lstlisting}
 
+\subsection*{Pre and post maps: stateful connections as edge-sets}
+\label{sec:incidence}
+
+The parent map is a tree: every element has exactly one parent. But a
+\emph{connection} joins two elements and belongs to neither exclusively --- a
+chemical synapse has one presynaptic and one postsynaptic neuron, and is owned by
+both and by neither. A connection is therefore not a parent map; it is another map
+(indeed a pair) on the same sets.
+
+\paragraph{When a relation is enough, and when it is not.} A connection has two
+faithful representations, and which one is correct is set by whether the connection
+has \emph{state of its own}.
+\begin{itemize}\itemsep2pt
+\item \textbf{Passive.} If the edge is a fixed scalar --- a synaptic weight
+$W_{ij}$, a spring constant --- it is a \textbf{relation} $E\subseteq S_k\times S_k$
+with an edge attribute: exactly the \code{Level.edge\_index} of the previous
+section, read in place by a Lateral operator (Section~\ref{sec:operators}).
+\item \textbf{Dynamical.} If the edge carries its own evolving state --- synaptic
+gating and transmitter, short-term facilitation, a plastic weight, a remodelling
+adhesion --- then it is promoted to an \textbf{edge-set} $S_e$: a first-class set
+whose \emph{elements are the connections}, with their own state schema and their own
+operators, joined to the endpoint sets by \textbf{pre and post maps}.
+\end{itemize}
+This is the rule: \emph{a relation suffices while an edge is passive; when an edge
+carries dynamical state it becomes an edge-set with its own pre/post maps.} The
+edge-set is not a new layer or a new engine primitive --- it is an ordinary set that
+happens to sit on the connections, and it still has a parent (the \code{network}).
+
+\paragraph{Pre and post maps.} An edge-set element points at its endpoints through
+one map per endpoint role. For a directed synapse,
+\[
+  \iota_{\mathrm{pre}}:S_{\mathrm{synapse}}\to S_{\mathrm{neuron}},
+  \qquad
+  \iota_{\mathrm{post}}:S_{\mathrm{synapse}}\to S_{\mathrm{neuron}},
+\]
+send each synapse to its presynaptic and postsynaptic neuron. They do not answer
+``who owns me'' (the synapse's parent is the \code{network}), they answer ``whom do I
+connect.'' Structurally they are index buffers on the edge-set (\code{.pre},
+\code{.post}), the exact analogue of \code{.parent} --- so an operator gathers or
+scatters along a pre/post map with the same machinery it uses along the parent map,
+and the engine gains no special case. The same shape recurs wherever a stateful
+connection does: ligand--receptor contacts
+($\iota:S_{\mathrm{ligand}}\to S_{\mathrm{receptor}}$), cell--cell junctions
+($\iota_1,\iota_2:S_{\mathrm{junction}}\to S_{\mathrm{cell}}$), and vascular segments
+($\iota_{\mathrm{from}},\iota_{\mathrm{to}}:S_{\mathrm{seg}}\to S_{\mathrm{node}}$).
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[font=\footnotesize,
+  set/.style={draw=cset,thick,rounded corners,fill=cset!10,minimum width=20mm,minimum height=8mm},
+  edgeset/.style={draw=cop,thick,rounded corners,fill=cop!8,minimum width=30mm,minimum height=8mm},
+  cont/.style={-{Stealth[length=2.4mm]},cset,thick},
+  inc/.style={-{Stealth[length=2.4mm]},cop,thick,densely dashed},
+]
+\node[set] (net) at (0,2.1) {network};
+\node[set] (neu) at (-3.1,0) {neuron};
+\node[edgeset] (syn) at (2.6,0) {synapse (edge-set)};
+\draw[cont] (neu) -- node[left,font=\scriptsize,pos=0.55]{$\pi$} (net);
+\draw[cont] (syn) -- node[right,font=\scriptsize,pos=0.55]{$\pi$} (net);
+\draw[inc] (syn) to[bend left=18] node[above,font=\scriptsize]{$\iota_{\mathrm{pre}}$} (neu);
+\draw[inc] (syn) to[bend right=18] node[below,font=\scriptsize]{$\iota_{\mathrm{post}}$} (neu);
+\end{tikzpicture}
+\caption{The neural hierarchy. Solid \emph{parent} maps $\pi$ (blue) make both
+\code{neuron} and \code{synapse} children of the one \code{network} --- the tree.
+Dashed \emph{pre}/\emph{post} maps $\iota_{\mathrm{pre}},\iota_{\mathrm{post}}$ (red)
+send each synapse edge-entity to the two neurons it connects --- the graph. The
+synapse is a set like any other; it merely carries pre/post maps in addition to a
+parent.}
+\label{fig:neuro}
+\end{figure}
+
+\paragraph{Signalling reads off the maps.} Endpoint voltages are \emph{gathered}
+onto each synapse along its pre and post maps; the synapse integrates its own state;
+its output current, scaled by the synaptic weight $W_e$, is \emph{aggregated} back
+onto the postsynaptic neuron; and the neuron integrates its voltage. For synapse $e$
+and neuron $i$, writing $\mathrm{pre}(e),\mathrm{post}(e)$ for the maps,
+\begin{align*}
+\text{synapse (edge-set ODE):}\quad
+  & \frac{d s_e}{dt}
+    = h\!\big(s_e,\ v_{\mathrm{pre}(e)},\ v_{\mathrm{post}(e)};\ \theta_{\tau(e)}\big),\\[1pt]
+\text{synaptic current}\ (\uparrow\ \text{\code{post}}):\quad
+  & I_i = \sum_{e:\,\mathrm{post}(e)=i} W_e\, g\big(s_e,\, v_i\big),\\[1pt]
+\text{neuron (set ODE):}\quad
+  & \tau_i\,\frac{d v_i}{dt}
+    = \mathrm{intrinsic}_i(v_i) + I_i + I^{\mathrm{ext}}_i .
+\end{align*}
+The middle line is an Aggregate (Section~\ref{sec:operators}) run along the
+\code{post} map rather than the \code{parent} map: the sum over children of a parent
+becomes a sum over the edges into $i$, each weighted by its synaptic weight $W_e$. A
+passive connectome is the degenerate case --- drop the synapse state $s_e$, so $g$
+collapses to $\phi(v_{\mathrm{pre}(e)})$ and
+$I_i=\sum_{e:\,\mathrm{post}(e)=i} W_e\,\phi(v_{\mathrm{pre}(e)})=\sum_j W_{ij}\,\phi(v_j)$,
+recovering a single Lateral \code{signal} operator on a plain relation (no edge-set
+needed). Listing~\ref{lst:neuro} is the stateful version.
+
+\begin{lstlisting}[style=yaml,caption={A recurrent circuit as one hierarchy: a \code{neuron} set and a \code{synapse} edge-set, both contained in the \code{network}, the synapse joined to the neurons by \code{pre}/\code{post} incidence maps.},label=lst:neuro]
+sets:
+  network: {n: 1}
+  neuron:                                  # an ordinary set
+    parent: network
+    per_parent: 13731
+    types: {T4a: {sign: +1, tau: 0.02}, Mi1: {sign: -1, tau: 0.05}}   # Dale sign, tau
+  synapse:                                 # an edge-set: elements ARE the connections
+    parent: network                        # containment: owned by the network
+    edge_set: true
+    pre: neuron                            # incidence iota_pre
+    post: neuron                           # incidence iota_post
+    state: {g: 0.0, plastic_w: 0.0}        # its own dynamical state
+operators:
+  - {op: synapse_ode,      at: synapse}                # ds_e/dt = h(s_e, v_pre, v_post)
+  - {op: synaptic_current, at: synapse, to: neuron}    # aggregate output onto post neuron
+  - {op: neuron_voltage,   at: neuron}                 # tau dv/dt = intrinsic + I_syn + I_ext
+schedule: [synapse_ode, synaptic_current, neuron_voltage]
+\end{lstlisting}
+
 \section{Operators}
 \label{sec:operators}
 
-A GNN is an \textbf{operator} $\mathcal{O}$ dispatched by the relation it acts on.
-An operator changes exactly one of the three things the container holds
+A GNN is an \textbf{operator} $\mathcal{O}$: a map on \textbf{state}
+(Section~\ref{sec:state}) dispatched by the relation it acts on --- it reads named
+blocks of a set's state and returns a derivative on others. Equivalently, an operator
+changes exactly one of the three things the container holds
 (Fig.~\ref{fig:ops}): the \textbf{state} on the nodes, the \textbf{relations}
 between them, or the \textbf{entities} themselves. \textbf{Four dynamics operators}
 move \emph{state} along a fixed structure, one per relation the container admits,
@@ -218,12 +474,12 @@ exist. Those last three return no state delta. The four dynamics operators:
 \begin{align*}
 \textbf{Lateral}\quad   & \mathcal{O}_E,\ E\subseteq S_k\times S_k
   &&\text{(ODE interaction $+$ graph Laplacian)}\\
-\textbf{Aggregate}\ \uparrow\quad & \textstyle\sum_{\pi}: S_k \to S_{k+1}
-  &&\text{(reduction over children of $\pi$)}\\
-\textbf{Broadcast}\ \downarrow\quad & \pi^{*}: S_{k+1}\to S_k
-  &&\text{(lift along $\pi$)}\\
+\textbf{Aggregate}\ \uparrow\quad & \textstyle\sum_{m}: S_a \to S_b
+  &&\text{(reduction along a map $m$)}\\
+\textbf{Broadcast}\ \downarrow\quad & m^{*}: S_b\to S_a
+  &&\text{(lift along a map $m$)}\\
 \textbf{Exchange}\quad  & \mathcal{S},\mathcal{G}: S_k \leftrightarrow F
-  &&\text{(scatter / gather; bipartite)}
+  &&\text{(a map to/from a field)}
 \end{align*}
 
 \noindent Two pieces of notation: $S_k\times S_k$ is the set of all node \emph{pairs}, so an
@@ -239,22 +495,32 @@ adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities
 over the edges. Examples: particle--particle elasticity, cell--cell flocking or
 adhesion, neuron--neuron signal propagation.
 
-\paragraph{Aggregate $\textstyle\sum_\pi$ (up).} Pools each parent's children into
-one quantity --- a cell's position is the mean of its particles, its metabolic state the
-sum over its molecules. This is how fine-scale dynamics are summarised into, and so
-move, the coarser object above.
+\paragraph{Aggregate $\textstyle\sum_m$ (up).} Reduces along a map $m$: pools the
+elements that $m$ sends to each target into one quantity. Along the \code{parent}
+map a cell's position is the mean of its particles, its metabolic state the sum over
+its molecules; along the \code{post} map the current into a neuron is the sum over
+its incoming synapses (the middle equation of Section~\ref{sec:incidence}). Same
+operator, different map named by \code{via:}.
 
-\paragraph{Broadcast $\pi^{*}$ (down).} The adjoint of Aggregate: it copies a
-parent's state to each of its children, so a decision taken at the cell level
-(a body force, a polarity, a signalling output) is applied identically to all of
-that cell's particles. Aggregate and Broadcast are a matched up/down pair on the
-same map $\pi$.
+\paragraph{Broadcast $m^{*}$ (down).} The adjoint of Aggregate: it lifts a target's
+state back onto every element the map $m$ sends to it. Along the \code{parent} map a
+decision taken at the cell level (a body force, a polarity, a signalling output) is
+applied identically to all of that cell's particles; along the \code{pre}/\code{post}
+maps it gathers the endpoint voltages a synapse needs. Aggregate and Broadcast are a
+matched up/down pair on \emph{any} named map, so no new operator is needed for a
+stateful connection: \code{synapse\_ode} (a Lateral operator on the synapse edge-set)
+sits between a Broadcast that gathers $v_{\mathrm{pre}},v_{\mathrm{post}}$ and an
+Aggregate that scatters the current onto the post neuron, and a passive connectome
+collapses the whole thing to a single Lateral \code{signal} operator on a plain
+relation.
 
-\paragraph{Exchange $\mathcal{S},\mathcal{G}$.} Couples a set to a field: scatter
-$\mathcal{S}$ deposits/secretes object state into the field, gather $\mathcal{G}$
-samples/senses the field back onto the objects. The relation is bipartite
-(objects~$\leftrightarrow$~grid); it is exactly the MPM particle--grid transfer
-(P2G/G2P) and chemotactic secretion/sensing.
+\paragraph{Exchange $\mathcal{S},\mathcal{G}$.} A map whose other endpoint is a
+\emph{field} rather than a set: scatter $\mathcal{S}$ deposits/secretes object state
+into the field, gather $\mathcal{G}$ samples/senses the field back onto the objects.
+It is exactly the MPM particle--grid transfer (P2G/G2P) and chemotactic
+secretion/sensing --- Aggregate/Broadcast read as ``set to field / field to set,''
+which is why Exchange is not a separate idea so much as the field-valued corner of
+the same map primitive.
 
 \paragraph{Rewire $\mathcal{R}$ (relations).} Rewire changes the \emph{relation}
 $E\subseteq S_k\times S_k$ on which the lateral operators act --- \emph{which}
@@ -337,7 +603,7 @@ Everything else assumes the cells it acts on already exist.
 \end{tikzpicture}}
 \caption{The operators, grouped by what they change. The first four are
 \emph{dynamics}: they move \emph{state} along a fixed structure --- \emph{Lateral}
-within a set; \emph{Aggregate}/\emph{Broadcast} across containment $\pi$;
+within a set; \emph{Aggregate}/\emph{Broadcast} along a map (the parent map $\pi$, or a \code{pre}/\code{post} map);
 \emph{Exchange} to/from a field (P2G/G2P and the metabolite--reaction graph are
 both Exchange). The last three return no state delta: \emph{Rewire} changes the
 \emph{relations} --- the edge set $E$, which nodes interact (a radius graph rebuilt
@@ -399,41 +665,27 @@ integrates as a single order. (A dynamics operator may instead declare \code{EMI
 force $a_\text{ext}$ rather than integrated by the engine.) Friction in the inertial case
 is itself an operator (a \code{drag} delta $-\kappa v$), not a special term in the integrator.
 
+\paragraph{The integrated quantity is the set's declared state.} Position and
+velocity are only the \emph{spatial} instance of this rule. What the engine
+integrates is whatever block a set's \emph{state schema} declares dynamical
+(Section~\ref{sec:language}): a moving particle declares \code{pos}/\code{vel}, but a
+neuron declares a scalar voltage, a metabolite a concentration, a gene its expression
+level, a synapse its gating and plastic weight. Each integrates under the same
+first-order rule $x_{t+1}=x_t+\Delta t\sum_i\Delta_i$ with $x$ the declared state,
+and only the spatial blocks are subject to the world boundary. Making integration
+\emph{schema-driven} rather than pos/vel-specific is the single change that lets one
+engine carry mechanics, signalling, metabolism, and gene expression at once --- the
+temporal counterpart of generalizing a lone hardcoded parent map to the open map
+collection $M$. Voltage, calcium, receptor occupancy, and a plastic weight are then
+all first-class integrands, each just a schema block plus an operator that returns
+its derivative.
+
 Two consequences follow: several operators may
 act on the same set in one tick (their deltas simply add --- none overwrites
 another), and because nothing is mutated in place, gradients flow through the sums
 and the integrator, so the whole rollout stays differentiable. The LLM searches over
 schedules and operator parameterizations --- one well-defined action space instead
 of per-domain code.
-
-\section{Glossary}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{@{}lll l@{}}
-\toprule
-\textbf{Concept} & \textbf{Set/operator term} & \textbf{Symbol} & \textbf{Code} \\
-\midrule
-collection of like nodes & set (a level)        & $S_k$                       & \code{Level} \\
-a single node            & element              & $x\in S_k$                  & row of \code{Level.state} \\
-learnable per-node code  & embedding            & $a_i$                       & \code{Level.embedding} \\
-containment              & parent map           & $\pi_k\!:\!S_k\!\to\!S_{k+1}$& \code{.parent}, \code{.parent\_name} \\
-within-set links         & relation             & $E\subseteq S_k\times S_k$  & \code{Level.edge\_index} \\
-continuum quantity       & field                & $f:\Omega\to\mathbb{R}^c$   & \code{Field} \\
-dynamics (GNN)           & operator: ODE+Laplacian & $\mathcal{O}$            & \code{Operator} \\
-within-set op            & lateral              & $\mathcal{O}_E$             & \code{Lateral} \\
-up op                    & reduction over children& $\sum_\pi$                & \code{Aggregate} \\
-down op                  & lift                 & $\pi^{*}$                   & \code{Broadcast} \\
-set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \code{Exchange} \\
-rebuild the relation     & relations: rewire    & $\mathcal{R}\!:\,\to\!E$     & \code{Rewire} \\
-make an element          & entities: division   & $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ & \code{Divide} \\
-remove an element        & entities: death      & $\mathcal{D}:x\!\mapsto\!\varnothing$ & \code{Die} \\
-per-element occupancy     & occupancy            & $w_i\in[0,1]$               & \code{Level.occ} \\
-the container            & hierarchy            & $(S_\bullet,F_\bullet,\pi_\bullet)$ & \code{Hierarchy} \\
-the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ & \code{Schedule} \\
-\bottomrule
-\end{tabular}
-\end{center}
 
 \part*{Part II --- A formal intermediate representation}
 \addcontentsline{toc}{section}{Part II --- A formal intermediate representation}
@@ -546,7 +798,8 @@ construct in it appears in the example of Listing~\ref{lst:agg}.
 \code{navigation}  & \code{geodesic} (precomputed external gradient) or \code{dynamic} (self-generated) & \code{navigation: geodesic}\\
 \midrule
 \multicolumn{3}{@{}l}{\emph{Operator} (a system; one per list entry)}\\
-\code{op}          & which registered operator to run                & \code{op: sense}\\
+\code{op}          & which registered operator (contract) to run     & \code{op: sense}\\
+\code{implementation} & which \emph{implementation} of that contract to run (default: the only one) & \code{hodgkin\_huxley}\\
 \code{at}          & selector --- the subset it acts on              & \code{at: cell[type=soft]}\\
 \code{to}/\code{from} & field an Exchange writes to / reads from      & \code{from: chemical}\\
 $\langle$params$\rangle$ & operator-specific arguments               & \code{gain: 150}\\
@@ -642,13 +895,18 @@ represents --- \code{velocity} / \code{acceleration} integrated by the engine,
 writes a field, a relation, or a \code{heading} and returns no set delta:
 
 \begin{center}
-\renewcommand{\arraystretch}{1.12}
+\renewcommand{\arraystretch}{1.05}
 \footnotesize
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}lll p{6.4cm}@{}}
 \toprule
 \textbf{op} & \textbf{kind} & \textbf{EMIT} & \textbf{behaviour} \\
 \midrule
 \multicolumn{4}{@{}l}{\emph{Dynamics --- move a set's state (return a delta)}}\\
+\code{signal}                & lateral & velocity & passive connectome: $dv_i=(-v_i+b_i+\sum_j W_{ij}\phi(v_j)+I_i)/\tau_i$ \\
+\code{synapse\_ode}          & lateral & velocity & edge-set synaptic state $ds_e/dt=h(s_e,v_{\mathrm{pre}},v_{\mathrm{post}})$ (gathers endpoints along $\iota$) \\
+\code{synaptic\_current}     & aggregate & --- & sum synapse output onto the postsynaptic neuron (Aggregate along $\iota_{\mathrm{post}}$) \\
+\code{neuron\_voltage}       & lateral & velocity & neuron ODE $\tau_i\,dv_i/dt=\mathrm{intrinsic}_i+I^{\mathrm{syn}}_i+I^{\mathrm{ext}}_i$ \\
 \code{attraction\_repulsion} & lateral & velocity & per-type difference-of-Gaussians interaction law \\
 \code{squared\_law}          & lateral & acceleration & inverse-square law: Coulomb electrostatics \emph{or} Newtonian gravity (\code{law}: \code{charge}/\code{mass}) \\
 \code{cohesion},\,\code{velocity\_align},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
@@ -682,7 +940,7 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \multicolumn{4}{@{}l}{\emph{Entities --- change the node set $|S|$ (\code{kind=structural})}}\\
 \code{cell\_divide}          & structural & --- & proliferation: wake a dormant buffer slot (\code{occ}) beside the mother \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{center}
 
 \section{Natural language $\to$ simulation: the repeatable mapping}
@@ -712,212 +970,13 @@ Section~\ref{sec:graph}: a \emph{behaviour} becomes an operator, a \emph{kind of
 node} a set (or a type within one), the \emph{space} the \code{general:} block ---
 never the reverse.
 
-\section{A spread of simulations from one registry}
-
-Once the vocabulary existed, qualitatively different behaviours were \emph{just
-different specs} over the same code --- breadth comes from the intermediate
-representation, not from new code. Each simulation is 100--600 cells of $\sim$100
-MLS-MPM particles (the two cell types in two colours over the shaded chemical
-field); eight are shown in Fig.~\ref{fig:sims}:
-\begin{itemize}\itemsep1pt
-\item \textbf{aggregate} --- soft cells secrete a chemical and climb it, clumping together;
-\item \textbf{disperse} --- soft cells flee their own chemical (negative gain), spreading apart;
-\item \textbf{swarm} --- strong boids make the cells flock and move as one;
-\item \textbf{wander} --- active motility alone: a diffusive gas of cells;
-\item \textbf{sort} --- type-specific adhesion segregates the two populations;
-\item \textbf{chase} --- a fast-decaying field makes moving hotspots the cells chase;
-\item \textbf{crystal} --- pure repulsion spaces the cells into a lattice;
-\item \textbf{collapse} --- low diffusion with strong chemotaxis pulls soft cells into one tight cluster.
-\end{itemize}
-Across all eight, only the operator choices and their parameters differ; the engine,
-the operators, and the schedule grammar are identical.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_sims.png}
-\caption{End states of the eight simulations described above, all generated from
-the same operator registry by changing only the spec.}
-\label{fig:sims}
-\end{figure}
-
-\section{Emergent ant trails}
-
-Adding the \code{sense} operator (a Physarum/Jones three-sensor rule: each ant
-samples pheromone ahead-left / ahead / ahead-right and turns toward the strongest,
-while \code{glide} drives it forward and \code{deposit} lays pheromone) yields
-self-reinforcing trails that grow, are followed, and coarsen over long runs
-(Fig.~\ref{fig:ant}). Listing~\ref{lst:ant} is the full simulation.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_ant.png}
-\caption{Ant trail-following over a long run (three frames, early to late). A
-diffuse network of pheromone trails (shaded) forms, reinforces, and \emph{coarsens
-into a few dominant trails} with ants marching along them (right) --- classic
-stigmergy.}
-\label{fig:ant}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_ant_variants.png}
-\caption{Ten ant variants, each the same \code{sense}$+$\code{glide}$+$\code{deposit}
-code with a few parameters changed (turn rate, sensor reach/angle, pheromone
-diffusion/decay, deposit rate, rotational noise). The parameter axes span the
-trail-formation regime --- from loose wandering to tight reinforced networks.}
-\label{fig:antvar}
-\end{figure}
-
-\begin{lstlisting}[style=yaml,caption={The ant simulation: red cells lay, follow, and reinforce pheromone trails.},label=lst:ant]
-name: ant
-seed: 0
-n_frames: 1500
-sets:
-  cell:
-    n: 150
-    types: {soft: {fraction: 0.6, youngs: 60}, stiff: {fraction: 0.4, youngs: 300}}
-  particle: {parent: cell, per_parent: 60, radius: 0.012}
-fields:
-  pheromone: {frame: grid, res: 160, couples_to: cell}
-operators:
-  - {op: glide, at: cell, speed: 300.0, rot: 0.06}              # persistent forward motion
-  - {op: sense,  at: "cell[type=soft]", from: pheromone, turn: 0.4, sensor_dist: 0.04, sensor_angle: 0.5}
-  - {op: deposit, at: "cell[type=soft]", to: pheromone, rate: 2.0}
-  - {op: diffuse, at: pheromone, rate: 0.02}                    # field self-dynamics (was pheromone.diffuse)
-  - {op: decay,   at: pheromone, rate: 0.04}
-  - {op: mls_mpm_mechanics, at: particle, n_grid: 128, substeps: 8, a_max: 1200, drag: 0.6}
-schedule: [aggregate, sense, glide, deposit, diffuse, decay, mls_mpm_mechanics]
-\end{lstlisting}
-
-\section{Cells in a maze: foraging and optimization}
-
-A harder simulation exercises more of the language: two rigid cell populations start
-at \emph{home} (bottom-left), navigate a walled \emph{maze} to \emph{food}
-(top-right), pick food up, and carry it back. It adds three constructs ---
-\code{obstacles}, a per-cell \code{loaded} state, and state-gated selectors
-(\code{cell[loaded=0]} seeks food, \code{cell[loaded=1]} returns home) --- and
-answers the design question \emph{how does one model an obstacle}: a wall is not a
-pairwise force but a \textbf{static occupancy mask reused as a boundary condition}
-by machinery already present. The same mask (i) zeroes the MPM grid velocity inside
-walls, so rigid cells cannot enter, and (ii) imposes no-flux on field diffusion, so
-a chemical \emph{routes around} the walls. Two such fields --- one sourced at food,
-one at home --- become navigation gradients that solve the maze; unloaded and loaded
-cells climb opposite ones.
-
-Because the whole simulation is differentiable and the spec is tiny, the colony can
-be \emph{optimized}: search the behavioural parameters to deliver food as fast as
-possible. The objective --- units delivered --- comes from a discrete
-pick-up/drop-off and is therefore non-differentiable, so we use a black-box
-\textbf{UCB} search over eight levers (motility speed and rotation, sense gain, MPM
-drag and force cap, cell stiffness and size, colony size). Over a few dozen
-simulations it improves delivery roughly five-fold. This
-echoes the differentiable-simulator design literature, where a \emph{smooth}
-objective is optimized by gradients through the rollout; the general recipe is
-\textbf{both} --- UCB or CEM for the discrete and structural choices, and
-gradient-through-rollout on a smooth surrogate for the continuous interior.
-
-The optimizer keeps a log of every accepted improvement (the auto-generated
-\code{WINNERS.md}), which is itself the finding: it shows
-\emph{what makes a good forager}. Two parameters move monotonically to their bounds
---- the colony grows to its cap ($n\!\approx\!120$: more foragers deliver more food)
-and the cells soften to the floor ($\text{youngs}\!\to\!20$: soft, deformable cells
-squeeze through the maze far better than the rigid ones we started from). Chemotaxis
-stays strong throughout ($\text{gain}\sim340$--$400$) and the cell radius sits at its
-minimum (smaller cells clear the gaps). The remaining knobs --- motility speed and
-rotation, drag, force cap --- are traded off rather than maximized: the best design
-(\code{winner\_7}) is a balanced, moderate-speed, moderate-drag colony, not any
-extreme. UCB explores widely (the parameter columns are non-monotonic) while the
-best-so-far food rises monotonically by construction. The headline is that the
-search rediscovered, with nothing hand-coded, that a \emph{large swarm of small,
-soft, strongly-chemotactic cells} forages a maze best.
-
-
-The difference is visible in the trails themselves (Fig.~\ref{fig:initwin}): the
-initial colony barely establishes a route, whereas the optimized one lays a strong
-chemoattractant highway that threads both maze gaps from home to food.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{figures/fig_init_vs_winner7.png}
-\caption{Initial design (top) versus the best found by UCB (bottom, \code{winner\_7}),
-each a single run shown as five frames from early to late. The optimized colony forms
-a far more complete and persistent foraging trail.}
-\label{fig:initwin}
-\end{figure}
-
-\section{Races: a longitudinal world, an exit boundary, and more levers}
-
-The foraging maze generalizes into a family of \emph{races}: a population starts at
-the left and must reach an exit at the right as fast as possible. Three additions to
-the language carry them, none touching the engine's generic core.
-
-\paragraph{A longitudinal world.} A declarative \code{world: W} makes the domain the
-rectangle $[0,W]\times[0,1]$ on a grid of \emph{square} cells ($n_x=\mathrm{round}(W\,n_y)$);
-$W{=}4$ gives a long left-to-right track. Obstacles may now be \textbf{circles}
-(\code{[cx,cy,r]}) as well as rectangles, so a porous field of $\sim$hundreds of round
-pillars and a real recursive-backtracker maze (genuine corridors and dead ends) are
-both just obstacle lists, reused as the one MPM/field mask as before.
-
-\paragraph{An exit (efflux) boundary.} A cell crossing the finish is handled by an
-operator: \code{finish} \emph{freezes} it at the line, while \code{death}
-\emph{removes} it (zeroing its particles' mass and parking them off-domain) so it
-disappears instead of piling up. Both count the crossing in \code{H.finished} (the race
-objective) and set a sticky \code{done} flag; driving operators select
-\code{cell[done=0]}, so an exited cell stops being driven or drawn. \code{death} is the
-discrete-set counterpart of a field \code{source}: an open sink, run last in the
-schedule. Navigation reuses the proven hidden \emph{geodesic} field (no source bands),
-while only the faint deposited \code{scent} trail is shown.
-
-\paragraph{More levers, including \code{boids}.} The optimizer (\code{race\_opt.py},
-same kNN-UCB as foraging, a winner gif saved whenever the escaped count rises by ten)
-sweeps the foraging levers \emph{plus the three boids weights} and its radius ---
-\code{boids.cohesion/align/separate/radius} --- twelve in all. This is the point of the
-operator-parameter view: the search tunes the collective-motion rule (how strongly cells
-flock and avoid jamming in a tight maze) jointly with body and fleet, not just scalar
-gains.
-
-\section{What the process taught us}
-
-\begin{enumerate}\itemsep2pt
-\item \textbf{The intermediate representation is the whole game.} Ten distinct
-behaviours and an ant model were all different YAML over the same code.
-\item \textbf{Selectors are the highest-leverage primitive.} \code{cell[type=soft]}
-expresses ``only population~1 does~X'' and lets behaviours coexist; every operator
-must honour the selector mask.
-\item \textbf{Verification must check \emph{intent}, not just ``it ran''.} The hard
-bugs were physical: unstable diffusion ($dt\!\cdot\!D>0.25$), wrong particle volume,
-unclamped accelerations blowing up MPM, cell inversion at very low stiffness, GPU
-non-determinism breaking reproducibility, and --- subtlest --- the \emph{wrong
-metric} (net displacement vs.\ nearest-neighbour clustering).
-\item \textbf{Honesty about regime.} Self-secreted chemotaxis aggregates only below
-a density threshold (above it the field is spatially flat --- correct physics); the
-simulation/verify output should state the regime, not silently show the one setting
-that worked.
-\item \textbf{Determinism is a feature you must force} (deterministic CUDA kernels),
-or ``reproduce with a new seed'' is meaningless.
-\item \textbf{Obstacles are boundary conditions, not forces.} A wall is one static
-mask reused by the MPM grid (interior zero-velocity) and the diffusing fields
-(no-flux); maze navigation then falls out of the field's gradient, with no special
-pathfinding code.
-\item \textbf{Cap speed below the CFL limit.} Strong gradients otherwise drive cells
-to the grid's stability ceiling, where they move ballistically (``asteroids''); an
-explicit max-speed clamp plus overdamped drag restores smooth, biological motion.
-\item \textbf{Discrete objectives need black-box search, differentiable ones admit
-gradients --- use both.} Food count (discrete) optimizes well under UCB; a smooth
-surrogate opens the gradient-through-rollout path, and the two compose: UCB for
-structure, gradients for the continuous interior.
-\item \textbf{Reproducibility needs full-precision provenance.} Archiving rounded
-parameters made a winner re-simulate to a different score; the exact spec (and seed)
-must be stored, or the run is not bit-reproducible.
-\end{enumerate}
-
-\part*{Part IV --- Building the repository}
-\addcontentsline{toc}{section}{Part IV --- Building the repository}
+\part*{Part III --- Building the repository}
+\addcontentsline{toc}{section}{Part III --- Building the repository}
 
 \section{Repository contract}
 
-Plexus is not a collection of simulations. It is an interpreter for a formal
-simulation language. The repository must therefore be built around one rule:
+Plexus is not a collection of simulations. It is an interpreter for a typed
+intermediate representation. The repository must therefore be built around one rule:
 
 \begin{quote}
 New biology enters Plexus by adding registered entities, fields, or operators;
@@ -1009,10 +1068,14 @@ This table is normative. Do not reinterpret it locally.
 
 \section{The integration invariant}
 
-The engine is the only code allowed to integrate position and velocity.
+The engine is the only code allowed to integrate a set's state --- position and
+velocity for a spatial set, or a schema-declared scalar such as voltage or
+concentration for a non-spatial one. Which block is integrated is read from the state
+schema, not hardcoded to \code{pos}/\code{vel}; the world boundary is applied only to
+spatial blocks.
 
-A dynamics operator never writes \code{pos} or \code{vel} directly. It returns a
-delta:
+A dynamics operator never writes a set's integrated state (\code{pos}/\code{vel}, or
+a scalar like \code{v}) directly. It returns a delta:
 \[
 \Delta_i =
 \begin{cases}
@@ -1108,6 +1171,17 @@ and must respect child occupancy.
 Aggregate and Broadcast are implemented as registered operators, not as special
 string builtins in the engine. The schedule names them like any other operator.
 
+\paragraph{Along any named map.} The reduction and lift are defined by the
+\emph{map}, not by any one role. An operator may run them along a \code{pre}/%
+\code{post} map (\code{Level.pre}, \code{Level.post}) instead of the parent map
+(\code{Level.parent}) --- both are index buffers of the same shape,
+so the reduction primitive is identical. This is how a stateful connection signals:
+\code{synaptic\_current} is an Aggregate along $\iota_{\mathrm{post}}$,
+$I_i = \sum_{e:\,\iota_{\mathrm{post}}(e)=i} g(s_e,v_i)$, and the endpoint voltages a
+\code{synapse\_ode} needs are a Broadcast/gather along $\iota_{\mathrm{pre}}$ and
+$\iota_{\mathrm{post}}$. Occupancy weighting is unchanged: dormant edges and dormant
+endpoints contribute nothing.
+
 \section{Structural rule: divide and die}
 
 Structural operators change membership, not tensor shape. All sets are allocated at
@@ -1165,6 +1239,10 @@ vel = lvl.state[:, 2:4]
 A type is a parametric variant inside one set; a sort is a different set.
 \begin{itemize}\itemsep2pt
 \item Different state space or different admissible operators: new set.
+\item A connection with its own dynamical state is a new set too --- an
+\emph{edge-set} --- joined to its endpoints by \code{pre}/\code{post} maps rather than
+a single parent map. A \emph{passive} connection stays a relation
+(\code{edge\_index}$+$attribute), not a set.
 \item Same state space and same operators, different parameter values: type within
 one set.
 \item Per-type properties belong in \code{types:}.
@@ -1329,13 +1407,20 @@ Promotion passes through five gates.
 \begin{enumerate}\itemsep3pt
 \item \textbf{Promote families, not isolated operators.} Before a mechanism is moved,
 it is assigned to a \code{family} --- a closed taxonomy declared in the registry
-(\code{motion}, \code{interaction}, \code{polarity}, \code{fields}, \code{mechanics},
-\code{mpm}, \code{coupling}, \code{hierarchy}, \code{growth}, \code{topology}). The family
+(\code{motion}, \code{interaction}, \code{kinetics}, \code{polarity}, \code{fields},
+\code{mechanics}, \code{mpm}, \code{coupling}, \code{hierarchy}, \code{growth},
+\code{topology}). The family
 is a keyword on \code{@register\_operator(..., family=...)}, and \code{OPERATOR\_FAMILIES}
 is the closed set an operator's family must belong to. An operator enters the core only
 when its family is clear; this keeps the registry a browsable set of reusable physical
 primitives (\code{operators\_by\_family("mechanics")}) rather than a flat pile of one-off
-biological events. A single check, \code{tools/audit\_operator\_registry.py}, enforces the
+biological events. Crucially a family names a \emph{mathematical} primitive --- message
+passing along a map (\code{interaction}), a local state ODE (\code{kinetics}), a
+reduction along a map (\code{hierarchy}) --- never a biological interpretation: neuronal
+signalling, metabolism, and gene regulation are all the same \code{kinetics}-plus-%
+\code{interaction} pattern, so there is deliberately no \code{signalling} family. Biology
+lives in the \emph{levels} and \emph{specs}, not the family taxonomy. A single check,
+\code{tools/audit\_operator\_registry.py}, enforces the
 whole contract at once --- every operator has a valid family and explicitly declares the
 five class attributes (\S\ref{sec:naming}), \code{EMIT} is one of the canonical values,
 \code{SUPPORTED\_DIMS} is a subset of $\{2,3\}$, no deprecated alias appears in a source
@@ -1415,7 +1500,45 @@ the language larger.
 
 \appendix
 \part*{Appendix}
-\addcontentsline{toc}{section}{Appendix --- Plexus and Lean}
+\addcontentsline{toc}{section}{Appendix}
+
+\section{Glossary}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lll l@{}}
+\toprule
+\textbf{Concept} & \textbf{Set/operator term} & \textbf{Symbol} & \textbf{Code} \\
+\midrule
+collection of like nodes & set (a level)        & $S_k$                       & \code{Level} \\
+a single node            & element              & $x\in S_k$                  & row of \code{Level.state} \\
+what each element carries & state                & named blocks of $S_k$       & \code{Level.state} $+$ schema \\
+learnable per-node code  & embedding            & $a_i$                       & \code{Level.embedding} \\
+map between sets         & named map            & $m\!:\!S_a\!\to\!S_b$        & index buffer (\code{.parent}, \code{.pre}...) \\
+all maps of a container  & map collection       & $M=\{m_1,m_2,\dots\}$       & --- \\
+containment (map role)   & parent map           & $\pi_k\!:\!S_k\!\to\!S_{k+1}$& \code{.parent}, \code{.parent\_name} \\
+incidence (map role)     & incidence map        & $\iota\!:\!S_e\!\to\!S_k$    & \code{.pre}, \code{.post} \\
+connection with state    & edge-set             & $S_e$                       & \code{Level} (\code{edge\_set}) \\
+within-set links         & relation             & $E\subseteq S_k\times S_k$  & \code{Level.edge\_index} \\
+continuum quantity       & field                & $f:\Omega\to\mathbb{R}^c$   & \code{Field} \\
+dynamics (GNN)           & operator: ODE+Laplacian & $\mathcal{O}$            & \code{Operator} \\
+operator interface       & contract             & state\,$\to$\,state          & the op name \\
+choice of dynamics for a contract & implementation & ---                     & \code{implementation:} \\
+a simulator implementing contracts & backend         & ---                     & (Jaxley, \textsc{Neuron}) \\
+within-set op            & lateral              & $\mathcal{O}_E$             & \code{Lateral} \\
+up op                    & reduction over children& $\sum_\pi$                & \code{Aggregate} \\
+down op                  & lift                 & $\pi^{*}$                   & \code{Broadcast} \\
+set$\leftrightarrow$field op & transfer          & $\mathcal{S},\mathcal{G}$   & \code{Exchange} \\
+rebuild the relation     & relations: rewire    & $\mathcal{R}\!:\,\to\!E$     & \code{Rewire} \\
+make an element          & entities: division   & $\mathcal{B}:x\!\mapsto\!\{x',x''\}$ & \code{Divide} \\
+remove an element        & entities: death      & $\mathcal{D}:x\!\mapsto\!\varnothing$ & \code{Die} \\
+per-element occupancy     & occupancy            & $w_i\in[0,1]$               & \code{Level.occ} \\
+the container            & sets, fields, maps   & $(S_\bullet,F_\bullet,M_\bullet)$ & \code{Hierarchy} \\
+the model                & composition of ops   & $\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1$ & \code{Schedule} \\
+\bottomrule
+\end{tabular}}
+\end{center}
 
 \section{Plexus and Lean}
 \label{sec:lean}
@@ -1487,7 +1610,7 @@ perfect, but it is useful.
 \toprule
 \textbf{Lean} & \textbf{Plexus} & \textbf{Role} \\
 \midrule
-Types & Sets $S_\alpha$ and Fields $F$ & primitive objects \\
+Types & Sets $S_\alpha$, their state, Fields $F$, and maps $M$ & primitive objects \\
 Terms & Entities (cells, particles, metabolites) & instances of those objects \\
 Functions & Operators & transformations \\
 Proof composition & Schedule & composition of transformations \\
@@ -1565,7 +1688,7 @@ established by the validator and the engine, not by the model that wrote it.
 
 The third lesson is that a small set of primitives can support a large space of
 constructions. Lean builds mathematics from types, functions, and proof rules.
-Plexus builds biological models from sets, fields, operators, and schedules.
+Plexus builds biological models from sets, state, fields, maps, operators, and schedules.
 
 \subsection{A language and calculus of living systems}
 
@@ -1573,7 +1696,7 @@ Seen from this perspective, Plexus is best understood as a formal language and
 calculus for living systems.
 
 The language is the simulation specification. It provides a symbolic vocabulary for
-describing entities, fields, relations, and schedules.
+describing sets, their state, fields, maps, and schedules.
 
 The calculus is the collection of operators acting on those objects. Lateral,
 Aggregate, Broadcast, Exchange, Rewire, Divide, and Die are the primitive
@@ -1653,9 +1776,10 @@ mechanisms.
 
 Plexus instead begins from explicit objects:
 \[
-(S_\bullet,\, F_\bullet,\, \pi_\bullet)
+(S_\bullet,\, F_\bullet,\, M_\bullet)
 \]
-and explicit operators acting on them. Cells, particles, fields, and
+--- sets, fields, and an open collection of named maps (each playing a containment
+or incidence role) --- and explicit operators acting on them. Cells, particles, fields, and
 interactions remain visible throughout the computation.
 
 The difference is therefore not prediction versus simulation. Both can predict.
@@ -1669,7 +1793,7 @@ The difference is the object being searched.
 \toprule
 & \textbf{World Models} & \textbf{Plexus} \\
 \midrule
-Primitive representation & latent variables & sets, fields, operators \\
+Primitive representation & latent variables & sets, state, fields, maps, operators \\
 Search space & latent trajectories & mechanisms and parameters \\
 Primary strength & prediction & hypothesis testing \\
 Interpretability & low--moderate & high \\
