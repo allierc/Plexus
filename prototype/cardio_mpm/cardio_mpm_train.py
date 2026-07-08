@@ -41,7 +41,24 @@ from plexus.models.registry import get_operator
 from plexus.models.entities import _lame
 import plexus.engine as E
 import cardio_mpm_data as D
-from cardio_unet import UNet, load_image            # stiffness = UNet(microscope) -- registered identity (no flip)
+try:
+    from cardio_unet import UNet, load_image        # stiffness = UNet(microscope) -- registered identity (no flip)
+except ModuleNotFoundError:
+    # The sibling ../cardio dir (which held cardio_unet.py) was removed -> B38 total loss. Image-sourced
+    # fields are REJECTED (ledger Falsified#8/#9, net-harmful), so under --stiff_src siren nuo=0 and UNet is
+    # NEVER instantiated; load_image feeds ONLY the cosmetic dashboard corr(microscope) panel. Provide a
+    # self-contained fallback so cardio_mpm no longer depends on the deleted sibling dir.
+    class UNet(torch.nn.Module):                     # importable stub -- legacy image path only (unused under SIREN)
+        def __init__(self, out=1, *a, **k):
+            super().__init__()
+            self.out = out
+            self._lin = torch.nn.Conv2d(1, out, 1)
+        def forward(self, x):
+            return self._lin(x)
+    def load_image(size):                            # neutral radial blob in [~0.2,1] -> valid std for corr()
+        r = size[0] if isinstance(size, (tuple, list)) else int(size)
+        yy, xx = torch.meshgrid(torch.linspace(-1, 1, r), torch.linspace(-1, 1, r), indexing="ij")
+        return torch.exp(-(xx ** 2 + yy ** 2) * 1.5)
 import cardio_harmonic as HARM                       # morphology-aligned loop loss (--loss harmonic)
 
 torch.use_deterministic_algorithms(False)
@@ -488,6 +505,22 @@ def main():
                     "0 = OFF (fixed axis -> time-reversible radial motion). >0 makes the contraction axis rotate DURING "
                     "the beat so the release path differs from the contraction path -> the trajectory ENCLOSES AREA "
                     "(loopiness/area-enclosure probe; targets the enclosure residual after travelling-wave falsified it).")
+    # PHASE-3 RESIDUAL-STRESS / PRESTRESS operator (residual-driven operator discovery): the ~0.53 peak_ratio
+    # SIZE cap is a residual the current operator language cannot break (fibre_dev caps size @rot1.0). Hypothesis:
+    # the tissue enters each beat PRE-STRESSED, so active contraction rides a biased mechanical reference and
+    # enlarges the loop WITHOUT more active force. Constrained SIREN rest tensor F_res=I+alpha*tanh(dF(x,y)).
+    ap.add_argument("--residual_stress", type=int, default=0, help="PHASE-3 residual-stress/prestress operator "
+                    "(0=OFF, EXACT baseline). Learns a per-particle REST tensor F_res=I+residual_amp*tanh(dF(x,y)) from a "
+                    "SIREN; the fixed-corotated stress is computed RELATIVE to F_res (Fe=F@F_res^-1), so at the mesh rest "
+                    "state the tissue carries a standing PRELOAD. Targets the ~0.53 peak_ratio SIZE cap. residual_amp=0 "
+                    "reproduces today's model exactly (F_res=I).")
+    ap.add_argument("--residual_hidden", type=int, default=128, help="SIREN hidden width for the residual-stress field")
+    ap.add_argument("--residual_omega", type=float, default=5.0, help="SIREN omega_0 for the residual-stress field (keep COARSE/low, like the others)")
+    ap.add_argument("--residual_amp", type=float, default=0.2, help="bound alpha on the prestretch F_res=I+alpha*tanh(dF); 0=OFF/exact baseline")
+    ap.add_argument("--tau", type=float, default=0.0, help="PHASE-3 VISCOELASTIC (Maxwell) relaxation time (0=OFF/pure elastic, exact baseline). "
+                    ">0 makes the whole sheet viscoelastic: each substep F relaxes toward isotropic by exp(-dt_sub/tau) (volume kept), so "
+                    "the rest state DRIFTS during the beat -> EMERGENT residual stress (the dynamic counterpart of --residual_stress, per "
+                    "Ranft 'viscous over long timescales'). Smaller tau = more fluid. Second Stage-3 candidate for the ~0.53 size cap.")
     ap.add_argument("--dur0", type=float, default=8.0, help=f"initial pulse duration (frames, LEARNABLE, bounded [{DUR_LO:.0f},{DUR_HI:.0f}] -> sharp pulse)")
     ap.add_argument("--dur_hi", type=float, default=DUR_HI, help=f"upper bound for learnable pulse duration (default {DUR_HI:.0f}; raise to explore longer pulses)")
     ap.add_argument("--resume", default="")
@@ -519,6 +552,10 @@ def main():
     H.active_stress = None
     lvl = H.level("mpm_particle")
     rest = lvl.get("pos").clone()
+    if args.tau > 0:                                                # PHASE-3 VISCOELASTIC override: whole sheet -> Maxwell (tau)
+        _Nv = rest.shape[0]                                         # engine mpm_strain reads is_visco/visco_tau -> relaxes F
+        lvl.is_visco = torch.ones(_Nv, dtype=torch.bool, device=dev)
+        lvl.visco_tau = torch.full((_Nv,), float(args.tau), device=dev)
     real_disp_np, bnd_np, onsets, period = D.load_real(rest.cpu().numpy(), args.bwidth)
     real_disp = torch.tensor(real_disp_np, device=dev); bnd = torch.tensor(bnd_np, device=dev)
     F = real_disp.shape[0]
@@ -564,6 +601,14 @@ def main():
         gain_siren = Siren(**gk).to(dev)
     else:
         gain_siren = None
+    # PHASE-3 residual-stress field: SIREN dF(x,y) -> per-particle REST tensor F_res = I + residual_amp*tanh(dF).
+    # out_features=4 = a full 2x2 deviation (anisotropic, incompatible -> self-equilibrated residual stress).
+    residual_siren = None
+    if args.residual_stress:
+        rk = dict(in_features=2, hidden_features=args.residual_hidden, hidden_layers=args.siren_layers,
+                  out_features=4, outermost_linear=True,
+                  first_omega_0=args.residual_omega, hidden_omega_0=args.residual_omega)
+        residual_siren = Siren(**rk).to(dev)
     # coordinate grid for the SIREN fields (matches aniso_field_torch row=y / col=x convention)
     _ar01 = torch.linspace(0, 1, RES, device=dev)
     _yy, _xx = torch.meshgrid(_ar01, _ar01, indexing="ij")
@@ -574,10 +619,13 @@ def main():
                  + (list(stiff_siren.parameters()) if stiff_siren is not None else [])
     fibre_params = [f_wl, f_ang, f_amp, f_ph] + (list(fibre_siren.parameters()) if fibre_siren is not None else [])
     gain_params = [raw_g] + (list(gain_siren.parameters()) if gain_siren is not None else [])
-    groups = {"fibre": fibre_params, "stiff": stiff_params, "gain": gain_params, "dur": [raw_dur]}
+    residual_params = list(residual_siren.parameters()) if residual_siren is not None else []
+    groups = {"fibre": fibre_params, "stiff": stiff_params, "gain": gain_params, "dur": [raw_dur],
+              "residual": residual_params}
     sel = set(groups) if args.learn.strip() == "all" else {g.strip() for g in args.learn.split(",")}
     learn = [p for g in groups for p in groups[g] if g in sel]
-    for mod, grp in ((net, "stiff"), (stiff_siren, "stiff"), (fibre_siren, "fibre"), (gain_siren, "gain")):
+    for mod, grp in ((net, "stiff"), (stiff_siren, "stiff"), (fibre_siren, "fibre"), (gain_siren, "gain"),
+                     (residual_siren, "residual")):
         if mod is not None and grp not in sel:
             for prm in mod.parameters():
                 prm.requires_grad_(False)                                       # frozen field -> stays at init
@@ -641,6 +689,18 @@ def main():
         youngs_p = sample_to_particles(youngs_map)                           # [N]
         return youngs_p, youngs_map, gain_p, gain_map, d, theta, theta_dev
 
+    _eyeN = torch.eye(2, device=dev).expand(rest.shape[0], 2, 2)
+    def resid_Finv():
+        """PHASE-3 residual-stress operator: per-particle inverse REST tensor F_res^-1, or None when OFF.
+        F_res = I + residual_amp*tanh(dF(x,y)), dF a SIREN 2x2 deviation; residual_amp=0 -> F_res=I exactly
+        (so F@F_res^-1 = F, ablating). Read by mpm_scatter as lvl.F_res_inv -> stress computed on Fe=F@F_res^-1."""
+        if residual_siren is None:
+            return None
+        dfg = residual_siren(field_coords)                                       # [RES*RES, 4]
+        dfp = torch.stack([sample_to_particles(dfg[:, k].reshape(RES, RES)) for k in range(4)], -1)  # [N,4]
+        Fres = _eyeN + args.residual_amp * torch.tanh(dfp).reshape(-1, 2, 2)      # [N,2,2] = I + alpha*bounded dev
+        return torch.linalg.inv(Fres)
+
     # interior MOVING mask over the FIT BEAT (real motion > 10% of max), boundary excluded
     beat = real_disp[onset:onset + grad_len] - real_disp[onset]
     rmag = beat.norm(dim=2).amax(0)
@@ -682,9 +742,19 @@ def main():
     ref = real_disp[start]
 
     # dashboard nodes: the canonical 10x10/margin-10 selection (green matches gt_compare.png)
-    from cardio_real_render import select_grid_nodes
+    try:
+        from cardio_real_render import select_grid_nodes    # lives in the (deleted) ../cardio sibling dir
+    except ModuleNotFoundError:
+        # ../cardio was removed (B38/B39 loss); this is a COSMETIC dashboard node pick. Reconstruct the
+        # canonical nx*ny grid with `margin` from the 137x137 real grid so the pipeline stays self-contained.
+        def select_grid_nodes(nx, ny, side=137, margin=10):
+            rows = np.linspace(margin, side - 1 - margin, ny).round().astype(int)
+            cols = np.linspace(margin, side - 1 - margin, nx).round().astype(int)
+            return (rows[:, None] * side + cols[None, :]).ravel()
     from scipy.spatial import cKDTree
-    canon_dom = D.DOM_LO + D.DOM * np.load(D.NPZ)["pos"][0].astype(np.float32)[select_grid_nodes(10, 10)]
+    _pos0 = np.load(D.resolve_npz() or D.NPZ)["pos"][0].astype(np.float32)
+    _side = int(round(_pos0.shape[0] ** 0.5))               # infer real grid side (137) for the fallback
+    canon_dom = D.DOM_LO + D.DOM * _pos0[select_grid_nodes(10, 10, side=_side) if "side" in select_grid_nodes.__code__.co_varnames else select_grid_nodes(10, 10)]
     idx = cKDTree(rest.cpu().numpy()).query(canon_dom)[1]
 
     start_iter = 0
@@ -705,6 +775,8 @@ def main():
                 fibre_siren.load_state_dict(sd["fibre_siren"])
             if "gain_siren" in sd and gain_siren is not None:
                 gain_siren.load_state_dict(sd["gain_siren"])
+            if "residual_siren" in sd and residual_siren is not None:
+                residual_siren.load_state_dict(sd["residual_siren"])
             try:
                 start_iter = int(os.path.basename(path).split("_")[1].split(".")[0]) + 1
             except Exception:
@@ -717,6 +789,7 @@ def main():
             youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta, theta_dev = maps()
             dur = DUR_LO + (args.dur_hi - DUR_LO) * torch.sigmoid(raw_dur)
             set_maps(H, lvl, youngs_p, dir_grid, gain_p)
+            lvl.F_res_inv = resid_Finv()                                # PHASE-3 prestress (eval; None when OFF)
             for fr in range(start, onset):
                 H.fields["activation"].grid = act_grid(fr, dur)[None]
                 H.fields["direction"].grid = dir_at(theta, dir_grid, fr)   # rotating axis (no-op if rot_stress=0)
@@ -760,14 +833,17 @@ def main():
         youngs_p, youngs_map, gain_p, gain_map, dir_grid, theta, theta_dev = maps()
         dur_hi = args.dur_hi                                              # per-slot upper bound (default DUR_HI=14)
         dur = DUR_LO + (dur_hi - DUR_LO) * torch.sigmoid(raw_dur)       # SHARP bounded pulse duration
+        Fresinv = resid_Finv()                                          # PHASE-3 residual-stress rest tensor (None when OFF)
         with torch.no_grad():                                              # warmup -> settle to the beat rhythm
             set_maps(H, lvl, youngs_p.detach(), dir_grid.detach(), gain_p.detach())
+            lvl.F_res_inv = Fresinv.detach() if Fresinv is not None else None
             for fr in range(start, onset):
                 H.fields["activation"].grid = act_grid(fr, dur.detach())[None]
                 H.fields["direction"].grid = dir_at(theta.detach(), dir_grid.detach(), fr)  # rotating axis (no-op if rot_stress=0)
                 step_frame(H, ops, force_ops, mpm_ops, args.substeps, dt_sub)
                 anchor(lvl, rest, real_disp[fr] - ref, bnd)
         set_maps(H, lvl, youngs_p, dir_grid, gain_p)                       # differentiable beat
+        lvl.F_res_inv = Fresinv                                             # PHASE-3 prestress (grad; None when OFF)
         sim = []
         for k in range(grad_len):
             fr = onset + k
@@ -837,6 +913,7 @@ def main():
             if net is not None: sd_save["net"] = net.state_dict()
             if stiff_siren is not None: sd_save["stiff_siren"] = stiff_siren.state_dict()
             if fibre_siren is not None: sd_save["fibre_siren"] = fibre_siren.state_dict()
+            if residual_siren is not None: sd_save["residual_siren"] = residual_siren.state_dict()
             if gain_siren is not None: sd_save["gain_siren"] = gain_siren.state_dict()
             torch.save(sd_save, os.path.join(outdir, "checkpoints", f"model_{it:05d}.pt"))
             with open(os.path.join(outdir, "progress.txt"), "w") as pf:

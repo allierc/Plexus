@@ -1728,3 +1728,107 @@ All files updated. Phase gate: SIZE remains **◐ (near-✓)** — the B36 dose 
 If dev25 replicates ~0.53 and neither cap-test exceeds it → SIZE is dose-confirmed structurally-capped → ✓ → **Phase 2 completes next batch** (Batch 38). An overturn keeps SIZE open with a new mechanism.
 
 Files updated: `analysis_cardio_mpm.md` (dated B36→B37 section), `knowledge_cardio_mpm.md` (objective SIZE status, best-result block, fact #31, current hypothesis + iterations), `cardio_mpm_slots.md` (6 slots).
+
+
+================================================================================
+## DESIGN 38 -- 2026-07-07 16:37:16
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All five batch steps are complete. Summary:
+
+## Batch 38 (reads b37) — SIZE closed ✓-capped → **PHASE 2 COMPLETE** → **PHASE 3 opened**
+
+**Biggest surprise:** the dev25 *replicate regressed* (LS 0.488, peak_ratio 0.501) — B36's headline peak 0.534 was a lottery draw (10th single-draw regression). The reproducible winner was **d25g15** (gain_hi 2.0→1.5 @dev0.25): LS 0.504, peak 0.521, area 0.437 — all batch-best. gain_hi isn't a *size* lever, but lowering it trims overshoot so enclosure firms up.
+
+**Verdict on SIZE:** dose-confirmed **capped at peak_ratio ~0.52 within the current operator language**, via three independent tests — replicate regression + `durhi13` overshooting *open* (peak 0.520 but area collapses to 0.342) + `bwnar` boundary-release collapsing enclosure (area 0.344, chir 0.838; the Dirichlet anchor *helps* enclosure). No lever exceeds fibre_dev's cap. Per user_input this is a valid ✓ (structural-limit-within-language).
+
+**Phase gate:** all six axes ✓ (magnitude·enclosure·direction·shape·uniformity·SIZE-capped), none regressed → **Phase 2 declared COMPLETE**; `current_phase.txt` overwritten `PHASE2`→`PHASE3`.
+
+**Files updated:** `analysis_cardio_mpm.md` (dated Batch 38 section, per-slot rows, verdict), `knowledge_cardio_mpm.md` (distilled — objective→Phase 3, SIZE ✓-capped, new d25g15 anchor + Phase-3 operator spec), `current_phase.txt`→PHASE3, `cardio_mpm_slots.md`.
+
+**Batch 39 designed (Phase-3 batch 1 — residual-driven operator discovery).** I verified both new operators are wired and default-OFF in `cardio_mpm_train.py` (`--residual_stress/--residual_amp` with `residual` as a valid `--learn` group; `--tau` Maxwell viscoelasticity). Anchor = d25g15, one variable per slot:
+- `ctrl` — both OFF (~0.52 anchor)
+- `res_lo/mid/hi` — prestress α 0.1/0.2/0.3 (`+residual` learned)
+- `visco_mid/hi` — viscoelastic τ 0.05/0.02 (emergent residual)
+
+**Falsifier:** any slot pushes peak_ratio past ~0.53 with the ✓ axes held (read the full RESIDUAL_MORPHOLOGY row, not LS) → prestress/viscoelasticity is the missing operator, SIZE reopens as *solved*. A clean dose-confirmed null → the cap is deeper (constitutive nonlinearity), operators join the rejected record. No combo slot yet, per user_input.
+
+
+================================================================================
+## DESIGN 39 -- 2026-07-07 16:48:33
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All Phase-3 machinery is correctly wired (`residual` learn group registered at line 623-624, both operators default-OFF). The re-issue is safe — the *only* thing that broke B38 was the missing `cardio_unet` import, now fixed.
+
+## Batch 39 — Summary
+
+**B38 was a total execution loss, not science.** All 6 slots produced only `config.json`; every `.err` (identical, ~12 s) was:
+```
+cardio_mpm_train.py:44  ModuleNotFoundError: No module named 'cardio_unet'
+```
+
+**Root cause (4th loss mode for this campaign — a dependency crash):** the sibling `prototype/cardio/` dir was deleted wholesale (session `git status` = dozens of `D ../cardio/*`), taking `cardio_unet.py` with it. `train.py:33` puts `../cardio` on `sys.path` and line 44 imports `UNet, load_image` from there — so every slot died at import, before a single optimizer step. Scientifically inert: `UNet` is only built under legacy image paths (`nuo>0`, REJECTED Falsified#8/#9) and never instantiated under `--stiff_src siren`; `load_image` only feeds the cosmetic dashboard `corr(microscope)` panel.
+
+**Fix (durable, self-contained):** wrapped the import in `try/except ModuleNotFoundError` (`train.py:44–61`) with a local fallback — an importable `UNet` stub + a neutral-radial-blob `load_image`. cardio_mpm no longer depends on the deleted `../cardio` dir. Verified: flags `--residual_stress/--residual_amp/--tau` are wired (512–523), the residual SIREN field + `residual` learn-group are registered (604–701, 623-624), viscoelastic `is_visco/visco_tau` set (556–558). (`python`/`py_compile` approval-blocked; verified statically.)
+
+**Files updated:**
+- `cardio_mpm_train.py` — graceful import fallback.
+- `analysis_cardio_mpm.md` — dated Batch 39 section (loss → root cause → fix → re-issue + durable 0-archive triage rule).
+- `knowledge_cardio_mpm.md` — distilled **CODE-CRASH #2** (missing cross-dir import after sibling-dir cleanup) into Engineering facts + a B37/B38→39 iteration note.
+- `cardio_mpm_slots.md` — **Batch 39 = exact re-issue** of the 6 well-formed B38 slots (ctrl · res_lo/mid/hi prestress α 0.1/0.2/0.3 · visco_mid/hi τ 0.05/0.02), with a re-issue header.
+
+**Phase gate:** no new science (last real data stays **B37**, SIZE ✓-capped). `current_phase.txt` = **PHASE3** unchanged; Phase-3 axes remain open pending B39 data. The Phase-3 question is intact for the re-run: is the ~0.52 peak_ratio cap an active-stress amplitude limit, or a missing pre-stress state?
+
+
+================================================================================
+## DESIGN 40 -- 2026-07-07 17:02:12
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All deliverables written. Code verified coherent. Phase gate: no new science → `current_phase.txt` stays `PHASE3` (correctly unchanged). Let me confirm nothing else in `current_phase.txt` needs touching — it's already `PHASE3`, so I leave it.
+
+## Batch 40 — verdict: 3rd consecutive EXECUTION LOSS (not science), root cause isolated and code hardened; **the fit data must be restored by a human**
+
+**What happened.** B39 re-issue 0-archived *again* — all 6 slots died at ~13 s with only `config.json`. The traceback **moved past** B38's fixed import to a new site:
+
+```
+cardio_mpm_data.py:29  →  FileNotFoundError: .../cardio_mpm/../cardio/cardio_real.npz
+```
+
+**Root cause.** The same wholesale `../cardio` deletion that broke B38 (`cardio_unet`) also took **`cardio_real.npz` — the 137²-node real cardiomyocyte tracks that *are* the entire inverse-fit target.** B38's fix stubbed the *cosmetic* `cardio_unet` import but missed this **hard data dependency** — the classic "survives one landmine, dies on the next."
+
+**This is worse than B38 and I cannot fix it myself.** `git ls-files ../cardio/` returns only code/specs/`.md` → `cardio_real.npz` was **gitignored, never version-controlled → NOT restorable via `git checkout`.** No `.npz` survives in `archive/`. The only cardio `.npz` on-box are the *sim* `material_*_cardio/trajectory.npz` (a different array). Regenerating it needs the upstream microscopy source + the deleted render scripts. **The agent cannot restore or regenerate the fit target.**
+
+**What I did (code — cardio_mpm is now self-contained except the one irreducible data file):**
+1. `cardio_mpm_data.py` — replaced the single hard path with a **candidate-list resolver** (`$CARDIO_REAL_NPZ` → `cardio_mpm/cardio_real.npz` → `cardio_mpm/data/` → legacy `../cardio/`) and an **actionable `FileNotFoundError`** that names every path searched + the restore recipe (self-diagnosing loss).
+2. Defused a **second latent `../cardio` landmine** at `train.py:745` (`from cardio_real_render import select_grid_nodes` + a 2nd npz read) with a self-contained fallback — so a restored-data batch won't burn on it.
+3. Updated `analysis` (dated B40 section), `knowledge` (Engineering CODE-CRASH #2b + batch-history + the `.err`-tells-you-which-dep triage rule), and re-issued the 6 slots **verbatim** (design was well-formed; only the environment broke). `current_phase.txt` unchanged = PHASE3; last real data stays **B37** (SIZE ✓-capped ~0.52).
+
+**⚠ ACTION REQUIRED (human, cluster-side — the loop cannot proceed until this is done):** restore `cardio_real.npz` and place it at **`prototype/cardio_mpm/cardio_real.npz`** (the resolver's preferred slot), or set **`$CARDIO_REAL_NPZ`**, or `git checkout -- prototype/cardio` (restores the *code*) **and** restore the gitignored `.npz` from a backup / regenerate it. Until then every batch will 0-archive — now with a clear self-diagnosing error instead of a bare stack trace.
+
+
+================================================================================
+## DESIGN 41 -- 2026-07-08 03:55:02
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All deliverables complete. Let me confirm the phase gate needs no file change (PHASE3 stays, no new data).
+
+The phase gate: no new data landed this batch, so no axis moved and none regressed — `current_phase.txt` correctly stays **PHASE3**. No edit needed.
+
+## Batch 41 — summary
+
+**What happened in B40:** the 5th consecutive execution loss. All 6 slots 0-archived (only `config.json`, ~11 s LSF jobs). Every `.err` is the same self-diagnosing `FileNotFoundError: cardio_real.npz … NOT FOUND` — the gitignored real target lost in the `../cardio` deletion. **No science; last real data remains B37.**
+
+**The key event — the blocker is RESOLVED.** A human restored the file:
+```
+54,045,402 B  2026-07-08 03:52  cardio_mpm/cardio_real.npz   (resolver's preferred slot)
+```
+Timeline is clean: B40 ran 2026-07-07 17:12 (before the restore) so it still failed, but **B41 will be the first batch since B37 to produce real Phase-3 data.** Size check confirms it's the true target, not a stub: 54 MB / 4 / (137²×2) ≈ **360 frames** → `pos[~360, 137², 2]` float32.
+
+**Pre-flight (guard against a 6th loss):** verified both Phase-3 operators are wired in `cardio_mpm_train.py` — `--residual_stress/_amp/_hidden/_omega` + `residual` in `--learn`, `--tau`→`is_visco/visco_tau`, both default-OFF = exact baseline. No code/rename landmine.
+
+**Files updated:**
+- `analysis_cardio_mpm.md` — dated Batch 41 section (loss diagnosis + restore causality + re-issue rationale).
+- `knowledge_cardio_mpm.md` — new head entry marking the data pipeline as self-healing; Phase-3 question untouched since B37.
+- `cardio_mpm_slots.md` — re-issued the well-formed 6-slot Phase-3 batch (never actually ran): `ctrl` (0.52 anchor) · `res_lo/mid/hi` (imposed prestress α 0.1/0.2/0.3) · `visco_mid/hi` (emergent viscoelastic τ 0.05/0.02). Freeze rule + falsifier intact.
+
+**Phase gate:** PHASE3 unchanged (no data → no axis moved, none regressed). The live question the next batch finally tests: **is the ~0.52 peak_ratio SIZE cap an active-stress amplitude limit, or a missing pre-stress/residual-stress state?** — falsifier: any slot pushes peak_ratio past ~0.53 with the ✓ axes held → SIZE reopens as solved.

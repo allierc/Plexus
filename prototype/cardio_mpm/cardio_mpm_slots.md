@@ -5,36 +5,44 @@
 #   - each slot changes EXACTLY ONE variable from the current best parent
 #   - keep stiffness/direction COARSE (low --siren_omega, larger --fibre_wl); amplitude in [10,15]
 #
-# BATCH 37 — CLOSE THE SIZE AXIS (the last open Phase-2 axis, now near-✓).
+# BATCH 41 = PHASE 3 batch 1 (prestress/viscoelastic operator discovery) — FIRST REAL RUN.
 #
-# B36 RESULT (real data, dose ladder): fibre_dev is a DOSE-CONFIRMED SIZE lever @rot1.0 — peak_ratio rose MONOTONE
-#   0.482(dev20)->0.500(dev22)->0.534(dev25), area 0.326->0.418, then ROLLED OFF at dev0.30 (peak 0.504). So fibre
-#   heterogeneity CONVERTS to loop SIZE, peaking at dev~0.25, BUT peak_ratio still CAPS ~0.53 (sim ~half real).
-#   SURPRISE: control ghi15 (gain_hi 1.5) TOPPED the batch (LS 0.516, best LS_SD 0.281) with SIZE flat -> gain_hi is
-#   a UNIFORMITY lever, cleanly separate from the size channel. fwl40 (coarser fibre) INERT -> size = dev magnitude,
-#   not spatial scale.
+# ✅ DATA-LOSS BLOCKER RESOLVED. B38→B40 were execution losses from ONE `../cardio` deletion (B38 lost the
+#   cosmetic cardio_unet import [fixed]; B39/B40 lost the gitignored REAL TARGET cardio_real.npz [hard]). A HUMAN
+#   restored it 2026-07-08 03:52 at the resolver's preferred self-contained slot:
+#     /workspace/Plexus/prototype/cardio_mpm/cardio_real.npz  (54 MB ≈ pos[~360, 137^2, 2] float32)
+#   B40 ran 2026-07-07 17:12 (BEFORE the restore) so it 0-archived; B41 is the FIRST batch since B37 with data.
+#   Pre-flight verified: both Phase-3 operators are wired in cardio_mpm_train.py (--residual_stress/_amp/_hidden/
+#   _omega + `residual` in --learn @604-628; --tau -> lvl.is_visco/visco_tau @520/556) and default-OFF = exact
+#   baseline. If this batch 0-archives AGAIN, read a slot .err FIRST: FileNotFoundError on the npz = the
+#   self-contained copy was deleted (re-restore); import/spec-load traceback = a code/rename landmine.
 #
-# PARENT = dev25 (new SIZE op point): fibre_dev 0.25, gain_hi 2.0, rot1.0 + soft-floor stiff[30,300] w5, drag40,
-#   amp10, gain[0.2,2.0] g0=0.5, SIREN fibre-ON, dur_hi11, substeps10, 2400it.
+# SCIENCE (unchanged since B37; SIZE ✓-capped ~0.52, Phase 2 CLOSED B38). PHASE-3 QUESTION: is the ~0.52
+#   peak_ratio SIZE cap an active-stress AMPLITUDE limit, or a missing PRE-STRESS / residual-stress state?
+#   Two engine-ready operators (both default-OFF = EXACT baseline): prestress (--residual_stress 1 --residual_amp a,
+#   learned SIREN rest tensor F_res=I+a*tanh(dF), Fe=F@F_res^-1, add 'residual' to --learn) · viscoelastic (--tau t,
+#   Maxwell relaxation exp(-dt/t), t=0=OFF). PARENT/ctrl = d25g15 (fibre_dev 0.25, gain_hi 1.5, gain[0.2,1.5] g0=0.5,
+#   SIREN fibre-ON, rot1.0, soft-floor stiff[30,300] w5, drag40, amp10, dur_hi11, substeps10, 2400it).
 #
-# THE ONE QUESTION: is the ~0.53 peak_ratio cap a fibre-lever limit that a DIFFERENT mechanism breaks, or a
-#   STRUCTURAL cap of the active-stress model? Read peak_ratio + area_ratio from RESIDUAL_MORPHOLOGY, not LS alone.
-#   FALSIFIER for "size structurally capped": bwnar OR durhi13 raises peak_ratio ABOVE ~0.53 while holding LS+chir
-#   -> a new size mechanism, keep SIZE open. If dev25 replicates ~0.53 AND both cap-tests stay <=0.53 -> SIZE is
-#   dose-confirmed structurally-capped -> close SIZE ✓ -> Phase 2 COMPLETE next batch.
+# FREEZE RULE: a slot COUNTS only if it raises peak_ratio WHILE holding enclosure/chir/shape/uniformity (read the
+#   full RESIDUAL_MORPHOLOGY, not LS alone). FALSIFIER: any slot pushes peak_ratio past ~0.53 with the ✓ axes intact
+#   -> prestress/viscoelasticity is the missing operator, SIZE reopens as SOLVED. Clean dose-confirmed null
+#   (neither exceeds 0.53, axes held) -> the cap is deeper (constitutive nonlinearity), operators join the rejected
+#   record — still a ✓. No combo slot yet (only after one alone shows signal).
 #
-#   Balance: 3 EXPLOIT (dev25 replicate, dev27 dose, d25g15 combine) . 2 EXPLORE (bwnar, durhi13 cap-tests) . 1 CONTROL (dev20 anchor).
+#   Balance: 1 CONTROL (ctrl anchor) . 3 EXPLOIT-dose (res_lo/mid/hi prestress ladder) . 2 EXPLORE (visco_mid/hi
+#   viscoelastic dose — the emergent counterpart). Design well-formed & unchanged from B40 (which never ran).
 #
-#   b37_dev25   [EXPLOIT/replicate] : fibre_dev 0.25 -- net the single-draw peak (is peak_ratio 0.534 / LS 0.512 real?)
-#   b37_dev27   [EXPLOIT/dose]      : fibre_dev 0.25->0.27 -- locate the peak between dev25 and the dev30 roll-off
-#   b37_d25g15  [EXPLOIT/combine]   : gain_hi 2.0->1.5 (at dev0.25) -- combine B36's two wins (dev25 size + ghi15 uniformity)
-#   b37_bwnar   [EXPLORE/boundary]  : bwidth 0.06->0.03 -- does releasing the Dirichlet anchor break the ~0.53 peak cap?
-#   b37_durhi13 [EXPLORE/duration]  : dur_hi 11->13 -- does longer contraction travel raise peak excursion @rot1.0? (untested size candidate)
-#   b37_dev20   [CONTROL/anchor]    : fibre_dev 0.25->0.20 -- dose anchor; confirm dev25 > dev20 (net lottery both ends)
+#   ctrl       [CONTROL/anchor]   : both operators OFF -- the ~0.52 peak_ratio anchor (must reproduce d25g15).
+#   res_lo     [EXPLOIT/dose]     : --residual_stress 1 --residual_amp 0.1 -- weak imposed prestress.
+#   res_mid    [EXPLOIT/dose]     : --residual_amp 0.2 -- mid prestress (engine default alpha).
+#   res_hi     [EXPLOIT/dose]     : --residual_amp 0.3 -- strong prestress; locate roll-off if any.
+#   visco_mid  [EXPLORE/emergent] : --tau 0.05 -- moderate viscoelastic drift (emergent residual).
+#   visco_hi   [EXPLORE/emergent] : --tau 0.02 -- more fluid (stronger drift); brackets the tau dose.
 #
-b37_dev25 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 2.0 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
-b37_dev27 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 2.0 --siren_fibre 1 --fibre_dev 0.27 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
-b37_d25g15 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
-b37_bwnar : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 2.0 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0 --bwidth 0.03
-b37_durhi13 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 2.0 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 13 --rot_stress 1.0
-b37_dev20 : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 2.0 --siren_fibre 1 --fibre_dev 0.20 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+ctrl : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0
+res_lo : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff,residual --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0 --residual_stress 1 --residual_amp 0.1 --residual_hidden 128 --residual_omega 5
+res_mid : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff,residual --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0 --residual_stress 1 --residual_amp 0.2 --residual_hidden 128 --residual_omega 5
+res_hi : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff,residual --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0 --residual_stress 1 --residual_amp 0.3 --residual_hidden 128 --residual_omega 5
+visco_mid : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0 --tau 0.05
+visco_hi : --gain0 0.5 --gain_src siren --gain_lo 0.2 --gain_hi 1.5 --siren_fibre 1 --fibre_dev 0.25 --learn fibre,gain,dur,stiff --n_iter 2400 --fibre_wl 28.8 --fibre_angle 0.17 --fibre_amp 0.39 --fibre_phase 0.41 --stiff_src siren --siren_omega 5 --stiff_lo 30 --stiff_hi 300 --amplitude 10 --drag_k 40 --dur0 10 --dur_hi 11 --rot_stress 1.0 --tau 0.02
