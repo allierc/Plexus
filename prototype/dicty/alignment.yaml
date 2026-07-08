@@ -1,0 +1,36 @@
+# Contact-gated alignment demo -- a single flock relaxing to a common heading.
+# One species starts with random velocities; the `alignment` operator steers each
+# particle's acceleration toward the mean heading of the neighbours it is touching
+# (a `radius_graph` sets the candidate neighbourhood; the contact gate weights the
+# near-touching subset, so radius >= r). Second-derivative law: the engine
+# integrates vel += dt*acc, pos += dt*vel on a periodic torus.
+#
+# Read by test_alignment.py (test_spec_runs_through_engine): it loads this with
+# plexus.schema.load and runs it through plexus.engine.run -- no bespoke harness.
+# Swap `gate: contact` -> `gate: none` (+ per_type) to get the boids alignment rule.
+general:
+  name: alignment_demo
+  seed: 0
+  n_frames: 200
+  dt: 0.5
+  boundary: periodic           # torus: minimum-image displacement in the alignment
+
+sets:
+  particle:
+    n: 600
+    vel_init: 0.01             # random initial headings the flock then aligns
+    types:
+      a: {fraction: 1.0}
+
+fields: {}
+
+operators:
+  - {op: radius_graph, at: particle, radius: 0.08}                 # candidate neighbours (>= r)
+  - {op: alignment,    at: particle, gate: contact, a: 0.02, r: 0.07, softness: 0.5}
+
+schedule: [radius_graph, alignment]
+
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6.0
