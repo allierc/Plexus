@@ -1,0 +1,28 @@
+# galaxy3d_bh2_m2_j0.06_s0.9 -- 3D twin of the 2D sweep run galaxy2d_bh2_m2_j0.06_s0.9: a rotating
+# self-gravitating disk with finite THICKNESS on `squared_law` (law: gravity, all_pairs). Same knobs
+# as spiral_galaxy_3d but with the heavier `bh2_m2` combo the 2D sweep liked:
+#   bh2  -> central point mass 2.0   (vel_init.central_mass)
+#   m2   -> disk mass ~2.0           (per-particle mass 2.0/25000 = 0.00008)
+#   j0.06 -> velocity jitter 0.06    (vel_init.jitter)
+#   s0.9  -> spin 0.90               (vel_init.spin)
+# Initialization is a SPEC concern: `spawn: disk` places a FLAT xy disc with out-of-plane
+# `spawn_thickness` scatter, `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds.
+general: {name: galaxy3d_bh2_m2_j0.06_s0.9, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3, world: [8.0, 8.0, 8.0]}
+sets:
+  star:
+    n: 25000
+    spawn: disk                                     # flat xy disc + out-of-plane thickness
+    spawn_radius: 1.5
+    spawn_thickness: 0.08
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 2.0, jitter: 0.06}
+    types: {s: {fraction: 1.0, mass: 0.00008}}      # disk mass ~2.0 (m2)
+fields: {}
+operators:
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -> 1.35 rad (~77 deg) = almost side/edge-on.
+           # `camera_turns` adds a gentle azimuthal drift so the tilt reads as 3D.
+           camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15,
+           # Ken Burns move: slow push-in (camera_zoom) + slow screen drift (camera_pan [dx, dy], screen fraction).
+           camera_zoom: 0.30, camera_pan: [0.05, 0.03]}
