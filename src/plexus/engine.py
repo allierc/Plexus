@@ -27,6 +27,7 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 torch.use_deterministic_algorithms(True, warn_only=True)
 
 from plexus.models.base import Hierarchy, Level
+from plexus.models.state import spatial_schema, schema_from_spec, StateSchema, BOUNDARY_WORLD
 from plexus.models.registry import get_operator, get_entity, get_field
 import plexus.operators        # noqa: F401  self-registers the operator library
 import plexus.models.entities  # noqa: F401  self-registers entity state-schemas
@@ -205,10 +206,47 @@ def _entity_meta(sname: str) -> tuple[dict, dict, int]:
     return schema, render, level
 
 
-def _dim_schema(D: int) -> dict:
-    """Dimension-aware pos/vel state schema: pos = 0:D, vel = D:2D (state dim = 2D).
-    The container is dimension-generic; only operators are dimension-specific."""
-    return {"pos": (0, D), "vel": (D, 2 * D)}
+def _resolve_schema(s: dict, D: int) -> StateSchema:
+    """The set's StateSchema (the fifth primitive). A set that declares its own
+    `state:` block gets that schema (non-spatial: voltage, calcium, gating, ...);
+    every other set gets the dimension-aware pos/vel spatial default -- byte-identical
+    to the old hard-coded `{'pos': (0,D), 'vel': (D,2D)}`. Entity STATE_SCHEMAs stay
+    render/level hints (the spatial ones are 2D-encoded and dimension-specialized, so
+    the engine still sizes spatial state dimension-aware, not from the registry)."""
+    if "state" in s:
+        return schema_from_spec(s["state"])
+    return spatial_schema(D)
+
+
+def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
+    """Build an EDGE-SET: a set whose elements are connections, joined to endpoint sets
+    by `pre`/`post` incidence maps. `edges` is an inline `[[pre, post], ...]` list (PR2:
+    inline for determinism; a connectome loader is a later PR). The edge-set is contained
+    in `parent` (e.g. the network) and carries its own `state:` schema (usually
+    non-spatial). All edges are owned by the parent's slot 0 (a single network)."""
+    edges = s["edges"]
+    E = len(edges)
+    pre = torch.tensor([int(e[0]) for e in edges], dtype=torch.long, device=device)
+    post = torch.tensor([int(e[1]) for e in edges], dtype=torch.long, device=device)
+    schema = _resolve_schema(s, H.dim)
+    state = torch.zeros(E, schema.dim, device=device)
+    # optional per-edge weights -> the `w` block (a fixed synaptic parameter): a parallel
+    # `weights: [...]` list, or a 3rd element of each edge `[pre, post, w]`.
+    weights = s.get("weights")
+    if weights is None and all(len(e) >= 3 for e in edges):
+        weights = [e[2] for e in edges]
+    if weights is not None and "w" in schema:
+        w0, w1 = schema["w"]
+        state[:, w0:w1] = torch.tensor([float(x) for x in weights], device=device).reshape(E, w1 - w0)
+    occ = torch.ones(E, device=device)
+    parent_idx = torch.zeros(E, dtype=torch.long, device=device)
+    _, render, level = _entity_meta(sname)
+    lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
+                parent=parent_idx, parent_name=s["parent"],
+                pre=pre, post=post, pre_name=s["pre"], post_name=s["post"], role=s.get("role"))
+    lvl.render = render
+    _assign_types(lvl, s, H, device)
+    H.add_level(lvl)
 
 
 def _entity_class(sname: str):
@@ -344,24 +382,26 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
         _, render, level = _entity_meta(sname)         # render hints + level from the registry
-        schema = _dim_schema(D)                        # pos/vel sized to the dimension contract
-        dim = max(b for _, b in schema.values())
+        schema = _resolve_schema(s, D)                 # StateSchema: pos/vel default, or the set's `state:` block
+        dim = schema.dim
         state = torch.zeros(buffer, dim, device=device)
-        px0, px1 = schema["pos"]
+        has_pos = "pos" in schema                      # spatial sets place positions; a non-spatial set (voltage,...) does not
         head = None
-        if "spawn" in s:
-            if D == 3:                                 # 3D agent: vector heading; ball / thin `disk` spawn
-                pos, head = _spawn3d(s["spawn"], n, H.world_size,
-                                     float(s.get("spawn_radius", 0.3)), H.rng, device,
-                                     thickness=float(s.get("spawn_thickness", 0.0)))
-            else:                                               # 2D: framed to the world box (not height-1)
-                pos, head = _spawn(s["spawn"], n, H.world_size,
-                                   float(s.get("spawn_radius", 0.3)), H.rng, device)
-        elif "start" in s:
-            pos = _start_centers(s["start"], n, H.rng, device)      # known locations (e.g. an MPM blob)
-        else:
-            pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
-        state[:n, px0:px1] = pos
+        if has_pos:
+            px0, px1 = schema["pos"]
+            if "spawn" in s:
+                if D == 3:                             # 3D agent: vector heading; ball / thin `disk` spawn
+                    pos, head = _spawn3d(s["spawn"], n, H.world_size,
+                                         float(s.get("spawn_radius", 0.3)), H.rng, device,
+                                         thickness=float(s.get("spawn_thickness", 0.0)))
+                else:                                           # 2D: framed to the world box (not height-1)
+                    pos, head = _spawn(s["spawn"], n, H.world_size,
+                                       float(s.get("spawn_radius", 0.3)), H.rng, device)
+            elif "start" in s:
+                pos = _start_centers(s["start"], n, H.rng, device)  # known locations (e.g. an MPM blob)
+            else:
+                pos = torch.rand(n, D, generator=H.rng, device=device) * H.world_size   # uniform in the box
+            state[:n, px0:px1] = pos
         vinit = s.get("vel_init", 0.0)                      # random initial speed (e.g. boids start moving)
         if not isinstance(vinit, dict) and float(vinit or 0.0) > 0 and "vel" in schema:
             vx0, vx1 = schema["vel"]
@@ -397,45 +437,51 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         if pname not in H.levels:
             raise ValueError(f"set {sname!r} has parent {pname!r}, which is not a declared set")
         parent = H.level(pname)
+        if s.get("edge_set"):                                     # an edge-set: elements are connections (pre/post), not scattered in space
+            _build_edge_set(H, sname, s, device)
+            continue
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for cell_grow to wake
         per_tot = per + reserve
         _, render, level = _entity_meta(sname)         # render hints + level from the registry
-        schema = _dim_schema(H.dim)                     # pos/vel sized to the dimension contract (like top-level sets)
-        dim = max(b for _, b in schema.values())
+        schema = _resolve_schema(s, H.dim)             # StateSchema: pos/vel default (like top-level sets), or a `state:` block
+        dim = schema.dim
+        has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
         Np = parent.n * per_tot                                   # `per` live + `reserve` dormant per parent slot
         parent_idx = torch.arange(parent.n, device=device).repeat_interleave(per_tot)
         state = torch.zeros(Np, dim, device=device)
-        px0, px1 = schema["pos"]
         D = H.dim                                                # the child's pos dimension (the global dim contract)
-        ppos = parent.get("pos")[parent_idx][:, :D]              # parent position, projected to the child's dim
-        # scatter each child uniformly in a ball of `radius` about its parent. The 2D
-        # polar path is kept verbatim (bit-identical MPM particle seeding); 3D+ uses a
-        # random unit direction so true 3D child sets are not collapsed onto a plane.
-        if D == 2:
-            r = torch.sqrt(torch.rand(Np, generator=H.rng, device=device)) * radius
-            th = torch.rand(Np, generator=H.rng, device=device) * 2 * math.pi
-            offset = torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
-        else:
-            d = torch.randn(Np, D, generator=H.rng, device=device)        # isotropic direction
-            d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
-            r = torch.rand(Np, generator=H.rng, device=device).pow(1.0 / D) * radius   # uniform in the D-ball
-            offset = d * r[:, None]
-        state[:, px0:px1] = ppos + offset
-        # `vel_init` on a CONTAINED set = one coherent random launch velocity per parent
-        # CELL (the ball/cube body), shared by all its particles, so the whole object
-        # translates (not per-particle jitter). `vel_init_cell` / `vel_init_cube`: aliases.
-        vcell = float(s.get("vel_init", s.get("vel_init_cell", s.get("vel_init_cube", 0.0))))
-        if vcell > 0 and "vel" in schema:
-            vx0, vx1 = schema["vel"]
-            vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
-            state[:, vx0:vx1] = vc[parent_idx]
+        if has_pos:
+            px0, px1 = schema["pos"]
+            ppos = parent.get("pos")[parent_idx][:, :D]              # parent position, projected to the child's dim
+            # scatter each child uniformly in a ball of `radius` about its parent. The 2D
+            # polar path is kept verbatim (bit-identical MPM particle seeding); 3D+ uses a
+            # random unit direction so true 3D child sets are not collapsed onto a plane.
+            if D == 2:
+                r = torch.sqrt(torch.rand(Np, generator=H.rng, device=device)) * radius
+                th = torch.rand(Np, generator=H.rng, device=device) * 2 * math.pi
+                offset = torch.stack([r * torch.cos(th), r * torch.sin(th)], 1)
+            else:
+                d = torch.randn(Np, D, generator=H.rng, device=device)        # isotropic direction
+                d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
+                r = torch.rand(Np, generator=H.rng, device=device).pow(1.0 / D) * radius   # uniform in the D-ball
+                offset = d * r[:, None]
+            state[:, px0:px1] = ppos + offset
+            # `vel_init` on a CONTAINED set = one coherent random launch velocity per parent
+            # CELL (the ball/cube body), shared by all its particles, so the whole object
+            # translates (not per-particle jitter). `vel_init_cell` / `vel_init_cube`: aliases.
+            vcell = float(s.get("vel_init", s.get("vel_init_cell", s.get("vel_init_cube", 0.0))))
+            if vcell > 0 and "vel" in schema:
+                vx0, vx1 = schema["vel"]
+                vc = (torch.rand(parent.n, D, generator=H.rng, device=device) - 0.5) * (2 * vcell)
+                state[:, vx0:vx1] = vc[parent_idx]
         occ = parent.occ[parent_idx].clone()                      # a child is live iff its parent is
         if reserve > 0:                                           # the `reserve` tail of each parent block starts DORMANT
             block_pos = torch.arange(Np, device=device) % per_tot
             is_reserve = block_pos >= per
             occ[is_reserve] = 0.0
-            state[is_reserve, px0:px1] = ppos[is_reserve]         # park the dormant pool at the parent centre
+            if has_pos:
+                state[is_reserve, px0:px1] = ppos[is_reserve]     # park the dormant pool at the parent centre
         lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render
@@ -523,23 +569,39 @@ def _integrate(H: Hierarchy, dt: float) -> None:
     for name, emit in H.emit_order.items():
         lvl = H.levels[name]
         out = H.delta(name)
-        px0, px1 = lvl.state_schema["pos"]; vx0, vx1 = lvl.state_schema["vel"]
-        x, v = lvl.state[:, px0:px1], lvl.state[:, vx0:vx1]
-        v = out if emit == "velocity" else v + dt * out
-        vmax = getattr(lvl, "vmax", None)                      # optional speed clamp (anti-overshoot)
-        if vmax:
-            sp = v.norm(dim=-1, keepdim=True)
-            v = v * (sp.clamp(max=vmax) / sp.clamp(min=1e-9))
-        x = x + dt * v
-        b = getattr(H, "boundary", "wall")
-        if b == "periodic":
-            x = torch.remainder(x, box)                    # torus: wrap each axis by its size
-        elif b in ("free", "none", "open"):
-            pass                                           # unbounded: particles drift in open space
-        else:
-            x = torch.minimum(x.clamp(min=0.0), box)       # wall: clamp each axis to [0, w_k]
+        schema = lvl.state_schema
+        coord = schema.coordinate                          # the position-like integrated block (pos, or voltage, ...)
+        if coord is None:
+            continue                                       # no engine-integrated state
+        rate = schema.rate                                 # the rate block of a 2nd-order set (vel), or None (1st-order)
+        cx0, cx1 = schema.slice(coord.name)
+        x = lvl.state[:, cx0:cx1]
         new = lvl.state.clone()
-        new[:, px0:px1] = x; new[:, vx0:vx1] = v
+        if rate is not None:
+            # inertial (2nd-order) set -- the pos/vel path, byte-identical to before:
+            #   EMIT=velocity     -> the rate block IS the delta (overdamped)
+            #   EMIT=acceleration -> integrate the delta into the rate block
+            vx0, vx1 = schema.slice(rate.name)
+            v = lvl.state[:, vx0:vx1]
+            v = out if emit == "velocity" else v + dt * out
+            vmax = getattr(lvl, "vmax", None)              # optional speed clamp (anti-overshoot)
+            if vmax:
+                sp = v.norm(dim=-1, keepdim=True)
+                v = v * (sp.clamp(max=vmax) / sp.clamp(min=1e-9))
+            x = x + dt * v
+            new[:, vx0:vx1] = v
+        else:
+            # first-order (overdamped) set -- the delta is dx/dt directly (voltage, gating, conc)
+            x = x + dt * out
+        if coord.boundary == BOUNDARY_WORLD:               # a spatial coordinate is clamped/wrapped to the box;
+            b = getattr(H, "boundary", "wall")             # a `free` block (voltage) has no box and is left alone
+            if b == "periodic":
+                x = torch.remainder(x, box)                # torus: wrap each axis by its size
+            elif b in ("free", "none", "open"):
+                pass                                       # unbounded: particles drift in open space
+            else:
+                x = torch.minimum(x.clamp(min=0.0), box)   # wall: clamp each axis to [0, w_k]
+        new[:, cx0:cx1] = x
         lvl.state = new
 
 
@@ -556,14 +618,25 @@ def _setup_recording(sim: Spec, H: Hierarchy):
     rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})   # ticks recorded (last always in)
     rec_index = {t: i for i, t in enumerate(rec_ticks)}      # tick -> row index in the recording arrays
     n_rec = len(rec_ticks)
-    rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32) for name, lvl in H.levels.items()}  # positions [n_rec, N, D]
+    # positions [n_rec, N, D] for spatial sets (those with a `pos` block); a non-spatial
+    # set (voltage, ...) records its state blocks in `rec_state` instead.
+    rec_sets = {name: np.zeros((n_rec, lvl.n, H.dim), np.float32)
+                for name, lvl in H.levels.items() if "pos" in lvl.state_schema}
     occ_sets = {name: np.zeros((n_rec, lvl.n), bool) for name, lvl in H.levels.items()}               # live mask  [n_rec, N]
+    # the state/ group: every recorded block that is NOT the spatial `pos` (empty for a
+    # pos/vel set, since `vel` is record=False) -> [n_rec, N, width]. This is how a neuron's
+    # voltage / calcium timeseries is stored without overloading pos.
+    rec_state: dict[str, dict] = {}
+    for name, lvl in H.levels.items():
+        blocks = [b for b in lvl.state_schema.recorded if b.name != "pos"]
+        if blocks:
+            rec_state[name] = {b.name: np.zeros((n_rec, lvl.n, b.width), np.float32) for b in blocks}
     field_cap = int(getattr(sim, "field_record_cap", 256))   # fields are large grids -> a tighter, spec-tunable cap
     fstride = max(1, (sim.n_frames + field_cap) // field_cap)
     rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
     print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride {sstride}), "
           f"fields every {fstride} steps (<= {field_cap})", flush=True)
-    return rec_index, rec_sets, occ_sets, fstride, rec_fields
+    return rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields
 
 
 def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
@@ -599,7 +672,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              o.on,
              (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
             for o in sim.operators]
-    rec_index, rec_sets, occ_sets, fstride, rec_fields = _setup_recording(sim, H)
+    rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields = _setup_recording(sim, H)
     _print_run_summary(sim, H)
 
     def _run_token(token, tick):
@@ -656,8 +729,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             ri = rec_index.get(tick)                 # None on un-recorded ticks (strided long runs)
             if ri is not None:
                 for name, lvl in H.levels.items():
-                    rec_sets[name][ri] = lvl.get("pos").cpu().numpy()
+                    if name in rec_sets:                              # spatial: the pos trajectory
+                        rec_sets[name][ri] = lvl.get("pos").cpu().numpy()
                     occ_sets[name][ri] = lvl.active.cpu().numpy()
+                    if name in rec_state:                            # non-pos recorded state blocks (voltage, ...)
+                        for bname, arr in rec_state[name].items():
+                            arr[ri] = lvl.get(bname).cpu().numpy()
             if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
@@ -668,7 +745,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             if on_frame is not None:
                 on_frame(H, tick)
 
-    out = {"sets": {name: {"pos": rec_sets[name], "occ": occ_sets[name],
+    out = {"sets": {name: {"pos": rec_sets.get(name), "occ": occ_sets[name],
+                           # non-spatial recorded blocks (voltage, calcium, ...); None for a pos/vel set
+                           "state": rec_state.get(name),
                            "node_type": (H.level(name).node_type.cpu().numpy()
                                          if hasattr(H.level(name), "node_type") else None),
                            "type_names": getattr(H.level(name), "type_names", None),
@@ -690,8 +769,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         root = zarr.open_group(out_path, mode="w")
         for name in H.levels:
             g = root.create_group(name)
-            g.create_dataset("pos", data=out["sets"][name]["pos"])
+            if out["sets"][name]["pos"] is not None:            # spatial: the pos trajectory
+                g.create_dataset("pos", data=out["sets"][name]["pos"])
             g.create_dataset("occ", data=out["sets"][name]["occ"])
+            if out["sets"][name]["state"] is not None:          # non-spatial state blocks -> state/<block>
+                sg = g.create_group("state")
+                for bname, arr in out["sets"][name]["state"].items():
+                    sg.create_dataset(bname, data=arr)
         for fn, fd in out["fields"].items():
             g = root.create_group(fn)
             g.create_dataset("grid", data=fd["grid"])

@@ -92,6 +92,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+from plexus.models.state import StateSchema
+
 
 # The recognised operator kinds (dispatch tags), grouped by what they change:
 # the *dynamics* kinds (lateral / aggregate / broadcast / exchange) move a SET's
@@ -140,16 +142,29 @@ class Level(nn.Module):
         parent: Optional[torch.Tensor] = None,      # [N]      index into the PARENT SET (the map pi_{this->parent})
         edge_index: Optional[torch.Tensor] = None,  # [2, E]   lateral relation
         occ: Optional[torch.Tensor] = None,         # [N]      occupancy in [0,1] (default ones)
-        state_schema: Optional[dict] = None,        # {block: (c0,c1)} column semantics (from the entity registry)
+        state_schema=None,                          # StateSchema (the fifth primitive), or a legacy {block:(c0,c1)} dict
         parent_name: Optional[str] = None,          # name of the set that contains this one (a containment EDGE)
         role: Optional[str] = None,                 # this set's role inside its parent (membrane / cytoplasm / nucleus...)
+        pre: Optional[torch.Tensor] = None,         # [E] INCIDENCE map to the pre-endpoint set (edge-set only)
+        post: Optional[torch.Tensor] = None,        # [E] INCIDENCE map to the post-endpoint set (edge-set only)
+        pre_name: Optional[str] = None,             # the set `pre` indexes into (e.g. neuron)
+        post_name: Optional[str] = None,            # the set `post` indexes into (e.g. neuron)
     ):
         super().__init__()
         self.name = name
         self.level = level                          # a depth hint only; containment is by `parent_name`, not by integer
         self.parent_name = parent_name              # which set contains this one (None for a top-level set)
         self.role = role
-        self.state_schema = state_schema or {"pos": (0, 2), "vel": (2, 4)}
+        # Incidence maps (the second kind of map): an EDGE-SET's elements are connections,
+        # sent to their endpoints by `pre`/`post` -- index buffers of the same shape as
+        # `parent`, but answering "whom do I connect" not "who owns me". Empty for an
+        # ordinary set, so this is inert for every existing (spatial) spec.
+        self.pre_name = pre_name
+        self.post_name = post_name
+        # State is first-class: normalize a legacy {block:(c0,c1)} dict into a StateSchema
+        # (the shim). A StateSchema is still dict-indexable (schema['pos'] == (c0,c1)), so
+        # `get('pos')` and every legacy call site are unchanged.
+        self.state_schema = StateSchema.normalize(state_schema or {"pos": (0, 2), "vel": (2, 4)})
         N = state.shape[0]
         self.register_buffer("state", state)
         self.embedding = nn.Parameter(embedding) if embedding is not None else None
@@ -160,6 +175,14 @@ class Level(nn.Module):
         self.register_buffer(
             "edge_index",
             edge_index if edge_index is not None else torch.empty(2, 0, dtype=torch.long, device=state.device),
+        )
+        self.register_buffer(
+            "pre",
+            pre if pre is not None else torch.empty(0, dtype=torch.long, device=state.device),
+        )
+        self.register_buffer(
+            "post",
+            post if post is not None else torch.empty(0, dtype=torch.long, device=state.device),
         )
         self.register_buffer(
             "occ",
@@ -181,6 +204,20 @@ class Level(nn.Module):
         """A view of a named state block (e.g. 'pos', 'vel') per the schema."""
         a, b = self.state_schema[block]
         return self.state[:, a:b]
+
+    @property
+    def is_edge_set(self) -> bool:
+        """True if this set carries incidence maps -- its elements are connections
+        (a synapse/junction/vessel), sent to endpoints by `pre`/`post`."""
+        return self.pre_name is not None or self.post_name is not None
+
+    def incidence(self, role: str) -> torch.Tensor:
+        """The incidence-map index buffer for `role` ('pre' or 'post')."""
+        return getattr(self, role)
+
+    def incidence_name(self, role: str) -> str:
+        """The endpoint set name for `role`."""
+        return getattr(self, f"{role}_name")
 
     @property
     def active(self) -> torch.Tensor:
@@ -369,12 +406,42 @@ class Hierarchy(nn.Module):
         """The set that contains `name` (None for a top-level set)."""
         return getattr(self.levels[name], "parent_name", None)
 
+    # --- incidence maps: gather/scatter along a named map (pre/post), not containment -- #
+    def gather(self, edge_set: str, role: str, block: str) -> torch.Tensor:
+        """Gather an endpoint set's `block` state onto each edge along its `role`
+        incidence map -- a lift along an incidence map. Returns `[E, w]`: the pre/post
+        endpoint's block value per edge (e.g. `v_pre`, `v_post` for a synapse_ode)."""
+        es = self.level(edge_set)
+        idx = es.incidence(role)                          # [E] endpoint index per edge
+        ep = self.level(es.incidence_name(role))
+        return ep.get(block)[idx]
+
+    def scatter_along(self, edge_set: str, role: str, values: torch.Tensor) -> torch.Tensor:
+        """Sum per-edge `values` `[E, w]` onto the endpoint set along the `role`
+        incidence map -- an Aggregate along an incidence map (e.g. synaptic current onto
+        the post neuron). Occupancy-weighted, so dormant edges contribute nothing.
+        Returns `[N_endpoint, w]`."""
+        es = self.level(edge_set)
+        idx = es.incidence(role)
+        ep = self.level(es.incidence_name(role))
+        out = torch.zeros(ep.n, values.shape[-1], device=values.device)
+        out.index_add_(0, idx, values * es.occ[:, None])
+        return out
+
     # --- per-level delta accumulators (the integration scratch) ----------- #
+    def _delta_dim(self, lvl: "Level") -> int:
+        """Width of a level's delta = its integrated coordinate block's width. For a
+        spatial set that is `pos` (== self.dim, so byte-identical to the old
+        `H.dim`-sized accumulator); for a neuron it is voltage's width, etc."""
+        coord = lvl.state_schema.coordinate
+        return coord.width if coord is not None else self.dim
+
     def zero_delta(self, dim: int = None) -> None:
-        """Reset every level's delta accumulator to zeros (called once per tick)."""
-        dim = self.dim if dim is None else dim
+        """Reset every level's delta accumulator to zeros (called once per tick). Each
+        level's delta is sized to its coordinate block (pos for a spatial set, voltage
+        for a neuron), not a global spatial dim."""
         dev = next(iter(self.levels.values())).state.device
-        self._delta = {name: torch.zeros(l.n, dim, device=dev)
+        self._delta = {name: torch.zeros(l.n, self._delta_dim(l) if dim is None else dim, device=dev)
                        for name, l in self.levels.items()}
 
     def add_delta(self, level_name: str, delta: torch.Tensor) -> None:
@@ -388,7 +455,7 @@ class Hierarchy(nn.Module):
         """The accumulated delta for a level (zeros if nothing wrote it)."""
         if level_name not in self._delta:
             lvl = self.levels[level_name]
-            self._delta[level_name] = torch.zeros(lvl.n, self.dim, device=lvl.state.device)
+            self._delta[level_name] = torch.zeros(lvl.n, self._delta_dim(lvl), device=lvl.state.device)
         return self._delta[level_name]
 
 
