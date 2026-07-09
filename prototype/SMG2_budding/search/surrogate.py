@@ -28,12 +28,14 @@ BOOT = os.path.join(HERE, "_bootstrap")
 
 # ------------------------------------------------------------------ data
 def load_dataset(boot=BOOT):
+    """Reconstruct the feature matrix from each row's (branch, params) -- robust to wall-killed shards
+    that never wrote encodings.npy (dataset.jsonl is the single source of truth)."""
+    import mechanism_tree as mt
     rows = [json.loads(l) for l in open(os.path.join(boot, "dataset.jsonl")) if l.strip()]
-    X = np.load(os.path.join(boot, "encodings.npy")).astype(np.float32)
-    names = json.load(open(os.path.join(boot, "meta.json"))).get("feature_names")
-    assert len(X) == len(rows), f"encoding/row mismatch {len(X)} vs {len(rows)}"
-    Y, valid, cls = [], [], []
+    X, Y, valid, cls, names = [], [], [], [], None
     for r in rows:
+        enc, names = mt.encode(r["branch"], r["params"])
+        X.append(enc)
         v = r.get("value") or {}
         cls.append(r.get("failure", "unstable"))
         if v:
@@ -44,7 +46,8 @@ def load_dataset(boot=BOOT):
             valid.append(True)
         else:
             Y.append([0, 1, 0, 0, 0, 0, 0, 1]); valid.append(False)   # placeholder (excluded from regression)
-    return X, np.array(Y, np.float32), np.array(valid), np.array(cls), names
+    return (np.array(X, np.float32), np.array(Y, np.float32), np.array(valid),
+            np.array(cls), names)
 
 
 # ------------------------------------------------------------------ model
