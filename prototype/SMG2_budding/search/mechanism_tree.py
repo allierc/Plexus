@@ -66,29 +66,28 @@ BRANCHES = {
                 "cell_divide.rate": (0.0, 0.6), "cell_grow.rate": (0.0, 0.6)}),
     "static_growth_field": dict(parent="migration_plus_growth", needs_operator=["growth_field"],
         field="static", growth="grow",
-        params={"cell_grow.rate": (0.1, 1.0), "growth_field.scale": (0.2, 1.5),
+        params={"cell_grow.rate": (0.1, 0.6), "growth_field.gain": (0.2, 1.5),
                 "growth_field.mode": ["patch", "gradient", "ring"], "cell_grow.prestretch": (0.3, 0.9)}),
-    "slow_growth_field": dict(parent="static_growth_field", needs_operator=["growth_field", "slow_field"],
+    "slow_growth_field": dict(parent="static_growth_field", needs_operator=["slow_field"],
         field="slow", growth="grow",
-        params={"cell_grow.rate": (0.1, 1.0), "growth_field.scale": (0.2, 1.5),
+        params={"cell_grow.rate": (0.1, 0.6), "slow_field.gain": (0.2, 1.5),
                 "slow_field.omega": (0.1, 2.0)}),
     "boundary_guided_growth": dict(parent="migration_plus_growth", needs_operator=["ecm_boundary"],
-        field="none", growth="grow",
-        params={"cell_grow.rate": (0.1, 1.0), "ecm_boundary.stiffness": (10, 120),
-                "ecm_boundary.gap": (0.0, 0.06), "cell_grow.prestretch": (0.3, 0.9)}),
+        field="none", growth="grow",   # ecm is a CONSTRAINT/GUIDE; cell_grow is the growth source
+        params={"cell_grow.rate": (0.1, 0.6), "ecm_boundary.strength": (10, 80),
+                "ecm_boundary.aspect": (1.0, 3.0), "cell_grow.prestretch": (0.3, 0.9)}),
     "tip_localized_growth": dict(parent="migration_plus_growth", needs_operator=[],  # cell_grow mode=tip EXISTS
         field="none", growth="grow",
-        params={"cell_grow.rate": (0.1, 1.0), "cell_grow.mode": ["tip"],
-                "cell_grow.tip_sharpness": (4, 20), "cell_grow.prestretch": (0.3, 0.9)}),
+        params={"cell_grow.rate": (0.1, 0.6), "cell_grow.mode": ["tip"],
+                "cell_grow.prestretch": (0.3, 0.9)}),
     "duct_stiffness_gradient": dict(parent="migration_plus_growth", needs_operator=["stiffness_field"],
         field="static", growth="grow",
         params={"cell_grow.rate": (0.1, 0.8), "stiffness_field.lo": (30, 80),
                 "stiffness_field.hi": (100, 300), "stiffness_field.axis": ["x", "y", "radial"]}),
-    "signaling_like_field": dict(parent="migration_plus_growth", needs_operator=["growth_gate"],  # gray_scott EXISTS
+    "signaling_like_field": dict(parent="migration_plus_growth", needs_operator=[],  # growth_gate built; gray_scott Turing = TODO
         field="turing", growth="grow",
-        params={"gray_scott.DA": (0.08, 0.24), "gray_scott.DB": (0.04, 0.12),
-                "gray_scott.f": (0.030, 0.060), "gray_scott.k": (0.055, 0.065),
-                "growth_gate.gain": (0.0, 1.0)}),
+        params={"cell_grow.rate": (0.1, 0.6), "growth_gate.gain": (0.2, 1.5),
+                "growth_gate.mode": ["patch", "gradient", "ring"]}),
 }
 
 
@@ -140,18 +139,18 @@ OPERATOR_VOCAB = ["repel", "attraction_repulsion", "polar_align", "glide", "flow
                   "cell_divide", "cell_grow", "growth_field", "slow_field", "ecm_boundary",
                   "stiffness_field", "gray_scott", "growth_gate"]
 SCALAR_FEATS = ["move_speed", "repel.strength", "repel.r0", "polar_align.gamma", "cell_grow.rate",
-                "cell_divide.rate", "cell_grow.prestretch", "growth_field.scale", "slow_field.omega",
-                "ecm_boundary.stiffness", "cell_grow.tip_sharpness", "stiffness_field.lo",
+                "cell_divide.rate", "cell_grow.prestretch", "growth_field.gain", "slow_field.gain",
+                "slow_field.omega", "ecm_boundary.strength", "ecm_boundary.aspect", "stiffness_field.lo",
                 "stiffness_field.hi", "gray_scott.DA", "gray_scott.DB", "gray_scott.f",
                 "gray_scott.k", "growth_gate.gain"]
 SCALAR_RANGE = {"move_speed": (0.1, 0.6), "repel.strength": (2, 12), "repel.r0": (0.012, 0.028),
-                "polar_align.gamma": (0, 80), "cell_grow.rate": (0, 1), "cell_divide.rate": (0, 0.6),
-                "cell_grow.prestretch": (0.3, 0.9), "growth_field.scale": (0.2, 1.5),
-                "slow_field.omega": (0.1, 2.0), "ecm_boundary.stiffness": (10, 120),
-                "cell_grow.tip_sharpness": (4, 20), "stiffness_field.lo": (30, 80),
-                "stiffness_field.hi": (100, 300), "gray_scott.DA": (0.08, 0.24),
-                "gray_scott.DB": (0.04, 0.12), "gray_scott.f": (0.03, 0.06),
-                "gray_scott.k": (0.055, 0.065), "growth_gate.gain": (0, 1)}
+                "polar_align.gamma": (0, 80), "cell_grow.rate": (0, 0.6), "cell_divide.rate": (0, 0.6),
+                "cell_grow.prestretch": (0.3, 0.9), "growth_field.gain": (0.2, 1.5),
+                "slow_field.gain": (0.2, 1.5), "slow_field.omega": (0.1, 2.0),
+                "ecm_boundary.strength": (10, 80), "ecm_boundary.aspect": (1.0, 3.0),
+                "stiffness_field.lo": (30, 80), "stiffness_field.hi": (100, 300),
+                "gray_scott.DA": (0.08, 0.24), "gray_scott.DB": (0.04, 0.12),
+                "gray_scott.f": (0.03, 0.06), "gray_scott.k": (0.055, 0.065), "growth_gate.gain": (0, 1)}
 FIELD_TYPES = ["none", "static", "slow", "turing", "siren"]
 GROWTH_LAWS = ["none", "divide", "grow", "both"]
 
