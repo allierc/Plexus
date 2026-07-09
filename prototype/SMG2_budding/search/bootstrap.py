@@ -26,19 +26,45 @@ import mechanism_tree as mt
 import smg_reward as R
 
 
+_REAL_INIT = None
+
+
+def _real_init():
+    """Real SMG t=0 shape placed in the MPM disc (search/_real_init.npy, [n,2]). Every sim starts
+    from the real connected/branched gland -> observables start ON-PATH."""
+    global _REAL_INIT
+    if _REAL_INIT is None:
+        p = os.path.join(HERE, "_real_init.npy")
+        _REAL_INIT = np.load(p).astype(np.float32) if os.path.isfile(p) else np.zeros((0, 2), np.float32)
+    return _REAL_INIT
+
+
 def run_spec(spec, frames, stride, seed, dev):
     spec = copy.deepcopy(spec)
     spec["general"].pop("init", None)
-    spec["sets"]["agent"]["spawn"] = "disc"                 # real-init TODO (search worker)
+    spec["sets"]["agent"]["spawn"] = "disc"                 # spawn a disc, then overwrite with real shape
     spec["general"]["seed"] = int(seed); spec["general"]["n_frames"] = int(frames)
     f = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False)
     yaml.safe_dump(spec, f); f.close()
     caps = {"aX": [], "occ": []}
+    real = _real_init()
+    seeded = [False]
 
     def hook(H, frame):
+        a = H.level("agent")
+        if not seeded[0] and len(real):                     # REAL-INIT: seed live agents from the real gland
+            px0, px1 = a.state_schema["pos"]
+            live = (a.occ > 0).nonzero(as_tuple=True)[0]
+            n = min(len(live), len(real))
+            a.state[live[:n], px0:px1] = torch.as_tensor(real[:n], device=a.state.device,
+                                                         dtype=a.state.dtype)
+            if "vel" in a.state_schema:                     # zero stale velocity -> no teleport explosion
+                vx0, vx1 = a.state_schema["vel"]
+                a.state[live[:n], vx0:vx1] = 0.0
+            a._home = a.get("pos").detach().clone()         # home_anchor pins the real shape here
+            seeded[0] = True
         if frame % stride:
             return
-        a = H.level("agent")
         caps["aX"].append(a.get("pos").detach().cpu().numpy().copy())
         caps["occ"].append(a.occ.detach().cpu().numpy().copy())
 
