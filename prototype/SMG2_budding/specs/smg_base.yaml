@@ -1,0 +1,53 @@
+# smg_base -- SMG branching-morphogenesis forward-model SUBSTRATE (2D, phenomenological).
+# Q1 base: a cohesive epithelial tissue of self-propelled cells inside an elastic anchored
+# material (MPM). Cells align polarity to tissue flow (collective migration) and exclude each
+# other (repel). GROWTH (cell_divide) starts OFF at the base -- the loop TOGGLES mechanism
+# classes per causal question (Q1 migration-only -> Q2 +growth -> ...). No scripted bud/branch op.
+# Adapted from embryo_blastulla/specs/agent_mpm_embryo_div.yaml (known-good engine path).
+general: {name: smg_base, seed: 0, n_frames: 1200, dt: 0.002, boundary: wall}
+sets:
+  agent:
+    n: 600
+    buffer: 6000                              # dormant slots for proliferation (growth rungs)
+    spawn: disc
+    spawn_radius: 0.20
+    types:
+      epi: {fraction: 1.0, move_speed: 0.30}  # one epithelial cell type at the base
+  cell:
+    n: 1
+    start: [[0.5, 0.5]]
+    types:
+      body: {fraction: 1.0, youngs: 80}       # elastic anchored tissue substrate
+  mpm_particle: {parent: cell, per_parent: 12000, radius: 0.30, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+  - {op: radius_graph, at: agent, radius: 0.03}
+  - {op: polar_align, at: agent, gamma: 40.0, noise: 3.0}          # POLARITY (collective migration)
+  - {op: repel, at: agent, strength: 6.0, r0: 0.020}              # PAIRWISE exclusion
+  - {op: glide, at: agent}                                         # self-propulsion
+  # growth OFF at base: cell_divide added by the loop at Q2+  (rate 0 here)
+  - {op: cell_divide, at: agent, rate: 0.0, max_occ: 0.95, offset: 0.006}
+  - {op: mpm_anchor, at: mpm_particle, mode: substrate, k: 40.0}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: p2g, at: mpm_particle, to: mpm_grid, drag: 0.3, a_max: 200}
+  - {op: agent_to_mpm, at: agent, to: mpm_grid, agent_mass: 1.5e-5, k: 1.0}
+  - {op: mpm_grid_update, at: mpm_grid, surface_tension: 0.0, wall_damp: 0.7}
+  - {op: g2p, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1.0e9}
+  - {op: mpm_to_agent, at: agent, from: mpm_grid, k: 0.7, confine: 2.0}
+  - {op: flow_align, at: agent, from: mpm_grid, gain: 100.0}       # SPV: polarity <- tissue flow
+schedule:
+  - radius_graph
+  - polar_align
+  - repel
+  - glide
+  - cell_divide
+  - mpm_anchor
+  - {substep_dt: 0.0002, steps: [mpm_strain, p2g, agent_to_mpm, mpm_grid_update, g2p]}
+  - mpm_to_agent
+  - flow_align
+plotting:
+  colors: {epi: [1.0, 0.55, 0.2]}
+  background: black
+  marker: dot
+  point_size: 0.008

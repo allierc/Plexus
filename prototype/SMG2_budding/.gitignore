@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+_diag_*.png
+search/_specs/
+loop_logs/
