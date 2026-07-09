@@ -64,6 +64,8 @@ def temporal_consistency(frames, n_bud, n_branch, n_tube):
     n_branch = np.asarray(n_branch, float)
     n_tube = np.asarray(n_tube, float)
     rho = spearmanr(frames, n_bud).statistic if len(frames) > 2 else np.nan
+    if not np.isfinite(rho):          # constant n_bud (e.g. over-blur) -> Spearman NaN; no trend = 0
+        rho = 0.0
     dbud = np.abs(np.diff(n_bud)) if len(n_bud) > 1 else np.array([0.0])
     dbr = np.diff(n_branch) if len(n_branch) > 1 else np.array([0.0])
     return dict(

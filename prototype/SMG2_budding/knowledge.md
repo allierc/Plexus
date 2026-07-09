@@ -63,11 +63,20 @@ hard integer gates — exploration is guided toward the phenomenology, not pinne
 
 - **budding trajectory** — `n_bud(t)` rises **monotonically and smoothly**, ~4→~20 (≈3–5× over the run):
   score `bud_trend` (Spearman ρ→+1) and `bud_growth_ratio` (→~5), not exact integers.
-- **branching** — `n_branch` ~2→3 (few major bifurcations), `n_tube` ≡ 1 (one connected duct tree).
+- **branching** — `n_branch` ~2→3 (few major bifurcations), `n_tube` ≡ 1 (one connected duct tree),
+  and **branch genealogy** — the duct tree deepens in GENERATIONS (main duct → branch → subbranch);
+  later morphogenesis depends on this hierarchy, not just count. Eventually optimize against the
+  branch GRAPH (graph-edit distance to the real branch graph).
 - **growth** — net population ≈ ×1.3; proliferation source (`∂ρ/∂t+∇·(ρv)`) **localized at bud tips**
   (`growth_tip_localization` high), smooth in space/time.
 - **migration** — coherent PIV flow: nonzero `polar_order`, correlation length a few cell-diameters,
   tip-directed streaming (not jammed, not random).
+
+These programs are **latent tissue programs** (growth / polarity / stiffness / morphogen), not
+"fields": `field` is implementation, `tissue program` is biology. Climb their expressiveness only when
+the simpler class is exhausted — **pairwise → +static program → +slow program → +learned SIREN**
+(cardio's `f(x)→[program]`, low `omega_0` first). A SIREN introduced early explains everything and
+teaches nothing (the F(x,t) degeneracy from the opening discussion); it is the LAST rung.
 
 **Smooth-target loss (soft):** a weighted sum of (1−ρ_bud) + |log(growth_ratio/5)| +
 (1−tip_localization) + (1−polar_order_match) + branch/tube tolerance terms — minimize, don't threshold.
@@ -90,7 +99,13 @@ until then, gate on the **trajectory shape**, not the absolute integer.
 
 ---
 
-## 5. Findings ledger
+## 5. Findings — variance attribution (narrative; raw numbers live in `metrics_summary.md`)
+Which MECHANISM explains which OBSERVABLE, tagged [established]/[open]/[rejected]/[engineering]. This
+is the distilled causal STORY only — **NOT a comparison table** (that would duplicate
+`metrics_summary.md`, the single source of truth for every run's metrics). A mechanism's share = the
+drop in an observable's distance-to-the-real-trajectory when the class is ADDED vs its ablation;
+`[established]` = >2·SD across ≥3 seeds vs ablation.
+
 _(empty — first batch populates this)_
 
 ---

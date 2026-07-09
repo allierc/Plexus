@@ -215,6 +215,34 @@ def count_branches(occ, vox_um, prune_um=45.0):
     return n_branch, n_tips, H
 
 
+def branch_genealogy(H):
+    """Duct-tree HIERARCHY (generations), not just branch count.
+
+    Root the pruned junction tree at a leaf of its largest component and count,
+    along each root->leaf path, how many degree>=3 nodes (bifurcations) are
+    crossed. Returns (n_generations = max such depth, branches_per_generation).
+    main duct -> branch -> subbranch = generations 0,1,2,...
+    """
+    from collections import deque, Counter
+    if H is None or H.number_of_nodes() == 0:
+        return 0, []
+    comp = max(nx.connected_components(H), key=len)
+    T = H.subgraph(comp)
+    leaves = [n for n in T if T.degree(n) == 1]
+    root = leaves[0] if leaves else next(iter(comp))
+    gen = {root: 0}
+    dq = deque([root])
+    while dq:
+        u = dq.popleft()
+        for v in set(T.neighbors(u)):
+            if v not in gen:
+                gen[v] = gen[u] + (1 if T.degree(v) >= 3 else 0)
+                dq.append(v)
+    per_gen = Counter(gen[n] for n in T if T.degree(n) >= 3)
+    n_gen = max(gen.values()) if gen else 0
+    return n_gen, [per_gen.get(g, 0) for g in range(1, n_gen + 1)]
+
+
 # --------------------------------------------------------------------------- buds: inscribed-ellipsoid (medial radius) peaks
 def _graph_persistence(G, value):
     """H0 persistence of the superlevel sets of a node function on a graph.
