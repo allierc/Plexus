@@ -39,29 +39,30 @@ def _ssh(cmd, timeout=90, retries=3):
     return r if 'r' in dir() else None
 
 
-def submit(shards, per, frames, stride, wall):
+def submit(shards, per, frames, stride, wall, tag="", seed_from=""):
     logs = os.path.join(HERE, "_bootstrap", "logs"); os.makedirs(logs, exist_ok=True)
     clogs = f"{CROOT}/search/_bootstrap/logs"
+    sf = f"--seed-from {seed_from} " if seed_from else ""
     ids = {}
     for i in range(shards):
-        tag = f"boot{i:02d}"
-        script = os.path.join(logs, f"{tag}.sh")
+        jt = f"boot{tag}{i:02d}"
+        script = os.path.join(logs, f"{jt}.sh")
         with open(script, "w") as f:
             f.write("#!/bin/bash -l\n"
                     f"cd {CROOT}\n"
                     f"export PYTHONPATH={CSRC}:{CAM2}:{CROOT}/search\n"
                     f"echo START $(date +%s) $(hostname)\n"
                     f"{CPY} search/bootstrap.py --n {per} --seed {i} --frames {frames} "
-                    f"--stride {stride} --skip-gate --out search/_bootstrap/shard_{i:02d}\n"
+                    f"--stride {stride} --skip-gate {sf}--out search/_bootstrap/shard_{tag}{i:02d}\n"
                     f"echo END $(date +%s)\n")
-        bsub = (f"cd {CROOT} && bsub -n 4 -gpu num=1 -q {QUEUE} -W {wall} -J {tag} "
-                f"-o {clogs}/{tag}.out -e {clogs}/{tag}.err bash -l {clogs}/{tag}.sh")
+        bsub = (f"cd {CROOT} && bsub -n 4 -gpu num=1 -q {QUEUE} -W {wall} -J {jt} "
+                f"-o {clogs}/{jt}.out -e {clogs}/{jt}.err bash -l {clogs}/{jt}.sh")
         r = _ssh(bsub)
         m = re.search(r"Job <(\d+)>", r.stdout if r else "")
         if m:
-            ids[tag] = m.group(1); print(f"[submit] L4 job {m.group(1)}  {tag}", flush=True)
+            ids[jt] = m.group(1); print(f"[submit] L4 job {m.group(1)}  {jt}", flush=True)
         else:
-            print(f"[submit] FAILED {tag}: {(r.stdout if r else '')}{(r.stderr if r else '')}", flush=True)
+            print(f"[submit] FAILED {jt}: {(r.stdout if r else '')}{(r.stderr if r else '')}", flush=True)
     return ids
 
 
@@ -105,6 +106,8 @@ def main():
     ap.add_argument("--frames", type=int, default=600)
     ap.add_argument("--stride", type=int, default=20)
     ap.add_argument("--wall", type=int, default=60)
+    ap.add_argument("--tag", default="")                     # shard-dir prefix (e.g. r2 -> shard_r2NN)
+    ap.add_argument("--seed-from", default="")               # prior dataset.jsonl -> perturb winners
     ap.add_argument("--skip-gate", action="store_true")
     ap.add_argument("--merge-only", action="store_true")
     args = ap.parse_args()
@@ -122,7 +125,7 @@ def main():
 
     print(f"=== submitting {args.shards} L4 shards x {args.per} specs = {args.shards*args.per} total "
           f"(frames={args.frames}, queue={QUEUE}) ===", flush=True)
-    ids = submit(args.shards, args.per, args.frames, args.stride, args.wall)
+    ids = submit(args.shards, args.per, args.frames, args.stride, args.wall, args.tag, args.seed_from)
     if not ids:
         print("no jobs submitted (cluster/ssh?) -> aborting"); return
     poll(ids)

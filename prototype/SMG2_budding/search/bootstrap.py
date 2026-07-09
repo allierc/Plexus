@@ -101,6 +101,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default=os.path.join(HERE, "_bootstrap"))
     ap.add_argument("--skip-gate", action="store_true")
+    ap.add_argument("--seed-from", default="")   # prior dataset.jsonl -> perturb its WINNERS (round-2 exploit)
     args = ap.parse_args()
 
     print("=== pre-flight: reward calibration gate ===", flush=True)
@@ -115,15 +116,27 @@ def main():
     ds_path = os.path.join(args.out, "dataset.jsonl")
     enc_list, rows = [], []
     best = None
+    seed_pool = []                                            # winners (branch, params) to exploit
+    if args.seed_from and os.path.isfile(args.seed_from):
+        prior = [json.loads(l) for l in open(args.seed_from) if l.strip()]
+        prior = sorted([p for p in prior if p.get("value", {}).get("duct_score", 0) > 0.2],
+                       key=lambda p: p["value"]["duct_score"], reverse=True)[:15]
+        seed_pool = [(p["branch"], p["params"]) for p in prior]
+        print(f"[seed-from] perturbing {len(seed_pool)} winner specs "
+              f"(top duct {prior[0]['value']['duct_score'] if prior else '-'})", flush=True)
     t0 = time.time()
     with open(ds_path, "w") as fh:
         for i in range(args.n):
-            # biased sampling: 50% random, 25% hand-plausible, 25% perturb-best (avoids a
-            # 95%-fragment dataset -> the surrogate sees failures AND 'almost-working' tissue)
+            # biased sampling. round-1: 50% random / 25% plausible / 25% perturb-best. round-2
+            # (--seed-from): 60% perturb WINNERS / 40% random -> densify the on-path region so the
+            # surrogate sees the cluster<->duct boundary, not a 98%-fragment 'everything fails' set.
             roll = rng.random()
-            if roll >= 0.75 and best is not None:
+            if seed_pool and roll < 0.6:
+                branch, p0 = seed_pool[int(rng.integers(len(seed_pool)))]
+                params = _perturb(branch, p0, rng); mode = "perturb-winner"
+            elif not seed_pool and roll >= 0.75 and best is not None:
                 branch = best["branch"]; params = _perturb(branch, best["params"], rng); mode = "perturb"
-            elif 0.5 <= roll < 0.75:
+            elif not seed_pool and 0.5 <= roll < 0.75:
                 branch = branches[i % len(branches)]; params = _plausible(branch, rng); mode = "plausible"
             else:
                 branch = branches[i % len(branches)]; params = mt.sample_params(branch, rng); mode = "random"
