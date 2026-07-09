@@ -200,6 +200,40 @@ class StiffnessField(Lateral):
         return {}
 
 
+@register_operator("chemotax_field", level="cell", kind="lateral")
+class ChemotaxField(Lateral):
+    """Chemotaxis up a prescribed morphogen gradient: velocity = gain * normalize(grad g(x)).
+    A migration bias (the chemotaxis hypothesis), distinct from growth. strength/gain=0 -> no-op."""
+    PREDICTION = "velocity"
+    SUPPORTED_DIMS = [2]
+    PARAM_ROLES = {"gain": "chemotactic_sensitivity"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.gain = float(params.get("gain", 0.5))
+        self.mode = str(params.get("mode", "gradient"))
+        self.radius = float(params.get("gate_radius", 0.18))
+        self.axis = str(params.get("axis", "x"))
+        self.at = params.get("_at", "cell")
+
+    def forward(self, H, mask=None):
+        if self.gain == 0.0:
+            return {}
+        lvl = H.level(self.at)
+        pos, occ = lvl.get("pos"), lvl.occ
+        if pos.shape[-1] != 2:
+            return {}
+        c = pos.new_tensor([0.5, 0.5])
+        e = 0.01
+        def g(p):
+            return _spatial_gate(p, self.mode, c, self.radius, self.axis)
+        gx = (g(pos + pos.new_tensor([e, 0])) - g(pos - pos.new_tensor([e, 0]))) / (2 * e)
+        gy = (g(pos + pos.new_tensor([0, e])) - g(pos - pos.new_tensor([0, e]))) / (2 * e)
+        grad = torch.stack([gx, gy], -1)
+        n = grad / grad.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        return {self.at: self.gain * n * occ[:, None].float()}
+
+
 # ------------------------------------------------------------------ tests
 def _run(spec, frames=60, seed=0, hook=None):
     import os, sys, copy, tempfile, yaml
