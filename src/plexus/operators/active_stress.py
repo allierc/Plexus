@@ -46,6 +46,11 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
             raise ValueError("active_stress needs `direction_from:` "
                              "(a vector_grid field giving the contraction axis n)")
         self.at = params.get("_at", "particle")
+        # FRANK-STARLING (length-dependent tension, NHS/Niederer form): scale contraction by local fibre
+        # stretch lambda -> T *= 1 + stretch_activation*(lambda-1). 0 = OFF (byte-identical). Real cardiomyocytes
+        # contract HARDER when stretched; a stretch-REGULATED size lever (bigger loops without the runaway
+        # overshoot of raw amplitude/gain), aimed at the size<->direction frontier.
+        self.stretch_activation = float(params.get("stretch_activation", 0.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -61,6 +66,11 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
             gate = gate * gain                                                    # spatially-structured contraction gain
         if mask is not None:
             gate = gate * mask.float()
+        if self.stretch_activation != 0.0:                                        # FRANK-STARLING length-dependent tension
+            F = getattr(lvl, "F", None)                                           # per-particle deformation gradient [N,2,2]
+            if F is not None:
+                lam = torch.bmm(F, n[:, :, None]).squeeze(-1).norm(dim=1).clamp(min=1e-6)   # fibre stretch lambda = |F n|
+                gate = gate * (1.0 + self.stretch_activation * (lam - 1.0)).clamp(min=0.0)  # T *= 1+beta*(lambda-1)
         nn = n[:, :, None] * n[:, None, :]                                        # [N, 2, 2]  n n^T
         # Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the
         # elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this

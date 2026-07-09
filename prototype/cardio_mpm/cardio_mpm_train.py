@@ -474,6 +474,18 @@ def main():
     # GLOBAL fixed knobs (swept per slot, not differentiated -- like amplitude/drag in train.py)
     ap.add_argument("--amplitude", type=float, default=10.0, help="active-stress amplitude (FIXED knob; plan constrains 10-15)")
     ap.add_argument("--drag_k", type=float, default=30.0, help="overdamped drag k (FIXED knob)")
+    # PHASE-3 ACTIVE TORQUE (mpm_spin): the frontier-breaker. The size<->direction frontier exists because the
+    # ONLY chirality source is rot_stress (rotating contraction axis) -- pushing it to fill SIZE over-rotates and
+    # decoheres chirality. mpm_spin injects a rigid-rotation body force v_rot=omega*perp(x-c), supplying
+    # CIRCULATION/CHIRALITY as a torque DECOUPLED from the contraction axis: reach real SIZE via rot_stress/--tau
+    # while mpm_spin independently restores chirality. Registered active-matter operator (used by embryo/SMG2).
+    ap.add_argument("--spin_omega", type=float, default=0.0, help="mpm_spin target angular velocity (rad/time); sign = chirality sense (CCW/CW)")
+    ap.add_argument("--spin_k", type=float, default=0.0, help="mpm_spin controller gain (0=OFF, op NOT applied = exact baseline; >0 enables the "
+                    "active torque). NOTE: spin_k>0 with omega=0 is pure velocity DAMPING, not a torque -- set omega too.")
+    ap.add_argument("--stretch_activation", type=float, default=0.0, help="PHASE-3 FRANK-STARLING length-dependent tension "
+                    "(0=OFF, exact baseline). >0 scales active tension by local fibre stretch: T *= 1+beta*(lambda-1), lambda=|F n| "
+                    "(Chaste NHS/Niederer form). Real cardiomyocytes contract HARDER when stretched -> a stretch-REGULATED size lever "
+                    "(bigger loops without raw-amplitude overshoot); second frontier-breaker alongside --spin_omega.")
     ap.add_argument("--pulse_skew", type=float, default=1.0, help="activation time-asymmetry (FIXED knob): "
                     "release/rise Gaussian-width ratio. 1.0 = symmetric (default). >1 = fast contract, "
                     "slow release (physiological twitch); <1 = slow contract, fast release. Size-mechanism probe.")
@@ -585,8 +597,13 @@ def main():
     # fixed per-slot mechanism knobs (swept by the plan -- not differentiated, exactly like train.py)
     ops = _ops_by_name(spec, str(dev))
     ops["active_stress"].amplitude = float(args.amplitude)
+    ops["active_stress"].stretch_activation = float(args.stretch_activation)   # PHASE-3 Frank-Starling (0=OFF baseline)
     ops["drag"].k = float(args.drag_k)            # op renamed mpm_drag -> drag (emit: mpm_acceleration) by M2 refactor
     force_ops = ["active_stress", "drag"]
+    if args.spin_k != 0.0:                                          # PHASE-3 ACTIVE TORQUE: chirality decoupled from the contraction axis
+        ops["mpm_spin"] = get_operator("mpm_spin")(
+            {"omega": float(args.spin_omega), "spin_k": float(args.spin_k), "_at": "mpm_particle"}, str(dev))
+        force_ops = force_ops + ["mpm_spin"]                        # body force summed into H.delta, consumed by mpm_scatter (like drag)
     mpm_ops = ["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"]   # p2g->mpm_scatter, g2p->mpm_gather (948ff60 transfer-family rename)
     spatial = _spatial_profile(profile, center, radius, dev)
     # TRAVELLING-WAVE activation phase tau(x,y): a coarse PLANE WAVE (action-potential propagation).
