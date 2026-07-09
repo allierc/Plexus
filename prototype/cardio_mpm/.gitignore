@@ -2,3 +2,5 @@ archive/
 *.pt
 *.mp4
 __pycache__/
+*.npz          # real-data (cardio_real.npz, 54MB) — regenerate via cardio_data.py save from Cardio_1
+*.bak_*
