@@ -23,7 +23,7 @@ BASE = {
                 "boundary": "wall", "init": "real_smg"},   # init -> worker seeds from x_list[0]
     "sets": {
         "agent": {"n": 600, "buffer": 6000, "spawn": "real", "spawn_radius": 0.20,
-                  "types": {"epi": {"fraction": 1.0, "move_speed": 0.30}}},
+                  "types": {"epi": {"fraction": 1.0, "move_speed": 0.06}}},   # low: anchor holds the real shape
         "cell": {"n": 1, "start": [[0.5, 0.5]], "types": {"body": {"fraction": 1.0, "youngs": 80}}},
         "mpm_particle": {"parent": "cell", "per_parent": 12000, "radius": 0.30, "density": 1.0},
     },
@@ -41,13 +41,14 @@ BASE = {
         {"op": "mpm_grid_update", "at": "mpm_grid", "surface_tension": 0.0, "wall_damp": 0.7},
         {"op": "g2p", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 0.7,
          "wall_contact": 0.04, "vmax": 1.0e9},
-        {"op": "mpm_to_agent", "at": "agent", "from": "mpm_grid", "k": 0.7, "confine": 2.0},
+        {"op": "mpm_to_agent", "at": "agent", "from": "mpm_grid", "k": 0.7, "confine": 0.4},   # weak: don't re-round the real shape
         {"op": "flow_align", "at": "agent", "from": "mpm_grid", "gain": 100.0},
+        {"op": "home_anchor", "at": "agent", "k": 100.0},      # hold the real-init shape (metastable)
     ],
     "schedule": ["radius_graph", "polar_align", "repel", "glide", "cell_divide", "mpm_anchor",
                  {"substep_dt": 0.0002, "steps": ["mpm_strain", "p2g", "agent_to_mpm",
                                                   "mpm_grid_update", "g2p"]},
-                 "mpm_to_agent", "flow_align"],
+                 "mpm_to_agent", "flow_align", "home_anchor"],
     "plotting": {"colors": {"epi": [1.0, 0.55, 0.2]}, "background": "black",
                  "marker": "dot", "point_size": 0.008},
 }

@@ -200,6 +200,33 @@ class StiffnessField(Lateral):
         return {}
 
 
+@register_operator("home_anchor", level="cell", kind="lateral")
+class HomeAnchor(Lateral):
+    """Soft spring pinning agents to their HOME positions: F = -k (x - x_home). Preserves the
+    real-init branched shape as a metastable reference so growth/adhesion can DEFORM it locally
+    instead of it collapsing to a blob. `x_home` is set by the worker after real-init (lvl._home);
+    if unset, no-op. k=0 no-op."""
+    PREDICTION = "velocity"
+    SUPPORTED_DIMS = [2, 3]
+    PARAM_ROLES = {"k": "anchor_stiffness"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.k = float(params.get("k", 6.0))
+        self.at = params.get("_at", "cell")
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        if self.k == 0.0 or not hasattr(lvl, "_home"):
+            return {}
+        pos, occ = lvl.get("pos"), lvl.occ
+        home = lvl._home
+        n = min(pos.shape[0], home.shape[0])
+        f = torch.zeros_like(pos)
+        f[:n] = -self.k * (pos[:n] - home[:n])
+        return {self.at: f * occ[:, None].float()}
+
+
 @register_operator("chemotax_field", level="cell", kind="lateral")
 class ChemotaxField(Lateral):
     """Chemotaxis up a prescribed morphogen gradient: velocity = gain * normalize(grad g(x)).
