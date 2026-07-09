@@ -71,6 +71,28 @@ def observe(caps):
     return o, polar, growth, area_ratio
 
 
+def _plausible(branch, rng):
+    """A hand-plausible spec: mid-range numerics (less blow-up than extremes) + sensible choices."""
+    p = {}
+    for k, r in mt.BRANCHES[branch]["params"].items():
+        if isinstance(r, list):
+            p[k] = str(r[0])
+        else:
+            lo, hi = r
+            p[k] = float(np.clip((lo + hi) / 2 + rng.normal(0, 0.15 * (hi - lo)), lo, hi))
+    return p
+
+
+def _perturb(branch, params, rng):
+    """Small gaussian perturbation around a known-good spec (exploit the best morphology so far)."""
+    p = dict(params)
+    for k, r in mt.BRANCHES[branch]["params"].items():
+        if k in p and not isinstance(r, list):
+            lo, hi = r
+            p[k] = float(np.clip(p[k] + rng.normal(0, 0.12 * (hi - lo)), lo, hi))
+    return p
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=320)
@@ -92,11 +114,19 @@ def main():
     rng = np.random.default_rng(args.seed)
     ds_path = os.path.join(args.out, "dataset.jsonl")
     enc_list, rows = [], []
+    best = None
     t0 = time.time()
     with open(ds_path, "w") as fh:
         for i in range(args.n):
-            branch = branches[i % len(branches)]             # stratified round-robin over branches
-            params = mt.sample_params(branch, rng)
+            # biased sampling: 50% random, 25% hand-plausible, 25% perturb-best (avoids a
+            # 95%-fragment dataset -> the surrogate sees failures AND 'almost-working' tissue)
+            roll = rng.random()
+            if roll >= 0.75 and best is not None:
+                branch = best["branch"]; params = _perturb(branch, best["params"], rng); mode = "perturb"
+            elif 0.5 <= roll < 0.75:
+                branch = branches[i % len(branches)]; params = _plausible(branch, rng); mode = "plausible"
+            else:
+                branch = branches[i % len(branches)]; params = mt.sample_params(branch, rng); mode = "random"
             seed = int(rng.integers(0, 100000))
             spec = mt.build_spec(branch, params, seed=seed, frames=args.frames)
             caps, err = run_spec(spec, args.frames, args.stride, seed, dev)

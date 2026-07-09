@@ -52,13 +52,15 @@ migration_coherence · target_distance`. **Key design point:** a cluster and a n
 
   Gate checks all PASS: real duct>0.6, cluster<0.2, class=branch-like, duct ≫ cluster/blob duct.
 
-## 6. Mechanism tree — the search space (`mechanism_tree.py`)
-8 branches, each owning `{allowed operators, parameter ranges}`; UCB decides which family gets compute,
-specs are sampled *within* a branch, all built on the real-init substrate:
-`pairwise_only · migration_plus_growth · static_growth_field · slow_growth_field ·
-boundary_guided_growth · tip_localized_growth · duct_stiffness_gradient · signaling_like_field`.
-A structured **encoder** (48-D: operators-present multi-hot, normalized scalar params, field-type /
-growth-law / pairwise-law / branch one-hots) turns any (branch, params) into the surrogate's input.
+## 6. Mechanism tree — a tree over BIOLOGICAL HYPOTHESES (`mechanism_tree.py`)
+7 branches, each activating **one biological hypothesis** (not an operator list) so the search is
+scientifically interpretable, not just combinatorial; UCB decides which hypothesis gets compute, specs
+are sampled *within* a branch, all built on the real-init substrate:
+`baseline_migration` (null control) · **differential_adhesion** (cell-cell vs cell-matrix, Wang–Yamada)
+· **chemotaxis** · **ecm_guidance** (deformable boundary) · **growth_instability** (differential growth
+buckles) · **reaction_diffusion** (Turing prepattern) · **mechanical_buckling** (stiffness heterogeneity).
+A structured **encoder** (47-D: operators-present multi-hot, normalized scalar params, field-type /
+growth-law / branch one-hots) turns any (branch, params) into the surrogate's input.
 
 ## 7. Operators — palette gaps, grounded in the vendored repos
 A branch can only be reached if its operators exist. Missing operators, mapped to source algorithms:
@@ -71,10 +73,13 @@ A branch can only be reached if its operators exist. Missing operators, mapped t
 These are built + unit-tested (register + one step on the base substrate) **before** the bootstrap.
 
 ## 8. Search algorithm
-1. **Bootstrap the failure manifold first** — 200–500 **stratified-random** specs (over branches, not just
-   params) → run on GPU → dataset (`encoding → value vector → failure class`). Without this, the tree has
-   no prior and rediscovers clusters.
-2. **Train an ensemble surrogate** (RandomForest first; MLP ensemble later) `spec → value vector`;
+1. **Bootstrap the failure manifold first** — 200–500 specs (stratified over branches) → run on GPU →
+   dataset (`encoding → value vector → failure class`). Sampling is **biased 50% random / 25%
+   hand-plausible / 25% perturb-best** (not pure-uniform) so the dataset contains failures AND
+   "almost-working" tissue — otherwise it is ~95% fragments = an "everything fails" value function.
+2. **Train an ensemble surrogate** — `spec → MORPHOLOGY VECTOR` (`{duct, cluster, bud, branch_count,
+   migration, growth_ratio, …}`), **not a scalar reward**; reward is computed *from* the predicted
+   vector (richer supervision, smoother landscape, interpretable errors, reusable). RandomForest first;
    **ensemble variance = epistemic uncertainty** for exploration.
 3. **Gate the surrogate** — held-out R² and failure-class separability before trusting it.
 4. **UCB over branches** (shallow bandit first; MCTS with add-mechanism edges later) → surrogate
@@ -85,10 +90,10 @@ These are built + unit-tested (register + one step on the base substrate) **befo
 | file | role | status |
 |---|---|---|
 | `smg_reward.py` | value vector · failure taxonomy · stage reward · **calibration gate** | **built; gate PASSES** |
-| `mechanism_tree.py` | 8 branches · spec generator · 48-D encoder | **built; 5 palette gaps flagged** |
-| `operators_smg.py` | the missing operators (ecm_boundary first) | next |
-| `bootstrap.py` | stratified-random → dataset | queued |
-| `surrogate.py` | ensemble spec→metrics + uncertainty | queued |
+| `mechanism_tree.py` | 7 hypothesis branches · spec generator · 47-D encoder | **built; all branches build+run** |
+| `operators_smg.py` | `ecm_boundary`·`growth_field`·`slow_field`·`growth_gate`·`chemotax_field`·`stiffness_field` | **built + tested** (ecm 3-test contract passes) |
+| `bootstrap.py` | biased (50/25/25) stratified → dataset | **built + validated** (all 7 branches run) |
+| `surrogate.py` | ensemble `spec → morphology vector` + uncertainty | **next** |
 | `ucb_loop.py` | UCB over branches + surrogate pre-screen | queued |
 
 ## 10. Open questions for the reviewer

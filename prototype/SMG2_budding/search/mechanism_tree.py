@@ -1,18 +1,16 @@
-"""mechanism_tree -- the search space as a TREE OVER MECHANISMS (not raw YAML).
+"""mechanism_tree -- the search space as a tree over BIOLOGICAL HYPOTHESES (not operator lists).
 
-Each branch = a hypothesis family that OWNS its allowed operators + parameter ranges. UCB decides
-which family deserves compute; specs are sampled WITHIN a branch. Every spec is built on the SMG
-substrate INITIALIZED FROM THE REAL DATA (general.init = real_smg -> the worker seeds cell positions
-from x_list frame 0). A structured ENCODER turns any (branch, params) into a fixed feature vector so
-the surrogate can predict the metric vector.
+Each branch activates ONE hypothesis family (differential adhesion / chemotaxis / ECM guidance /
+growth instability / reaction-diffusion / mechanical buckling) so the search is scientifically
+interpretable, not merely combinatorial. UCB decides which hypothesis deserves compute; specs are
+sampled WITHIN a branch. Every spec is built on the SMG substrate INITIALIZED FROM THE REAL DATA
+(general.init = real_smg -> the worker seeds cell positions from x_list frame 0). A structured
+ENCODER turns any (branch, params) into a fixed feature vector for the surrogate.
 
-  BRANCHES                     -> {operators, param ranges, needs_operator (TODO palette gaps)}
+  BRANCHES                     -> {hypothesis, operators, param ranges, needs_operator}
   sample_params(branch, rng)   -> a params dict
   build_spec(branch, params..) -> a Plexus spec dict (dump with write_spec)
   encode(branch, params)       -> (feature vector, feature names)  for the surrogate
-
-`needs_operator` marks the operators the branch REQUIRES that are not yet in the palette -> build
-those in operators_smg.py BEFORE the bootstrap, else that branch can only make clusters.
 """
 from __future__ import annotations
 import os, copy, hashlib
@@ -54,40 +52,37 @@ BASE = {
                  "marker": "dot", "point_size": 0.008},
 }
 
-# ------------------------------------------------------------------ the mechanism tree
-# param range = (lo, hi) numeric  OR  [choices]. needs_operator = palette gaps to build first.
+# ------------------------------------------------------------------ hypothesis branches
+# param range = (lo, hi) numeric OR [choices]. Each branch = ONE biological hypothesis.
 BRANCHES = {
-    "pairwise_only": dict(parent="root", needs_operator=[], field="none", growth="none",
-        params={"repel.strength": (2, 12), "repel.r0": (0.012, 0.028),
-                "polar_align.gamma": (0, 80), "move_speed": (0.10, 0.60),
-                "pairwise_law": ["repel", "attraction_repulsion"]}),
-    "migration_plus_growth": dict(parent="pairwise_only", needs_operator=[], field="none", growth="both",
-        params={"polar_align.gamma": (10, 80), "move_speed": (0.15, 0.50),
-                "cell_divide.rate": (0.0, 0.6), "cell_grow.rate": (0.0, 0.6)}),
-    "static_growth_field": dict(parent="migration_plus_growth", needs_operator=["growth_field"],
-        field="static", growth="grow",
-        params={"cell_grow.rate": (0.1, 0.6), "growth_field.gain": (0.2, 1.5),
-                "growth_field.mode": ["patch", "gradient", "ring"], "cell_grow.prestretch": (0.3, 0.9)}),
-    "slow_growth_field": dict(parent="static_growth_field", needs_operator=["slow_field"],
-        field="slow", growth="grow",
-        params={"cell_grow.rate": (0.1, 0.6), "slow_field.gain": (0.2, 1.5),
-                "slow_field.omega": (0.1, 2.0)}),
-    "boundary_guided_growth": dict(parent="migration_plus_growth", needs_operator=["ecm_boundary"],
-        field="none", growth="grow",   # ecm is a CONSTRAINT/GUIDE; cell_grow is the growth source
-        params={"cell_grow.rate": (0.1, 0.6), "ecm_boundary.strength": (10, 80),
-                "ecm_boundary.aspect": (1.0, 3.0), "cell_grow.prestretch": (0.3, 0.9)}),
-    "tip_localized_growth": dict(parent="migration_plus_growth", needs_operator=[],  # cell_grow mode=tip EXISTS
-        field="none", growth="grow",
-        params={"cell_grow.rate": (0.1, 0.6), "cell_grow.mode": ["tip"],
-                "cell_grow.prestretch": (0.3, 0.9)}),
-    "duct_stiffness_gradient": dict(parent="migration_plus_growth", needs_operator=["stiffness_field"],
-        field="static", growth="grow",
-        params={"cell_grow.rate": (0.1, 0.8), "stiffness_field.lo": (30, 80),
-                "stiffness_field.hi": (100, 300), "stiffness_field.axis": ["x", "y", "radial"]}),
-    "signaling_like_field": dict(parent="migration_plus_growth", needs_operator=[],  # growth_gate built; gray_scott Turing = TODO
-        field="turing", growth="grow",
-        params={"cell_grow.rate": (0.1, 0.6), "growth_gate.gain": (0.2, 1.5),
-                "growth_gate.mode": ["patch", "gradient", "ring"]}),
+    "baseline_migration": dict(hypothesis="null: collective migration + exclusion, NO growth (control)",
+        parent="root", needs_operator=[], field="none", growth="none",
+        params={"repel.strength": (2, 12), "repel.r0": (0.012, 0.028), "polar_align.gamma": (0, 80),
+                "move_speed": (0.10, 0.60), "pairwise_law": ["repel", "attraction_repulsion"]}),
+    "differential_adhesion": dict(hypothesis="cell-cell vs cell-matrix adhesion differential drives budding (Wang-Yamada)",
+        parent="baseline_migration", needs_operator=[], field="none", growth="grow",
+        params={"pairwise_law": ["attraction_repulsion"], "ecm_boundary.strength": (10, 80),
+                "ecm_boundary.adhesion": (0.1, 1.0), "cell_grow.rate": (0.1, 0.6)}),
+    "chemotaxis": dict(hypothesis="cells migrate up a morphogen gradient, shaping ducts",
+        parent="baseline_migration", needs_operator=[], field="static", growth="grow",
+        params={"chemotax_field.gain": (0.1, 1.0), "chemotax_field.mode": ["gradient", "patch", "ring"],
+                "cell_grow.rate": (0.1, 0.6)}),
+    "ecm_guidance": dict(hypothesis="a deformable ECM boundary GUIDES bud/duct shape (constraint, not the growth source)",
+        parent="baseline_migration", needs_operator=[], field="none", growth="grow",
+        params={"ecm_boundary.strength": (10, 80), "ecm_boundary.aspect": (1.0, 3.0),
+                "cell_grow.rate": (0.1, 0.6), "cell_grow.prestretch": (0.3, 0.9)}),
+    "growth_instability": dict(hypothesis="localized/differential growth BUCKLES the tissue into buds",
+        parent="baseline_migration", needs_operator=[], field="static", growth="grow",
+        params={"growth_field.gain": (0.2, 1.5), "growth_field.mode": ["patch", "gradient", "ring"],
+                "cell_grow.rate": (0.1, 0.6), "cell_grow.mode": ["isotropic", "tip"]}),
+    "reaction_diffusion": dict(hypothesis="a Turing morphogen prepattern GATES budding (wavelength-set)",
+        parent="baseline_migration", needs_operator=[], field="turing", growth="grow",  # gray_scott Turing = TODO
+        params={"growth_gate.gain": (0.2, 1.5), "growth_gate.mode": ["patch", "gradient", "ring"],
+                "cell_grow.rate": (0.1, 0.6)}),
+    "mechanical_buckling": dict(hypothesis="stiffness heterogeneity (soft ducts) BUCKLES the growing tissue",
+        parent="baseline_migration", needs_operator=[], field="static", growth="grow",
+        params={"stiffness_field.lo": (30, 80), "stiffness_field.hi": (100, 300),
+                "stiffness_field.axis": ["x", "y", "radial"], "cell_grow.rate": (0.1, 0.6)}),
 }
 
 
@@ -99,16 +94,18 @@ def sample_params(branch, rng):
 
 
 # ------------------------------------------------------------------ spec builder
+_OP_AT = {"stiffness_field": "mpm_particle"}                    # ops that live on a non-agent level
+
+
 def _set_op(spec, opname, **kw):
     for o in spec["operators"]:
         if o["op"] == opname:
             o.update(kw); return
-    spec["operators"].append({"op": opname, "at": "agent", **kw})
+    spec["operators"].append({"op": opname, "at": _OP_AT.get(opname, "agent"), **kw})
 
 
 def build_spec(branch, params, seed=0, frames=1200):
-    """Compose the branch's mechanism onto the real-init base. Returns a spec dict.
-    (NEW operators named in needs_operator are emitted as ops here; operators_smg.py must register them.)"""
+    """Compose the branch's hypothesis onto the real-init base. Returns a spec dict."""
     s = copy.deepcopy(BASE)
     s["general"]["seed"] = int(seed); s["general"]["n_frames"] = int(frames)
     s["general"]["name"] = branch
@@ -116,12 +113,16 @@ def build_spec(branch, params, seed=0, frames=1200):
         if k == "move_speed":
             s["sets"]["agent"]["types"]["epi"]["move_speed"] = v
         elif k == "pairwise_law" and v == "attraction_repulsion":
-            _set_op(s, "attraction_repulsion", p=[0.6, 0.05, 6.0, 0.02])
+            for t in s["sets"]["agent"]["types"].values():
+                t["p"] = [0.6, 0.05, 6.0, 0.02]                          # pull, pull_range, push, push_range
+            _set_op(s, "attraction_repulsion", sigma=0.02, aggr="sum")   # cell-cell adhesion+repulsion
+            if "attraction_repulsion" not in [o for o in s["schedule"] if isinstance(o, str)]:
+                s["schedule"].insert(3, "attraction_repulsion")
         elif "." in k:
             op, param = k.split(".", 1)
             _set_op(s, op, **{param: v})
             if op not in [o for o in s["schedule"] if isinstance(o, str)] and op != "attraction_repulsion":
-                s["schedule"].insert(5, op)          # run new mechanism after glide/divide
+                s["schedule"].insert(5, op)
     return s
 
 
@@ -136,21 +137,21 @@ def write_spec(spec, out_dir):
 
 # ------------------------------------------------------------------ structured encoder (surrogate input)
 OPERATOR_VOCAB = ["repel", "attraction_repulsion", "polar_align", "glide", "flow_align",
-                  "cell_divide", "cell_grow", "growth_field", "slow_field", "ecm_boundary",
-                  "stiffness_field", "gray_scott", "growth_gate"]
+                  "cell_divide", "cell_grow", "ecm_boundary", "growth_field", "slow_field",
+                  "growth_gate", "chemotax_field", "stiffness_field", "gray_scott"]
 SCALAR_FEATS = ["move_speed", "repel.strength", "repel.r0", "polar_align.gamma", "cell_grow.rate",
-                "cell_divide.rate", "cell_grow.prestretch", "growth_field.gain", "slow_field.gain",
-                "slow_field.omega", "ecm_boundary.strength", "ecm_boundary.aspect", "stiffness_field.lo",
-                "stiffness_field.hi", "gray_scott.DA", "gray_scott.DB", "gray_scott.f",
-                "gray_scott.k", "growth_gate.gain"]
+                "cell_divide.rate", "cell_grow.prestretch", "ecm_boundary.strength",
+                "ecm_boundary.aspect", "ecm_boundary.adhesion", "growth_field.gain", "slow_field.gain",
+                "slow_field.omega", "chemotax_field.gain", "growth_gate.gain", "stiffness_field.lo",
+                "stiffness_field.hi"]
 SCALAR_RANGE = {"move_speed": (0.1, 0.6), "repel.strength": (2, 12), "repel.r0": (0.012, 0.028),
                 "polar_align.gamma": (0, 80), "cell_grow.rate": (0, 0.6), "cell_divide.rate": (0, 0.6),
-                "cell_grow.prestretch": (0.3, 0.9), "growth_field.gain": (0.2, 1.5),
-                "slow_field.gain": (0.2, 1.5), "slow_field.omega": (0.1, 2.0),
-                "ecm_boundary.strength": (10, 80), "ecm_boundary.aspect": (1.0, 3.0),
-                "stiffness_field.lo": (30, 80), "stiffness_field.hi": (100, 300),
-                "gray_scott.DA": (0.08, 0.24), "gray_scott.DB": (0.04, 0.12),
-                "gray_scott.f": (0.03, 0.06), "gray_scott.k": (0.055, 0.065), "growth_gate.gain": (0, 1)}
+                "cell_grow.prestretch": (0.3, 0.9), "ecm_boundary.strength": (10, 80),
+                "ecm_boundary.aspect": (1.0, 3.0), "ecm_boundary.adhesion": (0.0, 1.0),
+                "growth_field.gain": (0.2, 1.5), "slow_field.gain": (0.2, 1.5),
+                "slow_field.omega": (0.1, 2.0), "chemotax_field.gain": (0.1, 1.0),
+                "growth_gate.gain": (0.2, 1.5), "stiffness_field.lo": (30, 80),
+                "stiffness_field.hi": (100, 300)}
 FIELD_TYPES = ["none", "static", "slow", "turing", "siren"]
 GROWTH_LAWS = ["none", "divide", "grow", "both"]
 
@@ -164,18 +165,22 @@ def encode(branch, params):
         ops.add("cell_divide")
     if params.get("pairwise_law") == "attraction_repulsion":
         ops.add("attraction_repulsion")
+    for op in ("ecm_boundary", "growth_field", "slow_field", "growth_gate", "chemotax_field",
+               "stiffness_field"):
+        if any(k.startswith(op + ".") for k in params):
+            ops.add(op)
     ops |= {"repel", "polar_align", "glide", "flow_align"}
     feat, names = [], []
-    for op in OPERATOR_VOCAB:                          # operators-present multi-hot
+    for op in OPERATOR_VOCAB:
         feat.append(1.0 if op in ops else 0.0); names.append(f"has_{op}")
-    for k in SCALAR_FEATS:                             # normalized scalar params
+    for k in SCALAR_FEATS:
         lo, hi = SCALAR_RANGE[k]; v = params.get(k, lo)
         feat.append(float((v - lo) / (hi - lo + 1e-9))); names.append(k)
-    for ft in FIELD_TYPES:                             # field type one-hot
+    for ft in FIELD_TYPES:
         feat.append(1.0 if b["field"] == ft else 0.0); names.append(f"field_{ft}")
-    for gl in GROWTH_LAWS:                             # growth law one-hot
+    for gl in GROWTH_LAWS:
         feat.append(1.0 if b["growth"] == gl else 0.0); names.append(f"growth_{gl}")
-    for br in BRANCHES:                                # branch one-hot
+    for br in BRANCHES:
         feat.append(1.0 if br == branch else 0.0); names.append(f"branch_{br}")
     return np.array(feat, np.float32), names
 
@@ -183,19 +188,13 @@ def encode(branch, params):
 # ------------------------------------------------------------------ audit
 if __name__ == "__main__":
     rng = np.random.default_rng(0)
-    todo = {}
-    print(f"{'branch':24} {'#ops-needed':>11}  needs_operator")
+    print(f"{'branch':22} {'hypothesis'}")
     for b in BRANCHES:
-        need = BRANCHES[b]["needs_operator"]
-        for op in need:
-            todo[op] = todo.get(op, 0) + 1
+        print(f"{b:22} {BRANCHES[b]['hypothesis']}")
         p = sample_params(b, rng)
         vec, names = encode(b, p)
-        print(f"{b:24} {len(need):>11}  {need}")
     print(f"\nfeature-vector length = {len(vec)}")
-    print(f"\nPALETTE GAPS to build in operators_smg.py BEFORE bootstrap: {sorted(todo)}")
-    # sanity: build+write one spec per branch
     outd = os.path.join(os.path.dirname(__file__), "_specs")
     for b in BRANCHES:
-        sp = write_spec(build_spec(b, sample_params(b, rng)), outd)
+        write_spec(build_spec(b, sample_params(b, rng)), outd)
     print(f"wrote {len(BRANCHES)} sample specs to {outd}")
