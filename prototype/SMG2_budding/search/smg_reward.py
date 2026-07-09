@@ -273,8 +273,8 @@ def calibration_gate():
     for k, ok in checks.items():
         print(f"  [{'PASS' if ok else 'FAIL'}] {k}")
     passed = all(checks.values())
-    print(f"\n=== CALIBRATION GATE: {'PASS — reward approved, search may start'
-                                   if passed else 'FAIL — do NOT start search'} ===")
+    msg = "PASS — reward approved, search may start" if passed else "FAIL — do NOT start search"
+    print(f"\n=== CALIBRATION GATE: {msg} ===")
     return passed
 
 

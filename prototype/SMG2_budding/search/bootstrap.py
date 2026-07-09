@@ -11,7 +11,7 @@ not yet wired, so `signaling_like_field` uses growth_gate's prescribed-field fal
 """
 import os, sys, json, time, argparse, copy, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, "/workspace/Plexus/src")
+sys.path.insert(0, os.path.join(HERE, "..", "..", "..", "src"))          # Plexus/src (portable: /workspace or cluster)
 sys.path.insert(0, os.path.join(HERE, "..", "..", "active_matter2"))
 sys.path.insert(0, HERE)
 import numpy as np
