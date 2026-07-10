@@ -6,7 +6,7 @@ subtitle: "A boids steering rule (Lateral, second-derivative)."
 ::: {.op-head}
 ![](../figures/icons/lateral.png){.op-logo}
 
-[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: second_derivative`]{.op-badge}
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
 A boids steering rule (Lateral, second-derivative).
 :::
@@ -36,8 +36,8 @@ A boids steering rule (Lateral, second-derivative).
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `separation`  (per-type props: `separation`)
-- **Writes / returns** &mdash; returns an **acceleration** &mdash; $v \mathrel{+}= \Delta t\,\delta;\ x \mathrel{+}= \Delta t\,v$.
-- **Prediction** &mdash; `second_derivative`.
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
 - **Dimensions** &mdash; 2D, 3D.
 
 ## Mechanism
@@ -71,11 +71,10 @@ operators:
 ## Mechanism-search tags
 
 **Mechanism** &mdash; [`short_range_repulsion`]{.op-badge} [`collision_avoidance`]{.op-badge}  
-**Morphology prior** &mdash; [`even_spacing`]{.op-badge}
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`drag`](drag.qmd), [`advance`](advance.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
@@ -97,13 +96,13 @@ from plexus.models.registry import register_operator
 from plexus.geometry import neighbour_mean
 
 
-@register_operator("separation", level="particle", kind="lateral")
+@register_operator("separation", family="interaction", level="particle", kind="lateral")
 class Separation(Lateral):
-    PREDICTION = "second_derivative"
+    EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
+    REQUIRES_PARAMS = []                             # no required params — `scale` optional (separation is a type prop)
     REQUIRES_TYPE_PROPS = ["separation"]
     MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]
-    MORPHOLOGY_PRIOR = ["even_spacing"]
     PARAM_ROLES = {"scale": "separation_strength"}
 
     def __init__(self, params, device="cpu"):

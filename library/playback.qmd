@@ -1,6 +1,6 @@
 ---
 title: "playback"
-subtitle: "A scalar field *prescribed* from an external video, plus the"
+subtitle: "A scalar field *prescribed* from external data (currently a"
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "A scalar field *prescribed* from an external video, plus the"
 
 [`field`]{.op-badge} [`acts on: field`]{.op-badge} [`prediction: none`]{.op-badge}
 
-A scalar field *prescribed* from an external video, plus the
+A scalar field *prescribed* from external data (currently a
 :::
 
 ```{=html}
@@ -42,7 +42,7 @@ A scalar field *prescribed* from an external video, plus the
 
 ## Mechanism
 
-`playback` operator that advances it frame by frame.
+video), plus the `playback` operator that advances it frame by frame.
 
 Some fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded
 movie becomes a time-varying scalar field over the domain. The field is pure state
@@ -66,19 +66,29 @@ operators:
   - {op: playback, at: field}
 ```
 
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`prescribed_field`]{.op-badge} [`video_playback`]{.op-badge} [`data_driven_field`]{.op-badge}  
+
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 
-[`src/plexus/operators/video_field.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/video_field.py) &mdash; the registered operator.
+[`src/plexus/operators/prescribed_field.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/prescribed_field.py) &mdash; the registered operator.
 
 ```python
-@register_operator("playback", level="field", kind="field")
+@register_operator("playback", family="fields", level="field", kind="field")
 class Playback(FieldUpdate):
     """field <- data: set the field grid to the current tick's video frame (looping).
     Reads the engine's current frame from `H.frame`. Mutates the field, returns {}."""
+
+    EMIT = None                 # field->field: writes the grid in place from the video; returns {} — no integrable delta
+    SUPPORTED_DIMS = [2]        # 2D grid field playback
+    REQUIRES_PARAMS = []        # no required params — `_at` (the field to advance) is engine-injected
+    MECHANISM_TAGS = ["prescribed_field", "video_playback", "data_driven_field"]
+    PARAM_ROLES = {}            # reads no tunable params (only the structural `_at`)
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

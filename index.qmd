@@ -7,15 +7,12 @@ resources:
 
 ::: {.callout-note appearance="simple"}
 **Operators adapted from prior work.** Plexus re-implements published simulation code
-as registered operators: attraction–repulsion, boids, and rock–paper–scissors
-reaction–diffusion from [ParticleGraph](https://github.com/allierc/ParticleGraph);
-the slime-mould (Physarum)
+as registered operators: attraction–repulsion and boids from
+[ParticleGraph](https://github.com/allierc/ParticleGraph); the slime-mould (Physarum)
 agent from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation);
-the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from
-[*The Well*](https://github.com/PolymathicAI/the_well) (Ohana et al., NeurIPS 2024); and
-the ciliate microswimmer from
-[Liu, Costello & Kanso](https://github.com/jingyiliu1900/Flow-Physics-drives-functional-design-of-microswimmers)
-(*Nat. Commun.* 2025).
+softened self-gravity from Philip Mocz's *Create Your Own N-body Simulation* (2020); the
+continuum solver from MLS-MPM (Hu et al. 2018); and the strange attractors from their
+originating papers (Lorenz 1963, Rössler 1976, Sprott 1994, …).
 :::
 
 Biology is not a single graph.
@@ -103,7 +100,7 @@ compilation rules, and how the contract fails loudly on a bad spec are on the
 Qualitatively different dynamical systems expressed within the same language. Each
 simulation is constructed from the same primitives—sets, fields, operators, and
 schedules—yet gives rise to distinct collective behaviours spanning flocking,
-morphogenesis, fluid mechanics, reaction–diffusion, and active matter.
+self-organizing networks, self-gravity, and deterministic chaos.
 
 ```{=html}
 <style>
@@ -115,10 +112,10 @@ morphogenesis, fluid mechanics, reaction–diffusion, and active matter.
 .home-2x2 figcaption b{color:#333}
 </style>
 <div class="home-2x2">
-  <figure><div class="vidbox"><video src="gallery/boids_16.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
-  <figure><div class="vidbox"><video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
-  <figure><div class="vidbox"><video src="gallery/rps_species_6.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>competition</b> — six-species rock–paper–scissors spirals</figcaption></figure>
-  <figure><div class="vidbox"><video src="gallery/rd_worms.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>fields</b> — a Gray–Scott reaction–diffusion pattern</figcaption></figure>
+  <figure><div class="vidbox"><video src="gallery/boids.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
+  <figure><div class="vidbox"><video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
+  <figure><div class="vidbox"><video src="gallery/inverse_square.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>self-gravity</b> — a rotating disc collapses into a galaxy</figcaption></figure>
+  <figure><div class="vidbox"><video src="gallery/attractor_aizawa.mp4" autoplay loop muted playsinline preload="metadata"></video></div><figcaption><b>chaos</b> — a cloud drawn onto a strange attractor</figcaption></figure>
 </div>
 ```
 
@@ -154,8 +151,9 @@ This site distils a working prototype into a single blueprint, in three parts:
   graph container stated in the language of sets, fields, and four operators.
 - **[LLM ↔ registry](methodology.qmd)** — the two-layer contract and the small
   declarative language that lets an LLM drive a registry of operators.
-- **[Simulations](experiment.qmd)** — ten distinct simulations, an emergent
-  ant-trail model, and a maze-foraging colony optimized end-to-end.
+- **[Simulations](experiment.qmd)** — the core operator families as one-per-family
+  clips (interaction, boids, active matter, slime, MLS-MPM, inverse-square, strange
+  attractors), plus a maze-foraging colony optimized end-to-end.
 
 A static version with full schematics and glossary is in
 [`paper/plexus.pdf`](paper/plexus.pdf).

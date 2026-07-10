@@ -101,11 +101,10 @@ operators:
 ## Mechanism-search tags
 
 **Mechanism** &mdash; [`elastic_mechanics`]{.op-badge} [`material_point_method`]{.op-badge} [`fixed_corotated_stress`]{.op-badge} [`incompressible_volume`]{.op-badge} [`surface_tension`]{.op-badge} [`plastic_flow`]{.op-badge}  
-**Morphology prior** &mdash; [`deformable_blob`]{.op-badge} [`rigid_aggregate`]{.op-badge} [`liquid_droplet`]{.op-badge} [`snow_pile`]{.op-badge}
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`apply_material_map`](apply_material_map.qmd).
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
 
 ## Source
 
@@ -322,7 +321,7 @@ def mls_mpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
 # --------------------------------------------------------------------------- #
 #  The fenced transitional operator
 # --------------------------------------------------------------------------- #
-@register_operator("mls_mpm_mechanics", level="particle", kind="exchange")
+@register_operator("mls_mpm_mechanics", family="mpm", level="particle", kind="exchange")
 class MLSMPMMechanics(Exchange):
     """Compound MLS-MPM mechanics at the particle level (P2G -> grid solve -> G2P ->
     advect). Cell shape/rigidity emerge from the particles' elastic stress; per-cell-
@@ -332,6 +331,10 @@ class MLSMPMMechanics(Exchange):
     rules on purpose, behind the `TRANSITIONAL` fence. See module docstring and
     `ARCHITECTURAL_DEBT` for the decomposition roadmap.
     """
+
+    EMIT = None                          # substep advects pos/vel in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
+    SUPPORTED_DIMS = [2]                  # the MLS-MPM kernel hard-codes 2D (eye(2), 3x3 stencil, nx*ny grid)
+    REQUIRES_PARAMS = []                  # no required params — all knobs optional (defaults in __init__)
 
     # --- the fence ------------------------------------------------------- #
     TRANSITIONAL = True
@@ -359,7 +362,6 @@ class MLSMPMMechanics(Exchange):
     MECHANISM_TAGS = ["elastic_mechanics", "material_point_method",
                       "fixed_corotated_stress", "incompressible_volume",
                       "surface_tension", "plastic_flow"]
-    MORPHOLOGY_PRIOR = ["deformable_blob", "rigid_aggregate", "liquid_droplet", "snow_pile"]
     PARAM_ROLES = {
         "n_grid": "background_grid_resolution",
         "substeps": "cfl_subcycling",
@@ -436,7 +438,7 @@ class MLSMPMMechanics(Exchange):
         dev = p.state.device
         # external per-cell acceleration = the PARENT set's accumulated delta. A cell-level
         # force operator (e.g. gravity) returns {cell: g}; the engine accumulates it and --
-        # since the cell has no PREDICTION -- never integrates it, so the MPM substep is free
+        # since the cell has no EMIT -- never integrates it, so the MPM substep is free
         # to consume it here as a body force (no bespoke `H.cell_accel`).
         pn = getattr(p, "parent_name", None)
         if pn is not None:

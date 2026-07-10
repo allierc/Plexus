@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -282,8 +282,8 @@ window.Quarto = {
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle) and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward their REST positions – the cultured-sheet “attached substrate” of the cardio prototype (p1_aniso’s <code>k_anchor</code>). <code>mode: boundary</code> (default) anchors only the outer RING of the tissue (width <code>ring</code> in world units), pinning the edges so the sheet cannot globally breathe/translate while the interior moves freely – the condition that exposes whether LOCAL loops come from material structure rather than a global mode. <code>mode: substrate</code> anchors EVERY particle (global self-relaxation, as p1_aniso).</p>
-<p><code>PREDICTION=None</code>: not engine-integrated; enters mechanics only through the MPM substep body force. Rest positions are captured on the first call (frame 0 = the undeformed sheet).</p>
+<p>acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle) and the p2g scatter consumes as a body force (same idiom as drag). It pulls particles back toward their REST positions – the cultured-sheet “attached substrate” of the cardio prototype (p1_aniso’s <code>k_anchor</code>). <code>mode: boundary</code> (default) anchors only the outer RING of the tissue (width <code>ring</code> in world units), pinning the edges so the sheet cannot globally breathe/translate while the interior moves freely – the condition that exposes whether LOCAL loops come from material structure rather than a global mode. <code>mode: substrate</code> anchors EVERY particle (global self-relaxation, as p1_aniso).</p>
+<p><code>EMIT=mpm_acceleration</code>: not engine-integrated; enters mechanics only through the MPM substep body force. Rest positions are captured on the first call (frame 0 = the undeformed sheet).</p>
 </section>
 <section id="parameters" class="level2">
 <h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
@@ -325,7 +325,7 @@ window.Quarto = {
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/Coulomb.html"><code>Coulomb</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/alignment.html"><code>alignment</code></a>, <a href="../library/separation.html"><code>separation</code></a>, <a href="../library/drag.html"><code>drag</code></a>.</p>
+<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/attractor_flow.html"><code>attractor_flow</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>, <a href="../library/alignment.html"><code>alignment</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
@@ -333,14 +333,14 @@ window.Quarto = {
 <div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""mpm_anchor -- a substrate/boundary rest-anchor body force for MLS-MPM particles.</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle)</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">and the p2g scatter consumes as a body force (same idiom as drag). It pulls particles back toward</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">their REST positions -- the cultured-sheet "attached substrate" of the cardio prototype (p1_aniso's</span></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">`k_anchor`). `mode: boundary` (default) anchors only the outer RING of the tissue (width `ring` in</span></span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">world units), pinning the edges so the sheet cannot globally breathe/translate while the interior</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">moves freely -- the condition that exposes whether LOCAL loops come from material structure rather</span></span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">than a global mode. `mode: substrate` anchors EVERY particle (global self-relaxation, as p1_aniso).</span></span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">`PREDICTION=None`: not engine-integrated; enters mechanics only through the MPM substep body force.</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">`EMIT=mpm_acceleration`: not engine-integrated; enters mechanics only through the MPM substep body force.</span></span>
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">Rest positions are captured on the first call (frame 0 = the undeformed sheet).</span></span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
@@ -351,9 +351,9 @@ window.Quarto = {
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mpm_anchor"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mpm_anchor"</span>, family<span class="op">=</span><span class="st">"mechanics"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MPMAnchor(Lateral):</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    PREDICTION <span class="op">=</span> <span class="va">None</span>                 <span class="co"># consumed by the MPM substep as a body force, not engine-integrated</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"mpm_acceleration"</span>   <span class="co"># consumed by the MPM substep as a_ext, not engine-integrated</span></span>
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"k"</span>]</span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"substrate_anchor"</span>, <span class="st">"boundary_condition"</span>, <span class="st">"rest_restoring"</span>]</span>
@@ -617,8 +617,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -729,7 +727,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

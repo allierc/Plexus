@@ -84,7 +84,7 @@ schedule: [radius_graph, attraction_repulsion]""",
         schedule="Always paired with a `rewire` that supplies the neighbour graph it reads. "
                  "The canonical tick is `radius_graph` &rarr; `attraction_repulsion`; the graph is "
                  "rebuilt every step so the force tracks the moving particles.",
-        gallery=("arbitrary_3.mp4", "Three types, 30&nbsp;000 particles, &sigma;=0.005, periodic &mdash; "
+        gallery=("attraction.mp4", "Three types, 30&nbsp;000 particles, &sigma;=0.005, periodic &mdash; "
                  "the field coarsens into a honeycomb of interconnected domains."),
         identifiability=(
             "Trajectories of a settled pattern pin down **ratios** far better than absolute scales. "
@@ -125,8 +125,8 @@ schedule: [secrete, diffuse, decay, sense]""",
                  "writes the field, `diffuse` spreads it, `decay` removes it, and a `sense` / "
                  "`chemotaxis` operator reads the gradient. Multiple `diffuse` steps per tick give "
                  "a larger effective diffusion length.",
-        gallery=("rd_worms.mp4", "A Gray&ndash;Scott reaction&ndash;diffusion pattern &mdash; "
-                 "`diffuse` is the transport term that lets the worms spread and branch."),
+        gallery=("slime.mp4", "A self-organizing Physarum network &mdash; `diffuse` is the "
+                 "transport term that spreads the pheromone trail the agents then follow."),
         identifiability=(
             "Only the **product** rate&middot;$\\Delta t$ and the number of steps per tick are "
             "observable &mdash; doubling `rate` and halving $\\Delta t$ is invisible. The diffusion "
@@ -168,8 +168,8 @@ operators:
                  "and placed upstream, then converted to force, then run through the solver:\n\n"
                  "```\npacemaker → pulse_stimulus → pulse_to_contraction → mpm_drag → "
                  "[mpm_strain, p2g, mpm_grid_update, g2p]×substeps\n```",
-        gallery=("mat_elastic.mp4", "Active deformable matter under MLS-MPM &mdash; the same "
-                 "mechanics chain this operator feeds (here an elastic body, the cardiac "
+        gallery=("material.mp4", "Deformable matter under MLS-MPM &mdash; the same "
+                 "mechanics chain this operator feeds (here elastic bodies; the cardiac "
                  "scenario swaps in a `directional` activation map)."),
         identifiability=(
             "`amplitude` is identifiable only **up to the material stiffness** it works against "
@@ -186,9 +186,68 @@ operators:
             ("force scale vs. MPM `a_max`", "p2g clamps the body force at a_max; an amplitude above it is silently capped."),
         ],
         related=[("pacemaker", "sets *when* the activation field fires (the clock)"),
-                 ("pulse_stimulus", "sets *where* on the field the activation appears"),
-                 ("p2g", "scatters this force onto the MPM grid as the body force a_ext"),
-                 ("mpm_drag", "the companion damping force summed into the same particle delta")],
+                 ("activation_pulse", "sets *where/when* on the field the activation appears"),
+                 ("mpm_scatter", "scatters this force onto the MPM grid as the body force a_ext"),
+                 ("drag", "the companion damping force summed into the same particle delta")],
+    ),
+
+    "squared_law": dict(
+        lead="The inverse-square law between particles &mdash; one operator, two regimes selected "
+             "by `law`: **gravity** (mass-weighted, always attractive, softened, all-pairs) collapses "
+             "a rotating disc into a spiral galaxy; **coulomb** (signed charge, like-repel / "
+             "opposite-attract) is a screened plasma on the neighbour graph. Ported from "
+             "ParticleGraph's `PDE_E` (Coulomb) and Philip Mocz's N-body `getAcc` (gravity).",
+        equation=r"""$$
+\ddot{\mathbf x}_i \;=\; \mathrm{sign}\,k\;r_i\!\!\sum_{j}\, s_j\,
+\frac{\mathbf x_j-\mathbf x_i}{\big(\lVert\mathbf x_j-\mathbf x_i\rVert^{2}+\varepsilon^{2}\big)^{3/2}}
+$$
+`law: coulomb` uses signed charge $s=q$ with a like-repel sign and the receiver's own $q_i$;
+`law: gravity` uses $s=m$, always attracts, and the receiver factor is $1$ (equivalence
+principle). $\varepsilon$ is Plummer softening; `all_pairs` sums over every pair ($O(N^2)$,
+`compile`d) rather than a `radius_graph`.""",
+        spec="""sets:
+  star: {n: 25000, spawn: disk, spawn_radius: 1.5,
+         vel_init: {mode: circular_orbit, spin: 0.9, central_mass: 0.5},
+         types: {s: {fraction: 1.0, mass: 0.00004}}}
+operators:
+  - {op: squared_law, at: star, law: gravity, softening: 0.08, all_pairs: true, compile: true}
+schedule: [squared_law]""",
+        gallery=("inverse_square.mp4", "`law: gravity`, all-pairs, softened &mdash; a rotating "
+                 "disc of stars collapses under its own gravity into spiral structure."),
+        related=[("attraction_repulsion", "the parametric, per-type analogue on a neighbour graph"),
+                 ("radius_graph", "supplies the neighbour graph for the screened `coulomb` range"),
+                 ("attractor_flow", "another closed-form lateral flow, but single-particle chaos")],
+    ),
+
+    "attractor_flow": dict(
+        lead="Rides a whole cloud along a dissipative 3D **strange-attractor** vector field "
+             "$\\dot{\\mathbf x}=f(\\mathbf x)$. No interaction: every point is an independent "
+             "tracer of the same chaotic flow, so a tiny seed ball is stretched-and-folded until "
+             "the cloud *is* the attractor. `system` selects one of ten classic flows (Lorenz, "
+             "R&ouml;ssler, Aizawa, Sprott&nbsp;B, Halvorsen, Thomas, Chen, Chua, Dadras, "
+             "Rabinovich&ndash;Fabrikant), each citing its originating paper.",
+        equation=r"""$$
+\dot{\mathbf x} \;=\; f_{\text{system}}(\mathbf x),
+\qquad
+\text{e.g. Lorenz: }\;
+\dot x=\sigma(y-x),\;\; \dot y=x(\rho-z)-y,\;\; \dot z=xy-\beta z
+$$
+A first-derivative (velocity) flow, so the engine integrates $\mathbf x \mathrel{+}= \Delta t\,f(\mathbf x)$.
+3D only: a continuous planar autonomous flow cannot be chaotic (Poincar&eacute;&ndash;Bendixson).""",
+        spec="""sets:
+  cloud: {n: 60000, start: [0.6,0.6,14.6, 1.4,1.4,15.4]}   # tiny seed cube in the basin
+operators:
+  - {op: attractor_flow, at: cloud, system: lorenz, sigma: 10.0, rho: 28.0, beta: 2.6666667}
+schedule: [attractor_flow]""",
+        gallery=("attractor_lorenz.mp4", "`system: lorenz` &mdash; a seed cloud fans out onto the "
+                 "butterfly, its two lobes drawn by the chaotic flow."),
+        identifiability=(
+            "The trajectory pins down the flow's **constants** (e.g. Lorenz $\\sigma,\\rho,\\beta$) "
+            "from the shape and timing of the attractor, but sensitive dependence means individual "
+            "point paths diverge exponentially &mdash; only the *invariant set* (the attractor "
+            "geometry) and its spectrum are reproducibly identifiable, not any single orbit."),
+        related=[("squared_law", "the other closed-form lateral flow &mdash; pairwise, not single-particle"),
+                 ("drag", "a linear velocity law; attractor_flow is its nonlinear, chaotic cousin")],
     ),
 
     # --- equation-only enrichments (math straight from each operator's source) --- #

@@ -44,7 +44,7 @@ Set. Reflect a self-propelled agent off the domain walls / obstacles.
 
 A boundary condition on *orientation*, kept separate from propulsion: if a dt-step
 along the current heading would leave the box (or enter an obstacle), the heading is
-turned back inside. Run it AFTER `sense` (which steers) and BEFORE `advance` (which
+turned back inside. Run it AFTER `sense` (which steers) and BEFORE `glide` (which
 emits the propulsion velocity), so the velocity already points back inside --
 proactive bounce, no agent ever crosses the wall.
 
@@ -58,6 +58,12 @@ have no single axis-aligned normal. Replaces the old 2D `bounce` + `bounce_3d`.
 It mutates the heading (auxiliary control state, not the integrated position) and
 returns {} -- like the other in-place set ops, it is not a force.
 
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `noise` | obstacle_reheading_randomness | 0.0 |
+
 ## Minimal spec
 
 ```yaml
@@ -65,9 +71,13 @@ operators:
   - {op: bounce, at: cell}
 ```
 
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`boundary_condition`]{.op-badge} [`wall_reflection`]{.op-badge} [`obstacle_avoidance`]{.op-badge} [`steering`]{.op-badge}  
+
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`separation`](separation.qmd), [`drag`](drag.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
@@ -78,7 +88,7 @@ Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd),
 
 A boundary condition on *orientation*, kept separate from propulsion: if a dt-step
 along the current heading would leave the box (or enter an obstacle), the heading is
-turned back inside. Run it AFTER `sense` (which steers) and BEFORE `advance` (which
+turned back inside. Run it AFTER `sense` (which steers) and BEFORE `glide` (which
 emits the propulsion velocity), so the velocity already points back inside --
 proactive bounce, no agent ever crosses the wall.
 
@@ -119,13 +129,18 @@ def _random_unit(n, D, rng, device):
     return v / v.norm(dim=1, keepdim=True).clamp(min=1e-9)
 
 
-@register_operator("bounce", level="cell", kind="lateral")
+@register_operator("bounce", family="motion", level="cell", kind="lateral")
 class Bounce(Lateral):
+    EMIT = None                                 # writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection
+    REQUIRES_PARAMS = []                         # no required params — `noise` optional
+    MECHANISM_TAGS = ["boundary_condition", "wall_reflection", "obstacle_avoidance", "steering"]
     REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
+    PARAM_ROLES = {"noise": "obstacle_reheading_randomness"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
+        self.noise = float(params.get("noise", 0.0))    # obstacle re-head: 0 = reverse (deterministic), 1 = isotropic
         self.at = params.get("_at", "cell")
 
     def forward(self, H, mask=None):
@@ -146,12 +161,16 @@ class Bounce(Lateral):
         out = (nxt < 0) | (nxt > box[None, :])              # which axes would exit the box
         new_h = torch.where(out, -h, h)                     # specular reflect the exiting components
 
-        # obstacles (2D maze rects/discs): re-head isotropically where the step would
-        # enter one -- they carry no single axis-aligned normal to reflect against.
+        # obstacles (2D maze rects/discs): re-head where the step would enter one --
+        # they carry no single axis-aligned normal to reflect against. The `noise` knob
+        # (default 0) sets how random that re-heading is: 0 reverses the heading (-h,
+        # deterministic), 1 picks an isotropic random direction (the old behaviour).
         obs = getattr(H, "obstacles", [])
         if obs and pos.shape[1] == 2:
             hit = _in_obstacles(nxt[:, 0], nxt[:, 1], obs)
-            new_h = torch.where(hit[:, None], _random_unit(N, 2, H.rng, dev), new_h)
+            rehead = -h if self.noise <= 0.0 else \
+                (1.0 - self.noise) * (-h) + self.noise * _random_unit(N, 2, H.rng, dev)
+            new_h = torch.where(hit[:, None], rehead, new_h)
 
         new_h = new_h / new_h.norm(dim=1, keepdim=True).clamp(min=1e-9)
         lvl.heading = torch.where(keep, new_h, h)

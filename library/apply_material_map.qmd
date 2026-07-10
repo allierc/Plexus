@@ -90,21 +90,21 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`mls_mpm_mechanics`](mls_mpm_mechanics.qmd).
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
 
 ## Source
 
 [`src/plexus/operators/material_map.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/material_map.py) &mdash; the registered operator.
 
 ```python
-@register_operator("apply_material_map", level="particle", kind="exchange")
+@register_operator("apply_material_map", family="mpm", level="particle", kind="exchange")
 class ApplyMaterialMap(Exchange):
     """field -> set: sample the map at each particle and write a per-particle material
     parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the
     Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as
     a per-particle buffer of that name. Mutates per-particle buffers, returns {}."""
 
-    PREDICTION = None                              # sets material, emits no force
+    EMIT = None                              # sets material, emits no force
     REQUIRES_PARAMS = ["from", "target"]
     SUPPORTED_DIMS = [2, 3]
     MECHANISM_TAGS = ["material_map", "heterogeneous_stiffness", "symmetry_breaking"]
@@ -120,16 +120,8 @@ class ApplyMaterialMap(Exchange):
         self.at = params.get("_at", "mpm_particle")
 
     def _sample(self, H, lvl):
-        """Bilinear-sample the map field at the particle positions -> intensity [N]."""
-        pos = lvl.get("pos")
-        g = H.fields[self.field_name].grid[self.channel]            # [nx, ny]
-        W = float(getattr(H, "world_width", 1.0))
-        gxn = (pos[:, 0] / W) * 2 - 1
-        gyn = (pos[:, 1] / 1.0) * 2 - 1
-        grid = torch.stack([gyn, gxn], -1)[None, None]             # grid_sample expects (x=ny, y=nx)
-        val = Fnn.grid_sample(g[None, None], grid, mode="bilinear",
-                              padding_mode="border", align_corners=True)[0, 0, 0]
-        return val.clamp(0.0, 1.0)
+        """Bilinear-sample the map field at the particle positions -> intensity [N] in [0,1]."""
+        return H.fields[self.field_name].sample(lvl.get("pos"), self.channel).clamp(0.0, 1.0)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)

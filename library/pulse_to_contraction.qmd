@@ -1,6 +1,6 @@
 ---
 title: "pulse_to_contraction"
-subtitle: "The FORCE half: activation field -> per-particle MPM force."
+subtitle: "The FORCE constitutive law: an activation field -> per-particle MPM body force."
 ---
 
 ::: {.op-head}
@@ -42,17 +42,20 @@ The force half of an active-matter actuator: it reads an activation field $a(\ma
 
 ## Mechanism
 
+(Renamed from `pulse_to_contraction`, kept as a transitional alias: the operator names the
+MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+
 Reads the activation field a(x,t) (the `from:` field) and converts its gradient into
 a per-particle body force, RETURNED as a particle delta. The engine sums it (with any
-`mpm_drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
+`drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
 as the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counterpart
 of the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)
 points toward the centre, so
 
 contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
-mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).
+mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`activation_pulse`).
 
-`kind=exchange` (field -> set); `PREDICTION=None`, so the engine never integrates the
+`kind=exchange` (field -> set); `EMIT=None`, so the engine never integrates the
 particle set (g2p owns advection) -- the force enters mechanics only through the MPM
 substep. The engine's `zero_delta` resets the delta each outer tick, and the substep
 loop reads that constant body force on each of its iterations.
@@ -98,8 +101,8 @@ pacemaker → pulse_stimulus → pulse_to_contraction → mpm_drag → [mpm_stra
 ## Example output
 
 ```{=html}
-<figure class="op-vid"><video src="../gallery/mat_elastic.mp4" autoplay loop muted playsinline preload="metadata"></video>
-<figcaption>Active deformable matter under MLS-MPM &mdash; the same mechanics chain this operator feeds (here an elastic body, the cardiac scenario swaps in a `directional` activation map).</figcaption></figure>
+<figure class="op-vid"><video src="../gallery/material.mp4" autoplay loop muted playsinline preload="metadata"></video>
+<figcaption>Deformable matter under MLS-MPM &mdash; the same mechanics chain this operator feeds (here elastic bodies; the cardiac scenario swaps in a `directional` activation map).</figcaption></figure>
 ```
 
 ## Identifiability
@@ -122,20 +125,23 @@ pacemaker → pulse_stimulus → pulse_to_contraction → mpm_drag → [mpm_stra
 ## Related operators
 
 - [`pacemaker`](pacemaker.qmd) &mdash; sets *when* the activation field fires (the clock)
-- [`pulse_stimulus`](pulse_stimulus.qmd) &mdash; sets *where* on the field the activation appears
-- [`p2g`](p2g.qmd) &mdash; scatters this force onto the MPM grid as the body force a_ext
-- [`mpm_drag`](mpm_drag.qmd) &mdash; the companion damping force summed into the same particle delta
+- [`activation_pulse`](activation_pulse.qmd) &mdash; sets *where/when* on the field the activation appears
+- [`mpm_scatter`](mpm_scatter.qmd) &mdash; scatters this force onto the MPM grid as the body force a_ext
+- [`drag`](drag.qmd) &mdash; the companion damping force summed into the same particle delta
 
 ## Source
 
-[`src/plexus/operators/pulse_to_contraction.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pulse_to_contraction.py) &mdash; the registered operator.
+[`src/plexus/operators/active_force.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/active_force.py) &mdash; the registered operator.
 
 ```python
-"""pulse_to_contraction -- the FORCE half: activation field -> per-particle MPM force.
+"""active_force -- the FORCE constitutive law: an activation field -> per-particle MPM body force.
+
+(Renamed from `pulse_to_contraction`, kept as a transitional alias: the operator names the
+MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
 
 Reads the activation field a(x,t) (the `from:` field) and converts its gradient into
 a per-particle body force, RETURNED as a particle delta. The engine sums it (with any
-`mpm_drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
+`drag` delta) into H.delta(mpm_particle), which the MLS-MPM `p2g` scatter consumes
 as the body force (`p2g`: a_ext += H.delta(particle)) -- the per-particle counterpart
 of the parent-delta path that carries `gravity`. For a Gaussian activation bump grad(a)
 points toward the centre, so
@@ -143,9 +149,9 @@ points toward the centre, so
     F_i = sign * amplitude * grad(a)(x_i)          sign = +1 (inward) / -1 (outward)
 
 contracts (mode: inward) or expands (mode: outward) the sheet. It owns only the
-mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`pulse_stimulus`).
+mechanical mapping -- not WHEN (`pacemaker`) nor WHERE (`activation_pulse`).
 
-`kind=exchange` (field -> set); `PREDICTION=None`, so the engine never integrates the
+`kind=exchange` (field -> set); `EMIT=None`, so the engine never integrates the
 particle set (g2p owns advection) -- the force enters mechanics only through the MPM
 substep. The engine's `zero_delta` resets the delta each outer tick, and the substep
 loop reads that constant body force on each of its iterations.
@@ -153,15 +159,15 @@ loop reads that constant body force on each of its iterations.
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as Fnn
 
 from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("pulse_to_contraction", level="particle", kind="exchange")
-class PulseToContraction(Exchange):
-    PREDICTION = None                         # force is consumed by the MPM substep, not engine-integrated
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", level="particle", kind="exchange")
+class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
+    EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
+    SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field
     REQUIRES_PARAMS = ["from"]                # the activation field to read
     MECHANISM_TAGS = ["active_contraction", "field_gradient_force", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "contraction_strength", "mode": "gradient_or_directional"}
@@ -177,46 +183,32 @@ class PulseToContraction(Exchange):
         self.sign = {"inward": 1.0, "outward": -1.0}.get(self.mode, 1.0)
         self.direction_from = params.get("direction_from")
         if self.mode == "directional" and self.direction_from is None:
-            raise ValueError("pulse_to_contraction mode: directional needs `direction_from:` "
+            raise ValueError("active_force mode: directional needs `direction_from:` "
                              "(a vector_grid field giving the contraction direction)")
         self.at = params.get("_at", "particle")
-
-    def _sample(self, field_grid, pos, W):
-        """Bilinear-sample a `[C, nx, ny]` field at particle positions -> `[N, C]`."""
-        gxn = (pos[:, 0] / W) * 2 - 1
-        gyn = (pos[:, 1] / 1.0) * 2 - 1
-        grid = torch.stack([gyn, gxn], -1)[None, None]              # grid_sample expects (x=ny, y=nx)
-        return Fnn.grid_sample(field_grid[None], grid, mode="bilinear",
-                               padding_mode="border", align_corners=True)[0, :, 0].t()
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
-        W = float(getattr(H, "world_width", 1.0))
 
         if self.mode == "directional":
             # F_i = amplitude * a(x_i) * d(x_i): uniform activation sets WHEN/how much,
             # the vector field sets WHERE to push (the active-stress orientation map).
-            a = self._sample(fld.grid[self.channel:self.channel + 1], pos, W)[:, 0]   # [N]
-            d = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2]
+            a = fld.sample(pos, self.channel)                             # [N] activation
+            d = H.fields[self.direction_from].sample(pos)                 # [N, 2] direction
             d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
             acc = self.amplitude * a[:, None] * d
         else:
-            # gradient mode: direction = +/- grad(activation), bilinear-sampled (chemotaxis idiom).
-            g = fld.grid[self.channel]                                  # [nx, ny]
-            pad = "circular" if getattr(H, "periodic", False) else "replicate"
-            gp = Fnn.pad(g[None, None], (1, 1, 1, 1), mode=pad)[0, 0]
-            gx = (gp[2:, 1:-1] - gp[:-2, 1:-1]) * 0.5 * (fld.nx / W)    # d a/d x
-            gy = (gp[1:-1, 2:] - gp[1:-1, :-2]) * 0.5 * fld.ny          # d a/d y
-            grad = torch.stack([gx, gy], 0)                            # [2, nx, ny]
-            acc = self.sign * self.amplitude * self._sample(grad, pos, W)  # inward for sign>0
+            # gradient mode: direction = +/- grad(activation), sampled at each particle.
+            grad = fld.grad_at(pos, self.channel, periodic=getattr(H, "periodic", False))  # [N, 2]
+            acc = self.sign * self.amplitude * grad                       # inward for sign>0
 
         acc = acc * lvl.occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()
-        # return a per-particle force delta; the engine sums it (with mpm_drag's) into
-        # H.delta(mpm_particle), which p2g consumes as the MPM body force. PREDICTION=None,
+        # return a per-particle force delta; the engine sums it (with drag's) into
+        # H.delta(mpm_particle), which p2g consumes as the MPM body force. EMIT=None,
         # so the engine never integrates the particle set (g2p owns advection).
         return {self.at: acc}
 ```

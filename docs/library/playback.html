@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -217,6 +217,7 @@ window.Quarto = {
   <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
   <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
   <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
   <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
   <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
   </ul>
@@ -228,7 +229,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">playback</h1>
-<p class="subtitle lead">A scalar field <em>prescribed</em> from an external video, plus the</p>
+<p class="subtitle lead">A scalar field <em>prescribed</em> from external data (currently a</p>
 </div>
 
 
@@ -248,7 +249,7 @@ window.Quarto = {
 <div class="op-head">
 <p><img src="../figures/icons/field_dyn.png" class="op-logo img-fluid"></p>
 <p><span class="op-badge"><code>field</code></span> <span class="op-badge"><code>acts on: field</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
-<p>A scalar field <em>prescribed</em> from an external video, plus the</p>
+<p>A scalar field <em>prescribed</em> from external data (currently a</p>
 </div>
 <style>
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
@@ -280,7 +281,7 @@ window.Quarto = {
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p><code>playback</code> operator that advances it frame by frame.</p>
+<p>video), plus the <code>playback</code> operator that advances it frame by frame.</p>
 <p>Some fields are not evolved by a PDE (diffuse/decay) but read from data: a recorded movie becomes a time-varying scalar field over the domain. The field is pure state (it holds the video buffer and the current grid); <code>playback</code> sets the grid to the current tick’s frame (a field self-update, returns {}). A coupling operator such as <code>chemotaxis</code> then drives the particles from it – the same set&lt;-&gt;field Exchange the slime trail used, but the field is supplied rather than deposited.</p>
 <p>This is the Plexus form of ParticleGraph’s <code>node_value_map: video_bisons.tif</code>.</p>
 <p><span class="math display">\[
@@ -292,27 +293,37 @@ window.Quarto = {
 <div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> playback</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> field</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>prescribed_field</code></span> <span class="op-badge"><code>video_playback</code></span> <span class="op-badge"><code>data_driven_field</code></span></p>
+</section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>field</strong> operators: <a href="../library/diffuse.html"><code>diffuse</code></a>, <a href="../library/decay.html"><code>decay</code></a>, <a href="../library/pacemaker.html"><code>pacemaker</code></a>, <a href="../library/pulse_stimulus.html"><code>pulse_stimulus</code></a>, <a href="../library/phase_delay_pulse.html"><code>phase_delay_pulse</code></a>, <a href="../library/mpm_grid_update.html"><code>mpm_grid_update</code></a>.</p>
+<p>Other <strong>field</strong> operators: <a href="../library/diffuse.html"><code>diffuse</code></a>, <a href="../library/decay.html"><code>decay</code></a>, <a href="../library/pacemaker.html"><code>pacemaker</code></a>, <a href="../library/activation_pulse.html"><code>activation_pulse</code></a>, <a href="../library/mpm_grid_update.html"><code>mpm_grid_update</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
-<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/video_field.py"><code>src/plexus/operators/video_field.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"playback"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/prescribed_field.py"><code>src/plexus/operators/prescribed_field.py</code></a> — the registered operator.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"playback"</span>, family<span class="op">=</span><span class="st">"fields"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Playback(FieldUpdate):</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""field &lt;- data: set the field grid to the current tick's video frame (looping).</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">    Reads the engine's current frame from `H.frame`. Mutates the field, returns {}."""</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> <span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="dv">0</span>)) <span class="op">%</span> fld.T</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> fld.video[t:t <span class="op">+</span> <span class="dv">1</span>].clone()</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                 <span class="co"># field-&gt;field: writes the grid in place from the video; returns {} — no integrable delta</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>]        <span class="co"># 2D grid field playback</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []        <span class="co"># no required params — `_at` (the field to advance) is engine-injected</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"prescribed_field"</span>, <span class="st">"video_playback"</span>, <span class="st">"data_driven_field"</span>]</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {}            <span class="co"># reads no tunable params (only the structural `_at`)</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> <span class="bu">int</span>(<span class="bu">getattr</span>(H, <span class="st">"frame"</span>, <span class="dv">0</span>)) <span class="op">%</span> fld.T</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> fld.video[t:t <span class="op">+</span> <span class="dv">1</span>].clone()</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
@@ -544,8 +555,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -656,7 +665,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

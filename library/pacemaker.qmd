@@ -90,7 +90,7 @@ operators:
 
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`decay`](decay.qmd), [`playback`](playback.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 
@@ -124,9 +124,11 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("pacemaker", level="field", kind="field")
+@register_operator("pacemaker", family="fields", level="field", kind="field")
 class Pacemaker(FieldUpdate):
+    EMIT = None                 # writes `H.signals[name]` scalar in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
     MECHANISM_TAGS = ["periodic_source", "clock", "pacemaker"]
     PARAM_ROLES = {"period": "beat_interval", "duration": "active_width", "phase": "beat_offset"}
 

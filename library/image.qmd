@@ -66,7 +66,7 @@ class ImageField(Field):
     """A 1-channel scalar field read from a 2D image (TIFF/PNG), normalised to [0,1].
     A STATIC map (no dynamics): it holds only its grid `[1, nx, ny]` and the
     world<->pixel geometry, sampled by `apply_material_map`. Same orientation
-    convention as `VideoField` (flip vertical so image-top maps to domain-top)."""
+    convention as `PrescribedField` (flip vertical so image-top maps to domain-top)."""
 
     def __init__(self, name, source=None, res=None, width=1.0, device="cpu",
                  normalize=True, **kw):

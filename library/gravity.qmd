@@ -38,7 +38,7 @@ A uniform body force at the cell level.
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
-- **Dimensions** &mdash; 2D.
+- **Dimensions** &mdash; 2D, 3D.
 
 ## Mechanism
 
@@ -84,7 +84,7 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`separation`](separation.qmd), [`drag`](drag.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
@@ -116,11 +116,13 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("gravity", level="cell", kind="lateral")
+@register_operator("gravity", family="mechanics", level="cell", kind="lateral")
 class GravityOperator(Lateral):
-    # PREDICTION is intentionally None: gravity emits a force the MPM substep consumes,
-    # it is NOT integrated on the cell (the cell is a centroid readout). So `cell` never
-    # enters H.predict and the engine never advects it under gravity.
+    EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
+    # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never
+    # enters H.emit_order and the engine never advects it under gravity.
+    SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
+    REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
     PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
     MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
 
@@ -134,7 +136,8 @@ class GravityOperator(Lateral):
     def forward(self, H, mask=None):
         cell = H.level(self.at)
         dev = cell.state.device
-        accel = torch.zeros(cell.n, 2, device=dev)
+        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector; -y (axis 1) is "down"
+        accel = torch.zeros(cell.n, D, device=dev)
         accel[:, 0] = self.gx
         accel[:, 1] = self.gy
         if mask is not None:
