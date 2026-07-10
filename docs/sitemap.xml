@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://allierc.github.io/Plexus/optimization.html</loc>
-    <lastmod>2026-07-10T19:46:52.508Z</lastmod>
+    <lastmod>2026-07-10T20:15:42.496Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library_sets.html</loc>
@@ -46,7 +46,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/p2g.html</loc>
-    <lastmod>2026-07-10T19:39:33.593Z</lastmod>
+    <lastmod>2026-07-10T20:15:42.371Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/mpm_strain.html</loc>
@@ -54,7 +54,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/mpm_scatter.html</loc>
-    <lastmod>2026-07-10T19:39:33.580Z</lastmod>
+    <lastmod>2026-07-10T20:15:42.319Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/mpm_grid_update.html</loc>
@@ -134,7 +134,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/index.html</loc>
-    <lastmod>2026-07-10T19:47:13.216Z</lastmod>
+    <lastmod>2026-07-10T20:18:59.349Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/abstraction.html</loc>
@@ -142,7 +142,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/experiment.html</loc>
-    <lastmod>2026-07-10T19:44:38.072Z</lastmod>
+    <lastmod>2026-07-10T20:15:40.376Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/inverse.html</loc>
@@ -154,7 +154,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/active_stress.html</loc>
-    <lastmod>2026-07-10T19:39:33.567Z</lastmod>
+    <lastmod>2026-07-10T20:15:42.256Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/agent_remodel.html</loc>
@@ -246,7 +246,7 @@
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/pulse_to_active_stress.html</loc>
-    <lastmod>2026-07-10T19:39:33.606Z</lastmod>
+    <lastmod>2026-07-10T20:15:42.436Z</lastmod>
   </url>
   <url>
     <loc>https://allierc.github.io/Plexus/library/radius_graph.html</loc>

@@ -20,40 +20,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -259,7 +225,9 @@ window.Quarto = {
 </div>
 <p>Biology is not a single graph.</p>
 <p>A graph fixes <em>one</em> kind of node and <em>one</em> kind of edge — particles and the forces between them, cells and their contacts, neurons and synapses, molecular species and reactions. Each existing framework commits to one such graph and models that layer alone. But a living system is several of these at once, nested inside one another: particles make up cells, and cells make up tissues and populations. And every level may be coupled to continuous fields — a morphogen gradient, a pressure field, a chemical signal — that the discrete entities both shape and read. Choose any single graph and you capture one slice — the couplings <em>between</em> slices, where much of the biology lives, fall outside it.</p>
-<p>Rather than building another domain-specific simulator, Plexus introduces a common representation based on <strong>hierarchical sets</strong>, <strong>continuous fields</strong>, and a small collection of <strong>operators</strong> acting between them. Cells contain particles and metabolites. State moves through just four operators — <strong>lateral</strong> (within a set), <strong>aggregate</strong> (upward), <strong>broadcast</strong> (downward), and <strong>exchange</strong> (between sets and fields). Complex simulations emerge from composing a few primitive operations.</p>
+<p>Rather than building another domain-specific simulator, Plexus introduces one common representation built from <strong>five primitives</strong>: <strong>sets</strong> of discrete entities across scales, the <strong>state</strong> each element carries, <strong>fields</strong> of continuous quantities over space, <strong>maps</strong> — the index relations between sets, both containment and connection — and <strong>operators</strong> that transform state along those maps.</p>
+<p>State is what makes the objects interchangeable: a particle carrying <span class="math inline">\(\{\text{pos},\text{vel}\}\)</span> and a neuron carrying <span class="math inline">\(\{\text{voltage},\text{calcium}\}\)</span> are the <em>same</em> object under different schemas. And an operator is a <strong>contract</strong>, not a piece of biophysics — <code>neuron_voltage</code> names “membrane state <span class="math inline">\(\to\)</span> its derivative,” which Hodgkin–Huxley, Izhikevich, a Neural ODE, or an MLP all satisfy interchangeably. State moves through just <strong>four operator kinds</strong> — <strong>lateral</strong> (within a set), <strong>aggregate</strong> (up a map), <strong>broadcast</strong> (down a map), and <strong>exchange</strong> (between a set and a field) — and a model is a <strong>schedule</strong> that composes them.</p>
+<p>Plexus is therefore not another simulator but a typed <strong>intermediate representation</strong> for biological computation: models written for NEURON, Jaxley, or a connectome GNN compile to the same sets, states, maps, fields, and operators, and existing simulators become <em>backends</em> that implement one family of operator contracts — Plexus is to a biophysics simulator what LLVM is to a C compiler.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:70.0%"></p>
@@ -276,27 +244,11 @@ window.Quarto = {
 <p>Both layers are built from <strong>explicit, named primitives</strong>. And because those primitives are explicit <em>and</em> differentiable, the same language serves prediction, inverse inference, and the optimization of biological designs alike.</p>
 <p>The two meet at exactly one place — the validated spec — and <strong>never touch directly</strong>. The code owns everything <em>below</em> the spec: the registered operators and the engine that runs them. The language owns everything <em>above</em> it: the spec that names the sets, fields, operators, and schedule of a system.</p>
 <p>This separation becomes important the moment the framework is connected to an <strong>LLM</strong>. The LLM works only in the language layer — it reads, edits, and generates the spec — and never touches the codebase: it never writes engine code, and the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.</p>
-<p>The practical payoff: a new behaviour is a new sentence in the language, not a new program. A short prompt becomes a running, differentiable simulation <strong>with no code written</strong> —</p>
-<blockquote class="blockquote">
-<p><strong>Prompt</strong> — <em>“100 cells; the soft ones secrete a chemical and climb it, so they clump together; the stiff ones ignore it.”</em></p>
-</blockquote>
-<p>the LLM compiles it to a specification:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> aggregate</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">12</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}}</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">particle</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">radius</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="kw">}</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">fields</span><span class="kw">:</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">chemical</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">frame</span><span class="kw">:</span><span class="at"> grid</span><span class="kw">,</span><span class="at"> </span><span class="fu">res</span><span class="kw">:</span><span class="at"> </span><span class="dv">96</span><span class="kw">,</span><span class="at"> </span><span class="fu">diffusion</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.1</span><span class="kw">,</span><span class="at"> </span><span class="fu">decay</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.05</span><span class="kw">,</span><span class="at"> </span><span class="fu">couples_to</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">}</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">1.0</span><span class="kw">}</span><span class="co">    # only soft cells make it</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at">   </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">gain</span><span class="kw">:</span><span class="at"> </span><span class="dv">150</span><span class="kw">}</span><span class="co">  # only soft cells follow it</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at">     </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>and the engine resolves each <code>op</code> against the registry and runs it — producing the <em>aggregate</em> result shown below. No operator was written; the selector <code>cell[type=soft]</code> did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
+<p>The practical payoff: a new behaviour is a new <em>sentence</em> in the language, not a new program — so a short natural-language prompt can compile to a running, differentiable simulation with no engine code written. How that compilation works, and how the contract fails loudly on a bad spec, is on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
 </section>
 <section id="what-it-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>
-<p>Qualitatively different dynamical systems expressed within the same language. Each simulation is constructed from the same primitives—sets, fields, operators, and schedules—yet gives rise to distinct collective behaviours spanning flocking, self-organizing networks, self-gravity, and deterministic chaos.</p>
+<p>Qualitatively different dynamical systems expressed within the same language. Each simulation is constructed from the same primitives—sets, state, fields, maps, and operators—yet gives rise to distinct collective behaviours spanning flocking, self-organizing networks, self-gravity, and deterministic chaos.</p>
 <style>
 .home-2x2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;max-width:660px;margin:1.3rem auto .5rem}
 .home-2x2 figure{margin:0}
@@ -307,7 +259,7 @@ window.Quarto = {
 </style>
 <div class="home-2x2">
   <figure class="figure"><div class="vidbox"><video src="gallery/boids.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
-  <figure class="figure"><div class="vidbox"><video src="gallery/slime.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
+  <figure class="figure"><div class="vidbox"><video src="gallery/slime_filaments.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
   <figure class="figure"><div class="vidbox"><video src="gallery/inverse_square.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>self-gravity</b> — a rotating disc collapses into a galaxy</figcaption></figure>
   <figure class="figure"><div class="vidbox"><video src="gallery/attractor_aizawa.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>chaos</b> — a cloud drawn onto a strange attractor</figcaption></figure>
 </div>
