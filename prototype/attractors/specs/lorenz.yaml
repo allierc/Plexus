@@ -1,0 +1,27 @@
+# Lorenz attractor -- Lorenz (1963) convection, THE butterfly: two spiralling lobes joined
+# by a chaotic switch. A small seed cube (off the invariant z-axis) is unfolded by the flow
+# into both wings. sigma=10, rho=28, beta=8/3 is the canonical chaotic regime.
+general: {name: lorenz, seed: 0, n_frames: 10000, dt: 0.004,
+          boundary: free, dim: 3, world: [50.0, 50.0, 50.0], record_cap: 800}
+sets:
+  cloud:
+    n: 120000
+    start: [0.6, 0.6, 14.6, 1.4, 1.4, 15.4]             # seed cube (center [1,1,15] +/- 0.4), off the z-axis
+fields: {}
+operators:
+  - {op: attractor_flow, at: cloud, system: lorenz, sigma: 10.0, rho: 28.0, beta: 2.6666667}
+schedule: [attractor_flow]
+plotting:
+  color: [0.24, 1.0, 0.42]          # green
+  splat_core: 0.95
+  splat_halo: 3.2
+  ref_quantile: 0.93
+  gamma: 0.78
+  core_power: 3.0
+  core_amt: 0.6
+  bloom: 0.45
+  trail_decay: 0.45
+  camera_azim: 0.35                  # keep the wings broadside (a full azimuth orbit hits a blobby end-on angle)
+  camera_elev: 1.0                   # sweep ELEVATION 1.0->1.34->1.0 = fold-throat <-> owl, with a small azimuth wobble
+  camera_turns: 0.08
+  camera_elev_drift: 0.34

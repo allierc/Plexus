@@ -1,0 +1,36 @@
+# dadras attractor -- Dadras-Momeni (2009): a swooping multi-wing bird.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -> open space (the flow is bounded by its dissipation).
+general:
+  name: dadras
+  seed: 0
+  n_frames: 16000
+  dt: 0.003
+  boundary: free
+  dim: 3
+  world: [50.0, 30.0, 40.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [0.8, 1.8, -2.3, 1.4, 2.4, -1.7]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: dadras, a: 3.0, b: 2.7, c: 1.7, d: 2.0, e: 9.0, clamp: 5000.0}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [1.0, 0.35, 0.72]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.6
+  camera_elev: 0.7
+  camera_elev_end: 1.2
+  camera_turns: 0.4

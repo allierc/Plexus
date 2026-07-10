@@ -1,0 +1,36 @@
+# chua attractor -- Chua's circuit double-scroll: a bow-tie of two spiral disks.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -> open space (the flow is bounded by its dissipation).
+general:
+  name: chua
+  seed: 0
+  n_frames: 12000
+  dt: 0.006
+  boundary: free
+  dim: 3
+  world: [8.0, 4.0, 10.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [0.45, -0.15, -0.35, 0.75, 0.15, -0.05]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: chua, alpha: 15.6, beta: 28.58, m0: -1.1428571, m1: -0.7142857}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [0.38, 0.62, 1.0]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.0
+  camera_elev: 1.1
+  camera_elev_end: 1.45
+  camera_turns: 0.08
