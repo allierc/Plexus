@@ -130,6 +130,10 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Simulations</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="./optimization.html"> 
+<span class="menu-text">Optimization</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./inverse.html"> 
 <span class="menu-text">Slime inverse problem</span></a>
   </li>  
@@ -355,6 +359,54 @@ config/material/material_3d_snow_block.yaml</pre></span></span>
       <span class="sim-name" tabindex="0">multi-material<span class="sim-spec"><pre>op: mls_mpm  # elastic + fluid + snow in one scene
 config/material/material_3d_multimaterial.yaml</pre></span></span>
       <span class="sim-cap">elastic, fluid, and granular bodies interacting at once</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_water_lots.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">water (deep pool)<span class="sim-spec"><pre>op: mls_mpm  # large fluid body, many particles
+config/material/material_3d_water_lots_x10.yaml</pre></span></span>
+      <span class="sim-cap">a deep body of water sloshes, settles, and fills the tank</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_obstacle.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">sphere obstacle<span class="sim-spec"><pre>op: mls_mpm  # obstacle mask in the grid solve (BCs)
+config/material/material_3d_obstacle_sphere.yaml</pre></span></span>
+      <span class="sim-cap">material pours over and piles around a sphere obstacle</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_two_drops.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">two drops (surface tension)<span class="sim-spec"><pre>op: mls_mpm  # surface-tension CSF on the colour field
+config/material/material_two_drops_st.yaml</pre></span></span>
+      <span class="sim-cap">two liquid drops coalesce under surface tension</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_visco.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">viscoelastic vs elastic<span class="sim-spec"><pre>op: mls_mpm  # two material models, side by side
+config/material/material_viscoelastic_vs_elastic.yaml</pre></span></span>
+      <span class="sim-cap">a viscoelastic body creeps; a purely elastic one rings</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_leak.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">leaking tank<span class="sim-spec"><pre>op: mls_mpm  # walls (obstacle mask) with a gap
+config/material/material_leak_tank.yaml</pre></span></span>
+      <span class="sim-cap">fluid drains through a gap between two walls</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_map.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">material map (4 quadrants)<span class="sim-spec"><pre>op: apply_material_map  # image field -&gt; per-particle stiffness
+config/material/material_map_four_quadrants.yaml</pre></span></span>
+      <span class="sim-cap">an image sets per-region Young's modulus (four quadrants)</span>
     </figcaption>
   </figure>
 </div>

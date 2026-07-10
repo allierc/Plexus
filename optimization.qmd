@@ -1,0 +1,41 @@
+---
+title: "Optimization"
+subtitle: "Differentiable design — tuning a foraging colony end-to-end"
+resources:
+  - gallery/
+---
+
+And because every Plexus simulation is a composition of **differentiable** operators, a
+*design* can be optimized, not just simulated. A slime-style foraging colony — built from the
+same `deposit` / `diffuse` / `sense` / `glide` operators as the
+[Physarum networks](experiment.qmd) — is tuned by a black-box **UCB** search over its spec
+parameters, from a hand-set design (left) to the best found (right), which delivers food
+roughly **five-fold faster**.
+
+::: {layout-ncol=2}
+{{< video gallery/initial.mp4 title="initial hand-set colony" >}}
+
+{{< video gallery/winner_7.mp4 title="optimized colony — ~5× faster to food" >}}
+:::
+
+## Harder navigation
+
+The same recipe scales to harder navigation — a porous **pillar** field and a walled **maze**,
+each crossed by a self-generated attractant gradient and tuned by the same optimizer. Each strip
+runs left → right, from its starting point to the optimized colony.
+
+**Pillars — a porous field**
+
+{{< video gallery/race_pillars_winner_1.mp4 title="pillars — starting point" >}}
+
+{{< video gallery/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escape the porous field)" >}}
+
+**Maze — a walled labyrinth**
+
+{{< video gallery/race_maze_hard_winner_1.mp4 title="maze — starting point" >}}
+
+{{< video gallery/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}
+
+The colony never “sees” the maze — it only reads its own attractant gradient — yet the optimizer
+discovers spec parameters that route the population through the labyrinth. Same operators, same
+engine; only the spec changed.
