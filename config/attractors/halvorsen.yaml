@@ -1,0 +1,36 @@
+# halvorsen attractor -- cyclically-symmetric (x->y->z) quadratic flow: a fat three-armed folded knot.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -> open space (the flow is bounded by its dissipation).
+general:
+  name: halvorsen
+  seed: 0
+  n_frames: 10000
+  dt: 0.004
+  boundary: free
+  dim: 3
+  world: [16.0, 16.0, 16.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [-2.35, -2.35, -2.35, -1.65, -1.65, -1.65]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: halvorsen, a: 1.4}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [1.0, 0.62, 0.16]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.5
+  camera_elev: 0.7
+  camera_elev_end: 1.2
+  camera_turns: 0.4
