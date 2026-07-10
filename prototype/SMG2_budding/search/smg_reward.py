@@ -45,17 +45,25 @@ _CALIB = _load_calib()
 
 
 # ------------------------------------------------------------------ morphology readout (2D)
-def obs_2d(points, W=1.0, vox=0.008, sigma_vox=4.5, thr=0.10, prune=14):
-    """Locked morphology observables from a 2D point cloud in [0,W]x[0,1]."""
+def obs_2d(points, W=1.0, vox=0.008, sigma_vox=2.5, thr=0.10, prune=14, support_dilate=2):
+    """Locked morphology observables from a 2D point cloud in [0,W]x[0,1].
+
+    sigma_vox is deliberately MODEST (~2.5): a large blur (the old 4.5) bridges the gaps between
+    disconnected fragments so a shattered gland reads as one 'connected' branched body. We also
+    return `skel_support` = fraction of the skeleton that actually sits on occupied tissue (the raw
+    nucleus footprint, no blur); a skeleton that floats across black gaps has low support and is
+    discounted in value_vector -> the readout can no longer be fooled by fragmentation.
+    """
     nx_, ny_ = int(W / vox) + 1, int(1.0 / vox) + 1
     ix = np.clip((points[:, 0] / vox).astype(int), 0, nx_ - 1)
     iy = np.clip((points[:, 1] / vox).astype(int), 0, ny_ - 1)
     g = np.zeros((nx_, ny_), np.float32); np.add.at(g, (ix, iy), 1.0)
+    raw = ndi.binary_dilation(g > 0, iterations=support_dilate)   # true tissue footprint (nucleus size)
     dens = ndi.gaussian_filter(g, sigma_vox)
     occ = ndi.binary_fill_holes(dens > thr * max(dens.max(), 1e-9))
     lbl, ncomp = ndi.label(occ)
     o = dict(n_tube=0, n_bud=0, n_branch=0, n_generations=0, skel_len=0.0,
-             body_diam=1e-6, body_aniso=1.0, sheetness=0.0, area=0.0, ncomp=ncomp)
+             body_diam=1e-6, body_aniso=1.0, sheetness=0.0, area=0.0, ncomp=ncomp, skel_support=0.0)
     if ncomp == 0:
         return o
     sizes = np.bincount(lbl.ravel()); sizes[0] = 0
@@ -74,6 +82,8 @@ def obs_2d(points, W=1.0, vox=0.008, sigma_vox=4.5, thr=0.10, prune=14):
     o["n_bud"] = len(buds)
     skel = skeletonize(body)
     o["skel_len"] = float(skel.sum()) * vox
+    sk = np.argwhere(skel)                                        # tissue support of the skeleton
+    o["skel_support"] = float(raw[sk[:, 0], sk[:, 1]].mean()) if len(sk) else 0.0
     # skeleton graph -> prune spurs -> branch points + generations
     o["n_branch"], o["n_generations"] = _skel_topology(skel, vox, prune * vox)
     return o
@@ -143,12 +153,18 @@ def _clip(x, lo=0.0, hi=1.0):
     return float(max(lo, min(hi, x)))
 
 
+def _blr(obs):
+    """Branch-length-ratio DISCOUNTED by tissue support: a skeleton that bridges gaps between
+    fragments (low skel_support) contributes little length -> a shattered gland can't score as a duct."""
+    return obs["skel_len"] * obs.get("skel_support", 1.0) / max(obs["body_diam"], 1e-6)
+
+
 def value_vector(obs, migration_coherence=0.0, growth_ratio=1.0,
                  tip_growth_localization=0.0, target_distance=1.0):
     """The metric VECTOR (surrogate target + UCB value + reward inputs)."""
     conn = 1.0 if obs["n_tube"] <= 1 else 1.0 / obs["n_tube"]
     elong = _clip((obs["body_aniso"] - 1.0) / 2.0)                 # aniso 1..3 -> 0..1
-    blr = obs["skel_len"] / max(obs["body_diam"], 1e-6)            # branch_length_ratio
+    blr = _blr(obs)                                                # support-discounted branch-length-ratio
     gens = _clip(obs["n_generations"] / _CALIB["GEN_REF"])
     dref = _clip(blr / _CALIB["BLR_REF"])                          # length NORMALIZED to real SMG
     duct = conn * dref * (0.4 + 0.6 * gens)                        # real anchors ~1 (conn=1,dref=1,gens=1)
@@ -165,6 +181,7 @@ def value_vector(obs, migration_coherence=0.0, growth_ratio=1.0,
         migration_coherence=round(float(migration_coherence), 3),
         target_distance=round(float(target_distance), 3),
         elongation=round(elong, 3), connectedness=round(conn, 3), generations=int(obs["n_generations"]),
+        skel_support=round(float(obs.get("skel_support", 1.0)), 3),
     )
 
 
@@ -175,9 +192,9 @@ def classify(obs, growth_ratio=1.0, area_ratio=1.0, unstable=False):
         return "unstable"
     if growth_ratio > 4.0 and area_ratio > 3.0:
         return "overgrowth"
-    if obs["n_tube"] >= 4:
-        return "fragment"
-    if obs["n_generations"] >= 2 and (obs["skel_len"] / max(obs["body_diam"], 1e-6)) > 1.5:
+    if obs["n_tube"] >= 4 or obs.get("skel_support", 1.0) < 0.5:
+        return "fragment"                                         # many comps OR skeleton floats over gaps
+    if obs["n_generations"] >= 2 and _blr(obs) > 1.5:
         return "branch-like"
     if obs["sheetness"] > 0.7:
         return "sheet"
@@ -210,13 +227,28 @@ def reward(obs, stage="connect", **kw):
 
 
 # ------------------------------------------------------------------ calibration to real SMG
-def _real_obs(frame=552):
+def _real_points(frame=552):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     import torch, smg_topo as st
     xl = torch.load(st.PT_DEFAULT, map_location="cpu", weights_only=False)
     p = st.load_frame(xl, frame)[:, :2]
-    p = (p - p.min(0)) / (p.max(0) - p.min(0) + 1e-9)
-    return obs_2d(p, W=1.0)
+    return (p - p.min(0)) / (p.max(0) - p.min(0) + 1e-9)
+
+
+def _real_obs(frame=552):
+    return obs_2d(_real_points(frame), W=1.0)
+
+
+def _shatter(p, ncells=5, gap=0.7):
+    """Explode a point cloud onto a grid, inserting a gap after each cell -> the SAME tissue, its
+    connectivity destroyed. A readout that can't tell this from the connected original is gap-fooled."""
+    out = np.array(p, float)
+    for ax in range(2):
+        cw = 1.0 / ncells
+        ci = np.clip(np.floor(out[:, ax] / cw), 0, ncells - 1)
+        frac = out[:, ax] / cw - ci
+        out[:, ax] = ci * cw * (1 + gap) + frac * cw
+    return (out - out.min(0)) / (np.ptp(out, 0) + 1e-9)
 
 
 def calibrate(frames=(184, 276, 368, 460, 552)):
@@ -226,7 +258,7 @@ def calibrate(frames=(184, 276, 368, 460, 552)):
     blrs, gens = [], []
     for f in frames:
         o = _real_obs(f)
-        blrs.append(o["skel_len"] / max(o["body_diam"], 1e-6)); gens.append(o["n_generations"])
+        blrs.append(_blr(o)); gens.append(o["n_generations"])
     calib = {"BLR_REF": round(float(np.median(blrs)), 3), "GEN_REF": float(max(2.0, np.median(gens)))}
     json.dump(calib, open(_CALIB_PATH, "w"), indent=2)
     global _CALIB; _CALIB = _load_calib()
@@ -242,7 +274,12 @@ def _synthetic(rng):
                           np.c_[0.5 - 0.32 * t, 0.54 + 0.32 * t],
                           np.c_[0.5 + 0.32 * t, 0.54 + 0.32 * t]])
     branch = np.clip(ybr + 0.025 * rng.standard_normal(ybr.shape), 0, 1)
-    return dict(cluster=obs_2d(cluster, W=1.0), blob=obs_2d(blob, W=1.0), branch=obs_2d(branch, W=1.0))
+    # POSITIVE/NEGATIVE control: the SAME Y tissue, shattered by periodic gaps along its length.
+    # The connected branch must outscore its shattered twin -> proof the readout is not gap-fooled.
+    keep = (np.floor(ybr[:, 1] * 9) % 2 == 0)                                  # punch dashes -> disconnect arms
+    frag = np.clip(ybr[keep] + 0.025 * rng.standard_normal((int(keep.sum()), 2)), 0, 1)
+    return dict(cluster=obs_2d(cluster, W=1.0), blob=obs_2d(blob, W=1.0),
+                branch=obs_2d(branch, W=1.0), frag_branch=obs_2d(frag, W=1.0))
 
 
 def calibration_gate():
@@ -251,16 +288,19 @@ def calibration_gate():
     calib, blrs, gens = calibrate()
     print(f"calibrated to real SMG: BLR_REF={calib['BLR_REF']} GEN_REF={calib['GEN_REF']}  "
           f"(real blr {np.round(blrs, 2).tolist()}, gen {gens})\n")
-    ro = _real_obs(552); real = value_vector(ro); real_cl = classify(ro)
-    syn = _synthetic(np.random.default_rng(0))
-    print(f"{'case':10} {'cluster':>7} {'bud':>5} {'duct':>5} {'branch':>6}  class")
-    print(f"{'REAL':10} {real['cluster_score']:>7} {real['bud_score']:>5} {real['duct_score']:>5} "
-          f"{real['branch_count']:>6}  {real_cl}")
+    rp = _real_points(552)
+    ro = obs_2d(rp, W=1.0); real = value_vector(ro); real_cl = classify(ro)
+    rfo = obs_2d(_shatter(rp), W=1.0); rfrag = value_vector(rfo)     # real gland shattered against itself
+    syn = _synthetic(np.random.default_rng(0)); syn["real_frag"] = rfo
+    print(f"{'case':12} {'cluster':>7} {'bud':>5} {'duct':>5} {'branch':>6} {'suppt':>6}  class")
+    print(f"{'REAL':12} {real['cluster_score']:>7} {real['bud_score']:>5} {real['duct_score']:>5} "
+          f"{real['branch_count']:>6} {real['skel_support']:>6}  {real_cl}")
     vs = {}
     for name, o in syn.items():
         vs[name] = value_vector(o)
-        print(f"{name:10} {vs[name]['cluster_score']:>7} {vs[name]['bud_score']:>5} "
-              f"{vs[name]['duct_score']:>5} {vs[name]['branch_count']:>6}  {classify(o)}")
+        print(f"{name:12} {vs[name]['cluster_score']:>7} {vs[name]['bud_score']:>5} "
+              f"{vs[name]['duct_score']:>5} {vs[name]['branch_count']:>6} {vs[name]['skel_support']:>6}"
+              f"  {classify(o)}")
     checks = {
         "real duct > 0.6": real["duct_score"] > 0.6,
         "real cluster < 0.2": real["cluster_score"] < 0.2,
@@ -268,6 +308,9 @@ def calibration_gate():
         "real bud > cluster bud + 0.05": real["bud_score"] > vs["cluster"]["bud_score"] + 0.05,
         "real duct > cluster duct + 0.5": real["duct_score"] > vs["cluster"]["duct_score"] + 0.5,
         "real duct > blob duct + 0.4": real["duct_score"] > vs["blob"]["duct_score"] + 0.4,
+        # connectivity honesty: the real gland must beat its SHATTERED self, which must read fragmented
+        "real duct > real_frag duct + 0.4": real["duct_score"] > rfrag["duct_score"] + 0.4,
+        "real_frag NOT branch-like": classify(rfo) != "branch-like",
     }
     print()
     for k, ok in checks.items():
