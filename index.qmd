@@ -120,40 +120,23 @@ self-organizing networks, self-gravity, and deterministic chaos.
 ```
 
 And because every simulation is differentiable, biological designs can be
-*optimized*. Below, a foraging colony in a maze is tuned by a UCB algorithm —
-from a hand-set design (left) to the best found (right), which delivers food
-roughly five-fold faster.
-
-::: {layout-ncol=2}
-{{< video gallery/initial.mp4 title="initial hand-set colony" >}}
-
-{{< video gallery/winner_7.mp4 title="optimized colony (winner 7)" >}}
-:::
-
-The same recipe scales to harder navigation — a porous **pillar** field and a
-walled **maze**, each crossed by a self-generated attractant gradient and tuned
-by the same optimizer. Each is shown from its starting point to the optimized
-colony (see [Simulations](experiment.qmd) for the full runs):
-
-{{< video gallery/race_pillars_winner_1.mp4 title="pillars — starting point" >}}
-
-{{< video gallery/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escape the porous field)" >}}
-
-{{< video gallery/race_maze_hard_winner_1.mp4 title="maze — starting point" >}}
-
-{{< video gallery/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}
+*optimized*, not just simulated — a foraging colony in a maze, tuned end-to-end by a
+UCB search, delivers food roughly **five-fold faster**. See
+**[Optimization](optimization.qmd)** for the full runs.
 
 ## Read the blueprint
 
-This site distils a working prototype into a single blueprint, in three parts:
+This site distils a working prototype into a single blueprint, in four parts:
 
 - **[The abstraction](abstraction.qmd)** — the missing primitive: a hierarchical
   graph container stated in the language of sets, fields, and four operators.
 - **[LLM ↔ registry](methodology.qmd)** — the two-layer contract and the small
   declarative language that lets an LLM drive a registry of operators.
-- **[Simulations](experiment.qmd)** — the core operator families as one-per-family
-  clips (interaction, boids, active matter, slime, MLS-MPM, inverse-square, strange
-  attractors), plus a maze-foraging colony optimized end-to-end.
+- **[Simulations](experiment.qmd)** — the core operator families as multi-example
+  panels (interaction, boids, active matter, slime, MLS-MPM, inverse-square, strange
+  attractors).
+- **[Optimization](optimization.qmd)** — a foraging colony tuned end-to-end by a
+  differentiable UCB search, from a hand-set design to the best found.
 
 A static version with full schematics and glossary is in
 [`paper/plexus.pdf`](paper/plexus.pdf).

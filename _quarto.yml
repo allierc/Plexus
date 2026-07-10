@@ -28,6 +28,8 @@ website:
             text: Operators
       - href: experiment.qmd
         text: Simulations
+      - href: optimization.qmd
+        text: Optimization
       - href: inverse.qmd
         text: Slime inverse problem
     tools:
