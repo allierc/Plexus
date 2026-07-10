@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -343,19 +343,19 @@ E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>exchange</strong> operators: <a href="../library/deposit.html"><code>deposit</code></a>, <a href="../library/sense.html"><code>sense</code></a>, <a href="../library/chemotaxis.html"><code>chemotaxis</code></a>, <a href="../library/pulse_to_contraction.html"><code>pulse_to_contraction</code></a>, <a href="../library/pulse_to_active_stress.html"><code>pulse_to_active_stress</code></a>, <a href="../library/mls_mpm_mechanics.html"><code>mls_mpm_mechanics</code></a>.</p>
+<p>Other <strong>exchange</strong> operators: <a href="../library/deposit.html"><code>deposit</code></a>, <a href="../library/sense.html"><code>sense</code></a>, <a href="../library/chemotax.html"><code>chemotax</code></a>, <a href="../library/active_force.html"><code>active_force</code></a>, <a href="../library/pulse_to_contraction.html"><code>pulse_to_contraction</code></a>, <a href="../library/active_stress.html"><code>active_stress</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
 <p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/material_map.py"><code>src/plexus/operators/material_map.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"apply_material_map"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"apply_material_map"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ApplyMaterialMap(Exchange):</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""field -&gt; set: sample the map at each particle and write a per-particle material</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the</span></span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Lame buffers mu/la (the MPM stress law reads them); any other `target` is written as</span></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">    a per-particle buffer of that name. Mutates per-particle buffers, returns {}."""</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    PREDICTION <span class="op">=</span> <span class="va">None</span>                              <span class="co"># sets material, emits no force</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                              <span class="co"># sets material, emits no force</span></span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"from"</span>, <span class="st">"target"</span>]</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"material_map"</span>, <span class="st">"heterogeneous_stiffness"</span>, <span class="st">"symmetry_breaking"</span>]</span>
@@ -371,37 +371,29 @@ E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
 <span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
 <span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _sample(<span class="va">self</span>, H, lvl):</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Bilinear-sample the map field at the particle positions -&gt; intensity [N]."""</span></span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> H.fields[<span class="va">self</span>.field_name].grid[<span class="va">self</span>.channel]            <span class="co"># [nx, ny]</span></span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>        W <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H, <span class="st">"world_width"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>        gxn <span class="op">=</span> (pos[:, <span class="dv">0</span>] <span class="op">/</span> W) <span class="op">*</span> <span class="dv">2</span> <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>        gyn <span class="op">=</span> (pos[:, <span class="dv">1</span>] <span class="op">/</span> <span class="fl">1.0</span>) <span class="op">*</span> <span class="dv">2</span> <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>        grid <span class="op">=</span> torch.stack([gyn, gxn], <span class="op">-</span><span class="dv">1</span>)[<span class="va">None</span>, <span class="va">None</span>]             <span class="co"># grid_sample expects (x=ny, y=nx)</span></span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>        val <span class="op">=</span> Fnn.grid_sample(g[<span class="va">None</span>, <span class="va">None</span>], grid, mode<span class="op">=</span><span class="st">"bilinear"</span>,</span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>                              padding_mode<span class="op">=</span><span class="st">"border"</span>, align_corners<span class="op">=</span><span class="va">True</span>)[<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>]</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> val.clamp(<span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>        mapped <span class="op">=</span> <span class="va">self</span>.lo <span class="op">+</span> <span class="va">self</span>._sample(H, lvl) <span class="op">*</span> (<span class="va">self</span>.hi <span class="op">-</span> <span class="va">self</span>.lo)   <span class="co"># intensity -&gt; [lo, hi]</span></span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.target <span class="op">==</span> <span class="st">"youngs"</span>:</span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>            <span class="im">from</span> plexus.models.entities <span class="im">import</span> _lame</span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>            mu, la <span class="op">=</span> _lame(mapped)</span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>            liquid <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:                                 <span class="co"># liquid keeps zero shear modulus</span></span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>                mu <span class="op">=</span> torch.where(liquid, torch.zeros_like(mu), mu)</span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>            lvl.mu, lvl.la <span class="op">=</span> mu, la                                <span class="co"># MPM stress reads these</span></span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="st">"youngs"</span> <span class="kw">in</span> <span class="bu">getattr</span>(lvl, <span class="st">"_buffers"</span>, {}):</span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>                lvl.youngs <span class="op">=</span> mapped</span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>                lvl.register_buffer(<span class="st">"youngs"</span>, mapped)</span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.target <span class="kw">in</span> <span class="bu">getattr</span>(lvl, <span class="st">"_buffers"</span>, {}):</span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>                <span class="bu">setattr</span>(lvl, <span class="va">self</span>.target, mapped)</span>
-<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
-<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>                lvl.register_buffer(<span class="va">self</span>.target, mapped)</span>
-<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""Bilinear-sample the map field at the particle positions -&gt; intensity [N] in [0,1]."""</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> H.fields[<span class="va">self</span>.field_name].sample(lvl.get(<span class="st">"pos"</span>), <span class="va">self</span>.channel).clamp(<span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>        mapped <span class="op">=</span> <span class="va">self</span>.lo <span class="op">+</span> <span class="va">self</span>._sample(H, lvl) <span class="op">*</span> (<span class="va">self</span>.hi <span class="op">-</span> <span class="va">self</span>.lo)   <span class="co"># intensity -&gt; [lo, hi]</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.target <span class="op">==</span> <span class="st">"youngs"</span>:</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>            <span class="im">from</span> plexus.models.entities <span class="im">import</span> _lame</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>            mu, la <span class="op">=</span> _lame(mapped)</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>            liquid <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:                                 <span class="co"># liquid keeps zero shear modulus</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>                mu <span class="op">=</span> torch.where(liquid, torch.zeros_like(mu), mu)</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>            lvl.mu, lvl.la <span class="op">=</span> mu, la                                <span class="co"># MPM stress reads these</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="st">"youngs"</span> <span class="kw">in</span> <span class="bu">getattr</span>(lvl, <span class="st">"_buffers"</span>, {}):</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>                lvl.youngs <span class="op">=</span> mapped</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>                lvl.register_buffer(<span class="st">"youngs"</span>, mapped)</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.target <span class="kw">in</span> <span class="bu">getattr</span>(lvl, <span class="st">"_buffers"</span>, {}):</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>                <span class="bu">setattr</span>(lvl, <span class="va">self</span>.target, mapped)</span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>            <span class="cf">else</span>:</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>                lvl.register_buffer(<span class="va">self</span>.target, mapped)</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
@@ -633,8 +625,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -745,7 +735,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

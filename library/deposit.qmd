@@ -59,7 +59,7 @@ under its position, clamped to 1 — the only place agents imprint the trail.
 | parameter | role | default |
 |---|---|---|
 | `to` | &ndash; | **required** |
-| `amount` | &ndash; | 0.9 |
+| `amount` | deposit_rate | 0.9 |
 
 ## Minimal spec
 
@@ -68,9 +68,13 @@ operators:
   - {op: deposit, at: cell, to: ...}
 ```
 
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`deposition`]{.op-badge} [`stigmergy`]{.op-badge} [`field_write`]{.op-badge}  
+
 ## Related operators
 
-Other **exchange** operators: [`sense`](sense.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`apply_material_map`](apply_material_map.qmd), [`mls_mpm_mechanics`](mls_mpm_mechanics.qmd).
+Other **exchange** operators: [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd).
 
 ## Source
 
@@ -91,12 +95,15 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("deposit", level="cell", kind="exchange")
+@register_operator("deposit", family="fields", level="cell", kind="exchange")
 class Deposit(Exchange):
     """object -> field. Writes `to:` field in place; returns {}."""
 
+    EMIT = None                                # set->field: scatters onto the grid in place (stigmergy write); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
     REQUIRES_PARAMS = ["to"]
+    MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]
+    PARAM_ROLES = {"amount": "deposit_rate"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

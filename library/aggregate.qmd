@@ -38,7 +38,7 @@ Children -> parent. Reduce a contained set onto its parent.
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
-- **Dimensions** &mdash; 2D.
+- **Dimensions** &mdash; 2D, 3D.
 
 ## Mechanism
 
@@ -53,12 +53,22 @@ $$
 The occupancy-weighted centroid of a parent $P$'s children ($o_i$ = occupancy). A
 derived readout written straight onto the parent, not an integrated force.
 
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `child` | source_child_set | &ndash; |
+
 ## Minimal spec
 
 ```yaml
 operators:
   - {op: aggregate, at: cell}
 ```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`centroid`]{.op-badge} [`reduction`]{.op-badge} [`hierarchical_readout`]{.op-badge}  
 
 ## Related operators
 
@@ -84,8 +94,13 @@ from plexus.models.base import Aggregate
 from plexus.models.registry import register_operator
 
 
-@register_operator("aggregate", level="cell", kind="aggregate")
+@register_operator("aggregate", family="hierarchy", level="cell", kind="aggregate")
 class Centroid(Aggregate):
+    EMIT = None                                    # readout: writes parent `pos` in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
+    SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
+    REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
+    MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]
+    PARAM_ROLES = {"child": "source_child_set"}
     MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
 
     def __init__(self, params, device="cpu"):
@@ -103,9 +118,9 @@ class Centroid(Aggregate):
         if pidx.numel() == 0:
             return {}
         dev = parent.state.device
-        px0, px1 = parent.state_schema["pos"]
+        px0, px1 = parent.state_schema["pos"]; D = H.dim   # spatial dim (the global contract; == px1 - px0)
         cpos = child.get("pos"); cocc = child.occ
-        s = torch.zeros(parent.n, 2, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
+        s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
         w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
         centroid = s / w.clamp(min=1.0)[:, None]
         new = parent.state.clone()                 # only live parents take the readout

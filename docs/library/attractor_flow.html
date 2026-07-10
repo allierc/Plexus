@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.42">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>attractor_flow – Plexus</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Plexus</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../abstraction.html"> 
+<span class="menu-text">The abstraction</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../methodology.html"> 
+<span class="menu-text">LLM ↔︎ registry</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Library</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
+        <li>
+    <a class="dropdown-item" href="../library.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_sets.html">
+ <span class="dropdown-text">Sets</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_fields.html">
+ <span class="dropdown-text">Fields</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../library_operators.html">
+ <span class="dropdown-text">Operators</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../experiment.html"> 
+<span class="menu-text">Simulations</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../inverse.html"> 
+<span class="menu-text">Slime inverse problem</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+    <a href="https://github.com/allierc/Plexus" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
+  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
+  <li><a href="#example-output" id="toc-example-output" class="nav-link" data-scroll-target="#example-output">Example output</a></li>
+  <li><a href="#identifiability" id="toc-identifiability" class="nav-link" data-scroll-target="#identifiability">Identifiability</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
+  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
+  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">attractor_flow</h1>
+<p class="subtitle lead">Ride a set along a strange-attractor vector field dx/dt = f(x).</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="op-head">
+<p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
+<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>Rides a whole cloud along a dissipative 3D <strong>strange-attractor</strong> vector field <span class="math inline">\(\dot{\mathbf x}=f(\mathbf x)\)</span>. No interaction: every point is an independent tracer of the same chaotic flow, so a tiny seed ball is stretched-and-folded until the cloud <em>is</em> the attractor. <code>system</code> selects one of ten classic flows (Lorenz, Rössler, Aizawa, Sprott&nbsp;B, Halvorsen, Thomas, Chen, Chua, Dadras, Rabinovich–Fabrikant), each citing its originating paper.</p>
+</div>
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+<section id="role-in-plexus" class="level2">
+<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<ul>
+<li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Reads</strong> — <code>system</code></li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
+<li><strong>Dimensions</strong> — 3D.</li>
+</ul>
+</section>
+<section id="mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
+<p>ONE Lateral, first-derivative operator (EMIT=velocity) for a whole family of dissipative 3D chaotic flows. Every point of a set reads its OWN position and returns its instantaneous velocity f(x); the engine integrates x &lt;- x + dt*f(x). There is no interaction and no neighbour graph – the cloud is a swarm of independent tracers of the SAME flow, so a tiny seed ball is stretched-and-folded by the chaos until the cloud IS the attractor (the shape draws itself). This is the same “compact seed -&gt; sprawling structure” contract as the inverse-square galaxy spec, with the pairwise force replaced by a prescribed vector field.</p>
+<p>The <code>system</code> param switches between the classic flows (state s = (x, y, z)); its constants are optional spec overrides of the defaults below:</p>
+<pre><code>lorenz    (sig=10,rho=28,       xd = sig(y - x)
+aizawa    (a=.95,b=.7,c=.6,     xd = (z - b) x - d y
+sprott_b  (a=1)                 xd = a y z ;  yd = x - y ;  zd = 1 - x y
+chen      (a=35,b=3,c=28)       xd = a(y - x)
+           28.58,m0=-8/7,       h(x) = m1 x + (m0-m1)/2 (|x+1| - |x-1|)   [PWL diode]</code></pre>
+<p>3D ONLY (SUPPORTED_DIMS=[3]). This is not an unfinished 2D interface: by the Poincare-Bendizson theorem a continuous autonomous flow in the plane cannot be chaotic, so a strange attractor of this kind needs &gt;=3 dimensions – there is no 2D specialization to write. <code>clamp</code> caps |v| as a safety valve (systems like Dadras go Euler-unstable at large dt, and Rabinovich-Fabrikant’s chaotic attractor coexists with escape-to-infinity orbits); the clamp keeps a stray point finite without distorting the well-conditioned bulk of the flow.</p>
+<p>Provenance (each <code>system</code> reproduces a published flow): * lorenz – E. N. Lorenz, “Deterministic Nonperiodic Flow”, J. Atmos. Sci. 20 (1963). * rossler – O. E. Rossler, “An Equation for Continuous Chaos”, Phys. Lett. A 57 (1976). * sprott_b – J. C. Sprott, “Some simple chaotic flows”, Phys. Rev.&nbsp;E 50 (1994), case B. * rabinovich_fabrikant – M. I. Rabinovich &amp; A. L. Fabrikant, Sov. Phys. JETP 50 (1979). * chen – G. Chen &amp; T. Ueta, “Yet another chaotic attractor”, Int. J. Bif. Chaos 9 (1999). * chua – L. O. Chua’s circuit double-scroll (Matsumoto-Chua-Komuro, 1985). * dadras – S. Dadras &amp; H. R. Momeni, Phys. Lett. A 373 (2009). * halvorsen, aizawa, thomas – cyclically-symmetric / torus-spike / labyrinth flows from J. C. Sprott, “Chaos and Time-Series Analysis” (2003) and the standard attractor catalogs. Introduced by the <code>prototype/attractors</code> campaign and promoted here as one <code>system</code>-switched operator (the four-&gt;ten attractor family), the same way the galaxy prototype became <code>squared_law</code>.</p>
+<p><span class="math display">\[
+\dot{\mathbf x} \;=\; f_{\text{system}}(\mathbf x),
+\qquad
+\text{e.g. Lorenz: }\;
+\dot x=\sigma(y-x),\;\; \dot y=x(\rho-z)-y,\;\; \dot z=xy-\beta z
+\]</span> A first-derivative (velocity) flow, so the engine integrates <span class="math inline">\(\mathbf x \mathrel{+}= \Delta t\,f(\mathbf x)\)</span>. 3D only: a continuous planar autonomous flow cannot be chaotic (Poincaré–Bendixson).</p>
+</section>
+<section id="parameters" class="level2">
+<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>role</th>
+<th>default</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>system</code></td>
+<td>which attractor: one of [‘halvorsen’, ‘lorenz’, ‘aizawa’, ‘sprott_b’, ‘thomas’, ‘rossler’, ‘dadras’, ‘chen’, ‘chua’, ‘rabinovich_fabrikant’]</td>
+<td><strong>required</strong></td>
+</tr>
+<tr class="even">
+<td><code>scale</code></td>
+<td>time-rescale the flow (f -&gt; scale*f); &gt;1 = faster</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td><code>clamp</code></td>
+<td>max</td>
+<td>velocity</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="minimal-spec" class="level2">
+<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cloud</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">60000</span><span class="kw">,</span><span class="at"> </span><span class="fu">start</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="fl">0.6</span><span class="kw">,</span><span class="fl">0.6</span><span class="kw">,</span><span class="fl">14.6</span><span class="kw">,</span><span class="at"> </span><span class="fl">1.4</span><span class="kw">,</span><span class="fl">1.4</span><span class="kw">,</span><span class="fl">15.4</span><span class="kw">]}</span><span class="co">   # tiny seed cube in the basin</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> attractor_flow</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> cloud</span><span class="kw">,</span><span class="at"> </span><span class="fu">system</span><span class="kw">:</span><span class="at"> lorenz</span><span class="kw">,</span><span class="at"> </span><span class="fu">sigma</span><span class="kw">:</span><span class="at"> </span><span class="fl">10.0</span><span class="kw">,</span><span class="at"> </span><span class="fu">rho</span><span class="kw">:</span><span class="at"> </span><span class="fl">28.0</span><span class="kw">,</span><span class="at"> </span><span class="fu">beta</span><span class="kw">:</span><span class="at"> </span><span class="fl">2.6666667</span><span class="kw">}</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">attractor_flow</span><span class="kw">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="example-output" class="level2">
+<h2 class="anchored" data-anchor-id="example-output">Example output</h2>
+<figure class="op-vid figure"><video src="../gallery/attractor_lorenz.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+<figcaption>`system: lorenz` — a seed cloud fans out onto the butterfly, its two lobes drawn by the chaotic flow.</figcaption></figure>
+</section>
+<section id="identifiability" class="level2">
+<h2 class="anchored" data-anchor-id="identifiability">Identifiability</h2>
+<p>The trajectory pins down the flow’s <strong>constants</strong> (e.g.&nbsp;Lorenz <span class="math inline">\(\sigma,\rho,\beta\)</span>) from the shape and timing of the attractor, but sensitive dependence means individual point paths diverge exponentially — only the <em>invariant set</em> (the attractor geometry) and its spectrum are reproducibly identifiable, not any single orbit.</p>
+</section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>strange_attractor</code></span> <span class="op-badge"><code>deterministic_chaos</code></span> <span class="op-badge"><code>dissipative_flow</code></span> <span class="op-badge"><code>sensitive_dependence</code></span> <span class="op-badge"><code>phase_space_contraction</code></span> <span class="op-badge"><code>dynamical_system</code></span></p>
+</section>
+<section id="related-operators" class="level2">
+<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
+<ul>
+<li><a href="../library/squared_law.html"><code>squared_law</code></a> — the other closed-form lateral flow — pairwise, not single-particle</li>
+<li><a href="../library/drag.html"><code>drag</code></a> — a linear velocity law; attractor_flow is its nonlinear, chaotic cousin</li>
+</ul>
+</section>
+<section id="source" class="level2">
+<h2 class="anchored" data-anchor-id="source">Source</h2>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/attractor_flow.py"><code>src/plexus/operators/attractor_flow.py</code></a> — the registered operator.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""attractor_flow -- ride a set along a strange-attractor vector field dx/dt = f(x).</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">ONE Lateral, first-derivative operator (EMIT=velocity) for a whole family of dissipative</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">3D chaotic flows. Every point of a set reads its OWN position and returns its instantaneous</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">velocity f(x); the engine integrates x &lt;- x + dt*f(x). There is no interaction and no</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">neighbour graph -- the cloud is a swarm of independent tracers of the SAME flow, so a tiny</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">seed ball is stretched-and-folded by the chaos until the cloud IS the attractor (the shape</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">draws itself). This is the same "compact seed -&gt; sprawling structure" contract as the</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">inverse-square galaxy spec, with the pairwise force replaced by a prescribed vector field.</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">The `system` param switches between the classic flows (state s = (x, y, z)); its constants are</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">optional spec overrides of the defaults below:</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">    halvorsen (a=1.4)               xd = -a x - 4y - 4z - y^2   (+ cyclic y,z)</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">    lorenz    (sig=10,rho=28,       xd = sig(y - x)</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co">               beta=8/3)            yd = x(rho - z) - y ;  zd = x y - beta z</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">    aizawa    (a=.95,b=.7,c=.6,     xd = (z - b) x - d y</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">               d=3.5,e=.25,f=.1)    yd = d x + (z - b) y</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co">                                    zd = c + a z - z^3/3 - (x^2+y^2)(1 + e z) + f z x^3</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">    sprott_b  (a=1)                 xd = a y z ;  yd = x - y ;  zd = 1 - x y</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co">    thomas    (b=0.208)             xd = sin(y) - b x           (+ cyclic y,z)</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co">    rossler   (a=b=.2,c=5.7)        xd = -y - z ;  yd = x + a y ;  zd = b + z(x - c)</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co">    dadras    (a=3,b=2.7,c=1.7,     xd = y - a x + b y z</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co">               d=2,e=9)             yd = c y - x z + z ;  zd = d x y - e z</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="co">    chen      (a=35,b=3,c=28)       xd = a(y - x)</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="co">                                    yd = (c - a) x - x z + c y ;  zd = x y - b z</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="co">    chua      (alpha=15.6,beta=     xd = alpha(y - x - h(x)) ;  yd = x - y + z ;  zd = -beta y,</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="co">               28.58,m0=-8/7,       h(x) = m1 x + (m0-m1)/2 (|x+1| - |x-1|)   [PWL diode]</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="co">               m1=-5/7)</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="co">    rabinovich_fabrikant            xd = y(z - 1 + x^2) + g x</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="co">              (alpha=1.1,gamma=.87) yd = x(3z + 1 - x^2) + g y ;  zd = -2 z(alpha + x y)</span></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="co">3D ONLY (SUPPORTED_DIMS=[3]). This is not an unfinished 2D interface: by the</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="co">Poincare-Bendizson theorem a continuous autonomous flow in the plane cannot be chaotic, so a</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="co">strange attractor of this kind needs &gt;=3 dimensions -- there is no 2D specialization to write.</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a><span class="co">`clamp` caps |v| as a safety valve (systems like Dadras go Euler-unstable at large dt, and</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a><span class="co">Rabinovich-Fabrikant's chaotic attractor coexists with escape-to-infinity orbits); the clamp</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a><span class="co">keeps a stray point finite without distorting the well-conditioned bulk of the flow.</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a><span class="co">Provenance (each `system` reproduces a published flow):</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a><span class="co">  * lorenz   -- E. N. Lorenz, "Deterministic Nonperiodic Flow", J. Atmos. Sci. 20 (1963).</span></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a><span class="co">  * rossler  -- O. E. Rossler, "An Equation for Continuous Chaos", Phys. Lett. A 57 (1976).</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a><span class="co">  * sprott_b -- J. C. Sprott, "Some simple chaotic flows", Phys. Rev. E 50 (1994), case B.</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a><span class="co">  * rabinovich_fabrikant -- M. I. Rabinovich &amp; A. L. Fabrikant, Sov. Phys. JETP 50 (1979).</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a><span class="co">  * chen     -- G. Chen &amp; T. Ueta, "Yet another chaotic attractor", Int. J. Bif. Chaos 9 (1999).</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a><span class="co">  * chua     -- L. O. Chua's circuit double-scroll (Matsumoto-Chua-Komuro, 1985).</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a><span class="co">  * dadras   -- S. Dadras &amp; H. R. Momeni, Phys. Lett. A 373 (2009).</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a><span class="co">  * halvorsen, aizawa, thomas -- cyclically-symmetric / torus-spike / labyrinth flows from</span></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a><span class="co">    J. C. Sprott, "Chaos and Time-Series Analysis" (2003) and the standard attractor catalogs.</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a><span class="co">Introduced by the `prototype/attractors` campaign and promoted here as one `system`-switched</span></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a><span class="co">operator (the four-&gt;ten attractor family), the same way the galaxy prototype became `squared_law`.</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a><span class="co"># --------------------------------------------------------------------------- #</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a><span class="co">#  the vector fields -- pure torch, vectorised over the [N, 3] cloud; `p` overrides constants</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a><span class="co"># --------------------------------------------------------------------------- #</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _halvorsen(x, y, z, p):</span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"a"</span>, <span class="fl">1.4</span>)</span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="op">-</span>a <span class="op">*</span> x <span class="op">-</span> <span class="fl">4.0</span> <span class="op">*</span> y <span class="op">-</span> <span class="fl">4.0</span> <span class="op">*</span> z <span class="op">-</span> y <span class="op">*</span> y,</span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>            <span class="op">-</span>a <span class="op">*</span> y <span class="op">-</span> <span class="fl">4.0</span> <span class="op">*</span> z <span class="op">-</span> <span class="fl">4.0</span> <span class="op">*</span> x <span class="op">-</span> z <span class="op">*</span> z,</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>            <span class="op">-</span>a <span class="op">*</span> z <span class="op">-</span> <span class="fl">4.0</span> <span class="op">*</span> x <span class="op">-</span> <span class="fl">4.0</span> <span class="op">*</span> y <span class="op">-</span> x <span class="op">*</span> x)</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _lorenz(x, y, z, p):</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> p.get(<span class="st">"sigma"</span>, <span class="fl">10.0</span>)<span class="op">;</span> r <span class="op">=</span> p.get(<span class="st">"rho"</span>, <span class="fl">28.0</span>)<span class="op">;</span> b <span class="op">=</span> p.get(<span class="st">"beta"</span>, <span class="fl">8.0</span> <span class="op">/</span> <span class="fl">3.0</span>)</span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (s <span class="op">*</span> (y <span class="op">-</span> x), x <span class="op">*</span> (r <span class="op">-</span> z) <span class="op">-</span> y, x <span class="op">*</span> y <span class="op">-</span> b <span class="op">*</span> z)</span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _aizawa(x, y, z, p):</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"a"</span>, <span class="fl">0.95</span>)<span class="op">;</span> b <span class="op">=</span> p.get(<span class="st">"b"</span>, <span class="fl">0.7</span>)<span class="op">;</span> c <span class="op">=</span> p.get(<span class="st">"c"</span>, <span class="fl">0.6</span>)</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> p.get(<span class="st">"d"</span>, <span class="fl">3.5</span>)<span class="op">;</span> e <span class="op">=</span> p.get(<span class="st">"e"</span>, <span class="fl">0.25</span>)<span class="op">;</span> f <span class="op">=</span> p.get(<span class="st">"f"</span>, <span class="fl">0.1</span>)</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ((z <span class="op">-</span> b) <span class="op">*</span> x <span class="op">-</span> d <span class="op">*</span> y,</span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a>            d <span class="op">*</span> x <span class="op">+</span> (z <span class="op">-</span> b) <span class="op">*</span> y,</span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a>            c <span class="op">+</span> a <span class="op">*</span> z <span class="op">-</span> (z <span class="op">**</span> <span class="dv">3</span>) <span class="op">/</span> <span class="fl">3.0</span> <span class="op">-</span> (x <span class="op">*</span> x <span class="op">+</span> y <span class="op">*</span> y) <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">+</span> e <span class="op">*</span> z) <span class="op">+</span> f <span class="op">*</span> z <span class="op">*</span> (x <span class="op">**</span> <span class="dv">3</span>))</span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _sprott_b(x, y, z, p):</span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"a"</span>, <span class="fl">1.0</span>)</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (a <span class="op">*</span> y <span class="op">*</span> z, x <span class="op">-</span> y, <span class="fl">1.0</span> <span class="op">-</span> x <span class="op">*</span> y)</span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _thomas(x, y, z, p):</span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a>    b <span class="op">=</span> p.get(<span class="st">"b"</span>, <span class="fl">0.208</span>)</span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (torch.sin(y) <span class="op">-</span> b <span class="op">*</span> x, torch.sin(z) <span class="op">-</span> b <span class="op">*</span> y, torch.sin(x) <span class="op">-</span> b <span class="op">*</span> z)</span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _rossler(x, y, z, p):</span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"a"</span>, <span class="fl">0.2</span>)<span class="op">;</span> b <span class="op">=</span> p.get(<span class="st">"b"</span>, <span class="fl">0.2</span>)<span class="op">;</span> c <span class="op">=</span> p.get(<span class="st">"c"</span>, <span class="fl">5.7</span>)</span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="op">-</span>y <span class="op">-</span> z, x <span class="op">+</span> a <span class="op">*</span> y, b <span class="op">+</span> z <span class="op">*</span> (x <span class="op">-</span> c))</span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _dadras(x, y, z, p):</span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"a"</span>, <span class="fl">3.0</span>)<span class="op">;</span> b <span class="op">=</span> p.get(<span class="st">"b"</span>, <span class="fl">2.7</span>)<span class="op">;</span> c <span class="op">=</span> p.get(<span class="st">"c"</span>, <span class="fl">1.7</span>)</span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> p.get(<span class="st">"d"</span>, <span class="fl">2.0</span>)<span class="op">;</span> e <span class="op">=</span> p.get(<span class="st">"e"</span>, <span class="fl">9.0</span>)</span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (y <span class="op">-</span> a <span class="op">*</span> x <span class="op">+</span> b <span class="op">*</span> y <span class="op">*</span> z, c <span class="op">*</span> y <span class="op">-</span> x <span class="op">*</span> z <span class="op">+</span> z, d <span class="op">*</span> x <span class="op">*</span> y <span class="op">-</span> e <span class="op">*</span> z)</span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _chen(x, y, z, p):</span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"a"</span>, <span class="fl">35.0</span>)<span class="op">;</span> b <span class="op">=</span> p.get(<span class="st">"b"</span>, <span class="fl">3.0</span>)<span class="op">;</span> c <span class="op">=</span> p.get(<span class="st">"c"</span>, <span class="fl">28.0</span>)</span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (a <span class="op">*</span> (y <span class="op">-</span> x), (c <span class="op">-</span> a) <span class="op">*</span> x <span class="op">-</span> x <span class="op">*</span> z <span class="op">+</span> c <span class="op">*</span> y, x <span class="op">*</span> y <span class="op">-</span> b <span class="op">*</span> z)</span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _chua(x, y, z, p):</span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> p.get(<span class="st">"alpha"</span>, <span class="fl">15.6</span>)<span class="op">;</span> b <span class="op">=</span> p.get(<span class="st">"beta"</span>, <span class="fl">28.58</span>)</span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>    m0 <span class="op">=</span> p.get(<span class="st">"m0"</span>, <span class="op">-</span><span class="fl">1.1428571</span>)<span class="op">;</span> m1 <span class="op">=</span> p.get(<span class="st">"m1"</span>, <span class="op">-</span><span class="fl">0.7142857</span>)</span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>    h <span class="op">=</span> m1 <span class="op">*</span> x <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> (m0 <span class="op">-</span> m1) <span class="op">*</span> (torch.<span class="bu">abs</span>(x <span class="op">+</span> <span class="fl">1.0</span>) <span class="op">-</span> torch.<span class="bu">abs</span>(x <span class="op">-</span> <span class="fl">1.0</span>))</span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (a <span class="op">*</span> (y <span class="op">-</span> x <span class="op">-</span> h), x <span class="op">-</span> y <span class="op">+</span> z, <span class="op">-</span>b <span class="op">*</span> y)</span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _rabinovich_fabrikant(x, y, z, p):</span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a>    al <span class="op">=</span> p.get(<span class="st">"alpha"</span>, <span class="fl">1.1</span>)<span class="op">;</span> g <span class="op">=</span> p.get(<span class="st">"gamma"</span>, <span class="fl">0.87</span>)</span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (y <span class="op">*</span> (z <span class="op">-</span> <span class="fl">1.0</span> <span class="op">+</span> x <span class="op">*</span> x) <span class="op">+</span> g <span class="op">*</span> x,</span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>            x <span class="op">*</span> (<span class="fl">3.0</span> <span class="op">*</span> z <span class="op">+</span> <span class="fl">1.0</span> <span class="op">-</span> x <span class="op">*</span> x) <span class="op">+</span> g <span class="op">*</span> y,</span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>            <span class="op">-</span><span class="fl">2.0</span> <span class="op">*</span> z <span class="op">*</span> (al <span class="op">+</span> x <span class="op">*</span> y))</span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a>_FIELDS <span class="op">=</span> {</span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>    <span class="st">"halvorsen"</span>: _halvorsen, <span class="st">"lorenz"</span>: _lorenz, <span class="st">"aizawa"</span>: _aizawa, <span class="st">"sprott_b"</span>: _sprott_b,</span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>    <span class="st">"thomas"</span>: _thomas, <span class="st">"rossler"</span>: _rossler, <span class="st">"dadras"</span>: _dadras, <span class="st">"chen"</span>: _chen, <span class="st">"chua"</span>: _chua,</span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>    <span class="st">"rabinovich_fabrikant"</span>: _rabinovich_fabrikant,</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a>ATTRACTOR_SYSTEMS <span class="op">=</span> <span class="bu">tuple</span>(_FIELDS)</span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> attractor_velocity(system: <span class="bu">str</span>, pos: torch.Tensor, params: <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>) <span class="op">-&gt;</span> torch.Tensor:</span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""The strange-attractor vector field f(x): dx/dt for every point of `pos` [N, 3].</span></span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a><span class="co">    `system` is one of `ATTRACTOR_SYSTEMS`; `params` overrides that system's constants.</span></span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns a velocity tensor [N, 3] on the same device/dtype as `pos`."""</span></span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> system <span class="kw">not</span> <span class="kw">in</span> _FIELDS:</span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a>        <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="ss">f"attractor_flow: unknown system </span><span class="sc">{</span>system<span class="sc">!r}</span><span class="ss">; "</span></span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a>                         <span class="ss">f"choose one of </span><span class="sc">{</span><span class="bu">list</span>(ATTRACTOR_SYSTEMS)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> params <span class="kw">or</span> {}</span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a>    x, y, z <span class="op">=</span> pos[:, <span class="dv">0</span>], pos[:, <span class="dv">1</span>], pos[:, <span class="dv">2</span>]</span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a>    xd, yd, zd <span class="op">=</span> _FIELDS[system](x, y, z, p)</span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> torch.stack([xd, yd, zd], dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a><span class="co"># --------------------------------------------------------------------------- #</span></span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a><span class="co">#  the operator -- a within-set (lateral) velocity field, engine-integrated</span></span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a><span class="co"># --------------------------------------------------------------------------- #</span></span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"attractor_flow"</span>, family<span class="op">=</span><span class="st">"motion"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb3-149"><a href="#cb3-149" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AttractorFlow(Lateral):</span>
+<span id="cb3-150"><a href="#cb3-150" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Advect every particle along a strange-attractor vector field dx/dt = f(x) (see module</span></span>
+<span id="cb3-151"><a href="#cb3-151" aria-hidden="true" tabindex="-1"></a><span class="co">    docstring for the ten systems + provenance). A first-derivative flow, so the engine does</span></span>
+<span id="cb3-152"><a href="#cb3-152" aria-hidden="true" tabindex="-1"></a><span class="co">    x += dt*f(x) (forward Euler); a small dt keeps a dissipative flow pinned to its attractor."""</span></span>
+<span id="cb3-153"><a href="#cb3-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-154"><a href="#cb3-154" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"velocity"</span>                 <span class="co"># delta IS dx/dt; engine integrates x += dt * f(x)</span></span>
+<span id="cb3-155"><a href="#cb3-155" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">3</span>]              <span class="co"># continuous autonomous chaos requires &gt;=3D (Poincare-Bendixson)</span></span>
+<span id="cb3-156"><a href="#cb3-156" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"system"</span>]      <span class="co"># which attractor to ride</span></span>
+<span id="cb3-157"><a href="#cb3-157" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"strange_attractor"</span>, <span class="st">"deterministic_chaos"</span>, <span class="st">"dissipative_flow"</span>,</span>
+<span id="cb3-158"><a href="#cb3-158" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"sensitive_dependence"</span>, <span class="st">"phase_space_contraction"</span>, <span class="st">"dynamical_system"</span>]</span>
+<span id="cb3-159"><a href="#cb3-159" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"system"</span>: <span class="ss">f"which attractor: one of </span><span class="sc">{</span><span class="bu">list</span>(ATTRACTOR_SYSTEMS)<span class="sc">}</span><span class="ss">"</span>,</span>
+<span id="cb3-160"><a href="#cb3-160" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"scale"</span>: <span class="st">"time-rescale the flow (f -&gt; scale*f); &gt;1 = faster"</span>,</span>
+<span id="cb3-161"><a href="#cb3-161" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"clamp"</span>: <span class="st">"max |velocity| safety cap (0 = off)"</span>}</span>
+<span id="cb3-162"><a href="#cb3-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-163"><a href="#cb3-163" aria-hidden="true" tabindex="-1"></a>    <span class="co"># spec-line keys that are plumbing/knobs, not per-system physical constants</span></span>
+<span id="cb3-164"><a href="#cb3-164" aria-hidden="true" tabindex="-1"></a>    _NON_CONST <span class="op">=</span> {<span class="st">"op"</span>, <span class="st">"at"</span>, <span class="st">"to"</span>, <span class="st">"from"</span>, <span class="st">"_at"</span>, <span class="st">"system"</span>, <span class="st">"scale"</span>, <span class="st">"clamp"</span>,</span>
+<span id="cb3-165"><a href="#cb3-165" aria-hidden="true" tabindex="-1"></a>                  <span class="st">"emit"</span>, <span class="st">"after_frame"</span>, <span class="st">"before_frame"</span>}</span>
+<span id="cb3-166"><a href="#cb3-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-167"><a href="#cb3-167" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb3-168"><a href="#cb3-168" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb3-169"><a href="#cb3-169" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
+<span id="cb3-170"><a href="#cb3-170" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.system <span class="op">=</span> <span class="bu">str</span>(params[<span class="st">"system"</span>])</span>
+<span id="cb3-171"><a href="#cb3-171" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.system <span class="kw">not</span> <span class="kw">in</span> _FIELDS:</span>
+<span id="cb3-172"><a href="#cb3-172" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="ss">f"attractor_flow: unknown system </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>system<span class="sc">!r}</span><span class="ss">; "</span></span>
+<span id="cb3-173"><a href="#cb3-173" aria-hidden="true" tabindex="-1"></a>                             <span class="ss">f"choose one of </span><span class="sc">{</span><span class="bu">list</span>(ATTRACTOR_SYSTEMS)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb3-174"><a href="#cb3-174" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.scale <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"scale"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb3-175"><a href="#cb3-175" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.clamp <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"clamp"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb3-176"><a href="#cb3-176" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.const <span class="op">=</span> {k: <span class="bu">float</span>(v) <span class="cf">for</span> k, v <span class="kw">in</span> params.items()</span>
+<span id="cb3-177"><a href="#cb3-177" aria-hidden="true" tabindex="-1"></a>                      <span class="cf">if</span> k <span class="kw">not</span> <span class="kw">in</span> <span class="va">self</span>._NON_CONST <span class="kw">and</span> <span class="bu">isinstance</span>(v, (<span class="bu">int</span>, <span class="bu">float</span>))}</span>
+<span id="cb3-178"><a href="#cb3-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-179"><a href="#cb3-179" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-180"><a href="#cb3-180" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb3-181"><a href="#cb3-181" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)</span>
+<span id="cb3-182"><a href="#cb3-182" aria-hidden="true" tabindex="-1"></a>        occ <span class="op">=</span> lvl.occ</span>
+<span id="cb3-183"><a href="#cb3-183" aria-hidden="true" tabindex="-1"></a>        vel <span class="op">=</span> attractor_velocity(<span class="va">self</span>.system, pos, <span class="va">self</span>.const) <span class="op">*</span> <span class="va">self</span>.scale</span>
+<span id="cb3-184"><a href="#cb3-184" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.clamp <span class="op">&gt;</span> <span class="dv">0</span>:                                       <span class="co"># safety cap on |v|</span></span>
+<span id="cb3-185"><a href="#cb3-185" aria-hidden="true" tabindex="-1"></a>            mag <span class="op">=</span> vel.norm(dim<span class="op">=-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb3-186"><a href="#cb3-186" aria-hidden="true" tabindex="-1"></a>            vel <span class="op">=</span> vel <span class="op">*</span> (mag.clamp(<span class="bu">max</span><span class="op">=</span><span class="va">self</span>.clamp) <span class="op">/</span> mag)</span>
+<span id="cb3-187"><a href="#cb3-187" aria-hidden="true" tabindex="-1"></a>        vel <span class="op">=</span> vel <span class="op">*</span> occ[:, <span class="va">None</span>]                                 <span class="co"># dormant points hold still</span></span>
+<span id="cb3-188"><a href="#cb3-188" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-189"><a href="#cb3-189" aria-hidden="true" tabindex="-1"></a>            vel <span class="op">=</span> vel <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb3-190"><a href="#cb3-190" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: vel}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/allierc\.github\.io\/Plexus\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Cedric Allier · Janelia Research Campus · 2026</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

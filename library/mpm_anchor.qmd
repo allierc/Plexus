@@ -43,14 +43,14 @@ A substrate/boundary rest-anchor body force for MLS-MPM particles.
 ## Mechanism
 
 acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle)
-and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward
+and the p2g scatter consumes as a body force (same idiom as drag). It pulls particles back toward
 their REST positions -- the cultured-sheet "attached substrate" of the cardio prototype (p1_aniso's
 `k_anchor`). `mode: boundary` (default) anchors only the outer RING of the tissue (width `ring` in
 world units), pinning the edges so the sheet cannot globally breathe/translate while the interior
 moves freely -- the condition that exposes whether LOCAL loops come from material structure rather
 than a global mode. `mode: substrate` anchors EVERY particle (global self-relaxation, as p1_aniso).
 
-`PREDICTION=None`: not engine-integrated; enters mechanics only through the MPM substep body force.
+`EMIT=mpm_acceleration`: not engine-integrated; enters mechanics only through the MPM substep body force.
 Rest positions are captured on the first call (frame 0 = the undeformed sheet).
 
 ## Parameters
@@ -74,7 +74,7 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`separation`](separation.qmd), [`drag`](drag.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
@@ -84,14 +84,14 @@ Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd),
 """mpm_anchor -- a substrate/boundary rest-anchor body force for MLS-MPM particles.
 
 acc = k * (rest - pos), returned as a particle-level delta the engine sums into H.delta(mpm_particle)
-and the p2g scatter consumes as a body force (same idiom as mpm_drag). It pulls particles back toward
+and the p2g scatter consumes as a body force (same idiom as drag). It pulls particles back toward
 their REST positions -- the cultured-sheet "attached substrate" of the cardio prototype (p1_aniso's
 `k_anchor`). `mode: boundary` (default) anchors only the outer RING of the tissue (width `ring` in
 world units), pinning the edges so the sheet cannot globally breathe/translate while the interior
 moves freely -- the condition that exposes whether LOCAL loops come from material structure rather
 than a global mode. `mode: substrate` anchors EVERY particle (global self-relaxation, as p1_aniso).
 
-`PREDICTION=None`: not engine-integrated; enters mechanics only through the MPM substep body force.
+`EMIT=mpm_acceleration`: not engine-integrated; enters mechanics only through the MPM substep body force.
 Rest positions are captured on the first call (frame 0 = the undeformed sheet).
 """
 from __future__ import annotations
@@ -102,9 +102,9 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("mpm_anchor", level="particle", kind="lateral")
+@register_operator("mpm_anchor", family="mechanics", level="particle", kind="lateral")
 class MPMAnchor(Lateral):
-    PREDICTION = None                 # consumed by the MPM substep as a body force, not engine-integrated
+    EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]
     REQUIRES_PARAMS = ["k"]
     MECHANISM_TAGS = ["substrate_anchor", "boundary_condition", "rest_restoring"]

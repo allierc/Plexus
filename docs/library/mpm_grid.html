@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -248,6 +248,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="description">Description</h2>
 <p>decomposed MLS-MPM operators (mpm_strain / p2g / mpm_grid_update / g2p).</p>
 <p>The grid is a FIELD, not an entity: transient scratch rebuilt every substep. p2g scatters mass/momentum/colour into it, mpm_grid_update solves on it, g2p reads it back. The B-spline weight helper lives here because both p2g (scatter) and g2p (gather) recompute it from the (pre-advection) particle positions – so no per-substep scratch needs threading and the numbers match the <code>mls_mpm_mechanics</code> oracle.</p>
+<p>Dimension-generic (the dimension contract): the grid is <code>dim</code>-dimensional – a [nx, ny] square grid in 2D, an [nx, ny, nz] cube in 3D – and the B-spline kernel spans the 3^dim stencil. The 2D path is bit-identical to the original (3x3 stencil, <code>gx*ny + gy</code> row-major flatten); the 3D path mirrors MPM_pytorch’s MPM_3D (27-cell stencil, <code>x*ny*nz + y*nz + z</code>). axis 0 spans the world width, the others span 1.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
@@ -260,69 +261,101 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">The B-spline weight helper lives here because both p2g (scatter) and g2p (gather)</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">recompute it from the (pre-advection) particle positions -- so no per-substep scratch</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">needs threading and the numbers match the `mls_mpm_mechanics` oracle.</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Field</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_field</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="co"># 3x3 stencil offsets, built once (CPU constant; moved to device in each operator)</span></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>_OFFSETS <span class="op">=</span> torch.tensor([[i, j] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">3</span>) <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">3</span>)], dtype<span class="op">=</span>torch.float32)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">Dimension-generic (the dimension contract): the grid is `dim`-dimensional -- a</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">[nx, ny] square grid in 2D, an [nx, ny, nz] cube in 3D -- and the B-spline kernel</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co">spans the 3^dim stencil. The 2D path is bit-identical to the original (3x3 stencil,</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">`gx*ny + gy` row-major flatten); the 3D path mirrors MPM_pytorch's MPM_3D (27-cell</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">stencil, `x*ny*nz + y*nz + z`). axis 0 spans the world width, the others span 1.</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> itertools</span>
 <span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="at">@register_field</span>(<span class="st">"mpm_grid"</span>)</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MPMGrid(Field):</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""MLS-MPM background grid on [0,width]x[0,1] with square cells dx = 1/n_grid.</span></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="co">    Channels: m (mass), mv (momentum), c (liquid colour for CSF), v (velocity). Pure</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co">    scratch: p2g zeroes + scatters into it each substep, grid_update solves on it, g2p</span></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="co">    reads it back."""</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    RECORD <span class="op">=</span> <span class="va">False</span>                                   <span class="co"># transient scratch -- not recorded/rendered</span></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, name, width<span class="op">=</span><span class="fl">1.0</span>, n_grid<span class="op">=</span><span class="dv">128</span>, device<span class="op">=</span><span class="st">"cpu"</span>, <span class="op">**</span>kw):</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(name)</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ny <span class="op">=</span> <span class="bu">int</span>(n_grid)</span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.nx <span class="op">=</span> <span class="bu">int</span>(<span class="bu">round</span>(<span class="bu">float</span>(width) <span class="op">*</span> <span class="va">self</span>.ny))</span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.width <span class="op">=</span> <span class="bu">float</span>(width)</span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dx <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> <span class="va">self</span>.ny</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.inv_dx <span class="op">=</span> <span class="bu">float</span>(<span class="va">self</span>.ny)</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> <span class="va">self</span>.nx <span class="op">*</span> <span class="va">self</span>.ny</span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"m"</span>, torch.zeros(n, device<span class="op">=</span>device))</span>
-<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"mv"</span>, torch.zeros(n, <span class="dv">2</span>, device<span class="op">=</span>device))</span>
-<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"c"</span>, torch.zeros(n, device<span class="op">=</span>device))</span>
-<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"v"</span>, torch.zeros(n, <span class="dv">2</span>, device<span class="op">=</span>device))</span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>    <span class="at">@property</span></span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> grid(<span class="va">self</span>):                                  <span class="co"># [C,nx,ny] view for the recorder (mass density)</span></span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.m.view(<span class="dv">1</span>, <span class="va">self</span>.nx, <span class="va">self</span>.ny)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Field</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_field</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> stencil_offsets(dim: <span class="bu">int</span>, device<span class="op">=</span><span class="st">"cpu"</span>) <span class="op">-&gt;</span> torch.Tensor:</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""The 3^dim quadratic-B-spline stencil offsets, row-major (last axis fastest).</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="co">    2D -&gt; [9,2] == `[[i,j] for i in 0..2 for j in 0..2]`; 3D -&gt; [27,3] (matches the</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="co">    MPM_3D offset ordering: idx//9, (idx%9)//3, idx%3)."""</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> torch.tensor(<span class="bu">list</span>(itertools.product(<span class="bu">range</span>(<span class="dv">3</span>), repeat<span class="op">=</span>dim)),</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>                        dtype<span class="op">=</span>torch.float32, device<span class="op">=</span>device)</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="co"># 2D stencil kept as a module constant for back-compat (p2g/g2p now build per-dim)</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>_OFFSETS <span class="op">=</span> stencil_offsets(<span class="dv">2</span>)</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="at">@register_field</span>(<span class="st">"mpm_grid"</span>)</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MPMGrid(Field):</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""MLS-MPM background grid on [0,width]x[0,1](x[0,1]) with square cells dx = 1/n_grid.</span></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="co">    Channels: m (mass), mv (momentum [.,dim]), c (liquid colour for CSF), v (velocity</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="co">    [.,dim]). Pure scratch: p2g zeroes + scatters into it each substep, grid_update</span></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="co">    solves on it, g2p reads it back."""</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>    RECORD <span class="op">=</span> <span class="va">False</span>                                   <span class="co"># transient scratch -- not recorded/rendered</span></span>
 <span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bspline(X, inv_dx, offsets, nx, ny, periodic):</span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Quadratic B-spline weights of each particle over its 3x3 grid stencil.</span></span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns (fx, weight[N,9], flat[N*9]) -- identical to the oracle's P2G block."""</span></span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> (X <span class="op">*</span> inv_dx <span class="op">-</span> <span class="fl">0.5</span>).floor().<span class="bu">long</span>()</span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>    fx <span class="op">=</span> X <span class="op">*</span> inv_dx <span class="op">-</span> base.<span class="bu">float</span>()</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>    w <span class="op">=</span> torch.stack([<span class="fl">0.5</span> <span class="op">*</span> (<span class="fl">1.5</span> <span class="op">-</span> fx) <span class="op">**</span> <span class="dv">2</span>,</span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>                     <span class="fl">0.75</span> <span class="op">-</span> (fx <span class="op">-</span> <span class="dv">1</span>) <span class="op">**</span> <span class="dv">2</span>,</span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>                     <span class="fl">0.5</span> <span class="op">*</span> (fx <span class="op">-</span> <span class="fl">0.5</span>) <span class="op">**</span> <span class="dv">2</span>], dim<span class="op">=</span><span class="dv">1</span>)                 <span class="co"># [N,3,2]</span></span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>    oi <span class="op">=</span> offsets[:, <span class="dv">0</span>].<span class="bu">long</span>()<span class="op">;</span> oj <span class="op">=</span> offsets[:, <span class="dv">1</span>].<span class="bu">long</span>()</span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>    weight <span class="op">=</span> w[:, oi, <span class="dv">0</span>] <span class="op">*</span> w[:, oj, <span class="dv">1</span>]                             <span class="co"># [N,9]</span></span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>    gpos <span class="op">=</span> base[:, <span class="va">None</span>, :] <span class="op">+</span> offsets.<span class="bu">long</span>()[<span class="va">None</span>]</span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> periodic:</span>
-<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>        gpos <span class="op">=</span> torch.stack([gpos[..., <span class="dv">0</span>] <span class="op">%</span> nx, gpos[..., <span class="dv">1</span>] <span class="op">%</span> ny], dim<span class="op">=-</span><span class="dv">1</span>)</span>
-<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
-<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>        gpos <span class="op">=</span> torch.stack([gpos[..., <span class="dv">0</span>].clamp(<span class="dv">0</span>, nx <span class="op">-</span> <span class="dv">1</span>), gpos[..., <span class="dv">1</span>].clamp(<span class="dv">0</span>, ny <span class="op">-</span> <span class="dv">1</span>)], dim<span class="op">=-</span><span class="dv">1</span>)</span>
-<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>    flat <span class="op">=</span> (gpos[..., <span class="dv">0</span>] <span class="op">*</span> ny <span class="op">+</span> gpos[..., <span class="dv">1</span>]).reshape(<span class="op">-</span><span class="dv">1</span>)</span>
-<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> fx, weight, flat</span>
-<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sub_dt(H, fallback):</span>
-<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""The current substep dt: the schedule's `{substep: N, dt}` loop sets `H.sub_dt`;</span></span>
-<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a><span class="co">    fall back to the operator's own `dt_sub` param if run outside a substep loop."""</span></span>
-<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a>    sd <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"sub_dt"</span>, <span class="va">None</span>)</span>
-<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(sd <span class="cf">if</span> sd <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> fallback)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, name, width<span class="op">=</span><span class="fl">1.0</span>, n_grid<span class="op">=</span><span class="dv">128</span>, dim<span class="op">=</span><span class="dv">2</span>, device<span class="op">=</span><span class="st">"cpu"</span>, <span class="op">**</span>kw):</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(name)</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dim <span class="op">=</span> <span class="bu">int</span>(dim)</span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ny <span class="op">=</span> <span class="bu">int</span>(n_grid)                        <span class="co"># cells per unit length (axes 1..)</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.nx <span class="op">=</span> <span class="bu">int</span>(<span class="bu">round</span>(<span class="bu">float</span>(width) <span class="op">*</span> <span class="va">self</span>.ny)) <span class="co"># axis 0 spans the world width</span></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.width <span class="op">=</span> <span class="bu">float</span>(width)</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dx <span class="op">=</span> <span class="fl">1.0</span> <span class="op">/</span> <span class="va">self</span>.ny</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.inv_dx <span class="op">=</span> <span class="bu">float</span>(<span class="va">self</span>.ny)</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.dim <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.shape <span class="op">=</span> (<span class="va">self</span>.nx, <span class="va">self</span>.ny)</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                        <span class="co"># 3D cube: axes 1,2 span [0,1]</span></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.nz <span class="op">=</span> <span class="va">self</span>.ny</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.shape <span class="op">=</span> (<span class="va">self</span>.nx, <span class="va">self</span>.ny, <span class="va">self</span>.nz)</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> s <span class="kw">in</span> <span class="va">self</span>.shape:</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>            n <span class="op">*=</span> s</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.n_cells <span class="op">=</span> n</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"m"</span>, torch.zeros(n, device<span class="op">=</span>device))</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"mv"</span>, torch.zeros(n, <span class="va">self</span>.dim, device<span class="op">=</span>device))</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"c"</span>, torch.zeros(n, device<span class="op">=</span>device))</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.register_buffer(<span class="st">"v"</span>, torch.zeros(n, <span class="va">self</span>.dim, device<span class="op">=</span>device))</span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a>    <span class="at">@property</span></span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> grid(<span class="va">self</span>):                                  <span class="co"># [1,*shape] view for the recorder (mass density)</span></span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.m.view((<span class="dv">1</span>,) <span class="op">+</span> <span class="va">self</span>.shape)</span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bspline(X, inv_dx, offsets, shape, periodic):</span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Quadratic B-spline weights of each particle over its 3^dim grid stencil.</span></span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns (fx [N,D], weight [N,S], flat [N*S]) where S = 3^D. Dimension-generic; the</span></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="co">    2D call reduces bit-identically to the original `w[:,oi,0]*w[:,oj,1]`, `gx*ny+gy`."""</span></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a>    D <span class="op">=</span> X.shape[<span class="dv">1</span>]</span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> (X <span class="op">*</span> inv_dx <span class="op">-</span> <span class="fl">0.5</span>).floor().<span class="bu">long</span>()                          <span class="co"># [N,D]</span></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a>    fx <span class="op">=</span> X <span class="op">*</span> inv_dx <span class="op">-</span> base.<span class="bu">float</span>()                                    <span class="co"># [N,D]</span></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a>    w <span class="op">=</span> torch.stack([<span class="fl">0.5</span> <span class="op">*</span> (<span class="fl">1.5</span> <span class="op">-</span> fx) <span class="op">**</span> <span class="dv">2</span>,</span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a>                     <span class="fl">0.75</span> <span class="op">-</span> (fx <span class="op">-</span> <span class="dv">1</span>) <span class="op">**</span> <span class="dv">2</span>,</span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a>                     <span class="fl">0.5</span> <span class="op">*</span> (fx <span class="op">-</span> <span class="fl">0.5</span>) <span class="op">**</span> <span class="dv">2</span>], dim<span class="op">=</span><span class="dv">1</span>)                   <span class="co"># [N,3,D]</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a>    oidx <span class="op">=</span> offsets.<span class="bu">long</span>()                                            <span class="co"># [S,D]</span></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a>    weight <span class="op">=</span> torch.ones(X.shape[<span class="dv">0</span>], offsets.shape[<span class="dv">0</span>], device<span class="op">=</span>X.device)</span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D):                                               <span class="co"># prod_k w[:, o_k, k]</span></span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a>        weight <span class="op">=</span> weight <span class="op">*</span> w[:, oidx[:, k], k]</span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a>    gpos <span class="op">=</span> base[:, <span class="va">None</span>, :] <span class="op">+</span> oidx[<span class="va">None</span>]                             <span class="co"># [N,S,D]</span></span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>    comps <span class="op">=</span> []</span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D):</span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a>        comps.append(gpos[..., k] <span class="op">%</span> shape[k] <span class="cf">if</span> periodic</span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a>                     <span class="cf">else</span> gpos[..., k].clamp(<span class="dv">0</span>, shape[k] <span class="op">-</span> <span class="dv">1</span>))</span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a>    flat <span class="op">=</span> comps[<span class="dv">0</span>]                                                  <span class="co"># row-major flatten over `shape`</span></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, D):</span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a>        flat <span class="op">=</span> flat <span class="op">*</span> shape[k] <span class="op">+</span> comps[k]</span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> fx, weight, flat.reshape(<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sub_dt(H, fallback):</span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""The current substep dt: the schedule's `{substep: N, dt}` loop sets `H.sub_dt`;</span></span>
+<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a><span class="co">    fall back to the operator's own `dt_sub` param if run outside a substep loop."""</span></span>
+<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a>    sd <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"sub_dt"</span>, <span class="va">None</span>)</span>
+<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(sd <span class="cf">if</span> sd <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> fallback)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
@@ -554,8 +587,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -666,7 +697,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

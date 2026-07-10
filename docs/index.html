@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script src="site_libs/quarto-contrib/videojs/video.min.js"></script>
 <link href="site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
@@ -251,7 +251,7 @@ window.Quarto = {
 <i class="callout-icon"></i>
 </div>
 <div class="callout-body-container">
-<p><strong>Operators adapted from prior work.</strong> Plexus re-implements published simulation code as registered operators: attraction–repulsion, boids, and rock–paper–scissors reaction–diffusion from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a>; the slime-mould (Physarum) agent from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>; the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from <a href="https://github.com/PolymathicAI/the_well"><em>The Well</em></a> (Ohana et al., NeurIPS 2024); and the ciliate microswimmer from <a href="https://github.com/jingyiliu1900/Flow-Physics-drives-functional-design-of-microswimmers">Liu, Costello &amp; Kanso</a> (<em>Nat. Commun.</em> 2025).</p>
+<p><strong>Operators adapted from prior work.</strong> Plexus re-implements published simulation code as registered operators: attraction–repulsion and boids from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a>; the slime-mould (Physarum) agent from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>; softened self-gravity from Philip Mocz’s <em>Create Your Own N-body Simulation</em> (2020); the continuum solver from MLS-MPM (Hu et al.&nbsp;2018); and the strange attractors from their originating papers (Lorenz 1963, Rössler 1976, Sprott 1994, …).</p>
 </div>
 </div>
 </div>
@@ -294,7 +294,7 @@ window.Quarto = {
 </section>
 <section id="what-it-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>
-<p>Qualitatively different dynamical systems expressed within the same language. Each simulation is constructed from the same primitives—sets, fields, operators, and schedules—yet gives rise to distinct collective behaviours spanning flocking, morphogenesis, fluid mechanics, reaction–diffusion, and active matter.</p>
+<p>Qualitatively different dynamical systems expressed within the same language. Each simulation is constructed from the same primitives—sets, fields, operators, and schedules—yet gives rise to distinct collective behaviours spanning flocking, self-organizing networks, self-gravity, and deterministic chaos.</p>
 <style>
 .home-2x2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;max-width:660px;margin:1.3rem auto .5rem}
 .home-2x2 figure{margin:0}
@@ -304,10 +304,10 @@ window.Quarto = {
 .home-2x2 figcaption b{color:#333}
 </style>
 <div class="home-2x2">
-  <figure class="figure"><div class="vidbox"><video src="gallery/boids_16.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
-  <figure class="figure"><div class="vidbox"><video src="gallery/slime_filaments.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
-  <figure class="figure"><div class="vidbox"><video src="gallery/rps_species_6.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>competition</b> — six-species rock–paper–scissors spirals</figcaption></figure>
-  <figure class="figure"><div class="vidbox"><video src="gallery/rd_worms.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>fields</b> — a Gray–Scott reaction–diffusion pattern</figcaption></figure>
+  <figure class="figure"><div class="vidbox"><video src="gallery/boids.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>flocking</b> — boids move as one from local rules</figcaption></figure>
+  <figure class="figure"><div class="vidbox"><video src="gallery/slime.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>networks</b> — a self-organizing Physarum web</figcaption></figure>
+  <figure class="figure"><div class="vidbox"><video src="gallery/inverse_square.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>self-gravity</b> — a rotating disc collapses into a galaxy</figcaption></figure>
+  <figure class="figure"><div class="vidbox"><video src="gallery/attractor_aizawa.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>chaos</b> — a cloud drawn onto a strange attractor</figcaption></figure>
 </div>
 <p>And because every simulation is differentiable, biological designs can be <em>optimized</em>. Below, a foraging colony in a maze is tuned by a UCB algorithm — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.</p>
 <div>
@@ -335,7 +335,7 @@ window.Quarto = {
 <ul>
 <li><strong><a href="./abstraction.html">The abstraction</a></strong> — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.</li>
 <li><strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.</li>
-<li><strong><a href="./experiment.html">Simulations</a></strong> — ten distinct simulations, an emergent ant-trail model, and a maze-foraging colony optimized end-to-end.</li>
+<li><strong><a href="./experiment.html">Simulations</a></strong> — the core operator families as one-per-family clips (interaction, boids, active matter, slime, MLS-MPM, inverse-square, strange attractors), plus a maze-foraging colony optimized end-to-end.</li>
 </ul>
 <p>A static version with full schematics and glossary is in <a href="paper/plexus.pdf"><code>paper/plexus.pdf</code></a>.</p>
 
@@ -569,8 +569,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -681,7 +679,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

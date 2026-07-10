@@ -1,0 +1,167 @@
+---
+title: "mpm_to_agent"
+subtitle: "Agent_gather (was mpm_to_agent) (mpm_grid -> agent set): the material drags the agents, and the fluid's"
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Agent_gather (was mpm_to_agent) (mpm_grid -> agent set): the material drags the agents, and the fluid's
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Reads** &mdash; `from`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+surface (its colour-field interface) confines them.
+
+The symmetric counterpart of `agent_to_mpm`. After the MLS-MPM substep has solved the grid
+velocity `g.v` (mpm_grid_update), this gathers that velocity back onto a SEPARATE active-matter
+agent set via the SAME quadratic B-spline kernel MPM uses for g2p -- so agents are advected by
+the flow exactly as material points would be (`k` = coupling gain / slip: k=1 fully carried,
+k<1 partial slip). On top of the advection it adds a CONFINEMENT drift up the liquid colour
+gradient `+confine * grad(c)`: the colour `g.c` is ~1 inside the fluid and ~0 in vacuum, so
+`grad(c)` points INWARD at the fluid interface -- the "surface tension holds the agents in"
+force the user asked for (a soft membrane, not a hard wall). No colour field (dry/elastic disc
+with no liquid band) -> `g.c == 0` -> confinement is a no-op.
+
+`kind=exchange` (field -> set coupling). `EMIT = "velocity"`: it returns an added
+ADVECTION VELOCITY that the engine sums with the agent set's other first-derivative ops
+(`glide`, `repel`) and integrates once per tick (`pos += dt * sum(v)`). It MUST therefore share
+the first-derivative prediction with those ops (the engine forbids mixing predictions on one
+set). SCHEDULE IT AFTER THE MPM SUBSTEP BLOCK: `g.v` is transient scratch, valid only after
+mpm_grid_update ran this tick.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `from` | &ndash; | **required** |
+| `k` | fluid_drag_gain | 1.0 |
+| `confine` | surface_tension_confinement | 0.0 |
+| `field` | &ndash; | "mass" |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: mpm_to_agent, at: cell, from: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`grid_to_agent`]{.op-badge} [`fluid_drag`]{.op-badge} [`surface_confinement`]{.op-badge}  
+
+## Related operators
+
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
+
+## Source
+
+[`src/plexus/operators/agent_gather.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/agent_gather.py) &mdash; the registered operator.
+
+```python
+"""agent_gather (was mpm_to_agent) (mpm_grid -> agent set): the material drags the agents, and the fluid's
+surface (its colour-field interface) confines them.
+
+The symmetric counterpart of `agent_to_mpm`. After the MLS-MPM substep has solved the grid
+velocity `g.v` (mpm_grid_update), this gathers that velocity back onto a SEPARATE active-matter
+agent set via the SAME quadratic B-spline kernel MPM uses for g2p -- so agents are advected by
+the flow exactly as material points would be (`k` = coupling gain / slip: k=1 fully carried,
+k<1 partial slip). On top of the advection it adds a CONFINEMENT drift up the liquid colour
+gradient `+confine * grad(c)`: the colour `g.c` is ~1 inside the fluid and ~0 in vacuum, so
+`grad(c)` points INWARD at the fluid interface -- the "surface tension holds the agents in"
+force the user asked for (a soft membrane, not a hard wall). No colour field (dry/elastic disc
+with no liquid band) -> `g.c == 0` -> confinement is a no-op.
+
+`kind=exchange` (field -> set coupling). `EMIT = "velocity"`: it returns an added
+ADVECTION VELOCITY that the engine sums with the agent set's other first-derivative ops
+(`glide`, `repel`) and integrates once per tick (`pos += dt * sum(v)`). It MUST therefore share
+the first-derivative prediction with those ops (the engine forbids mixing predictions on one
+set). SCHEDULE IT AFTER THE MPM SUBSTEP BLOCK: `g.v` is transient scratch, valid only after
+mpm_grid_update ran this tick.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
+from plexus.operators.mpm_grid import stencil_offsets, bspline
+
+
+@register_operator("agent_gather", "mpm_to_agent", family="coupling", level="cell", kind="exchange")
+class AgentGather(Exchange):               # (alias `mpm_to_agent`, one migration cycle)
+    EMIT = "velocity"                 # emits an advection velocity; engine integrates pos
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["from"]
+    MECHANISM_TAGS = ["grid_to_agent", "fluid_drag", "surface_confinement"]
+    PARAM_ROLES = {"k": "fluid_drag_gain", "confine": "surface_tension_confinement"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "agent")
+        self.frm = params.get("from", "mpm_grid")
+        self.k = float(params.get("k", 1.0))           # fluid advection gain (1 = fully carried)
+        self.confine = float(params.get("confine", 0.0))  # inward drift up grad(density); 0 = off
+        self.field = params.get("field", "mass")       # "mass" (g.m, universal) or "colour" (g.c, liquid)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); g = H.field(self.frm); dev = lvl.state.device
+        X = lvl.get("pos")
+        D = X.shape[1]
+        periodic = bool(getattr(H, "periodic", False))
+        offsets = stencil_offsets(D, dev); S = offsets.shape[0]
+        _, weight, flat = bspline(X, g.inv_dx, offsets, g.shape, periodic)
+
+        # --- fluid drag: B-spline gather of the solved grid velocity (same as g2p) ---
+        gvn = g.v[flat].view(lvl.n, S, D)
+        v_fluid = torch.nan_to_num((weight[..., None] * gvn).sum(1))   # [N,D]
+        vel = self.k * v_fluid
+
+        # --- confinement: drift up the MATERIAL-DENSITY gradient (inward), holding cells in the
+        # blob. Uses the grid mass g.m (high inside the material, ~0 outside) so it works for a
+        # fully-elastic disc too, not only a liquid one; `field: colour` switches to the liquid
+        # colour g.c (true surface-tension interface) when a liquid skin is present.
+        if self.confine != 0.0:
+            src = g.c if (self.field == "colour" and bool((g.c > 0).any())) else g.m
+            dens = (src / src.max().clamp(min=1e-9)).view(g.shape)     # normalised 0..1 density
+            grad = torch.stack([                                       # central diff * 0.5*inv_dx per axis
+                (torch.roll(dens, -1, k) - torch.roll(dens, 1, k)) * (0.5 * g.inv_dx)
+                for k in range(D)], dim=-1).reshape(g.n_cells, D)      # [n_cells, D]
+            gcn = grad[flat].view(lvl.n, S, D)
+            grad_at = torch.nan_to_num((weight[..., None] * gcn).sum(1))
+            vel = vel + self.confine * grad_at                        # +grad(density) points inward
+
+        m = (mask.float() if mask is not None else torch.ones(lvl.n, device=dev)) * lvl.occ
+        return {self.at: vel * m[:, None]}
+```

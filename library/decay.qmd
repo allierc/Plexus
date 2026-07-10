@@ -56,7 +56,7 @@ trails fade so the network coarsens. The companion of `deposit` / `diffuse`.
 
 | parameter | role | default |
 |---|---|---|
-| `rate` | &ndash; | 0.012 |
+| `rate` | evaporation_rate | 0.012 |
 
 ## Minimal spec
 
@@ -65,9 +65,13 @@ operators:
   - {op: decay, at: field}
 ```
 
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`evaporation`]{.op-badge} [`field_decay`]{.op-badge} [`stigmergy`]{.op-badge}  
+
 ## Related operators
 
-Other **field** operators: [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`pulse_stimulus`](pulse_stimulus.qmd), [`phase_delay_pulse`](phase_delay_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
+Other **field** operators: [`diffuse`](diffuse.qmd), [`playback`](playback.qmd), [`pacemaker`](pacemaker.qmd), [`activation_pulse`](activation_pulse.qmd), [`mpm_grid_update`](mpm_grid_update.qmd).
 
 ## Source
 
@@ -86,11 +90,15 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("decay", level="field", kind="field")
+@register_operator("decay", family="fields", level="field", kind="field")
 class Decay(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
+    EMIT = None                                # field->field: writes the grid in place (evaporation); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                     # elementwise evaporation, dimension-agnostic
+    REQUIRES_PARAMS = []                        # no required params — field target from `at:`; `rate` optional
+    MECHANISM_TAGS = ["evaporation", "field_decay", "stigmergy"]
+    PARAM_ROLES = {"rate": "evaporation_rate"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

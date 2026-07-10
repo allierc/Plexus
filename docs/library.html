@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -35,12 +35,12 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -189,9 +189,9 @@ ul.task-list li input[type="checkbox"] {
 .op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
 .op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
 </style>
-<p>The whole calculus is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>31 operators</strong> (39 primitives in all). Every simulation on this site is a schedule composed from this list — nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages — the two objects (<strong>sets</strong> and <strong>fields</strong>) and the <strong>operators</strong> that move state between them:</p>
+<p>The whole calculus is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>51 operators</strong> (59 primitives in all). Every simulation on this site is a schedule composed from this list — nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages — the two objects (<strong>sets</strong> and <strong>fields</strong>) and the <strong>operators</strong> that move state between them:</p>
 <div class="op-grid">
-<p><a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds — the levels a hierarchy is built from.</span></span></a> <a class="op-card" href="library_fields.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">Fields</span><span class="op-card-sub">5 continuum discretizations — coupled to sets through exchange.</span></span></a> <a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">31 operators, grouped by kind — how state moves.</span></span></a></p>
+<p><a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds — the levels a hierarchy is built from.</span></span></a> <a class="op-card" href="library_fields.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">Fields</span><span class="op-card-sub">5 continuum discretizations — coupled to sets through exchange.</span></span></a> <a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">51 operators, grouped by kind — how state moves.</span></span></a></p>
 </div>
 
 
@@ -423,8 +423,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -535,7 +533,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

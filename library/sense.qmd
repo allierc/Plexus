@@ -80,6 +80,7 @@ $\hat{\mathbf h}$ toward it (up to `turn_speed` $\omega$) and renormalise.
 |---|---|---|
 | `from` | &ndash; | **required** |
 | `cross` | inter_species_coupling_sign | -1.0 |
+| `noise` | steer_noise | 0.0 |
 
 ## Minimal spec
 
@@ -91,11 +92,10 @@ operators:
 ## Mechanism-search tags
 
 **Mechanism** &mdash; [`trail_following`]{.op-badge} [`stigmergy`]{.op-badge} [`physarum_sensing`]{.op-badge}  
-**Morphology prior** &mdash; [`filaments`]{.op-badge} [`transport_network`]{.op-badge}
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd), [`apply_material_map`](apply_material_map.qmd), [`mls_mpm_mechanics`](mls_mpm_mechanics.qmd).
+Other **exchange** operators: [`deposit`](deposit.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd), [`pulse_to_active_stress`](pulse_to_active_stress.qmd).
 
 ## Source
 
@@ -127,7 +127,6 @@ place; returns {}.
 from __future__ import annotations
 
 import math
-import itertools
 import torch
 
 from plexus.models.base import Exchange
@@ -169,43 +168,54 @@ def _ring_dirs(h, ca, sa):
 
 
 def _read(fld, centers, weights, ssz):
-    """Windowed, species-weighted trail read at one D-dim sensor (field->scalar/agent).
+    """Windowed, species-weighted trail read at a BATCH of sensors (field -> [N, S]).
 
-    Sums dot(weights, grid[:, *window]) over a (2k+1)^D voxel window around each
-    sensor centre [N, D]; per-agent `ssz` masks offsets outside that agent's own
-    window (the 2D `sensor_size` semantics, generalised to N-D)."""
-    D = centers.shape[1]
-    gidx = fld.pix(*[centers[:, k] for k in range(D)])     # D-tuple of [N] index tensors
+    Sums dot(weights, grid[:, *window]) over a (2k+1)^D voxel window around each of the
+    S sensor centres [N, S, D]; per-agent `ssz` masks offsets outside that agent's own
+    window (the 2D `sensor_size` semantics, generalised to N-D). Vectorised over BOTH
+    the S sensors and the (2k+1)^D window voxels -- one gather, no Python voxel/sensor
+    loop (was 27 gathers per tick in 2D: 3 sensors x 9 voxels)."""
+    N, S, D = centers.shape
+    dev = centers.device
     g = fld.grid                                           # [C, *shape]
-    N = centers.shape[0]
-    out = centers.new_zeros(N)
+    shape = fld.shape
+    per = getattr(fld, "periodic", False)                  # torus field: wrap the window across the seam
     ssz = ssz if torch.is_tensor(ssz) else centers.new_full((N,), float(ssz))
     ks = int(ssz.max().item())
-    shape = fld.shape
-    for off in itertools.product(range(-ks, ks + 1), repeat=D):
-        idx = tuple((gidx[k] + off[k]).clamp(0, shape[k] - 1) for k in range(D))
-        inwin = torch.ones(N, dtype=torch.bool, device=centers.device)
-        for o in off:
-            inwin = inwin & (abs(o) <= ssz)
-        vals = g[(slice(None),) + idx].t()                 # [N, C]
-        out = out + (weights * vals).sum(1) * inwin.float()
-    return out
+
+    flat = centers.reshape(N * S, D)
+    gidx = torch.stack(fld.pix(*[flat[:, k] for k in range(D)]), dim=-1).reshape(N, S, D)   # [N, S, D]
+    rng = torch.arange(-ks, ks + 1, device=dev)
+    offs = torch.stack(torch.meshgrid(*([rng] * D), indexing="ij"), dim=-1).reshape(-1, D)  # [W, D] window
+    W = offs.shape[0]
+
+    # per-axis wrapped/clamped voxel index for the whole [N, S, W] window (D=2/3, not a hot loop)
+    axes = []
+    for k in range(D):
+        col = gidx[:, :, None, k] + offs[None, None, :, k]                 # [N, S, W]
+        axes.append(torch.remainder(col, shape[k]) if per else col.clamp(0, shape[k] - 1))
+    vals = g[(slice(None),) + tuple(axes)].permute(1, 2, 3, 0)             # [N, S, W, C]
+
+    inwin = (offs.abs()[None, :, :] <= ssz[:, None, None]).all(-1)         # [N, W] offset inside agent window
+    contrib = (weights[:, None, None, :] * vals).sum(-1)                   # [N, S, W]
+    return (contrib * inwin[:, None, :].float()).sum(-1)                   # [N, S]
 
 
-@register_operator("sense", level="cell", kind="exchange")
+@register_operator("sense", family="fields", level="cell", kind="exchange")
 class Sense(Exchange):
+    EMIT = None                                 # writes `heading` in place (steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
     REQUIRES_PARAMS = ["from"]
     REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]
     MECHANISM_TAGS = ["trail_following", "stigmergy", "physarum_sensing"]
-    MORPHOLOGY_PRIOR = ["filaments", "transport_network"]
-    PARAM_ROLES = {"cross": "inter_species_coupling_sign"}
+    PARAM_ROLES = {"cross": "inter_species_coupling_sign", "noise": "steer_noise"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.field_name = params.get("from")
         self.cross = float(params.get("cross", -1.0))      # sense weight on OTHER species' channels
-        self.at = params.get("_at", "cell")
+        self.noise = float(params.get("noise", 0.0))       # steer-noise knob in [0,1]: 0 = deterministic
+        self.at = params.get("_at", "cell")                # turn (theta = turn_speed); 1 = uniform[0, turn_speed]
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -227,16 +237,26 @@ class Sense(Exchange):
         w = torch.full((N, C), self.cross, device=dev)
         w[torch.arange(N, device=dev), nt] = 1.0
 
-        centre = _read(fld, pos + h * sd, w, ssz)          # [N] sensor straight ahead
         dirs = _ring_dirs(h, ca, sa)                       # list of [N, D] tilted directions
-        ring = torch.stack([_read(fld, pos + d * sd, w, ssz) for d in dirs], dim=1)   # [N, K]
         stacked = torch.stack(dirs, dim=1)                 # [N, K, D]
+        # centre sensor (heading) + K ring sensors -> one batched windowed read [N, 1+K]
+        dir_all = torch.cat([h[:, None, :], stacked], dim=1)           # [N, 1+K, D]
+        centers = pos[:, None, :] + dir_all * sd[:, None, :]           # [N, 1+K, D] sensor centres
+        reads = _read(fld, centers, w, ssz)                # [N, 1+K]
+        centre, ring = reads[:, 0], reads[:, 1:]           # [N] centre, [N, K] ring
 
         best_val, best_idx = ring.max(1)                   # strongest fan sensor
         target = stacked[torch.arange(N, device=dev), best_idx]        # [N, D]
         straight = centre >= best_val                      # centre wins -> keep heading
 
-        theta = (torch.rand(N, generator=H.rng, device=dev) * ts)[:, None]            # turn angle <= turn_speed
+        # turn magnitude toward the winning sensor. `noise` knob (default 0) blends a
+        # deterministic full turn (frac=1 -> theta=turn_speed) with the stochastic
+        # Physarum turn (frac ~ uniform[0,1]); noise=1 reproduces the old `rand*ts`.
+        if self.noise > 0.0:
+            frac = (1.0 - self.noise) + self.noise * torch.rand(N, generator=H.rng, device=dev)
+        else:
+            frac = torch.ones(N, device=dev)
+        theta = (ts * frac)[:, None]                                                   # turn angle <= turn_speed
         t_perp = target - (target * h).sum(1, keepdim=True) * h         # toward target, perp to h
         t_perp = t_perp / t_perp.norm(dim=1, keepdim=True).clamp(min=1e-9)
         turned = torch.cos(theta) * h + torch.sin(theta) * t_perp      # rotate h by theta toward target
