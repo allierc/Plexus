@@ -68,7 +68,34 @@ def measure_v0(traj):
                 area=round(area, 3), emergent=emergent)
 
 
-METRICS = {"metric_v0": measure_v0}                           # frozen anchor; Loop III appends metric_v1, ...
+def _lobules(phi):
+    from scipy import ndimage as ndi
+    from skimage.feature import peak_local_max
+    b = np.asarray(phi) > 0.5
+    lbl, nc = ndi.label(b)
+    if nc == 0 or b.sum() < 20:
+        return 0.0
+    sizes = np.bincount(lbl.ravel()); sizes[0] = 0
+    body = lbl == int(sizes.argmax())
+    edt = ndi.distance_transform_edt(body)
+    return float(len(peak_local_max(edt, min_distance=6, threshold_abs=3.0)))
+
+
+def measure_v1(traj):
+    """metric_v1 -- promoted by Loop III (measurement discovery). It EXTENDS metric_v0's regime check
+    with the subdivision observable that resolved the named failure: the composition must not only stay
+    branch-like/connected but SUBDIVIDE the already-branched initial condition (more lobules than t=0).
+    This is the observable metric_v0 could not measure; under it, cleft/growth operators become
+    necessary (the reopened Loop-I conclusion)."""
+    v0 = measure_v0(traj)
+    lob_T = _lobules(traj[-1]); lob0 = _lobules(traj[0])
+    subdivided = lob_T > 1.3 * max(lob0, 1.0)
+    v0.update(metric="metric_v1", lobules=int(lob_T), lobules0=int(lob0),
+              emergent=bool(v0["emergent"] and subdivided))
+    return v0
+
+
+METRICS = {"metric_v0": measure_v0, "metric_v1": measure_v1}   # v0 frozen anchor; v1 promoted by Loop III
 
 
 if __name__ == "__main__":

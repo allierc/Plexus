@@ -93,9 +93,10 @@ def main():
     phi_full = np.load(os.path.join(ROOT, "pf", "_real", "phi0.npy"))
     phi0 = torch.nn.functional.avg_pool2d(
         torch.as_tensor(phi_full, dtype=torch.float32, device=DEV)[None, None], 3, 3)[0, 0]  # 256->~85, cheaper BPTT
-    # SYNTHETIC RECOVERABLE: target generated with a known theta*
-    theta_star = dict(kappa=torch.tensor(1.4, device=DEV), growth_frac=torch.tensor(1.5, device=DEV),
-                      lam=torch.tensor(1.1, device=DEV), s=torch.tensor(1.2, device=DEV))
+    # SYNTHETIC RECOVERABLE: target generated with a known theta* chosen OFF the bound midpoints (so the
+    # fit, which starts at each midpoint, must move every parameter -- no trivially-pre-solved coordinate).
+    theta_star = dict(kappa=torch.tensor(1.05, device=DEV), growth_frac=torch.tensor(1.72, device=DEV),
+                      lam=torch.tensor(0.85, device=DEV), s=torch.tensor(1.38, device=DEV))
     with torch.no_grad():
         target = rollout(phi0, theta_star).detach()
     print("Loop II (minimal) — differentiable inverse modelling on a synthetic recoverable case")

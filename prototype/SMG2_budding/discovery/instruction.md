@@ -57,17 +57,23 @@ verdicts; a composition graduates to Established only when necessary ∧ suffici
 - Loop I under metric_v0: Rung 1 reached (focal-ECM robustly in-regime); structural limitations found
   (no-growth / fragment / blob); **named failure** — metric_v0 cannot separate the in-regime
   compositions nor prove necessity (the IC is the already-branch-like real t=0 gland).
-- Loop III: promoted **metric_v1** (`perimeter_ratio`) — GT-agreeing, separates focal-ECM vs Turing,
-  seed-invariant — and re-scored the archive without re-simulation.
-- Loop II: differentiable θ-recovery verified on a synthetic case.
-- Next: reopen Loop I necessity tests under metric_v1; add Stage-3 operators (react_rd routing,
-  chemotax) to the backend; second specimen for robustness.
+- Loop III: promoted **metric_v1** (a subdivision observable) — GT-agreeing, separates focal-ECM vs
+  Turing, seed-invariant — and re-scored the archive without re-simulation.
+- **Circle closed (rung 4):** reopening Loop I necessity tests under metric_v1 makes `cleft_induce`
+  and `tissue_grow` **necessary**, reclassifies the substrate-only composition as a structural
+  limitation ("grows but cannot subdivide"), and graduates focal-ECM from Open to **Established**.
+- Loop II: differentiable fit on a synthetic case drives ρ 8.7e-3 → 7.6e-10, recovers surface-tension/growth exactly, and exposes a cleft-strength (lam/s) degeneracy.
+- Loop I (Stage 3) now DISCOVERS the Turing region (adds react_rd + routes it to the cleft), so the
+  focal-ECM-vs-Turing separation is between two Loop-I-discovered compositions.
+- Next: backend support for chemotax/oriented_growth; fit a real specimen with Loop II and read its
+  residual; a second specimen for cross-specimen robustness.
 
 ## Run
 
 ```
-python discovery/loop1_explore.py [--basin 2 --param_basin 2 --node_cap 12 --max_stage 2]
-python discovery/loop3_measure.py
-python discovery/loop2_fit.py
+python discovery/loop1_explore.py [--basin 2 --param_basin 2 --node_cap 24 --max_stage 3 --proposer]
+python discovery/loop3_measure.py                       # promote metric_v1
+python discovery/loop1_explore.py --metric metric_v1    # reopen Loop I (rung 4): cleft becomes necessary
+python discovery/loop2_fit.py                            # differentiable θ-recovery
 ```
 Archive (source of truth): `discovery/_archive/{records.jsonl, analyses.jsonl, trajectories/}`.
