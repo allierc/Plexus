@@ -909,6 +909,7 @@ writes a field, a relation, or a \code{heading} and returns no set delta:
 \code{neuron\_voltage}       & lateral & velocity & neuron ODE $\tau_i\,dv_i/dt=\mathrm{intrinsic}_i+I^{\mathrm{syn}}_i+I^{\mathrm{ext}}_i$ \\
 \code{attraction\_repulsion} & lateral & velocity & per-type difference-of-Gaussians interaction law \\
 \code{squared\_law}          & lateral & acceleration & inverse-square law: Coulomb electrostatics \emph{or} Newtonian gravity (\code{law}: \code{charge}/\code{mass}) \\
+\code{attractor\_flow}       & lateral & velocity & ride a set along a strange-attractor field $\dot x=f(x)$ (\code{system}: lorenz/rossler/chen/\ldots; 3D-only, no interaction) \\
 \code{cohesion},\,\code{velocity\_align},\,\code{separation} & lateral & acceleration & the three boids rules; their deltas sum to flocking \\
 \code{velocity\_cruise}                & lateral & acceleration & Vicsek self-propulsion toward cruising speed $v_0$ \\
 \code{drag}                  & lateral & accel.\,$|$\,mpm\_accel. & viscous friction $-\kappa v$ (\code{emit:} routes to the engine or the MPM substep) \\
@@ -1484,6 +1485,18 @@ the source charge (\code{charge} vs.\ \code{mass}), the sign/receiver convention
 The Coulomb path is byte-identical to the pre-merge operator; the gravity path
 reproduces the prototype's force exactly. The galaxy prototype is thereby retired into
 the core as a spec, not a fork.
+
+The \code{attractor\_flow} operator is a second such promotion, out of the
+\code{prototype/attractors} campaign: ten classic strange attractors (Lorenz, R\"ossler,
+Aizawa, Sprott~B, Halvorsen, Thomas, Chen, Chua, Dadras, Rabinovich--Fabrikant) collapse
+into \emph{one} \code{system}-switched operator by the merge-by-contract rule --- they share
+the same contract, a per-point autonomous field $\dot x=f(x)$ emitted as a \code{velocity},
+differing only in the field's closed form and constants. It is filed under \code{motion}
+(a prescribed kinematic velocity rule, like \code{drag}/\code{glide}), declares
+\code{SUPPORTED\_DIMS}$=[3]$ on principle rather than as an unfinished interface (a
+continuous planar flow cannot be chaotic, by Poincar\'e--Bendixson), and carries each
+system's originating paper in its docstring. The ten prototype specs retire into
+\code{config/attractors/} and render through the existing generic 3D splat, no new plotter.
 
 This promotion discipline is the same reconvergence process the repository was built
 for: sibling prototype frameworks that had drifted apart are pulled back into one

@@ -1,0 +1,27 @@
+# Rossler (1976) -- xd=-y-z; yd=x+a y; zd=b+z(x-c). The iconic spiral-and-fold: a flat spiral
+# disk in the x-y plane with a single sheet that flaps up in z. Like Lorenz it is nearly planar,
+# so the camera sweeps ELEVATION (spiral <-> fold) instead of doing a full azimuth orbit.
+general: {name: rossler, seed: 0, n_frames: 14000, dt: 0.015,
+          boundary: free, dim: 3, world: [30.0, 30.0, 50.0], record_cap: 800}
+sets:
+  cloud:
+    n: 120000
+    start: [0.7, 0.7, -0.3, 1.3, 1.3, 0.3]              # seed cube (center [1,1,0] +/- 0.3)
+fields: {}
+operators:
+  - {op: attractor_flow, at: cloud, system: rossler, a: 0.2, b: 0.2, c: 5.7}
+schedule: [attractor_flow]
+plotting:
+  color: [1.0, 0.82, 0.28]          # gold
+  splat_core: 0.95
+  splat_halo: 3.2
+  ref_quantile: 0.93
+  gamma: 0.78
+  core_power: 3.0
+  core_amt: 0.6
+  bloom: 0.45
+  trail_decay: 0.45
+  camera_azim: 0.3
+  camera_elev: 0.72                  # low tilt shows the spiral; the drift lifts to reveal the fold
+  camera_turns: 0.12
+  camera_elev_drift: 0.34

@@ -63,6 +63,8 @@ def config_path(*parts: str) -> str:
 _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("attraction_repulsion", ("attraction_repulsion", "attract", "repuls", "arbitrary")),
     ("inverse_square", ("inverse_square", "coulomb", "electro", "charge", "nbody", "galaxy", "spiral")),
+    ("attractors",  ("attractor", "lorenz", "halvorsen", "aizawa", "sprott", "thomas",
+                     "rossler", "dadras", "chen", "chua", "rabinovich")),
     ("boids",       ("boids", "flock", "swarm")),
     ("slime",       ("slime", "physarum", "trail")),
     ("material",    ("material",)),

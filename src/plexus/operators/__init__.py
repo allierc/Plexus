@@ -13,6 +13,7 @@ from . import aggregate             # noqa: F401  children -> parent reduction (
 from . import broadcast             # noqa: F401  parent -> children lift (containment)
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
 from . import squared_law                # noqa: F401  registers squared_law (lateral, 2nd-derivative: Coulomb electrostatics OR Newtonian gravity)
+from . import attractor_flow         # noqa: F401  registers attractor_flow (lateral, 1st-derivative: strange-attractor ODE flow dx/dt = f(x))
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
 from . import velocity_align       # noqa: F401  Vicsek velocity alignment (nominal); boids = special case (was alignment)
 from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
@@ -55,7 +56,7 @@ from . import polarity_align       # noqa: F401  agent -> agent heading (1st-ord
 from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
 from . import cell_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
 
-__all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law",
+__all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law", "attractor_flow",
            "cohesion", "velocity_align", "separation", "velocity_cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
            "prescribed_field", "chemotax", "gravity", "sediment",

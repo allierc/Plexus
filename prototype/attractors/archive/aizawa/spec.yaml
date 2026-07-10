@@ -1,0 +1,28 @@
+# Aizawa attractor -- a torus with an axial spike: the flow winds around a sphere while a
+# thin jet drills a hole straight through its pole. Slower flow than the others, so a larger
+# dt and more sim-time. Seed a tiny cube near the origin (inside the basin).
+general: {name: aizawa, seed: 0, n_frames: 10000, dt: 0.008,
+          boundary: free, dim: 3, world: [4.0, 4.0, 4.0], record_cap: 800}
+sets:
+  cloud:
+    n: 120000
+    start: [-0.15, -0.25, -0.25, 0.35, 0.25, 0.25]      # seed cube (center [0.1,0,0] +/- 0.25)
+fields: {}
+operators:
+  - {op: attractor_flow, at: cloud, system: aizawa,
+     a: 0.95, b: 0.7, c: 0.6, d: 3.5, e: 0.25, f: 0.1}
+schedule: [attractor_flow]
+plotting:
+  color: [0.55, 0.85, 1.0]          # icy cyan
+  splat_core: 0.95
+  splat_halo: 3.2
+  ref_quantile: 0.93
+  gamma: 0.80
+  core_power: 3.0
+  core_amt: 0.6
+  bloom: 0.5
+  trail_decay: 0.5
+  camera_azim: 0.4
+  camera_elev: 1.15                  # near side-on so the axial spike drilling the sphere reads
+  camera_turns: 0.50
+  camera_elev_drift: 0.12
