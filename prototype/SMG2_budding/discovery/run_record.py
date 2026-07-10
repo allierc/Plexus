@@ -73,6 +73,14 @@ class RunRecord:
                                  f"Use add_analysis() to append a versioned measurement.")
         object.__setattr__(self, k, v)
 
+    def set_trajectory_ref(self, ref):
+        """Set the storage pointer to the persisted trajectory exactly once (it is determined only after
+        the archive writes the file). A pointer, not a scientific fact: settable once, never overwritten."""
+        if self.trajectory_ref is not None:
+            raise ValueError(f"trajectory_ref already set for {self.run_id}")
+        object.__setattr__(self, "trajectory_ref", ref)
+        return self
+
     # --- append-only, versioned analyses -------------------------------------------
     def add_analysis(self, metric_version: str, result: dict):
         """Attach a measurement computed under `metric_version`. Never overwrites an existing version

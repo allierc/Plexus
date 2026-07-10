@@ -169,6 +169,8 @@ class CompositionGraph:
         rd_to_cleft = any(c["slot"] == "source" for c in self.conns)
         if "react_rd" in ops and (rd_to_cleft or "cleft_induce" not in ops):
             return "turing-like (Menshykau-Iber)"
+        if "cleft_induce" in ops and "confine" in ops and "react_rd" not in ops:
+            return "focal-ECM under confinement"
         if "cleft_induce" in ops and "react_rd" not in ops:
             return "focal-ECM (Yamada)"
         if "cleft_induce" in ops and "react_rd" in ops:
