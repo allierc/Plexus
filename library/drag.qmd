@@ -6,7 +6,7 @@ subtitle: "Viscous friction as a composable operator (not an integration knob)."
 ::: {.op-head}
 ![](../figures/icons/lateral.png){.op-logo}
 
-[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: second_derivative`]{.op-badge}
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
 Viscous friction as a composable operator (not an integration knob).
 :::
@@ -36,8 +36,8 @@ Viscous friction as a composable operator (not an integration knob).
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `k`
-- **Writes / returns** &mdash; returns an **acceleration** &mdash; $v \mathrel{+}= \Delta t\,\delta;\ x \mathrel{+}= \Delta t\,v$.
-- **Prediction** &mdash; `second_derivative`.
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
 - **Dimensions** &mdash; 2D, 3D.
 
 ## Mechanism
@@ -45,8 +45,10 @@ Viscous friction as a composable operator (not an integration knob).
 A `drag` force opposes velocity: acc = -k * vel. Modelling friction as an
 operator (rather than a `damping` field baked into the integrator) keeps the
 integrator generic and lets drag compose in the schedule with the other forces.
-It is a second-derivative contribution (an acceleration), so it lives on sets
-integrated with `prediction: second_derivative` (e.g. alongside boids).
+It is a second-derivative contribution (an acceleration): `emit: acceleration`
+(the class default) sums it into a set the ENGINE integrates (e.g. alongside boids);
+`emit: mpm_acceleration` routes the same -k*v into the MPM substep as a body force
+(p2g reads H.delta as a_ext) -- this replaces the former `mpm_drag` operator.
 
 $$
 \mathbf a_i \;=\; -\,k\,\mathbf v_i
@@ -58,7 +60,8 @@ schedule, not an integrator knob, so it composes with the other second-derivativ
 
 | parameter | role | default |
 |---|---|---|
-| `k` | &ndash; | **required** |
+| `k` | drag_coefficient | **required** |
+| `noise` | thermal_noise | 0.0 |
 
 ## Minimal spec
 
@@ -67,9 +70,13 @@ operators:
   - {op: drag, at: particle, k: ...}
 ```
 
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`viscous_drag`]{.op-badge} [`friction`]{.op-badge} [`damping`]{.op-badge}  
+
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`Coulomb`](Coulomb.qmd), [`cohesion`](cohesion.qmd), [`alignment`](alignment.qmd), [`separation`](separation.qmd), [`advance`](advance.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
 
 ## Source
 
@@ -81,8 +88,10 @@ Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd),
 A `drag` force opposes velocity: acc = -k * vel. Modelling friction as an
 operator (rather than a `damping` field baked into the integrator) keeps the
 integrator generic and lets drag compose in the schedule with the other forces.
-It is a second-derivative contribution (an acceleration), so it lives on sets
-integrated with `prediction: second_derivative` (e.g. alongside boids).
+It is a second-derivative contribution (an acceleration): `emit: acceleration`
+(the class default) sums it into a set the ENGINE integrates (e.g. alongside boids);
+`emit: mpm_acceleration` routes the same -k*v into the MPM substep as a body force
+(p2g reads H.delta as a_ext) -- this replaces the former `mpm_drag` operator.
 """
 from __future__ import annotations
 
@@ -92,20 +101,28 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("drag", level="particle", kind="lateral")
+@register_operator("drag", family="motion", level="particle", kind="lateral")
 class Drag(Lateral):
-    PREDICTION = "second_derivative"            # emits an acceleration
+    EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
+    MECHANISM_TAGS = ["viscous_drag", "friction", "damping"]
+    PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.k = float(params["k"])
+        self.noise = float(params.get("noise", 0.0))     # isotropic Langevin noise (off by default)
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        acc = -self.k * lvl.get("vel") * lvl.occ[:, None]
+        occ = lvl.occ
+        acc = -self.k * lvl.get("vel") * occ[:, None]
+        if self.noise > 0.0:                             # drag + noise = a Brownian/Langevin bath
+            N, D = acc.shape
+            acc = acc + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None),
+                                                 device=acc.device) * occ[:, None]
         if mask is not None:
             acc = acc * mask[:, None].float()
         return {self.at: acc}

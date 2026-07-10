@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -222,6 +222,7 @@ window.Quarto = {
   <li><a href="#example-output" id="toc-example-output" class="nav-link" data-scroll-target="#example-output">Example output</a></li>
   <li><a href="#identifiability" id="toc-identifiability" class="nav-link" data-scroll-target="#identifiability">Identifiability</a></li>
   <li><a href="#failure-modes" id="toc-failure-modes" class="nav-link" data-scroll-target="#failure-modes">Failure modes</a></li>
+  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
   <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
   <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
   </ul>
@@ -304,7 +305,7 @@ c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 <tbody>
 <tr class="odd">
 <td><code>rate</code></td>
-<td>–</td>
+<td>diffusion_rate</td>
 <td>0.35</td>
 </tr>
 </tbody>
@@ -324,8 +325,8 @@ c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 </section>
 <section id="example-output" class="level2">
 <h2 class="anchored" data-anchor-id="example-output">Example output</h2>
-<figure class="op-vid figure"><video src="../gallery/rd_worms.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-<figcaption>A Gray–Scott reaction–diffusion pattern — `diffuse` is the transport term that lets the worms spread and branch.</figcaption></figure>
+<figure class="op-vid figure"><video src="../gallery/slime.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+<figcaption>A self-organizing Physarum network — `diffuse` is the transport term that spreads the pheromone trail the agents then follow.</figcaption></figure>
 </section>
 <section id="identifiability" class="level2">
 <h2 class="anchored" data-anchor-id="identifiability">Identifiability</h2>
@@ -360,13 +361,17 @@ c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 </tbody>
 </table>
 </section>
+<section id="mechanism-search-tags" class="level2">
+<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>diffusion</code></span> <span class="op-badge"><code>field_smoothing</code></span> <span class="op-badge"><code>laplacian</code></span></p>
+</section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
 <ul>
 <li><a href="../library/decay.html"><code>decay</code></a> — the companion sink term; diffuse spreads, decay removes</li>
 <li><a href="../library/deposit.html"><code>deposit</code></a> — writes a scalar source into the field that diffuse then spreads</li>
 <li><a href="../library/sense.html"><code>sense</code></a> — reads the diffused gradient back onto a set (stigmergy)</li>
-<li><a href="../library/chemotaxis.html"><code>chemotaxis</code></a> — particle-level gradient following on a diffused field</li>
+<li><a href="chemotaxis.qmd"><code>chemotaxis</code></a> — particle-level gradient following on a diffused field</li>
 </ul>
 </section>
 <section id="source" class="level2">
@@ -388,30 +393,36 @@ c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
 <span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"diffuse"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"diffuse"</span>, family<span class="op">=</span><span class="st">"fields"</span>, level<span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>)</span>
 <span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Diffuse(FieldUpdate):</span>
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""field -&gt; field: acts on the field named by `at:` (no set involved)."""</span></span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                     <span class="co"># 3x3 (2D) / 3x3x3 (3D) box-blur step</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.35</span>))     <span class="co"># diffusion weight per unit time</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> fld.grid                                                    <span class="co"># [C, *shape]</span></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g.dim() <span class="op">==</span> <span class="dv">3</span>:                                               <span class="co"># 2D field [C, nx, ny]</span></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span><span class="st">"replicate"</span>)   <span class="co"># edge-clamp</span></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool2d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)             <span class="co"># 3x3 mean, same size</span></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                         <span class="co"># 3D field [C, nx, ny, nz]</span></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span><span class="st">"replicate"</span>)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool3d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)            <span class="co"># 3x3x3 mean, same size</span></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        dw <span class="op">=</span> <span class="bu">min</span>(<span class="bu">max</span>(<span class="va">self</span>.rate <span class="op">*</span> dt, <span class="fl">0.0</span>), <span class="fl">1.0</span>)                        <span class="co"># saturate(rate*dt)</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> g <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> dw) <span class="op">+</span> blur <span class="op">*</span> dw</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                                <span class="co"># field-&gt;field: writes the grid in place; returns {} — no integrable delta</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                     <span class="co"># 3x3 (2D) / 3x3x3 (3D) box-blur step</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []                        <span class="co"># no required params — target field comes from `at:` (engine-injected)</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"diffusion"</span>, <span class="st">"field_smoothing"</span>, <span class="st">"laplacian"</span>]</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"rate"</span>: <span class="st">"diffusion_rate"</span>}</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.35</span>))     <span class="co"># diffusion weight per unit time</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> fld.grid                                                    <span class="co"># [C, *shape]</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="co"># periodic field -&gt; wrap the blur across the seam (`circular`); else edge-clamp.</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        pmode <span class="op">=</span> <span class="st">"circular"</span> <span class="cf">if</span> <span class="bu">getattr</span>(fld, <span class="st">"periodic"</span>, <span class="va">False</span>) <span class="cf">else</span> <span class="st">"replicate"</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g.dim() <span class="op">==</span> <span class="dv">3</span>:                                               <span class="co"># 2D field [C, nx, ny]</span></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span>pmode)</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool2d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)             <span class="co"># 3x3 mean, same size</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                         <span class="co"># 3D field [C, nx, ny, nz]</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span>pmode)</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool3d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)            <span class="co"># 3x3x3 mean, same size</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        dw <span class="op">=</span> <span class="bu">min</span>(<span class="bu">max</span>(<span class="va">self</span>.rate <span class="op">*</span> dt, <span class="fl">0.0</span>), <span class="fl">1.0</span>)                        <span class="co"># saturate(rate*dt)</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> g <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> dw) <span class="op">+</span> blur <span class="op">*</span> dw</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
@@ -643,8 +654,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -755,7 +764,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

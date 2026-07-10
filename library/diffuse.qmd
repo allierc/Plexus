@@ -58,7 +58,7 @@ $\partial_t c = D\,\nabla^2 c$ (3&times;3 in 2D, 3&times;3&times;3 in 3D).
 
 | parameter | role | default |
 |---|---|---|
-| `rate` | &ndash; | 0.35 |
+| `rate` | diffusion_rate | 0.35 |
 
 ## Minimal spec
 
@@ -77,8 +77,8 @@ Sits between deposition and sensing: a source operator (`deposit` / `secrete`) w
 ## Example output
 
 ```{=html}
-<figure class="op-vid"><video src="../gallery/rd_worms.mp4" autoplay loop muted playsinline preload="metadata"></video>
-<figcaption>A Gray&ndash;Scott reaction&ndash;diffusion pattern &mdash; `diffuse` is the transport term that lets the worms spread and branch.</figcaption></figure>
+<figure class="op-vid"><video src="../gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
+<figcaption>A self-organizing Physarum network &mdash; `diffuse` is the transport term that spreads the pheromone trail the agents then follow.</figcaption></figure>
 ```
 
 ## Identifiability
@@ -92,6 +92,10 @@ Only the **product** rate&middot;$\Delta t$ and the number of steps per tick are
 | `rate`&middot;`dt` &gt; 1 | the lerp saturates (clamped to 1) &rarr; the field becomes its own neighbourhood mean in one step; over-smoothing, lost structure. |
 | too few steps for the domain | diffusion length too short &rarr; sources stay pinned, no long-range coupling. |
 | wrong boundary expectation | edges are clamped (zero-flux), not periodic &mdash; mass piles up at walls unless the field is periodic by design. |
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`diffusion`]{.op-badge} [`field_smoothing`]{.op-badge} [`laplacian`]{.op-badge}  
 
 ## Related operators
 
@@ -121,11 +125,15 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("diffuse", level="field", kind="field")
+@register_operator("diffuse", family="fields", level="field", kind="field")
 class Diffuse(FieldUpdate):
     """field -> field: acts on the field named by `at:` (no set involved)."""
 
+    EMIT = None                                # field->field: writes the grid in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]                     # 3x3 (2D) / 3x3x3 (3D) box-blur step
+    REQUIRES_PARAMS = []                        # no required params — target field comes from `at:` (engine-injected)
+    MECHANISM_TAGS = ["diffusion", "field_smoothing", "laplacian"]
+    PARAM_ROLES = {"rate": "diffusion_rate"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -136,11 +144,13 @@ class Diffuse(FieldUpdate):
         fld = H.fields[self.field_name]
         g = fld.grid                                                    # [C, *shape]
         dt = float(getattr(H.config, "dt", 1.0))
+        # periodic field -> wrap the blur across the seam (`circular`); else edge-clamp.
+        pmode = "circular" if getattr(fld, "periodic", False) else "replicate"
         if g.dim() == 3:                                               # 2D field [C, nx, ny]
-            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1), mode="replicate")   # edge-clamp
+            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1), mode=pmode)
             blur = Fnn.avg_pool2d(gp, 3, stride=1).squeeze(0)             # 3x3 mean, same size
         else:                                                         # 3D field [C, nx, ny, nz]
-            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1, 1, 1), mode="replicate")
+            gp = Fnn.pad(g.unsqueeze(0), (1, 1, 1, 1, 1, 1), mode=pmode)
             blur = Fnn.avg_pool3d(gp, 3, stride=1).squeeze(0)            # 3x3x3 mean, same size
         dw = min(max(self.rate * dt, 0.0), 1.0)                        # saturate(rate*dt)
         fld.grid = g * (1.0 - dw) + blur * dw

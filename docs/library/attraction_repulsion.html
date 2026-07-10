@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -253,7 +253,7 @@ window.Quarto = {
 
 <div class="op-head">
 <p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
-<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: first_derivative</code></span></p>
+<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
 <p>A smooth, per-type pairwise force law on a neighbour graph — the analytic core of <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a>. A long-range Gaussian pulls, a short-range Gaussian pushes; the balance between them, set per particle type, selects the emergent phase: single clusters, multi-cluster foams, lattices, or filaments.</p>
 </div>
 <style>
@@ -279,15 +279,15 @@ window.Quarto = {
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
 <li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
 <li><strong>Reads</strong> — <code>sigma</code>, <code>p</code> (per-type props: <code>p</code>)</li>
-<li><strong>Writes / returns</strong> — returns a <strong>velocity</strong> — the engine integrates <span class="math inline">\(x \mathrel{+}= \Delta t\,\delta\)</span>.</li>
-<li><strong>Prediction</strong> — <code>first_derivative</code>.</li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
 <li><strong>Dimensions</strong> — 2D, 3D.</li>
 </ul>
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
 <p>A Lateral operator over a neighbour graph. For a receiver particle i of type t, summed over its neighbours j (the edges left by a <code>rewire</code> operator such as <code>radius_graph</code>):</p>
-<p>with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first Gaussian is the long-range pull, the second the short-range push; their balance gives type-specific phases (clusters, networks, lattices). First-derivative law: returns a velocity (set <code>prediction: first_derivative</code>).</p>
+<p>with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first Gaussian is the long-range pull, the second the short-range push; their balance gives type-specific phases (clusters, networks, lattices). First-derivative law: returns a velocity (<code>EMIT = velocity</code>; overdamped, engine-integrated).</p>
 <p>This is message passing on <code>Level.edge_index</code> (O(E), scales to 1e4-1e5 nodes), not a dense O(N^2) matrix. Per-type parameters come from the spec’s <code>types:</code> block (each type carries <code>p</code>), assembled by the engine into <code>Level.type_params</code>.</p>
 <p><span class="math display">\[
 f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
@@ -317,11 +317,16 @@ f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
 <td><strong>required</strong></td>
 </tr>
 <tr class="even">
+<td><code>noise</code></td>
+<td>exploration_noise</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
 <td><code>p</code></td>
 <td>[pull_strength, pull_range, push_strength, push_range] per type</td>
 <td>–</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>aggr</code></td>
 <td>–</td>
 <td>“mean”</td>
@@ -349,7 +354,7 @@ f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
 </section>
 <section id="example-output" class="level2">
 <h2 class="anchored" data-anchor-id="example-output">Example output</h2>
-<figure class="op-vid figure"><video src="../gallery/arbitrary_3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+<figure class="op-vid figure"><video src="../gallery/attraction.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
 <figcaption>Three types, 30&nbsp;000 particles, σ=0.005, periodic — the field coarsens into a honeycomb of interconnected domains.</figcaption></figure>
 </section>
 <section id="identifiability" class="level2">
@@ -391,14 +396,13 @@ f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
-<p><strong>Mechanism</strong> — <span class="op-badge"><code>long_range_attraction</code></span> <span class="op-badge"><code>short_range_repulsion</code></span> <span class="op-badge"><code>coarsening</code></span> <span class="op-badge"><code>lattice_forming</code></span><br>
-<strong>Morphology prior</strong> — <span class="op-badge"><code>single_cluster</code></span> <span class="op-badge"><code>multi_cluster</code></span> <span class="op-badge"><code>lattice</code></span> <span class="op-badge"><code>filaments</code></span></p>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>long_range_attraction</code></span> <span class="op-badge"><code>short_range_repulsion</code></span> <span class="op-badge"><code>coarsening</code></span> <span class="op-badge"><code>lattice_forming</code></span></p>
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
 <ul>
 <li><a href="../library/radius_graph.html"><code>radius_graph</code></a> — the rewire that builds the neighbour graph this operator reads</li>
-<li><a href="../library/Coulomb.html"><code>Coulomb</code></a> — a fixed <span class="math inline">\(1/r^2\)</span> law — the non-parametric cousin</li>
+<li><a href="Coulomb.qmd"><code>Coulomb</code></a> — a fixed <span class="math inline">\(1/r^2\)</span> law — the non-parametric cousin</li>
 <li><a href="../library/alignment.html"><code>alignment</code></a> — another lateral law, velocity-aligning rather than position-based</li>
 <li><a href="../library/separation.html"><code>separation</code></a> — short-range repulsion alone, for collision handling</li>
 </ul>
@@ -418,7 +422,7 @@ f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first</span></span>
 <span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">Gaussian is the long-range pull, the second the short-range push; their balance</span></span>
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">gives type-specific phases (clusters, networks, lattices). First-derivative law:</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">returns a velocity (set `prediction: first_derivative`).</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">returns a velocity (`EMIT = velocity`; overdamped, engine-integrated).</span></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not</span></span>
 <span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block</span></span>
@@ -433,23 +437,23 @@ f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.geometry <span class="im">import</span> minimum_image</span>
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"attraction_repulsion"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"attraction_repulsion"</span>, family<span class="op">=</span><span class="st">"interaction"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AttractionRepulsion(Lateral):</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    PREDICTION <span class="op">=</span> <span class="st">"first_derivative"</span>             <span class="co"># emits a velocity (overdamped law)</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"velocity"</span>             <span class="co"># emits a velocity (overdamped law)</span></span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                      <span class="co"># dimension-generic (reads D = pos.shape[-1])</span></span>
 <span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"sigma"</span>]                 <span class="co"># the cutoff lives on the radius_graph rewire op</span></span>
 <span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    REQUIRES_TYPE_PROPS <span class="op">=</span> [<span class="st">"p"</span>]                 <span class="co"># per-type force-law params [p1,p2,p3,p4]</span></span>
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="co"># mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the</span></span>
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    <span class="co"># short-range Gaussian (p3,p4) the push; their balance sets the phase.</span></span>
 <span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"long_range_attraction"</span>, <span class="st">"short_range_repulsion"</span>, <span class="st">"coarsening"</span>, <span class="st">"lattice_forming"</span>]</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    MORPHOLOGY_PRIOR <span class="op">=</span> [<span class="st">"single_cluster"</span>, <span class="st">"multi_cluster"</span>, <span class="st">"lattice"</span>, <span class="st">"filaments"</span>]</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"sigma"</span>: <span class="st">"interaction_length"</span>,</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"p"</span>: <span class="st">"[pull_strength, pull_range, push_strength, push_range] per type"</span>}</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sigma <span class="op">=</span> <span class="bu">float</span>(params[<span class="st">"sigma"</span>])</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.aggr <span class="op">=</span> params.get(<span class="st">"aggr"</span>, <span class="st">"mean"</span>)               <span class="co"># mean (default, matches the reference) or sum</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"sigma"</span>: <span class="st">"interaction_length"</span>, <span class="st">"noise"</span>: <span class="st">"exploration_noise"</span>,</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"p"</span>: <span class="st">"[pull_strength, pull_range, push_strength, push_range] per type"</span>}</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.sigma <span class="op">=</span> <span class="bu">float</span>(params[<span class="st">"sigma"</span>])</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.aggr <span class="op">=</span> params.get(<span class="st">"aggr"</span>, <span class="st">"mean"</span>)               <span class="co"># mean (default, matches the reference) or sum</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.noise <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"noise"</span>, <span class="fl">0.0</span>))         <span class="co"># isotropic velocity noise (off by default)</span></span>
 <span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
 <span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
@@ -477,9 +481,12 @@ f(r) \;=\; p_1\,e^{-r^{2p_2}/2\sigma^2} \;-\; p_3\,e^{-r^{2p_4}/2\sigma^2},
 <span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>            deg <span class="op">=</span> torch.zeros(N, device<span class="op">=</span>pos.device).index_add_(<span class="dv">0</span>, i, occ[j])</span>
 <span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>            dpos <span class="op">=</span> dpos <span class="op">/</span> deg.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1.0</span>)[:, <span class="va">None</span>]</span>
 <span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        dpos <span class="op">=</span> dpos <span class="op">*</span> occ[:, <span class="va">None</span>]</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>            dpos <span class="op">=</span> dpos <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: dpos}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.noise <span class="op">&gt;</span> <span class="fl">0.0</span>:                                 <span class="co"># exploratory noise on the overdamped velocity</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>            dpos <span class="op">=</span> dpos <span class="op">+</span> <span class="va">self</span>.noise <span class="op">*</span> torch.randn(N, D, generator<span class="op">=</span><span class="bu">getattr</span>(H, <span class="st">"rng"</span>, <span class="va">None</span>),</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>                                                   device<span class="op">=</span>pos.device) <span class="op">*</span> occ[:, <span class="va">None</span>]</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>            dpos <span class="op">=</span> dpos <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: dpos}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
@@ -711,8 +718,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -823,7 +828,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

@@ -110,6 +110,32 @@ The distinction between a new set and a new type can be read straight off a tabl
 | in the spec | separate `sets:` with `parent:` | a `types:` block inside one set |
 | dispatch | by name (`at: nucleus`) | per-row lookup $p[\tau(i)]$ |
 
+### Edge-sets: stateful connections {#edge-sets}
+
+The parent map is a tree — every element has exactly one parent. But a *connection*
+joins two elements and belongs to neither: a chemical synapse has one presynaptic and
+one postsynaptic neuron. Which representation is correct depends on whether the
+connection carries **state of its own**:
+
+- **Passive** — a fixed scalar (a synaptic weight $W_{ij}$, a spring constant) is just a
+  **relation** $E\subseteq S_k\times S_k$ with an edge attribute: the `edge_index` a
+  `radius_graph`-style rewire leaves, read in place by a lateral operator.
+- **Dynamical** — an edge that carries its own evolving state (synaptic gating, a plastic
+  weight, a remodelling adhesion) is promoted to an **edge-set** $S_e$: an ordinary set
+  whose *elements are the connections*, with its own state schema and operators, still
+  parented to the `network`, but joined to its endpoints by **pre and post maps**
+  $\iota_{\text{pre}},\iota_{\text{post}}:S_{\text{synapse}}\to S_{\text{neuron}}$.
+
+The pre/post maps are index buffers (`.pre`, `.post`) — the exact analogue of `.parent` —
+so an operator gathers/scatters along them with the same machinery it uses along
+containment, and the engine gains no special case. Connectome **signalling** is then just
+those maps composed: endpoint voltages are *gathered* onto each synapse, the synapse
+integrates its own state, its weighted output current is *aggregated* back onto the
+postsynaptic neuron, and the neuron integrates its voltage — the passive first-order ODE
+$\tau_i\,\dot v_i = -v_i + b_i + \sum_j W_{ij}\,\phi(v_j) + I_i$ carried by the registered
+[`signal`](library/signal.html) operator. The same shape recurs for ligand–receptor
+contacts, cell–cell junctions, and vascular segments.
+
 ## Operators
 
 A GNN is an **operator** $\mathcal{O}$ dispatched by the relation it acts on. An
