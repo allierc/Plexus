@@ -60,13 +60,13 @@ def evaluate(g, phi0, archive, seeds, rng, param_basin=2, metric="metric_v0", pa
     return n_emerge / total, obs_rep, rid
 
 
-def explore(basin=2, node_cap=12, max_stage=2, param_basin=2, metric='metric_v0', use_proposer=False, out=None):
+def explore(basin=2, node_cap=12, max_stage=2, param_basin=2, metric='metric_v0', use_proposer=False, seed_offset=0, out=None):
     out = out or os.path.join(HERE, "_archive")
     print(f"metric = {metric}", flush=True)
     phi0 = np.load(os.path.join(ROOT, "pf", "_real", "phi0.npy"))
     archive = RunArchive(out)
-    seeds = [1, 2, 3][:basin]
-    rng = np.random.default_rng(0)
+    seeds = [1 + 7 * seed_offset + i for i in range(basin)]        # distinct seeds per round
+    rng = np.random.default_rng(seed_offset)
     surr = Surrogate() if use_proposer else None
     ADD = {"interface_relax", "tissue_grow", "cleft_induce", "confine", "react_rd"}  # backend-supported ops
 
@@ -124,6 +124,7 @@ def explore(basin=2, node_cap=12, max_stage=2, param_basin=2, metric='metric_v0'
     print(f"ledger: Established {stats['established']} · Structural-limitation {stats['structural']} · "
           f"Open {stats['open']}  →  {kout}")
     print(f"archive (source of truth): {out}/records.jsonl + analyses.jsonl + trajectories/")
+    return {"n_records": n_runs, "n_comps": len(evals), **stats}
 
 
 if __name__ == "__main__":

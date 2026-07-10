@@ -3,7 +3,7 @@
 > Distilled interpretation of the evidence. The archive of RunRecords is the source of truth; this ledger is revised as evidence accumulates.
 
 ## Bootstrap-ladder status  (metric_v0, frozen)
-- **Rung 1 reached** — first composition robustly in the real regime across seeds + parameter basin: `cleft_induce+interface_relax+tissue_grow` (focal-ECM (Yamada), rate 1.00). 7 compositions are in-regime.
+- **Rung 1 reached** — first composition robustly in the real regime across seeds + parameter basin: `cleft_induce+confine+react_rd` (turing-like (Menshykau-Iber), rate 1.00). 9 compositions are in-regime.
 
 ## Established  (sufficient ∧ robust ∧ has a necessary operator)
 - **focal-ECM under confinement** — composition `cleft_induce+confine` emerges (rate 1.00); necessary operator(s): `cleft_induce`.
@@ -34,6 +34,8 @@
 - `cleft_induce+confine+react_rd` — partial (rate 1.00, class branch-like).
 - `cleft_induce+react_rd` — partial (rate 1.00, class branch-like).
 - `cleft_induce+interface_relax+react_rd` — partial (rate 0.50, class branch-like).
+- `cleft_induce+react_rd+tissue_grow` — partial (rate 0.75, class branch-like).
+- `cleft_induce+confine+react_rd` — partial (rate 1.00, class branch-like).
 
 ## Composition → phenotype map
 | composition | region | emergence | class | topology |
@@ -45,6 +47,8 @@
 | `cleft_induce+react_rd+tissue_grow` | turing-like (Menshykau-Iber) | 1.00 | branch-like | duct 0.721 / gen 6 |
 | `cleft_induce+confine+react_rd` | turing-like (Menshykau-Iber) | 1.00 | branch-like | duct 1.0 / gen 8 |
 | `cleft_induce+react_rd` | turing-like (Menshykau-Iber) | 1.00 | branch-like | duct 0.877 / gen 6 |
+| `cleft_induce+confine+react_rd` | turing-like (Menshykau-Iber) | 1.00 | branch-like | duct 1.0 / gen 8 |
+| `cleft_induce+react_rd+tissue_grow` | turing-like (Menshykau-Iber) | 0.75 | branch-like | duct 0.721 / gen 6 |
 | `cleft_induce+interface_relax` | focal-ECM (Yamada) | 0.50 | branch-like | duct 0.414 / gen 5 |
 | `cleft_induce+tissue_grow` | focal-ECM (Yamada) | 0.50 | branch-like | duct 0.702 / gen 6 |
 | `cleft_induce+confine+tissue_grow` | focal-ECM under confinement | 0.50 | branch-like | duct 0.846 / gen 8 |
