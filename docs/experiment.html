@@ -41,8 +41,6 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
 <link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<script src="site_libs/quarto-contrib/videojs/video.min.js"></script>
-<link href="site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -148,14 +146,8 @@ ul.task-list li input[type="checkbox"] {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
-   
-  <ul>
-  <li><a href="#differentiable-optimization-a-foraging-colony" id="toc-differentiable-optimization-a-foraging-colony" class="nav-link active" data-scroll-target="#differentiable-optimization-a-foraging-colony">Differentiable optimization — a foraging colony</a></li>
-  </ul>
-</nav>
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+        
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
@@ -209,6 +201,8 @@ How a clip is made
 </div>
 <style>
 .sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:1rem 0 2.4rem}
+.sim-gallery.g3{grid-template-columns:repeat(3,1fr)}
+@media (max-width:560px){.sim-gallery.g3{grid-template-columns:repeat(2,1fr)}}
 .sim-card{margin:0}
 .sim-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
 .sim-card figcaption{margin-top:.4rem;line-height:1.3}
@@ -257,55 +251,170 @@ config/active_matter/vicsek_flock.yaml</pre></span></span>
 </div>
 
 <h2 class="anchored">Stigmergy — Physarum slime</h2>
-<p class="opk">A set + a scalar field, coupled: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network.</p>
-<div class="sim-gallery">
+<p class="opk">A set + a scalar field, coupled: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network. One operator schedule; the network class is set by the spec (turn rate, deposit/decay, species count).</p>
+<div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/slime.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">slime<span class="sim-spec"><pre>ops: deposit + diffuse + decay + sense + glide
+      <span class="sim-name" tabindex="0">slime (default)<span class="sim-spec"><pre>ops: deposit + diffuse + decay + sense + glide
 # 3-sensor steering up a self-deposited pheromone
-# field (Jones/Lague). Stigmergy: network grows,
-# coarsens, and prunes.
+# field (Jones/Lague). Stigmergy: grows, coarsens, prunes.
 config/slime/slime_default.yaml</pre></span></span>
       <span class="sim-cap">deposit → diffuse → decay → sense → glide — a growing, coarsening web</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/slime_curly.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">curly<span class="sim-spec"><pre>op: slime  # higher turn_speed / sensor angle
+config/slime/slime_curly.yaml</pre></span></span>
+      <span class="sim-cap">tighter turning — curled, looping trails</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/slime_filaments.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">filaments<span class="sim-spec"><pre>op: slime  # low deposit / high decay
+config/slime/slime_filaments.yaml</pre></span></span>
+      <span class="sim-cap">thin, filamentous strands below field saturation</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/slime_four.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">four species<span class="sim-spec"><pre>op: slime  # 4 types = 4 trail channels
+config/slime/slime_four.yaml</pre></span></span>
+      <span class="sim-cap">four species, each following its own trail channel</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/slime_six.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">six species<span class="sim-spec"><pre>op: slime  # 6 overlapping channels
+config/slime/slime_six.yaml</pre></span></span>
+      <span class="sim-cap">six overlapping species — richer coupled networks</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/slime_eight.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">eight species<span class="sim-spec"><pre>op: slime  # 8 channels, lowest deposit / highest decay
+config/slime/slime_eight.yaml</pre></span></span>
+      <span class="sim-cap">eight species — the most restrained, most-channelled web</span>
     </figcaption>
   </figure>
 </div>
 
 <h2 class="anchored">Continuum mechanics — MLS-MPM</h2>
-<p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies.</p>
-<div class="sim-gallery">
+<p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Only the material model + scene change between these.</p>
+<div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/material.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">material (3D bouncy balls)<span class="sim-spec"><pre>ops: mpm_strain -&gt; mpm_scatter -&gt; mpm_grid_update
+      <span class="sim-name" tabindex="0">bouncy balls<span class="sim-spec"><pre>ops: mpm_strain -&gt; mpm_scatter -&gt; mpm_grid_update
      -&gt; mpm_gather   (MLS-MPM substep cycle)
-# three neo-Hookean elastic balls dropped in a 3D
-# box; grid solve handles contact + gravity.
 config/material/material_3d_balls_bouncy.yaml</pre></span></span>
-      <span class="sim-cap">MLS-MPM continuum — three elastic balls collide and bounce in 3D</span>
+      <span class="sim-cap">three neo-Hookean elastic balls collide and bounce</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_water.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">water drop<span class="sim-spec"><pre>op: mls_mpm  # fluid material (drops shape memory)
+config/material/material_3d_water_drop.yaml</pre></span></span>
+      <span class="sim-cap">a fluid drop splashes and settles into a pool</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_ball.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">elastic drop<span class="sim-spec"><pre>op: mls_mpm  # fixed-corotated elastic
+config/material/material_3d_ball_drop.yaml</pre></span></span>
+      <span class="sim-cap">an elastic ball drops, deforms, and rebounds</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_cube.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">cube drop<span class="sim-spec"><pre>op: mls_mpm  # elastic cube
+config/material/material_3d_cube_drop.yaml</pre></span></span>
+      <span class="sim-cap">an elastic cube lands and jiggles</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_snow.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">snow block<span class="sim-spec"><pre>op: mls_mpm  # snow plasticity (singular-value clamp + hardening)
+config/material/material_3d_snow_block.yaml</pre></span></span>
+      <span class="sim-cap">a granular snow block crumbles under impact</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/material_multi.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">multi-material<span class="sim-spec"><pre>op: mls_mpm  # elastic + fluid + snow in one scene
+config/material/material_3d_multimaterial.yaml</pre></span></span>
+      <span class="sim-cap">elastic, fluid, and granular bodies interacting at once</span>
     </figcaption>
   </figure>
 </div>
 
 <h2 class="anchored">Inverse-square law — self-gravity &amp; electrostatics</h2>
 <p class="opk">One <code>squared_law</code> operator, two regimes: <code>law: gravity</code> (mass, always attract, all-pairs) collapses a disc into a galaxy; <code>law: coulomb</code> (signed charge, like-repel) is a plasma.</p>
-<div class="sim-gallery">
+<div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/inverse_square.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">self-gravitating galaxy<span class="sim-spec"><pre>op: squared_law   # lateral, EMIT=acceleration
-# law: gravity, all_pairs, softened 1/r^2 (Mocz).
-# a rotating disc of stars collapses into arms.
+      <span class="sim-name" tabindex="0">galaxy (2D)<span class="sim-spec"><pre>op: squared_law   # law: gravity, all_pairs, softened 1/r^2 (Mocz)
 config/inverse_square/spiral_galaxy.yaml</pre></span></span>
-      <span class="sim-cap">squared_law (law: gravity) — a rotating disc collapses into a galaxy</span>
+      <span class="sim-cap">law: gravity — a rotating disc collapses into a galaxy</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/spiral_galaxy_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">galaxy (3D)<span class="sim-spec"><pre>op: squared_law   # law: gravity, dim: 3, camera orbit
+config/inverse_square/spiral_galaxy_3d.yaml</pre></span></span>
+      <span class="sim-cap">the same self-gravity in 3D, from an orbiting camera</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/galaxy3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">massive core<span class="sim-spec"><pre>op: squared_law   # law: gravity + heavy central mass
+config/inverse_square/spiral_galaxy_3d.yaml</pre></span></span>
+      <span class="sim-cap">a heavier core draws the disc into tight structure</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/nbody_cluster.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">N-body cluster<span class="sim-spec"><pre>op: squared_law   # law: gravity, all_pairs, cold start
+config/inverse_square/nbody_cluster.yaml</pre></span></span>
+      <span class="sim-cap">clumps merge hierarchically under mutual gravity</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/coulomb_3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">Coulomb plasma<span class="sim-spec"><pre>op: squared_law   # law: coulomb, signed charge, radius_graph
+config/inverse_square/coulomb_3.yaml</pre></span></span>
+      <span class="sim-cap">law: coulomb — like-repel / opposite-attract screening</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/coulomb_6_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre>op: squared_law   # law: coulomb, dim: 3, six charge types
+config/inverse_square/coulomb_6_3d.yaml</pre></span></span>
+      <span class="sim-cap">a 3D charged cloud settling into a screened arrangement</span>
     </figcaption>
   </figure>
 </div>
 
 <h2 class="anchored">Strange attractors — <code>attractor_flow</code></h2>
-<p class="opk">A single lateral operator rides a whole cloud along a dissipative 3D chaotic flow ẋ = f(x); a tiny seed is stretched-and-folded until the cloud <em>is</em> the attractor. Ten systems ship; four shown.</p>
-<div class="sim-gallery">
+<p class="opk">A single lateral operator rides a whole cloud along a dissipative 3D chaotic flow ẋ = f(x); a tiny seed is stretched-and-folded until the cloud <em>is</em> the attractor. Ten systems ship; six shown.</p>
+<div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/attractor_lorenz.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
@@ -342,31 +451,27 @@ config/attractors/sprott_b.yaml</pre></span></span>
       <span class="sim-cap">a symmetric twin-scroll with two spiral eyes</span>
     </figcaption>
   </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/attractor_dadras.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">Dadras<span class="sim-spec"><pre>op: attractor_flow, system: dadras
+# ẋ=y−a x+b y z; ẏ=c y−x z+z; ż=d x y−e z  (2009)
+config/attractors/dadras.yaml</pre></span></span>
+      <span class="sim-cap">a swooping multi-wing bird with two eye-holes</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/attractor_thomas.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">Thomas<span class="sim-spec"><pre>op: attractor_flow, system: thomas
+# ẋ=sin(y)−b x  (+ cyclic y,z),  b=0.208
+config/attractors/thomas.yaml</pre></span></span>
+      <span class="sim-cap">a woven cage of interlinked loops</span>
+    </figcaption>
+  </figure>
 </div>
-<section id="differentiable-optimization-a-foraging-colony" class="level2">
-<h2 class="anchored" data-anchor-id="differentiable-optimization-a-foraging-colony">Differentiable optimization — a foraging colony</h2>
-<p>Because the whole rollout is differentiable, a <em>design</em> can be optimized, not just simulated. A slime-style foraging colony (the same <code>deposit</code>/<code>diffuse</code>/<code>sense</code>/<code>glide</code> operators) is tuned by a black-box UCB search over its spec parameters — from a hand-set start to the best found. Each strip runs left → right, start → optimized.</p>
-<div>
-
-</div>
-<div class="quarto-layout-panel" data-layout-ncol="2">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set colony"><source src="gallery/initial.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="optimized colony — ~5× faster to food"><source src="gallery/winner_7.mp4"></video></div>
-</div>
-</div>
-</div>
-<p>The same recipe scales to harder navigation — a porous <strong>pillar</strong> field and a walled <strong>maze</strong>, each crossed by a self-generated attractant gradient and tuned by the same optimizer:</p>
-<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — starting point"><source src="gallery/race_pillars_winner_1.mp4"></video></div>
-<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — optimized (136/154 escape the porous field)"><source src="gallery/race_pillars_winner_8.mp4"></video></div>
-<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — starting point"><source src="gallery/race_maze_hard_winner_1.mp4"></video></div>
-<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — optimized (150/160 solve the labyrinth)"><source src="gallery/race_maze_hard_winner_5.mp4"></video></div>
 
 
-</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -944,12 +1049,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>videojs(video_shortcode_videojs_video1);</script>
-<script>videojs(video_shortcode_videojs_video2);</script>
-<script>videojs(video_shortcode_videojs_video3);</script>
-<script>videojs(video_shortcode_videojs_video4);</script>
-<script>videojs(video_shortcode_videojs_video5);</script>
-<script>videojs(video_shortcode_videojs_video6);</script>
 
 
 
