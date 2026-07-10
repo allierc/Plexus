@@ -6,1345 +6,190 @@ resources:
 ---
 
 ::: {.callout-note appearance="simple"}
-**Operators adapted from prior work.** Plexus re-implements published simulation code
-as registered operators: attraction–repulsion, boids, and rock–paper–scissors
-reaction–diffusion from [ParticleGraph](https://github.com/allierc/ParticleGraph);
-the slime-mould (Physarum)
-agent from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation);
-the field PDEs — reaction–diffusion, acoustics, Navier–Stokes, and active matter — from
-[*The Well*](https://github.com/PolymathicAI/the_well) (Ohana et al., NeurIPS 2024); and
-the ciliate microswimmer from
-[Liu, Costello & Kanso](https://github.com/jingyiliu1900/Flow-Physics-drives-functional-design-of-microswimmers)
-(*Nat. Commun.* 2025).
+**Codebase operators only.** Every clip on this page is produced by a *registered core
+operator* run through the Plexus engine — one `config/**.yaml` spec, no per-simulation code.
+The interaction and boids laws are ported from
+[ParticleGraph](https://github.com/allierc/ParticleGraph); the slime-mould (Physarum) agent
+from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation); the
+softened self-gravity from Philip Mocz's *Create Your Own N-body Simulation* (2020); the
+continuum solver is MLS-MPM (Hu et al. 2018); and each strange attractor cites its originating
+paper (Lorenz 1963, Rössler 1976, Sprott 1994, …). Prototype-only experiments have been
+dropped — the gallery is the live operator vocabulary of the paper.
 :::
 
 Each clip below is one `spec.yaml` over the identical operators and schedule grammar;
-**hover (or tab to) a simulation's title to read the exact spec that generated it.**
-The first two are validated to floating-point precision against
-[ParticleGraph](https://github.com/allierc/ParticleGraph).
+**hover (or tab to) a simulation's title to read the exact spec that generated it.** The
+first two are validated to floating-point precision against
+[ParticleGraph](https://github.com/allierc/ParticleGraph). Every movie is rendered the same
+way: a black-background, full-frame point splat, so the *dynamics* — not the chrome — is what
+you compare across systems.
 
 ::: {.callout-note collapse="true"}
 ## How a clip is made
-`Plexus_Main.py -o generate_plot <config>` runs the forward simulation, writes the
-trajectory, and renders the movie — no per-simulation code, only the spec differs.
+`python Plexus_Main.py -o generate_plot <config>` runs the forward simulation, writes the
+trajectory, and renders the movie — no per-simulation code, only the spec differs. e.g.
+`... -o generate_plot inverse_square/spiral_galaxy_3d` or `... -o generate_plot attractors/lorenz`.
 :::
 
 ```{=html}
 <style>
-.sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.1rem;margin:1rem 0 2rem}
+.sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:1rem 0 2.4rem}
 .sim-card{margin:0}
 .sim-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
-.sim-card figcaption{margin-top:.35rem;line-height:1.25}
+.sim-card figcaption{margin-top:.4rem;line-height:1.3}
 .sim-name{font-weight:600;cursor:help;position:relative;border-bottom:1px dotted #999}
-.sim-cap{display:block;font-size:.84em;color:#777;margin-top:.1rem}
-.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(300px,108%);max-height:360px;overflow:auto;
+.sim-cap{display:block;font-size:.84em;color:#777;margin-top:.12rem}
+.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(320px,112%);max-height:360px;overflow:auto;
   background:#1e1e1e;border-radius:7px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:.5rem .7rem;text-align:left;cursor:auto}
 .sim-name:hover .sim-spec,.sim-name:focus .sim-spec{display:block}
 .sim-spec pre{margin:0;font-size:.72em;line-height:1.3;white-space:pre;color:#e9e9e9;background:none;border:none;padding:0}
+.opk{font-size:.8em;color:#888}
 </style>
-<h2>Attraction–repulsion &amp; boids — validated against ParticleGraph</h2>
+
+<h2>Interaction &amp; flocking — validated against ParticleGraph</h2>
+<p class="opk">Lateral operators over a radius neighbour graph: a per-type force law (attraction–repulsion) and the three boids rules that sum to flocking.</p>
 <div class="sim-gallery">
   <figure class="sim-card">
-    <video src="gallery/arbitrary_3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">arbitrary_3<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
-# max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
-# because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
-general:
-  name: arbitrary_3
-  seed: 0
-  n_frames: 250
-  dt: 0.1
-  boundary: periodic
-
-sets:
-  particle:
-    n: 30000
-    types:
-      t0: {fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615]}
-      t1: {fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055]}
-      t2: {fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579]}
-
-fields: {}
-
-operators:
-  - {op: radius_graph,         at: particle, radius: 0.075}
-  - {op: attraction_repulsion, at: particle, sigma: 0.005}
-
-schedule: [radius_graph, attraction_repulsion]
-
-plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
-  background: black
-  colormap: tab10
-  point_size: 2.0</pre></span></span>
-      <span class="sim-cap">3 types, 30k particles; per-type difference-of-Gaussians law (reproduces PDE_A)</span>
+      <span class="sim-name" tabindex="0">attraction–repulsion<span class="sim-spec"><pre>op: attraction_repulsion   # lateral, EMIT=velocity
+# 3 types, per-type difference-of-Gaussians law
+# on a radius_graph (O(E)); byte-matched to
+# ParticleGraph arbitrary_3.
+config/attraction_repulsion/arbitrary_3.yaml</pre></span></span>
+      <span class="sim-cap">per-type difference-of-Gaussians interaction — types self-sort into cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/arbitrary_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/boids.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">arbitrary_3d<span class="sim-spec"><pre># arbitrary_3d -- the FIRST 3D Plexus spec: attraction_repulsion in a 3D periodic box.
-# Exercises the dimension contract (general.dim: 3, world: [1,1,1]); the engine builds
-# pos/vel as 3-vectors, radius_graph + attraction_repulsion run dimension-generically
-# (SUPPORTED_DIMS=[2,3]). Same per-type force law as the 2D arbitrary_3.
-general:
-  name: arbitrary_3d
-  seed: 0
-  n_frames: 200
-  dt: 0.1
-  boundary: periodic
-  dim: 3
-  world: [1.0, 1.0, 1.0]
-sets:
-  particle:
-    n: 8000
-    types:
-      t0: { fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615] }
-      t1: { fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055] }
-      t2: { fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579] }
-fields: {}
-operators:
-  # 3D retune: neighbour counts scale by VOLUME, so the Gaussian width must be ~ the
-  # mean spacing n^(-1/3) ~ 0.05 (not the 2D 0.005). sigma/spacing ~ 0.7 (as in 2D)
-  # gives strong clustering (61% nn-distance drop vs 11% at sigma 0.01).
-  - { op: radius_graph, at: particle, radius: 0.12 }
-  - { op: attraction_repulsion, at: particle, sigma: 0.035 }
-schedule: [radius_graph, attraction_repulsion]
-plotting:
-  background: black
-  colormap: tab10
-  point_size: 2.0</pre></span></span>
-      <span class="sim-cap">the same 3-type force law in 3D — the dimension contract (dim: 3, periodic box)</span>
+      <span class="sim-name" tabindex="0">boids<span class="sim-spec"><pre>ops: cohesion + velocity_align + separation
+# three lateral rules; their deltas SUM to flocking.
+config/boids/boids_16.yaml</pre></span></span>
+      <span class="sim-cap">cohesion + alignment + separation — one flock from local rules</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/boids_16.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/active_matter.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">boids_16<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
-# 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
-# max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
-# Per-type p = [cohesion, alignment, separation].
-general:
-  name: boids_16
-  seed: 0
-  n_frames: 4000
-  dt: 0.5
-  boundary: periodic
-
-sets:
-  particle:
-    n: 1792
-    vel_init: 0.0004
-    types:
-      t00: {fraction: 0.0625, p: [27.600000381469727, 92.5, 48.20000076293945]}
-      t01: {fraction: 0.0625, p: [32.0, 51.79999923706055, 29.799999237060547]}
-      t02: {fraction: 0.0625, p: [23.600000381469727, 35.0, 13.5]}
-      t03: {fraction: 0.0625, p: [3.299999952316284, 76.4000015258789, 13.0]}
-      t04: {fraction: 0.0625, p: [94.0, 78.69999694824219, 30.799999237060547]}
-      t05: {fraction: 0.0625, p: [81.4000015258789, 34.599998474121094, 2.200000047683716]}
-      t06: {fraction: 0.0625, p: [3.0999999046325684, 40.5, 17.0]}
-      t07: {fraction: 0.0625, p: [88.80000305175781, 7.199999809265137, 29.799999237060547]}
-      t08: {fraction: 0.0625, p: [32.70000076293945, 76.80000305175781, 26.100000381469727]}
-      t09: {fraction: 0.0625, p: [14.5, 56.79999923706055, 27.600000381469727]}
-      t10: {fraction: 0.0625, p: [63.29999923706055, 99.9000015258789, 13.899999618530273]}
-      t11: {fraction: 0.0625, p: [32.5, 25.200000762939453, 24.399999618530273]}
-      t12: {fraction: 0.0625, p: [97.5999984741211, 56.5, 12.100000381469727]}
-      t13: {fraction: 0.0625, p: [62.20000076293945, 9.100000381469727, 28.299999237060547]}
-      t14: {fraction: 0.0625, p: [76.4000015258789, 52.900001525878906, 32.0]}
-      t15: {fraction: 0.0625, p: [48.099998474121094, 54.400001525878906, 30.700000762939453]}
-
-fields: {}
-
-operators:
-  - {op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001}
-  - {op: boids,        at: particle}
-
-schedule: [radius_graph, boids]
-
-plotting:
-  background: black
-  colormap: tab20
-  point_size: 6.0</pre></span></span>
-      <span class="sim-cap">16 types of boid; cohesion/alignment/separation (reproduces PDE_B)</span>
+      <span class="sim-name" tabindex="0">active matter (Vicsek)<span class="sim-spec"><pre>ops: velocity_align + velocity_cruise
+# Vicsek self-propulsion to speed v0 + polar
+# alignment on a radius_graph -> ordered flock.
+config/active_matter/vicsek_flock.yaml</pre></span></span>
+      <span class="sim-cap">Vicsek self-propulsion + alignment — a polar-ordered swarm</span>
     </figcaption>
   </figure>
 </div>
 
-<h2>Slime mould — Physarum networks</h2>
+<h2>Stigmergy — Physarum slime</h2>
+<p class="opk">A set + a scalar field, coupled: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network.</p>
 <div class="sim-gallery">
   <figure class="sim-card">
-    <video src="gallery/slime_default.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">slime_default<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
-# Port of SebLague/Slime-Simulation default settings: agents spawned in a disc at
-# centre, sense 3 sensors, steer toward the strongest trail, deposit + diffuse +
-# decay -&gt; a self-reinforcing network that grows and coarsens (stigmergy).
-general: {name: slime_default, seed: 0, n_frames: 400, record_every: 4, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 12000
-    spawn: disc
-    spawn_radius: 0.3
-    types:
-      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.012, diffuse: 0.35, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">self-reinforcing transport network</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_curly.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_curly<span class="sim-spec"><pre># slime_curly -- wide sensor cone + high turn -&gt; curly, restless, foam-like texture.
-general: {name: slime_curly, seed: 0, n_frames: 400, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 13000
-    spawn: disc
-    spawn_radius: 0.3
-    types:
-      a: {fraction: 1.0, move_speed: 0.005, turn_speed: 0.9, sensor_angle: 45, sensor_dist: 0.02, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.014, diffuse: 0.35, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">high turning rate, curly filaments</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_filaments<span class="sim-spec"><pre># slime_filaments -- narrow sensor cone + low turn -&gt; long, straight, branching filaments.
-general: {name: slime_filaments, seed: 0, n_frames: 450, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 13000
-    spawn: disc
-    spawn_radius: 0.3
-    types:
-      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 220, deposit: 0.9, decay: 0.01, diffuse: 0.3, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">fine filamentary structure</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_labyrinth.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_labyrinth<span class="sim-spec"><pre># slime_labyrinth -- uniform spawn + low turn + low decay + wide cone -&gt; a space-filling
-# Turing maze of evenly spaced corridors (distinct from the radial filament colony).
-general: {name: slime_labyrinth, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 16000
-    spawn: random
-    types:
-      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 30, sensor_dist: 0.03, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 240, deposit: 0.7, decay: 0.045, diffuse: 0.26, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.35, 0.8, 1.0]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">uniform seed + high decay → a persistent space-filling labyrinth</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_fine_graph.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_fine_graph<span class="sim-spec"><pre># slime_fine -- short sensor reach + low diffusion -&gt; a fine, dense capillary mesh.
-general: {name: slime_fine, seed: 0, n_frames: 400, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 16000
-    spawn: disc
-    spawn_radius: 0.32
-    types:
-      a: {fraction: 1.0, move_speed: 0.004, turn_speed: 0.5, sensor_angle: 26, sensor_dist: 0.012, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 260, deposit: 0.9, decay: 0.018, diffuse: 0.15, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">fine network, extracted as a graph</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_two_repel.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_two_repel<span class="sim-spec"><pre># slime_two_repel -- TWO species, identical rules, cross=-1 (attract own channel,
-# repel the other). Categorical separation: same operator, two `types`, two field
-# channels -&gt; the two slimes carve out separate territories with a sharp interface.
-# Density kept BELOW field saturation (lower deposit, higher decay) so a gradient
-# survives -- saturated trails are flat and the repulsion would have nothing to climb.
-general: {name: slime_two_repel, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 11000
-    spawn: random
-    types:
-      a: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      b: {fraction: 0.5, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 240, deposit: 0.5, decay: 0.03, diffuse: 0.28, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">two species repel: separate territories, sharp interface</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_six.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_six<span class="sim-spec"><pre># slime_six -- SIX mutually-repelling species (cross=-1): six colour territories.
-# More channels overlap (and additive-blend toward white) faster, so deposit drops
-# and decay rises vs four to keep the field below saturation and the colours distinct.
-general: {name: slime_six, seed: 0, n_frames: 420, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 18000
-    spawn: random
-    types:
-      a: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      b: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      c: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      d: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      e: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      f: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 240, deposit: 0.38, decay: 0.042, diffuse: 0.25, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.20, 0.95, 0.65]
-    b: [1.00, 0.35, 0.45]
-    c: [0.40, 0.65, 1.00]
-    d: [1.00, 0.85, 0.30]
-    e: [0.95, 0.40, 0.95]
-    f: [1.00, 0.60, 0.20]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">six sources</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_eight.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_eight<span class="sim-spec"><pre># slime_eight -- EIGHT mutually-repelling species (cross=-1): eight colour territories.
-# The framework is channel-agnostic -- one type = one trail channel = one colour, so
-# going 4 -&gt; 8 species is purely more `types` + more `plotting.colors`, no code change.
-# Lowest deposit / highest decay / most agents of the suite: eight overlapping channels
-# saturate (and additive-blend to white) fastest, so the density is the most restrained.
-general: {name: slime_eight, seed: 0, n_frames: 440, record_every: 4, boundary: wall}
-sets:
-  cell:
-    n: 24000
-    spawn: random
-    types:
-      a: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      b: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      c: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      d: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      e: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      f: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      g: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      h: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 256, deposit: 0.33, decay: 0.05, diffuse: 0.24, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.20, 0.95, 0.65]
-    b: [1.00, 0.35, 0.45]
-    c: [0.40, 0.65, 1.00]
-    d: [1.00, 0.85, 0.30]
-    e: [0.95, 0.40, 0.95]
-    f: [1.00, 0.60, 0.20]
-    g: [0.20, 0.85, 0.85]
-    h: [0.65, 0.50, 1.00]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">eight sources</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_torus.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime_torus<span class="sim-spec"><pre># slime_torus -- periodic (wrap-around) boundary: an endless, seamless network with
-# no walls to reflect off. Tests the engine&#x27;s periodic boundary path.
-general: {name: slime_torus, seed: 0, n_frames: 400, record_every: 4, boundary: periodic}
-sets:
-  cell:
-    n: 18000
-    spawn: random
-    types:
-      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
-fields:
-  trail: {frame: trail, res: 240, deposit: 0.9, decay: 0.012, diffuse: 0.35, couples_to: cell}
-operators:
-- {op: slime, at: cell, from: trail, to: trail, cross: -1.0}
-schedule: [slime, trail.diffuse]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7</pre></span></span>
-      <span class="sim-cap">periodic (toroidal) domain</span>
+      <span class="sim-name" tabindex="0">slime<span class="sim-spec"><pre>ops: deposit + diffuse + decay + sense + glide
+# 3-sensor steering up a self-deposited pheromone
+# field (Jones/Lague). Stigmergy: network grows,
+# coarsens, and prunes.
+config/slime/slime_default.yaml</pre></span></span>
+      <span class="sim-cap">deposit → diffuse → decay → sense → glide — a growing, coarsening web</span>
     </figcaption>
   </figure>
 </div>
 
-<h2>MPM fluids &amp; materials</h2>
+<h2>Continuum mechanics — MLS-MPM</h2>
+<p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies.</p>
 <div class="sim-gallery">
   <figure class="sim-card">
-    <video src="gallery/mat_liquid_1.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/material.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">mat_liquid_1<span class="sim-spec"><pre># mat_liquid_1: a BIG ball of water dropped into the box [0,1]^2 to check it fills the
-# container properly (should fall, splash, and settle into a flat-topped pool). Stiffer
-# than mat_liquid (E 80-&gt;300, less compressible) and NO surface tension so it spreads and
-# fills instead of balling up. More substeps (15) for liquid stability; low drag so it flows.
-name: mat_liquid_1
-seed: 0
-n_frames: 700
-record_every: 3
-boundary: wall
-sets:
-  cell:
-    n: 1
-    start: [0.5, 0.62, 0.5, 0.62]
-    types:
-      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-  particle: {parent: cell, per_parent: 4500, radius: 0.20, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 15, dt_sub: 2.0e-4, a_max: 200, drag: 0.05, wall_damp: 1.0}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">a big water ball drops, splashes, and settles into a pool</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mat_elastic.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mat_elastic<span class="sim-spec"><pre>name: mat_elastic
-seed: 0
-n_frames: 500
-record_every: 2
-boundary: wall
-sets:
-  cell:
-    n: 1
-    start: [0.5, 0.80, 0.5, 0.80]
-    types:
-      ball: {fraction: 1.0, youngs: 200, layers: [{frac: 1.0, youngs: 200, material: elastic}]}
-  particle: {parent: cell, per_parent: 2200, radius: 0.11, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.1, wall_damp: 0.9}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">elastic material (shape memory)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mat_snow.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mat_snow<span class="sim-spec"><pre>name: mat_snow
-seed: 0
-n_frames: 500
-record_every: 2
-boundary: wall
-sets:
-  cell:
-    n: 1
-    start: [0.5, 0.80, 0.5, 0.80]
-    types:
-      ball: {fraction: 1.0, youngs: 200, layers: [{frac: 1.0, youngs: 200, material: snow}]}
-  particle: {parent: cell, per_parent: 2200, radius: 0.11, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 12, dt_sub: 2.0e-4, a_max: 200, drag: 0.1, wall_damp: 0.9}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">snow / granular material</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ph_crown_splash.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ph_crown_splash<span class="sim-spec"><pre>name: ph_crown_splash
-seed: 0
-n_frames: 900
-record_every: 5
-boundary: wall
-sets:
-  cell:
-    n: 2
-    start: [0.5,0.86,0.5,0.86]
-    types:
-      water: {fraction: 0.5, youngs: 300, block: [0.03,0.03,0.97,0.38], layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-      ball: {fraction: 0.5, youngs: 500, layers: [{frac: 1.0, youngs: 500, material: elastic}]}
-  particle: {parent: cell, per_parent: 7000, radius: 0.10, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.1, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 10}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">a drop hits a pool: crown splash</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ob_zigzag.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ob_zigzag<span class="sim-spec"><pre>name: ob_zigzag
-seed: 0
-n_frames: 1100
-record_every: 5
-boundary: wall
-obstacles:
-  - [0.0,0.66,0.66,0.72]
-  - [0.34,0.40,1.0,0.46]
-  - [0.0,0.16,0.66,0.22]
-sets:
-  cell:
-    n: 1
-    start: [0.18,0.82,0.18,0.82]
-    types:
-      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-  particle: {parent: cell, per_parent: 7000, radius: 0.18, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.25, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 12}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">water cascades down a zig-zag channel</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ph_slosh.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ph_slosh<span class="sim-spec"><pre>name: ph_slosh
-seed: 0
-n_frames: 1000
-record_every: 5
-boundary: wall
-sets:
-  cell:
-    n: 1
-    start: [0.5,0.2,0.5,0.2]
-    types:
-      water: {fraction: 1.0, youngs: 300, block: [0.05,0.04,0.95,0.30], layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-  particle: {parent: cell, per_parent: 9000, radius: 0.30, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0, gx: 6.0, gy: -10.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.15, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 10}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">sloshing in a vessel</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ob_dam_break.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ob_dam_break<span class="sim-spec"><pre>name: ob_dam_break
-seed: 0
-n_frames: 900
-record_every: 5
-boundary: wall
-sets:
-  cell:
-    n: 1
-    start: [0.17,0.4,0.17,0.4]
-    types:
-      water: {fraction: 1.0, youngs: 300, block: [0.04,0.03,0.30,0.78], layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-  particle: {parent: cell, per_parent: 9000, radius: 0.30, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.08, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 10}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">dam break against an obstacle</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ob_funnel.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ob_funnel<span class="sim-spec"><pre>name: ob_funnel
-seed: 0
-n_frames: 1000
-record_every: 5
-boundary: wall
-obstacles:
-  - [0.00,0.0,0.18,1.0]
-  - [0.18,0.0,0.28,0.62]
-  - [0.28,0.0,0.38,0.42]
-  - [0.38,0.0,0.45,0.26]
-  - [0.55,0.0,0.62,0.26]
-  - [0.62,0.0,0.72,0.42]
-  - [0.72,0.0,0.82,0.62]
-  - [0.82,0.0,1.0,1.0]
-sets:
-  cell:
-    n: 1
-    start: [0.5,0.8,0.5,0.8]
-    types:
-      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-  particle: {parent: cell, per_parent: 7000, radius: 0.20, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.3, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 14}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">draining through a funnel</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ob_wedge.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ob_wedge<span class="sim-spec"><pre>name: ob_wedge
-seed: 0
-n_frames: 1100
-record_every: 5
-boundary: wall
-obstacles:
-  - [0.00,0.0,0.20,0.45]
-  - [0.20,0.0,0.40,0.35]
-  - [0.40,0.0,0.60,0.25]
-  - [0.60,0.0,0.80,0.15]
-  - [0.80,0.0,1.00,0.06]
-sets:
-  cell:
-    n: 1
-    start: [0.2,0.7,0.2,0.7]
-    types:
-      water: {fraction: 1.0, youngs: 300, layers: [{frac: 1.0, youngs: 300, material: liquid}]}
-  particle: {parent: cell, per_parent: 7000, radius: 0.20, density: 1.0}
-fields:
-  chemical: {frame: grid, res: 64, diffusion: 0.1, decay: 0.0, couples_to: cell}
-operators:
-  - {op: gravity, at: cell, g: 12.0}
-  - {op: mpm, at: particle, n_grid: 128, substeps: 18, dt_sub: 2.0e-4, a_max: 200, drag: 0.3, wall_damp: 0.5, wall_contact: 0.06, surface_tension: 12}
-schedule: [aggregate, gravity, mpm]</pre></span></span>
-      <span class="sim-cap">a falling stream splits around a wedge</span>
+      <span class="sim-name" tabindex="0">material (3D bouncy balls)<span class="sim-spec"><pre>ops: mpm_strain -> mpm_scatter -> mpm_grid_update
+     -> mpm_gather   (MLS-MPM substep cycle)
+# three neo-Hookean elastic balls dropped in a 3D
+# box; grid solve handles contact + gravity.
+config/material/material_3d_balls_bouncy.yaml</pre></span></span>
+      <span class="sim-cap">MLS-MPM continuum — three elastic balls collide and bounce in 3D</span>
     </figcaption>
   </figure>
 </div>
 
-<h2>The Well — fields &amp; active matter</h2>
+<h2>Inverse-square law — self-gravity &amp; electrostatics</h2>
+<p class="opk">One <code>squared_law</code> operator, two regimes: <code>law: gravity</code> (mass, always attract, all-pairs) collapses a disc into a galaxy; <code>law: coulomb</code> (signed charge, like-repel) is a plasma.</p>
 <div class="sim-gallery">
   <figure class="sim-card">
-    <video src="gallery/am_flock.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/inverse_square.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">am_flock<span class="sim-spec"><pre># Vicsek self-propelled particles -- the microscopic model behind the_well/active_matter
-# (whose stored continuum coarse-grains exactly this). SET half of Plexus: a particle
-# Level + a rewired radius graph (Rewire) + an alignment Lateral operator, the SAME
-# machinery the water particles used. Only the spec changes between regimes.
-# low noise -&gt; global alignment (ordered polar flock; Vicsek ordered phase)
-name: am_flock
-seed: 0
-n_frames: 600
-record_every: 3
-world: 1.0
-sets:
-  active: {n: 4000}
-operators:
-  - {op: radius_graph, at: active, radius: 0.05}
-  - {op: active_matter, at: active, v0: 0.010, noise: 0.04}
-schedule: [radius_graph, active_matter]</pre></span></span>
-      <span class="sim-cap">active matter: a coherent polar flock (Vicsek)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/rd_worms.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">rd_worms<span class="sim-spec"><pre># Gray-Scott reaction-diffusion -- worms regime.
-# the_well/gray_scott_reaction_diffusion (Ohana et al., NeurIPS 2024). One FIELD
-# self-update operator; only (f,k) and the initial condition change vs the others.
-# Worms: elongating, branching filaments.
-name: rd_worms
-seed: 0
-n_frames: 7000
-record_every: 70
-world: 1.0
-fields:
-  chem: {frame: grid, res: 128, channels: 2, bc: periodic}
-init:
-  chem:
-    A: 1.0
-    B: {seed: clusters, n: 30, radius: 2.0, value: 1.0}
-operators:
-  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, Da: 0.16, Db: 0.08, substeps: 12}
-schedule: [reaction_diffusion]</pre></span></span>
-      <span class="sim-cap">field: Gray–Scott reaction–diffusion, worms</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/wave_double_slit.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">wave_double_slit<span class="sim-spec"><pre># Classic double-slit DIFFRACTION: a pressure pulse below a barrier passes through
-# two narrow gaps and the two transmitted wavefronts interfere above. Sound-hard
-# barrier via the obstacle mask (the_well acoustic family).
-name: wave_double_slit
-seed: 0
-n_frames: 520
-record_every: 4
-world: 1.0
-fields:
-  acoustic:
-    frame: grid
-    res: 256
-    channels: 3
-    bc_x: wall
-    bc_y: open
-    obstacles:
-    - [0.0, 0.49, 0.31999999999999995, 0.51]
-    - [0.38, 0.49, 0.62, 0.51]
-    - [0.68, 0.49, 1.0, 0.51]
-init:
-  acoustic:
-    rho: {kind: uniform, value: 1.0}
-    p: {seed: point, cx: 0.5, cy: 0.22, r: 0.018, inten: 2.5}
-operators:
-- {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.3, substeps: 6, sponge: 0.12}
-schedule: [wave_acoustic]</pre></span></span>
-      <span class="sim-cap">field: acoustic double-slit diffraction</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/wave_maze.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">wave_maze<span class="sim-spec"><pre># Acoustic propagation through a connected MAZE of sound-hard corridors (recursive-
-# backtracker spanning tree -&gt; guaranteed path). the_well/acoustic_scattering_maze.
-# Obstacles rasterize to the SAME wall mask the water/MPM prototype used for solids.
-name: wave_maze
-seed: 3
-n_frames: 900
-record_every: 6
-world: 1.0
-fields:
-  acoustic:
-    frame: grid
-    res: 256
-    channels: 3
-    bc_x: wall
-    bc_y: wall
-    obstacles:
-    - [0.15966666666666665, 0.3333333333333333, 0.17366666666666666, 0.5]
-    - [0.15966666666666665, 0.5, 0.17366666666666666, 0.6666666666666666]
-    - [0.3263333333333333, 0.16666666666666666, 0.3403333333333333, 0.3333333333333333]
-    - [0.493, 0.0, 0.507, 0.16666666666666666]
-    - [0.493, 0.16666666666666666, 0.507, 0.3333333333333333]
-    - [0.493, 0.3333333333333333, 0.507, 0.5]
-    - [0.493, 0.6666666666666666, 0.507, 0.8333333333333333]
-    - [0.6596666666666666, 0.16666666666666666, 0.6736666666666666, 0.3333333333333333]
-    - [0.6596666666666666, 0.5, 0.6736666666666666, 0.6666666666666666]
-    - [0.8263333333333333, 0.0, 0.8403333333333333, 0.16666666666666666]
-    - [0.8263333333333333, 0.3333333333333333, 0.8403333333333333, 0.5]
-    - [0.0, 0.15966666666666665, 0.16666666666666666, 0.17366666666666666]
-    - [0.16666666666666666, 0.15966666666666665, 0.3333333333333333, 0.17366666666666666]
-    - [0.6666666666666666, 0.3263333333333333, 0.8333333333333333, 0.3403333333333333]
-    - [0.16666666666666666, 0.493, 0.3333333333333333, 0.507]
-    - [0.3333333333333333, 0.493, 0.5, 0.507]
-    - [0.5, 0.493, 0.6666666666666666, 0.507]
-    - [0.8333333333333333, 0.493, 1.0, 0.507]
-    - [0.16666666666666666, 0.6596666666666666, 0.3333333333333333, 0.6736666666666666]
-    - [0.6666666666666666, 0.6596666666666666, 0.8333333333333333, 0.6736666666666666]
-    - [0.0, 0.8263333333333333, 0.16666666666666666, 0.8403333333333333]
-    - [0.16666666666666666, 0.8263333333333333, 0.3333333333333333, 0.8403333333333333]
-    - [0.3333333333333333, 0.8263333333333333, 0.5, 0.8403333333333333]
-    - [0.5, 0.8263333333333333, 0.6666666666666666, 0.8403333333333333]
-    - [0.6666666666666666, 0.8263333333333333, 0.8333333333333333, 0.8403333333333333]
-init:
-  acoustic:
-    rho: {kind: uniform, value: 1.0}
-    p: {seed: point, cx: 0.08, cy: 0.08, r: 0.016, inten: 2.5}
-operators:
-- {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.28, substeps: 6, sponge: 0.0}
-schedule: [wave_acoustic]</pre></span></span>
-      <span class="sim-cap">field: acoustic propagation through a maze of sound-hard corridors</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/wave_lens.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">wave_lens<span class="sim-spec"><pre># Acoustic focusing: a single slow (high-rho) disc acts as a converging lens for a
-# plane-ish pulse. Heterogeneous-medium wave propagation (the_well acoustic family).
-name: wave_lens
-seed: 3
-n_frames: 520
-record_every: 4
-world: 1.0
-fields:
-  acoustic: {frame: grid, res: 256, channels: 3, bc_x: wall, bc_y: open}
-init:
-  acoustic:
-    rho: {kind: lens, cx: 0.5, cy: 0.62, r: 0.16, rho: 7.0}
-    p: {seed: rings, n: 1}
-operators:
-  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 6, sponge: 0.12}
-schedule: [wave_acoustic]</pre></span></span>
-      <span class="sim-cap">field: acoustic waves focused by a lens</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ns_rayleigh_benard.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ns_rayleigh_benard<span class="sim-spec"><pre># Rayleigh-Benard convection -&gt; the_well/rayleigh_benard. Hot (buoyant) fluid under
-# cold; body_force(buoyancy) drives rolls. Schedule = buoyancy + advect + diffuse +
-# project + advect(T). This is what advect+poisson_solve unlock together.
-name: ns_rayleigh_benard
-seed: 2
-n_frames: 700
-record_every: 4
-world: 1.0
-fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
-init: {fluid: {preset: rayleigh_benard, seed: 0.03, width: 0.05}}
-operators:
-  - {op: body_force, at: fluid, scalar: 2, g: 28.0, ref: 0.5, dt_sub: 0.006}
-  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
-  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.012}
-  - {op: poisson_solve, at: fluid, vel: [0,1]}
-  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
-  - {op: diffuse, at: fluid, channels: [2], D: 0.00002, dt_sub: 0.012}
-schedule: [body_force, advect, diffuse, poisson_solve, advect, diffuse]</pre></span></span>
-      <span class="sim-cap">field: Rayleigh–Bénard convection rolls (Navier–Stokes)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ns_vortices.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ns_vortices<span class="sim-spec"><pre># Decaying 2D turbulence: six random vortices merge and form coherent structures
-# (the inverse cascade). advect + project only.
-name: ns_vortices
-seed: 4
-n_frames: 520
-record_every: 3
-world: 1.0
-fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
-init: {fluid: {preset: vortices, n: 8, bands: 8}}
-operators:
-  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,2,3], dt_sub: 0.005, substeps: 2}
-  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00002, dt_sub: 0.01}
-  - {op: poisson_solve, at: fluid, vel: [0,1]}
-schedule: [advect, diffuse, poisson_solve]</pre></span></span>
-      <span class="sim-cap">field: decaying 2-D turbulence, vortices merge (Navier–Stokes)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ns_taylor_green.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ns_taylor_green<span class="sim-spec"><pre># Taylor-Green vortex decay -- the canonical incompressible-NS test (vortex lattice
-# that cascades to small scales). Pure advect + project, viscous decay.
-name: ns_taylor_green
-seed: 0
-n_frames: 420
-record_every: 3
-world: 1.0
-fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
-init: {fluid: {preset: taylor_green, U: 0.8}}
-operators:
-  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,2,3], dt_sub: 0.004, substeps: 2}
-  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00004, dt_sub: 0.008}
-  - {op: poisson_solve, at: fluid, vel: [0,1]}
-schedule: [advect, diffuse, poisson_solve]</pre></span></span>
-      <span class="sim-cap">field: Taylor–Green vortex decay (Navier–Stokes)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/ns_rayleigh_taylor.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">ns_rayleigh_taylor<span class="sim-spec"><pre># Rayleigh-Taylor instability -&gt; the_well/rayleigh_taylor_instability. Heavy fluid
-# above light; body_force with g&lt;0 makes it sink into fingers/mushrooms.
-name: ns_rayleigh_taylor
-seed: 3
-n_frames: 700
-record_every: 4
-world: 1.0
-fields: {fluid: {frame: grid, res: 256, channels: 4, bc: periodic}}
-init: {fluid: {preset: rayleigh_taylor, amp: 0.012, k: 3}}
-operators:
-  - {op: body_force, at: fluid, scalar: 2, g: -26.0, ref: 0.5, dt_sub: 0.006}
-  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.006, substeps: 2}
-  - {op: diffuse, at: fluid, channels: [0,1], D: 0.00003, dt_sub: 0.012}
-  - {op: poisson_solve, at: fluid, vel: [0,1]}
-  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.006, substeps: 2}
-schedule: [body_force, advect, diffuse, poisson_solve, advect]</pre></span></span>
-      <span class="sim-cap">field: Rayleigh–Taylor fingering instability (Navier–Stokes)</span>
+      <span class="sim-name" tabindex="0">self-gravitating galaxy<span class="sim-spec"><pre>op: squared_law   # lateral, EMIT=acceleration
+# law: gravity, all_pairs, softened 1/r^2 (Mocz).
+# a rotating disc of stars collapses into arms.
+config/inverse_square/spiral_galaxy.yaml</pre></span></span>
+      <span class="sim-cap">squared_law (law: gravity) — a rotating disc collapses into a galaxy</span>
     </figcaption>
   </figure>
 </div>
 
-<h2>Reaction–diffusion — cyclic competition (rock–paper–scissors)</h2>
+<h2>Strange attractors — <code>attractor_flow</code></h2>
+<p class="opk">A single lateral operator rides a whole cloud along a dissipative 3D chaotic flow ẋ = f(x); a tiny seed is stretched-and-folded until the cloud <em>is</em> the attractor. Ten systems ship; four shown.</p>
 <div class="sim-gallery">
   <figure class="sim-card">
-    <video src="gallery/rps_random.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/attractor_lorenz.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">rps_random<span class="sim-spec"><pre>grid: 256
-species: 3
-a: 0.6
-D: 0.5
-dt: 0.3
-bc: periodic
-steps: 5000
-record_every: 33
-init: random
-seed: 0</pre></span></span>
-      <span class="sim-cap">3 species quenched from disorder → spiral turbulence</span>
+      <span class="sim-name" tabindex="0">Lorenz<span class="sim-spec"><pre>op: attractor_flow, system: lorenz
+# ẋ=σ(y−x); ẏ=x(ρ−z)−y; ż=xy−βz   (1963)
+config/attractors/lorenz.yaml</pre></span></span>
+      <span class="sim-cap">the butterfly — two spiralling lobes</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/rps_species_4.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/attractor_halvorsen.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">rps_species_4<span class="sim-spec"><pre>grid: 256
-species: 4
-a: 0.6
-D: 0.5
-dt: 0.3
-bc: periodic
-steps: 5000
-record_every: 33
-init: pinwheel
-seed: 0</pre></span></span>
-      <span class="sim-cap">4-species cyclic competition</span>
+      <span class="sim-name" tabindex="0">Halvorsen<span class="sim-spec"><pre>op: attractor_flow, system: halvorsen
+# ẋ=−a x−4y−4z−y²  (+ cyclic y,z),  a=1.4
+config/attractors/halvorsen.yaml</pre></span></span>
+      <span class="sim-cap">a fat three-armed folded knot</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/rps_species_6.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/attractor_aizawa.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">rps_species_6<span class="sim-spec"><pre>grid: 256
-species: 6
-a: 0.6
-D: 0.5
-dt: 0.3
-bc: periodic
-steps: 5000
-record_every: 33
-init: pinwheel
-seed: 0</pre></span></span>
-      <span class="sim-cap">6-species cyclic competition (validated vs ParticleGraph RD_RPS)</span>
-    </figcaption>
-  </figure>
-</div>
-
-<h2>Mixtures — several mechanisms in one world</h2>
-<div class="sim-gallery">
-  <figure class="sim-card">
-    <video src="gallery/mix_avoid.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mix_avoid<span class="sim-spec"><pre># MIX (2 families): same worms morphogen, but NEGATIVE chemotaxis gain -&gt; particles
-# FLEE the ridges and pack into the valleys (one sign flip in the spec, opposite behaviour).
-name: mix_avoid
-seed: 1
-n_frames: 600
-record_every: 3
-world: 1.0
-fields: {chem: {frame: grid, res: 128, channels: 2, bc: periodic}}
-sets: {active: {n: 3000}}
-init:
-  chem: {A: 1.0, B: {seed: clusters, n: 18, radius: 2.0, value: 1.0}}
-operators:
-  - {op: reaction_diffusion, at: chem, f: 0.058, k: 0.065, substeps: 12}
-  - {op: radius_graph, at: active, radius: 0.05}
-  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
-  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: -0.0022}
-schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]</pre></span></span>
-      <span class="sim-cap">particles flee a reaction–diffusion ridge field</span>
+      <span class="sim-name" tabindex="0">Aizawa<span class="sim-spec"><pre>op: attractor_flow, system: aizawa
+# a torus with an axial spike through a sphere
+config/attractors/aizawa.yaml</pre></span></span>
+      <span class="sim-cap">a banded sphere with an axial spike</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/mix_slime4.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/attractor_sprott_b.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">mix_slime4<span class="sim-spec"><pre># MIX: four-species SLIME (Physarum) + ACTIVE-MATTER alignment, PAIRED trail affinity.
-# Four particle types, each laying its own trail channel. The affinity matrix W[s,:]
-# sets which trails a species follows: pairs (0,1) and (2,3) share trails, the two
-# pairs repel -&gt; four types running two coupled transport NETWORKS.
-#   trail_diffuse -&gt; 4-channel pheromone field self-update (diffuse + evaporate)   FIELD
-#   radius_graph  -&gt; neighbour relation for the alignment term                     REWIRE
-#   slime         -&gt; sense weighted trail (3 sensors) + Vicsek alignment + move +  EXCHANGE
-#                    deposit. The Jones/Lague steer builds networks; the alignment
-#                    term IS the active-matter half, fused on the shared heading.
-name: mix_slime4
-seed: 0
-n_frames: 560
-record_every: 3
-world: 1.0
-fields:
-  trail: {frame: grid, res: 200, channels: 4, bc: periodic}
-sets:
-  active: {n: 8000, species: 4}
-operators:
-  - {op: trail_diffuse, at: trail, D: 0.13, decay: 0.04, substeps: 1}
-  - {op: radius_graph, at: active, radius: 0.02}
-  - {op: slime, at: active, from_field: trail, to_field: trail, v0: 0.004,
-     turn: 0.5, sensor_angle: 24, sensor_dist: 0.022, align: 0.10, noise: 0.06,
-     amount: 0.05, cap: 1.0,
-     affinity: [[1.0, 0.9, -0.5, -0.5],
-                [0.9, 1.0, -0.5, -0.5],
-                [-0.5, -0.5, 1.0, 0.9],
-                [-0.5, -0.5, 0.9, 1.0]]}
-schedule: [trail_diffuse, radius_graph, slime]</pre></span></span>
-      <span class="sim-cap">four slime species run two coupled networks</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mix_taxis_maze_A.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mix_taxis_maze_A<span class="sim-spec"><pre># MIX (2 families): Gray-Scott MAZE morphogen + particles tracing its corridors.
-name: mix_taxis_maze
-seed: 3
-n_frames: 700
-record_every: 3
-world: 1.0
-fields: {chem: {frame: grid, res: 128, channels: 2, bc: periodic}}
-sets: {active: {n: 3500}}
-init:
-  chem: {A: 1.0, B: {seed: fourier, kmax: 8, thresh: 0.55, value: 1.0}}
-operators:
-  - {op: reaction_diffusion, at: chem, f: 0.029, k: 0.057, substeps: 12}
-  - {op: radius_graph, at: active, radius: 0.05}
-  - {op: active_matter, at: active, v0: 0.004, noise: 0.12}
-  - {op: chemotaxis, at: active, from_field: chem, channel: 1, gain: 0.0022}
-schedule: [reaction_diffusion, radius_graph, active_matter, chemotaxis]</pre></span></span>
-      <span class="sim-cap">particles trace a Gray–Scott maze morphogen</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mix_swarm_flow.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mix_swarm_flow<span class="sim-spec"><pre># MIX: ACTIVE MATTER in a TURBULENT FLOW. A Vicsek swarm (SET) is simultaneously
-# self-propelled/aligning AND swept by a decaying-turbulence velocity field (FIELD).
-#   advect + poisson_solve  -&gt; evolve the carrier flow (2D turbulence)
-#   radius_graph + active_matter -&gt; flocking
-#   advect_particles        -&gt; the flow carries the swarm (set&lt;-&gt;field gather)
-# active_matter and advect_particles deltas SUM on the swarm -&gt; flock riding vortices.
-name: mix_swarm_flow
-seed: 4
-n_frames: 520
-record_every: 3
-world: 1.0
-fields:
-  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
-sets:
-  active: {n: 4000}
-init:
-  fluid: {preset: vortices, n: 8, bands: 8}
-operators:
-  - {op: advect, at: fluid, vel: [0,1], channels: [0,1,3], dt_sub: 0.005, substeps: 2}
-  - {op: poisson_solve, at: fluid, vel: [0,1]}
-  - {op: radius_graph, at: active, radius: 0.04}
-  - {op: active_matter, at: active, v0: 0.002, noise: 0.10}
-  - {op: advect_particles, at: active, from_field: fluid, vel: [0,1], speed: 0.9}
-schedule: [advect, poisson_solve, radius_graph, active_matter, advect_particles]</pre></span></span>
-      <span class="sim-cap">a Vicsek swarm swept by a turbulent flow</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mix_rd_flow.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mix_rd_flow<span class="sim-spec"><pre># MIX: reaction-ADVECTION-diffusion. A Gray-Scott &quot;worms&quot; pattern (channels A,B = 2,3)
-# is stirred by a decaying-turbulence velocity field (channels vx,vy = 0,1). Three
-# fluid/Well operators compose on ONE field:
-#   advect (carry A,B by the velocity) -&gt; reaction_diffusion (grow the pattern) -&gt;
-#   advect+poisson_solve (evolve the carrier flow). The pattern is smeared along the
-#   streamlines -&gt; Turing patterns wrapped onto vortices.
-name: mix_rd_flow
-seed: 3
-n_frames: 900
-record_every: 5
-world: 1.0
-fields:
-  fluid: {frame: grid, res: 200, channels: 4, bc: periodic}
-init:
-  fluid: {preset: stir_rd, n: 8, seeds: 30}
-operators:
-  - {op: advect, at: fluid, vel: [0,1], channels: [2,3], dt_sub: 0.004, substeps: 1}
-  - {op: reaction_diffusion, at: fluid, f: 0.058, k: 0.065, channels: [2,3], substeps: 8}
-  - {op: advect, at: fluid, vel: [0,1], channels: [0,1], dt_sub: 0.004, substeps: 1}
-  - {op: poisson_solve, at: fluid, vel: [0,1]}
-schedule: [advect, reaction_diffusion, advect, poisson_solve]</pre></span></span>
-      <span class="sim-cap">a reaction–diffusion pattern stirred by turbulence</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/mix_acoustic_push.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">mix_acoustic_push<span class="sim-spec"><pre># MIX (2 families): an ACOUSTIC wave + particles pushed by its pressure gradient.
-# wave_acoustic(field) + active_matter(set) coupled by the SAME chemotaxis op, just
-# pointed at the pressure channel -&gt; expanding wavefronts herd the swarm.
-name: mix_acoustic_push
-seed: 0
-n_frames: 600
-record_every: 3
-world: 1.0
-fields: {acoustic: {frame: grid, res: 128, channels: 3, bc: periodic}}
-sets: {active: {n: 3000}}
-init:
-  acoustic: {rho: {kind: uniform, value: 1.0}, p: {seed: rings, n: 3}}
-operators:
-  - {op: wave_acoustic, at: acoustic, K: 4.0, cfl: 0.30, substeps: 4, sponge: 0.0}
-  - {op: radius_graph, at: active, radius: 0.05}
-  - {op: active_matter, at: active, v0: 0.003, noise: 0.10}
-  - {op: chemotaxis, at: active, from_field: acoustic, channel: 0, gain: -0.0010}
-schedule: [wave_acoustic, radius_graph, active_matter, chemotaxis]</pre></span></span>
-      <span class="sim-cap">expanding acoustic wavefronts herd a swarm</span>
-    </figcaption>
-  </figure>
-</div>
-
-<h2>Building a microswimmers simulation</h2>
-<div class="sim-gallery">
-  <figure class="sim-card">
-    <video src="gallery/motile.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">motile<span class="sim-spec"><pre># A motile (swimming) ciliate: the sphere self-propels at U = (2/3) B_1 along its
-# axis, sweeping through the nutrient bath and leaving a depleted wake (lab frame).
-# Same registry as sessile.yaml -- only the type (lifestyle) + the swim op differ.
-name: motile
-seed: 0
-n_frames: 200
-record_every: 2
-dt: 1.0
-world: 1.6
-sets:
-  organism:
-    n: 1
-    radius: 0.12
-    n_mode: 40
-    axis: 0.0
-    types:
-      motile: {fraction: 1.0, lifestyle: motile, feeding_area: 0.5}
-  surface_node: {parent: organism, per_parent: 240, role: membrane}
-fields:
-  flow:     {kind: flow, res: 192, couples_to: organism}
-  chemical: {kind: chemical, res: 192, couples_to: surface_node, diffusion: 0.05, peclet: 120.0, c_inf: 1.0}
-operators:
-  - {op: squirmer_flow, at: organism, to: flow, frame: lab}
-  - {op: slip,   at: surface_node}
-  - {op: swim,   at: &quot;organism[type=motile]&quot;, gain: 0.012}
-  - {op: absorb, at: &quot;surface_node[type=mouth]&quot;, from: chemical, rate: 1.0}
-schedule: [squirmer_flow, slip, swim, absorb, chemical.diffuse]</pre></span></span>
-      <span class="sim-cap">active self-propelled swimmers</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slipwave_motile.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slipwave_motile<span class="sim-spec"><pre># A motile (swimming) ciliate: the sphere self-propels at U = (2/3) B_1 along its
-# axis, sweeping through the nutrient bath and leaving a depleted wake (lab frame).
-# Same registry as sessile.yaml -- only the type (lifestyle) + the swim op differ.
-name: motile
-seed: 0
-n_frames: 200
-record_every: 2
-dt: 1.0
-world: 1.6
-sets:
-  organism:
-    n: 1
-    radius: 0.12
-    n_mode: 40
-    axis: 0.0
-    types:
-      motile: {fraction: 1.0, lifestyle: motile, feeding_area: 0.5}
-  surface_node: {parent: organism, per_parent: 240, role: membrane}
-fields:
-  flow:     {kind: flow, res: 192, couples_to: organism}
-  chemical: {kind: chemical, res: 192, couples_to: surface_node, diffusion: 0.05, peclet: 120.0, c_inf: 1.0}
-operators:
-  - {op: squirmer_flow, at: organism, to: flow, frame: lab}
-  - {op: slip,   at: surface_node}
-  - {op: swim,   at: &quot;organism[type=motile]&quot;, gain: 0.012}
-  - {op: absorb, at: &quot;surface_node[type=mouth]&quot;, from: chemical, rate: 1.0}
-schedule: [squirmer_flow, slip, swim, absorb, chemical.diffuse]</pre></span></span>
-      <span class="sim-cap">motile swimmer — slip-wave field overlay</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/vorticity_motile.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">vorticity_motile<span class="sim-spec"><pre># A motile (swimming) ciliate: the sphere self-propels at U = (2/3) B_1 along its
-# axis, sweeping through the nutrient bath and leaving a depleted wake (lab frame).
-# Same registry as sessile.yaml -- only the type (lifestyle) + the swim op differ.
-name: motile
-seed: 0
-n_frames: 200
-record_every: 2
-dt: 1.0
-world: 1.6
-sets:
-  organism:
-    n: 1
-    radius: 0.12
-    n_mode: 40
-    axis: 0.0
-    types:
-      motile: {fraction: 1.0, lifestyle: motile, feeding_area: 0.5}
-  surface_node: {parent: organism, per_parent: 240, role: membrane}
-fields:
-  flow:     {kind: flow, res: 192, couples_to: organism}
-  chemical: {kind: chemical, res: 192, couples_to: surface_node, diffusion: 0.05, peclet: 120.0, c_inf: 1.0}
-operators:
-  - {op: squirmer_flow, at: organism, to: flow, frame: lab}
-  - {op: slip,   at: surface_node}
-  - {op: swim,   at: &quot;organism[type=motile]&quot;, gain: 0.012}
-  - {op: absorb, at: &quot;surface_node[type=mouth]&quot;, from: chemical, rate: 1.0}
-schedule: [squirmer_flow, slip, swim, absorb, chemical.diffuse]</pre></span></span>
-      <span class="sim-cap">motile swimmer — vorticity field overlay</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/vortzoom_fast.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">vortzoom_fast<span class="sim-spec"><pre># A motile (swimming) ciliate: the sphere self-propels at U = (2/3) B_1 along its
-# axis, sweeping through the nutrient bath and leaving a depleted wake (lab frame).
-# Same registry as sessile.yaml -- only the type (lifestyle) + the swim op differ.
-name: motile
-seed: 0
-n_frames: 200
-record_every: 2
-dt: 1.0
-world: 1.6
-sets:
-  organism:
-    n: 1
-    radius: 0.12
-    n_mode: 40
-    axis: 0.0
-    types:
-      motile: {fraction: 1.0, lifestyle: motile, feeding_area: 0.5}
-  surface_node: {parent: organism, per_parent: 240, role: membrane}
-fields:
-  flow:     {kind: flow, res: 192, couples_to: organism}
-  chemical: {kind: chemical, res: 192, couples_to: surface_node, diffusion: 0.05, peclet: 120.0, c_inf: 1.0}
-operators:
-  - {op: squirmer_flow, at: organism, to: flow, frame: lab}
-  - {op: slip,   at: surface_node}
-  - {op: swim,   at: &quot;organism[type=motile]&quot;, gain: 0.012}
-  - {op: absorb, at: &quot;surface_node[type=mouth]&quot;, from: chemical, rate: 1.0}
-schedule: [squirmer_flow, slip, swim, absorb, chemical.diffuse]</pre></span></span>
-      <span class="sim-cap">motile swimmer — vorticity close-up</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/feeding.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">feeding<span class="sim-spec"><pre># Phagotrophy: a sessile ciliate sits in a gentle ambient current (drift) that
-# carries food parcels (tracers) past it left-&gt;right. Its feeding current bends the
-# nearby parcels and its absorbing mouth -- here facing UPSTREAM -- EATS the ones
-# that arrive. Parcels leaving the domain respawn at the left inlet, so the stream
-# is continuous and the eaten count climbs.
-#
-# Adds one set (tracer) + two operators (advect_particles, capture) to sessile.yaml
-# -- same registry, no engine change. Reference: Liu, Costello &amp; Kanso, Nat Commun
-# 16, 4154 (2025).
-name: feeding
-seed: 0
-n_frames: 360
-record_every: 2
-dt: 1.0
-world: 1.6
-sets:
-  organism:
-    n: 1
-    radius: 0.14
-    n_mode: 40
-    axis: 0.0
-    types:
-      sessile: {fraction: 1.0, lifestyle: sessile, feeding_area: 0.3, mouth_offset: 3.14159}
-  surface_node: {parent: organism, per_parent: 240, role: membrane}
-  tracer: {n: 900}
-fields:
-  flow:     {kind: flow, res: 176, couples_to: organism}
-  chemical: {kind: chemical, res: 176, couples_to: surface_node, diffusion: 0.06, peclet: 120.0, c_inf: 1.0}
-operators:
-  - {op: squirmer_flow,    at: organism, to: flow, frame: body}
-  - {op: slip,             at: surface_node}
-  - {op: absorb,           at: &quot;surface_node[type=mouth]&quot;, from: chemical, rate: 1.0}
-  - {op: advect_particles, at: tracer, from: flow, speed: 0.04, drift: [0.006, 0.0]}
-  - {op: capture,          at: tracer, margin: 0.25}
-schedule: [squirmer_flow, slip, absorb, chemical.diffuse, advect_particles, capture]</pre></span></span>
-      <span class="sim-cap">feeding on a resource field</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/sessile.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">sessile<span class="sim-spec"><pre># A sessile (attached) ciliate: anchored sphere whose cilia drive a feeding current
-# over a 50%-coverage mouth cap. Reproduces the sessile column of the paper&#x27;s
-# flow + concentration figures (Liu, Costello &amp; Kanso, Nat Commun 2025).
-name: sessile
-seed: 0
-n_frames: 120
-record_every: 2
-dt: 1.0
-world: 1.0
-sets:
-  organism:
-    n: 1
-    radius: 0.14
-    n_mode: 40
-    types:
-      sessile: {fraction: 1.0, lifestyle: sessile, feeding_area: 0.2}
-  surface_node: {parent: organism, per_parent: 240, role: membrane}
-fields:
-  flow:     {kind: flow, res: 160, couples_to: organism}
-  chemical: {kind: chemical, res: 160, couples_to: surface_node, diffusion: 0.06, peclet: 100.0, c_inf: 1.0}
-operators:
-  - {op: squirmer_flow, at: organism, to: flow, frame: body}
-  - {op: slip,    at: surface_node}
-  - {op: absorb,  at: &quot;surface_node[type=mouth]&quot;, from: chemical, rate: 1.0}
-schedule: [squirmer_flow, slip, absorb, chemical.diffuse]</pre></span></span>
-      <span class="sim-cap">attached, beating cilia</span>
+      <span class="sim-name" tabindex="0">Sprott B<span class="sim-spec"><pre>op: attractor_flow, system: sprott_b
+# ẋ=yz; ẏ=x−y; ż=1−xy   (Sprott 1994, case B)
+config/attractors/sprott_b.yaml</pre></span></span>
+      <span class="sim-cap">a symmetric twin-scroll with two spiral eyes</span>
     </figcaption>
   </figure>
 </div>
 ```
+
+## Differentiable optimization — a foraging colony
+
+Because the whole rollout is differentiable, a *design* can be optimized, not just simulated.
+A slime-style foraging colony (the same `deposit`/`diffuse`/`sense`/`glide` operators) is tuned
+by a black-box UCB search over its spec parameters — from a hand-set start to the best found.
+Each strip runs left → right, start → optimized.
+
+::: {layout-ncol=2}
+{{< video gallery/initial.mp4 title="initial hand-set colony" >}}
+
+{{< video gallery/winner_7.mp4 title="optimized colony — ~5× faster to food" >}}
+:::
+
+The same recipe scales to harder navigation — a porous **pillar** field and a walled **maze**,
+each crossed by a self-generated attractant gradient and tuned by the same optimizer:
+
+{{< video gallery/race_pillars_winner_1.mp4 title="pillars — starting point" >}}
+
+{{< video gallery/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escape the porous field)" >}}
+
+{{< video gallery/race_maze_hard_winner_1.mp4 title="maze — starting point" >}}
+
+{{< video gallery/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}

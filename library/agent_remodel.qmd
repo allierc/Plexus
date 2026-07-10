@@ -1,0 +1,161 @@
+---
+title: "agent_remodel"
+subtitle: "Agent_remodel (agent set -> mpm_particle stiffness): cells remodel the tissue."
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Agent_remodel (agent set -> mpm_particle stiffness): cells remodel the tissue.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Reads** &mdash; `to`, `target`
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+The THIRD coupling (beyond momentum): active cells progressively SOFTEN or RIGIDIFY the MPM
+material around them -- the tissue-remodelling of morphogenesis (cells secreting/degrading
+matrix, stiffening or fluidising their neighbourhood). Each cell carries a per-type
+`remodel_rate` (>0 rigidify, <0 soften, 0 inert). Routed through the grid like every other
+coupling: cells scatter their rate onto the mpm grid (density-normalised, so it is the *mean*
+rate where cells sit), material points gather it, and their Lame moduli drift multiplicatively
+
+The multiplicative form preserves liquid points (mu=0 stays 0) and never flips sign; the clamps
+bound the excursion. Grid cells with no cells nearby get rate 0 -> factor 1 -> no change, so
+only the cell-occupied tissue is remodelled. `kind=exchange`, `EMIT=None` (mutates the
+target set's buffers in place, returns {}). Schedule it in the OUTER loop (once per frame), like
+the other body-force couplings.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `to` | &ndash; | **required** |
+| `target` | &ndash; | **required** |
+| `gain` | remodel_gain | 1.0 |
+| `rate_attr` | per_type_remodel_rate | "remodel_rate" |
+| `mu_min` | &ndash; | 0.5 |
+| `mu_max` | &ndash; | 1.0e4 |
+| `la_min` | &ndash; | 0.5 |
+| `la_max` | &ndash; | 1.0e4 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: agent_remodel, at: cell, to: ..., target: ...}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`tissue_remodelling`]{.op-badge} [`stiffening`]{.op-badge} [`fluidisation`]{.op-badge}  
+
+## Related operators
+
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
+
+## Source
+
+[`src/plexus/operators/agent_remodel.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/agent_remodel.py) &mdash; the registered operator.
+
+```python
+"""agent_remodel (agent set -> mpm_particle stiffness): cells remodel the tissue.
+
+The THIRD coupling (beyond momentum): active cells progressively SOFTEN or RIGIDIFY the MPM
+material around them -- the tissue-remodelling of morphogenesis (cells secreting/degrading
+matrix, stiffening or fluidising their neighbourhood). Each cell carries a per-type
+`remodel_rate` (>0 rigidify, <0 soften, 0 inert). Routed through the grid like every other
+coupling: cells scatter their rate onto the mpm grid (density-normalised, so it is the *mean*
+rate where cells sit), material points gather it, and their Lame moduli drift multiplicatively
+
+    mu  <- clamp( mu * exp(gain * rate(x) * dt),  mu_min, mu_max )
+    la  <- clamp( la * exp(gain * rate(x) * dt),  la_min, la_max )
+
+The multiplicative form preserves liquid points (mu=0 stays 0) and never flips sign; the clamps
+bound the excursion. Grid cells with no cells nearby get rate 0 -> factor 1 -> no change, so
+only the cell-occupied tissue is remodelled. `kind=exchange`, `EMIT=None` (mutates the
+target set's buffers in place, returns {}). Schedule it in the OUTER loop (once per frame), like
+the other body-force couplings.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
+from plexus.operators.mpm_grid import stencil_offsets, bspline
+
+
+@register_operator("agent_remodel", family="coupling", level="cell", kind="exchange")
+class AgentRemodel(Exchange):
+    EMIT = None
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = ["to", "target"]
+    MECHANISM_TAGS = ["tissue_remodelling", "stiffening", "fluidisation"]
+    PARAM_ROLES = {"gain": "remodel_gain", "rate_attr": "per_type_remodel_rate"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "agent")
+        self.to = params.get("to", "mpm_grid")            # grid used only for the transfer geometry
+        self.target = params.get("target", "mpm_particle")
+        self.gain = float(params.get("gain", 1.0))
+        self.rate_attr = params.get("rate_attr", "remodel_rate")
+        self.mu_min = float(params.get("mu_min", 0.5)); self.mu_max = float(params.get("mu_max", 1.0e4))
+        self.la_min = float(params.get("la_min", 0.5)); self.la_max = float(params.get("la_max", 1.0e4))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); g = H.field(self.to); tgt = H.level(self.target)
+        rate = getattr(lvl, self.rate_attr, None)
+        if rate is None or float(rate.abs().max()) == 0.0:
+            return {}                                     # no remodellers -> nothing to do
+        dt = float(getattr(H.config, "dt", 1.0))
+        periodic = bool(getattr(H, "periodic", False))
+        dev = lvl.state.device
+        offs = stencil_offsets(tgt.get("pos").shape[1], dev); S = offs.shape[0]
+
+        # scatter cells' remodel rate + presence onto the grid (density-normalised mean rate)
+        Xa = lvl.get("pos"); _, wa, fa = bspline(Xa, g.inv_dx, offs, g.shape, periodic)
+        occ_a = lvl.occ if mask is None else lvl.occ * mask.float()
+        R = torch.zeros(g.n_cells, device=dev); Wt = torch.zeros(g.n_cells, device=dev)
+        R.index_add_(0, fa, (wa * (rate * occ_a)[:, None]).reshape(-1))
+        Wt.index_add_(0, fa, (wa * occ_a[:, None]).reshape(-1))
+        Rn = R / Wt.clamp(min=1e-6)                       # mean remodel rate per cell
+
+        # gather at material points and update their stiffness multiplicatively
+        Xp = tgt.get("pos"); _, wp, fp = bspline(Xp, g.inv_dx, offs, g.shape, periodic)
+        Rp = (wp * Rn[fp].view(tgt.n, S)).sum(1)          # [Np]
+        factor = torch.exp((self.gain * dt) * Rp)
+        tgt.mu = (tgt.mu * factor).clamp(self.mu_min, self.mu_max)
+        tgt.la = (tgt.la * factor).clamp(self.la_min, self.la_max)
+        return {}
+```

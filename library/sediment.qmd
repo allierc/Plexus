@@ -1,0 +1,143 @@
+---
+title: "sediment"
+subtitle: "A per-agent constant directional drift (a first-order body force at"
+---
+
+::: {.op-head}
+![](../figures/icons/lateral.png){.op-logo}
+
+[`lateral`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+A per-agent constant directional drift (a first-order body force at
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
+- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+the AGENT level, the type-selectable sibling of `gravity`).
+
+`gravity` is a CELL-level body force: it feeds the MPM substep as a_ext and so acts
+on the whole soft body uniformly -- it cannot express a per-type force (both agent
+types are dragged identically by the sedimenting fluid). `sediment` instead returns a
+velocity delta `{agent: v}` with `v = (gx, gy)` and lets the ENGINE integrate the
+position, exactly like `glide` returns a propulsion velocity. Because
+the drift is a CONSTANT direction (it never decorrelates like a heading), a small
+magnitude on a confined agent set produces a persistent settling toward one pole.
+
+The point is DIFFERENTIAL sedimentation: instantiate it twice with a per-type selector
+(`at: 'agent[type=a]' gy: -0.1` + `at: 'agent[type=b]' gy: 0.1`) so the two types drift
+oppositely along the gravity axis and sort into a REPRODUCIBLE animal-vegetal (y) axis
+-- the oriented-symmetry-break the type-blind `gravity` cannot set.
+
+Default direction is -y (down); override `gx`/`gy` for a sideways or tilted drift.
+EMIT is `velocity` so it composes with the first-order agent set (glide/chemotax/repel).
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `g` | sediment_magnitude | 0.0 |
+| `gx` | sediment_x | 0.0 |
+| `gy` | sediment_y | -self.g |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: sediment, at: cell}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`body_force`]{.op-badge} [`differential_sedimentation`]{.op-badge}  
+
+## Related operators
+
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+
+## Source
+
+[`src/plexus/operators/sediment.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/sediment.py) &mdash; the registered operator.
+
+```python
+"""sediment -- a per-agent constant directional drift (a first-order body force at
+the AGENT level, the type-selectable sibling of `gravity`).
+
+`gravity` is a CELL-level body force: it feeds the MPM substep as a_ext and so acts
+on the whole soft body uniformly -- it cannot express a per-type force (both agent
+types are dragged identically by the sedimenting fluid). `sediment` instead returns a
+velocity delta `{agent: v}` with `v = (gx, gy)` and lets the ENGINE integrate the
+position (`pos += dt * v`), exactly like `glide` returns a propulsion velocity. Because
+the drift is a CONSTANT direction (it never decorrelates like a heading), a small
+magnitude on a confined agent set produces a persistent settling toward one pole.
+
+The point is DIFFERENTIAL sedimentation: instantiate it twice with a per-type selector
+(`at: 'agent[type=a]' gy: -0.1` + `at: 'agent[type=b]' gy: 0.1`) so the two types drift
+oppositely along the gravity axis and sort into a REPRODUCIBLE animal-vegetal (y) axis
+-- the oriented-symmetry-break the type-blind `gravity` cannot set.
+
+Default direction is -y (down); override `gx`/`gy` for a sideways or tilted drift.
+EMIT is `velocity` so it composes with the first-order agent set (glide/chemotax/repel).
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Lateral
+from plexus.models.registry import register_operator
+
+
+@register_operator("sediment", family="motion", level="cell", kind="lateral")
+class Sediment(Lateral):
+    EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
+    SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic
+    REQUIRES_PARAMS = []                             # no required params — all knobs optional (defaults in __init__)
+    PARAM_ROLES = {"g": "sediment_magnitude", "gx": "sediment_x", "gy": "sediment_y"}
+    MECHANISM_TAGS = ["body_force", "differential_sedimentation"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")              # the set this acts on (engine-injected)
+        self.g = float(params.get("g", 0.0))             # magnitude (world units / time)
+        self.gx = float(params.get("gx", 0.0))           # x-component (default 0)
+        self.gy = float(params.get("gy", -self.g))       # y-component (default -g: down)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        dev = lvl.state.device
+        N = lvl.n
+        D = int(getattr(H, "dim", 2))                    # drift is a D-vector; -y (axis 1) is "down"
+        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
+        vel = torch.zeros(N, D, device=dev)
+        vel[:, 0] = self.gx
+        vel[:, 1] = self.gy
+        return {self.at: vel * m[:, None]}
+```

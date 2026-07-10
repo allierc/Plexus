@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.6.42">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -69,12 +69,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -230,7 +230,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">alignment</h1>
-<p class="subtitle lead">A boids steering rule (Lateral, second-derivative).</p>
+<p class="subtitle lead">Velocity_align (was alignment) – Vicsek-style neighbour velocity alignment (the NOMINAL model);</p>
 </div>
 
 
@@ -249,8 +249,8 @@ window.Quarto = {
 
 <div class="op-head">
 <p><img src="../figures/icons/lateral.png" class="op-logo img-fluid"></p>
-<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: second_derivative</code></span></p>
-<p>A boids steering rule (Lateral, second-derivative).</p>
+<p><span class="op-badge"><code>lateral</code></span> <span class="op-badge"><code>acts on: particle</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
+<p>Velocity_align (was alignment) – Vicsek-style neighbour velocity alignment (the NOMINAL model);</p>
 </div>
 <style>
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
@@ -274,15 +274,22 @@ window.Quarto = {
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
 <li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
-<li><strong>Reads</strong> — <code>alignment</code> (per-type props: <code>alignment</code>)</li>
-<li><strong>Writes / returns</strong> — returns an <strong>acceleration</strong> — <span class="math inline">\(v \mathrel{+}= \Delta t\,\delta;\ x \mathrel{+}= \Delta t\,v\)</span>.</li>
-<li><strong>Prediction</strong> — <code>second_derivative</code>.</li>
+<li><strong>Reads</strong> — –</li>
+<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
+<li><strong>Prediction</strong> — <code>none</code>.</li>
 <li><strong>Dimensions</strong> — 2D, 3D.</li>
 </ul>
 </section>
 <section id="mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>Match neighbours’ velocity: <code>a2 * w^a_i * mean_j (vel_j - vel_i)</code>, with the per-receiver weight <code>w^a</code> the type’s named <code>alignment</code> property. One of the three rules whose deltas the engine sums to make a flock; see also cohesion, separation.</p>
+<p>Reynolds’ boids alignment rule is recovered as a SPECIAL CASE.</p>
+<p>Each receiver i steers toward the (weighted) mean velocity of its graph neighbours j – the edges left by a <code>rewire</code> op such as <code>radius_graph</code>. This is the alignment interaction at the heart of the Vicsek model of active matter and of boids:</p>
+<p>NOMINAL – Vicsek (<code>gate: none</code>, <code>per_type: false</code>): every radius neighbour counts equally (w_ij = 1). Paired with <code>cruise</code> over a <code>radius_graph</code> this is the metric Vicsek model, whose polar order undergoes the noise-driven flocking transition (flock &lt;-&gt; disorder, with bands/swirls in between).</p>
+<p>SPECIAL CASE – boids (<code>per_type: true</code>): fold in the set’s per-type alignment strength (the <code>alignment</code> type property), reproducing Reynolds’ boids alignment term exactly; compose with <code>cohesion</code> + <code>separation</code> for the full boids law.</p>
+<p>OPTION – <code>gate: contact</code>: a smoothstep contact gate weights w_ij by how close i and j are (1 in contact, 0 at radius r), for dense/contact active matter with no discontinuity as neighbours drift in and out of range.</p>
+<p>OPTION – <code>noise</code>: isotropic orientation noise added to the alignment acceleration (off by default). In the canonical Vicsek model the noise eta lives ON the heading update, so the order/disorder transition can be driven here instead of (or with) the <code>noise</code> in <code>cruise</code> – raise it to melt the flock into a disordered gas.</p>
+<p>Second-derivative law (an acceleration): the engine integrates vel += dt<em>acc, pos += dt</em>vel. No 1/|d|^2 term, so it needs no <code>min_radius</code> and composes cleanly with <code>cruise</code>, <code>cohesion</code>, <code>separation</code>, <code>drag</code>.</p>
+<p>Refs: Vicsek, Czirok, Ben-Jacob, Cohen &amp; Shochet, PRL 75 (1995) (active matter); Reynolds, SIGGRAPH 1987 (boids); the active-matter Vicsek generator in The Well (Ohana et al., NeurIPS 2024, github.com/PolymathicAI/the_well), ported in prototype/well/well_ops.py.</p>
 <p><span class="math display">\[
 \mathbf a_i \;=\; a_2\,w^a_i\,\big\langle \mathbf v_j-\mathbf v_i\big\rangle_{j\in\mathcal N(i)}
 \]</span> The boids velocity-matching rule: steer toward the mean neighbour velocity. <span class="math inline">\(w^a_i\)</span> is the receiver type’s <code>alignment</code> weight; <span class="math inline">\(\langle\cdot\rangle\)</span> is the mean over neighbours.</p>
@@ -299,9 +306,39 @@ window.Quarto = {
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>scale</code></td>
+<td><code>a</code></td>
 <td>alignment_strength</td>
-<td>5e-4</td>
+<td>params.get(“scale”, 5e-4</td>
+</tr>
+<tr class="even">
+<td><code>gate</code></td>
+<td>neighbour_weighting</td>
+<td>“none”</td>
+</tr>
+<tr class="odd">
+<td><code>r</code></td>
+<td>contact_radius</td>
+<td>0.05</td>
+</tr>
+<tr class="even">
+<td><code>noise</code></td>
+<td>orientation_noise</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td><code>softness</code></td>
+<td>–</td>
+<td>0.5</td>
+</tr>
+<tr class="even">
+<td><code>per_type</code></td>
+<td>–</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<td><code>weight</code></td>
+<td>–</td>
+<td>“alignment”</td>
 </tr>
 </tbody>
 </table>
@@ -313,54 +350,116 @@ window.Quarto = {
 </section>
 <section id="mechanism-search-tags" class="level2">
 <h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
-<p><strong>Mechanism</strong> — <span class="op-badge"><code>velocity_alignment</code></span> <span class="op-badge"><code>collective_motion</code></span><br>
-<strong>Morphology prior</strong> — <span class="op-badge"><code>flock</code></span> <span class="op-badge"><code>streams</code></span></p>
+<p><strong>Mechanism</strong> — <span class="op-badge"><code>velocity_alignment</code></span> <span class="op-badge"><code>collective_motion</code></span> <span class="op-badge"><code>vicsek</code></span></p>
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/Coulomb.html"><code>Coulomb</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/separation.html"><code>separation</code></a>, <a href="../library/drag.html"><code>drag</code></a>, <a href="../library/advance.html"><code>advance</code></a>.</p>
+<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/attractor_flow.html"><code>attractor_flow</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>, <a href="../library/separation.html"><code>separation</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
-<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/alignment.py"><code>src/plexus/operators/alignment.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""alignment -- a boids steering rule (Lateral, second-derivative).</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">Match neighbours' velocity: `a2 * w^a_i * mean_j (vel_j - vel_i)`, with the</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">per-receiver weight `w^a` the type's named `alignment` property. One of the three</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">rules whose deltas the engine sums to make a flock; see also cohesion, separation.</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.geometry <span class="im">import</span> neighbour_mean</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"alignment"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Alignment(Lateral):</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    PREDICTION <span class="op">=</span> <span class="st">"second_derivative"</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                          <span class="co"># neighbour_mean is N-D; the rule is dimension-generic</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    REQUIRES_TYPE_PROPS <span class="op">=</span> [<span class="st">"alignment"</span>]</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"velocity_alignment"</span>, <span class="st">"collective_motion"</span>]</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    MORPHOLOGY_PRIOR <span class="op">=</span> [<span class="st">"flock"</span>, <span class="st">"streams"</span>]</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"scale"</span>: <span class="st">"alignment_strength"</span>}</span>
+<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/velocity_align.py"><code>src/plexus/operators/velocity_align.py</code></a> — the registered operator.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the NOMINAL model);</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">Reynolds' boids alignment rule is recovered as a SPECIAL CASE.</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">Each receiver i steers toward the (weighted) mean velocity of its graph neighbours</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">j -- the edges left by a `rewire` op such as `radius_graph`. This is the alignment</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">interaction at the heart of the Vicsek model of active matter and of boids:</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">    acc_i = a * (sum_j w_ij (vel_j - vel_i)) / (sum_j w_ij)</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">NOMINAL -- Vicsek (`gate: none`, `per_type: false`): every radius neighbour counts</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">equally (w_ij = 1). Paired with `cruise` over a `radius_graph` this is the</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">metric Vicsek model, whose polar order undergoes the noise-driven flocking</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">transition (flock &lt;-&gt; disorder, with bands/swirls in between).</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">SPECIAL CASE -- boids (`per_type: true`): fold in the set's per-type alignment</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">strength (the `alignment` type property), reproducing Reynolds' boids alignment</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">term exactly; compose with `cohesion` + `separation` for the full boids law.</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">OPTION -- `gate: contact`: a smoothstep contact gate weights w_ij by how close i</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co">and j are (1 in contact, 0 at radius r), for dense/contact active matter with no</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co">discontinuity as neighbours drift in and out of range.</span></span>
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.a <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"scale"</span>, <span class="fl">5e-4</span>))       <span class="co"># PDE_B alignment scale a2</span></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co">OPTION -- `noise`: isotropic orientation noise added to the alignment acceleration</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co">(off by default). In the canonical Vicsek model the noise eta lives ON the heading</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co">update, so the order/disorder transition can be driven here instead of (or with) the</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co">`noise` in `cruise` -- raise it to melt the flock into a disordered gas.</span></span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        w <span class="op">=</span> lvl.alignment</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        vel <span class="op">=</span> lvl.get(<span class="st">"vel"</span>)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> neighbour_mean(lvl.get(<span class="st">"pos"</span>), lvl.occ, lvl.edge_index,</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>                             <span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>),</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>                             <span class="bu">getattr</span>(H, <span class="st">"world_size"</span>, <span class="bu">getattr</span>(H, <span class="st">"world_width"</span>, <span class="fl">1.0</span>)),</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>                             <span class="kw">lambda</span> i, j, d: w[i, <span class="va">None</span>] <span class="op">*</span> <span class="va">self</span>.a <span class="op">*</span> (vel[j] <span class="op">-</span> vel[i]))</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>            acc <span class="op">=</span> acc <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: acc}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="co">Second-derivative law (an acceleration): the engine integrates vel += dt*acc,</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="co">pos += dt*vel. No 1/|d|^2 term, so it needs no `min_radius` and composes cleanly</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="co">with `cruise`, `cohesion`, `separation`, `drag`.</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co">Refs: Vicsek, Czirok, Ben-Jacob, Cohen &amp; Shochet, PRL 75 (1995) (active matter);</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="co">Reynolds, SIGGRAPH 1987 (boids); the active-matter Vicsek generator in The Well</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="co">(Ohana et al., NeurIPS 2024, github.com/PolymathicAI/the_well), ported in</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="co">prototype/well/well_ops.py.</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Lateral</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.geometry <span class="im">import</span> minimum_image</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"velocity_align"</span>, <span class="st">"alignment"</span>, family<span class="op">=</span><span class="st">"interaction"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> VelocityAlign(Lateral):                    <span class="co"># (alias `alignment`, one migration cycle)</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"acceleration"</span>            <span class="co"># emits an acceleration</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                     <span class="co"># velocity neighbour-mean is dimension-generic</span></span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []                        <span class="co"># no required params — all knobs optional (defaults in __init__)</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>    OPTIONAL_TYPE_PROPS <span class="op">=</span> [<span class="st">"alignment"</span>]        <span class="co"># read per-receiver only when `per_type: true` (boids)</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"velocity_alignment"</span>, <span class="st">"collective_motion"</span>, <span class="st">"vicsek"</span>]</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"a"</span>: <span class="st">"alignment_strength"</span>, <span class="st">"gate"</span>: <span class="st">"neighbour_weighting"</span>,</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"r"</span>: <span class="st">"contact_radius"</span>, <span class="st">"noise"</span>: <span class="st">"orientation_noise"</span>}</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.a <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"a"</span>, params.get(<span class="st">"scale"</span>, <span class="fl">5e-4</span>)))    <span class="co"># alignment scale (`scale`: legacy alias)</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gate <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"gate"</span>, <span class="st">"none"</span>))                   <span class="co"># "none" (Vicsek/boids) | "contact"</span></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.r <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"r"</span>, <span class="fl">0.05</span>))                         <span class="co"># contact radius (gate="contact")</span></span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.softness <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"softness"</span>, <span class="fl">0.5</span>))            <span class="co"># falloff band [0,1]; 0 = hard cutoff</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.per_type <span class="op">=</span> <span class="bu">bool</span>(params.get(<span class="st">"per_type"</span>, <span class="va">False</span>))           <span class="co"># boids special case: per-type weight</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.weight_prop <span class="op">=</span> <span class="bu">str</span>(params.get(<span class="st">"weight"</span>, <span class="st">"alignment"</span>))     <span class="co"># which type property holds the weight</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.noise <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"noise"</span>, <span class="fl">0.0</span>))                  <span class="co"># isotropic Vicsek orientation noise (off by default)</span></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.gate <span class="kw">not</span> <span class="kw">in</span> (<span class="st">"none"</span>, <span class="st">"contact"</span>):</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="ss">f"alignment: gate must be 'none' or 'contact', got </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>gate<span class="sc">!r}</span><span class="ss">"</span>)</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        pos, vel, occ <span class="op">=</span> lvl.get(<span class="st">"pos"</span>), lvl.get(<span class="st">"vel"</span>), lvl.occ</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        N, D <span class="op">=</span> vel.shape[<span class="dv">0</span>], vel.shape[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        ei <span class="op">=</span> lvl.edge_index                                 <span class="co"># row0 = receiver i, row1 = neighbour j</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> ei.numel() <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {<span class="va">self</span>.at: torch.zeros(N, D, device<span class="op">=</span>vel.device)}</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        i, j <span class="op">=</span> ei[<span class="dv">0</span>], ei[<span class="dv">1</span>]</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.gate <span class="op">==</span> <span class="st">"contact"</span>:                          <span class="co"># smoothstep contact gate: 1 -&gt; 0 over [r_in, r]</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> minimum_image(pos[j] <span class="op">-</span> pos[i], <span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>),</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>                              <span class="bu">getattr</span>(H, <span class="st">"world_size"</span>, <span class="bu">getattr</span>(H, <span class="st">"world_width"</span>, <span class="fl">1.0</span>)))</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>            dist <span class="op">=</span> d.norm(dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>            r_in <span class="op">=</span> (<span class="fl">1.0</span> <span class="op">-</span> <span class="va">self</span>.softness) <span class="op">*</span> <span class="va">self</span>.r</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>            t <span class="op">=</span> ((<span class="va">self</span>.r <span class="op">-</span> dist) <span class="op">/</span> <span class="bu">max</span>(<span class="va">self</span>.r <span class="op">-</span> r_in, <span class="fl">1e-12</span>)).clamp(<span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>            gate <span class="op">=</span> t <span class="op">*</span> t <span class="op">*</span> (<span class="fl">3.0</span> <span class="op">-</span> <span class="fl">2.0</span> <span class="op">*</span> t)</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                               <span class="co"># gate="none": every neighbour equal (Vicsek/boids)</span></span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>            gate <span class="op">=</span> torch.ones(ei.shape[<span class="dv">1</span>], device<span class="op">=</span>vel.device)</span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        w <span class="op">=</span> gate <span class="op">*</span> occ[j]                                   <span class="co"># gate + mask dormant neighbours</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        msg <span class="op">=</span> <span class="va">self</span>.a <span class="op">*</span> (vel[j] <span class="op">-</span> vel[i]) <span class="op">*</span> w[:, <span class="va">None</span>]</span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.per_type:                                   <span class="co"># boids: per-receiver alignment weight</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>            pw <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="va">self</span>.weight_prop)[i]</span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>            msg <span class="op">=</span> msg <span class="op">*</span> pw[:, <span class="va">None</span>]</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> torch.zeros(N, D, device<span class="op">=</span>vel.device).index_add_(<span class="dv">0</span>, i, msg)</span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>        deg <span class="op">=</span> torch.zeros(N, device<span class="op">=</span>vel.device).index_add_(<span class="dv">0</span>, i, w)</span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> (acc <span class="op">/</span> deg.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1.0</span>)[:, <span class="va">None</span>]) <span class="op">*</span> occ[:, <span class="va">None</span>]       <span class="co"># (weighted) mean over neighbours</span></span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.noise <span class="op">&gt;</span> <span class="fl">0.0</span>:                                           <span class="co"># Vicsek angular noise: order vs disorder</span></span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>            acc <span class="op">=</span> acc <span class="op">+</span> <span class="va">self</span>.noise <span class="op">*</span> torch.randn(N, D, generator<span class="op">=</span><span class="bu">getattr</span>(H, <span class="st">"rng"</span>, <span class="va">None</span>),</span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>                                                 device<span class="op">=</span>vel.device) <span class="op">*</span> occ[:, <span class="va">None</span>]</span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>            acc <span class="op">=</span> acc <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: acc}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
@@ -592,8 +691,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   });
   clipboard.on('success', onCopySuccess);
   if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    // For code content inside modals, clipBoardJS needs to be initialized with a container option
-    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
     const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
       text: getTextToCopy,
       container: window.document.getElementById('quarto-embedded-source-code-modal')
@@ -704,7 +801,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
       if (note.classList.contains("callout")) {
         return note.outerHTML;
       } else {

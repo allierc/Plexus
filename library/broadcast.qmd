@@ -6,7 +6,7 @@ subtitle: "Parent -> children. Lift a parent quantity onto its children."
 ::: {.op-head}
 ![](../figures/icons/broadcast.png){.op-logo}
 
-[`broadcast`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: first_derivative`]{.op-badge}
+[`broadcast`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
 Parent -> children. Lift a parent quantity onto its children.
 :::
@@ -36,9 +36,9 @@ Parent -> children. Lift a parent quantity onto its children.
 - **Kind** &mdash; $\pi^*$ **Broadcast**: parent &rarr; children, down the containment $\pi$.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `stiffness`
-- **Writes / returns** &mdash; returns a **velocity** &mdash; the engine integrates $x \mathrel{+}= \Delta t\,\delta$.
-- **Prediction** &mdash; `first_derivative`.
-- **Dimensions** &mdash; 2D.
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
 
 ## Mechanism
 
@@ -57,7 +57,7 @@ stiffness $k$ — the down-the-hierarchy dual of `aggregate`.
 
 | parameter | role | default |
 |---|---|---|
-| `stiffness` | &ndash; | **required** |
+| `stiffness` | containment_strength | **required** |
 
 ## Minimal spec
 
@@ -65,6 +65,10 @@ stiffness $k$ — the down-the-hierarchy dual of `aggregate`.
 operators:
   - {op: broadcast, at: particle, stiffness: ...}
 ```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`containment`]{.op-badge} [`hierarchical_coupling`]{.op-badge} [`spring`]{.op-badge}  
 
 ## Related operators
 
@@ -90,10 +94,13 @@ from plexus.models.base import Broadcast
 from plexus.models.registry import register_operator
 
 
-@register_operator("broadcast", level="particle", kind="broadcast")
+@register_operator("broadcast", family="hierarchy", level="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
-    PREDICTION = "first_derivative"            # emits a velocity; the engine integrates
+    EMIT = "velocity"            # emits a velocity; the engine integrates
+    SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D
     REQUIRES_PARAMS = ["stiffness"]
+    MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]
+    PARAM_ROLES = {"stiffness": "containment_strength"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -105,7 +112,7 @@ class BroadcastLift(Broadcast):
         dev = child.state.device
         pname = getattr(child, "parent_name", None)
         if pname is None:
-            return {self.at: torch.zeros(child.n, 2, device=dev)}
+            return {self.at: torch.zeros_like(child.get("pos"))}   # no parent -> zero delta (matches pos dim, 2D/3D)
         parent = H.level(pname)
         ppos = parent.get("pos")[child.parent]     # each child's parent position
         vel = self.k * (ppos - child.get("pos")) * child.occ[:, None]

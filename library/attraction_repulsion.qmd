@@ -6,7 +6,7 @@ subtitle: "Analytic attraction-repulsion: a smooth, per-type pairwise interactio
 ::: {.op-head}
 ![](../figures/icons/lateral.png){.op-logo}
 
-[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: first_derivative`]{.op-badge}
+[`lateral`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
 A smooth, per-type pairwise force law on a neighbour graph &mdash; the analytic core of [ParticleGraph](https://github.com/allierc/ParticleGraph). A long-range Gaussian pulls, a short-range Gaussian pushes; the balance between them, set per particle type, selects the emergent phase: single clusters, multi-cluster foams, lattices, or filaments.
 :::
@@ -36,8 +36,8 @@ A smooth, per-type pairwise force law on a neighbour graph &mdash; the analytic 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
 - **Acts on** &mdash; `particle` (the level the operator runs at).
 - **Reads** &mdash; `sigma`, `p`  (per-type props: `p`)
-- **Writes / returns** &mdash; returns a **velocity** &mdash; the engine integrates $x \mathrel{+}= \Delta t\,\delta$.
-- **Prediction** &mdash; `first_derivative`.
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
 - **Dimensions** &mdash; 2D, 3D.
 
 ## Mechanism
@@ -49,7 +49,7 @@ summed over its neighbours j (the edges left by a `rewire` operator such as
 with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
 Gaussian is the long-range pull, the second the short-range push; their balance
 gives type-specific phases (clusters, networks, lattices). First-derivative law:
-returns a velocity (set `prediction: first_derivative`).
+returns a velocity (`EMIT = velocity`; overdamped, engine-integrated).
 
 This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
 a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
@@ -68,6 +68,7 @@ The first term is the long-range pull, the second the short-range push.
 | parameter | role | default |
 |---|---|---|
 | `sigma` | interaction_length | **required** |
+| `noise` | exploration_noise | 0.0 |
 | `p` | [pull_strength, pull_range, push_strength, push_range] per type | &ndash; |
 | `aggr` | &ndash; | "mean" |
 
@@ -94,7 +95,7 @@ Always paired with a `rewire` that supplies the neighbour graph it reads. The ca
 ## Example output
 
 ```{=html}
-<figure class="op-vid"><video src="../gallery/arbitrary_3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+<figure class="op-vid"><video src="../gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
 <figcaption>Three types, 30&nbsp;000 particles, &sigma;=0.005, periodic &mdash; the field coarsens into a honeycomb of interconnected domains.</figcaption></figure>
 ```
 
@@ -114,7 +115,6 @@ Trajectories of a settled pattern pin down **ratios** far better than absolute s
 ## Mechanism-search tags
 
 **Mechanism** &mdash; [`long_range_attraction`]{.op-badge} [`short_range_repulsion`]{.op-badge} [`coarsening`]{.op-badge} [`lattice_forming`]{.op-badge}  
-**Morphology prior** &mdash; [`single_cluster`]{.op-badge} [`multi_cluster`]{.op-badge} [`lattice`]{.op-badge} [`filaments`]{.op-badge}
 
 ## Related operators
 
@@ -140,7 +140,7 @@ summed over its neighbours j (the edges left by a `rewire` operator such as
 with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
 Gaussian is the long-range pull, the second the short-range push; their balance
 gives type-specific phases (clusters, networks, lattices). First-derivative law:
-returns a velocity (set `prediction: first_derivative`).
+returns a velocity (`EMIT = velocity`; overdamped, engine-integrated).
 
 This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
 a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
@@ -155,23 +155,23 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("attraction_repulsion", level="particle", kind="lateral")
+@register_operator("attraction_repulsion", family="interaction", level="particle", kind="lateral")
 class AttractionRepulsion(Lateral):
-    PREDICTION = "first_derivative"             # emits a velocity (overdamped law)
+    EMIT = "velocity"             # emits a velocity (overdamped law)
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
     REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
     REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]
     # mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the
     # short-range Gaussian (p3,p4) the push; their balance sets the phase.
     MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
-    MORPHOLOGY_PRIOR = ["single_cluster", "multi_cluster", "lattice", "filaments"]
-    PARAM_ROLES = {"sigma": "interaction_length",
+    PARAM_ROLES = {"sigma": "interaction_length", "noise": "exploration_noise",
                    "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.sigma = float(params["sigma"])
         self.aggr = params.get("aggr", "mean")               # mean (default, matches the reference) or sum
+        self.noise = float(params.get("noise", 0.0))         # isotropic velocity noise (off by default)
         self.at = params.get("_at", "particle")
 
     def forward(self, H, mask=None):
@@ -199,6 +199,9 @@ class AttractionRepulsion(Lateral):
             deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
             dpos = dpos / deg.clamp(min=1.0)[:, None]
         dpos = dpos * occ[:, None]
+        if self.noise > 0.0:                                 # exploratory noise on the overdamped velocity
+            dpos = dpos + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None),
+                                                   device=pos.device) * occ[:, None]
         if mask is not None:
             dpos = dpos * mask[:, None].float()
         return {self.at: dpos}

@@ -1,0 +1,164 @@
+---
+title: "heading_align"
+subtitle: "Polarity_align (was heading_align) (agent set -> agent heading): FIRST-ORDER Vicsek polar alignment."
+---
+
+::: {.op-head}
+![](../figures/icons/exchange.png){.op-logo}
+
+[`exchange`]{.op-badge} [`acts on: cell`]{.op-badge} [`prediction: none`]{.op-badge}
+
+Polarity_align (was heading_align) (agent set -> agent heading): FIRST-ORDER Vicsek polar alignment.
+:::
+
+```{=html}
+<style>
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
+.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
+  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
+.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
+.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
+.op-card-body{display:flex;flex-direction:column;min-width:0}
+.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
+.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
+.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
+.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
+.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
+.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
+.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
+.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+</style>
+```
+
+## Role in Plexus
+
+- **Kind** &mdash; push / pull **Exchange**: set &harr; field.
+- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Reads** &mdash; &ndash;
+- **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
+- **Prediction** &mdash; `none`.
+- **Dimensions** &mdash; 2D, 3D.
+
+## Mechanism
+
+The orientational half of the Vicsek model, realised as a HEADING-STEER (like
+`flow_align`/`chemotax`) so it composes with the first-derivative embryo cell set
+(`glide` + `repel` + `mpm_to_agent` confine) WITHOUT the integration-order conflict
+that blocks the 2nd-derivative `alignment`/`cruise` operators (the engine forces one
+integration order per set; `mpm_to_agent` confine is `velocity`-locked).
+
+Each cell relaxes its polarity (unit heading n_i) toward the mean heading of its
+radius-graph neighbours j (the edges left by `radius_graph`), so neighbouring cells
+swim TOGETHER -- the polar-order term whose balance against jostling noise drives the
+flocking transition (flock <-> disorder, with bands/swirls between):
+
+    n_bar_i = mean_{j~i} n_j
+
+Cells with no neighbours (or n_bar ~ 0, i.e. neighbours cancel) keep their heading.
+`kind=exchange`, mutates `heading` in place and returns {} (a heading-steering op, like
+`flow_align`). Schedule it alongside `flow_align` (both steer heading before the next
+`glide`). `gain` is the alignment rate = the Vicsek order lever.
+
+Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet, PRL 75 (1995); the heading-kinematic
+(first-order) sibling of the acceleration-based `alignment` operator.
+
+## Parameters
+
+| parameter | role | default |
+|---|---|---|
+| `gain` | alignment_rate | 1.0 |
+| `noise` | orientation_noise | 0.0 |
+
+## Minimal spec
+
+```yaml
+operators:
+  - {op: heading_align, at: cell}
+```
+
+## Mechanism-search tags
+
+**Mechanism** &mdash; [`vicsek`]{.op-badge} [`polar_alignment`]{.op-badge} [`collective_motion`]{.op-badge} [`flocking`]{.op-badge}  
+
+## Related operators
+
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
+
+## Source
+
+[`src/plexus/operators/polarity_align.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/polarity_align.py) &mdash; the registered operator.
+
+```python
+"""polarity_align (was heading_align) (agent set -> agent heading): FIRST-ORDER Vicsek polar alignment.
+
+The orientational half of the Vicsek model, realised as a HEADING-STEER (like
+`flow_align`/`chemotax`) so it composes with the first-derivative embryo cell set
+(`glide` + `repel` + `mpm_to_agent` confine) WITHOUT the integration-order conflict
+that blocks the 2nd-derivative `alignment`/`cruise` operators (the engine forces one
+integration order per set; `mpm_to_agent` confine is `velocity`-locked).
+
+Each cell relaxes its polarity (unit heading n_i) toward the mean heading of its
+radius-graph neighbours j (the edges left by `radius_graph`), so neighbouring cells
+swim TOGETHER -- the polar-order term whose balance against jostling noise drives the
+flocking transition (flock <-> disorder, with bands/swirls between):
+
+    n_bar_i = mean_{j~i} n_j
+    n_i  <-  renorm( n_i + gain*dt * (n_hat - (n_hat . n_i) n_i) ),   n_hat = n_bar/|n_bar|
+
+Cells with no neighbours (or n_bar ~ 0, i.e. neighbours cancel) keep their heading.
+`kind=exchange`, mutates `heading` in place and returns {} (a heading-steering op, like
+`flow_align`). Schedule it alongside `flow_align` (both steer heading before the next
+`glide`). `gain` is the alignment rate = the Vicsek order lever.
+
+Refs: Vicsek, Czirok, Ben-Jacob, Cohen & Shochet, PRL 75 (1995); the heading-kinematic
+(first-order) sibling of the acceleration-based `alignment` operator.
+"""
+from __future__ import annotations
+
+import torch
+
+from plexus.models.base import Exchange
+from plexus.models.registry import register_operator
+
+
+@register_operator("polarity_align", "heading_align", family="polarity", level="cell", kind="exchange")
+class PolarityAlign(Exchange):                   # (alias `heading_align`, one migration cycle)
+    EMIT = None                                 # writes `heading` in place (Vicsek steering); returns {} — not an integrable delta
+    SUPPORTED_DIMS = [2, 3]
+    REQUIRES_PARAMS = []                        # no required params — gain/noise optional (defaults in __init__)
+    MECHANISM_TAGS = ["vicsek", "polar_alignment", "collective_motion", "flocking"]
+    PARAM_ROLES = {"gain": "alignment_rate", "noise": "orientation_noise"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "agent")
+        self.gain = float(params.get("gain", 1.0))
+        self.noise = float(params.get("noise", 0.0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        h = lvl.heading; occ = lvl.occ; dev = h.device
+        N, D = h.shape
+        dt = float(getattr(H.config, "dt", 1.0))
+        ei = getattr(lvl, "edge_index", None)
+        if ei is None or ei.numel() == 0:
+            return {}
+        i, j = ei[0], ei[1]                                       # row0 receiver i, row1 neighbour j
+        w = occ[j].to(h.dtype)                                    # mask dormant neighbours
+        hbar = torch.zeros(N, D, device=dev, dtype=h.dtype).index_add_(0, i, h[j] * w[:, None])
+        deg = torch.zeros(N, device=dev, dtype=h.dtype).index_add_(0, i, w)
+        hbar = hbar / deg.clamp(min=1.0)[:, None]                 # mean neighbour heading [N,D]
+        hmag = hbar.norm(dim=-1, keepdim=True)
+        hhat = hbar / hmag.clamp(min=1e-9)
+        perp = hhat - (hhat * h).sum(-1, keepdim=True) * h        # component of n_hat perp to n
+        new_h = h + (self.gain * dt) * perp
+        if self.noise > 0.0:                                      # Vicsek angular noise: order vs disorder
+            new_h = new_h + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None), device=dev)
+        new_h = new_h / new_h.norm(dim=-1, keepdim=True).clamp(min=1e-9)
+        keep = (occ > 0) & (deg > 0) & (hmag[:, 0] > 1e-7)        # keep heading where no coherent neighbour signal
+        if mask is not None:
+            keep = keep & (mask > 0)
+        lvl.heading = torch.where(keep[:, None], new_h, h)
+        return {}
+```

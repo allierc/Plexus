@@ -1,6 +1,6 @@
 ---
 title: "pulse_to_active_stress"
-subtitle: "The STRESS half: activation field -> per-particle active stress."
+subtitle: "The STRESS constitutive law: an activation field -> per-particle active stress."
 ---
 
 ::: {.op-head}
@@ -8,7 +8,7 @@ subtitle: "The STRESS half: activation field -> per-particle active stress."
 
 [`exchange`]{.op-badge} [`acts on: particle`]{.op-badge} [`prediction: none`]{.op-badge}
 
-The STRESS half: activation field -> per-particle active stress.
+The STRESS constitutive law: an activation field -> per-particle active stress.
 :::
 
 ```{=html}
@@ -42,7 +42,10 @@ The STRESS half: activation field -> per-particle active stress.
 
 ## Mechanism
 
-The mechanical alternative to `pulse_to_contraction` (the FORCE half). Instead of injecting a
+(Renamed from `pulse_to_active_stress`, kept as a transitional alias: the operator names the
+MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+
+The mechanical alternative to `active_force` (the FORCE law). Instead of injecting a
 per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
 elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
 
@@ -53,7 +56,7 @@ and is stretched/sheared by its neighbours. Interior forces appear only where A 
 the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
 not a pointwise push. This is the standard cardiac active-stress formulation.
 
-`kind=exchange`, `PREDICTION=None` (the stress is consumed by the MPM substep, never engine-
+`kind=exchange`, `EMIT=None` (the stress is consumed by the MPM substep, never engine-
 integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
 which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
 
@@ -88,16 +91,19 @@ operators:
 
 ## Related operators
 
-Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotaxis`](chemotaxis.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`apply_material_map`](apply_material_map.qmd), [`mls_mpm_mechanics`](mls_mpm_mechanics.qmd).
+Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`chemotax`](chemotax.qmd), [`active_force`](active_force.qmd), [`pulse_to_contraction`](pulse_to_contraction.qmd), [`active_stress`](active_stress.qmd).
 
 ## Source
 
-[`src/plexus/operators/pulse_to_active_stress.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/pulse_to_active_stress.py) &mdash; the registered operator.
+[`src/plexus/operators/active_stress.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/active_stress.py) &mdash; the registered operator.
 
 ```python
-"""pulse_to_active_stress -- the STRESS half: activation field -> per-particle active stress.
+"""active_stress -- the STRESS constitutive law: an activation field -> per-particle active stress.
 
-The mechanical alternative to `pulse_to_contraction` (the FORCE half). Instead of injecting a
+(Renamed from `pulse_to_active_stress`, kept as a transitional alias: the operator names the
+MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+
+The mechanical alternative to `active_force` (the FORCE law). Instead of injecting a
 per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
 elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
 
@@ -110,22 +116,22 @@ and is stretched/sheared by its neighbours. Interior forces appear only where A 
 the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
 not a pointwise push. This is the standard cardiac active-stress formulation.
 
-`kind=exchange`, `PREDICTION=None` (the stress is consumed by the MPM substep, never engine-
+`kind=exchange`, `EMIT=None` (the stress is consumed by the MPM substep, never engine-
 integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
 which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
 """
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as Fnn
 
 from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("pulse_to_active_stress", level="particle", kind="exchange")
-class PulseToActiveStress(Exchange):
-    PREDICTION = None                         # stress is consumed by the MPM substep, not integrated
+@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", level="particle", kind="exchange")
+class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
+    EMIT = None                         # stress is consumed by the MPM substep, not integrated
+    SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
     REQUIRES_PARAMS = ["from", "direction_from"]
     MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}
@@ -137,27 +143,17 @@ class PulseToActiveStress(Exchange):
         self.channel = int(params.get("channel", 0))
         self.direction_from = params.get("direction_from")
         if self.direction_from is None:
-            raise ValueError("pulse_to_active_stress needs `direction_from:` "
+            raise ValueError("active_stress needs `direction_from:` "
                              "(a vector_grid field giving the contraction axis n)")
         self.at = params.get("_at", "particle")
-
-    def _sample(self, field_grid, pos, W):
-        """Bilinear-sample a `[C, nx, ny]` field at particle positions -> `[N, C]`.
-        Same convention as pulse_to_contraction so force<->stress is a clean mechanism swap."""
-        gxn = (pos[:, 0] / W) * 2 - 1
-        gyn = (pos[:, 1] / 1.0) * 2 - 1
-        grid = torch.stack([gyn, gxn], -1)[None, None]              # grid_sample expects (x=ny, y=nx)
-        return Fnn.grid_sample(field_grid[None], grid, mode="bilinear",
-                               padding_mode="border", align_corners=True)[0, :, 0].t()
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         fld = H.fields[self.field_name]
-        W = float(getattr(H, "world_width", 1.0))
 
-        a = self._sample(fld.grid[self.channel:self.channel + 1], pos, W)[:, 0]   # [N] activation a(x)
-        n = self._sample(H.fields[self.direction_from].grid, pos, W)              # [N, 2] contraction axis
+        a = fld.sample(pos, self.channel)                                         # [N] activation a(x)
+        n = H.fields[self.direction_from].sample(pos)                             # [N, 2] contraction axis
         n = n / n.norm(dim=1, keepdim=True).clamp(min=1e-9)                        # unit
         gate = (a * lvl.occ).clamp(min=0.0)                                       # only inactive=0 particles off
         gain = getattr(lvl, "gain", None)                                         # optional per-particle gain map
