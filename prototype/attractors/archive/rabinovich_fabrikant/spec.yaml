@@ -1,0 +1,31 @@
+# Rabinovich-Fabrikant (1979) -- xd=y(z-1+x^2)+g x; yd=x(3z+1-x^2)+g y; zd=-2z(a+x y). A spiky
+# "sea-urchin". It is STIFF and basin-sensitive (many ICs escape to infinity), so: a tiny seed
+# ball placed tight on the attractor, a small dt, and a |v| clamp (safety valve) on the operator.
+general: {name: rabinovich_fabrikant, seed: 0, n_frames: 18000, dt: 0.001,
+          boundary: free, dim: 3, world: [5.0, 5.0, 3.0], record_cap: 800}
+sets:
+  cloud:
+    n: 120000
+    start: [-1.05, -0.05, 0.45, -0.95, 0.05, 0.55]      # tiny seed cube (center [-1,0,0.5] +/- 0.05)
+fields: {}
+# RF's chaotic attractor coexists with escape-to-infinity orbits, so ~20% of the cloud leaks out
+# along y. That is physical, not a bug: the clamp keeps them finite and `view_quantile` (below)
+# frames the bounded core (the urchin) so the renderer drops the far escapees out of frame.
+operators:
+  - {op: attractor_flow, at: cloud, system: rabinovich_fabrikant, alpha: 1.1, gamma: 0.87, clamp: 25.0}
+schedule: [attractor_flow]
+plotting:
+  color: [1.0, 0.6, 0.85]           # hot pink-white
+  splat_core: 0.95
+  splat_halo: 3.2
+  ref_quantile: 0.93
+  gamma: 0.80
+  core_power: 3.0
+  core_amt: 0.6
+  bloom: 0.45
+  trail_decay: 0.5
+  view_quantile: 0.80               # frame the bounded urchin core; escapees fall outside and are dropped
+  camera_azim: 0.5
+  camera_elev: 1.05
+  camera_turns: 0.4
+  camera_elev_drift: 0.1

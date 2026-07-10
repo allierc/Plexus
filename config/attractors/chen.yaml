@@ -1,0 +1,36 @@
+# chen attractor -- Chen (1999): a denser, more twisted double-scroll (a Lorenz cousin).
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -> open space (the flow is bounded by its dissipation).
+general:
+  name: chen
+  seed: 0
+  n_frames: 15000
+  dt: 0.002
+  boundary: free
+  dim: 3
+  world: [60.0, 60.0, 60.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [0.6, 0.6, 19.6, 1.4, 1.4, 20.4]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: chen, a: 35.0, b: 3.0, c: 28.0}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [0.2, 0.92, 0.78]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.4
+  camera_elev: 0.95
+  camera_elev_end: 1.4
+  camera_turns: 0.1

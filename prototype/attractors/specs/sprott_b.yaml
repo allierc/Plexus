@@ -1,0 +1,27 @@
+# Sprott B attractor -- Sprott (1994) case B, one of the algebraically simplest chaotic flows
+# (xd = yz, yd = x - y, zd = 1 - xy): just three terms, yet fully chaotic. A tiny seed cube is
+# stretched-and-folded into a twin-scroll ribbon.
+general: {name: sprott_b, seed: 0, n_frames: 10000, dt: 0.006,
+          boundary: free, dim: 3, world: [8.0, 8.0, 8.0], record_cap: 800}
+sets:
+  cloud:
+    n: 120000
+    start: [-0.15, -0.15, -0.25, 0.55, 0.55, 0.45]      # seed cube (center [0.2,0.2,0.1] +/- 0.35)
+fields: {}
+operators:
+  - {op: attractor_flow, at: cloud, system: sprott_b, a: 1.0}
+schedule: [attractor_flow]
+plotting:
+  color: [1.0, 0.30, 0.24]          # red
+  splat_core: 0.95
+  splat_halo: 3.2
+  ref_quantile: 0.93
+  gamma: 0.78
+  core_power: 3.0
+  core_amt: 0.6
+  bloom: 0.45
+  trail_decay: 0.45
+  camera_azim: 0.7
+  camera_elev: 1.08
+  camera_turns: 0.40
+  camera_elev_drift: 0.12

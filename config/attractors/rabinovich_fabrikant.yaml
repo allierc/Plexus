@@ -1,0 +1,36 @@
+# rabinovich_fabrikant attractor -- Rabinovich-Fabrikant (1979): a spiky sea-urchin (escape-prone; clamp + auto-frame).
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -> open space (the flow is bounded by its dissipation).
+general:
+  name: rabinovich_fabrikant
+  seed: 0
+  n_frames: 18000
+  dt: 0.001
+  boundary: free
+  dim: 3
+  world: [5.0, 5.0, 3.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [-1.05, -0.05, 0.45, -0.95, 0.05, 0.55]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: rabinovich_fabrikant, alpha: 1.1, gamma: 0.87, clamp: 25.0}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [1.0, 0.6, 0.85]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.5
+  camera_elev: 0.7
+  camera_elev_end: 1.15
+  camera_turns: 0.4

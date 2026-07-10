@@ -1,0 +1,27 @@
+# Chen (1999) -- xd=a(y-x); yd=(c-a)x-x z+c y; zd=x y-b z. A denser, more twisted double-scroll,
+# a Lorenz cousin. The large a=35 makes it fast/stiff, so it uses a small dt. Nearly planar like
+# Lorenz -> a small azimuth wobble + elevation drift, not a full orbit.
+general: {name: chen, seed: 0, n_frames: 15000, dt: 0.002,
+          boundary: free, dim: 3, world: [60.0, 60.0, 60.0], record_cap: 800}
+sets:
+  cloud:
+    n: 120000
+    start: [0.6, 0.6, 19.6, 1.4, 1.4, 20.4]             # seed cube (center [1,1,20] +/- 0.4), off the z-axis
+fields: {}
+operators:
+  - {op: attractor_flow, at: cloud, system: chen, a: 35.0, b: 3.0, c: 28.0}
+schedule: [attractor_flow]
+plotting:
+  color: [0.20, 0.92, 0.78]         # teal
+  splat_core: 0.95
+  splat_halo: 3.2
+  ref_quantile: 0.93
+  gamma: 0.78
+  core_power: 3.0
+  core_amt: 0.6
+  bloom: 0.45
+  trail_decay: 0.45
+  camera_azim: 0.4
+  camera_elev: 1.0
+  camera_turns: 0.12
+  camera_elev_drift: 0.32
