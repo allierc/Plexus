@@ -34,8 +34,12 @@ def main():
                     "> One line per round. The archive (`_archive_overnight/`) is the source of truth; "
                     "`knowledge.md` is the current distilled ledger.\n\n")
 
+    phi0 = os.path.join(HERE, "..", "pf", "_real", "phi0.npy")
     start = time.time(); r = 0
     while (time.time() - start) < a.hours * 3600 and r < a.max_rounds:
+        if not os.path.exists(phi0):                            # branch switched away? pause, don't error-spin
+            print("[pause] phi0.npy absent (branch switched?) — waiting 60s", flush=True)
+            time.sleep(60); continue
         node_cap = a.node_cap + (r // 4) * 4                    # deepen the search every 4 rounds
         pb = a.param_basin + (r // 12)                          # denser parameter basin over time
         t0 = time.time()
