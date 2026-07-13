@@ -38,37 +38,41 @@
 \maketitle
 
 \begin{abstract}
-Living systems are simultaneously mechanical, chemical, electrical, and
-developmental, yet existing computational frameworks each specialize in one aspect
---- particle mechanics, reaction--diffusion, graph neural networks, or multicellular
-dynamics. Plexus starts from the observation that these are not different simulators
-but different \emph{operators} acting on the same biological objects.
+The central challenge in computational biology is not parameter optimization but
+model discovery. When observations cannot be explained, optimizing existing
+parameters often finds compensating solutions rather than revealing the missing
+mechanism. Progress therefore requires searching over competing mechanistic
+models, not only over parameter values.
 
-We introduce Plexus, a formal language whose objects are five primitives:
-\emph{sets} of discrete entities across scales; the \emph{state} each element
-carries; \emph{fields} of continuous quantities over space; \emph{maps}, index
-relations between sets (containment and incidence alike); and \emph{operators} that
-transform state along maps. State is what makes the sets interchangeable: a particle
-carrying $\{\code{pos},\code{vel}\}$ and a neuron carrying
-$\{\code{voltage},\code{calcium}\}$ are the \emph{same} object under different
-schemas. An operator is a \emph{contract} --- \code{neuron\_voltage} names ``membrane
-state $\to$ its derivative,'' which Hodgkin--Huxley, Izhikevich, a Neural ODE, or an
-MLP all satisfy interchangeably --- so choosing biophysical or learned dynamics is
-choosing an implementation, never editing the engine.
+We introduce \emph{Plexus}, a formal language for biological modelling built on
+a common abstraction of living systems. Plexus is derived by decomposing the
+large existing corpus of simulation models---from neural computation
+(Hodgkin--Huxley, connectome and neural-network models), multicellular dynamics
+(vertex, Cellular Potts and active-matter models), transport processes
+(diffusion, chemotaxis and reaction--diffusion), and developmental dynamics
+(embryogenesis, morphogenesis and tissue mechanics)---into a common
+representation. Every simulation model is expressed through five primitives:
+\emph{sets} of biological entities, the \emph{states} carried by each entity,
+continuous spatial \emph{fields}, \emph{maps} relating entities across scales,
+and \emph{operators} describing their interactions and transformations.
+Operators are further organized by the hierarchy of interactions they implement
+(set--set, set--field, field--field, and parent--child), allowing heterogeneous
+simulation models to be decomposed, recomposed, and extended within a common
+language. Every primitive is paired with a differentiable counterpart:
+operators become differentiable functions, maps become differentiable
+transformations, and fields may be represented explicitly or as neural implicit
+representations. Biological models expressed in Plexus can therefore be
+optimized end-to-end without sacrificing mechanistic interpretability.
 
-Plexus is therefore not another simulator but a typed \emph{intermediate
-representation} for biological computation: models written for \textsc{Neuron},
-Jaxley, or a connectome GNN compile to the same sets, states, maps, fields, and
-operators, and existing simulators become \emph{backends} that implement one family
-of operator contracts --- Plexus is to a biophysics simulator what \textsc{LLVM} is
-to a C compiler. This single representation unifies mechanics, signalling, transport,
-growth, and neural computation, and is also a foundation for automated discovery.
-Because mechanisms
-are explicit, composable operators, inverse modelling can search not only parameter
-values but competing mechanistic explanations, and a persistent residual is read as
-evidence for a \emph{missing} operator --- so the language itself expands as new
-mechanisms are found. Simulation, inference, and hypothesis generation become stages
-of constructing an increasingly expressive language for living systems.
+This separation between biological description and numerical
+implementation enables a new workflow for scientific discovery. Agentic systems
+can first assemble and compare competing mechanistic hypotheses, then optimize
+their parameters against experimental observations, using persistent residuals
+to identify missing mechanisms and motivate new operators. Plexus therefore
+provides a common language in which simulation, inverse modelling, and
+hypothesis generation become successive stages of mechanistic model discovery.
+
+\end{abstract}
 \end{abstract}
 
 \part*{Part I --- The abstraction}
