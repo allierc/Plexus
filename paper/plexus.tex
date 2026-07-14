@@ -38,36 +38,36 @@
 \maketitle
 
 \begin{abstract}
-The central challenge in computational biology is not parameter optimization but
-model discovery. When observations cannot be explained, optimizing existing
-parameters often finds compensating solutions rather than revealing the missing
-mechanism. Progress therefore requires searching over competing mechanistic
-models, not only over parameter values.
 
 We introduce \emph{Plexus}, a formal language for biological modelling built on
-a common abstraction of living systems. Plexus is derived by decomposing the
-large existing corpus of simulation models---from neural computation
-(Hodgkin--Huxley, connectome and neural-network models), multicellular dynamics
-(vertex, Cellular Potts and active-matter models), transport processes
-(diffusion, chemotaxis and reaction--diffusion), and developmental dynamics
-(embryogenesis, morphogenesis and tissue mechanics)---into a common
-representation. Every simulation model is expressed through five primitives:
-\emph{sets} of biological entities, the \emph{states} carried by each entity,
-continuous spatial \emph{fields}, \emph{maps} relating entities across scales,
-and \emph{operators} describing their interactions and transformations.
-Operators are further organized by the hierarchy of interactions they implement
-(set--set, set--field, field--field, and parent--child), allowing heterogeneous
-simulation models to be decomposed, recomposed, and extended within a common
-language. Every primitive is paired with a differentiable counterpart:
-operators become differentiable functions, maps become differentiable
-transformations, and fields may be represented explicitly or as neural implicit
-representations. Biological models can therefore be assembled from reusable operators, 
-systematically compared, differentiated against observations, and progressively 
-extended as new mechanisms are discovered. In sum, Plexus provides a common language 
-in which simulation, inverse modelling, and hypothesis generation become successive stages 
-of model discovery.
+a common abstraction of living systems. Plexus is constructed by decomposing the
+large existing corpus of simulation models into a common representation. This
+includes neural computation (Hodgkin--Huxley, connectome and neural-network
+models), multicellular dynamics (vertex, Cellular Potts and active-matter
+models), transport processes (diffusion, chemotaxis and reaction--diffusion),
+and developmental dynamics (embryogenesis and morphogenesis).
 
-\end{abstract}
+Within Plexus, every simulation model is expressed through five primitives:
+\emph{sets} of biological entities, the \emph{states} carried by each entity,
+continuous spatial \emph{fields}, \emph{maps} describing relationships between
+entities and representations, and \emph{operators} implementing biological
+mechanisms. Operators are further organized by the hierarchy of interactions
+they implement (set--set, set--field, field--field, and parent--child). Every
+primitive is paired with a differentiable counterpart: operators become
+differentiable functions, maps become differentiable transformations, and
+fields may be represented explicitly or as neural implicit representations.
+Models originating from different simulation paradigms can therefore be
+expressed, composed, compared, and optimized within a single formalism without
+sacrificing mechanistic interpretability.
+
+This representation enables mechanistic analysis tha goes beyond forward modelisation.
+Competing models can be fitted against biological observations, their residuals
+compared, and persistent discrepancies interpreted as evidence for missing
+mechanisms rather than suboptimal parameters. Plexus provides a common language 
+in which simulation, inverse modelling, mechanistic analysis, and hypothesis generation 
+become successive stages of mechanistic model discovery.
+
+
 \end{abstract}
 
 \part*{Part I --- The abstraction}
