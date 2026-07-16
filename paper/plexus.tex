@@ -129,6 +129,78 @@ automatically. Mechanistic model discovery is therefore recast as the
 progressive construction, evaluation, and extension of an executable language
 of biological mechanisms.
 
+\section{A typed operator algebra}
+
+Plexus is built around three fundamental concepts: \emph{sets},
+\emph{states}, and \emph{operators}. Among them, operators are the primary
+objects of the language. A biological model is therefore not defined by a
+simulator, but by a composition of biological operators.
+
+An operator represents one biological mechanism independently of its numerical
+implementation. Examples include adhesion, chemotaxis, diffusion, electrical
+propagation, active stress, metabolism, growth, and cell division. Operators
+can be composed into larger dynamical systems, compared through their
+observable consequences, differentiated for inverse modelling, replaced by
+alternative numerical implementations, and ultimately discovered from
+experimental observations.
+
+Every operator is defined by a \emph{typed signature} and one or more
+implementations.
+
+The typed signature specifies
+
+\begin{itemize}
+\item the input sets,
+\item the output sets,
+\item the maps relating these sets,
+\item the state variables consumed and produced.
+\end{itemize}
+
+The implementation specifies how this transformation is numerically realized.
+Different numerical methods may therefore implement the same operator without
+changing its biological meaning.
+
+For example, the operator
+
+\[
+\texttt{chemotaxis}
+:
+(\mathrm{Cell},\mathrm{ConcentrationField})
+\xrightarrow{\mathrm{sample}}
+\mathrm{Cell}
+\]
+
+states that cells interact with a concentration field through a
+\texttt{sample} map. Likewise,
+
+\[
+\texttt{aggregate}
+:
+\mathrm{Particle}
+\xrightarrow{\mathrm{parent}}
+\mathrm{Cell}
+\]
+
+reduces particle information onto their parent cells through the
+\texttt{parent} map, while
+
+\[
+\texttt{synaptic\_transmission}
+:
+(\mathrm{Neuron},\mathrm{Synapse})
+\xrightarrow{\mathrm{pre},\,\mathrm{post}}
+\mathrm{Neuron}
+\]
+
+requires the \texttt{pre} and \texttt{post} maps relating synapses to their
+presynaptic and postsynaptic neurons.
+
+Maps are therefore not independent primitives of the language. They are part of
+the operator signature, defining how biological entities are related whenever a
+mechanism is applied. Operators become typed morphisms between biological sets,
+while implementations become interchangeable numerical realizations of the same
+biological semantics.
+
 \part*{Part I --- The abstraction}
 \addcontentsline{toc}{section}{Part I --- The abstraction}
 
