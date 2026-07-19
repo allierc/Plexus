@@ -20,40 +20,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -210,19 +176,65 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#sets-and-fields" id="toc-sets-and-fields" class="nav-link active" data-scroll-target="#sets-and-fields">Sets and fields</a></li>
-  <li><a href="#sets-and-types" id="toc-sets-and-types" class="nav-link" data-scroll-target="#sets-and-types">Sets and types</a></li>
-  <li><a href="#the-containment-graph" id="toc-the-containment-graph" class="nav-link" data-scroll-target="#the-containment-graph">The containment graph</a>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#the-language" id="toc-the-language" class="nav-link" data-scroll-target="#the-language">The language</a>
   <ul class="collapse">
-  <li><a href="#edge-sets" id="toc-edge-sets" class="nav-link" data-scroll-target="#edge-sets">Edge-sets: stateful connections</a></li>
+  <li><a href="#operators" id="toc-operators" class="nav-link" data-scroll-target="#operators">Operators</a></li>
+  <li><a href="#sets" id="toc-sets" class="nav-link" data-scroll-target="#sets">Sets</a></li>
+  <li><a href="#states" id="toc-states" class="nav-link" data-scroll-target="#states">States</a></li>
+  <li><a href="#fields" id="toc-fields" class="nav-link" data-scroll-target="#fields">Fields</a></li>
   </ul></li>
-  <li><a href="#operators" id="toc-operators" class="nav-link" data-scroll-target="#operators">Operators</a>
+  <li><a href="#the-operator-algebra" id="toc-the-operator-algebra" class="nav-link" data-scroll-target="#the-operator-algebra">The operator algebra</a></li>
+  <li><a href="#composing-biological-mechanisms" id="toc-composing-biological-mechanisms" class="nav-link" data-scroll-target="#composing-biological-mechanisms">Composing biological mechanisms</a></li>
+  <li><a href="#numerical-implementations" id="toc-numerical-implementations" class="nav-link" data-scroll-target="#numerical-implementations">Numerical implementations</a></li>
+  <li><a href="#mechanistic-inverse-modelling" id="toc-mechanistic-inverse-modelling" class="nav-link" data-scroll-target="#mechanistic-inverse-modelling">Mechanistic inverse modelling</a></li>
+  <li><a href="#agentic-mechanistic-discovery" id="toc-agentic-mechanistic-discovery" class="nav-link" data-scroll-target="#agentic-mechanistic-discovery">Agentic mechanistic discovery</a></li>
+  <li><a href="#appendix" id="toc-appendix" class="nav-link" data-scroll-target="#appendix">Appendix</a>
   <ul class="collapse">
-  <li><a href="#differentiating-division-and-death" id="toc-differentiating-division-and-death" class="nav-link" data-scroll-target="#differentiating-division-and-death">Differentiating division and death</a></li>
+  <li><a href="#reference-implementation" id="toc-reference-implementation" class="nav-link" data-scroll-target="#reference-implementation">Reference implementation</a>
+  <ul class="collapse">
+  <li><a href="#hierarchy" id="toc-hierarchy" class="nav-link" data-scroll-target="#hierarchy">Hierarchy</a></li>
+  <li><a href="#levels" id="toc-levels" class="nav-link" data-scroll-target="#levels">Levels</a></li>
+  <li><a href="#fields-1" id="toc-fields-1" class="nav-link" data-scroll-target="#fields-1">Fields</a></li>
+  <li><a href="#operators-1" id="toc-operators-1" class="nav-link" data-scroll-target="#operators-1">Operators</a></li>
+  <li><a href="#schedules" id="toc-schedules" class="nav-link" data-scroll-target="#schedules">Schedules</a></li>
+  <li><a href="#model-specification" id="toc-model-specification" class="nav-link" data-scroll-target="#model-specification">Model specification</a></li>
+  <li><a href="#reference-architecture" id="toc-reference-architecture" class="nav-link" data-scroll-target="#reference-architecture">Reference architecture</a></li>
   </ul></li>
-  <li><a href="#one-operator-many-implementations" id="toc-one-operator-many-implementations" class="nav-link" data-scroll-target="#one-operator-many-implementations">One operator, many implementations</a></li>
-  <li><a href="#dynamics-a-schedule" id="toc-dynamics-a-schedule" class="nav-link" data-scroll-target="#dynamics-a-schedule">Dynamics: a schedule</a></li>
-  <li><a href="#glossary" id="toc-glossary" class="nav-link" data-scroll-target="#glossary">Glossary</a></li>
+  <li><a href="#building-the-plexus-operator-atlas" id="toc-building-the-plexus-operator-atlas" class="nav-link" data-scroll-target="#building-the-plexus-operator-atlas">Building the Plexus operator atlas</a>
+  <ul class="collapse">
+  <li><a href="#from-simulators-to-operators" id="toc-from-simulators-to-operators" class="nav-link" data-scroll-target="#from-simulators-to-operators">From simulators to operators</a></li>
+  <li><a href="#normalization" id="toc-normalization" class="nav-link" data-scroll-target="#normalization">Normalization</a></li>
+  <li><a href="#operator-metadata" id="toc-operator-metadata" class="nav-link" data-scroll-target="#operator-metadata">Operator metadata</a></li>
+  <li><a href="#atlas-growth" id="toc-atlas-growth" class="nav-link" data-scroll-target="#atlas-growth">Atlas growth</a></li>
+  <li><a href="#validation-of-the-operator-algebra" id="toc-validation-of-the-operator-algebra" class="nav-link" data-scroll-target="#validation-of-the-operator-algebra">Validation of the operator algebra</a></li>
+  </ul></li>
+  <li><a href="#implementing-new-operators" id="toc-implementing-new-operators" class="nav-link" data-scroll-target="#implementing-new-operators">Implementing new operators</a>
+  <ul class="collapse">
+  <li><a href="#define-the-biological-mechanism" id="toc-define-the-biological-mechanism" class="nav-link" data-scroll-target="#define-the-biological-mechanism">Define the biological mechanism</a></li>
+  <li><a href="#separate-semantics-from-implementation" id="toc-separate-semantics-from-implementation" class="nav-link" data-scroll-target="#separate-semantics-from-implementation">Separate semantics from implementation</a></li>
+  <li><a href="#register-the-operator-and-its-implementations" id="toc-register-the-operator-and-its-implementations" class="nav-link" data-scroll-target="#register-the-operator-and-its-implementations">Register the operator and its implementations</a></li>
+  <li><a href="#validation" id="toc-validation" class="nav-link" data-scroll-target="#validation">Validation</a></li>
+  <li><a href="#promotion" id="toc-promotion" class="nav-link" data-scroll-target="#promotion">Promotion</a></li>
+  </ul></li>
+  <li><a href="#refactoring-guidelines" id="toc-refactoring-guidelines" class="nav-link" data-scroll-target="#refactoring-guidelines">Refactoring guidelines</a>
+  <ul class="collapse">
+  <li><a href="#general-principles" id="toc-general-principles" class="nav-link" data-scroll-target="#general-principles">General principles</a></li>
+  <li><a href="#recommended-workflow" id="toc-recommended-workflow" class="nav-link" data-scroll-target="#recommended-workflow">Recommended workflow</a></li>
+  <li><a href="#code-migration" id="toc-code-migration" class="nav-link" data-scroll-target="#code-migration">Code migration</a></li>
+  <li><a href="#incremental-evolution" id="toc-incremental-evolution" class="nav-link" data-scroll-target="#incremental-evolution">Incremental evolution</a></li>
+  </ul></li>
+  <li><a href="#reference-corpus-for-the-operator-atlas" id="toc-reference-corpus-for-the-operator-atlas" class="nav-link" data-scroll-target="#reference-corpus-for-the-operator-atlas">Reference corpus for the operator atlas</a>
+  <ul class="collapse">
+  <li><a href="#cell-and-tissue-mechanics" id="toc-cell-and-tissue-mechanics" class="nav-link" data-scroll-target="#cell-and-tissue-mechanics">Cell and tissue mechanics</a></li>
+  <li><a href="#reactiondiffusion-and-signalling" id="toc-reactiondiffusion-and-signalling" class="nav-link" data-scroll-target="#reactiondiffusion-and-signalling">Reaction–diffusion and signalling</a></li>
+  <li><a href="#neural-circuits" id="toc-neural-circuits" class="nav-link" data-scroll-target="#neural-circuits">Neural circuits</a></li>
+  <li><a href="#mechanobiology-and-collective-behaviour" id="toc-mechanobiology-and-collective-behaviour" class="nav-link" data-scroll-target="#mechanobiology-and-collective-behaviour">Mechanobiology and collective behaviour</a></li>
+  <li><a href="#inverse-modelling-and-differentiable-simulation" id="toc-inverse-modelling-and-differentiable-simulation" class="nav-link" data-scroll-target="#inverse-modelling-and-differentiable-simulation">Inverse modelling and differentiable simulation</a></li>
+  <li><a href="#image-analysis-and-quantitative-biology" id="toc-image-analysis-and-quantitative-biology" class="nav-link" data-scroll-target="#image-analysis-and-quantitative-biology">Image analysis and quantitative biology</a></li>
+  <li><a href="#building-the-atlas" id="toc-building-the-atlas" class="nav-link" data-scroll-target="#building-the-atlas">Building the atlas</a></li>
+  </ul></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -232,7 +244,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">The language</h1>
-<p class="subtitle lead">Operators, sets, states, and fields</p>
+<p class="subtitle lead">A typed intermediate representation for biological mechanisms</p>
 </div>
 
 
@@ -249,278 +261,507 @@ window.Quarto = {
 </header>
 
 
-<p>Plexus is a typed language for expressing biological mechanisms independently of how they are computed. Its fundamental object is the <strong>operator</strong> — a single mechanism (adhesion, diffusion, division, chemotaxis, electrical propagation, active stress) defined by a <em>typed signature</em>, which says <strong>what</strong> transformation it performs, and one or more <em>implementations</em>, which say <strong>how</strong> it is numerically realized. Operators act on three kinds of thing: <strong>sets</strong> — discrete biological entities across scales (particles, cells, neurons, synapses, tissues); the <strong>state</strong> each element of a set carries; and <strong>fields</strong> — continuous quantities defined over space (morphogens, pressure, potentials). A biological model is a <strong>schedule</strong>: an ordered composition of operators, iterated over time and kept differentiable throughout.</p>
-<p>These four concepts — <em>operators, sets, states, fields</em> — are the whole vocabulary, and they are the missing primitive: the place where particle mechanics, cellular interaction, neural dynamics, and reaction networks all become the same kind of thing. The rest of this page defines the objects the operators act on — sets, state, fields, and the maps between them — then the <strong>seven operator families</strong> that make up the algebra, and finally how a schedule composes them into differentiable dynamics.</p>
-<section id="sets-and-fields" class="level2">
-<h2 class="anchored" data-anchor-id="sets-and-fields">Sets and fields</h2>
-<p>Operators act on two kinds of object.</p>
-<p>A <strong>set</strong> is a discrete collection of elements of one kind: particles, cells, nuclei, metabolites, organisms. More precisely, <em>a set is a collection of elements with the same state schema and the same admissible operators</em> — every element carries the same state variables (position, velocity, concentration, …) and the same operators may act on it.</p>
-<p>A <strong>field</strong> is a continuous quantity defined on a grid: a chemical concentration, an activation level, a stiffness map, a pressure, a substrate signal. (Formally, <span class="math inline">\(f:\Omega\to\mathbb{R}^q\)</span> over a domain <span class="math inline">\(\Omega\)</span>.)</p>
-<p>Operators move state between these objects, and a model is a scheduled composition of them. Fields are <em>not</em> contained by sets and do not contain them; a set and a field meet only through an <strong>exchange</strong> operator — secretion, sensing, particle–grid transfer, field sampling.</p>
-</section>
-<section id="sets-and-types" class="level2">
-<h2 class="anchored" data-anchor-id="sets-and-types">Sets and types</h2>
-<p>A <em>new kind of object</em> is a new <strong>set</strong>. The <em>same object with different parameters</em> is a new <strong>type</strong> inside that set:</p>
-<pre class="text"><code>new kind of object       → new set
-same object, new params   → new type inside that set</code></pre>
-<p>In a spec, <code>types:</code> means parameter variants inside one set. Soft and stiff cells are two <strong>types</strong> of the same <code>cell</code> set: they share the same state variables and the same operators, and differ only in a parameter (here Young’s modulus). A nucleus, by contrast, is a different <strong>set</strong> — it has its own state and its own operators.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">types</span><span class="kw">:</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">soft</span><span class="kw">:</span><span class="at">  </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">40</span><span class="kw">}</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">200</span><span class="kw">}</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">nucleus</span><span class="kw">:</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">membrane_particle</span><span class="kw">:</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">parent</span><span class="kw">:</span><span class="at"> cell</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">per_parent</span><span class="kw">:</span><span class="at"> </span><span class="dv">64</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li><code>cell</code>, <code>nucleus</code>, and <code>membrane_particle</code> are different <strong>sets</strong> — different state, different operators.</li>
-<li><code>soft</code> and <code>stiff</code> are <strong>types</strong> inside <code>cell</code> — same state and operators; only the parameters differ.</li>
-</ul>
-<p>Keeping the two apart keeps operators simple: an operator names the one set it acts on (<code>at: nucleus</code>) and never branches on a role flag at run time. A type is handled by a per-element parameter lookup, not by a separate code path.</p>
-</section>
-<section id="the-containment-graph" class="level2">
-<h2 class="anchored" data-anchor-id="the-containment-graph">The containment graph</h2>
-<p>Sets may contain other sets through <strong>parent maps</strong>. A nucleus belongs to a cell; a membrane particle belongs to a cell; a metabolite belongs to a cell. Each parent map,</p>
-<p><span class="math display">\[\pi_{\alpha\to\beta} : S_\alpha \longrightarrow S_\beta,\]</span></p>
-<p>assigns every element of one set to the element of another that contains it. These maps form a <strong>containment graph</strong>, not a fixed scale ladder: a set may have several child sets at once, and a cell is assembled from all of them.</p>
-<p>So a cell is <strong>not one fibre</strong>. It is a <em>bundle of fibres</em>. The <em>fibre</em> of a parent map over an element <span class="math inline">\(b\)</span> is everything that maps to it — <span class="math inline">\(\pi_{\alpha\to\beta}^{-1}(b)=\{x : \pi_{\alpha\to\beta}(x)=b\}\)</span>; the fibre of <span class="math inline">\(\pi_{\text{membrane}\to\text{cell}}\)</span> over a cell <span class="math inline">\(c\)</span> is the membrane particles of <span class="math inline">\(c\)</span>. The cell is the union of <em>all</em> its child fibres — membrane particles, cytoplasmic particles, nucleus, metabolites — each a distinct set mapping to the same parent.</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:58.0%"></p>
-<figcaption>Containment across scales: each parent map <span class="math inline">\(\pi\)</span> sends an element to the one that contains it. A cell is a <em>bundle</em> of fibres — here its particles and metabolites; in general also its membrane, nucleus, and other child sets.</figcaption>
-</figure>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
 </div>
-<p>Formally the container is a directed acyclic graph (sets are nodes, parent maps are directed edges, no cycles); the familiar <span class="math inline">\(S_0\to S_1\to S_2\)</span> scale ladder is just the chain-shaped special case. Each set carries its own state schema and operators, so adding structure is adding a set and a parent map — never an engine change. (For the formally inclined: this is the many-sorted, or <em>typed</em>, discipline an ECS or a relational database already uses — one sort per set, joined by maps.)</p>
-<p>The distinction between a new set and a new type can be read straight off a table:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th></th>
-<th><strong>Different sets</strong> (<span class="math inline">\(S_\alpha\)</span>)</th>
-<th><strong>Types within one set</strong> (<span class="math inline">\(\tau\)</span>)</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>example</td>
-<td>membrane vs nucleus vs metabolite</td>
-<td>soft cell vs stiff cell</td>
-</tr>
-<tr class="even">
-<td>differ in</td>
-<td>state space + operators</td>
-<td>only parameter values</td>
-</tr>
-<tr class="odd">
-<td>in the spec</td>
-<td>separate <code>sets:</code> with <code>parent:</code></td>
-<td>a <code>types:</code> block inside one set</td>
-</tr>
-<tr class="even">
-<td>dispatch</td>
-<td>by name (<code>at: nucleus</code>)</td>
-<td>per-row lookup <span class="math inline">\(p[\tau(i)]\)</span></td>
-</tr>
-</tbody>
-</table>
-<section id="edge-sets" class="level3">
-<h3 class="anchored" data-anchor-id="edge-sets">Edge-sets: stateful connections</h3>
-<p>The parent map is a tree — every element has exactly one parent. But a <em>connection</em> joins two elements and belongs to neither: a chemical synapse has one presynaptic and one postsynaptic neuron. Which representation is correct depends on whether the connection carries <strong>state of its own</strong>:</p>
+<div class="callout-body-container">
+<p>We introduce <em>Plexus</em>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are biological operators. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an algebra of biological operators. Second, to decompose the existing corpus of simulation models into this common language. Third, to construct differentiable implementations of these operators so that mechanistic models can be directly inferred from biological data.</p>
+</div>
+</div>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Computational biology has produced a rich ecosystem of simulation frameworks. Neural simulators model electrical activity, reaction–diffusion systems model chemical transport, particle and continuum methods model mechanics, while vertex, Cellular Potts and active-matter models describe multicellular tissues. These frameworks remain however largely incompatible. Combining electrical signalling, mechanics, metabolism and development often requires coupling multiple specialized simulators whose underlying abstractions differ fundamentally. Each simulator introduces its own representation of biological mechanisms, making models difficult to compare, compose and extend. This fragmentation is not primarily a numerical problem but more a language problem.</p>
+<p>Instead of treating simulation frameworks as fundamental, we treat biological mechanisms as the primary objects. To this aim, Plexus introduces an intermediate representation whose central elements are biological operators. Operators describe mechanisms such as adhesion, diffusion, division, chemotaxis, electrical propagation or active stress independently of their numerical implementation. In this perspective, biological modeling becomes analogous to compiler design. Just as modern compilers separate programming languages from their implementations through an intermediate representation, Plexus separates biological mechanisms from their numerical implementations.</p>
+<p>This viewpoint defines a broader research program. First, Plexus seeks to construct an algebra of biological operators whose elements can be composed into complex dynamical systems, compared through their observable consequences, and expanded as new mechanisms are discovered. Second, Plexus aims to extract this operator algebra from the existing corpus of biological simulation models. Rather than viewing current frameworks as competing simulators, we regard them as repositories of reusable mechanisms. By decomposing these models into a common language, we seek to identify a compact vocabulary capable of expressing a wide range of biological dynamics across scales. Third, Plexus constructs differentiable counterparts of these operator compositions. Differentiability allows mechanistic models to be fitted directly to biological data, residuals to be interpreted mechanistically, and missing operators intuited.</p>
+<p>Finally, because biological mechanisms are represented in a formal language rather than embedded in simulator-specific code, they become amenable to automated reasoning. The explicit separation between biological semantics and numerical implementations allows agentic systems to operate directly on the language itself, composing, comparing and optimizing mechanistic models without modifying simulator code. The search for biological explanations therefore becomes a search over model structures rather than simulator implementations. In sum, mechanistic discovery can proceed by iteratively assembling operator compositions, fitting them to observations, and extending the language whenever existing operators prove insufficient.</p>
+</section>
+<section id="the-language" class="level2">
+<h2 class="anchored" data-anchor-id="the-language">The language</h2>
+<p>Plexus defines a typed language for expressing biological mechanisms independently of their numerical realization. The language is built around four fundamental concepts: <em>operators</em>, <em>sets</em>, <em>states</em>, and <em>fields</em>. Biological models are therefore represented as compositions of operators acting on discrete and continuous biological objects rather than simulator-specific algorithms.</p>
+<section id="operators" class="level3">
+<h3 class="anchored" data-anchor-id="operators">Operators</h3>
+<p>Operators are the fundamental objects of the language. An operator represents a single biological mechanism, such as adhesion, chemotaxis, diffusion, electrical propagation, active stress, metabolism, growth, or cell division. Every operator is defined by a typed signature and one or more numerical implementations. The signature specifies <em>what</em> biological transformation is performed, whereas implementations specify <em>how</em> it is numerically realized. The signature specifies</p>
 <ul>
-<li><strong>Passive</strong> — a fixed scalar (a synaptic weight <span class="math inline">\(W_{ij}\)</span>, a spring constant) is just a <strong>relation</strong> <span class="math inline">\(E\subseteq S_k\times S_k\)</span> with an edge attribute: the <code>edge_index</code> a <code>radius_graph</code>-style rewire leaves, read in place by a lateral operator.</li>
-<li><strong>Dynamical</strong> — an edge that carries its own evolving state (synaptic gating, a plastic weight, a remodelling adhesion) is promoted to an <strong>edge-set</strong> <span class="math inline">\(S_e\)</span>: an ordinary set whose <em>elements are the connections</em>, with its own state schema and operators, still parented to the <code>network</code>, but joined to its endpoints by <strong>pre and post maps</strong> <span class="math inline">\(\iota_{\text{pre}},\iota_{\text{post}}:S_{\text{synapse}}\to S_{\text{neuron}}\)</span>.</li>
+<li>the input sets,</li>
+<li>the output sets,</li>
+<li>the state variables consumed and produced,</li>
+<li>the maps relating the participating sets.</li>
 </ul>
-<p>The pre/post maps are index buffers (<code>.pre</code>, <code>.post</code>) — the exact analogue of <code>.parent</code> — so an operator gathers/scatters along them with the same machinery it uses along containment, and the engine gains no special case. Connectome <strong>signalling</strong> is then just those maps composed: endpoint voltages are <em>gathered</em> onto each synapse, the synapse integrates its own state, its weighted output current is <em>aggregated</em> back onto the postsynaptic neuron, and the neuron integrates its voltage — the passive first-order ODE <span class="math inline">\(\tau_i\,\dot v_i = -v_i + b_i + \sum_j W_{ij}\,\phi(v_j) + I_i\)</span> carried by the registered <a href="library/signal.html"><code>signal</code></a> operator. The same shape recurs for ligand–receptor contacts, cell–cell junctions, and vascular segments.</p>
+<p>Maps define the relations required by the mechanism. They determine, for example, which particle belongs to which cell, which synapses connect which neurons, or how cells relate to a continuous field. Plexus incorporates maps into the operator, making operators typed morphisms between biological sets.</p>
+</section>
+<section id="sets" class="level3">
+<h3 class="anchored" data-anchor-id="sets">Sets</h3>
+<p>Sets represent collections of biological entities. Examples include genes, proteins, particles, cells, neurons, synapses, tissues, organs and organisms. Sets naturally organize into hierarchies reflecting biological organization. Genes regulate proteins, proteins determine cellular behaviour, cells assemble into tissues, tissues form organs, and organs compose organisms. Each level is represented uniformly as a set, allowing the same language to describe intracellular signalling, multicellular mechanics, developmental processes and organ-level physiology.</p>
+</section>
+<section id="states" class="level3">
+<h3 class="anchored" data-anchor-id="states">States</h3>
+<p>Every element of a set carries a state describing its current biological condition. While sets define <em>what</em> biological entities exist, states define <em>what each entity carries</em>. The state schema is specific to each set. A particle may carry position, velocity and deformation gradient; a neuron membrane voltage and calcium; a cell polarity, stiffness and gene-expression levels; a synapse conductance and plastic weight. Operators transform states. They consume selected state variables and produce updates to others, while leaving the underlying biological entities unchanged.</p>
+</section>
+<section id="fields" class="level3">
+<h3 class="anchored" data-anchor-id="fields">Fields</h3>
+<p>Fields represent continuous quantities defined over space rather than over discrete biological entities. Examples include morphogen concentrations, pressure, extracellular signalling molecules, electric potentials, and material properties. Fields complement sets. While sets describe discrete biological entities, fields describe the continuous environment in which these entities evolve. Operators couple sets and fields through explicit maps relating discrete entities to continuous spatial representations.</p>
 </section>
 </section>
-<section id="operators" class="level2">
-<h2 class="anchored" data-anchor-id="operators">Operators</h2>
-<p>A GNN is an <strong>operator</strong> <span class="math inline">\(\mathcal{O}\)</span> dispatched by the relation it acts on. An operator changes exactly one of the three things the container holds: the <strong>state</strong> on the nodes, the <strong>relations</strong> between them, or the <strong>entities</strong> themselves. <strong>Four dynamics operators</strong> move <em>state</em> along a fixed structure, one per relation the container admits. <strong>Rewire</strong> changes the <em>relations</em> — the edge set <span class="math inline">\(E\)</span>, which nodes interact. <strong>Divide</strong> and <strong>Die</strong> change the <em>entities</em> — the node set <span class="math inline">\(|S_k|\)</span>, which nodes exist. Those last three return no state delta. The four dynamics operators:</p>
-<p><span class="math display">\[
-\begin{aligned}
-\textbf{Lateral}\quad   &amp; \mathcal{O}_E,\ E\subseteq S_k\times S_k
-  &amp;&amp; \text{(ODE interaction } + \text{ graph Laplacian)}\\
-\textbf{Aggregate}\ \uparrow\quad &amp; \textstyle\sum_{\pi}: S_k \to S_{k+1}
-  &amp;&amp; \text{(reduction over fibres of } \pi)\\
-\textbf{Broadcast}\ \downarrow\quad &amp; \pi^{*}: S_{k+1}\to S_k
-  &amp;&amp; \text{(lift along } \pi)\\
-\textbf{Exchange}\quad  &amp; \text{push},\ \text{pull}: S_k \leftrightarrow F
-  &amp;&amp; \text{(set} \leftrightarrow \text{field; bipartite)}
-\end{aligned}
-\]</span></p>
-<p>Two pieces of notation: <span class="math inline">\(S_k\times S_k\)</span> is the set of all node <em>pairs</em>, so an edge set <span class="math inline">\(E\subseteq S_k\times S_k\)</span> is simply a graph on <span class="math inline">\(S_k\)</span> — which nodes interact (e.g.&nbsp;neighbours within a cutoff radius, or a fixed connectome). The two halves of a field coupling are <em>push</em> (<span class="math inline">\(S_k\to F\)</span>, which writes object state into the field) and <em>pull</em> (<span class="math inline">\(F\to S_k\)</span>, which reads it back).</p>
-<p><strong>Lateral <span class="math inline">\(\mathcal{O}_E\)</span>.</strong> Message passing <em>within</em> one scale along the edges <span class="math inline">\(E\)</span>. It carries the within-scale physics: pairwise interactions (forces, adhesion, signalling) plus a graph Laplacian that diffuses or smooths quantities over the edges. Examples: particle–particle elasticity, cell–cell flocking or adhesion, neuron–neuron signal propagation.</p>
-<p><strong>Aggregate <span class="math inline">\(\textstyle\sum_\pi\)</span> (up).</strong> Pools each parent’s fibre into one quantity — a cell’s position is the mean of its particles, its metabolic state the sum over its molecules. This is how fine-scale dynamics are summarised into, and so move, the coarser object above.</p>
-<p><strong>Broadcast <span class="math inline">\(\pi^{*}\)</span> (down).</strong> The adjoint of Aggregate: it copies a parent’s state to every child in its fibre, so a decision taken at the cell level (a body force, a polarity, a signalling output) is applied identically to all of that cell’s particles. Aggregate and Broadcast are a matched up/down pair on the same map <span class="math inline">\(\pi\)</span>.</p>
-<p><strong>Exchange (push / pull).</strong> Couples a set to a field: <em>push</em> deposits/secretes object state into the field (set → field), <em>pull</em> samples/senses the field back onto the objects (field → set). The relation is bipartite (objects <span class="math inline">\(\leftrightarrow\)</span> grid); it is exactly the MPM particle–grid transfer (P2G/G2P) and chemotactic secretion/sensing.</p>
-<p><strong>Rewire <span class="math inline">\(\mathcal{R}\)</span> (relations).</strong> Rewire changes the <em>relation</em> <span class="math inline">\(E\subseteq S_k\times S_k\)</span> on which the lateral operators act — <em>which</em> nodes are neighbours — and returns no state delta. A <em>geometric</em> relation is rebuilt every tick from the live configuration (a <strong>radius graph</strong>: all pairs within a cutoff; or a <span class="math inline">\(k\)</span>-nearest-neighbour or Delaunay graph), so the interaction graph tracks motion, growth, and division; a <em>fixed</em> relation (a connectome) is built once and never rewired. Rewire is of a different nature from the other five: it neither moves state nor changes who exists — it maintains the <em>scaffold</em> the dynamics run on. Separating <em>who</em> interacts (Rewire) from <em>how</em> they interact (Lateral) also turns a dense <span class="math inline">\(O(N^2)\)</span> force law into <span class="math inline">\(O(|E|)\)</span> message passing.</p>
-<p><strong>Divide and Die (entities).</strong> The dynamics operators move <em>state</em> and Rewire moves <em>relations</em>, both while the node set stays fixed; living matter also rewrites its own membership. <strong>Divide</strong> <span class="math inline">\(\mathcal{B}: x \mapsto \{x',x''\}\)</span> (proliferation) and <strong>Die</strong> <span class="math inline">\(\mathcal{D}: x \mapsto \varnothing\)</span> (apoptosis / efflux) are the only operators that change the <em>entities</em> themselves — the cardinality <span class="math inline">\(|S_k|\)</span>. For a <em>living</em> system they are as primordial as the four dynamics operators: a tissue is defined as much by the cells it makes and loses as by how they move. Everything else assumes the cells it acts on already exist.</p>
+<section id="the-operator-algebra" class="level2">
+<h2 class="anchored" data-anchor-id="the-operator-algebra">The operator algebra</h2>
+<p>The language introduced in the previous section defines the objects manipulated by Plexus. We now define the elementary operator families from which biological models are constructed. The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator families. Rather than introducing a new operator for every biological phenomenon, Plexus identifies a compact operator algebra that can be reused across mechanics, signalling, metabolism, development and physiology.</p>
+<p>The proposed operator algebra consists of seven elementary families (see the figure below):</p>
+<ul>
+<li><strong>Lateral</strong>: interactions within a biological set.</li>
+<li><strong>Aggregate</strong>: many-to-one transformations across biological scales.</li>
+<li><strong>Broadcast</strong>: one-to-many transformations across biological scales.</li>
+<li><strong>Exchange</strong>: transformations between sets and fields.</li>
+<li><strong>Rewire</strong>: modification of relations between biological entities.</li>
+<li><strong>Divide</strong>: creation of biological entities.</li>
+<li><strong>Die</strong>: removal of biological entities.</li>
+</ul>
+<p>The first four families transform biological state while preserving the underlying biological organization. Rewire modifies the interaction graph, whereas Divide and Die modify the biological entities themselves. Together they form the elementary computational vocabulary of Plexus.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
-<figcaption>The operators, grouped by what they change. The first four are <em>dynamics</em> — they move <em>state</em> along a fixed structure (Lateral within a set; Aggregate/Broadcast across containment <span class="math inline">\(\pi\)</span>; Exchange to/from a field). The last three return no state delta: <em>Rewire</em> changes the <em>relations</em> — the edge set <span class="math inline">\(E\)</span>, which nodes interact (a radius graph rebuilt each tick, dashed cutoff); <em>Divide</em> and <em>Die</em> change the <em>entities</em> — the node set <span class="math inline">\(|S_k|\)</span>, on a fixed buffer with per-element occupancy <span class="math inline">\(w\)</span>.</figcaption>
+<figcaption>The elementary operator algebra of Plexus. Lateral, Aggregate, Broadcast and Exchange transform biological state. Rewire modifies biological relations, whereas Divide and Die modify biological entities. Complex biological models are obtained by composing these elementary operator families.</figcaption>
 </figure>
 </div>
-<section id="differentiating-division-and-death" class="level3">
-<h3 class="anchored" data-anchor-id="differentiating-division-and-death">Differentiating division and death</h3>
-<p>Changing <span class="math inline">\(|S_k|\)</span> is the one move that resists automatic differentiation: it alters a tensor’s shape, and <em>“does this cell divide?”</em> is a discrete event with no useful gradient. Plexus keeps differentiable with a <strong>continuous-occupancy</strong> formulation. Rather than resize, hold a fixed buffer of <span class="math inline">\(N_{\max}\)</span> slots and give every element a <strong>mass</strong> <span class="math inline">\(w_i\in[0,1]\)</span>:</p>
-<ul>
-<li><strong>Die</strong> decays <span class="math inline">\(w_i\to 0\)</span> — the slot goes dormant, not deleted.</li>
-<li><strong>Divide</strong> activates a dormant slot, copies the mother’s state with a small perturbation, and splits the mass <span class="math inline">\(w\to(\tfrac{w}{2},\tfrac{w}{2})\)</span>.</li>
-</ul>
-<p><em>Every operator then honours <span class="math inline">\(w\)</span></em>: Aggregate becomes a <strong>mass-weighted</strong> reduction <span class="math inline">\(\left(\sum_i w_i x_i\right)/\sum_i w_i\)</span>, Lateral weights each message by <span class="math inline">\(w_j\)</span>, and so on — so the boolean selector mask is just the <span class="math inline">\(\{0,1\}\)</span> special case of <span class="math inline">\(w\)</span>. The trajectory between events is now smooth in <span class="math inline">\(w\)</span>, so gradients flow on a fixed-shape tensor (and <code>torch.compile</code> still applies).</p>
-<p>The one genuinely non-differentiable part — the integer decision of <em>when</em> to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division <em>policy</em>; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death <em>rates</em>; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the <em>use both</em> recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.</p>
-<p>Sets, fields, and these operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields.</p>
+<p><strong>Lateral.</strong> Lateral operators describe interactions between entities belonging to the same set. Typical examples include mechanical forces between particles, adhesion between neighbouring cells, electrical communication between neurons, or biochemical interactions within a metabolic network.</p>
+<p><strong>Aggregate.</strong> Aggregate operators propagate information from many entities to a higher level of biological organization. Examples include computing cellular properties from their constituent particles or accumulating synaptic currents acting on a neuron.</p>
+<p><strong>Broadcast.</strong> Broadcast operators perform the complementary transformation, propagating information from higher organizational levels toward their constituents. Aggregate and Broadcast therefore define the upward and downward flow of information across biological scales.</p>
+<p><strong>Exchange.</strong> Exchange operators couple discrete biological entities with continuous fields. Typical examples include secretion, sensing, transport, uptake, or particle–grid transfer.</p>
+<p><strong>Rewire.</strong> Rewire operators modify the relations between biological entities without changing the entities themselves. They update neighbour graphs, contact networks, developmental connectivity or other interaction structures, determining which entities participate in subsequent operator evaluations.</p>
+<p><strong>Divide and Die.</strong> Living systems continuously modify their own composition. Divide creates new biological entities, whereas Die removes existing ones. These operators modify the biological organization itself rather than only its state.</p>
 </section>
+<section id="composing-biological-mechanisms" class="level2">
+<h2 class="anchored" data-anchor-id="composing-biological-mechanisms">Composing biological mechanisms</h2>
+<p>Biological models are expressed as compositions of elementary operators. Rather than embedding all mechanisms within a monolithic simulator, Plexus represents a model as an ordered sequence of operator applications. This sequence, called the <em>schedule</em>, specifies both the order and the frequency with which operators are evaluated. Formally, one simulation step is the composition</p>
+<p><span class="math display">\[\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1,\]</span></p>
+<p>whose repeated application generates the system dynamics</p>
+<p><span class="math display">\[x_{t+1} = \Phi(x_t).\]</span></p>
+<p>The schedule therefore describes the temporal organization of biological mechanisms. Different operators may evolve on different time scales. Mechanical interactions may be evaluated every simulation step, whereas diffusion, growth or cell division may occur less frequently. A biological model therefore becomes a multi-rate composition of biological mechanisms rather than a monolithic numerical solver.</p>
+<p>Operators are pure transformations. Rather than modifying biological state directly, every operator returns its contribution to the system evolution. If operator <span class="math inline">\(\mathcal{O}_i\)</span> produces the increment <span class="math inline">\(\Delta_i\)</span>, the complete update is obtained by</p>
+<p><span class="math display">\[\Delta = \sum_i \Delta_i,\]</span></p>
+<p>before being passed to the numerical implementation. This formulation has two important consequences. First, biological mechanisms remain independent and composable: introducing a new mechanism simply requires adding a new operator to the schedule. Second, the language remains independent of its numerical realization. The schedule specifies the biological model, whereas the numerical implementation specifies how that model is evaluated.</p>
 </section>
-<section id="one-operator-many-implementations" class="level2">
-<h2 class="anchored" data-anchor-id="one-operator-many-implementations">One operator, many implementations</h2>
-<p>A signature is a biological <em>contract</em>; it does not fix the numerics. Every operator may carry several <strong>implementations</strong> that satisfy the same signature and differ only in how they compute. A mechanical <strong>Lateral</strong> interaction can be realized by MLS-MPM, finite elements, a vertex model, or a phase field; a neuronal one by Hodgkin–Huxley, a Neural ODE, or a graph neural network; a field update by finite differences, spectral methods, or a neural implicit. Choosing an implementation is a numerical decision, never a biological one, so the same model runs on different backends without changing a single operator, map, or schedule.</p>
-<p>This splits progress into two independent axes. <strong>Biological</strong> innovation is a new operator or a new composition; <strong>numerical</strong> innovation is a faster or more accurate implementation of an existing one. Existing simulators then stop being rival paradigms and become complementary <strong>backends</strong>, each implementing one family of operator contracts — which is what makes mechanism search well posed: hold the sets, state, and maps fixed, and search over the implementation of each contract and the composition of the schedule.</p>
+<section id="numerical-implementations" class="level2">
+<h2 class="anchored" data-anchor-id="numerical-implementations">Numerical implementations</h2>
+<p>The operator algebra defines the biological semantics of a model independently of its numerical realization. Every operator may admit multiple implementations satisfying the same typed signature. These implementations differ in numerical realization while preserving identical biological semantics. Selecting an implementation is therefore a numerical decision rather than a biological one.</p>
+<p>This abstraction naturally accommodates a broad range of computational methods. Mechanical operators may be implemented using Material Point Methods, finite elements, vertex models, phase-field methods, Cellular Potts models or optimal-transport formulations. Signalling operators may employ Hodgkin–Huxley equations, graph neural networks or Neural ODEs. Likewise, field operators may use finite differences, finite elements, neural implicit representations or spectral methods. These implementations coexist within the same language because they satisfy identical operator contracts.</p>
+<p>Different implementations may also employ different numerical integration schemes. Depending on the operator, implementations may evolve first-order states such as concentrations or membrane voltages, second-order states such as mechanical accelerations, or rely on explicit, implicit or adaptive solvers. These choices affect computational efficiency and numerical accuracy but not the biological interpretation of the model.</p>
+<p>This distinction fundamentally changes how biological simulations are compared. Traditional frameworks compare complete simulators, intertwining biological mechanisms with numerical algorithms. Plexus instead separates these two questions. Biological models are compared through the operators they compose, whereas numerical methods are compared through the implementations realizing those operators.</p>
+<p>This separation establishes two independent axes of scientific progress. Biological innovation corresponds to discovering new operators or new operator compositions, whereas numerical innovation corresponds to developing more efficient or more accurate implementations of existing operators. Existing simulation frameworks therefore become complementary backends implementing a common intermediate representation rather than competing modelling paradigms.</p>
 </section>
-<section id="dynamics-a-schedule" class="level2">
-<h2 class="anchored" data-anchor-id="dynamics-a-schedule">Dynamics: a schedule</h2>
-<p>A simulation is a multi-rate composition of operators, declared as a <code>Schedule</code>. In math terms, one tick is the composition</p>
-<p><span class="math display">\[\Phi=\mathcal{O}_n\circ\cdots\circ\mathcal{O}_1,\]</span></p>
-<p>and the dynamics is its iteration <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span> — a discrete flow. <em>Multi-rate</em> means the operators need not all fire on every tick: a slow process (diffusion, cell division) can be scheduled to act once every <span class="math inline">\(k\)</span> ticks, while a fast one (mechanics) runs every tick, so a single <code>Schedule</code> interleaves dynamics that evolve on different time scales. Each operator is <strong>pure</strong>: instead of editing the state in place, it only <em>returns its contribution</em> — a delta <span class="math inline">\(\Delta_i\)</span> (a time-derivative term) for the sets it touches. The schedule sums the deltas acting on each set and integrates once per tick.</p>
-<p>An operator declares the <strong>order</strong> of its delta, since a time-derivative can be of position or of velocity. A <em>first-order</em> (overdamped) operator returns a velocity, integrated <span class="math inline">\(x_{t+1}=x_t+\Delta t\sum_i\Delta_i\)</span>; a <em>second-order</em> (inertial) operator returns an acceleration, integrated <span class="math inline">\(v_{t+1}=v_t+\Delta t\sum_i\Delta_i,\ x_{t+1}=x_t+\Delta t\,v_{t+1}\)</span>. The order is a fixed property of each operator (<code>PREDICTION</code>): attraction–repulsion is first order, boids flocking is second; all operators on one set must agree, so the set integrates as a single order. Friction in the inertial case is itself an operator (a <code>drag</code> delta <span class="math inline">\(-\kappa v\)</span>), not a special term in the integrator.</p>
-<p>Two consequences follow: several operators may act on the same set in one tick (their deltas simply add — none overwrites another), and because nothing is mutated in place, gradients flow through the sums and the integrator, so the whole rollout stays <strong>differentiable</strong>. The LLM searches over schedules and operator parameterizations — one well-defined action space instead of per-domain code.</p>
+<section id="mechanistic-inverse-modelling" class="level2">
+<h2 class="anchored" data-anchor-id="mechanistic-inverse-modelling">Mechanistic inverse modelling</h2>
+<p>One of the primary motivations for introducing a formal language of biological mechanisms is to identify mechanistic models directly from experimental observations. Rather than calibrating simulations manually, the objective is to infer the parameters, spatial organization and constitutive laws governing biological systems from imaging data.</p>
+<p>Plexus makes this possible by associating every biological operator with one or more differentiable implementations satisfying the same typed signature. Differentiability therefore becomes a property of the language rather than of a particular simulator. Regardless of the numerical backend, gradients propagate through compositions of explicit biological operators rather than through monolithic simulation code.</p>
+<p>This distinction fundamentally changes the role of inverse modelling. Traditional approaches assume that the underlying mechanism is already correct and seek the parameter values that best reproduce the observations. Such parameter optimization is effective when the forward model is complete, but it becomes misleading when important biological mechanisms are absent. Optimizing existing parameters may improve the fit while merely compensating for missing mechanisms.</p>
+<p>In Plexus, parameters remain attached to explicit biological operators rather than to opaque numerical models. Mechanical properties belong to mechanical operators, reaction rates to biochemical operators, conductances to signalling operators, and spatial fields to the mechanisms generating them. Parameter estimation therefore preserves the mechanistic interpretation of the model.</p>
+<p>Residuals likewise acquire a mechanistic interpretation. A persistent mismatch between simulation and experiment no longer indicates only poor parameter values; it may also indicate that the current operator composition is unable to explain the observations. Differentiability thus provides more than efficient optimization: it enables quantitative comparison between competing mechanistic models while preserving their explicit biological structure.</p>
 </section>
-<section id="glossary" class="level2">
-<h2 class="anchored" data-anchor-id="glossary">Glossary</h2>
+<section id="agentic-mechanistic-discovery" class="level2">
+<h2 class="anchored" data-anchor-id="agentic-mechanistic-discovery">Agentic mechanistic discovery</h2>
+<p>The explicit representation of biological mechanisms transforms scientific discovery from a parameter optimization problem into a language exploration problem. Because mechanisms are represented as explicit operators rather than embedded in simulator-specific code, they become directly accessible to agentic systems.</p>
+<p>Plexus proposes a three-loop strategy for mechanistic discovery. Each loop operates at a different level of abstraction, progressively moving from existing models toward new biological knowledge.</p>
+<p><strong>Loop I: Understanding.</strong> The first loop analyses an existing simulation model. Rather than treating the simulator as opaque code, the agent decomposes it into Plexus operators, identifies the biological mechanisms it implements, and reconstructs an explicit mechanistic description. Existing simulation frameworks therefore become repositories of reusable biological operators.</p>
+<p><strong>Loop II: Fitting.</strong> The second loop estimates the parameters, spatial fields and initial conditions of the resulting mechanistic model by fitting it directly to experimental observations. Because every operator admits a differentiable implementation, optimization preserves an explicit correspondence between parameters and biological mechanisms.</p>
+<p><strong>Loop III: Discovery.</strong> The third loop analyses the residual remaining after optimization. Persistent discrepancies are interpreted as evidence that the current operator composition is incomplete rather than simply poorly parameterized. The agent therefore proposes alternative operators, compares competing mechanistic hypotheses, and extends the operator algebra whenever existing mechanisms fail to explain the observations.</p>
+<p>Together, these three loops transform simulation, inverse modelling and hypothesis generation into successive stages of a single scientific workflow. The language itself becomes the object of discovery: new biological knowledge is represented by extending the operator algebra rather than merely adjusting parameter values.</p>
+<hr>
+</section>
+<section id="appendix" class="level1">
+<h1>Appendix</h1>
+<section id="reference-implementation" class="level2">
+<h2 class="anchored" data-anchor-id="reference-implementation">Reference implementation</h2>
+<p>The main text defines Plexus as a formal language for expressing biological mechanisms. This appendix describes the reference implementation of that language. The implementation follows the abstractions introduced in the paper without introducing additional biological concepts. Its purpose is simply to execute models written in the Plexus language.</p>
+<p>The implementation distinguishes two levels. The <em>language</em> defines the biological semantics through operators, sets, states and fields. The <em>runtime</em> provides concrete software classes implementing these concepts.</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Concept</th>
-<th>Set/operator term</th>
-<th>Symbol</th>
-<th>Code</th>
+<th>Language</th>
+<th>Reference implementation</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>collection of like nodes</td>
-<td>set (level)</td>
-<td><span class="math inline">\(S_k\)</span></td>
-<td><code>Level</code></td>
-</tr>
-<tr class="even">
-<td>a single node</td>
-<td>element</td>
-<td><span class="math inline">\(x\in S_k\)</span></td>
-<td>row of <code>Level.state</code></td>
-</tr>
-<tr class="odd">
-<td>learnable per-node code</td>
-<td>embedding</td>
-<td><span class="math inline">\(a_i\)</span></td>
-<td><code>Level.embedding</code></td>
-</tr>
-<tr class="even">
-<td>containment</td>
-<td>partition</td>
-<td><span class="math inline">\(\pi_k\!:\!S_k\!\to\!S_{k+1}\)</span></td>
-<td><code>Level.parent</code></td>
-</tr>
-<tr class="odd">
-<td>within-set links</td>
-<td>relation</td>
-<td><span class="math inline">\(E\subseteq S_k\times S_k\)</span></td>
-<td><code>Level.edge_index</code></td>
-</tr>
-<tr class="even">
-<td>continuum quantity</td>
-<td>field</td>
-<td><span class="math inline">\(f:\Omega\to\mathbb{R}^c\)</span></td>
-<td><code>Field</code></td>
-</tr>
-<tr class="odd">
-<td>dynamics (GNN)</td>
-<td>operator: ODE+Laplacian</td>
-<td><span class="math inline">\(\mathcal{O}\)</span></td>
+<td>Operator</td>
 <td><code>Operator</code></td>
 </tr>
 <tr class="even">
-<td>within-set op</td>
-<td>lateral</td>
-<td><span class="math inline">\(\mathcal{O}_E\)</span></td>
-<td><code>Lateral</code></td>
+<td>Set</td>
+<td><code>Level</code></td>
 </tr>
 <tr class="odd">
-<td>up op</td>
-<td>reduction over fibres</td>
-<td><span class="math inline">\(\sum_\pi\)</span></td>
-<td><code>Aggregate</code></td>
+<td>State</td>
+<td>typed tensors stored by a <code>Level</code></td>
 </tr>
 <tr class="even">
-<td>down op</td>
-<td>lift</td>
-<td><span class="math inline">\(\pi^{*}\)</span></td>
-<td><code>Broadcast</code></td>
+<td>Field</td>
+<td><code>Field</code></td>
 </tr>
 <tr class="odd">
-<td>set <span class="math inline">\(\leftrightarrow\)</span> field op</td>
-<td>transfer</td>
-<td>push / pull</td>
-<td><code>Exchange</code></td>
-</tr>
-<tr class="even">
-<td>rebuild the relation</td>
-<td>relations: rewire</td>
-<td><span class="math inline">\(\mathcal{R}\!:\,\to\!E\)</span></td>
-<td><code>Rewire</code></td>
-</tr>
-<tr class="odd">
-<td>make an element</td>
-<td>entities: division</td>
-<td><span class="math inline">\(\mathcal{B}:x\!\mapsto\!\{x',x''\}\)</span></td>
-<td><code>Divide</code></td>
-</tr>
-<tr class="even">
-<td>remove an element</td>
-<td>entities: death</td>
-<td><span class="math inline">\(\mathcal{D}:x\!\mapsto\!\varnothing\)</span></td>
-<td><code>Die</code></td>
-</tr>
-<tr class="odd">
-<td>per-element occupancy</td>
-<td>occupancy</td>
-<td><span class="math inline">\(w_i\in[0,1]\)</span></td>
-<td><code>Level.occ</code></td>
-</tr>
-<tr class="even">
-<td>the container</td>
-<td>hierarchy</td>
-<td><span class="math inline">\((S_\bullet,F_\bullet,\pi_\bullet)\)</span></td>
+<td>Biological model</td>
 <td><code>Hierarchy</code></td>
-</tr>
-<tr class="odd">
-<td>the model</td>
-<td>composition of ops</td>
-<td><span class="math inline">\(\mathcal{O}_n\!\circ\!\cdots\!\circ\!\mathcal{O}_1\)</span></td>
-<td><code>Schedule</code></td>
 </tr>
 </tbody>
 </table>
+<section id="hierarchy" class="level3">
+<h3 class="anchored" data-anchor-id="hierarchy">Hierarchy</h3>
+<p>The <code>Hierarchy</code> represents one executable biological model. It is the runtime container responsible for assembling the language primitives into a simulation. A Hierarchy stores</p>
+<ul>
+<li>the collection of biological Levels,</li>
+<li>the continuous Fields,</li>
+<li>the instantiated Operators,</li>
+<li>the execution Schedule,</li>
+<li>backend-specific runtime data.</li>
+</ul>
+<p>The Hierarchy therefore corresponds to one complete biological model expressed in the Plexus language.</p>
+</section>
+<section id="levels" class="level3">
+<h3 class="anchored" data-anchor-id="levels">Levels</h3>
+<p>A <code>Level</code> is the runtime representation of a biological Set. Each Level contains</p>
+<ul>
+<li>the entities belonging to the set,</li>
+<li>their typed state,</li>
+<li>optional biological types,</li>
+<li>the maps relating this Level to other Levels.</li>
+</ul>
+<p>State is stored as contiguous tensors for computational efficiency, while its biological interpretation is determined entirely by the state schema declared by the language. Consequently, the runtime never assumes that a particular state variable represents position, voltage, concentration or any other specific quantity.</p>
+</section>
+<section id="fields-1" class="level3">
+<h3 class="anchored" data-anchor-id="fields-1">Fields</h3>
+<p>Fields represent continuous spatial quantities. Unlike Levels, which contain discrete biological entities, Fields describe continuous media such as morphogen concentrations, extracellular signals, pressure or material properties. Operators interact with Fields exclusively through the maps declared by their typed signatures. The numerical realization of these maps (interpolation, particle–grid transfer, neural implicit evaluation, etc.) is entirely implementation dependent.</p>
+</section>
+<section id="operators-1" class="level3">
+<h3 class="anchored" data-anchor-id="operators-1">Operators</h3>
+<p>Operators are registered independently from the execution engine. Every registered operator declares</p>
+<ul>
+<li>its operator family,</li>
+<li>its typed signature,</li>
+<li>one or more numerical implementations,</li>
+<li>implementation capabilities such as supported dimensions or differentiability.</li>
+</ul>
+<p>The registry therefore separates biological semantics from numerical realization. New numerical methods are introduced by registering additional implementations rather than modifying the execution engine.</p>
+</section>
+<section id="schedules" class="level3">
+<h3 class="anchored" data-anchor-id="schedules">Schedules</h3>
+<p>A biological model is executed by evaluating an ordered Schedule of operator applications. During each simulation step</p>
+<ol type="1">
+<li>operators are evaluated according to the Schedule,</li>
+<li>each operator produces a contribution to the system state,</li>
+<li>contributions are accumulated,</li>
+<li>the selected numerical backend advances the state.</li>
+</ol>
+<p>The Schedule therefore implements the operational semantics introduced in the main text while remaining independent of the particular numerical solver.</p>
+</section>
+<section id="model-specification" class="level3">
+<h3 class="anchored" data-anchor-id="model-specification">Model specification</h3>
+<p>Biological models are described declaratively rather than procedurally. A specification defines</p>
+<ul>
+<li>biological Levels,</li>
+<li>their state schemas,</li>
+<li>Fields,</li>
+<li>instantiated Operators,</li>
+<li>the execution Schedule,</li>
+<li>the numerical implementations selected for each operator.</li>
+</ul>
+<p>Before execution, the specification is validated against the typed signatures declared by the registered operators, ensuring that every operator, state variable and required map is available.</p>
+</section>
+<section id="reference-architecture" class="level3">
+<h3 class="anchored" data-anchor-id="reference-architecture">Reference architecture</h3>
+<p>The reference implementation follows a strict separation of concerns.</p>
+<ul>
+<li>The language defines biological semantics.</li>
+<li>The registry stores biological operator contracts.</li>
+<li>Implementations realize these contracts numerically.</li>
+<li>The execution engine evaluates operator compositions.</li>
+<li>Numerical backends solve the resulting dynamical system.</li>
+</ul>
+<p>Consequently, extending Plexus never requires modifying the execution engine. New biological mechanisms are introduced by defining new operator contracts, whereas new numerical methods are introduced by registering additional implementations of existing operators. The reference implementation therefore mirrors the architecture proposed in the main text: the language remains stable while implementations and numerical backends evolve independently.</p>
+</section>
+</section>
+<section id="building-the-plexus-operator-atlas" class="level2">
+<h2 class="anchored" data-anchor-id="building-the-plexus-operator-atlas">Building the Plexus operator atlas</h2>
+<p>One of the principal objectives of the Plexus research program is to construct a comprehensive atlas of biological operators by systematically analysing the existing corpus of biological simulation models. Rather than cataloguing simulators, the atlas catalogues reusable biological mechanisms together with their numerical implementations.</p>
+<p>This atlas serves two complementary purposes. First, it provides the biological vocabulary from which new models are assembled. Second, it defines the search space explored by the agentic discovery framework described in the main text.</p>
+<section id="from-simulators-to-operators" class="level3">
+<h3 class="anchored" data-anchor-id="from-simulators-to-operators">From simulators to operators</h3>
+<p>Existing simulation frameworks are not imported directly into Plexus. Instead, each framework is systematically decomposed into the language introduced in this paper. The decomposition proceeds through the following steps:</p>
+<ol type="1">
+<li>identify the biological sets,</li>
+<li>identify the associated state variables,</li>
+<li>identify continuous fields,</li>
+<li>identify biological operators,</li>
+<li>identify the maps required by each operator,</li>
+<li>separate biological semantics from numerical implementations,</li>
+<li>register each operator in the Plexus language.</li>
+</ol>
+<p>The result is an implementation-independent description expressed entirely in terms of operators, sets, states and fields.</p>
+</section>
+<section id="normalization" class="level3">
+<h3 class="anchored" data-anchor-id="normalization">Normalization</h3>
+<p>Different simulators frequently implement identical biological mechanisms using very different numerical algorithms. The atlas therefore groups operators according to biological semantics rather than implementation. For example,</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Biological operator</th>
+<th>Possible implementations</th>
+<th>Example frameworks</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Mechanical interaction</td>
+<td>MPM, FEM, Vertex, Phase Field</td>
+<td>Taichi, Chaste, Tissue Forge</td>
+</tr>
+<tr class="even">
+<td>Chemotaxis</td>
+<td>Finite differences, Neural fields</td>
+<td>Morpheus, CompuCell3D</td>
+</tr>
+<tr class="odd">
+<td>Electrical propagation</td>
+<td>Hodgkin–Huxley, Neural ODE, GNN</td>
+<td>NEURON, Jaxley, BrainPy</td>
+</tr>
+<tr class="even">
+<td>Diffusion</td>
+<td>Finite differences, FEM</td>
+<td>Morpheus, VirtualLeaf</td>
+</tr>
+<tr class="odd">
+<td>Cell division</td>
+<td>Vertex, CPM, Agent-based</td>
+<td>Chaste, CompuCell3D</td>
+</tr>
+</tbody>
+</table>
+<p>The objective is therefore not to catalogue implementations but to identify the smallest reusable vocabulary capable of reconstructing the existing simulation literature.</p>
+</section>
+<section id="operator-metadata" class="level3">
+<h3 class="anchored" data-anchor-id="operator-metadata">Operator metadata</h3>
+<p>Every entry in the atlas records</p>
+<ul>
+<li>the operator name,</li>
+<li>its family,</li>
+<li>its typed signature,</li>
+<li>biological interpretation,</li>
+<li>known implementations,</li>
+<li>originating publications,</li>
+<li>reference repositories,</li>
+<li>validation status.</li>
+</ul>
+<p>Consequently the atlas simultaneously documents biological mechanisms, available numerical realizations, and scientific provenance.</p>
+</section>
+<section id="atlas-growth" class="level3">
+<h3 class="anchored" data-anchor-id="atlas-growth">Atlas growth</h3>
+<p>The atlas is intended to evolve continuously. Every newly analysed simulator contributes either</p>
+<ol type="1">
+<li>an implementation of an existing operator,</li>
+<li>a refinement of an existing typed signature,</li>
+<li>or a genuinely new biological operator.</li>
+</ol>
+<p>The first outcome strengthens numerical diversity. The second improves the language. The third expands the biological vocabulary itself.</p>
+</section>
+<section id="validation-of-the-operator-algebra" class="level3">
+<h3 class="anchored" data-anchor-id="validation-of-the-operator-algebra">Validation of the operator algebra</h3>
+<p>The atlas provides a direct experimental test of the central hypothesis of Plexus. If the decomposition of a sufficiently broad collection of biological simulation frameworks converges toward a compact and reusable operator vocabulary, then the proposed operator algebra constitutes a meaningful intermediate representation for biological modelling. Conversely, repeated discovery of genuinely new operator families indicates that the language remains incomplete and must be extended. The operator atlas therefore serves both as a repository of biological knowledge and as the principal mechanism through which the Plexus language itself evolves.</p>
+</section>
+</section>
+<section id="implementing-new-operators" class="level2">
+<h2 class="anchored" data-anchor-id="implementing-new-operators">Implementing new operators</h2>
+<p>The Plexus language grows by introducing new biological operators rather than by modifying the execution engine. A new operator should be introduced only when an existing operator cannot express the mechanism without changing its biological meaning. New solvers, discretizations, parameterizations or hardware targets should instead be added as alternative implementations of an existing operator.</p>
+<section id="define-the-biological-mechanism" class="level3">
+<h3 class="anchored" data-anchor-id="define-the-biological-mechanism">Define the biological mechanism</h3>
+<p>Before implementation, the mechanism must be described independently of its numerical realization. This description should specify</p>
+<ul>
+<li>the biological transformation represented by the operator,</li>
+<li>its operator family,</li>
+<li>its input and output sets or fields,</li>
+<li>the state variables it reads and produces,</li>
+<li>the maps required to relate the participating objects.</li>
+</ul>
+<p>Together, these elements define the operator’s typed signature, which serves as its biological contract.</p>
+</section>
+<section id="separate-semantics-from-implementation" class="level3">
+<h3 class="anchored" data-anchor-id="separate-semantics-from-implementation">Separate semantics from implementation</h3>
+<p>The operator contract and its numerical implementations are represented separately. A single biological operator may admit multiple implementations based, for example, on Material Point Methods, finite elements, vertex models, phase fields, Neural ODEs or graph neural networks. These implementations may differ in their numerical assumptions, spatial representation, supported dimensions or differentiability while preserving the same biological semantics. Conversely, mechanisms should not be merged merely because they share similar code or numerical utilities. Distinct biological transformations require distinct operator contracts.</p>
+</section>
+<section id="register-the-operator-and-its-implementations" class="level3">
+<h3 class="anchored" data-anchor-id="register-the-operator-and-its-implementations">Register the operator and its implementations</h3>
+<p>Once defined, the operator is added to the registry together with one or more numerical implementations. The registry records</p>
+<ul>
+<li>the canonical operator name,</li>
+<li>its operator family,</li>
+<li>its typed signature,</li>
+<li>the available implementations,</li>
+<li>their numerical capabilities,</li>
+<li>their differentiability,</li>
+<li>their scientific provenance.</li>
+</ul>
+<p>Registration makes the mechanism available to every compatible Plexus model without introducing biological knowledge into the execution engine.</p>
+</section>
+<section id="validation" class="level3">
+<h3 class="anchored" data-anchor-id="validation">Validation</h3>
+<p>Every implementation should satisfy four requirements:</p>
+<ol type="1">
+<li>it satisfies the declared typed signature;</li>
+<li>it reproduces the intended biological mechanism;</li>
+<li>its numerical behaviour is verified;</li>
+<li>its scientific provenance is preserved.</li>
+</ol>
+<p>Validation establishes structural and numerical consistency, but does not by itself establish biological validity. The latter must be assessed through comparison with observations, known limits, ablations or the originating model.</p>
+</section>
+<section id="promotion" class="level3">
+<h3 class="anchored" data-anchor-id="promotion">Promotion</h3>
+<p>Prototype implementations should not enter the core registry directly. Promotion requires a stable operator contract, at least one validated implementation, clear scientific provenance, and evidence that the mechanism is reusable beyond its originating prototype. The guiding principle is</p>
+<blockquote class="blockquote">
+<p><em>Prototype freely; promote biological mechanisms conservatively.</em></p>
+</blockquote>
+</section>
+</section>
+<section id="refactoring-guidelines" class="level2">
+<h2 class="anchored" data-anchor-id="refactoring-guidelines">Refactoring guidelines</h2>
+<p>The current Plexus repository predates the formalization of the language presented in this paper. Consequently, much of the biological semantics is embedded directly in numerical implementations. Refactoring aims to recover these semantics and progressively reorganize the codebase around the language abstractions introduced in this work.</p>
+<section id="general-principles" class="level3">
+<h3 class="anchored" data-anchor-id="general-principles">General principles</h3>
+<p>Every refactoring should follow the same principles.</p>
+<ul>
+<li>Preserve biological behaviour.</li>
+<li>Improve separation between biological semantics and numerical methods.</li>
+<li>Replace implicit assumptions by explicit typed signatures.</li>
+<li>Prefer extending the language rather than adding special cases.</li>
+<li>Refactor incrementally while preserving existing functionality.</li>
+</ul>
+</section>
+<section id="recommended-workflow" class="level3">
+<h3 class="anchored" data-anchor-id="recommended-workflow">Recommended workflow</h3>
+<p>When refactoring an existing module, contributors should proceed in the following order.</p>
+<ol type="1">
+<li>Identify the biological mechanism implemented by the code.</li>
+<li>Determine whether it corresponds to an existing operator.</li>
+<li>If not, introduce a new operator contract.</li>
+<li>Separate the biological contract from the numerical implementation.</li>
+<li>Register the implementation.</li>
+<li>Validate that the refactored implementation reproduces the original behaviour.</li>
+</ol>
+</section>
+<section id="code-migration" class="level3">
+<h3 class="anchored" data-anchor-id="code-migration">Code migration</h3>
+<p>Existing code should progressively migrate toward the following organization.</p>
+<ul>
+<li>Biological concepts belong to operator contracts.</li>
+<li>Numerical algorithms belong to implementations.</li>
+<li>Execution logic belongs to the runtime.</li>
+<li>Data structures belong to Levels, Fields and Hierarchies.</li>
+</ul>
+<p>The execution engine should never contain mechanism-specific code.</p>
+</section>
+<section id="incremental-evolution" class="level3">
+<h3 class="anchored" data-anchor-id="incremental-evolution">Incremental evolution</h3>
+<p>Refactoring is expected to be continuous. During the transition, legacy modules and language-native modules may coexist. New developments should preferentially follow the language architecture, while legacy components are progressively decomposed into reusable operators as they are revisited. The objective is not to rewrite the repository, but to allow the language to emerge progressively from the existing implementation.</p>
+</section>
+</section>
+<section id="reference-corpus-for-the-operator-atlas" class="level2">
+<h2 class="anchored" data-anchor-id="reference-corpus-for-the-operator-atlas">Reference corpus for the operator atlas</h2>
+<p>The Plexus operator atlas is constructed by systematically decomposing existing simulation frameworks into biological operators, typed signatures and numerical implementations. To ensure reproducibility, the initial atlas is built from open-source projects for which both the scientific publication and an implementation are publicly available. Rather than treating each simulator as an indivisible software package, every framework is analysed according to the methodology described above. The objective is to recover the reusable biological mechanisms implemented by each project and register them as operators within the Plexus language. The reference corpus is organized into six broad categories.</p>
+<section id="cell-and-tissue-mechanics" class="level3">
+<h3 class="anchored" data-anchor-id="cell-and-tissue-mechanics">Cell and tissue mechanics</h3>
+<p>These frameworks describe multicellular mechanics, growth, adhesion, proliferation, remodelling and morphogenesis.</p>
+<ul>
+<li>Chaste</li>
+<li>CompuCell3D</li>
+<li>Morpheus</li>
+<li>Tissue Forge</li>
+<li>VirtualLeaf</li>
+<li>PhysiCell</li>
+<li>Active Vertex Model for Cell-Resolution Description of Epithelial Tissue Mechanics</li>
+<li>Multicellular Simulations with Shape and Volume Constraints using Optimal Transport</li>
+<li>Cell Simulation as Cell Segmentation</li>
+</ul>
+<p>Typical operators extracted from these models include mechanical interaction, adhesion, active stress, cell growth, cell division, apoptosis, neighbour rewiring, particle–cell aggregation, and optimal transport.</p>
+</section>
+<section id="reactiondiffusion-and-signalling" class="level3">
+<h3 class="anchored" data-anchor-id="reactiondiffusion-and-signalling">Reaction–diffusion and signalling</h3>
+<p>These models describe transport, biochemical signalling and spatial pattern formation. Representative projects include</p>
+<ul>
+<li>Morpheus</li>
+<li>Reaction-Diffusion Systems in Intracellular Transport and Control</li>
+<li>A Programmable Reaction-Diffusion System for Spatiotemporal Cell Signalling Circuit Design</li>
+<li>SPDEs</li>
+</ul>
+<p>Representative operators include diffusion, reaction, secretion, uptake, field sampling, and broadcast signalling.</p>
+</section>
+<section id="neural-circuits" class="level3">
+<h3 class="anchored" data-anchor-id="neural-circuits">Neural circuits</h3>
+<p>These frameworks model neuronal signalling and connectome dynamics. Representative projects include</p>
+<ul>
+<li>Jaxley</li>
+<li>BrainPy</li>
+<li>Connectome-GNN</li>
+</ul>
+<p>Typical operators include synaptic transmission, membrane integration, plasticity, and neuromodulation.</p>
+</section>
+<section id="mechanobiology-and-collective-behaviour" class="level3">
+<h3 class="anchored" data-anchor-id="mechanobiology-and-collective-behaviour">Mechanobiology and collective behaviour</h3>
+<p>Several recent frameworks couple mechanics with biochemical signalling and collective migration. Representative examples include</p>
+<ul>
+<li>ERK-mediated mechanochemical wave models</li>
+<li>Active Vertex mechanics</li>
+<li>Collective cell migration models</li>
+<li>Bioelectric morphogenesis</li>
+</ul>
+<p>Representative operators include mechanochemical coupling, force transmission, wave propagation, chemotaxis, and collective polarity.</p>
+</section>
+<section id="inverse-modelling-and-differentiable-simulation" class="level3">
+<h3 class="anchored" data-anchor-id="inverse-modelling-and-differentiable-simulation">Inverse modelling and differentiable simulation</h3>
+<p>These projects are particularly relevant for the mechanistic inverse modelling described in the main text because they expose differentiable representations of biological systems. Representative projects include</p>
+<ul>
+<li>MultiCell: Geometric Learning in Multicellular Development</li>
+<li>Differentiable Rendering for 3D Fluorescence Microscopy</li>
+<li>Inferring Cell Junction Tension and Pressure from Cell Geometry</li>
+<li>Machine Learning Interpretable Models of Cell Mechanics from Protein Images</li>
+<li>3D Single-Cell Shape Analysis using Geometric Deep Learning</li>
+</ul>
+<p>Typical operators include image formation, geometric inference, parameter estimation, mechanical inversion, and differentiable observation.</p>
+</section>
+<section id="image-analysis-and-quantitative-biology" class="level3">
+<h3 class="anchored" data-anchor-id="image-analysis-and-quantitative-biology">Image analysis and quantitative biology</h3>
+<p>These projects provide computational operators that transform experimental observations into structured biological measurements. Representative projects include</p>
+<ul>
+<li>TissueMiner</li>
+<li>ERNet</li>
+<li>DeXtrusion</li>
+<li>FlowShape</li>
+<li>CellRank</li>
+</ul>
+<p>Representative operators include segmentation, tracking, graph construction, feature extraction, and trajectory inference.</p>
+</section>
+<section id="building-the-atlas" class="level3">
+<h3 class="anchored" data-anchor-id="building-the-atlas">Building the atlas</h3>
+<p>Each framework in the reference corpus is analysed using the same procedure.</p>
+<ol type="1">
+<li>Identify the biological sets.</li>
+<li>Identify their state variables.</li>
+<li>Identify continuous fields.</li>
+<li>Identify the biological operators.</li>
+<li>Identify the maps relating the participating objects.</li>
+<li>Separate biological semantics from numerical implementation.</li>
+<li>Register the resulting operators in the Plexus atlas.</li>
+</ol>
+<p>The objective is not to reproduce the original software architecture, but to recover the reusable biological mechanisms that underlie existing simulators. Each analysed framework may contribute additional implementations of existing operators, refine existing typed signatures, or reveal genuinely new biological operators. Consequently, the atlas evolves continuously as new open-source simulation frameworks become available.</p>
+<hr>
+<p>The full framework, including all figures, is in <a href="paper/plexus2.pdf"><code>paper/plexus2.pdf</code></a>.</p>
 
 
+</section>
+</section>
 </section>
 
 </main> <!-- /main -->

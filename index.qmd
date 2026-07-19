@@ -15,98 +15,82 @@ continuum solver from MLS-MPM (Hu et al. 2018); and the strange attractors from 
 originating papers (Lorenz 1963, Rössler 1976, Sprott 1994, …).
 :::
 
-Living systems are mechanical, chemical, electrical, and developmental at once.
-Computational biology has answered each of these with its own simulator — neural
-simulators for electrical activity, reaction–diffusion solvers for chemical
-transport, particle and continuum methods for mechanics, vertex and Cellular-Potts
-models for tissues. These frameworks remain largely incompatible: coupling
-signalling, mechanics, metabolism, and development means bolting specialized
-simulators together, each carrying its own representation of what a biological
-mechanism *is*. The obstacle is not primarily numerical. **It is a language
-problem.**
+Computational biology has produced a rich ecosystem of simulation frameworks —
+neural simulators for electrical activity, reaction–diffusion systems for chemical
+transport, particle and continuum methods for mechanics, vertex, Cellular Potts and
+active-matter models for tissues. These frameworks remain largely incompatible.
+Combining electrical signalling, mechanics, metabolism and development often requires
+coupling multiple specialized simulators whose underlying abstractions differ
+fundamentally, making models difficult to compare, compose and extend. This
+fragmentation is not primarily a numerical problem but a **language problem.**
 
-Plexus treats biological *mechanisms* — not simulators — as the primary objects.
-Rather than building another simulator, it defines a common language whose central
-elements are **biological operators**: adhesion, diffusion, division, chemotaxis,
-electrical propagation, active stress. Every operator specifies the entities it
-acts on, the state it reads and writes, the relations between those entities, and
-one or more numerical implementations. Biological modelling then becomes analogous
+Instead of treating simulation frameworks as fundamental, Plexus treats biological
+*mechanisms* as the primary objects. It introduces an intermediate representation
+whose central elements are **biological operators** — adhesion, diffusion, division,
+chemotaxis, electrical propagation, active stress — described independently of their
+numerical implementation. In this perspective, biological modelling becomes analogous
 to compiler design.
 
 ## A typed intermediate representation
 
-Just as a modern compiler separates a programming language from the machine it runs
-on through an **intermediate representation**, Plexus separates a biological
-mechanism from its numerical realization. An operator is defined by a **typed
-signature** — *what* biological transformation it performs — and by one or more
-**implementations** — *how* that transformation is computed. The signature is the
+Just as modern compilers separate programming languages from their implementations
+through an **intermediate representation**, Plexus separates biological mechanisms
+from their numerical implementations. Every operator is defined by a **typed
+signature** — *what* biological transformation it performs — and one or more
+**implementations** — *how* it is numerically realized. The signature is the
 biological contract; the implementation is a numerical choice.
 
-`neuron_voltage` is the contract "membrane state → its derivative," which
-Hodgkin–Huxley, Izhikevich, a Neural ODE, or an MLP all satisfy interchangeably;
-a mechanical interaction is the contract that MLS-MPM, finite elements, a vertex
-model, or a phase field all realize. Because a mechanism is stated once,
-independently of its solver, models written for different simulators compile to the
-*same* operators, and existing simulators become **complementary backends** rather
-than competing paradigms — Plexus is to a biophysics simulator what an intermediate
-representation is to a compiler.
+Every operator may admit multiple implementations satisfying the same signature: a
+mechanical interaction by Material Point Methods, finite elements, vertex or
+phase-field models; a signalling operator by Hodgkin–Huxley equations, Neural ODEs
+or graph neural networks. Because a mechanism is stated once, independently of its
+solver, existing simulation frameworks become **complementary backends** implementing
+a common intermediate representation rather than competing modelling paradigms.
 
 ## Four concepts, seven operators
 
-The language is built from four concepts — **operators**, and the three kinds of
-thing they act on: **sets** (discrete biological entities across scales — particles,
-cells, neurons, synapses, tissues), the **state** each element carries, and
-**fields** (continuous quantities — morphogens, pressure, potentials). A biological
-model is a composition of operators over these objects.
+The language is built around four fundamental concepts: **operators**, **sets**
+(collections of biological entities across scales — particles, cells, neurons,
+synapses, tissues), the **states** each element carries, and **fields** (continuous
+quantities defined over space — morphogens, pressure, potentials). A biological model
+is a composition of operators acting on these objects.
 
-The central wager of Plexus is that a large fraction of the existing simulation
-literature can be written with a compact algebra of **seven operator families**:
+The central hypothesis of Plexus is that a large fraction of existing biological
+simulation models can be expressed as compositions of a small number of elementary
+operator families. The proposed algebra consists of **seven**:
 
-![The elementary operator algebra. The first four move biological *state*: *Lateral* within a set; *Aggregate* and *Broadcast* up and down across containment $\pi$; *Exchange* to and from a field. The last three change structure: *Rewire* the relations between entities, *Divide* and *Die* the entities themselves.](figures/fig_ops.png){width=100% fig-align="center"}
+![The elementary operator algebra of Plexus. Lateral, Aggregate, Broadcast and Exchange transform biological state. Rewire modifies biological relations, whereas Divide and Die modify biological entities. Complex biological models are obtained by composing these elementary operator families.](figures/fig_ops.png){width=100% fig-align="center"}
 
-- **Lateral** — interactions within a set (forces, adhesion, signalling).
-- **Aggregate ↑** and **Broadcast ↓** — many-to-one and one-to-many transforms
+- **Lateral** — interactions within a biological set.
+- **Aggregate ↑** and **Broadcast ↓** — many-to-one and one-to-many transformations
   across biological scales.
-- **Exchange** — coupling between sets and continuous fields (secretion, sensing,
-  particle–grid transfer).
-- **Rewire** — modification of the relations between entities.
-- **Divide** and **Die** — creation and removal of entities.
+- **Exchange** — transformations between sets and fields.
+- **Rewire** — modification of relations between biological entities.
+- **Divide** and **Die** — creation and removal of biological entities.
 
-The first four transform biological *state* while preserving organization; Rewire
-changes the interaction *graph*; Divide and Die change the *entities* themselves.
-The full algebra — typed signatures, the containment graph, stateful edge-sets, the
-one-operator-many-implementations rule, and how division stays differentiable — is
-on **[The language](language.qmd)**.
+The first four families transform biological state while preserving the underlying
+organization; Rewire modifies the interaction graph; Divide and Die modify the
+entities themselves. The full algebra — with typed signatures and the reference
+implementation — is on **[The language](language.qmd)**.
 
 ## Composing mechanisms
 
-A biological model is an ordered **schedule** of operator applications. One
-simulation step is the composition
-$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$, iterated as
-$x_{t+1}=\Phi(x_t)$. Operators are *pure*: each returns its contribution $\Delta_i$
-and the engine sums them, so introducing a mechanism is adding a line to the
-schedule, never editing the engine. A cell that secretes a chemical, climbs it, and
-self-aggregates through its constituent particles is a handful of operators:
+Biological models are expressed as compositions of elementary operators. Plexus
+represents a model as an ordered sequence of operator applications — a **schedule** —
+specifying both the order and the frequency with which operators are evaluated.
+Formally, one simulation step is the composition
+$\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1$, whose repeated application
+generates the system dynamics $x_{t+1}=\Phi(x_t)$. Different operators may evolve on
+different time scales — mechanical interactions every step, diffusion, growth or
+division less often — so a model is a *multi-rate* composition of biological
+mechanisms rather than a monolithic solver.
 
-```yaml
-name: aggregate
-sets:
-  cell: {n: 100, types: {soft: {fraction: 0.5, youngs: 12}, stiff: {fraction: 0.5, youngs: 300}}}
-  particle: {parent: cell, per_parent: 100, radius: 0.02}
-fields:
-  chemical: {frame: grid, res: 96, diffusion: 0.1, decay: 0.05, couples_to: cell}
-operators:
-  - {op: secrete, at: "cell[type=soft]", to: chemical, rate: 1.0}    # only soft cells make it
-  - {op: sense,   at: "cell[type=soft]", from: chemical, gain: 150}  # only soft cells follow it
-  - {op: mpm,     at: particle, n_grid: 128, a_max: 800, drag: 4}
-schedule: [aggregate, secrete, chemical.diffuse, sense, mpm]
-```
-
-The schedule can be *multi-rate*: mechanics may run every tick while diffusion,
-growth, or division fire less often. And because nothing is mutated in place,
-gradients flow through the sums and the integrator — the whole rollout stays
-**differentiable**, so differentiability is a property of the *language*, not of any
-one solver.
+Operators are **pure** transformations: rather than modifying state in place, each
+returns its contribution $\Delta_i$ to the system evolution, and the complete update
+$\Delta = \sum_i \Delta_i$ is passed to the numerical implementation. Introducing a
+new mechanism is therefore adding a new operator to the schedule, never editing the
+engine — and because nothing is mutated in place, gradients propagate through the
+composition and the whole rollout stays **differentiable**.
 
 ## What it looks like
 
@@ -449,10 +433,11 @@ config/attractors/thomas.yaml</pre></span></span>
 
 ## Agentic mechanistic discovery
 
-Because mechanisms are explicit operators rather than simulator-specific code, they
-are directly accessible to agentic systems — which turns discovery from a parameter
-search into a **search over model structures**. Plexus organizes this as three loops,
-each at a higher level of abstraction:
+The explicit representation of biological mechanisms transforms scientific discovery
+from a parameter optimization problem into a **language exploration problem**. Because
+mechanisms are explicit operators rather than simulator-specific code, they are
+directly accessible to agentic systems. Plexus organizes this as three loops, each at
+a different level of abstraction:
 
 - **Loop I — Understanding.** Decompose an existing simulator into Plexus operators,
   recovering an explicit mechanistic description from opaque code.
@@ -477,16 +462,18 @@ BrainPy, connectome GNNs, …) treated not as rival simulators but as repositori
 reusable mechanisms, each decomposed into operators, typed signatures, and
 implementations.
 
-The atlas is also the test of the central hypothesis: if decomposing a broad
+The atlas is also a direct test of the central hypothesis: if decomposing a broad
 collection of simulators converges toward a compact, reusable vocabulary, the operator
 algebra is a meaningful intermediate representation for biology; if genuinely new
-families keep appearing, the language is still incomplete and extends. Either way, the
-vocabulary grows monotonically and every earlier model keeps working.
+families keep appearing, the language remains incomplete and must be extended. The
+atlas therefore serves both as a repository of biological knowledge and as the
+mechanism through which the language itself evolves.
 
 ## Read the blueprint
 
-- **[The language](language.qmd)** — the four concepts and the seven-family operator
-  algebra, with typed signatures, the containment graph, and stateful edge-sets.
+- **[The language](language.qmd)** — the full framework mirrored section by section:
+  the four concepts, the seven-family operator algebra, numerical implementations,
+  mechanistic inverse modelling, agentic discovery, and the operator atlas.
 - **[Optimization](optimization.qmd)** — a slime-style foraging colony tuned end-to-end
   by a black-box search over its spec, from maze to porous-pillar navigation.
 - **[Slime inverse problem](inverse.qmd)** — fitting a Physarum network to a target by
