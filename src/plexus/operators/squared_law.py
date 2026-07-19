@@ -83,7 +83,7 @@ def _get_inv_square_sum(compile):
     return _inv_square_sum_compiled
 
 
-@register_operator("squared_law", family="interaction", level="particle", kind="lateral")
+@register_operator("squared_law", family="interaction", set="particle", kind="lateral")
 class SquaredLaw(Lateral):
     EMIT = "acceleration"                        # emits an acceleration (charges/masses have inertia)
     SUPPORTED_DIMS = [2, 3]                       # dimension-generic (reads D = pos.shape[-1])

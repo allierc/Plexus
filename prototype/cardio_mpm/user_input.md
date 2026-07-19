@@ -1,63 +1,40 @@
-# User input
+# User input — PHASE 3: TWO operators to test the size↔direction frontier
 
-## UPDATE (2026-07-08): cardio_real.npz RESTORED — proceed with the Phase-3 experiment
+_Posted 2026-07-09._
 
-The B38–B40 zero-archives were a pure INFRA loss (`../cardio/cardio_real.npz` was deleted); **the data has been
-regenerated from source and now lives self-contained at `prototype/cardio_mpm/cardio_real.npz`** (resolver
-finds it; no `../cardio` needed). Do NOT read B38–B40 as a scientific null on the operators — the
-residual-stress / viscoelastic experiment has NOT yet run on real data. Batch 41 is its first real run.
-`--residual_stress` and `--tau` are engine-ready and default-off (verified). Proceed exactly per the Phase-3
-design below.
+## Why the frontier is now a TESTABLE hypothesis, not a closed result
 
----
+B44 closed SIZE ✓ as "bounded by a size↔direction frontier" — but that frontier was established with **no
+active-torque and no length-dependent-tension operator in the language**; the only chirality source was
+`rot_stress` (which couples size and chirality through one knob). Per NEVER-TRUST-OPTIMIZATION, a conclusion
+under one operator language is a HYPOTHESIS under an extended one. Two new operators (engine-ready,
+**default-OFF = exact baseline**, unit-tested) each attack the frontier from a different direction:
 
-# POST-B37: CLOSE Phase 2, ENTER Phase 3 (operator discovery)
+## Operator 1 — ACTIVE TORQUE (`mpm_spin`): chirality decoupled from the contraction axis
 
-_Posted 2026-07-07._
+**`--spin_omega <ω> --spin_k <k>`** injects a rigid-rotation body force `v_rot = ω·perp(x−c)` (grounded in
+SAMoS's alignment torque). `ω` sign = chirality sense (+CCW/−CW); `spin_k=0` = OFF. It supplies circulation
+**independent of `rot_stress`**: reach real SIZE via over-rotation/`--tau`, then restore chirality with the
+torque.
 
-## 1. Close the SIZE axis and complete Phase 2
+## Operator 2 — FRANK–STARLING (`--stretch_activation <β>`): stretch-regulated size, no overshoot
 
-SIZE is dose-confirmed **capped at peak_ratio ~0.53 within the current operator language**: fibre_dev is the
-size lever (B36 monotone 0.482→0.534, rolls off dev0.30), and B37's cap-tests did NOT exceed it (dev25
-replicate regressed to 0.409, `bwnar` boundary-release 0.349 worst, `durhi13` 0.425). That is a valid **✓
-(structural-limit-established-within-current-language)** — not "unsolved," but "the current language cannot
-exceed ~0.53." Record SIZE as ✓-capped in the ledger, mark all six axes ✓, declare **Phase 2 COMPLETE** in
-`analysis_cardio_mpm.md`, and **write `PHASE3` to `current_phase.txt`**.
+Scales active tension by local fibre stretch: `T *= 1 + β·(λ−1)`, `λ = |F·n|` (Chaste NHS/Niederer form).
+Real cardiomyocytes contract HARDER when stretched — a size lever that's *self-limiting* (regulated by length,
+not raw drive), so it may enlarge loops **without** the overshoot that killed amplitude/gain (facts #4/#25) and
+**without** the chirality cost of over-rotation. `β=0` = OFF. This is the biologically authentic candidate.
 
-## 2. Phase 3 = residual-driven operator discovery — TWO new operators are ENGINE-READY
+## Experiment (one operator-variable per slot; freeze rule = raise size AND hold chirality/enclosure)
 
-The ~0.53 cap is a residual the current language can't break → per the Plexus principle, extend the language.
-Two operators are implemented, wired into `cardio_mpm_train.py`, unit-tested, and **default-OFF (exact
-baseline)** — so a control slot is simply the current best config with neither flag:
+- `ctrl` — a known frontier point (`rot2.5` or `--tau 0.05`): high peak_ratio, LOW chir.
+- **Torque route:** frontier point + `--spin_omega 0.3/0.6/1.0 --spin_k 20` (dose), plus `--spin_omega −0.6`
+  (wrong sign, causal control). Does chir_match climb back to ~0.85 while peak_ratio stays high?
+- **Frank–Starling route:** the ELASTIC op point (dev25, chir≈0.85) + `--stretch_activation 0.5/1.0/2.0`
+  (dose). Does peak_ratio rise past ~0.53 while chir_match HOLDS ~0.85 (no over-rotation needed)?
+- Read the FULL `enclosure_row`. **Confirmer:** any slot lands peak_ratio ≥0.8 AND chir_match ≥0.83 → the
+  frontier BREAKS, **SIZE reopens as solved** under the extended language. **Falsifier:** neither route recovers
+  chirality at high size → the frontier is genuinely structural (SIZE stays ✓-closed).
 
-- **`--residual_stress 1 --residual_amp <α>`** (also `--residual_hidden 128 --residual_omega 5`): a learned
-  SIREN rest tensor `F_res = I + α·tanh(dF(x,y))`; the fixed-corotated stress is taken relative to `F_res`
-  (`Fe = F @ F_res⁻¹`), so the tissue enters each beat **pre-stressed** → contraction rides a biased reference
-  and may enlarge the loop *without more active force*. `α=0` reproduces today exactly. Add `residual` to
-  `--learn` to optimize the field.
-- **`--tau <τ>`**: makes the whole sheet **viscoelastic (Maxwell)** — F relaxes toward isotropic by
-  `exp(-dt/τ)` each substep, so the rest state **drifts** between beats → *emergent* residual stress. `τ=0`
-  = OFF (pure elastic). Smaller τ = more fluid.
-
-**Hypothesis (the Phase-3 question):** the remaining size cap is not an active-stress amplitude limit; it is a
-missing **pre-stress / residual-stress state**. Prestress (imposed) and viscoelasticity (emergent) are the two
-faces of it.
-
-## 3. First Phase-3 batch — design
-
-One operator per slot, dose-swept, under the **freeze rule** (a slot must raise peak_ratio **while holding**
-enclosure/chirality/shape/uniformity — read the full `enclosure_row`, not LS alone):
-
-- `ctrl` — current best (dev25 family), no new flag → the ~0.53 anchor.
-- `res_lo / res_mid / res_hi` — `--residual_stress 1 --residual_amp 0.1 / 0.2 / 0.3`, `--learn …,residual`.
-- `visco_mid` — `--tau 0.05` (dial toward more fluid if inert).
-- (optional) `res+visco` — only after one alone shows signal.
-
-**Verdict:** any slot that pushes peak_ratio past ~0.53 with the ✓ axes intact → prestress/viscoelasticity is
-the missing operator, SIZE reopens as *solved*. A clean dose-confirmed null (neither exceeds 0.53, axes held)
-→ the cap is deeper (constitutive nonlinearity), and these operators join the rejected record — still a ✓
-result. Keep amplitude in [10,15]; settled context otherwise = the B36/dev25 family (rot1.0, drag40,
-stiff[30,300], substeps10, dur_hi11).
-
-_(Engine changes are additive and default-off; the running loop is untouched. `mpm_scatter.py` reads
-`lvl.F_res_inv`; `mpm_strain.py` reads `lvl.is_visco/visco_tau`.)_
+Both operators default-off (verified byte-baseline); `active_stress` β-guard is safe for all specs. This is the
+`residual → hypothesis → operator → extended language` loop applied to the campaign's deepest result — with a
+torque route and a stretch-activation route so you can compare mechanisms on the same frontier.

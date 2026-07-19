@@ -208,7 +208,7 @@ def mls_mpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
 # --------------------------------------------------------------------------- #
 #  The fenced transitional operator
 # --------------------------------------------------------------------------- #
-@register_operator("mls_mpm_mechanics", family="mpm", level="particle", kind="exchange")
+@register_operator("mls_mpm_mechanics", family="mpm", set="particle", kind="exchange")
 class MLSMPMMechanics(Exchange):
     """Compound MLS-MPM mechanics at the particle level (P2G -> grid solve -> G2P ->
     advect). Cell shape/rigidity emerge from the particles' elastic stress; per-cell-

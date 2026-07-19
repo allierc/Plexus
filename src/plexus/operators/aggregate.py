@@ -13,9 +13,15 @@ from plexus.models.base import Aggregate
 from plexus.models.registry import register_operator
 
 
-@register_operator("aggregate", family="hierarchy", level="cell", kind="aggregate")
+@register_operator("aggregate", family="hierarchy", set="cell", kind="aggregate")
 class Centroid(Aggregate):
     EMIT = None                                    # readout: writes parent `pos` in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
+    # typed signature (Plexus2 sec. 2.1): children -> parent along the `parent` map.
+    INPUTS = ["particle"]                          # the contained (child) set
+    OUTPUTS = ["cell"]                             # the parent set it writes
+    READS = ["pos"]
+    WRITES = ["pos"]                               # parent centroid position (a derived readout)
+    MAPS = ["parent"]                              # reduce along the parent (containment) map
     SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
     REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
     MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]

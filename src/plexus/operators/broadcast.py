@@ -13,9 +13,15 @@ from plexus.models.base import Broadcast
 from plexus.models.registry import register_operator
 
 
-@register_operator("broadcast", family="hierarchy", level="particle", kind="broadcast")
+@register_operator("broadcast", family="hierarchy", set="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
     EMIT = "velocity"            # emits a velocity; the engine integrates
+    # typed signature (Plexus2 sec. 2.1): parent -> children along the `parent` map.
+    INPUTS = ["cell"]                           # the parent set
+    OUTPUTS = ["particle"]                       # the child set it lifts onto
+    READS = ["pos"]
+    WRITES = ["pos"]                             # velocity delta pulling each child toward its parent
+    MAPS = ["parent"]                            # lift along the parent (containment) map
     SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D
     REQUIRES_PARAMS = ["stiffness"]
     MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]

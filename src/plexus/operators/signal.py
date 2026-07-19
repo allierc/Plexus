@@ -32,9 +32,17 @@ _ACT = {
 }
 
 
-@register_operator("signal", family="interaction", level="neuron", kind="lateral")
+@register_operator("signal", family="interaction", set="neuron", kind="lateral")
 class Signal(Lateral):
     EMIT = "velocity"                     # first-order voltage ODE (dv/dt); engine integrates the `voltage` coordinate
+    # typed signature (Plexus2 sec. 2.1): a morphism from (neuron, synapse) to neuron,
+    # reading neuron voltage + synapse weight, writing the neuron voltage derivative,
+    # traversing the pre/post incidence maps. The maps are PART of the signature.
+    INPUTS = ["neuron", "synapse"]
+    OUTPUTS = ["neuron"]
+    READS = ["voltage", "w"]              # neuron membrane voltage; synapse weight block W_e
+    WRITES = ["voltage"]                  # returns dv/dt on the neuron voltage
+    MAPS = ["pre", "post"]                # gather phi(v) along `pre`; aggregate current along `post`
     SUPPORTED_DIMS = [2, 3]               # voltage is scalar -- the operator ignores spatial dimension
     REQUIRES_PARAMS = ["tau", "edge_set"]
     MECHANISM_TAGS = ["signal_propagation", "connectome", "recurrent"]

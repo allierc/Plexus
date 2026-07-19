@@ -43,7 +43,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("velocity_align", "alignment", family="interaction", level="particle", kind="lateral")
+@register_operator("velocity_align", "alignment", family="interaction", set="particle", kind="lateral")
 class VelocityAlign(Lateral):                    # (alias `alignment`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic

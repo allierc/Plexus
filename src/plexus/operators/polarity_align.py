@@ -30,7 +30,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("polarity_align", "heading_align", family="polarity", level="cell", kind="exchange")
+@register_operator("polarity_align", "heading_align", family="polarity", set="cell", kind="exchange")
 class PolarityAlign(Exchange):                   # (alias `heading_align`, one migration cycle)
     EMIT = None                                 # writes `heading` in place (Vicsek steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]

@@ -30,23 +30,23 @@ from plexus.models.registry import (
 # --------------------------------------------------------------------------- #
 #  Entities  (node kinds -> the sets / levels)
 # --------------------------------------------------------------------------- #
-@register_entity("molecule", level=0)
+@register_entity("molecule", depth=0)
 class Molecule:
     """Leaf. State = concentration. Lives inside a cell (metabolite / protein)."""
 
-@register_entity("particle", level=0)
+@register_entity("particle", depth=0)
 class Particle:
     """Leaf. State = position, velocity, deformation F. MPM material point."""
 
-@register_entity("cell", level=1)
+@register_entity("cell", depth=1)
 class Cell:
     """State = position, type, phase. A set of particles and/or molecules."""
 
-@register_entity("population", level=2)
+@register_entity("population", depth=2)
 class Population:
     """A set of cells (tissue domain / cell population)."""
 
-@register_entity("organism", level=3)
+@register_entity("organism", depth=3)
 class Organism:
     """A set of populations."""
 
@@ -54,35 +54,35 @@ class Organism:
 # --------------------------------------------------------------------------- #
 #  Lateral operators  (within-set ODE interaction + discrete Laplacian)
 # --------------------------------------------------------------------------- #
-@register_operator("signal", level="cell", kind="lateral")
+@register_operator("signal", set="cell", kind="lateral")
 class SignalOperator(Lateral):
     """Connectome signal propagation. Port: NeuralGraph Signal_Propagation_*."""
 
-@register_operator("interaction", level="cell", kind="lateral")
+@register_operator("interaction", set="cell", kind="lateral")
 class InteractionOperator(Lateral):
     """Pairwise cell interaction. Port: cell-gnn CellGNN / Interaction_Particle."""
 
-@register_operator("boids", level="cell", kind="lateral")
+@register_operator("boids", set="cell", kind="lateral")
 class BoidsOperator(Lateral):
     """Flocking / active matter. Port: ParticleGraph boids, active_matter_ode."""
 
-@register_operator("gravity", level="cell", kind="lateral")
+@register_operator("gravity", set="cell", kind="lateral")
 class GravityOperator(Lateral):
     """Long-range attraction. Port: ParticleGraph gravity_ode."""
 
-@register_operator("adhesion", level="cell", kind="lateral")
+@register_operator("adhesion", set="cell", kind="lateral")
 class AdhesionOperator(Lateral):
     """Junction / contact mechanics (MISSING in repos — new for tissue)."""
 
-@register_operator("sph", level="particle", kind="lateral")
+@register_operator("sph", set="particle", kind="lateral")
 class SmoothParticleOperator(Lateral):
     """Smoothed-particle hydrodynamics. Port: ParticleGraph Interaction_Smooth_Particle."""
 
-@register_operator("spring", level="particle", kind="lateral")
+@register_operator("spring", set="particle", kind="lateral")
 class SpringOperator(Lateral):
     """Elastic spring network. Port: cell-gnn particle_spring_force_ode."""
 
-@register_operator("population_coupling", level="population", kind="lateral")
+@register_operator("population_coupling", set="population", kind="lateral")
 class PopulationCouplingOperator(Lateral):
     """Population-population coupling (MISSING — new for multi-population tissue)."""
 
@@ -90,15 +90,15 @@ class PopulationCouplingOperator(Lateral):
 # --------------------------------------------------------------------------- #
 #  Aggregate (up) operators  (children -> parent over the partition)
 # --------------------------------------------------------------------------- #
-@register_operator("centroid", level="cell", kind="aggregate")
+@register_operator("centroid", set="cell", kind="aggregate")
 class CentroidAggregate(Aggregate):
     """Cell position = aggregate of its particles. Drives 'MPM moves the cell'."""
 
-@register_operator("metabolic_state", level="cell", kind="aggregate")
+@register_operator("metabolic_state", set="cell", kind="aggregate")
 class MetabolicAggregate(Aggregate):
     """Cell metabolic state = aggregate of its molecules."""
 
-@register_operator("pool_population", level="population", kind="aggregate")
+@register_operator("pool_population", set="population", kind="aggregate")
 class PopulationAggregate(Aggregate):
     """Population state = aggregate of its cells."""
 
@@ -106,11 +106,11 @@ class PopulationAggregate(Aggregate):
 # --------------------------------------------------------------------------- #
 #  Broadcast (down) operators  (parent -> children along the partition)
 # --------------------------------------------------------------------------- #
-@register_operator("broadcast_force", level="particle", kind="broadcast")
+@register_operator("broadcast_force", set="particle", kind="broadcast")
 class ForceBroadcast(Broadcast):
     """Cell-level decision -> force on its particles. 'signaling moves the cell'."""
 
-@register_operator("broadcast_field", level="cell", kind="broadcast")
+@register_operator("broadcast_field", set="cell", kind="broadcast")
 class FieldBroadcast(Broadcast):
     """Population-level field/context -> per-cell input."""
 
@@ -118,19 +118,19 @@ class FieldBroadcast(Broadcast):
 # --------------------------------------------------------------------------- #
 #  Exchange operators  (set <-> field / set <-> set; the bipartite operator)
 # --------------------------------------------------------------------------- #
-@register_operator("p2g_g2p", level="particle", kind="exchange")
+@register_operator("p2g_g2p", set="particle", kind="exchange")
 class MPMExchange(Exchange):
     """Particle <-> background grid. Port: MPM_pytorch Interaction_MPM (MPM_P2G)."""
 
-@register_operator("reaction", level="molecule", kind="exchange")
+@register_operator("reaction", set="molecule", kind="exchange")
 class ReactionExchange(Exchange):
     """Metabolite <-> reaction (stoichiometry). Port: MetabolismGraph Metabolism_Propagation."""
 
-@register_operator("secrete_sense", level="cell", kind="exchange")
+@register_operator("secrete_sense", set="cell", kind="exchange")
 class SecreteSenseExchange(Exchange):
     """Cell <-> morphogen field (deposit / sample gradient)."""
 
-@register_operator("particle_field", level="particle", kind="exchange")
+@register_operator("particle_field", set="particle", kind="exchange")
 class ParticleFieldExchange(Exchange):
     """Particle <-> continuous field. Port: ParticleGraph Interaction_Particle_Field."""
 
@@ -138,15 +138,15 @@ class ParticleFieldExchange(Exchange):
 # --------------------------------------------------------------------------- #
 #  Field self-dynamics  (field -> field; mutate the grid, return {})
 # --------------------------------------------------------------------------- #
-@register_operator("react", level="field", kind="field")
+@register_operator("react", set="field", kind="field")
 class ReactionDiffusion(FieldUpdate):
     """Reaction-diffusion kinetics (Gray-Scott / RPS). Port: ParticleGraph RD_*."""
 
-@register_operator("wave_acoustic", level="field", kind="field")
+@register_operator("wave_acoustic", set="field", kind="field")
 class WaveAcoustic(FieldUpdate):
     """Acoustic wave (leapfrog). Port: the_well acoustic_scattering."""
 
-@register_operator("advect", level="field", kind="field")
+@register_operator("advect", set="field", kind="field")
 class Advect(FieldUpdate):
     """Semi-Lagrangian advection by a carrier flow. Port: the_well navier_stokes."""
 
@@ -156,11 +156,11 @@ class Advect(FieldUpdate):
 # --------------------------------------------------------------------------- #
 #  Rewire operators  (rebuild the relation E = edge_index; emit no delta)
 # --------------------------------------------------------------------------- #
-@register_operator("neighbour_graph", level="particle", kind="rewire")
+@register_operator("neighbour_graph", set="particle", kind="rewire")
 class NeighbourGraph(Rewire):
     """Proximity graph each tick (validated as `radius_graph`). Port: geometry.edges_radius_blockwise."""
 
-@register_operator("membrane_ring", level="particle", kind="rewire")
+@register_operator("membrane_ring", set="particle", kind="rewire")
 class MembraneRing(Rewire):
     """Cyclic membrane bonds around a cell (MISSING -- new for deformable cells)."""
 
@@ -168,15 +168,15 @@ class MembraneRing(Rewire):
 # --------------------------------------------------------------------------- #
 #  Structural operators  (change cardinality |S| / membership via occupancy)
 # --------------------------------------------------------------------------- #
-@register_operator("divide", level="cell", kind="structural")
+@register_operator("divide", set="cell", kind="structural")
 class Divide(Structural):
     """Mitosis: one cell -> two on a fixed buffer. Port: prototype ops_grow divide."""
 
-@register_operator("die", level="cell", kind="structural")
+@register_operator("die", set="cell", kind="structural")
 class Die(Structural):
     """Apoptosis / efflux: retire a cell (occ -> 0). Port: prototype death."""
 
-@register_operator("spawn", level="cell", kind="structural")
+@register_operator("spawn", set="cell", kind="structural")
 class Spawn(Structural):
     """Birth / nucleation: wake a dormant slot. Port: prototype dicty inflow."""
 

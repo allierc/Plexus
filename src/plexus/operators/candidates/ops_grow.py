@@ -27,7 +27,7 @@ from plexus.models.registry import register_operator
 EPS = 1e-6
 
 
-@register_operator("cohere", level="particle", kind="broadcast")
+@register_operator("cohere", set="particle", kind="broadcast")
 class Cohere(Broadcast):
     """Pull each particle toward the centroid of its containing set, so that set
     stays round and together. With no `role`, the set is the whole cell (cytosol
@@ -56,7 +56,7 @@ class Cohere(Broadcast):
         return {"particle": -self.k * (pos - cen[part.parent]) * isr[:, None]}
 
 
-@register_operator("repulse", level="particle", kind="lateral")
+@register_operator("repulse", set="particle", kind="lateral")
 class Repulse(Lateral):
     """Soft short-range repulsion among active particles (incompressibility ->
     the cell has area; daughters push apart)."""
@@ -77,7 +77,7 @@ class Repulse(Lateral):
         return {"particle": f * w[:, None]}
 
 
-@register_operator("duplicate", level="particle", kind="structural")
+@register_operator("duplicate", set="particle", kind="structural")
 class Duplicate(Operator):
     """Wake `rate` dormant particle slots, each next to a random active particle
     of the same cell (cell grows). Mutates occupancy; returns no delta."""
@@ -115,7 +115,7 @@ class Duplicate(Operator):
         return {}
 
 
-@register_operator("skin", level="particle", kind="rewire")
+@register_operator("skin", set="particle", kind="rewire")
 class Skin(Operator):
     """Rewire roles by radius each tick: per cell, the innermost `nucleus`
     fraction becomes the nucleus, the outermost `membrane` fraction becomes the
@@ -156,7 +156,7 @@ class Skin(Operator):
         return {}
 
 
-@register_operator("shell", level="particle", kind="broadcast")
+@register_operator("shell", set="particle", kind="broadcast")
 class Shell(Broadcast):
     """Confine a role's particles to a uniform SHELL at the cell surface: a radial
     spring pulls each `role` particle to target radius R from the cell centroid,
@@ -186,7 +186,7 @@ class Shell(Broadcast):
         return {"particle": -self.k * (dist - Rt) / dist * rvec * ism.float()[:, None]}
 
 
-@register_operator("ring", level="particle", kind="rewire")
+@register_operator("ring", set="particle", kind="rewire")
 class Ring(Operator):
     """REWIRE operator: (re)build the membrane relation. For each cell, the
     `role` particles are ordered by angle around the cell centroid and linked into
@@ -218,7 +218,7 @@ class Ring(Operator):
         return {}
 
 
-@register_operator("spring", level="particle", kind="lateral")
+@register_operator("spring", set="particle", kind="lateral")
 class Spring(Lateral):
     """LATERAL operator: Hookean spring along `H.mem_edges` (the membrane ring).
     Membrane tension -> a taut shell of particles at the cell surface."""
@@ -241,7 +241,7 @@ class Spring(Lateral):
         return {"particle": accel}
 
 
-@register_operator("tension", level="particle", kind="lateral")
+@register_operator("tension", set="particle", kind="lateral")
 class Tension(Lateral):
     """Cortical surface tension: a particle on the cell BOUNDARY (few same-cell
     neighbours) is pulled inward toward the cell centroid; interior particles
@@ -267,7 +267,7 @@ class Tension(Lateral):
         return {"particle": self.s * bw[:, None] * (cen - pos) * w[:, None]}
 
 
-@register_operator("separate", level="particle", kind="lateral")
+@register_operator("separate", set="particle", kind="lateral")
 class Separate(Lateral):
     """Cross-cell repulsion: a particle is pushed away from nearby particles of
     OTHER cells, holding a gap so single-material MPM bodies do NOT fuse on the
@@ -291,7 +291,7 @@ class Separate(Lateral):
         return {"particle": f * w[:, None]}
 
 
-@register_operator("tissue", level="cell", kind="lateral")
+@register_operator("tissue", set="cell", kind="lateral")
 class Tissue(Lateral):
     """Inter-cell adhesion: each active cell is pulled toward the centroids of its
     active neighbours within `radius`. This is the attraction that holds the colony
@@ -315,7 +315,7 @@ class Tissue(Lateral):
         return {"cell": accel * act[:, None]}
 
 
-@register_operator("mitosis", level="cell", kind="structural")
+@register_operator("mitosis", set="cell", kind="structural")
 class Mitosis(Operator):
     """Gradual, realistic division. When a cell's mass doubles it enters mitosis:
     over `frames` ticks it (i) ELONGATES along its principal axis (the two halves
@@ -386,7 +386,7 @@ class Mitosis(Operator):
         return {"particle": accel}
 
 
-@register_operator("divide", level="cell", kind="structural")
+@register_operator("divide", set="cell", kind="structural")
 class Divide(Operator):
     """Split any active cell whose mass has reached `ratio`x its birth mass, along
     the cell's principal axis: half its particles get a fresh cell id, both
