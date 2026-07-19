@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>The abstraction – Plexus</title>
+<title>The language – Plexus</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -158,12 +158,8 @@ window.Quarto = {
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link active" href="./abstraction.html" aria-current="page"> 
-<span class="menu-text">The abstraction</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./methodology.html"> 
-<span class="menu-text">LLM ↔︎ registry</span></a>
+    <a class="nav-link active" href="./language.html" aria-current="page"> 
+<span class="menu-text">The language</span></a>
   </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
@@ -224,6 +220,7 @@ window.Quarto = {
   <ul class="collapse">
   <li><a href="#differentiating-division-and-death" id="toc-differentiating-division-and-death" class="nav-link" data-scroll-target="#differentiating-division-and-death">Differentiating division and death</a></li>
   </ul></li>
+  <li><a href="#one-operator-many-implementations" id="toc-one-operator-many-implementations" class="nav-link" data-scroll-target="#one-operator-many-implementations">One operator, many implementations</a></li>
   <li><a href="#dynamics-a-schedule" id="toc-dynamics-a-schedule" class="nav-link" data-scroll-target="#dynamics-a-schedule">Dynamics: a schedule</a></li>
   <li><a href="#glossary" id="toc-glossary" class="nav-link" data-scroll-target="#glossary">Glossary</a></li>
   </ul>
@@ -234,8 +231,8 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">The abstraction</h1>
-<p class="subtitle lead">Sets, fields, operators, and schedules</p>
+<h1 class="title">The language</h1>
+<p class="subtitle lead">Operators, sets, states, and fields</p>
 </div>
 
 
@@ -252,10 +249,11 @@ window.Quarto = {
 </header>
 
 
-<p>Plexus is built from two kinds of object — <strong>sets</strong> and <strong>fields</strong> — and a small collection of <strong>operators</strong> that move information, force, state, or membership between them. A model is a <strong>schedule</strong>: an ordered composition of operators, iterated over time. Those four words — <em>sets, fields, operators, schedules</em> — are the whole vocabulary, and they are the missing primitive: the place where particle mechanics, cellular interaction, neural dynamics, and reaction networks all become the same kind of thing.</p>
+<p>Plexus is a typed language for expressing biological mechanisms independently of how they are computed. Its fundamental object is the <strong>operator</strong> — a single mechanism (adhesion, diffusion, division, chemotaxis, electrical propagation, active stress) defined by a <em>typed signature</em>, which says <strong>what</strong> transformation it performs, and one or more <em>implementations</em>, which say <strong>how</strong> it is numerically realized. Operators act on three kinds of thing: <strong>sets</strong> — discrete biological entities across scales (particles, cells, neurons, synapses, tissues); the <strong>state</strong> each element of a set carries; and <strong>fields</strong> — continuous quantities defined over space (morphogens, pressure, potentials). A biological model is a <strong>schedule</strong>: an ordered composition of operators, iterated over time and kept differentiable throughout.</p>
+<p>These four concepts — <em>operators, sets, states, fields</em> — are the whole vocabulary, and they are the missing primitive: the place where particle mechanics, cellular interaction, neural dynamics, and reaction networks all become the same kind of thing. The rest of this page defines the objects the operators act on — sets, state, fields, and the maps between them — then the <strong>seven operator families</strong> that make up the algebra, and finally how a schedule composes them into differentiable dynamics.</p>
 <section id="sets-and-fields" class="level2">
 <h2 class="anchored" data-anchor-id="sets-and-fields">Sets and fields</h2>
-<p>Plexus has two objects.</p>
+<p>Operators act on two kinds of object.</p>
 <p>A <strong>set</strong> is a discrete collection of elements of one kind: particles, cells, nuclei, metabolites, organisms. More precisely, <em>a set is a collection of elements with the same state schema and the same admissible operators</em> — every element carries the same state variables (position, velocity, concentration, …) and the same operators may act on it.</p>
 <p>A <strong>field</strong> is a continuous quantity defined on a grid: a chemical concentration, an activation level, a stiffness map, a pressure, a substrate signal. (Formally, <span class="math inline">\(f:\Omega\to\mathbb{R}^q\)</span> over a domain <span class="math inline">\(\Omega\)</span>.)</p>
 <p>Operators move state between these objects, and a model is a scheduled composition of them. Fields are <em>not</em> contained by sets and do not contain them; a set and a field meet only through an <strong>exchange</strong> operator — secretion, sensing, particle–grid transfer, field sampling.</p>
@@ -385,6 +383,11 @@ same object, new params   → new type inside that set</code></pre>
 <p>The one genuinely non-differentiable part — the integer decision of <em>when</em> to divide or die — is handled separately: a straight-through or Gumbel estimator to learn a division <em>policy</em>; a score-function (REINFORCE) gradient for an expected objective w.r.t. division/death <em>rates</em>; or black-box search (UCB/CEM) when the objective is itself discrete (final count, fraction escaped). This is the <em>use both</em> recipe applied to structure: gradients for the continuous interior, black-box for the discrete choices.</p>
 <p>Sets, fields, and these operators are the entire vocabulary. The wager of Plexus is that this is enough <strong>to describe a complex living system</strong> — that everything from mechanics to morphogenesis to division and death is some composition of them over a hierarchy of sets and fields.</p>
 </section>
+</section>
+<section id="one-operator-many-implementations" class="level2">
+<h2 class="anchored" data-anchor-id="one-operator-many-implementations">One operator, many implementations</h2>
+<p>A signature is a biological <em>contract</em>; it does not fix the numerics. Every operator may carry several <strong>implementations</strong> that satisfy the same signature and differ only in how they compute. A mechanical <strong>Lateral</strong> interaction can be realized by MLS-MPM, finite elements, a vertex model, or a phase field; a neuronal one by Hodgkin–Huxley, a Neural ODE, or a graph neural network; a field update by finite differences, spectral methods, or a neural implicit. Choosing an implementation is a numerical decision, never a biological one, so the same model runs on different backends without changing a single operator, map, or schedule.</p>
+<p>This splits progress into two independent axes. <strong>Biological</strong> innovation is a new operator or a new composition; <strong>numerical</strong> innovation is a faster or more accurate implementation of an existing one. Existing simulators then stop being rival paradigms and become complementary <strong>backends</strong>, each implementing one family of operator contracts — which is what makes mechanism search well posed: hold the sets, state, and maps fixed, and search over the implementation of each contract and the composition of the schedule.</p>
 </section>
 <section id="dynamics-a-schedule" class="level2">
 <h2 class="anchored" data-anchor-id="dynamics-a-schedule">Dynamics: a schedule</h2>
