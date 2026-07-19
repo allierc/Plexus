@@ -160,12 +160,8 @@ window.Quarto = {
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./abstraction.html"> 
-<span class="menu-text">The abstraction</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./methodology.html"> 
-<span class="menu-text">LLM ↔︎ registry</span></a>
+    <a class="nav-link" href="./language.html"> 
+<span class="menu-text">The language</span></a>
   </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-library" role="link" data-bs-toggle="dropdown" aria-expanded="false">
@@ -216,8 +212,13 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#a-language-and-a-calculus-two-layers-that-never-touch" id="toc-a-language-and-a-calculus-two-layers-that-never-touch" class="nav-link active" data-scroll-target="#a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</a></li>
+  <li><a href="#a-typed-intermediate-representation" id="toc-a-typed-intermediate-representation" class="nav-link active" data-scroll-target="#a-typed-intermediate-representation">A typed intermediate representation</a></li>
+  <li><a href="#four-concepts-seven-operators" id="toc-four-concepts-seven-operators" class="nav-link" data-scroll-target="#four-concepts-seven-operators">Four concepts, seven operators</a></li>
+  <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
+  <li><a href="#mechanistic-inverse-modelling" id="toc-mechanistic-inverse-modelling" class="nav-link" data-scroll-target="#mechanistic-inverse-modelling">Mechanistic inverse modelling</a></li>
+  <li><a href="#agentic-mechanistic-discovery" id="toc-agentic-mechanistic-discovery" class="nav-link" data-scroll-target="#agentic-mechanistic-discovery">Agentic mechanistic discovery</a></li>
+  <li><a href="#the-operator-atlas" id="toc-the-operator-atlas" class="nav-link" data-scroll-target="#the-operator-atlas">The operator atlas</a></li>
   <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
   </ul>
 </nav>
@@ -228,7 +229,7 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">Plexus</h1>
-<p class="subtitle lead">Toward a language and calculus of living systems</p>
+<p class="subtitle lead">A typed intermediate representation for biological mechanisms</p>
 </div>
 
 
@@ -255,30 +256,35 @@ window.Quarto = {
 </div>
 </div>
 </div>
-<p>Biology is not a single graph.</p>
-<p>A graph fixes <em>one</em> kind of node and <em>one</em> kind of edge — particles and the forces between them, cells and their contacts, neurons and synapses, molecular species and reactions. Each existing framework commits to one such graph and models that layer alone. But a living system is several of these at once, nested inside one another: particles make up cells, and cells make up tissues and populations. And every level may be coupled to continuous fields — a morphogen gradient, a pressure field, a chemical signal — that the discrete entities both shape and read. Choose any single graph and you capture one slice — the couplings <em>between</em> slices, where much of the biology lives, fall outside it.</p>
-<p>Rather than building another domain-specific simulator, Plexus introduces a common representation based on <strong>hierarchical sets</strong>, <strong>continuous fields</strong>, and a small collection of <strong>operators</strong> acting between them. Cells contain particles and metabolites. State moves through just four operators — <strong>lateral</strong> (within a set), <strong>aggregate</strong> (upward), <strong>broadcast</strong> (downward), and <strong>exchange</strong> (between sets and fields). Complex simulations emerge from composing a few primitive operations.</p>
+<p>Living systems are mechanical, chemical, electrical, and developmental at once. Computational biology has answered each of these with its own simulator — neural simulators for electrical activity, reaction–diffusion solvers for chemical transport, particle and continuum methods for mechanics, vertex and Cellular-Potts models for tissues. These frameworks remain largely incompatible: coupling signalling, mechanics, metabolism, and development means bolting specialized simulators together, each carrying its own representation of what a biological mechanism <em>is</em>. The obstacle is not primarily numerical. <strong>It is a language problem.</strong></p>
+<p>Plexus treats biological <em>mechanisms</em> — not simulators — as the primary objects. Rather than building another simulator, it defines a common language whose central elements are <strong>biological operators</strong>: adhesion, diffusion, division, chemotaxis, electrical propagation, active stress. Every operator specifies the entities it acts on, the state it reads and writes, the relations between those entities, and one or more numerical implementations. Biological modelling then becomes analogous to compiler design.</p>
+<section id="a-typed-intermediate-representation" class="level2">
+<h2 class="anchored" data-anchor-id="a-typed-intermediate-representation">A typed intermediate representation</h2>
+<p>Just as a modern compiler separates a programming language from the machine it runs on through an <strong>intermediate representation</strong>, Plexus separates a biological mechanism from its numerical realization. An operator is defined by a <strong>typed signature</strong> — <em>what</em> biological transformation it performs — and by one or more <strong>implementations</strong> — <em>how</em> that transformation is computed. The signature is the biological contract; the implementation is a numerical choice.</p>
+<p><code>neuron_voltage</code> is the contract “membrane state → its derivative,” which Hodgkin–Huxley, Izhikevich, a Neural ODE, or an MLP all satisfy interchangeably; a mechanical interaction is the contract that MLS-MPM, finite elements, a vertex model, or a phase field all realize. Because a mechanism is stated once, independently of its solver, models written for different simulators compile to the <em>same</em> operators, and existing simulators become <strong>complementary backends</strong> rather than competing paradigms — Plexus is to a biophysics simulator what an intermediate representation is to a compiler.</p>
+</section>
+<section id="four-concepts-seven-operators" class="level2">
+<h2 class="anchored" data-anchor-id="four-concepts-seven-operators">Four concepts, seven operators</h2>
+<p>The language is built from four concepts — <strong>operators</strong>, and the three kinds of thing they act on: <strong>sets</strong> (discrete biological entities across scales — particles, cells, neurons, synapses, tissues), the <strong>state</strong> each element carries, and <strong>fields</strong> (continuous quantities — morphogens, pressure, potentials). A biological model is a composition of operators over these objects.</p>
+<p>The central wager of Plexus is that a large fraction of the existing simulation literature can be written with a compact algebra of <strong>seven operator families</strong>:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:70.0%"></p>
-<figcaption>The four operators. <em>Lateral</em> acts within a set; <em>Aggregate</em> and <em>Broadcast</em> move across containment <span class="math inline">\(\pi\)</span>; <em>Exchange</em> pushes to and pulls from a field.</figcaption>
+<p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>The elementary operator algebra. The first four move biological <em>state</em>: <em>Lateral</em> within a set; <em>Aggregate</em> and <em>Broadcast</em> up and down across containment <span class="math inline">\(\pi\)</span>; <em>Exchange</em> to and from a field. The last three change structure: <em>Rewire</em> the relations between entities, <em>Divide</em> and <em>Die</em> the entities themselves.</figcaption>
 </figure>
 </div>
-<section id="a-language-and-a-calculus-two-layers-that-never-touch" class="level2">
-<h2 class="anchored" data-anchor-id="a-language-and-a-calculus-two-layers-that-never-touch">A language <em>and</em> a calculus — two layers that never touch</h2>
-<p>Plexus is two things at once, kept strictly apart:</p>
 <ul>
-<li>a <strong>language</strong> — a small, declarative <em>specification</em> (<code>spec.yaml</code>) that names the sets, fields, operators, and schedule of a system. This is <em>what</em> a living system is.</li>
-<li>a <strong>calculus</strong> — the registered operators and the engine that composes and integrates them. A simulation is a composition of operators, declared as a <code>Schedule</code>; in math terms, one tick is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, iterated as <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span> and kept differentiable throughout. This is <em>how</em> it evolves.</li>
+<li><strong>Lateral</strong> — interactions within a set (forces, adhesion, signalling).</li>
+<li><strong>Aggregate ↑</strong> and <strong>Broadcast ↓</strong> — many-to-one and one-to-many transforms across biological scales.</li>
+<li><strong>Exchange</strong> — coupling between sets and continuous fields (secretion, sensing, particle–grid transfer).</li>
+<li><strong>Rewire</strong> — modification of the relations between entities.</li>
+<li><strong>Divide</strong> and <strong>Die</strong> — creation and removal of entities.</li>
 </ul>
-<p>Both layers are built from <strong>explicit, named primitives</strong>. And because those primitives are explicit <em>and</em> differentiable, the same language serves prediction, inverse inference, and the optimization of biological designs alike.</p>
-<p>The two meet at exactly one place — the validated spec — and <strong>never touch directly</strong>. The code owns everything <em>below</em> the spec: the registered operators and the engine that runs them. The language owns everything <em>above</em> it: the spec that names the sets, fields, operators, and schedule of a system.</p>
-<p>This separation becomes important the moment the framework is connected to an <strong>LLM</strong>. The LLM works only in the language layer — it reads, edits, and generates the spec — and never touches the codebase: it never writes engine code, and the engine never sees natural language. The spec is the contract between them: small, typed, and human-auditable.</p>
-<p>The practical payoff: a new behaviour is a new sentence in the language, not a new program. A short prompt becomes a running, differentiable simulation <strong>with no code written</strong> —</p>
-<blockquote class="blockquote">
-<p><strong>Prompt</strong> — <em>“100 cells; the soft ones secrete a chemical and climb it, so they clump together; the stiff ones ignore it.”</em></p>
-</blockquote>
-<p>the LLM compiles it to a specification:</p>
+<p>The first four transform biological <em>state</em> while preserving organization; Rewire changes the interaction <em>graph</em>; Divide and Die change the <em>entities</em> themselves. The full algebra — typed signatures, the containment graph, stateful edge-sets, the one-operator-many-implementations rule, and how division stays differentiable — is on <strong><a href="./language.html">The language</a></strong>.</p>
+</section>
+<section id="composing-mechanisms" class="level2">
+<h2 class="anchored" data-anchor-id="composing-mechanisms">Composing mechanisms</h2>
+<p>A biological model is an ordered <strong>schedule</strong> of operator applications. One simulation step is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, iterated as <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>. Operators are <em>pure</em>: each returns its contribution <span class="math inline">\(\Delta_i\)</span> and the engine sums them, so introducing a mechanism is adding a line to the schedule, never editing the engine. A cell that secretes a chemical, climbs it, and self-aggregates through its constituent particles is a handful of operators:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> aggregate</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sets</span><span class="kw">:</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cell</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">100</span><span class="kw">,</span><span class="at"> </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">soft</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">12</span><span class="kw">},</span><span class="at"> </span><span class="fu">stiff</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">fraction</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.5</span><span class="kw">,</span><span class="at"> </span><span class="fu">youngs</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}}}</span></span>
@@ -290,11 +296,11 @@ window.Quarto = {
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> sense</span><span class="kw">,</span><span class="at">   </span><span class="fu">at</span><span class="kw">:</span><span class="at"> </span><span class="st">"cell[type=soft]"</span><span class="kw">,</span><span class="at"> </span><span class="fu">from</span><span class="kw">:</span><span class="at"> chemical</span><span class="kw">,</span><span class="at"> </span><span class="fu">gain</span><span class="kw">:</span><span class="at"> </span><span class="dv">150</span><span class="kw">}</span><span class="co">  # only soft cells follow it</span></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> mpm</span><span class="kw">,</span><span class="at">     </span><span class="fu">at</span><span class="kw">:</span><span class="at"> particle</span><span class="kw">,</span><span class="at"> </span><span class="fu">n_grid</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="kw">,</span><span class="at"> </span><span class="fu">a_max</span><span class="kw">:</span><span class="at"> </span><span class="dv">800</span><span class="kw">,</span><span class="at"> </span><span class="fu">drag</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span><span class="kw">}</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">schedule</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">aggregate</span><span class="kw">,</span><span class="at"> secrete</span><span class="kw">,</span><span class="at"> chemical.diffuse</span><span class="kw">,</span><span class="at"> sense</span><span class="kw">,</span><span class="at"> mpm</span><span class="kw">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>and the engine resolves each <code>op</code> against the registry and runs it — producing the <em>aggregate</em> result shown below. No operator was written; the selector <code>cell[type=soft]</code> did the work of “only the soft ones”. The full grammar, the compilation rules, and how the contract fails loudly on a bad spec are on the <strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> page.</p>
+<p>The schedule can be <em>multi-rate</em>: mechanics may run every tick while diffusion, growth, or division fire less often. And because nothing is mutated in place, gradients flow through the sums and the integrator — the whole rollout stays <strong>differentiable</strong>, so differentiability is a property of the <em>language</em>, not of any one solver.</p>
 </section>
 <section id="what-it-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>
-<p>Qualitatively different dynamical systems expressed within the same language. Each simulation is constructed from the same primitives—sets, fields, operators, and schedules—yet gives rise to distinct collective behaviours spanning flocking, self-organizing networks, self-gravity, and deterministic chaos.</p>
+<p>Qualitatively different dynamical systems expressed in the same operator language. Each is built from the same primitives — sets, state, fields, operators, and a schedule — yet gives rise to distinct collective behaviour: flocking, self-organizing networks, self-gravity, deterministic chaos.</p>
 <style>
 .home-2x2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;max-width:660px;margin:1.3rem auto .5rem}
 .home-2x2 figure{margin:0}
@@ -309,7 +315,12 @@ window.Quarto = {
   <figure class="figure"><div class="vidbox"><video src="gallery/inverse_square.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>self-gravity</b> — a rotating disc collapses into a galaxy</figcaption></figure>
   <figure class="figure"><div class="vidbox"><video src="gallery/attractor_aizawa.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video></div><figcaption><b>chaos</b> — a cloud drawn onto a strange attractor</figcaption></figure>
 </div>
-<p>And because every simulation is differentiable, biological designs can be <em>optimized</em>. Below, a foraging colony in a maze is tuned by a UCB algorithm — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.</p>
+</section>
+<section id="mechanistic-inverse-modelling" class="level2">
+<h2 class="anchored" data-anchor-id="mechanistic-inverse-modelling">Mechanistic inverse modelling</h2>
+<p>Because every operator carries a differentiable implementation, gradients propagate through a composition of <em>explicit</em> biological mechanisms rather than through opaque simulator code. This changes what inference means. Classical calibration assumes the mechanism is already correct and only tunes parameters — effective when the forward model is complete, but misleading when a mechanism is <em>missing</em>, since optimizing the present parameters merely compensates for the absent one.</p>
+<p>In Plexus, parameters stay attached to named operators — stiffness to mechanical operators, reaction rates to biochemical ones, conductances to signalling ones — so estimation preserves the mechanistic meaning of the model, and the residual acquires one too. A persistent mismatch between simulation and experiment is read not only as poor parameters but as evidence that the current operator composition cannot explain the data: a <strong>missing operator</strong>.</p>
+<p>The same differentiability lets biological designs be <em>optimized</em>. Below, a foraging colony in a maze is tuned by a UCB search — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.</p>
 <div>
 
 </div>
@@ -323,21 +334,35 @@ window.Quarto = {
 </div>
 </div>
 </div>
-<p>The same recipe scales to harder navigation — a porous <strong>pillar</strong> field and a walled <strong>maze</strong>, each crossed by a self-generated attractant gradient and tuned by the same optimizer. Each is shown from its starting point to the optimized colony (see <a href="./experiment.html">Simulations</a> for the full runs):</p>
+<p>The same recipe scales to harder navigation — a porous <strong>pillar</strong> field and a walled <strong>maze</strong>, each crossed by a self-generated attractant gradient and tuned by the same optimizer, shown from starting point to optimized colony (full runs in <a href="./experiment.html">Simulations</a>):</p>
 <div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — starting point"><source src="gallery/race_pillars_winner_1.mp4"></video></div>
 <div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — optimized (136/154 escape the porous field)"><source src="gallery/race_pillars_winner_8.mp4"></video></div>
 <div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — starting point"><source src="gallery/race_maze_hard_winner_1.mp4"></video></div>
 <div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — optimized (150/160 solve the labyrinth)"><source src="gallery/race_maze_hard_winner_5.mp4"></video></div>
 </section>
+<section id="agentic-mechanistic-discovery" class="level2">
+<h2 class="anchored" data-anchor-id="agentic-mechanistic-discovery">Agentic mechanistic discovery</h2>
+<p>Because mechanisms are explicit operators rather than simulator-specific code, they are directly accessible to agentic systems — which turns discovery from a parameter search into a <strong>search over model structures</strong>. Plexus organizes this as three loops, each at a higher level of abstraction:</p>
+<ul>
+<li><strong>Loop I — Understanding.</strong> Decompose an existing simulator into Plexus operators, recovering an explicit mechanistic description from opaque code.</li>
+<li><strong>Loop II — Fitting.</strong> Fit the resulting composition to observations through its differentiable implementations, preserving the link between parameters and mechanisms.</li>
+<li><strong>Loop III — Discovery.</strong> Read the residual: propose new operators, compare competing mechanistic hypotheses, and extend the algebra when existing mechanisms fall short.</li>
+</ul>
+<p>The language itself becomes the object of discovery — new biological knowledge is a new operator, not merely a tuned parameter.</p>
+</section>
+<section id="the-operator-atlas" class="level2">
+<h2 class="anchored" data-anchor-id="the-operator-atlas">The operator atlas</h2>
+<p>This defines a research program with three objectives: build an <strong>algebra</strong> of biological operators; <strong>decompose</strong> the existing corpus of simulation frameworks into that common language; and construct <strong>differentiable</strong> implementations so mechanistic models can be inferred from data. The second objective is the <strong>operator atlas</strong> — existing frameworks (Chaste, CompuCell3D, Morpheus, Tissue Forge, PhysiCell, Jaxley, BrainPy, connectome GNNs, …) treated not as rival simulators but as repositories of reusable mechanisms, each decomposed into operators, typed signatures, and implementations.</p>
+<p>The atlas is also the test of the central hypothesis: if decomposing a broad collection of simulators converges toward a compact, reusable vocabulary, the operator algebra is a meaningful intermediate representation for biology; if genuinely new families keep appearing, the language is still incomplete and extends. Either way, the vocabulary grows monotonically and every earlier model keeps working.</p>
+</section>
 <section id="read-the-blueprint" class="level2">
 <h2 class="anchored" data-anchor-id="read-the-blueprint">Read the blueprint</h2>
-<p>This site distils a working prototype into a single blueprint, in three parts:</p>
 <ul>
-<li><strong><a href="./abstraction.html">The abstraction</a></strong> — the missing primitive: a hierarchical graph container stated in the language of sets, fields, and four operators.</li>
-<li><strong><a href="./methodology.html">LLM ↔︎ registry</a></strong> — the two-layer contract and the small declarative language that lets an LLM drive a registry of operators.</li>
-<li><strong><a href="./experiment.html">Simulations</a></strong> — the core operator families as one-per-family clips (interaction, boids, active matter, slime, MLS-MPM, inverse-square, strange attractors), plus a maze-foraging colony optimized end-to-end.</li>
+<li><strong><a href="./language.html">The language</a></strong> — the four concepts and the seven-family operator algebra, with typed signatures, the containment graph, and stateful edge-sets.</li>
+<li><strong><a href="./experiment.html">Simulations</a></strong> — one clip per operator family (interaction, boids, active matter, slime, MLS-MPM, inverse-square, strange attractors), plus a maze-foraging colony optimized end-to-end.</li>
+<li><strong><a href="./inverse.html">Slime inverse problem</a></strong> — fitting a Physarum network to a target by gradient descent through the operators.</li>
 </ul>
-<p>A static version with full schematics and glossary is in <a href="paper/plexus.pdf"><code>paper/plexus.pdf</code></a>.</p>
+<p>The full framework — numerical implementations, mechanistic inverse modelling, the agentic loops, and the reference corpus for the atlas — is in <a href="paper/plexus2.pdf"><code>paper/plexus2.pdf</code></a>.</p>
 
 
 </section>

@@ -6,16 +6,14 @@ project:
 
 website:
   title: "Plexus"
-  description: "A language and calculus of living systems."
+  description: "A typed intermediate representation for biological mechanisms."
   site-url: https://allierc.github.io/Plexus/
   navbar:
     left:
       - href: index.qmd
         text: Home
-      - href: abstraction.qmd
-        text: The abstraction
-      - href: methodology.qmd
-        text: LLM ↔ registry
+      - href: language.qmd
+        text: The language
       - text: Library
         menu:
           - href: library.qmd
