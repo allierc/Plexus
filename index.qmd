@@ -14,21 +14,15 @@ continuum solver from MLS-MPM (Hu et al. 2018); and the strange attractors from 
 originating papers (Lorenz 1963, Rössler 1976, Sprott 1994, …).
 :::
 
-Computational biology has produced a rich ecosystem of simulation frameworks —
-neural simulators for electrical activity, reaction–diffusion systems for chemical
-transport, particle and continuum methods for mechanics, vertex, Cellular Potts and
-active-matter models for tissues. These frameworks remain largely incompatible.
-Combining electrical signalling, mechanics, metabolism and development often requires
-coupling multiple specialized simulators whose underlying abstractions differ
-fundamentally, making models difficult to compare, compose and extend. This
-fragmentation is not primarily a numerical problem but a **language problem.**
-
-Instead of treating simulation frameworks as fundamental, Plexus treats biological
-*mechanisms* as the primary objects. It introduces an intermediate representation
-whose central elements are **biological operators** — adhesion, diffusion, division,
-chemotaxis, electrical propagation, active stress — described independently of their
-numerical implementation. In this perspective, biological modelling becomes analogous
-to compiler design.
+We introduce **Plexus**, a typed intermediate representation for biological
+mechanisms. Rather than defining yet another simulator, Plexus defines a common
+language whose primary objects are **biological operators**. Every operator specifies
+the biological entities it acts upon, the states it requires, the relations between
+these entities, and one or more numerical implementations. The Plexus research program
+has three objectives. First, to define an **algebra of biological operators**. Second,
+to **decompose the existing corpus** of simulation models into this common language.
+Third, to construct **differentiable implementations** of these operators so that
+mechanistic models can be directly inferred from biological data.
 
 ## A typed intermediate representation
 
@@ -171,7 +165,7 @@ descriptions:
       particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
       features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
       consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
-      <span class="sim-cap">per-type difference-of-Gaussians interaction — types self-sort into cells</span>
+      <span class="sim-cap">a Lateral interaction — a per-type force law sorts the types into cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -333,7 +327,7 @@ descriptions:
       are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
       the particles are arranged in a random, scattered topology across the entire frame. As the simulation
       progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
-      <span class="sim-cap">cohesion + alignment + separation — one flock from local rules</span>
+      <span class="sim-cap">three Lateral rules — cohesion, alignment, separation — compose into flocking</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -372,7 +366,7 @@ descriptions:
       a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
       representation of the data. The topology of the objects changes as they aggregate into dense regions
       and disperse into more scattered formations.</pre></span></span>
-      <span class="sim-cap">Vicsek self-propulsion + alignment — a polar-ordered swarm</span>
+      <span class="sim-cap">a Lateral alignment operator — self-propelled agents order into a polar swarm</span>
     </figcaption>
   </figure>
 </div>
@@ -433,7 +427,7 @@ descriptions:
       internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
       outward in all directions. All objects are a consistent teal-green color and are set against a solid
       black background.</pre></span></span>
-      <span class="sim-cap">deposit → diffuse → decay → sense → glide — a growing, coarsening web</span>
+      <span class="sim-cap">Exchange + Lateral — deposit into a field, sense it, steer up it: a self-organizing network</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -486,7 +480,7 @@ descriptions:
       a neural network or a microscopic biological structure. Surrounding this central mass are several
       thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
       medium blue, contrasting sharply against the solid black background.</pre></span></span>
-      <span class="sim-cap">tighter turning — curled, looping trails</span>
+      <span class="sim-cap">the same operators, tighter turning — curled, looping trails</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -542,7 +536,7 @@ descriptions:
       in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
       are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
       is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
-      <span class="sim-cap">thin, filamentous strands below field saturation</span>
+      <span class="sim-cap">the same operators, low deposit — thin, filamentous strands</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -602,7 +596,7 @@ descriptions:
       lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
       uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
       in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
-      <span class="sim-cap">four species, each following its own trail channel</span>
+      <span class="sim-cap">four types over four field channels, one shared schedule</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -666,7 +660,7 @@ descriptions:
       These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
       a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
       and are distributed evenly across the entire field of view.</pre></span></span>
-      <span class="sim-cap">six overlapping species — richer coupled networks</span>
+      <span class="sim-cap">six types coupled through a shared field — richer networks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -736,7 +730,7 @@ descriptions:
       loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
       and orange. Each individual filament is very small in width but spans across large portions of the
       frame, creating a high-frequency texture.</pre></span></span>
-      <span class="sim-cap">eight species — the most restrained, most-channelled web</span>
+      <span class="sim-cap">eight types — the most restrained, most-channelled web</span>
     </figcaption>
   </figure>
 </div>
@@ -803,7 +797,7 @@ descriptions:
   movie_mpm_particle:
     description: Initially, three distinct clusters of particles are arranged in a linear sequence along a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across the bottom plane of the bounding box. The green and white clusters remain relatively stationary as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles form a large, thin sheet on the floor while the green and white clusters sit atop it.
     objects: &#x27;There are three primary clusters of particles: one green, one blue, and one white. The green cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that covers the bottom of the cube.&#x27;</pre></span></span>
-      <span class="sim-cap">elastic, fluid, and granular bodies interacting at once</span>
+      <span class="sim-cap">Exchange particle↔grid (MLS-MPM) — elastic, fluid, and granular matter in one solver</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -863,7 +857,7 @@ descriptions:
     objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
 plotting:
   background: black</pre></span></span>
-      <span class="sim-cap">an image sets per-region Young's modulus (four quadrants)</span>
+      <span class="sim-cap">an Exchange field sets per-region stiffness (a material map)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -916,7 +910,7 @@ descriptions:
     objects: The scene contains a large main chamber and a smaller side chamber connected by a gap. The main chamber is bounded by thick grey vertical walls on the left and right. The particles are small, blue, and densely packed within the chambers. The side chamber is located at the bottom right and is partially filled by the flowing particles.
 plotting:
   background: black</pre></span></span>
-      <span class="sim-cap">fluid drains through a gap between two walls</span>
+      <span class="sim-cap">the same continuum operator — fluid drains through a gap in the wall</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1025,7 +1019,7 @@ descriptions:
       green, blue, and orange. As the simulation progresses, the individual hexagons merge into a massive,
       interconnected cloud of tiny points. The final state shows a large, flat surface of points with
       varying heights and intricate, nested color patterns.</pre></span></span>
-      <span class="sim-cap">a deep body of water sloshes, settles, and fills the tank</span>
+      <span class="sim-cap">one continuum operator — a deep fluid body sloshes and settles</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1081,7 +1075,7 @@ descriptions:
   movie_mpm_particle:
     description: A blue cluster of particles initially occupies the upper half of a cubic volume. Over time, the cluster descends toward the bottom surface, gradually flattening into a thin layer. A smaller, spherical cluster of grey particles is positioned directly beneath the blue mass and is eventually enveloped by it. By the final frame, the blue particles have spread out to cover the entire bottom face of the cube.
     objects: The primary object is a large, dense cluster of blue particles that changes shape from a cube to a flat sheet. A secondary, smaller spherical cluster of grey particles is located in the center of the cube. Both sets of particles are contained within a large, transparent white wireframe cube. The blue particles are significantly more numerous and larger in total volume than the grey particles.</pre></span></span>
-      <span class="sim-cap">material pours over and piles around a sphere obstacle</span>
+      <span class="sim-cap">grid boundary conditions — material pours and piles around an obstacle</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1131,7 +1125,7 @@ descriptions:
     objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
 plotting:
   background: black</pre></span></span>
-      <span class="sim-cap">two liquid drops coalesce under surface tension</span>
+      <span class="sim-cap">grid-level surface tension — two drops coalesce</span>
     </figcaption>
   </figure>
 </div>
@@ -1177,7 +1171,7 @@ descriptions:
       sphere. As the simulation progresses, the particles separate into elongated, curved streams and
       wispy filaments that radiate from the center. The background is a solid black void, providing high
       contrast for the evolving white particle field.</pre></span></span>
-      <span class="sim-cap">law: gravity — a rotating disc collapses into a galaxy</span>
+      <span class="sim-cap">a Lateral all-pairs 1/r² law — self-gravity condenses a disc into a galaxy</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1224,7 +1218,7 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
-      <span class="sim-cap">the same self-gravity in 3D, from an orbiting camera</span>
+      <span class="sim-cap">the same operator, in 3D from an orbiting camera</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1271,7 +1265,7 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
-      <span class="sim-cap">a heavier core draws the disc into tight structure</span>
+      <span class="sim-cap">the same law with a heavier central mass</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1309,7 +1303,7 @@ descriptions:
       As the simulation progresses, the particles aggregate into a central, multi-lobed cluster with a
       high density. In the final frames, the particles form a singular, elongated horizontal structure
       with a fuzzy, diffuse boundary.</pre></span></span>
-      <span class="sim-cap">clumps merge hierarchically under mutual gravity</span>
+      <span class="sim-cap">mutual gravity — clumps merge hierarchically</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1354,7 +1348,7 @@ descriptions:
       These particles are distributed randomly across the entire frame without any specific geometric
       arrangement or connection. Each particle is uniform in size and appears as a single pixel or a small
       cluster of pixels. The colors are vibrant and contrast sharply against the solid black background.&#x27;</pre></span></span>
-      <span class="sim-cap">law: coulomb — like-repel / opposite-attract screening</span>
+      <span class="sim-cap">the same operator, signed charge — a screened plasma</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1405,7 +1399,7 @@ descriptions:
       The grey particles are the most numerous and form the primary bulk of the central cluster. The red
       and blue particles are scattered throughout the grey mass, appearing as smaller subsets. All particles
       are uniform in size and are arranged in a disordered, stochastic distribution.&#x27;</pre></span></span>
-      <span class="sim-cap">a 3D charged cloud settling into a screened arrangement</span>
+      <span class="sim-cap">a 3D charged cloud settling into a self-screened arrangement</span>
     </figcaption>
   </figure>
 </div>
@@ -1452,7 +1446,7 @@ plotting:
   camera_elev: 0.95
   camera_elev_end: 1.4
   camera_turns: 0.08</pre></span></span>
-      <span class="sim-cap">the butterfly — two spiralling lobes</span>
+      <span class="sim-cap">a Lateral flow ẋ = f(x) — the Lorenz butterfly</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1494,7 +1488,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">a fat three-armed folded knot</span>
+      <span class="sim-cap">the same operator, Halvorsen flow — a folded three-armed knot</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1536,7 +1530,7 @@ plotting:
   camera_elev: 0.9
   camera_elev_end: 1.3
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">a banded sphere with an axial spike</span>
+      <span class="sim-cap">the same operator, Aizawa flow — a spiked, banded sphere</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1578,7 +1572,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">a symmetric twin-scroll with two spiral eyes</span>
+      <span class="sim-cap">the same operator, Sprott B flow — a symmetric twin-scroll</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1620,7 +1614,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">a swooping multi-wing bird with two eye-holes</span>
+      <span class="sim-cap">the same operator, Dadras flow — a swooping multi-wing</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1662,7 +1656,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.5</pre></span></span>
-      <span class="sim-cap">a woven cage of interlinked loops</span>
+      <span class="sim-cap">the same operator, Thomas flow — a woven cage of loops</span>
     </figcaption>
   </figure>
 </div>
@@ -1681,11 +1675,11 @@ plotting:
   boundary: free
   dim: 2
   world:
-  - 31.200000000000003
-  - 31.200000000000003
+  - 49.4
+  - 49.4
 sets:
   cell:
-    n: 1500
+    n: 4000
     state:
       chem:
         width: 2
@@ -1700,25 +1694,25 @@ operators:
 - op: aggregate_seed
   at: cell
   mode: disc
-  radius: 12.0
+  radius: 19.0
   k: 6
   seed_frac: 0.12
   before_frame: 1
-- op: cell_diffuse
+- op: graph_diffuse
   at: cell
   d_a: 0.08
   d_h: 0.16
   chi: 0.4
-- op: turing_react
+- op: react
   at: cell
   implementation: gray_scott
   F: 0.055
   kk: 0.062
 schedule:
 - aggregate_seed
-- cell_diffuse
-- turing_react</pre></span></span>
-      <span class="sim-cap">coral / branching worms — F=0.055</span>
+- graph_diffuse
+- react</pre></span></span>
+      <span class="sim-cap">Lateral graph-diffusion + reaction — the coral regime (F=0.055)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1732,11 +1726,11 @@ schedule:
   boundary: free
   dim: 2
   world:
-  - 31.200000000000003
-  - 31.200000000000003
+  - 49.4
+  - 49.4
 sets:
   cell:
-    n: 1500
+    n: 4000
     state:
       chem:
         width: 2
@@ -1751,25 +1745,25 @@ operators:
 - op: aggregate_seed
   at: cell
   mode: disc
-  radius: 12.0
+  radius: 19.0
   k: 6
   seed_frac: 0.12
   before_frame: 1
-- op: cell_diffuse
+- op: graph_diffuse
   at: cell
   d_a: 0.08
   d_h: 0.16
   chi: 0.4
-- op: turing_react
+- op: react
   at: cell
   implementation: gray_scott
   F: 0.039
   kk: 0.058
 schedule:
 - aggregate_seed
-- cell_diffuse
-- turing_react</pre></span></span>
-      <span class="sim-cap">inverse spots (holes) — F=0.039</span>
+- graph_diffuse
+- react</pre></span></span>
+      <span class="sim-cap">the same operators, another regime — inverse spots / holes (F=0.039)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1783,11 +1777,11 @@ schedule:
   boundary: free
   dim: 2
   world:
-  - 31.200000000000003
-  - 31.200000000000003
+  - 49.4
+  - 49.4
 sets:
   cell:
-    n: 1500
+    n: 4000
     state:
       chem:
         width: 2
@@ -1802,25 +1796,25 @@ operators:
 - op: aggregate_seed
   at: cell
   mode: disc
-  radius: 12.0
+  radius: 19.0
   k: 6
   seed_frac: 0.12
   before_frame: 1
-- op: cell_diffuse
+- op: graph_diffuse
   at: cell
   d_a: 0.08
   d_h: 0.16
   chi: 0.4
-- op: turing_react
+- op: react
   at: cell
   implementation: gray_scott
   F: 0.037
   kk: 0.06
 schedule:
 - aggregate_seed
-- cell_diffuse
-- turing_react</pre></span></span>
-      <span class="sim-cap">classic Turing spots — F=0.037</span>
+- graph_diffuse
+- react</pre></span></span>
+      <span class="sim-cap">the same operators — classic Turing spots (F=0.037)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1875,7 +1869,7 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">coral on a 3D cell shell</span>
+      <span class="sim-cap">the same reaction–diffusion on a 3D cell shell</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1930,7 +1924,7 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">labyrinth on a 3D cell shell</span>
+      <span class="sim-cap">reaction–diffusion on a 3D cell shell — the labyrinth regime</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1987,12 +1981,13 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">coarse spots on a 3D cell shell</span>
+      <span class="sim-cap">reaction–diffusion on a 3D cell shell — coarse spots</span>
     </figcaption>
   </figure>
 </div>
 
 ```
+
 
 
 
