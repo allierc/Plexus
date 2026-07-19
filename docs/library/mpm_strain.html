@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
-<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — –</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -341,7 +341,7 @@ window.Quarto = {
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.operators.mpm_grid <span class="im">import</span> sub_dt</span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mpm_strain"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mpm_strain"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MPMStrain(Lateral):</span>
 <span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                 <span class="co"># particle-&gt;particle: updates F + material in place; returns {} — no delta</span></span>
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>

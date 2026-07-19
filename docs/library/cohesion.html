@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
-<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>cohesion</code> (per-type props: <code>cohesion</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -332,7 +332,7 @@ window.Quarto = {
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.geometry <span class="im">import</span> neighbour_mean</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"cohesion"</span>, family<span class="op">=</span><span class="st">"interaction"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"cohesion"</span>, family<span class="op">=</span><span class="st">"interaction"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Cohesion(Lateral):</span>
 <span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"acceleration"</span></span>
 <span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                          <span class="co"># neighbour_mean is N-D; the rule is dimension-generic</span></span>

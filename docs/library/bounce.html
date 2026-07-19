@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
-<li><strong>Acts on</strong> — <code>cell</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>cell</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>move_speed</code> (per-type props: <code>move_speed</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -362,7 +362,7 @@ window.Quarto = {
 <span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> v <span class="op">/</span> v.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
 <span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"bounce"</span>, family<span class="op">=</span><span class="st">"motion"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"bounce"</span>, family<span class="op">=</span><span class="st">"motion"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Bounce(Lateral):</span>
 <span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                                 <span class="co"># writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta</span></span>
 <span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                      <span class="co"># dimension-generic specular wall reflection</span></span>

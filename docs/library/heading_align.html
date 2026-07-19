@@ -240,7 +240,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
-<li><strong>Acts on</strong> — <code>cell</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>cell</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — –</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -327,7 +327,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
 <span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"polarity_align"</span>, <span class="st">"heading_align"</span>, family<span class="op">=</span><span class="st">"polarity"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"polarity_align"</span>, <span class="st">"heading_align"</span>, family<span class="op">=</span><span class="st">"polarity"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
 <span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PolarityAlign(Exchange):                   <span class="co"># (alias `heading_align`, one migration cycle)</span></span>
 <span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                                 <span class="co"># writes `heading` in place (Vicsek steering); returns {} — not an integrable delta</span></span>
 <span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>

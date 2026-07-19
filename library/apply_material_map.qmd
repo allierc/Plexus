@@ -34,7 +34,7 @@ A static image FIELD read from a TIFF, plus `apply_material_map`,
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `from`, `target`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -97,7 +97,7 @@ Other **exchange** operators: [`deposit`](deposit.qmd), [`sense`](sense.qmd), [`
 [`src/plexus/operators/material_map.py`](https://github.com/allierc/Plexus/blob/main/src/plexus/operators/material_map.py) &mdash; the registered operator.
 
 ```python
-@register_operator("apply_material_map", family="mpm", level="particle", kind="exchange")
+@register_operator("apply_material_map", family="mpm", set="particle", kind="exchange")
 class ApplyMaterialMap(Exchange):
     """field -> set: sample the map at each particle and write a per-particle material
     parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the

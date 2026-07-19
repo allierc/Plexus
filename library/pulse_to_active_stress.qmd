@@ -34,7 +34,7 @@ The STRESS constitutive law: an activation field -> per-particle active stress.
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `from`, `direction_from`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -77,6 +77,7 @@ Activation $a$ becomes a rank-1 contractile stress along the unit axis $\mathbf 
 | `direction_from` | contraction_axis_field | **required** |
 | `amplitude` | active_stress_gain | 50.0 |
 | `channel` | &ndash; | 0 |
+| `stretch_activation` | &ndash; | 0.0 |
 
 ## Minimal spec
 
@@ -128,7 +129,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", level="particle", kind="exchange")
+@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
 class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
     SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
@@ -146,6 +147,11 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
             raise ValueError("active_stress needs `direction_from:` "
                              "(a vector_grid field giving the contraction axis n)")
         self.at = params.get("_at", "particle")
+        # FRANK-STARLING (length-dependent tension, NHS/Niederer form): scale contraction by local fibre
+        # stretch lambda -> T *= 1 + stretch_activation*(lambda-1). 0 = OFF (byte-identical). Real cardiomyocytes
+        # contract HARDER when stretched; a stretch-REGULATED size lever (bigger loops without the runaway
+        # overshoot of raw amplitude/gain), aimed at the size<->direction frontier.
+        self.stretch_activation = float(params.get("stretch_activation", 0.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -161,6 +167,11 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
             gate = gate * gain                                                    # spatially-structured contraction gain
         if mask is not None:
             gate = gate * mask.float()
+        if self.stretch_activation != 0.0:                                        # FRANK-STARLING length-dependent tension
+            F = getattr(lvl, "F", None)                                           # per-particle deformation gradient [N,2,2]
+            if F is not None:
+                lam = torch.bmm(F, n[:, :, None]).squeeze(-1).norm(dim=1).clamp(min=1e-6)   # fibre stretch lambda = |F n|
+                gate = gate * (1.0 + self.stretch_activation * (lam - 1.0)).clamp(min=0.0)  # T *= 1+beta*(lambda-1)
         nn = n[:, :, None] * n[:, None, :]                                        # [N, 2, 2]  n n^T
         # Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the
         # elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this

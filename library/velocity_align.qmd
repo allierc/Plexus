@@ -34,7 +34,7 @@ Velocity_align (was alignment) -- Vicsek-style neighbour velocity alignment (the
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -152,7 +152,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import minimum_image
 
 
-@register_operator("velocity_align", "alignment", family="interaction", level="particle", kind="lateral")
+@register_operator("velocity_align", "alignment", family="interaction", set="particle", kind="lateral")
 class VelocityAlign(Lateral):                    # (alias `alignment`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # velocity neighbour-mean is dimension-generic

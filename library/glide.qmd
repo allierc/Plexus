@@ -34,7 +34,7 @@ Set (lateral). Self-propulsion: glide along the heading at constant speed (overd
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `move_speed`  (per-type props: `move_speed`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -103,7 +103,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("glide", family="motion", level="cell", kind="lateral")
+@register_operator("glide", family="motion", set="cell", kind="lateral")
 class Glide(Lateral):
     EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)

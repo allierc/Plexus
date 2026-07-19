@@ -34,7 +34,7 @@ Polarity_flow_align (was flow_align) (mpm_grid -> agent heading): polarity-veloc
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -104,7 +104,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("polarity_flow_align", "flow_align", family="polarity", level="cell", kind="exchange")
+@register_operator("polarity_flow_align", "flow_align", family="polarity", set="cell", kind="exchange")
 class PolarityFlowAlign(Exchange):               # (alias `flow_align`, one migration cycle)
     EMIT = None                                 # writes `heading` in place (flow-alignment steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]

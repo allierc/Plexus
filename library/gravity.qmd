@@ -34,7 +34,7 @@ A uniform body force at the cell level.
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -116,7 +116,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("gravity", family="mechanics", level="cell", kind="lateral")
+@register_operator("gravity", family="mechanics", set="cell", kind="lateral")
 class GravityOperator(Lateral):
     EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
     # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never

@@ -240,7 +240,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
-<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>youngs</code>, <code>C</code>, <code>F</code>, <code>mass</code>, <code>mu</code>, <code>la</code>, <code>p_vol</code> (per-type props: <code>youngs</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -547,7 +547,7 @@ particle advection (pos/vel update)     [engine integration]</code></pre>
 <span id="cb3-208"><a href="#cb3-208" aria-hidden="true" tabindex="-1"></a><span class="co"># --------------------------------------------------------------------------- #</span></span>
 <span id="cb3-209"><a href="#cb3-209" aria-hidden="true" tabindex="-1"></a><span class="co">#  The fenced transitional operator</span></span>
 <span id="cb3-210"><a href="#cb3-210" aria-hidden="true" tabindex="-1"></a><span class="co"># --------------------------------------------------------------------------- #</span></span>
-<span id="cb3-211"><a href="#cb3-211" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mls_mpm_mechanics"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<span id="cb3-211"><a href="#cb3-211" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"mls_mpm_mechanics"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
 <span id="cb3-212"><a href="#cb3-212" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MLSMPMMechanics(Exchange):</span>
 <span id="cb3-213"><a href="#cb3-213" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compound MLS-MPM mechanics at the particle level (P2G -&gt; grid solve -&gt; G2P -&gt;</span></span>
 <span id="cb3-214"><a href="#cb3-214" aria-hidden="true" tabindex="-1"></a><span class="co">    advect). Cell shape/rigidity emerge from the particles' elastic stress; per-cell-</span></span>

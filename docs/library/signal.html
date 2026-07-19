@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
-<li><strong>Acts on</strong> — <code>neuron</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>neuron</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>tau</code>, <code>edge_set</code></li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -377,43 +377,51 @@ window.Quarto = {
 <span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"signal"</span>, family<span class="op">=</span><span class="st">"interaction"</span>, level<span class="op">=</span><span class="st">"neuron"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"signal"</span>, family<span class="op">=</span><span class="st">"interaction"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"neuron"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Signal(Lateral):</span>
 <span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"velocity"</span>                     <span class="co"># first-order voltage ODE (dv/dt); engine integrates the `voltage` coordinate</span></span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]               <span class="co"># voltage is scalar -- the operator ignores spatial dimension</span></span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"tau"</span>, <span class="st">"edge_set"</span>]</span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"signal_propagation"</span>, <span class="st">"connectome"</span>, <span class="st">"recurrent"</span>]</span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {</span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>        <span class="st">"tau"</span>: <span class="st">"membrane_time_constant"</span>,</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>        <span class="st">"edge_set"</span>: <span class="st">"connectome_synapse_set"</span>,</span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>        <span class="st">"activation"</span>: <span class="st">"presynaptic_nonlinearity"</span>,</span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>        <span class="st">"bias"</span>: <span class="st">"resting_drive"</span>,</span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>        <span class="st">"weight"</span>: <span class="st">"synapse_weight_block"</span>,</span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.tau <span class="op">=</span> <span class="bu">float</span>(params[<span class="st">"tau"</span>])</span>
-<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.edge_set <span class="op">=</span> params[<span class="st">"edge_set"</span>]</span>
-<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.act <span class="op">=</span> _ACT[params.get(<span class="st">"activation"</span>, <span class="st">"relu"</span>)]</span>
-<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.bias <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"bias"</span>, <span class="fl">0.0</span>))</span>
-<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.weight_block <span class="op">=</span> params.get(<span class="st">"weight"</span>, <span class="st">"w"</span>)     <span class="co"># synapse state block holding W_e</span></span>
-<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.block <span class="op">=</span> params.get(<span class="st">"block"</span>, <span class="st">"voltage"</span>)       <span class="co"># the neuron state block to evolve</span></span>
-<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"neuron"</span>)</span>
-<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>        neuron <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>        v <span class="op">=</span> neuron.get(<span class="va">self</span>.block)                                 <span class="co"># [N, 1]  membrane voltage</span></span>
-<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>        es <span class="op">=</span> H.level(<span class="va">self</span>.edge_set)</span>
-<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>        v_pre <span class="op">=</span> H.gather(<span class="va">self</span>.edge_set, <span class="st">"pre"</span>, <span class="va">self</span>.block)         <span class="co"># [E, 1]  presynaptic voltage per edge (lift along `pre`)</span></span>
-<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        w <span class="op">=</span> es.get(<span class="va">self</span>.weight_block)                              <span class="co"># [E, 1]  fixed synaptic weight W_e</span></span>
-<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>        edge_msg <span class="op">=</span> w <span class="op">*</span> <span class="va">self</span>.act(v_pre)                             <span class="co"># [E, 1]  W_e * phi(v_pre)</span></span>
-<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        current <span class="op">=</span> H.scatter_along(<span class="va">self</span>.edge_set, <span class="st">"post"</span>, edge_msg) <span class="co"># [N, 1]  synaptic current onto post neuron (Aggregate along `post`)</span></span>
-<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>        dv <span class="op">=</span> (<span class="op">-</span>v <span class="op">+</span> <span class="va">self</span>.bias <span class="op">+</span> current) <span class="op">/</span> <span class="va">self</span>.tau                 <span class="co"># [N, 1]  first-order voltage derivative</span></span>
-<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>        dv <span class="op">=</span> dv <span class="op">*</span> neuron.occ[:, <span class="va">None</span>]                              <span class="co"># dormant neurons do not move</span></span>
-<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>            dv <span class="op">=</span> dv <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
-<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: dv}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>    <span class="co"># typed signature (Plexus2 sec. 2.1): a morphism from (neuron, synapse) to neuron,</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    <span class="co"># reading neuron voltage + synapse weight, writing the neuron voltage derivative,</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    <span class="co"># traversing the pre/post incidence maps. The maps are PART of the signature.</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    INPUTS <span class="op">=</span> [<span class="st">"neuron"</span>, <span class="st">"synapse"</span>]</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    OUTPUTS <span class="op">=</span> [<span class="st">"neuron"</span>]</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    READS <span class="op">=</span> [<span class="st">"voltage"</span>, <span class="st">"w"</span>]              <span class="co"># neuron membrane voltage; synapse weight block W_e</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    WRITES <span class="op">=</span> [<span class="st">"voltage"</span>]                  <span class="co"># returns dv/dt on the neuron voltage</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    MAPS <span class="op">=</span> [<span class="st">"pre"</span>, <span class="st">"post"</span>]                <span class="co"># gather phi(v) along `pre`; aggregate current along `post`</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]               <span class="co"># voltage is scalar -- the operator ignores spatial dimension</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"tau"</span>, <span class="st">"edge_set"</span>]</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"signal_propagation"</span>, <span class="st">"connectome"</span>, <span class="st">"recurrent"</span>]</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {</span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        <span class="st">"tau"</span>: <span class="st">"membrane_time_constant"</span>,</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        <span class="st">"edge_set"</span>: <span class="st">"connectome_synapse_set"</span>,</span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>        <span class="st">"activation"</span>: <span class="st">"presynaptic_nonlinearity"</span>,</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>        <span class="st">"bias"</span>: <span class="st">"resting_drive"</span>,</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>        <span class="st">"weight"</span>: <span class="st">"synapse_weight_block"</span>,</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.tau <span class="op">=</span> <span class="bu">float</span>(params[<span class="st">"tau"</span>])</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.edge_set <span class="op">=</span> params[<span class="st">"edge_set"</span>]</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.act <span class="op">=</span> _ACT[params.get(<span class="st">"activation"</span>, <span class="st">"relu"</span>)]</span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.bias <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"bias"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.weight_block <span class="op">=</span> params.get(<span class="st">"weight"</span>, <span class="st">"w"</span>)     <span class="co"># synapse state block holding W_e</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.block <span class="op">=</span> params.get(<span class="st">"block"</span>, <span class="st">"voltage"</span>)       <span class="co"># the neuron state block to evolve</span></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"neuron"</span>)</span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>        neuron <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        v <span class="op">=</span> neuron.get(<span class="va">self</span>.block)                                 <span class="co"># [N, 1]  membrane voltage</span></span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>        es <span class="op">=</span> H.level(<span class="va">self</span>.edge_set)</span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>        v_pre <span class="op">=</span> H.gather(<span class="va">self</span>.edge_set, <span class="st">"pre"</span>, <span class="va">self</span>.block)         <span class="co"># [E, 1]  presynaptic voltage per edge (lift along `pre`)</span></span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>        w <span class="op">=</span> es.get(<span class="va">self</span>.weight_block)                              <span class="co"># [E, 1]  fixed synaptic weight W_e</span></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>        edge_msg <span class="op">=</span> w <span class="op">*</span> <span class="va">self</span>.act(v_pre)                             <span class="co"># [E, 1]  W_e * phi(v_pre)</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>        current <span class="op">=</span> H.scatter_along(<span class="va">self</span>.edge_set, <span class="st">"post"</span>, edge_msg) <span class="co"># [N, 1]  synaptic current onto post neuron (Aggregate along `post`)</span></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>        dv <span class="op">=</span> (<span class="op">-</span>v <span class="op">+</span> <span class="va">self</span>.bias <span class="op">+</span> current) <span class="op">/</span> <span class="va">self</span>.tau                 <span class="co"># [N, 1]  first-order voltage derivative</span></span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>        dv <span class="op">=</span> dv <span class="op">*</span> neuron.occ[:, <span class="va">None</span>]                              <span class="co"># dormant neurons do not move</span></span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>            dv <span class="op">=</span> dv <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: dv}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
-<li><strong>Acts on</strong> — <code>cell</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>cell</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>from</code>, <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>, <code>sensor_size</code> (per-type props: <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>, <code>sensor_size</code>)</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -436,7 +436,7 @@ S_k = \!\!\sum_{\mathbf p\in W_k}\!\Big(c_{\text{own}}(\mathbf p) + \kappa\!\!\s
 <span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (contrib <span class="op">*</span> inwin[:, <span class="va">None</span>, :].<span class="bu">float</span>()).<span class="bu">sum</span>(<span class="op">-</span><span class="dv">1</span>)                   <span class="co"># [N, S]</span></span>
 <span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"sense"</span>, family<span class="op">=</span><span class="st">"fields"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"sense"</span>, family<span class="op">=</span><span class="st">"fields"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
 <span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Sense(Exchange):</span>
 <span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span>                                 <span class="co"># writes `heading` in place (steering); returns {} — not an integrable delta</span></span>
 <span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]                      <span class="co"># dimension-generic (heading is a [N,D] unit vector)</span></span>

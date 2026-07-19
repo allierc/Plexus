@@ -6,7 +6,7 @@ subtitle: "A set of particles/molecules; its position is an aggregate of its chi
 ::: {.op-head}
 ![](../figures/icons/set.png){.op-logo}
 
-[`set`]{.op-badge} [`level: 1`]{.op-badge}
+[`set`]{.op-badge} [`depth: 1`]{.op-badge}
 
 A set of particles/molecules; its position is an aggregate of its children.
 :::
@@ -33,7 +33,7 @@ A set of particles/molecules; its position is an aggregate of its children.
 
 ## Role in Plexus
 
-- **Level** &mdash; `1` (0 = leaf, higher = container).
+- **Depth** &mdash; `1` (0 = leaf, higher = container).
 - **Is** &mdash; a set of nodes with the state schema below; operators act *within* it (`lateral`), *across* its containment (`aggregate` / `broadcast`), or *onto fields* (`exchange`).
 
 ## State schema
@@ -49,7 +49,7 @@ A set of particles/molecules; its position is an aggregate of its children.
 
 ```python
 @register_entity(
-    "cell", level=1,
+    "cell", depth=1,
     state_schema={"pos": (0, 2), "vel": (2, 4)},
     render={"color_by": "node_type", "arrows": "vel"},
 )

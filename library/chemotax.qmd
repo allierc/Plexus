@@ -34,7 +34,7 @@ Set <- field. Nodes follow (or flee) a field's gradient.
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -118,9 +118,16 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("chemotax", family="fields", level="particle", kind="exchange")
+@register_operator("chemotax", family="fields", set="particle", kind="exchange")
 class Chemotax(Exchange):
     EMIT = "velocity"                           # default routing; override in the spec with `emit: mpm_acceleration`
+    # typed signature (Plexus2 sec. 2.1): field -> set (Exchange). Reads the `from:`
+    # field gradient at each node's position, writes a velocity/accel on the node.
+    INPUTS = ["particle"]
+    OUTPUTS = ["particle"]
+    READS = ["pos"]
+    WRITES = ["pos"]                            # gain*grad(field) as a velocity (or mpm_acceleration)
+    MAPS = ["field"]                            # Exchange: a gather map from the `from:` field
     SUPPORTED_DIMS = [2]                         # Field.grad_at is 2D for now (N-D is a follow-up)
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation", "field_templated_flow"]

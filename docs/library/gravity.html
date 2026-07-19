@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{O}_E\)</span> <strong>Lateral</strong>: within-set interaction over a relation <span class="math inline">\(E\)</span>.</li>
-<li><strong>Acts on</strong> — <code>cell</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>cell</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — –</li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -355,7 +355,7 @@ window.Quarto = {
 <span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
 <span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"gravity"</span>, family<span class="op">=</span><span class="st">"mechanics"</span>, level<span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"gravity"</span>, family<span class="op">=</span><span class="st">"mechanics"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"lateral"</span>)</span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> GravityOperator(Lateral):</span>
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"mpm_acceleration"</span>                  <span class="co"># a body accel the MPM substep consumes as a_ext;</span></span>
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never</span></span>

@@ -34,7 +34,7 @@ Parent -> children. Lift a parent quantity onto its children.
 ## Role in Plexus
 
 - **Kind** &mdash; $\pi^*$ **Broadcast**: parent &rarr; children, down the containment $\pi$.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `stiffness`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -94,9 +94,15 @@ from plexus.models.base import Broadcast
 from plexus.models.registry import register_operator
 
 
-@register_operator("broadcast", family="hierarchy", level="particle", kind="broadcast")
+@register_operator("broadcast", family="hierarchy", set="particle", kind="broadcast")
 class BroadcastLift(Broadcast):
     EMIT = "velocity"            # emits a velocity; the engine integrates
+    # typed signature (Plexus2 sec. 2.1): parent -> children along the `parent` map.
+    INPUTS = ["cell"]                           # the parent set
+    OUTPUTS = ["particle"]                       # the child set it lifts onto
+    READS = ["pos"]
+    WRITES = ["pos"]                             # velocity delta pulling each child toward its parent
+    MAPS = ["parent"]                            # lift along the parent (containment) map
     SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D
     REQUIRES_PARAMS = ["stiffness"]
     MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]

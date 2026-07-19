@@ -1,6 +1,6 @@
 ---
 title: "Operators"
-subtitle: "How state moves &mdash; grouped by kind, in the visual language of Figure 1"
+subtitle: "How state moves &mdash; grouped by family, in the visual language of the operator algebra"
 resources:
   - gallery/
 ---
@@ -26,7 +26,7 @@ resources:
 ```
 
 
-The logo marks the operator **kind** in the visual language of [Figure 1](index.qmd) (`paper/fig_ops.tex`).
+Each operator belongs to one of the elementary **families** of the [operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, Rewire, Divide and Die; the logo marks the family (`paper/fig_ops.tex`). The registry also exposes a **field** self-dynamics kind (a field&rsquo;s own update).
 
 ## <img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym">$\mathcal{O}_E$</span>
 
@@ -98,6 +98,23 @@ The logo marks the operator **kind** in the visual language of [Figure 1](index.
 <a class="op-card" href="library/sense.html"><img src="figures/icons/exchange.png" alt="exchange"><span class="op-card-body"><span class="op-card-name">sense</span><span class="op-card-sub">Field -> set. Sample the field on a sensor fan around the heading, steer.</span></span></a>
 :::
 
+## <img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym">$\mathcal{R}\!:E$</span>
+
+*Rebuild the relation $E$ each tick.*
+
+::: {.op-grid}
+<a class="op-card" href="library/radius_graph.html"><img src="figures/icons/rewire.png" alt="rewire"><span class="op-card-body"><span class="op-card-name">radius_graph</span><span class="op-card-sub">Relation-building (rewire) operators: construct a Level's `edge_index`.</span></span></a>
+:::
+
+## <img class="kind-h" src="figures/icons/structural.png"> Structural <span class="kind-sym">$|S|$</span>
+
+*Change the entities themselves &mdash; Divide, Die, grow.*
+
+::: {.op-grid}
+<a class="op-card" href="library/cell_divide.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_divide</span><span class="op-card-sub">Cell_divide (agent set, structural): proliferation on a fixed buffer via occupancy.</span></span></a>
+<a class="op-card" href="library/cell_grow.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_grow</span><span class="op-card-sub">Cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth primitive.</span></span></a>
+:::
+
 ## <img class="kind-h" src="figures/icons/field_dyn.png"> Field <span class="kind-sym">$\partial_t\phi$</span>
 
 *A field's own self-dynamics.*
@@ -109,21 +126,4 @@ The logo marks the operator **kind** in the visual language of [Figure 1](index.
 <a class="op-card" href="library/mpm_grid_update.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">mpm_grid_update</span><span class="op-card-sub">Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.</span></span></a>
 <a class="op-card" href="library/pacemaker.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">pacemaker</span><span class="op-card-sub">A clocked scalar SOURCE: a periodic activation signal p(t).</span></span></a>
 <a class="op-card" href="library/playback.html"><img src="figures/icons/field_dyn.png" alt="field_dyn"><span class="op-card-body"><span class="op-card-name">playback</span><span class="op-card-sub">A scalar field *prescribed* from external data (currently a</span></span></a>
-:::
-
-## <img class="kind-h" src="figures/icons/rewire.png"> Rewire <span class="kind-sym">$\mathcal{R}\!:E$</span>
-
-*Rebuild the relation $E$ each tick.*
-
-::: {.op-grid}
-<a class="op-card" href="library/radius_graph.html"><img src="figures/icons/rewire.png" alt="rewire"><span class="op-card-body"><span class="op-card-name">radius_graph</span><span class="op-card-sub">Relation-building (rewire) operators: construct a Level's `edge_index`.</span></span></a>
-:::
-
-## <img class="kind-h" src="figures/icons/structural.png"> Structural <span class="kind-sym">$|S|$</span>
-
-*Change the node set (divide / die / spawn).*
-
-::: {.op-grid}
-<a class="op-card" href="library/cell_divide.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_divide</span><span class="op-card-sub">Cell_divide (agent set, structural): proliferation on a fixed buffer via occupancy.</span></span></a>
-<a class="op-card" href="library/cell_grow.html"><img src="figures/icons/structural.png" alt="structural"><span class="op-card-body"><span class="op-card-name">cell_grow</span><span class="op-card-sub">Cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth primitive.</span></span></a>
 :::

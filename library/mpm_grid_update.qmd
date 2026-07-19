@@ -34,7 +34,7 @@ Mpm_grid_update (mpm_grid -> mpm_grid): the MLS-MPM grid solve.
 ## Role in Plexus
 
 - **Kind** &mdash; $\partial_t\phi$ **Field**: a field's own self-dynamics.
-- **Acts on** &mdash; `field` (the level the operator runs at).
+- **Acts on** &mdash; `field` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -114,7 +114,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import sub_dt
 
 
-@register_operator("mpm_grid_update", family="mpm", level="field", kind="field")
+@register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
 class MPMGridUpdate(FieldUpdate):
     EMIT = None                                 # field->field grid solve: writes grid velocity in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]
