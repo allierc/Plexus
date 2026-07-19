@@ -731,9 +731,9 @@ descriptions:
 </div>
 
 <h3>Continuum mechanics — MLS-MPM</h3>
-<p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Each clip shows the same run three ways — <b>material</b>, <b>deformation</b> (‖F‖), and <b>stress</b>.</p>
+<p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Each clip plays the default <b>material</b> render, then the same run coloured by <b>stress</b>.</p>
 <p class="opk-ref">Reference — the continuum solver is MLS-MPM (Hu et&nbsp;al. 2018).</p>
-<div class="sim-gallery wide">
+<div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/material_multi.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
@@ -1929,6 +1929,7 @@ schedule:
 </div>
 
 ```
+
 
 
 
