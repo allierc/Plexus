@@ -380,7 +380,8 @@ class Hierarchy(nn.Module):
         super().__init__()
         self.levels = nn.ModuleDict()         # name -> Level (insertion order = bottom-up)
         self.fields = nn.ModuleDict()         # name -> Field
-        self._delta: dict[str, torch.Tensor] = {}
+        self._delta: dict[str, torch.Tensor] = {}          # per-set COORDINATE-block delta (MPM reads this via delta())
+        self._delta_blocks: dict[str, dict] = {}           # per-set EXTRA first-order block deltas: set -> {block: tensor}
         self.dim = 2                          # spatial dimensions (set by the engine from the spec)
 
     # --- structure -------------------------------------------------------- #
@@ -446,13 +447,28 @@ class Hierarchy(nn.Module):
         dev = next(iter(self.levels.values())).state.device
         self._delta = {name: torch.zeros(l.n, self._delta_dim(l) if dim is None else dim, device=dev)
                        for name, l in self.levels.items()}
+        self._delta_blocks = {}                            # extra (non-coordinate) block deltas, filled lazily
 
-    def add_delta(self, level_name: str, delta: torch.Tensor) -> None:
-        """Add an operator's returned delta into its level's accumulator."""
-        if level_name not in self._delta:
-            self._delta[level_name] = delta.clone()
+    def add_delta(self, level_name: str, delta: torch.Tensor, block: str = None) -> None:
+        """Add an operator's returned delta into its level's accumulator. `block` is the
+        state block the delta integrates into (an operator's `INTEGRAND`); `None` or the
+        coordinate block -> the COORDINATE accumulator (unchanged, what MPM reads via
+        `delta()`); any OTHER dynamical block -> its own accumulator, so one set can carry
+        several independently-integrated blocks (pos + chem + a0)."""
+        coord = self.levels[level_name].state_schema.coordinate
+        coord_name = coord.name if coord is not None else None
+        if block is None or block == coord_name:
+            if level_name not in self._delta:
+                self._delta[level_name] = delta.clone()
+            else:
+                self._delta[level_name] = self._delta[level_name] + delta
         else:
-            self._delta[level_name] = self._delta[level_name] + delta
+            db = self._delta_blocks.setdefault(level_name, {})
+            db[block] = delta.clone() if block not in db else db[block] + delta
+
+    def block_deltas(self, level_name: str) -> dict:
+        """Accumulated deltas for a set's EXTRA (non-coordinate) dynamical blocks: {block: tensor}."""
+        return self._delta_blocks.get(level_name, {})
 
     def delta(self, level_name: str) -> torch.Tensor:
         """The accumulated delta for a level (zeros if nothing wrote it)."""
@@ -497,6 +513,11 @@ class Operator(nn.Module):
     READS: list = []                    # state blocks consumed, by name, e.g. ["voltage", "w"]
     WRITES: list = []                   # state blocks produced, by name, e.g. ["voltage"]
     MAPS: list = []                     # named maps traversed, e.g. ["pre", "post"] or ["parent"]
+    # Which state BLOCK this operator's returned delta integrates into. `None` (default) =>
+    # the set's coordinate block (the common case; unchanged). Set it to a NON-coordinate
+    # dynamical block (e.g. "chem", "a0") so one set can carry several independently-
+    # integrated blocks at once -- pos integrated by the mechanics, chem by the RD, a0 by growth.
+    INTEGRAND: Optional[str] = None
     # What this operator's returned delta IS, so the engine knows how to integrate it.
     # One vocabulary (Axis A; = the spec `emit:` value on merged operators), see EMITS:
     #   "velocity"         -- delta is dx/dt     -> engine: x += dt*delta

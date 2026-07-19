@@ -274,19 +274,26 @@ def _start_centers(start, n: int, rng, device: str) -> torch.Tensor:
     return lo + torch.rand(n, D, generator=rng, device=device) * (hi - lo)
 
 
-def _resolve_emit(sim: Spec) -> dict:
-    """set -> engine integration order (`velocity` or `acceleration`), read from each
-    force-emitting operator's `emit:` (spec, if given) else its class `EMIT` --
-    one vocabulary, no translation table. Only the two engine-integrated states set a
-    set's order and must agree; `None` (emits no set delta) and `mpm_acceleration`
-    (routed to the MPM substep as a_ext, not the engine) do not participate. A conflict
-    is a modelling error, raised here."""
+def _resolve_emit(sim: Spec, H: "Hierarchy" = None) -> dict:
+    """set -> engine integration order (`velocity` or `acceleration`) of its COORDINATE
+    block, read from each force-emitting operator's `emit:` (spec, if given) else its class
+    `EMIT` -- one vocabulary, no translation table. Only the two engine-integrated states set
+    a set's order and must agree; `None` (emits no set delta) and `mpm_acceleration` (routed
+    to the MPM substep as a_ext, not the engine) do not participate. An operator whose
+    `INTEGRAND` names a NON-coordinate block integrates its OWN first-order block (chem/a0)
+    and so does not constrain the coordinate's order. A conflict is a modelling error."""
     modes: dict[str, str] = {}
     for o in sim.operators:
-        emit = o.params.get("emit") or getattr(get_operator(o.op, o.impl), "EMIT", None)
+        cls = get_operator(o.op, o.impl)
+        emit = o.params.get("emit") or getattr(cls, "EMIT", None)
         if emit not in ("velocity", "acceleration"):
             continue                                   # None / mpm_acceleration: no engine-integrated set delta
         s = o.on.set
+        integrand = getattr(cls, "INTEGRAND", None)    # which block this op integrates (None = coordinate)
+        if integrand is not None and H is not None and s in H.levels:
+            coord = H.levels[s].state_schema.coordinate
+            if coord is not None and integrand != coord.name:
+                continue                               # a non-coordinate (first-order) integrand: doesn't set the order
         if s in modes and modes[s] != emit:
             raise ValueError(
                 f"set {s!r} has operators with conflicting integration order "
@@ -605,6 +612,18 @@ def _integrate(H: Hierarchy, dt: float) -> None:
         new[:, cx0:cx1] = x
         lvl.state = new
 
+    # extra (non-coordinate) dynamical blocks: `pos` was integrated above; chem / a0 / ...
+    # are first-order integrands (x += dt*delta), unbounded (a free scalar/vector, not the
+    # world box). This is what lets ONE set carry several independently-integrated blocks --
+    # pos by the mechanics, chem by the RD, a0 by growth (plexus2 sec. Schedules).
+    for name, blocks in H._delta_blocks.items():
+        lvl = H.levels[name]; schema = lvl.state_schema
+        new = lvl.state.clone()
+        for bname, d in blocks.items():
+            cx0, cx1 = schema.slice(bname)
+            new[:, cx0:cx1] = new[:, cx0:cx1] + dt * d
+        lvl.state = new
+
 
 def _setup_recording(sim: Spec, H: Hierarchy):
     """Allocate the DECIMATED trajectory buffers and announce the recording plan.
@@ -664,7 +683,7 @@ def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False) -> tuple[Hierarchy, dict]:
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
-    H.emit_order = _resolve_emit(sim)         # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
+    H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)
     #    is enforced HERE by the engine, so no operator special-cases the clock.
@@ -687,8 +706,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
             deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})
+            block = getattr(ob, "INTEGRAND", None)   # which state block the delta integrates into (None = coordinate)
             for lvlname, d in deltas.items():        # break here to inspect `deltas`; empty for EMIT=None ops
-                H.add_delta(lvlname, d)              # record each returned delta for end-of-tick integration
+                H.add_delta(lvlname, d, block)       # record each returned delta for end-of-tick integration
 
             if snap is not None:
                 for n, before in snap.items():
