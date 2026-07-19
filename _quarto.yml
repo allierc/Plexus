@@ -27,7 +27,7 @@ website:
       - href: optimization.qmd
         text: Optimization
       - href: inverse.qmd
-        text: Slime inverse problem
+        text: Inverse problem
     tools:
       - icon: github
         href: https://github.com/allierc/Plexus
