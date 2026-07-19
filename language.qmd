@@ -1,19 +1,31 @@
 ---
-title: "The abstraction"
-subtitle: "Sets, fields, operators, and schedules"
+title: "The language"
+subtitle: "Operators, sets, states, and fields"
 ---
 
-Plexus is built from two kinds of object — **sets** and **fields** — and a small
-collection of **operators** that move information, force, state, or membership
-between them. A model is a **schedule**: an ordered composition of operators,
-iterated over time. Those four words — *sets, fields, operators, schedules* — are
-the whole vocabulary, and they are the missing primitive: the place where particle
+Plexus is a typed language for expressing biological mechanisms independently of
+how they are computed. Its fundamental object is the **operator** — a single
+mechanism (adhesion, diffusion, division, chemotaxis, electrical propagation,
+active stress) defined by a *typed signature*, which says **what** transformation
+it performs, and one or more *implementations*, which say **how** it is numerically
+realized. Operators act on three kinds of thing: **sets** — discrete biological
+entities across scales (particles, cells, neurons, synapses, tissues); the
+**state** each element of a set carries; and **fields** — continuous quantities
+defined over space (morphogens, pressure, potentials). A biological model is a
+**schedule**: an ordered composition of operators, iterated over time and kept
+differentiable throughout.
+
+These four concepts — *operators, sets, states, fields* — are the whole
+vocabulary, and they are the missing primitive: the place where particle
 mechanics, cellular interaction, neural dynamics, and reaction networks all become
-the same kind of thing.
+the same kind of thing. The rest of this page defines the objects the operators
+act on — sets, state, fields, and the maps between them — then the **seven
+operator families** that make up the algebra, and finally how a schedule composes
+them into differentiable dynamics.
 
 ## Sets and fields
 
-Plexus has two objects.
+Operators act on two kinds of object.
 
 A **set** is a discrete collection of elements of one kind: particles, cells,
 nuclei, metabolites, organisms. More precisely, *a set is a collection of elements
@@ -241,6 +253,25 @@ Sets, fields, and these operators are the entire vocabulary. The wager of
 Plexus is that this is enough **to describe a complex living system** — that
 everything from mechanics to morphogenesis to division and death is some
 composition of them over a hierarchy of sets and fields.
+
+## One operator, many implementations
+
+A signature is a biological *contract*; it does not fix the numerics. Every
+operator may carry several **implementations** that satisfy the same signature and
+differ only in how they compute. A mechanical **Lateral** interaction can be
+realized by MLS-MPM, finite elements, a vertex model, or a phase field; a neuronal
+one by Hodgkin–Huxley, a Neural ODE, or a graph neural network; a field update by
+finite differences, spectral methods, or a neural implicit. Choosing an
+implementation is a numerical decision, never a biological one, so the same model
+runs on different backends without changing a single operator, map, or schedule.
+
+This splits progress into two independent axes. **Biological** innovation is a new
+operator or a new composition; **numerical** innovation is a faster or more
+accurate implementation of an existing one. Existing simulators then stop being
+rival paradigms and become complementary **backends**, each implementing one family
+of operator contracts — which is what makes mechanism search well posed: hold the
+sets, state, and maps fixed, and search over the implementation of each contract
+and the composition of the schedule.
 
 ## Dynamics: a schedule
 
