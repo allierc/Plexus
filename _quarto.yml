@@ -24,8 +24,6 @@ website:
             text: Fields
           - href: library_operators.qmd
             text: Operators
-      - href: experiment.qmd
-        text: Simulations
       - href: optimization.qmd
         text: Optimization
       - href: inverse.qmd

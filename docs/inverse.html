@@ -151,10 +151,6 @@ window.Quarto = {
     </ul>
   </li>
   <li class="nav-item">
-    <a class="nav-link" href="./experiment.html"> 
-<span class="menu-text">Simulations</span></a>
-  </li>  
-  <li class="nav-item">
     <a class="nav-link" href="./optimization.html"> 
 <span class="menu-text">Optimization</span></a>
   </li>  
@@ -228,7 +224,7 @@ window.Quarto = {
 </div>
 <section id="from-the-forward-model-to-its-inverse" class="level2">
 <h2 class="anchored" data-anchor-id="from-the-forward-model-to-its-inverse">From the forward model to its inverse</h2>
-<p>The <a href="./experiment.html">slime</a> spec is <strong>eight continuous numbers</strong>: four on the field side (<code>deposit.amount</code>, <code>diffuse.rate</code>, <code>decay.rate</code>, <code>sense.cross</code>) and four per-cell motion parameters (<code>move_speed</code>, <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>). The registered operators make every cell deposit into a chemical field, sense that field at three forward sensors, turn toward the strongest reading, and advance; the field meanwhile diffuses and decays. From a uniform-random start the population condenses into a filament network. The <strong>inverse</strong> problem is <span class="math inline">\(\text{trajectory}\to\text{spec}\)</span>: identify those eight constants from the observed evolution alone.</p>
+<p>The <a href="./index.html#what-it-looks-like">slime</a> spec is <strong>eight continuous numbers</strong>: four on the field side (<code>deposit.amount</code>, <code>diffuse.rate</code>, <code>decay.rate</code>, <code>sense.cross</code>) and four per-cell motion parameters (<code>move_speed</code>, <code>turn_speed</code>, <code>sensor_angle</code>, <code>sensor_dist</code>). The registered operators make every cell deposit into a chemical field, sense that field at three forward sensors, turn toward the strongest reading, and advance; the field meanwhile diffuses and decays. From a uniform-random start the population condenses into a filament network. The <strong>inverse</strong> problem is <span class="math inline">\(\text{trajectory}\to\text{spec}\)</span>: identify those eight constants from the observed evolution alone.</p>
 </section>
 <section id="method" class="level2">
 <h2 class="anchored" data-anchor-id="method">Method</h2>

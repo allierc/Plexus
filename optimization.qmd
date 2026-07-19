@@ -8,7 +8,7 @@ resources:
 And because every Plexus simulation is a composition of **differentiable** operators, a
 *design* can be optimized, not just simulated. A slime-style foraging colony — built from the
 same `deposit` / `diffuse` / `sense` / `glide` operators as the
-[Physarum networks](experiment.qmd) — is tuned by a black-box **UCB** search over its spec
+[Physarum networks](index.qmd#what-it-looks-like) — is tuned by a black-box **UCB** search over its spec
 parameters, from a hand-set design (left) to the best found (right), which delivers food
 roughly **five-fold faster**.
 
