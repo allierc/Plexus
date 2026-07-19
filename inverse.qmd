@@ -16,7 +16,7 @@ operators are explicit *and* differentiable.
 
 ## From the forward model to its inverse
 
-The [slime](experiment.qmd) spec is **eight continuous numbers**: four on the
+The [slime](index.qmd#what-it-looks-like) spec is **eight continuous numbers**: four on the
 field side (`deposit.amount`, `diffuse.rate`, `decay.rate`, `sense.cross`) and
 four per-cell motion parameters (`move_speed`, `turn_speed`, `sensor_angle`,
 `sensor_dist`). The registered operators make every cell deposit into a chemical
