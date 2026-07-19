@@ -119,7 +119,7 @@ trajectory, and renders the movie — no per-simulation code, only the spec diff
 .sim-card figcaption{margin-top:.4rem;line-height:1.3}
 .sim-name{font-weight:600;cursor:help;position:relative;border-bottom:1px dotted #999}
 .sim-cap{display:block;font-size:.84em;color:#777;margin-top:.12rem}
-.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(320px,112%);max-height:360px;overflow:auto;
+.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(340px,116%);max-height:420px;overflow:auto;
   background:#1e1e1e;border-radius:7px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:.5rem .7rem;text-align:left;cursor:auto}
 .sim-name:hover .sim-spec,.sim-name:focus .sim-spec{display:block}
 .sim-spec pre{margin:0;font-size:.72em;line-height:1.3;white-space:pre;color:#e9e9e9;background:none;border:none;padding:0}
@@ -132,30 +132,250 @@ trajectory, and renders the movie — no per-simulation code, only the spec diff
   <figure class="sim-card">
     <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">attraction–repulsion<span class="sim-spec"><pre>op: attraction_repulsion   # lateral, EMIT=velocity
-# 3 types, per-type difference-of-Gaussians law
-# on a radius_graph (O(E)); byte-matched to
-# ParticleGraph arbitrary_3.
-config/attraction_repulsion/arbitrary_3.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">attraction–repulsion<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
+# max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
+# because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
+general:
+  name: arbitrary_3
+  seed: 0
+  n_frames: 250
+  dt: 0.1
+  boundary: periodic
+
+sets:
+  particle:
+    n: 30000
+    types:
+      t0: {fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615]}
+      t1: {fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055]}
+      t2: {fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579]}
+
+fields: {}
+
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+
+schedule: [radius_graph, attraction_repulsion]
+
+plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
+  background: black
+  colormap: tab10
+  point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles across
+      the entire field. Over time, the particles begin to aggregate into distinct, circular clusters with
+      dark centers. These clusters grow in size and number as the particles organize into a cellular-like
+      structure. By the final frame, the particles have formed a highly structured network of interconnected
+      circular domains.
+    objects: The scene contains thousands of tiny, individual particles in blue, green, and orange. These
+      particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
+      features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
+      consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
       <span class="sim-cap">per-type difference-of-Gaussians interaction — types self-sort into cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/boids.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">boids<span class="sim-spec"><pre>ops: cohesion + velocity_align + separation
-# three lateral rules; their deltas SUM to flocking.
-config/boids/boids_16.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">boids<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
+# 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
+# max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
+# Per-type p = [cohesion, alignment, separation].
+general:
+  name: boids_16
+  seed: 0
+  n_frames: 16000
+  dt: 0.5
+  boundary: periodic
+
+sets:
+  particle:
+    n: 1792
+    vel_init: 0.0004
+    types:
+      t00:
+        {
+          fraction: 0.0625,
+          cohesion: 27.600000381469727,
+          alignment: 92.5,
+          separation: 48.20000076293945,
+        }
+      t01:
+        {
+          fraction: 0.0625,
+          cohesion: 32.0,
+          alignment: 51.79999923706055,
+          separation: 29.799999237060547,
+        }
+      t02:
+        {
+          fraction: 0.0625,
+          cohesion: 23.600000381469727,
+          alignment: 35.0,
+          separation: 13.5,
+        }
+      t03:
+        {
+          fraction: 0.0625,
+          cohesion: 3.299999952316284,
+          alignment: 76.4000015258789,
+          separation: 13.0,
+        }
+      t04:
+        {
+          fraction: 0.0625,
+          cohesion: 94.0,
+          alignment: 78.69999694824219,
+          separation: 30.799999237060547,
+        }
+      t05:
+        {
+          fraction: 0.0625,
+          cohesion: 81.4000015258789,
+          alignment: 34.599998474121094,
+          separation: 2.200000047683716,
+        }
+      t06:
+        {
+          fraction: 0.0625,
+          cohesion: 3.0999999046325684,
+          alignment: 40.5,
+          separation: 17.0,
+        }
+      t07:
+        {
+          fraction: 0.0625,
+          cohesion: 88.80000305175781,
+          alignment: 7.199999809265137,
+          separation: 29.799999237060547,
+        }
+      t08:
+        {
+          fraction: 0.0625,
+          cohesion: 32.70000076293945,
+          alignment: 76.80000305175781,
+          separation: 26.100000381469727,
+        }
+      t09:
+        {
+          fraction: 0.0625,
+          cohesion: 14.5,
+          alignment: 56.79999923706055,
+          separation: 27.600000381469727,
+        }
+      t10:
+        {
+          fraction: 0.0625,
+          cohesion: 63.29999923706055,
+          alignment: 99.9000015258789,
+          separation: 13.899999618530273,
+        }
+      t11:
+        {
+          fraction: 0.0625,
+          cohesion: 32.5,
+          alignment: 25.200000762939453,
+          separation: 24.399999618530273,
+        }
+      t12:
+        {
+          fraction: 0.0625,
+          cohesion: 97.5999984741211,
+          alignment: 56.5,
+          separation: 12.100000381469727,
+        }
+      t13:
+        {
+          fraction: 0.0625,
+          cohesion: 62.20000076293945,
+          alignment: 9.100000381469727,
+          separation: 28.299999237060547,
+        }
+      t14:
+        {
+          fraction: 0.0625,
+          cohesion: 76.4000015258789,
+          alignment: 52.900001525878906,
+          separation: 32.0,
+        }
+      t15:
+        {
+          fraction: 0.0625,
+          cohesion: 48.099998474121094,
+          alignment: 54.400001525878906,
+          separation: 30.700000762939453,
+        }
+
+fields: {}
+
+operators:
+  - { op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001 }
+  - { op: cohesion, at: particle } # boids decomposed: the three steering rules
+  - { op: velocity_align, at: particle, per_type: true } # are separate operators; the engine sums them
+  - { op: separation, at: particle }
+
+schedule: [radius_graph, cohesion, velocity_align, separation]
+
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
+      a black background. Over time, the particles begin to aggregate into distinct, circular clusters
+      of varying sizes. These clusters appear to form and dissolve dynamically, with some growing larger
+      while others shrink or dissipate. By the final frame, the particles are organized into several prominent,
+      high-density circular formations surrounded by a sparse field of individual dots.
+    objects: The scene contains thousands of small, circular particles of uniform size. These particles
+      are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
+      the particles are arranged in a random, scattered topology across the entire frame. As the simulation
+      progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
       <span class="sim-cap">cohesion + alignment + separation — one flock from local rules</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/active_matter.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">active matter (Vicsek)<span class="sim-spec"><pre>ops: velocity_align + velocity_cruise
-# Vicsek self-propulsion to speed v0 + polar
-# alignment on a radius_graph -> ordered flock.
-config/active_matter/vicsek_flock.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">active matter (Vicsek)<span class="sim-spec"><pre># vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -&gt; polar order (phi-&gt;1)
+# Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
+# The Well (Ohana et al., NeurIPS 2024). Ordered flock.
+general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
+sets:
+  particle:
+    n: 2000
+    vel_init: 0.005
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
+  - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
+schedule: [radius_graph, velocity_align, velocity_cruise]
+plotting:
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a collection of blue triangular particles moving in a complex, fluid-like
+      motion. Over time, the particles form swirling patterns and dense clusters that shift and evolve
+      across the black background. The flow exhibits turbulent characteristics, with some areas showing
+      high concentration and others remaining sparse. The overall movement suggests a dynamic system governed
+      by collective behavior or fluid dynamics.
+    objects: The scene contains numerous small, blue triangular particles distributed across a black field.
+      These particles are arranged in irregular, swirling clusters and elongated filaments that suggest
+      a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
+      representation of the data. The topology of the objects changes as they aggregate into dense regions
+      and disperse into more scattered formations.</pre></span></span>
       <span class="sim-cap">Vicsek self-propulsion + alignment — a polar-ordered swarm</span>
     </figcaption>
   </figure>
@@ -167,50 +387,359 @@ config/active_matter/vicsek_flock.yaml</pre></span></span>
   <figure class="sim-card">
     <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">slime (default)<span class="sim-spec"><pre>ops: deposit + diffuse + decay + sense + glide
-# 3-sensor steering up a self-deposited pheromone
-# field (Jones/Lague). Stigmergy: grows, coarsens, prunes.
-config/slime/slime_default.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">slime (default)<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
+# The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
+# field: deposit (set-&gt;field) | diffuse, decay (field-&gt;field) | sense (field-&gt;set,
+# turns the heading) | glide (self-propelled move). Agents spawn in a central disc;
+# stigmergy grows a self-reinforcing, coarsening network.
+general: {name: slime_default, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical,            rate: 0.0175}
+- {op: decay,   at: chemical,            rate: 0.0006}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors: {a: [0.2, 0.95, 0.65]}
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cloud of green particles initially forms a roughly spherical shape. Over time,
+      the particles begin to organize into a complex, interconnected network of filaments. These filaments
+      form a web-like structure that maintains a spherical overall boundary. The network becomes increasingly
+      defined as the particles align into distinct paths.
+    objects: The primary objects are small, bright green particles. These particles are arranged in a
+      spherical cluster that occupies the center of the frame. They transition from a random distribution
+      into a connected topology of curved lines and loops. The overall size of the cluster remains constant
+      while the internal structure evolves from a cloud to a web.
+  movie_chemical:
+    description: The simulation begins with a dense, uniform cloud of green particles forming a circular
+      shape. Over time, these particles begin to organize into a complex, interconnected network of filaments.
+      The network structure becomes increasingly defined, forming a dense web of loops and strands within
+      the central sphere. Finally, long, thin filaments extend outward from the central mass into the
+      surrounding black space.
+    objects: The primary object is a large, circular cluster of green filaments located in the center
+      of the frame. These filaments are interconnected in a complex, web-like topology, creating a porous
+      internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
+      outward in all directions. All objects are a consistent teal-green color and are set against a solid
+      black background.</pre></span></span>
       <span class="sim-cap">deposit → diffuse → decay → sense → glide — a growing, coarsening web</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_curly.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">curly<span class="sim-spec"><pre>op: slime  # higher turn_speed / sensor angle
-config/slime/slime_curly.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">curly<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
+# (a fine, meandering network). Same 5 operators; only the `types:` scalars change.
+general: {name: slime_curly, seed: 1, n_frames: 400, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.32
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.95, sensor_angle: 45, sensor_dist: 0.013, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical,            rate: 0.015}
+- {op: decay,   at: chemical,            rate: 0.00075}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors: {a: [0.45, 0.75, 1.0]}
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large cluster of blue particles initially appears as a dense, uniform sphere. Over
+      time, the particles begin to organize into distinct, interconnected looping structures. These loops
+      expand and refine their shapes while maintaining a roughly spherical overall boundary. By the end
+      of the sequence, the internal structure is clearly defined by a network of continuous, winding paths.
+    objects: The primary objects are thousands of small, light-blue dots. These dots are arranged in a
+      complex, interconnected network of closed loops and winding paths. The overall shape of the collection
+      is a large, roughly spherical cluster against a black background. A few isolated dots and small
+      linear trails appear outside the main spherical body.
+  movie_chemical:
+    description: The video begins with a nearly invisible, faint cluster of particles in the center of
+      a black background. Over the course of the simulation, these particles rapidly brighten and organize
+      into a dense, interconnected network of blue filaments. The structure expands slightly as the filaments
+      become more defined and saturated in color. By the final frame, the central cluster is fully formed
+      and surrounded by thin, radiating lines extending outward.
+    objects: The primary object is a large, spherical cluster of interconnected blue filaments located
+      in the center of the frame. These filaments are arranged in a complex, tangled topology resembling
+      a neural network or a microscopic biological structure. Surrounding this central mass are several
+      thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
+      medium blue, contrasting sharply against the solid black background.</pre></span></span>
       <span class="sim-cap">tighter turning — curled, looping trails</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">filaments<span class="sim-spec"><pre>op: slime  # low deposit / high decay
-config/slime/slime_filaments.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">filaments<span class="sim-spec"><pre># slime_filaments -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_filaments, seed: 0, n_frames: 450, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 13000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical, rate: 0.015}
+- {op: decay,   at: chemical, rate: 0.0005}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large number of cyan particles are initially distributed in a dense, roughly spherical
+      cluster against a black background. Over time, these particles begin to organize into distinct,
+      elongated filaments that radiate outward from the center. A prominent circular boundary forms, with
+      many filaments crossing through its interior and extending beyond its perimeter. The simulation
+      concludes with a complex network of interconnected paths and scattered points, maintaining the overall
+      spherical symmetry.
+    objects: The primary objects are thousands of tiny cyan dots that represent individual particles or
+      data points. These particles are arranged into a dense central mass that gradually transitions into
+      a web-like topology of curved lines. A large, circular ring of high particle density defines a central
+      region where many filaments intersect. The filaments vary in length and curvature, extending from
+      the core to the edges of the frame in a radial pattern.
+  movie_chemical:
+    description: A dense cluster of green particles initially forms a spherical shape against a black
+      background. Over time, the particles begin to organize into a complex, interconnected network of
+      filaments. These filaments extend outward from the central sphere, creating a radial, web-like structure.
+      The final frames show a highly structured, glowing orb with long, thread-like tendrils reaching
+      toward the edges of the frame.
+    objects: The primary objects are thousands of small, cyan-colored particles. These particles are arranged
+      in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
+      are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
+      is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
       <span class="sim-cap">thin, filamentous strands below field saturation</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_four.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">four species<span class="sim-spec"><pre>op: slime  # 4 types = 4 trail channels
-config/slime/slime_four.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">four species<span class="sim-spec"><pre># slime_four -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_four, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 14000
+    spawn: random
+    types:
+      a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.02}
+- {op: diffuse, at: chemical, rate: 0.013}
+- {op: decay,   at: chemical, rate: 0.002}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a collection of multi-colored particles moving in complex, fluid-like
+      trajectories across a black background. Over time, the particles form elongated, winding filaments
+      that twist and curve like smoke or flowing water. These filaments appear to interact and weave around
+      one another, maintaining distinct paths while filling the space. The overall motion is continuous
+      and smooth, creating a dynamic, organic pattern of flowing lines.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
+      yellow, green, and blue. These particles are organized into long, continuous, thread-like structures
+      that curve and loop throughout the frame. The filaments are densely packed in some areas and more
+      sparse in others, creating a sense of depth and flow. Each individual particle is very small, but
+      their collective arrangement forms large, sweeping paths that dominate the visual field.
+  movie_chemical:
+    description: The simulation shows a complex network of colorful, undulating lines moving across a
+      black background. These lines appear to flow and twist in a fluid-like motion, maintaining their
+      continuous paths throughout the sequence. The movement is smooth and organic, with the lines weaving
+      over and under one another. Over time, the overall pattern remains stable while the individual curves
+      shift and evolve dynamically.
+    objects: The scene contains numerous thin, continuous lines that form a dense, tangled web. These
+      lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
+      uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
+      in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
       <span class="sim-cap">four species, each following its own trail channel</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_six.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">six species<span class="sim-spec"><pre>op: slime  # 6 overlapping channels
-config/slime/slime_six.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">six species<span class="sim-spec"><pre># slime_six -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_six, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      e: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      f: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.019}
+- {op: diffuse, at: chemical, rate: 0.0125}
+- {op: decay,   at: chemical, rate: 0.0021}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+    e: [0.95, 0.4, 0.95]
+    f: [1.0, 0.6, 0.2]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, flowing streams
+      that move in undulating, wave-like patterns. These streams gradually become more defined, forming
+      intricate, intertwined loops and winding paths. By the final frame, the particles have settled into
+      a complex network of coherent, swirling trajectories that fill the entire space.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including yellow,
+      cyan, magenta, and orange. These particles are initially arranged in a stochastic, disordered state
+      with no clear spatial correlation. As the simulation progresses, they form elongated, continuous
+      filaments that exhibit a fluid-like topology. The filaments are characterized by smooth, curved
+      geometries and varying densities, creating a sense of dynamic flow.
+  movie_chemical:
+    description: The simulation shows a dense network of colorful, undulating lines moving across a black
+      background. Over time, the lines shift and flow in a fluid, organic motion, creating a sense of
+      constant, rhythmic turbulence. The paths of the lines appear to weave in and out of each other,
+      maintaining a consistent density throughout the frame. The overall effect is a dynamic, abstract
+      visualization of complex, interconnected trajectories.
+    objects: The scene consists of numerous thin, continuous lines that are intertwined and overlapping.
+      These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
+      a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
+      and are distributed evenly across the entire field of view.</pre></span></span>
       <span class="sim-cap">six overlapping species — richer coupled networks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/slime_eight.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">eight species<span class="sim-spec"><pre>op: slime  # 8 channels, lowest deposit / highest decay
-config/slime/slime_eight.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">eight species<span class="sim-spec"><pre># slime_eight -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 24000
+    spawn: random
+    types:
+      a: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      b: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      c: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      d: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      e: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      f: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      g: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      h: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 256, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.0165}
+- {op: diffuse, at: chemical, rate: 0.012}
+- {op: decay,   at: chemical, rate: 0.0025}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+    e: [0.95, 0.4, 0.95]
+    f: [1.0, 0.6, 0.2]
+    g: [0.2, 0.85, 0.85]
+    h: [0.65, 0.5, 1.0]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, flowing streams
+      and swirling patterns. These structures evolve into complex, interconnected filaments that resemble
+      turbulent fluid flows or magnetic field lines. By the final frame, the particles have formed highly
+      defined, undulating curves and nested loops that fill the entire space.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including cyan,
+      magenta, yellow, and green. Initially, these objects are arranged in a stochastic, high-entropy
+      distribution with no clear spatial correlation. As the simulation progresses, the particles align
+      into elongated, continuous trajectories that form a network of winding filaments. These filaments
+      exhibit a nested topology, creating concentric loops and branching structures that mimic the behavior
+      of a complex dynamical system.
+  movie_chemical:
+    description: The simulation begins with a dense, chaotic network of multicolored filaments intertwined
+      in a dark space. Over time, these filaments appear to shift and undulate, maintaining their complex,
+      tangled structure while subtly changing their positions. The movement is fluid and continuous, suggesting
+      a dynamic flow or a field of interacting agents. By the final frame, the overall pattern remains
+      consistent, showing a steady-state of turbulent, weaving lines.
+    objects: The scene contains numerous thin, thread-like filaments that are densely packed and overlapping.
+      These objects are arranged in a complex, non-linear topology, forming a tangled web of curves and
+      loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
+      and orange. Each individual filament is very small in width but spans across large portions of the
+      frame, creating a high-frequency texture.</pre></span></span>
       <span class="sim-cap">eight species — the most restrained, most-channelled web</span>
     </figcaption>
   </figure>
@@ -220,100 +749,393 @@ config/slime/slime_eight.yaml</pre></span></span>
 <p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Only the material model + scene change between these.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/material.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">bouncy balls<span class="sim-spec"><pre>ops: mpm_strain -> mpm_scatter -> mpm_grid_update
-     -> mpm_gather   (MLS-MPM substep cycle)
-config/material/material_3d_balls_bouncy.yaml</pre></span></span>
-      <span class="sim-cap">three neo-Hookean elastic balls collide and bounce</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_water.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">water drop<span class="sim-spec"><pre>op: mls_mpm  # fluid material (drops shape memory)
-config/material/material_3d_water_drop.yaml</pre></span></span>
-      <span class="sim-cap">a fluid drop splashes and settles into a pool</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_ball.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">elastic drop<span class="sim-spec"><pre>op: mls_mpm  # fixed-corotated elastic
-config/material/material_3d_ball_drop.yaml</pre></span></span>
-      <span class="sim-cap">an elastic ball drops, deforms, and rebounds</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_cube.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">cube drop<span class="sim-spec"><pre>op: mls_mpm  # elastic cube
-config/material/material_3d_cube_drop.yaml</pre></span></span>
-      <span class="sim-cap">an elastic cube lands and jiggles</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_snow.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">snow block<span class="sim-spec"><pre>op: mls_mpm  # snow plasticity (singular-value clamp + hardening)
-config/material/material_3d_snow_block.yaml</pre></span></span>
-      <span class="sim-cap">a granular snow block crumbles under impact</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
     <video src="gallery/material_multi.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">multi-material<span class="sim-spec"><pre>op: mls_mpm  # elastic + fluid + snow in one scene
-config/material/material_3d_multimaterial.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">multi-material<span class="sim-spec"><pre># mpm3d_multimaterial -- three materials side by side in one 3D box (the spirit of
+# MPM_pytorch&#x27;s multimaterial_1_3D, trimmed to three blocks for a quick inspect):
+# an elastic jelly cube, a liquid water cube and a plastic snow cube fall together.
+# Three cells, one material type each (assigned by `fraction`), each block-filled.
+# Tests multi-object / multi-material 3D in a single grid solve.
+general: {name: material_3d_multimaterial, seed: 0, n_frames: 360, dt: 0.0032, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  cell:
+    n: 3
+    start: [[0.24, 0.6, 0.5], [0.5, 0.6, 0.5], [0.76, 0.6, 0.5]]
+    types:
+      jelly: {fraction: 0.3334, youngs: 260, block: [0.14, 0.50, 0.40, 0.34, 0.72, 0.60]}
+      water:
+        fraction: 0.3333
+        youngs: 200
+        block: [0.40, 0.50, 0.40, 0.60, 0.72, 0.60]
+        layers: [{frac: 1.0, youngs: 200, material: liquid}]
+      snow:
+        fraction: 0.3333
+        youngs: 90
+        block: [0.66, 0.50, 0.40, 0.86, 0.72, 0.60]
+        layers: [{frac: 1.0, youngs: 90, material: snow}]
+  mpm_particle: {parent: cell, per_parent: 6000, radius: 0.16, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 16.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_zoom: 0.0
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  dot_size: 1.2
+  render_3d: dots
+  splat_size: 2.4
+  splat_res: 600
+  camera_turns: 0.0
+  colors: {jelly: [0.40, 0.85, 0.55], water: [0.30, 0.62, 1.0], snow: [0.95, 0.96, 1.0]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: Initially, three distinct clusters of particles are arranged in a linear sequence along a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across the bottom plane of the bounding box. The green and white clusters remain relatively stationary as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles form a large, thin sheet on the floor while the green and white clusters sit atop it.
+    objects: &#x27;There are three primary clusters of particles: one green, one blue, and one white. The green cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that covers the bottom of the cube.&#x27;</pre></span></span>
       <span class="sim-cap">elastic, fluid, and granular bodies interacting at once</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/material_map.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">material map (4 quadrants)<span class="sim-spec"><pre>fields:
+  activation: {frame: grid, res: 128}
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+  stiffness_map: {frame: image, source: material/map_four_quadrants.tif}
+general: {boundary: wall, dt: 0.002, n_frames: 250, name: material_map_four_quadrants, seed: 0}
+operators:
+- {at: cell, op: aggregate}
+- {op: apply_material_map, at: mpm_particle, from: stiffness_map, target: youngs, min: 20, max: 200}
+- {at: activation, duration: 30, name: beat, op: pacemaker, period: 150, phase: 0}
+- at: activation
+  center: [0.5, 0.5]
+  clock: beat
+  op: activation_pulse
+  radius: 0.12
+- {amplitude: 20.0, at: mpm_particle, from: activation, mode: inward, op: active_force}
+- {at: mpm_particle, k: 30.0, op: drag, emit: mpm_acceleration}
+- {at: mpm_particle, op: mpm_strain}
+- {a_max: 200, at: mpm_particle, drag: 0.0, op: mpm_scatter, to: mpm_grid}
+- {at: mpm_grid, op: mpm_grid_update, wall_contact: 0.06, wall_damp: 0.5}
+- {at: mpm_particle, from: mpm_grid, op: mpm_gather, wall_contact: 0.06, wall_damp: 0.5}
+schedule:
+- aggregate
+- apply_material_map
+- pacemaker
+- activation_pulse
+- active_force
+- drag
+- substep_dt: 0.0002
+  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+sets:
+  cell:
+    n: 1
+    start:
+    - [0.5, 0.5]
+    types:
+      sheet:
+        block: [0.15, 0.15, 0.85, 0.85]
+        fraction: 1.0
+        youngs: 80
+  mpm_particle: {density: 1.0, parent: cell, per_parent: 16384}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_activation:
+    description: A single greyish-white circular blob appears in the center of a black background. The blob remains stationary and maintains its shape throughout the duration of the video. There is no movement, expansion, or contraction of the object over time. The scene remains static with no changes in lighting or environment.
+    objects: The scene contains a single circular object located in the center of the frame. The object is a soft-edged, greyish-white sphere or disk. It is relatively small compared to the overall black background. The object is isolated and does not interact with any other elements.
+  movie_cell:
+    description: The simulation begins with a uniform distribution of blue particles within a square boundary. Over time, a subtle inward migration occurs, causing the density of particles to increase toward the center of the frame. This central concentration creates a darker, more saturated blue region as the particles cluster together. By the final frame, the central core is noticeably denser than the surrounding periphery.
+    objects: The scene contains a large collection of small, individual blue particles. These particles are arranged in a roughly square formation with a porous, speckled texture. The color of the particles is a consistent medium blue against a white background. The size of each individual particle is very small and uniform, creating a granular appearance across the entire field.
+  movie_mpm_particle:
+    description: The simulation shows a large collection of blue particles distributed within a square boundary. Over time, the particles exhibit a subtle inward migration toward the center of the frame. The density of the particles increases slightly in the middle region as the simulation progresses. The overall distribution remains largely stochastic, with no significant structural formation or large-scale movement.
+    objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
+plotting:
+  background: black</pre></span></span>
+      <span class="sim-cap">an image sets per-region Young's modulus (four quadrants)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/material_leak.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">leaking tank<span class="sim-spec"><pre>general:
+  name: material_leak_tank
+  seed: 0
+  n_frames: 1100
+  dt: 0.0036
+  boundary: wall
+  obstacles:
+  - [0.18, 0.0, 0.23, 0.8]
+  - [0.71, 0.0, 0.76, 0.22]
+  - [0.71, 0.4, 0.76, 0.8]
+sets:
+  cell:
+    n: 1
+    start: [0.47, 0.3, 0.47, 0.3]
+    types:
+      water:
+        fraction: 1.0
+        youngs: 300
+        block: [0.23, 0.04, 0.71, 0.62]
+        layers:
+        - {frac: 1.0, youngs: 300, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 8000, radius: 0.3, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 12.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.12, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 10, wall_damp: 0.5}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.5, wall_contact: 0.06, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0002
+  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The blue area initially occupies the majority of the space between the two vertical grey bars. Over time, the blue area recedes downward, leaving a larger white space at the top. The right grey bar breaks into two segments as the blue area moves lower. By the final frame, the blue area is confined to the bottom portion of the container.
+    objects: The scene contains two primary vertical grey bars that act as boundaries. A large blue field represents a fluid or particle mass that changes its vertical position. The right grey bar is initially a single continuous piece but eventually splits into two smaller segments. The background is a solid white color, providing a high-contrast environment for the blue and grey elements.
+  movie_mpm_particle:
+    description: A large volume of blue particles is initially contained within a vessel with a gap in the right wall. As time progresses, the particles flow through the gap into a smaller adjacent chamber. The flow rate decreases as the level of the particles in the main chamber drops. Eventually, the particles fill the smaller chamber and the flow from the main chamber slows significantly.
+    objects: The scene contains a large main chamber and a smaller side chamber connected by a gap. The main chamber is bounded by thick grey vertical walls on the left and right. The particles are small, blue, and densely packed within the chambers. The side chamber is located at the bottom right and is partially filled by the flowing particles.
+plotting:
+  background: black</pre></span></span>
+      <span class="sim-cap">fluid drains through a gap between two walls</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/material_water_lots.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">water (deep pool)<span class="sim-spec"><pre>op: mls_mpm  # large fluid body, many particles
-config/material/material_3d_water_lots_x10.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">water (deep pool)<span class="sim-spec"><pre># material_3d_water_lots_x10 -- 27 liquid cubes (3x3x3), per_parent=35000 -&gt; ~945000 particles,
+# each cube a DISTINCT colour (same material -&gt; colour just tags the cube so you can watch
+# them merge/mix), launched with per-cube velocity and dropped in a box -&gt; a large splash.
+general: {name: material_3d_water_lots_x10, seed: 0, n_frames: 1280, dt: 0.0036, boundary: wall, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  cell:
+    n: 27
+    types:
+      w00: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.11, 0.19, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w01: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.11, 0.44, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w02: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.11, 0.69, 0.19, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w03: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.11, 0.19, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w04: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.11, 0.44, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w05: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.11, 0.69, 0.44, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w06: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.11, 0.19, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w07: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.11, 0.44, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w08: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.11, 0.69, 0.69, 0.19], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w09: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.36, 0.19, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w10: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.36, 0.44, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w11: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.36, 0.69, 0.19, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w12: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.36, 0.19, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w13: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.36, 0.44, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w14: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.36, 0.69, 0.44, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w15: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.36, 0.19, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w16: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.36, 0.44, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w17: {fraction: 0.037037, youngs: 200, block: [0.61, 0.61, 0.36, 0.69, 0.69, 0.44], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w18: {fraction: 0.037037, youngs: 200, block: [0.11, 0.11, 0.61, 0.19, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w19: {fraction: 0.037037, youngs: 200, block: [0.36, 0.11, 0.61, 0.44, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w20: {fraction: 0.037037, youngs: 200, block: [0.61, 0.11, 0.61, 0.69, 0.19, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w21: {fraction: 0.037037, youngs: 200, block: [0.11, 0.36, 0.61, 0.19, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w22: {fraction: 0.037037, youngs: 200, block: [0.36, 0.36, 0.61, 0.44, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w23: {fraction: 0.037037, youngs: 200, block: [0.61, 0.36, 0.61, 0.69, 0.44, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w24: {fraction: 0.037037, youngs: 200, block: [0.11, 0.61, 0.61, 0.19, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w25: {fraction: 0.037037, youngs: 200, block: [0.36, 0.61, 0.61, 0.44, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+      w26: {fraction: 0.037038, youngs: 200, block: [0.61, 0.61, 0.61, 0.69, 0.69, 0.69], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+  mpm_particle: {parent: cell, per_parent: 35000, radius: 0.05, density: 1.0, vel_init: 2.5}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 16.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 1.2
+  splat_res: 640
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  colors:
+    w00: [1.0, 0.0, 0.0]
+    w01: [1.0, 0.208, 0.0]
+    w02: [1.0, 0.417, 0.0]
+    w03: [1.0, 0.649, 0.0]
+    w04: [1.0, 0.857, 0.0]
+    w05: [0.911, 1.0, 0.0]
+    w06: [0.703, 1.0, 0.0]
+    w07: [0.471, 1.0, 0.0]
+    w08: [0.263, 1.0, 0.0]
+    w09: [0.031, 1.0, 0.0]
+    w10: [0.0, 1.0, 0.177]
+    w11: [0.0, 1.0, 0.409]
+    w12: [0.0, 1.0, 0.617]
+    w13: [0.0, 1.0, 0.849]
+    w14: [0.0, 0.943, 1.0]
+    w15: [0.0, 0.711, 1.0]
+    w16: [0.0, 0.503, 1.0]
+    w17: [0.0, 0.271, 1.0]
+    w18: [0.0, 0.063, 1.0]
+    w19: [0.169, 0.0, 1.0]
+    w20: [0.378, 0.0, 1.0]
+    w21: [0.609, 0.0, 1.0]
+    w22: [0.818, 0.0, 1.0]
+    w23: [0.996, 0.0, 0.946]
+    w24: [1.0, 0.0, 0.742]
+    w25: [1.0, 0.0, 0.511]
+    w26: [1.0, 0.0, 0.302]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: The simulation begins with a discrete set of colored hexagonal particles distributed
+      within a 3D bounding box. Over time, these particles rapidly transition into a dense, continuous
+      field of points that settle toward the bottom plane of the volume. The field exhibits complex, swirling
+      patterns and turbulent structures as it evolves. Eventually, the distribution stabilizes into a
+      layered, multi-colored sheet with distinct peaks and valleys.
+    objects: The scene contains a collection of hexagonal particles that are initially separated and scattered
+      in space. These particles are rendered in a vibrant spectrum of colors including magenta, cyan,
+      green, blue, and orange. As the simulation progresses, the individual hexagons merge into a massive,
+      interconnected cloud of tiny points. The final state shows a large, flat surface of points with
+      varying heights and intricate, nested color patterns.</pre></span></span>
       <span class="sim-cap">a deep body of water sloshes, settles, and fills the tank</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/material_obstacle.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">sphere obstacle<span class="sim-spec"><pre>op: mls_mpm  # obstacle mask in the grid solve (BCs)
-config/material/material_3d_obstacle_sphere.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">sphere obstacle<span class="sim-spec"><pre># material_3d_obstacle_sphere -- 3D MLS-MPM with fixed obstacles (no-slip box/sphere solids).
+general:
+  name: material_3d_obstacle_sphere
+  seed: 0
+  n_frames: 320
+  dt: 0.0036
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  obstacles:
+  - [0.5, 0.3, 0.5, 0.13]
+sets:
+  cell:
+    n: 1
+    types:
+      water: {fraction: 1.0, youngs: 200, block: [0.36, 0.58, 0.36, 0.64, 0.86, 0.64], layers: [{frac: 1.0, youngs: 200, material: liquid}]}
+  mpm_particle: {parent: cell, per_parent: 16000, radius: 0.05, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 96}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 14.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.9}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.9, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- {substep_dt: 0.0002, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+plotting:
+  background: black
+  up_axis: 1
+  camera_elev: 1.18
+  camera_turns: 0.0
+  camera_zoom: 0.0
+  render_3d: dots
+  dot_size: 1.2
+  splat_res: 620
+  box_frame: true
+  fps: 60
+  hide_sets: [cell]
+  colors:
+    water: [0.30, 0.62, 1.0]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_mpm_particle:
+    description: A blue cluster of particles initially occupies the upper half of a cubic volume. Over time, the cluster descends toward the bottom surface, gradually flattening into a thin layer. A smaller, spherical cluster of grey particles is positioned directly beneath the blue mass and is eventually enveloped by it. By the final frame, the blue particles have spread out to cover the entire bottom face of the cube.
+    objects: The primary object is a large, dense cluster of blue particles that changes shape from a cube to a flat sheet. A secondary, smaller spherical cluster of grey particles is located in the center of the cube. Both sets of particles are contained within a large, transparent white wireframe cube. The blue particles are significantly more numerous and larger in total volume than the grey particles.</pre></span></span>
       <span class="sim-cap">material pours over and piles around a sphere obstacle</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/material_two_drops.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">two drops (surface tension)<span class="sim-spec"><pre>op: mls_mpm  # surface-tension CSF on the colour field
-config/material/material_two_drops_st.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">two drops (surface tension)<span class="sim-spec"><pre>general: {name: material_two_drops_st, seed: 0, n_frames: 4000, dt: 0.0028, boundary: wall}
+sets:
+  cell:
+    n: 2
+    start:
+    - [0.39, 0.5]
+    - [0.61, 0.5]
+    types:
+      a:
+        fraction: 0.5
+        youngs: 200
+        layers:
+        - {frac: 1.0, youngs: 200, material: liquid}
+      b:
+        fraction: 0.5
+        youngs: 200
+        layers:
+        - {frac: 1.0, youngs: 200, material: liquid}
+  mpm_particle: {parent: cell, per_parent: 3000, radius: 0.11, density: 1.0}
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 128}
+operators:
+- {op: aggregate, at: cell}
+- {op: gravity, at: cell, g: 0.0}
+- {op: mpm_strain, at: mpm_particle}
+- {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.1, a_max: 200}
+- {op: mpm_grid_update, at: mpm_grid, surface_tension: 120.0, wall_damp: 1.0}
+- {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 1.0, wall_contact: 0.04, vmax: 1000000000.0}
+schedule:
+- aggregate
+- gravity
+- substep_dt: 0.0002
+  steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: Two separate circular particles initially move toward each other from the left and right sides of the frame. They collide and begin to merge into a single, unified shape. As they fuse, the boundary between the two colors becomes irregular and complex. Finally, the two particles completely integrate into a single, multi-colored blob.
+    objects: The scene contains two primary circular particles that are initially distinct and separate. One particle is light blue and the other is light orange, both having a similar diameter. As the simulation progresses, the two circles overlap and deform into a single, larger irregular shape. The final object is a single composite blob featuring both blue and orange colors with a jagged internal boundary.
+  movie_mpm_particle:
+    description: Two separate blue and orange circular clusters of particles initially exist side-by-side. They begin to move toward each other and merge into a single, unified spherical mass. As they merge, the blue and orange particles intermix to form a composite globe-like structure. The final frames show a stable, integrated sphere where the two colors are distributed across the surface.
+    objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
+plotting:
+  background: black</pre></span></span>
       <span class="sim-cap">two liquid drops coalesce under surface tension</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_visco.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">viscoelastic vs elastic<span class="sim-spec"><pre>op: mls_mpm  # two material models, side by side
-config/material/material_viscoelastic_vs_elastic.yaml</pre></span></span>
-      <span class="sim-cap">a viscoelastic body creeps; a purely elastic one rings</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_leak.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">leaking tank<span class="sim-spec"><pre>op: mls_mpm  # walls (obstacle mask) with a gap
-config/material/material_leak_tank.yaml</pre></span></span>
-      <span class="sim-cap">fluid drains through a gap between two walls</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/material_map.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">material map (4 quadrants)<span class="sim-spec"><pre>op: apply_material_map  # image field -> per-particle stiffness
-config/material/material_map_four_quadrants.yaml</pre></span></span>
-      <span class="sim-cap">an image sets per-region Young's modulus (four quadrants)</span>
     </figcaption>
   </figure>
 </div>
@@ -324,48 +1146,269 @@ config/material/material_map_four_quadrants.yaml</pre></span></span>
   <figure class="sim-card">
     <video src="gallery/inverse_square.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">galaxy (2D)<span class="sim-spec"><pre>op: squared_law   # law: gravity, all_pairs, softened 1/r^2 (Mocz)
-config/inverse_square/spiral_galaxy.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">galaxy (2D)<span class="sim-spec"><pre># spiral_galaxy (2D) -- a rotating self-gravitating disk on `squared_law` (law: gravity, all_pairs).
+# Initialization is a SPEC concern (no operator): `spawn: disc` places the disc, and
+# `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds v = spin*sqrt(G*M(&lt;r)/r)
+# from the enclosed mass, plus an optional central point mass (`central_mass`). This replaces the
+# former `disk_ic` operator -- placement lives in `spawn`, velocity in `vel_init`.
+#
+# TWIN of the galaxy prototype&#x27;s sweep winner bh0.5_m1_j0.06_s0.9 (N=25000, world 8, disc_R 1.5,
+# central mass 0.5, disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames).
+general: {name: spiral_galaxy, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, world: [8.0, 8.0]}
+sets:
+  star:
+    n: 25000
+    spawn: disc                                     # flat disc, centred in the world box
+    spawn_radius: 1.5
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 0.5, jitter: 0.06}
+    types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
+fields: {}
+operators:
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, point_size: 1, colors: {s: [0.86, 0.9, 1.0]}, movie_max_frames: 1000, fps: 25}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A dense, spherical cluster of particles begins as a uniform, solid mass in the center
+      of the frame. Over time, the cluster undergoes a violent expansion and fragmentation, with particles
+      streaming outward in distinct, curved trajectories. The structure transitions from a compact sphere
+      into a complex, swirling nebula-like formation with several prominent filaments. By the final frame,
+      the particles have dispersed into a diffuse, irregular cloud with a noticeable central void.
+    objects: The primary objects are thousands of tiny, white and light-blue particles that form a large,
+      central cluster. Initially, these particles are packed tightly together to create a circular, high-density
+      sphere. As the simulation progresses, the particles separate into elongated, curved streams and
+      wispy filaments that radiate from the center. The background is a solid black void, providing high
+      contrast for the evolving white particle field.</pre></span></span>
       <span class="sim-cap">law: gravity — a rotating disc collapses into a galaxy</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/spiral_galaxy_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">galaxy (3D)<span class="sim-spec"><pre>op: squared_law   # law: gravity, dim: 3, camera orbit
-config/inverse_square/spiral_galaxy_3d.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">galaxy (3D)<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
+# `squared_law` (law: gravity, all_pairs). Initialization is a SPEC concern (no operator):
+# `spawn: disk` places a FLAT xy disc with out-of-plane `spawn_thickness` scatter, and
+# `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds from the enclosed mass
+# (+ a central point mass). Replaces the former `disk_ic` operator.
+#
+# TWIN of the galaxy prototype&#x27;s 3D config (N=25000, cubic world 8, disc_R 1.5, thickness 0.08,
+# central mass 0.5, disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames).
+general: {name: spiral_galaxy_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3, world: [8.0, 8.0, 8.0]}
+sets:
+  star:
+    n: 25000
+    spawn: disk                                     # flat xy disc + out-of-plane thickness
+    spawn_radius: 1.5
+    spawn_thickness: 0.08
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 0.5, jitter: 0.06}
+    types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
+fields: {}
+operators:
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -&gt; 1.35 rad (~77 deg) = almost side/edge-on.
+           # `camera_turns` adds a gentle azimuthal drift so the tilt reads as 3D.
+           camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15,
+           # Ken Burns move: slow push-in (camera_zoom) + slow screen drift (camera_pan [dx, dy], screen fraction).
+           camera_zoom: 0.30, camera_pan: [0.05, 0.03]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A small, dense cluster of white particles begins as a compact, spherical mass in the
+      center of a black void. As time progresses, the cluster begins to expand outward, losing its initial
+      symmetry and becoming more irregular. The particles spread further into the surrounding space, forming
+      a larger, more diffuse cloud with visible internal structures. By the final frame, the mass has
+      significantly elongated and fragmented into a wide, sprawling distribution of individual points.
+    objects: The primary objects are numerous small, white particles that appear as distinct points of
+      light. Initially, these particles are tightly packed together to form a single, cohesive, and roughly
+      circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
+      irregular cloud with trailing filaments. The size of the individual particles remains constant,
+      but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
       <span class="sim-cap">the same self-gravity in 3D, from an orbiting camera</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/galaxy3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">massive core<span class="sim-spec"><pre>op: squared_law   # law: gravity + heavy central mass
-config/inverse_square/spiral_galaxy_3d.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">massive core<span class="sim-spec"><pre># spiral_galaxy_3d -- the 3D galaxy: a rotating self-gravitating disk with finite THICKNESS on
+# `squared_law` (law: gravity, all_pairs). Initialization is a SPEC concern (no operator):
+# `spawn: disk` places a FLAT xy disc with out-of-plane `spawn_thickness` scatter, and
+# `vel_init: {mode: circular_orbit}` seeds near-circular orbital speeds from the enclosed mass
+# (+ a central point mass). Replaces the former `disk_ic` operator.
+#
+# TWIN of the galaxy prototype&#x27;s 3D config (N=25000, cubic world 8, disc_R 1.5, thickness 0.08,
+# central mass 0.5, disk mass 1.0, spin 0.9, jitter 0.06, softening 0.08, dt 0.004, 10000 frames).
+general: {name: spiral_galaxy_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3, world: [8.0, 8.0, 8.0]}
+sets:
+  star:
+    n: 25000
+    spawn: disk                                     # flat xy disc + out-of-plane thickness
+    spawn_radius: 1.5
+    spawn_thickness: 0.08
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.08, central_mass: 0.5, jitter: 0.06}
+    types: {s: {fraction: 1.0, mass: 0.00004}}      # disk mass ~1.0
+fields: {}
+operators:
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.08, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, colors: {s: [1.0, 1.0, 1.0]}, splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # camera pitch SWEEP over the movie: 0.0 = top-down/face-on -&gt; 1.35 rad (~77 deg) = almost side/edge-on.
+           # `camera_turns` adds a gentle azimuthal drift so the tilt reads as 3D.
+           camera_azim: 0.7, camera_elev: 0.0, camera_elev_end: 1.35, camera_turns: 0.15,
+           # Ken Burns move: slow push-in (camera_zoom) + slow screen drift (camera_pan [dx, dy], screen fraction).
+           camera_zoom: 0.30, camera_pan: [0.05, 0.03]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A small, dense cluster of white particles begins as a compact, spherical mass in the
+      center of a black void. As time progresses, the cluster begins to expand outward, losing its initial
+      symmetry and becoming more irregular. The particles spread further into the surrounding space, forming
+      a larger, more diffuse cloud with visible internal structures. By the final frame, the mass has
+      significantly elongated and fragmented into a wide, sprawling distribution of individual points.
+    objects: The primary objects are numerous small, white particles that appear as distinct points of
+      light. Initially, these particles are tightly packed together to form a single, cohesive, and roughly
+      circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
+      irregular cloud with trailing filaments. The size of the individual particles remains constant,
+      but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
       <span class="sim-cap">a heavier core draws the disc into tight structure</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/nbody_cluster.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">N-body cluster<span class="sim-spec"><pre>op: squared_law   # law: gravity, all_pairs, cold start
-config/inverse_square/nbody_cluster.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">N-body cluster<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
+# (law: gravity, all_pairs). After Philip Mocz, &quot;Create Your Own N-body Simulation
+# (With Python)&quot; (2020), vendored at papers/nbody-python/ (MIT).
+# N=10000 stars (dense), total mass ~20 (mass/star = 0.002), softened Newtonian gravity
+# (k=G=1, eps=0.1), OPEN boundary. A colder start (vel_init 0.5) + smaller dt make the
+# collapse into a bound, orbiting cluster read gradually rather than flashing past. The
+# all-pairs O(N^2) force is fused with torch.compile (`compile: true`) so N=10000 is cheap.
+general: {name: nbody_cluster, seed: 17, n_frames: 4000, dt: 0.0006, boundary: free, world: [4.0, 4.0]}
+sets:
+  star:
+    n: 10000
+    vel_init: 0.5
+    types: {s: {fraction: 1.0, mass: 0.002}}         # ~20 total mass / 10000 stars
+fields: {}
+operators:
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.1, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, point_size: 2, colors: {s: [0.7, 0.7, 1.0]}}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: A large, uniform cloud of blue particles initially fills the entire frame. Over time,
+      the particles begin to migrate toward the center of the space, forming a dense, concentrated cluster.
+      This central mass undergoes internal structural changes, shifting from a square-like shape into
+      a more elongated, horizontal band. Finally, the cluster stabilizes into a distinct, dense horizontal
+      streak surrounded by a sparse halo of scattered points.
+    objects: The primary objects are thousands of tiny, light-blue dots representing individual particles.
+      Initially, these particles are distributed in a wide, square-shaped field across the black background.
+      As the simulation progresses, the particles aggregate into a central, multi-lobed cluster with a
+      high density. In the final frames, the particles form a singular, elongated horizontal structure
+      with a fuzzy, diffuse boundary.</pre></span></span>
       <span class="sim-cap">clumps merge hierarchically under mutual gravity</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/coulomb_3.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Coulomb plasma<span class="sim-spec"><pre>op: squared_law   # law: coulomb, signed charge, radius_graph
-config/inverse_square/coulomb_3.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Coulomb plasma<span class="sim-spec"><pre># coulomb_3 -- Coulomb (electrostatic inverse-square) via the unified `squared_law` operator.
+# charges [2, 1, -1]; ported from ParticleGraph Coulomb (PDE_E).
+# squared_law law=coulomb (default): 2nd-derivative + add-aggregated over the neighbour graph;
+# like charges repel, opposite attract. `charge` is a per-type parameter the engine broadcasts
+# to a per-particle buffer the operator reads.
+general: {name: coulomb_3, seed: 0, n_frames: 32000, dt: 0.0000003, boundary: periodic}
+sets:
+  particle:
+    n: 960
+    vel_init: 0.0001
+    types:
+      q_p2: {fraction: 0.3333, charge: 2}
+      q_p1: {fraction: 0.3333, charge: 1}
+      q_n1: {fraction: 0.3334, charge: -1}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
+  - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
+schedule: [radius_graph, squared_law]
+plotting:
+  background: black
+  size_by: charge          # point size ~ |charge|
+  colors:                  # ParticleGraph PDE_E colour code (by type index)
+    q_p2: [1, 1, 1]
+    q_p1: [0, 0.5, 0.75]
+    q_n1: [1, 0, 0]
+  point_size: 9.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of multicolored particles against a black background.
+      There is no movement or evolution of the particles across the four keyframes. The distribution of
+      the dots remains constant throughout the entire sequence. The scene represents a steady-state distribution
+      of discrete points.
+    objects: &#x27;The scene contains three distinct sets of small, circular particles: red, blue, and white.
+      These particles are distributed randomly across the entire frame without any specific geometric
+      arrangement or connection. Each particle is uniform in size and appears as a single pixel or a small
+      cluster of pixels. The colors are vibrant and contrast sharply against the solid black background.&#x27;</pre></span></span>
       <span class="sim-cap">law: coulomb — like-repel / opposite-attract screening</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/coulomb_6_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre>op: squared_law   # law: coulomb, dim: 3, six charge types
-config/inverse_square/coulomb_6_3d.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre># coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
+# charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
+# squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
+general: {name: coulomb_6_3d, seed: 0, n_frames: 32000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+sets:
+  particle:
+    n: 960
+    vel_init: 0.0001
+    types:
+      q_p1: {fraction: 0.1667, charge: 1}
+      q_n1: {fraction: 0.1667, charge: -1}
+      q_p2: {fraction: 0.1667, charge: 2}
+      q_n2: {fraction: 0.1667, charge: -2}
+      q_p3: {fraction: 0.1667, charge: 3}
+      q_n3: {fraction: 0.1665, charge: -3}
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
+  - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
+schedule: [radius_graph, squared_law]
+plotting:
+  background: black
+  size_by: charge          # point size ~ |charge|
+  colors:                  # ParticleGraph PDE_E colour code (by type index)
+    q_p1: [1, 1, 1]
+    q_n1: [0, 0.5, 0.75]
+    q_p2: [1, 0, 0]
+    q_n2: [0.75, 0, 0]
+    q_p3: [0.5, 0.5, 0.5]
+    q_n3: [0.5, 0.5, 0.5]
+  splat_size: 1.9
+  splat_res: 820
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a dense cluster of particles centered in the frame against a black
+      background. Over time, the particles exhibit subtle fluctuations in their spatial distribution while
+      maintaining a cohesive, roughly spherical shape. The red and blue particles appear to be interspersed
+      within the larger population of grey particles. There is no significant expansion or contraction
+      of the overall cluster throughout the sequence.
+    objects: &#x27;The scene contains three distinct sets of small, point-like particles: red, blue, and grey.
+      The grey particles are the most numerous and form the primary bulk of the central cluster. The red
+      and blue particles are scattered throughout the grey mass, appearing as smaller subsets. All particles
+      are uniform in size and are arranged in a disordered, stochastic distribution.&#x27;</pre></span></span>
       <span class="sim-cap">a 3D charged cloud settling into a screened arrangement</span>
     </figcaption>
   </figure>
@@ -377,59 +1420,585 @@ config/inverse_square/coulomb_6_3d.yaml</pre></span></span>
   <figure class="sim-card">
     <video src="gallery/attractor_lorenz.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Lorenz<span class="sim-spec"><pre>op: attractor_flow, system: lorenz
-# ẋ=σ(y−x); ẏ=x(ρ−z)−y; ż=xy−βz   (1963)
-config/attractors/lorenz.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Lorenz<span class="sim-spec"><pre># lorenz attractor -- Lorenz (1963) convection: THE butterfly, two spiralling lobes.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
+general:
+  name: lorenz
+  seed: 0
+  n_frames: 10000
+  dt: 0.004
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [0.6, 0.6, 14.6, 1.4, 1.4, 15.4]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: lorenz, sigma: 10.0, rho: 28.0, beta: 2.6666667}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [0.24, 1.0, 0.42]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.4
+  camera_elev: 0.95
+  camera_elev_end: 1.4
+  camera_turns: 0.08</pre></span></span>
       <span class="sim-cap">the butterfly — two spiralling lobes</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_halvorsen.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Halvorsen<span class="sim-spec"><pre>op: attractor_flow, system: halvorsen
-# ẋ=−a x−4y−4z−y²  (+ cyclic y,z),  a=1.4
-config/attractors/halvorsen.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Halvorsen<span class="sim-spec"><pre># halvorsen attractor -- cyclically-symmetric (x-&gt;y-&gt;z) quadratic flow: a fat three-armed folded knot.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
+general:
+  name: halvorsen
+  seed: 0
+  n_frames: 10000
+  dt: 0.004
+  boundary: free
+  dim: 3
+  world: [16.0, 16.0, 16.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [-2.35, -2.35, -2.35, -1.65, -1.65, -1.65]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: halvorsen, a: 1.4}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [1.0, 0.62, 0.16]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.5
+  camera_elev: 0.7
+  camera_elev_end: 1.2
+  camera_turns: 0.4</pre></span></span>
       <span class="sim-cap">a fat three-armed folded knot</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_aizawa.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Aizawa<span class="sim-spec"><pre>op: attractor_flow, system: aizawa
-# a torus with an axial spike through a sphere
-config/attractors/aizawa.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Aizawa<span class="sim-spec"><pre># aizawa attractor -- a torus with an axial spike drilling through a sphere.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
+general:
+  name: aizawa
+  seed: 0
+  n_frames: 10000
+  dt: 0.008
+  boundary: free
+  dim: 3
+  world: [4.0, 4.0, 4.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [-0.15, -0.25, -0.25, 0.35, 0.25, 0.25]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: aizawa, a: 0.95, b: 0.7, c: 0.6, d: 3.5, e: 0.25, f: 0.1}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [0.55, 0.85, 1.0]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.4
+  camera_elev: 0.9
+  camera_elev_end: 1.3
+  camera_turns: 0.4</pre></span></span>
       <span class="sim-cap">a banded sphere with an axial spike</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_sprott_b.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Sprott B<span class="sim-spec"><pre>op: attractor_flow, system: sprott_b
-# ẋ=yz; ẏ=x−y; ż=1−xy   (Sprott 1994, case B)
-config/attractors/sprott_b.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Sprott B<span class="sim-spec"><pre># sprott_b attractor -- Sprott (1994) case B: one of the algebraically simplest chaotic flows.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
+general:
+  name: sprott_b
+  seed: 0
+  n_frames: 10000
+  dt: 0.006
+  boundary: free
+  dim: 3
+  world: [8.0, 8.0, 8.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [-0.15, -0.15, -0.25, 0.55, 0.55, 0.45]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: sprott_b, a: 1.0}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [1.0, 0.3, 0.24]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.7
+  camera_elev: 0.7
+  camera_elev_end: 1.2
+  camera_turns: 0.4</pre></span></span>
       <span class="sim-cap">a symmetric twin-scroll with two spiral eyes</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_dadras.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Dadras<span class="sim-spec"><pre>op: attractor_flow, system: dadras
-# ẋ=y−a x+b y z; ẏ=c y−x z+z; ż=d x y−e z  (2009)
-config/attractors/dadras.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Dadras<span class="sim-spec"><pre># dadras attractor -- Dadras-Momeni (2009): a swooping multi-wing bird.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
+general:
+  name: dadras
+  seed: 0
+  n_frames: 16000
+  dt: 0.003
+  boundary: free
+  dim: 3
+  world: [50.0, 30.0, 40.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [0.8, 1.8, -2.3, 1.4, 2.4, -1.7]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: dadras, a: 3.0, b: 2.7, c: 1.7, d: 2.0, e: 9.0, clamp: 5000.0}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [1.0, 0.35, 0.72]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.6
+  camera_elev: 0.7
+  camera_elev_end: 1.2
+  camera_turns: 0.4</pre></span></span>
       <span class="sim-cap">a swooping multi-wing bird with two eye-holes</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/attractor_thomas.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Thomas<span class="sim-spec"><pre>op: attractor_flow, system: thomas
-# ẋ=sin(y)−b x  (+ cyclic y,z),  b=0.208
-config/attractors/thomas.yaml</pre></span></span>
+      <span class="sim-name" tabindex="0">Thomas<span class="sim-spec"><pre># thomas attractor -- Thomas&#x27; cyclically-symmetric attractor: a woven cage of interlinked loops.
+# A dense `cloud` is seeded in a tiny cube inside the basin; the `attractor_flow`
+# operator rides every point along dx/dt = f(x) and the chaos unfolds the seed into
+# the attractor. `boundary: free` -&gt; open space (the flow is bounded by its dissipation).
+general:
+  name: thomas
+  seed: 0
+  n_frames: 15000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world: [12.0, 12.0, 12.0]
+  record_cap: 800
+sets:
+  cloud:
+    n: 60000
+    start: [0.35, 0.15, -0.05, 0.85, 0.65, 0.45]
+    types:
+      c: {fraction: 1.0}
+fields: {}
+operators:
+- {op: attractor_flow, at: cloud, system: thomas, b: 0.208}
+schedule: [attractor_flow]
+plotting:
+  background: black
+  colors:
+    c: [0.72, 0.45, 1.0]
+  splat_size: 1.15
+  splat_res: 820
+  movie_max_frames: 700
+  fps: 30
+  camera_zoom: 0.25
+  camera_azim: 0.5
+  camera_elev: 0.7
+  camera_elev_end: 1.2
+  camera_turns: 0.5</pre></span></span>
       <span class="sim-cap">a woven cage of interlinked loops</span>
     </figcaption>
   </figure>
 </div>
+
+<h3>Turing — Gray–Scott reaction–diffusion</h3>
+<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>cell_diffuse</code> → <code>turing_react</code>), cells coloured by activator. The Gray–Scott feed/kill regimes on a 2D cell disc (coral, holes, spots), and the same reaction–diffusion on a 3D cell shell.</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/turing_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
+  name: turing2d_coral
+  seed: 0
+  n_frames: 6000
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world:
+  - 31.200000000000003
+  - 31.200000000000003
+sets:
+  cell:
+    n: 1500
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      xyz:
+        width: 2
+        integration: none
+        boundary: free
+fields: {}
+operators:
+- op: aggregate_seed
+  at: cell
+  mode: disc
+  radius: 12.0
+  k: 6
+  seed_frac: 0.12
+  before_frame: 1
+- op: cell_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.4
+- op: turing_react
+  at: cell
+  implementation: gray_scott
+  F: 0.055
+  kk: 0.062
+schedule:
+- aggregate_seed
+- cell_diffuse
+- turing_react</pre></span></span>
+      <span class="sim-cap">coral / branching worms — F=0.055</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_holes.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">holes<span class="sim-spec"><pre>general:
+  name: turing2d_holes
+  seed: 0
+  n_frames: 6000
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world:
+  - 31.200000000000003
+  - 31.200000000000003
+sets:
+  cell:
+    n: 1500
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      xyz:
+        width: 2
+        integration: none
+        boundary: free
+fields: {}
+operators:
+- op: aggregate_seed
+  at: cell
+  mode: disc
+  radius: 12.0
+  k: 6
+  seed_frac: 0.12
+  before_frame: 1
+- op: cell_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.4
+- op: turing_react
+  at: cell
+  implementation: gray_scott
+  F: 0.039
+  kk: 0.058
+schedule:
+- aggregate_seed
+- cell_diffuse
+- turing_react</pre></span></span>
+      <span class="sim-cap">inverse spots (holes) — F=0.039</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">spots<span class="sim-spec"><pre>general:
+  name: turing2d_spots
+  seed: 0
+  n_frames: 6000
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world:
+  - 31.200000000000003
+  - 31.200000000000003
+sets:
+  cell:
+    n: 1500
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      xyz:
+        width: 2
+        integration: none
+        boundary: free
+fields: {}
+operators:
+- op: aggregate_seed
+  at: cell
+  mode: disc
+  radius: 12.0
+  k: 6
+  seed_frac: 0.12
+  before_frame: 1
+- op: cell_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.4
+- op: turing_react
+  at: cell
+  implementation: gray_scott
+  F: 0.037
+  kk: 0.06
+schedule:
+- aggregate_seed
+- cell_diffuse
+- turing_react</pre></span></span>
+      <span class="sim-cap">classic Turing spots — F=0.037</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_shell_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">coral (sphere)<span class="sim-spec"><pre>general:
+  name: turing_shell_coral
+  seed: 0
+  n_frames: 10000
+  dt: 0.35
+  boundary: free
+  dim: 3
+  world:
+  - 20.8
+  - 20.8
+  - 20.8
+sets:
+  cell:
+    n: 1600
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      xyz:
+        width: 3
+        integration: none
+        boundary: free
+fields: {}
+operators:
+- op: aggregate_seed
+  at: cell
+  mode: shell
+  seed_mode: scatter
+  radius: 8.0
+  k: 6
+  before_frame: 1
+  seed_frac: 0.04
+  noise: 0.02
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.28
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.058
+  kk: 0.063
+schedule:
+- aggregate_seed
+- graph_diffuse
+- react</pre></span></span>
+      <span class="sim-cap">coral on a 3D cell shell</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_shell_labyrinth.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">labyrinth (sphere)<span class="sim-spec"><pre>general:
+  name: turing_shell_labyrinth
+  seed: 0
+  n_frames: 10000
+  dt: 0.35
+  boundary: free
+  dim: 3
+  world:
+  - 20.8
+  - 20.8
+  - 20.8
+sets:
+  cell:
+    n: 1600
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      xyz:
+        width: 3
+        integration: none
+        boundary: free
+fields: {}
+operators:
+- op: aggregate_seed
+  at: cell
+  mode: shell
+  seed_mode: scatter
+  radius: 8.0
+  k: 6
+  before_frame: 1
+  seed_frac: 0.04
+  noise: 0.02
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.28
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.029
+  kk: 0.054
+schedule:
+- aggregate_seed
+- graph_diffuse
+- react</pre></span></span>
+      <span class="sim-cap">labyrinth on a 3D cell shell</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_shell_big_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">spots (sphere)<span class="sim-spec"><pre>general:
+  name: turing_shell_big_spots
+  seed: 0
+  n_frames: 20000
+  dt: 0.2
+  boundary: free
+  dim: 3
+  world:
+  - 20.8
+  - 20.8
+  - 20.8
+sets:
+  cell:
+    n: 1400
+    state:
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      xyz:
+        width: 3
+        integration: none
+        boundary: free
+fields: {}
+operators:
+- op: aggregate_seed
+  at: cell
+  mode: shell
+  seed_mode: noise
+  radius: 8.0
+  k: 6
+  before_frame: 1
+  a0: 1.0
+  h0: 3.0
+  noise: 0.03
+- op: graph_diffuse
+  at: cell
+  d_a: 0.05
+  d_h: 0.5
+  chi: 6.4
+  norm: true
+- op: react
+  at: cell
+  implementation: brusselator
+  gamma: 0.02
+  A: 1.0
+  B: 3.0
+schedule:
+- aggregate_seed
+- graph_diffuse
+- react</pre></span></span>
+      <span class="sim-cap">coarse spots on a 3D cell shell</span>
+    </figcaption>
+  </figure>
+</div>
+
 ```
+
+
 
 ## Agentic mechanistic discovery
 
