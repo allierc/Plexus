@@ -261,8 +261,8 @@ How a clip is made
 .sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:.6rem 0 2.4rem}
 .sim-gallery.g3{grid-template-columns:repeat(3,1fr)}
 @media (max-width:560px){.sim-gallery.g3{grid-template-columns:repeat(2,1fr)}}
-.sim-gallery.wide{grid-template-columns:1fr;max-width:860px;margin:.6rem auto 2.4rem}
-.sim-gallery.wide .sim-card video{aspect-ratio:3/1;object-fit:cover}
+.sim-gallery.wide{grid-template-columns:1fr;max-width:900px;margin:.6rem auto 2.4rem}
+.sim-gallery.wide .sim-card video{aspect-ratio:auto !important;height:auto !important;object-fit:contain !important}
 .sim-card{margin:0}
 .sim-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
 .sim-card figcaption{margin-top:.4rem;line-height:1.3}
