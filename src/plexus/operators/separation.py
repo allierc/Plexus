@@ -13,7 +13,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import neighbour_mean
 
 
-@register_operator("separation", family="interaction", level="particle", kind="lateral")
+@register_operator("separation", family="interaction", set="particle", kind="lateral")
 class Separation(Lateral):
     EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic

@@ -59,7 +59,7 @@ def _one_level(schema: StateSchema, n=4, emit="velocity", **hattrs) -> Hierarchy
     H = Hierarchy()
     H.dim = 2
     state = torch.zeros(n, schema.dim)
-    H.add_level(Level("s", level=0, state=state, state_schema=schema))
+    H.add_level(Level("s", depth=0, state=state, state_schema=schema))
     H.world_size = torch.tensor([1.0, 1.0])
     H.boundary = hattrs.get("boundary", "wall")
     H.emit_order = {"s": emit}

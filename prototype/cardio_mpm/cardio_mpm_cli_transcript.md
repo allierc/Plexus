@@ -1731,104 +1731,518 @@ Files updated: `analysis_cardio_mpm.md` (dated B36→B37 section), `knowledge_ca
 
 
 ================================================================================
-## DESIGN 38 -- 2026-07-07 16:37:16
+## DESIGN 42 -- 2026-07-08 12:10:24
 ================================================================================
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-All five batch steps are complete. Summary:
+Batch 42 is complete. Here's the summary.
 
-## Batch 38 (reads b37) — SIZE closed ✓-capped → **PHASE 2 COMPLETE** → **PHASE 3 opened**
+## Batch 42 — what happened
 
-**Biggest surprise:** the dev25 *replicate regressed* (LS 0.488, peak_ratio 0.501) — B36's headline peak 0.534 was a lottery draw (10th single-draw regression). The reproducible winner was **d25g15** (gain_hi 2.0→1.5 @dev0.25): LS 0.504, peak 0.521, area 0.437 — all batch-best. gain_hi isn't a *size* lever, but lowering it trims overshoot so enclosure firms up.
+**The memory was 5–6 batches stale, and I reconstructed the lost science from the archive.** The ledger/analysis stopped at "B36→B37 design," but in fact: **B37 ran** (SIZE-close), **B38–B40 were 3 execution losses**, and **B41 ran** — none distilled. Worse, the B41 mechanism code was uncommitted working-tree state that got **clobbered when HEAD moved to the `signaling` branch and back** (reflog confirms the last cardio commit `64d0fc2` holds only the B36/B37-era files).
 
-**Verdict on SIZE:** dose-confirmed **capped at peak_ratio ~0.52 within the current operator language**, via three independent tests — replicate regression + `durhi13` overshooting *open* (peak 0.520 but area collapses to 0.342) + `bwnar` boundary-release collapsing enclosure (area 0.344, chir 0.838; the Dirichlet anchor *helps* enclosure). No lever exceeds fibre_dev's cap. Per user_input this is a valid ✓ (structural-limit-within-language).
+**The headline surprise (B41):** a new `--tau` **viscoelastic** mechanism **breaks the 2-month "elastic size cap"**:
+- B37 had confirmed the elastic peak-SIZE cap is dose-robust (~0.52 across fibre / boundary-release / longer-duration — all held).
+- B41 `--tau` reaches **peak_ratio 1.01, area_ratio 1.73 — FULL real loop scale** at the *lowest* overshoot — **but collapses chirality** (chir_match 0.855→0.61; dashboards show full-scale-but-tangled loops, many nodes at LS=−1.00, fields degraded to noise) → **LS goes negative**.
+- So the size cap is **constitutive, not model-structural**, and **full size ⇒ scrambled chirality** (a size↔direction coupling). `--residual_stress` was cleanly **rejected** (pure global-drive overshoot). The elastic op point **d25g15 (LS 0.502)** still holds all axes.
 
-**Phase gate:** all six axes ✓ (magnitude·enclosure·direction·shape·uniformity·SIZE-capped), none regressed → **Phase 2 declared COMPLETE**; `current_phase.txt` overwritten `PHASE2`→`PHASE3`.
+**B42 design (code-free, zero crash-risk):** a `--rot_stress` ladder (1.0/1.2/1.6/2.0, +−1.6) at the dev25 point — testing whether the size↔direction tradeoff is a **generic frontier** (any full-scale mechanism costs chirality) or **tau-specific**. Falsifier: rot1.6/2.0 raise area with chir held ≥0.83. One variable per slot, all existing flags.
 
-**Files updated:** `analysis_cardio_mpm.md` (dated Batch 38 section, per-slot rows, verdict), `knowledge_cardio_mpm.md` (distilled — objective→Phase 3, SIZE ✓-capped, new d25g15 anchor + Phase-3 operator spec), `current_phase.txt`→PHASE3, `cardio_mpm_slots.md`.
+**Phase gate: HELD at PHASE2.** SIZE's elastic cap is ✓-strength, but the viscoelastic escape (◐, n=1, code lost) reframes the axis and must be settled before closing. No ✓ axis regressed at the op point.
 
-**Batch 39 designed (Phase-3 batch 1 — residual-driven operator discovery).** I verified both new operators are wired and default-OFF in `cardio_mpm_train.py` (`--residual_stress/--residual_amp` with `residual` as a valid `--learn` group; `--tau` Maxwell viscoelasticity). Anchor = d25g15, one variable per slot:
-- `ctrl` — both OFF (~0.52 anchor)
-- `res_lo/mid/hi` — prestress α 0.1/0.2/0.3 (`+residual` learned)
-- `visco_mid/hi` — viscoelastic τ 0.05/0.02 (emergent residual)
+## ⚠ Action item for you (blocks the definitive Phase-2 close)
 
-**Falsifier:** any slot pushes peak_ratio past ~0.53 with the ✓ axes held (read the full RESIDUAL_MORPHOLOGY row, not LS) → prestress/viscoelasticity is the missing operator, SIZE reopens as *solved*. A clean dose-confirmed null → the cap is deeper (constitutive nonlinearity), operators join the rejected record. No combo slot yet, per user_input.
+The `--tau` / `--residual_stress` code is **gone from `cardio_mpm_train.py`** and I **cannot safely recover or re-implement it** here: git is approval-gated (non-interactive), there's no `.pyc` (train.py runs as `__main__`), and python is approval-blocked so I can't smoke-test a re-implementation — and tau's effect *sign* depends on where it enters the `mpm_strain` constitutive site, so a blind guess risks opposite-direction results or a 5th execution loss. **B42 works around it.** The definitive close ("is there a *moderate* tau that breaks the cap while holding chir≥0.8?") needs you to **restore/re-commit + smoke-test `--tau`**. I've documented all of this (Engineering fact **#E-tau**, Open-Q **#tau-DECOUPLE**).
+
+Files updated: `analysis_cardio_mpm.md` (Batch 42 section), `knowledge_cardio_mpm.md` (distilled: objective, best-result, mechanism #31, rejected, open, engineering, theme summaries, hypothesis, observations), `cardio_mpm_slots.md` (B42 slots), `current_phase.txt` unchanged (PHASE2).
 
 
 ================================================================================
-## DESIGN 39 -- 2026-07-07 16:48:33
+## DESIGN 43 -- 2026-07-08 12:40:44
 ================================================================================
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-All Phase-3 machinery is correctly wired (`residual` learn group registered at line 623-624, both operators default-OFF). The re-issue is safe — the *only* thing that broke B38 was the missing `cardio_unet` import, now fixed.
+All 21 flags are defined in `train.py` (`add_argument`) — zero stale-flag/argparse-crash risk. Combined with the loader fix, b43 is well-formed. The phase gate holds at PHASE2 (a pure execution loss produces no science and cannot advance/regress any axis), so `current_phase.txt` stays unchanged.
 
-## Batch 39 — Summary
+Batch 43 is complete. Summary:
 
-**B38 was a total execution loss, not science.** All 6 slots produced only `config.json`; every `.err` (identical, ~12 s) was:
-```
-cardio_mpm_train.py:44  ModuleNotFoundError: No module named 'cardio_unet'
-```
+## Batch 43 — B42 was an execution loss; diagnosed, fixed, re-issued
 
-**Root cause (4th loss mode for this campaign — a dependency crash):** the sibling `prototype/cardio/` dir was deleted wholesale (session `git status` = dozens of `D ../cardio/*`), taking `cardio_unet.py` with it. `train.py:33` puts `../cardio` on `sys.path` and line 44 imports `UNet, load_image` from there — so every slot died at import, before a single optimizer step. Scientifically inert: `UNet` is only built under legacy image paths (`nuo>0`, REJECTED Falsified#8/#9) and never instantiated under `--stiff_src siren`; `load_image` only feeds the cosmetic dashboard `corr(microscope)` panel.
+**What surprised me:** B42 produced **zero real archives** — a *5th* execution-loss event, and a **new (4th) root cause**. All 6 slots died identically at ~12 s / 307 MB with `FileNotFoundError: .../cardio_mpm/../cardio/cardio_real.npz` at `cardio_mpm_data.py:29` (the fast-fail code-crash signature, not SSH/poll/wall).
 
-**Fix (durable, self-contained):** wrapped the import in `try/except ModuleNotFoundError` (`train.py:44–61`) with a local fallback — an importable `UNet` stub + a neutral-radial-blob `load_image`. cardio_mpm no longer depends on the deleted `../cardio` dir. Verified: flags `--residual_stress/--residual_amp/--tau` are wired (512–523), the residual SIREN field + `residual` learn-group are registered (604–701, 623-624), viscoelastic `is_visco/visco_tau` set (556–558). (`python`/`py_compile` approval-blocked; verified statically.)
+**Root cause (fully traced):** `cardio_real.npz` was relocated out of the sibling `../cardio/` (now a *different* project) into `cardio_mpm/` itself (Jul 8 03:52), but the loader hard-coded the stale `../cardio/` path. Confirmed it's real, not a sandbox quirk: `/workspace` is an **NFS mount** of the cluster's `/groups/.../Graph` (`cardio_mpm_cluster.py:49-54`), so the co-located 54 MB npz *is* the file the cluster job needs — only the path was wrong. Likely collateral of the same `signaling`-branch churn that clobbered the B41 `--tau` code.
+
+**Fix applied** (`cardio_mpm_data.py`): replaced the constant `NPZ` with `_find_npz()`, a first-existing candidate search `[HERE/cardio_real.npz, HERE/../cardio/…, HERE/../cardio_mpm/…]` (co-located first). Verified statically: the co-located file exists → resolves correctly; `train.py:687`'s `np.load(D.NPZ)` inherits it; no other data-path references exist. Durable against the file moving again.
 
 **Files updated:**
-- `cardio_mpm_train.py` — graceful import fallback.
-- `analysis_cardio_mpm.md` — dated Batch 39 section (loss → root cause → fix → re-issue + durable 0-archive triage rule).
-- `knowledge_cardio_mpm.md` — distilled **CODE-CRASH #2** (missing cross-dir import after sibling-dir cleanup) into Engineering facts + a B37/B38→39 iteration note.
-- `cardio_mpm_slots.md` — **Batch 39 = exact re-issue** of the 6 well-formed B38 slots (ctrl · res_lo/mid/hi prestress α 0.1/0.2/0.3 · visco_mid/hi τ 0.05/0.02), with a re-issue header.
+- `analysis_cardio_mpm.md` — dated Batch 43 section: loss table, root cause, fix, re-issue design, pre-registered falsifier.
+- `knowledge_cardio_mpm.md` — new `#E-data` engineering fact (4th execution-loss root cause + `.err`-first triage) + campaign trailer line.
+- `cardio_mpm_slots.md` — **6 re-issue slots** (`b43_ctrl/dev28/rot12/rot16/rot20/rotneg16`), identical well-formed B42 config; all 21 flags verified present in `train.py` (zero argparse-crash risk).
 
-**Phase gate:** no new science (last real data stays **B37**, SIZE ✓-capped). `current_phase.txt` = **PHASE3** unchanged; Phase-3 axes remain open pending B39 data. The Phase-3 question is intact for the re-run: is the ~0.52 peak_ratio cap an active-stress amplitude limit, or a missing pre-stress state?
+**Science:** unchanged — last real data = **B41** (elastic op point d25g15 LS 0.502). B43 re-runs the pre-registered SIZE↔DIRECTION frontier test: does over-rotation past rot=1.0 raise `area_ratio` toward real while degrading `chir_match` (generic Pareto frontier) or hold chir ≥0.83 (viscoelastic-specific)? Falsifier registered.
 
+**Phase gate:** HOLD **PHASE2**. SIZE remains the one open axis (elastic cap ✓-strength; tau escape ◐/code-lost; frontier under test). No axis advanced or regressed (no run occurred). `current_phase.txt` = PHASE2, unchanged.
 
-================================================================================
-## DESIGN 40 -- 2026-07-07 17:02:12
-================================================================================
-Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-All deliverables written. Code verified coherent. Phase gate: no new science → `current_phase.txt` stays `PHASE3` (correctly unchanged). Let me confirm nothing else in `current_phase.txt` needs touching — it's already `PHASE3`, so I leave it.
-
-## Batch 40 — verdict: 3rd consecutive EXECUTION LOSS (not science), root cause isolated and code hardened; **the fit data must be restored by a human**
-
-**What happened.** B39 re-issue 0-archived *again* — all 6 slots died at ~13 s with only `config.json`. The traceback **moved past** B38's fixed import to a new site:
-
-```
-cardio_mpm_data.py:29  →  FileNotFoundError: .../cardio_mpm/../cardio/cardio_real.npz
-```
-
-**Root cause.** The same wholesale `../cardio` deletion that broke B38 (`cardio_unet`) also took **`cardio_real.npz` — the 137²-node real cardiomyocyte tracks that *are* the entire inverse-fit target.** B38's fix stubbed the *cosmetic* `cardio_unet` import but missed this **hard data dependency** — the classic "survives one landmine, dies on the next."
-
-**This is worse than B38 and I cannot fix it myself.** `git ls-files ../cardio/` returns only code/specs/`.md` → `cardio_real.npz` was **gitignored, never version-controlled → NOT restorable via `git checkout`.** No `.npz` survives in `archive/`. The only cardio `.npz` on-box are the *sim* `material_*_cardio/trajectory.npz` (a different array). Regenerating it needs the upstream microscopy source + the deleted render scripts. **The agent cannot restore or regenerate the fit target.**
-
-**What I did (code — cardio_mpm is now self-contained except the one irreducible data file):**
-1. `cardio_mpm_data.py` — replaced the single hard path with a **candidate-list resolver** (`$CARDIO_REAL_NPZ` → `cardio_mpm/cardio_real.npz` → `cardio_mpm/data/` → legacy `../cardio/`) and an **actionable `FileNotFoundError`** that names every path searched + the restore recipe (self-diagnosing loss).
-2. Defused a **second latent `../cardio` landmine** at `train.py:745` (`from cardio_real_render import select_grid_nodes` + a 2nd npz read) with a self-contained fallback — so a restored-data batch won't burn on it.
-3. Updated `analysis` (dated B40 section), `knowledge` (Engineering CODE-CRASH #2b + batch-history + the `.err`-tells-you-which-dep triage rule), and re-issued the 6 slots **verbatim** (design was well-formed; only the environment broke). `current_phase.txt` unchanged = PHASE3; last real data stays **B37** (SIZE ✓-capped ~0.52).
-
-**⚠ ACTION REQUIRED (human, cluster-side — the loop cannot proceed until this is done):** restore `cardio_real.npz` and place it at **`prototype/cardio_mpm/cardio_real.npz`** (the resolver's preferred slot), or set **`$CARDIO_REAL_NPZ`**, or `git checkout -- prototype/cardio` (restores the *code*) **and** restore the gitignored `.npz` from a backup / regenerate it. Until then every batch will 0-archive — now with a clear self-diagnosing error instead of a bare stack trace.
+One residual risk I couldn't fully clear statically: the relocated npz is a fresh file (03:52 today) — I confirmed it's a valid Zip but can't verify its `"pos"` member without python/unzip (both approval-blocked). If it were regenerated in a different format, b43 would surface a `KeyError` at load; the canonical format is documented in `data.py`, so I expect it intact.
 
 
 ================================================================================
-## DESIGN 41 -- 2026-07-08 03:55:02
+## DESIGN 44 -- 2026-07-08 18:56:47
 ================================================================================
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
-All deliverables complete. Let me confirm the phase gate needs no file change (PHASE3 stays, no new data).
+Batch 44 designed and all memory files updated. Summary:
 
-The phase gate: no new data landed this batch, so no axis moved and none regressed — `current_phase.txt` correctly stays **PHASE3**. No edit needed.
+## Batch 43 results (rot-frontier ladder, dev25 parent) — ranked by LoopScore
 
-## Batch 41 — summary
+| slot | var | **LS** | peak_r | chir | loopi_r | minor_r |
+|---|---|---|---|---|---|---|
+| **s0 ctrl** | rot1.0 | **0.526** | 0.539 | 0.862 | 1.166 | 0.760 |
+| s1 dev28 | dev0.28 | 0.498 | 0.527 | 0.858 | 1.147 | 0.783 |
+| s2 rot12 | rot1.2 | 0.493 | 0.538 | 0.851 | 1.134 | 0.818 |
+| s4 rot20 | rot2.0 | 0.468 | **0.608** | 0.827 | 0.956 | **0.972** |
+| s3 rot16 | rot1.6 | 0.460 | 0.519 | 0.827 | 1.104 | 0.739 |
+| s5 rotneg16 | rot−1.6 | 0.431 | 0.549 | 0.808 | 0.934 | 0.840 |
 
-**What happened in B40:** the 5th consecutive execution loss. All 6 slots 0-archived (only `config.json`, ~11 s LSF jobs). Every `.err` is the same self-diagnosing `FileNotFoundError: cardio_real.npz … NOT FOUND` — the gitignored real target lost in the `../cardio` deletion. **No science; last real data remains B37.**
+**Two surprises:** (a) the rot1.0 **control** drew a **campaign-high stable LS 0.526** (beats b41 0.502) — over-rotation was a *pure LS loss*. (b) Rotation's size effect is a **non-monotone threshold**: peak_ratio is flat through rot1.6 (chir lost for nothing), then jumps at rot2.0 to 0.608 — the **first in-code break of the elastic ~0.52 cap** (minor 0.972 ≈ real) — but at a chir cost (0.862→0.827).
 
-**The key event — the blocker is RESOLVED.** A human restored the file:
-```
-54,045,402 B  2026-07-08 03:52  cardio_mpm/cardio_real.npz   (resolver's preferred slot)
-```
-Timeline is clean: B40 ran 2026-07-07 17:12 (before the restore) so it still failed, but **B41 will be the first batch since B37 to produce real Phase-3 data.** Size check confirms it's the true target, not a stub: 54 MB / 4 / (137²×2) ≈ **360 frames** → `pos[~360, 137², 2]` float32.
+**Verdict — SUPPORTED:** The B43 falsifier ("over-rotation free with chir ≥ 0.83") did **not** fire. chir_match and loopiness both fall monotonically with |rot|; the size gain arrives only alongside chir loss. So the size↔direction tradeoff is **generic** — elastic (0.54, 0.86) → over-rotation (0.61, 0.83) → tau (1.01, 0.61) trace one Pareto arm — **not** a viscoelastic quirk. Best optimizer slot = ctrl (0.526, ◐); best scientific slot = rot2.0 (in-code cap-break confirming the frontier).
 
-**Pre-flight (guard against a 6th loss):** verified both Phase-3 operators are wired in `cardio_mpm_train.py` — `--residual_stress/_amp/_hidden/_omega` + `residual` in `--learn`, `--tau`→`is_visco/visco_tau`, both default-OFF = exact baseline. No code/rename landmine.
+## Files updated
+- **analysis** — dated Batch 44 section (surprise, per-slot table, frontier reading, verdict, next).
+- **knowledge** — new B43 top bullet, refreshed SIZE status line, rewrote `#SIZE↔DIRECTION` open-Q (now CONFIRMED GENERIC, needs a dose ladder).
+- **slots** — 6 slots: high-rot frontier ladder `rot 1.0/1.5/2.0/2.5/3.0` + `dev20` elastic anchor.
+
+## Phase gate — HOLD PHASE2
+SIZE stays **◐**: the cap-break arm is still n=1/lever (tau code-lost; rot2.0 single draw). No ✓ axis regressed — the op point (rot1.0) held chir 0.862, loopiness 1.166, minor 0.760, energy 0.896; the chir/loopiness drops are off-op-point (rot>1.0). Batch 44 dose-confirms the frontier via the high-rot ladder — **either outcome (clean monotone Pareto arm, or decoherence collapse) gives SIZE an identified structural bound and closes it ✓ at B45.**
+
+(Note: residual decomposition read from each slot's `progress.txt` `RESIDUAL_MORPHOLOGY` sim|real|ratio block — the `--eval_decompose` standalone pass needs `python`, which is sandbox-approval-blocked; the progress block supplies the per-axis peak/chir/loopiness/minor attribution the frontier analysis requires.)
+
+
+================================================================================
+## DESIGN 45 -- 2026-07-09 01:19:16
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All flags verified present in train.py (all 21, `--rot_stress` confirmed; my B45 slots reuse B44's exact flags at new values, so no execution-loss risk).
+
+Everything for Batch 45 is complete. Here's the summary.
+
+## Batch 45 — B44 read, distilled, Phase 2 CLOSED
+
+**What surprised me:** The cap-break arm was NOT the clean monotone Pareto I predicted. `peak_ratio` across the rot ladder is a **threshold with an interior optimum at rot≈2.5**: it *dips* at rot1.5 (0.481, below the rot1.0 0.508), breaks the elastic ~0.52 cap at rot2.0 (0.593), **peaks at rot2.5 (0.649, area 0.490, minor 0.968≈real)**, then rolls off at rot3.0 (0.572). `chir_match` falls ~monotone (0.852→0.736). Secondary: the B43 ctrl campaign-high LS 0.526 **regressed to 0.502** (Nth single-draw regression), and dev20≈dev25 (fibre_dev flat).
+
+**The decisive result:** rot2.0 (peak 0.593) **reproduced** B43's rot2.0 (0.608) — both >0.52 — and rot2.5 extended the ladder. The cap-break is now **n≥2 + a dose ladder**, no longer single-draw. Combined with elastic-cap dose-confirmation (B36/B37) and viscoelastic tau (B41), the **(peak, chir) Pareto arm is generic across three lever-batches**. No mechanism reaches real size while holding direction.
+
+**Verdict:** SIZE ✓ **CLOSED** — bounded by a dose-confirmed size↔direction frontier (a valid structural-limitation answer). Over-rotation is a pure LS loss; the LS op point stays rot1.0 (~0.50).
+
+**Phase gate:** All six axes now ✓ established (MAGNITUDE, ENCLOSURE, DIRECTION, SHAPE, UNIFORMITY, **SIZE**); freeze rule held (the rot1.0 op point preserved every axis; the chir/loopiness drops are deliberate frontier exploration off the op point). **→ Phase 2 COMPLETE. `current_phase.txt` overwritten PHASE2 → PHASE3.**
 
 **Files updated:**
-- `analysis_cardio_mpm.md` — dated Batch 41 section (loss diagnosis + restore causality + re-issue rationale).
-- `knowledge_cardio_mpm.md` — new head entry marking the data pipeline as self-healing; Phase-3 question untouched since B37.
-- `cardio_mpm_slots.md` — re-issued the well-formed 6-slot Phase-3 batch (never actually ran): `ctrl` (0.52 anchor) · `res_lo/mid/hi` (imposed prestress α 0.1/0.2/0.3) · `visco_mid/hi` (emergent viscoelastic τ 0.05/0.02). Freeze rule + falsifier intact.
+- `analysis_cardio_mpm.md` — appended dated Batch 45 section (surprise, per-slot table, SIZE-close verdict, phase-gate).
+- `knowledge_cardio_mpm.md` — Current objective rewritten to Phase 3; new B44 top result; **Established #32** (size↔direction frontier); Open-Qs: SIZE closed, **#PHASE3-MANIFOLD** opened.
+- `current_phase.txt` → `PHASE3`.
+- `cardio_mpm_slots.md` — **B46 = Phase-3 opener (morphology-manifold map):** `fam_rot1` (physiological family anchor), `fam_rot25` (figure-eight family + cap-break n≥2 belt), `fam_rot0` (radial-stub manifold origin), `fam_dev0`/`fam_hidev` (is fibre_dev family-defining or uniformity-only?), `fam_rotneg2` (mirror-chirality family). Each changes exactly one variable from the rot1.0 op point.
 
-**Phase gate:** PHASE3 unchanged (no data → no axis moved, none regressed). The live question the next batch finally tests: **is the ~0.52 peak_ratio SIZE cap an active-stress amplitude limit, or a missing pre-stress/residual-stress state?** — falsifier: any slot pushes peak_ratio past ~0.53 with the ✓ axes held → SIZE reopens as solved.
+Note for the user: the deeper Phase-3 *generative* mode (training against **synthetic non-cardio targets** — pure circle, figure-eight — to truly characterize the operator manifold rather than fit real data) is a `train.py` capability worth adding when you have a moment; I flagged it in the ledger rather than blind-building it into the autonomous loop.
+
+
+================================================================================
+## DESIGN 45 -- 2026-07-09 07:10:04
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All six slots are well-formed. Batch 45 is designed and all three memory files are updated.
+
+## Batch 45 — done
+
+**Acknowledged Cedric's `user_input.md` (2026-07-09).** It redirects this batch from the stale pre-written rot-family-map ("fam_rot1…") to a **frontier stress-test with two new operators**. I verified both are engine-ready and correct in code before designing:
+- `mpm_spin` (`src/plexus/operators/mpm_spin.py`): `acc = spin_k·(ω·perp(x−c)−v)`, sign(ω)=chirality, default-OFF. With drag_k=40 it settles v toward ~⅓·v_rot at spin_k=20 (a gentle rotational bias).
+- `--stretch_activation β` (`active_stress.py:69-73`): Frank–Starling `T*=1+β(λ−1)`, λ=|F·n|, β=0=OFF.
+
+**What surprised me in B44 → the hypothesis.** At rot2.5 the loops finally hit real size (peak 0.649, minor 0.968≈real) **but chir collapsed to 0.779** — size and direction welded through the *single* rot_stress knob. B44 called that welding "structural," but it was established with only ONE chirality operator. Per NEVER-TRUST-OPTIMIZATION, that's a hypothesis under an extended language. Two independent operators now test it.
+
+**The 6 slots — two one-variable causal ladders:**
+
+| slot | route | one var vs baseline | tests |
+|---|---|---|---|
+| `ctrl25` | anchor | rot→2.5, new ops OFF | reproduce b44 rot25 + validate byte-baseline |
+| `spin06`/`spin10` | torque | +spin_omega 0.6 / 1.0 | restore chir at high peak (dose) |
+| `spinN06` | control | spin_omega **−0.6** | wrong-sign → chir must DROP (causal) |
+| `strch10`/`strch20` | Frank–Starling | +stretch_activation 1.0 / 2.0 | raise peak past 0.53 holding chir (dose) |
+
+Torque route rides the rot2.5 frontier point (anchor + 2-pt dose + sign flip); stretch route rides the rot1.0/dev25 elastic op point vs the just-run b44-ctrl anchor. Confirmed the loop's parser + argparse both accept the negative `--spin_omega -0.6`.
+
+**Confirmer** (SIZE ✓→◐ overturn): any slot lands peak≥0.593 **and** chir≥0.83 — size/direction decoupled off the B44 Pareto arm. (Cedric's stronger bar peak≥0.8∧chir≥0.83 = SIZE reopens as *solved*.) **Falsifier** (SIZE ✓ reinforced): neither route recovers direction at high size, dose-confirmed.
+
+**Phase gate:** `current_phase.txt` stays **PHASE3** (Phase 2 already complete). This batch stress-tests the Phase-2 SIZE closure under the enlarged operator set rather than mapping a new family — a legitimate NEVER-TRUST-OPTIMIZATION check. No `current_phase.txt` change; SIZE's fate is set by the b45 data.
+
+Files updated: `cardio_mpm_slots.md` (6 slots), `analysis_cardio_mpm.md` (Batch 45 design-rev section), `knowledge_cardio_mpm.md` (fact #32 caveat + Open-Q reopened as `LIVE@B45`).
+
+
+================================================================================
+## DESIGN 46 -- 2026-07-09 14:01:08
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All four memory files are updated and the phase gate is evaluated. `current_phase.txt` stays **PHASE3** (no change — Phase 3 is the open-ended manifold-characterization phase, and the SIZE frontier stress-test is still active). No code change needed — the `mpm_spin` operator is verified working from B45, and every flag in the new slots was exercised successfully last batch.
+
+## Batch 46 summary
+
+**What surprised me in B45 (the driver for this batch):** `mpm_spin` — the "active torque" operator the user added to *restore chirality at high size* — did the **opposite job cleanly**. On the rot2.5 base its dose ladder raised peak_ratio **monotone 0.494→0.620→0.714** (batch-max, beating even rot2.5-alone) while chirality stayed **flat ~0.78–0.80**. So spin is a **chirality-neutral SIZE lever**, not a chirality-restorer. It couldn't reach the confirmer's chir≥0.83 *only because it was tested on rot2.5, whose over-rotation had already poisoned chir to 0.774*. The wrong-sign "control" also failed (both signs raise peak and chir → spin's sense is not a clean CCW/CW knob).
+
+**The other route died cleanly:** Frank–Starling (`--stretch_activation`) is a **dose-confirmed null** — β 0→1→2 left peak flat (0.506/0.527/0.505). At half-scale loops λ≈1, so β·(λ−1) can't bite. Recorded as a clean falsification.
+
+**Verdict:** the frontier falsifier *technically* fired (no slot hit peak≥0.593 AND chir≥0.83), but the test was **incomplete** — spin was never given its best shot. SIZE stays ✓ but the "structural" sub-claim is now ◐-under-active-test.
+
+**B46 runs the one decisive combination B45 missed:** spin on the **rot1.0 high-chir base** (chir 0.848). Two clean causal pairs:
+- **Frontier-break ladder** `{ctrl1 · spin1_06/10/15}` — if spin adds peak≥0.593 while chir HOLDS ≥0.85, the size↔direction frontier **breaks** and SIZE reopens (a clean overturn).
+- **Spin-alone mechanism** `{ctrl0 · spin0_10}` — is the torque an independent circulation/size operator off a radial base, or just rigid-orbit displacement?
+
+**Winners reported:** best optimizer = `fam_hidev` (LS 0.512, physiological center); best scientific = the spin dose ladder (the size-lever discovery that reclassifies the operator and sets up B46).
+
+
+================================================================================
+## DESIGN 47 -- 2026-07-09 20:27:54
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All 6 slots verified — each changes exactly one variable from parent `spin1_06` (rot1.0 + ω0.6 + spin_k20), amplitude fixed at 10, `current_phase.txt` unchanged at PHASE3. Batch 47 is designed and all ledger files are updated.
+
+## Batch 47 — summary
+
+**What surprised me in B46:** The pre-registered frontier-break **CONFIRMER FIRED at n=2**. On the rot1.0 high-chir base, `mpm_spin` raises peak_ratio **monotone 0.523→0.626→0.687→0.907** while chirality **HOLDS ≥0.83 through ω1.0** (0.850→0.859→0.841), decohering only at ω1.5. This is categorically unlike over-rotation, which trades chirality for *every* unit of size. **The size↔direction frontier was operator-limited (`rot_stress` welds size+chir through one knob), NOT structural** — an independent off-axis torque decouples them. The Phase-2 "structural size limitation" sub-claim is cleanly **overturned (SIZE ✓→◐)**.
+
+**The deeper surprise:** spin breaks the *peak* frontier but **degrades the true residual (enclosure)** — loopiness falls monotone (1.113→0.268), area flat-then-down, minor-axis up. Spin makes bigger-but-*thinner* loops; it's a magnitude/peak lever, **rotation-gated** (+0.16 peak on rot1.0, −0.01 on rot0), not an enclosure operator (#33 promoted to ✓).
+
+**Winners:** best optimizer AND best science = **spin1_06** (LS 0.510, batch max, +0.035 over ctrl; fires the confirmer at n=2). LS win is single-draw.
+
+**Design (parent = spin1_06):**
+- **EXPLOIT** — `spin06_rep` (replicate the 0.510 win, campaign single-draw law), `spin04`/`spin08` (bracket the ω-optimum around 0.6)
+- **EXPLORE / the Phase-3 prize** — `spin06_rot12` (+rotation) and `spin06_dev35` (+fibre) test whether spin's peak *stacks* with an enclosure operator into a **big-AND-loopy real-scale family** (STACK-WIN = peak≥0.60 ∧ loopiness≥1.0 ∧ chir≥0.83)
+- **CONTROL** — `spin06_neg` (is spin's peak-add sign-blind on rot1.0, as at rot2.5?)
+
+**Phase gate:** stays **PHASE3** (terminal manifold phase; no Phase-4 checklist). The SIZE regression is a deliberate, user-directed stress-test resolving to a scientific advance, reframed as a manifold finding — not a silent regression.
+
+Files updated: `analysis_cardio_mpm.md` (Batch 47 section), `knowledge_cardio_mpm.md` (current-best B46 entry, #32 overturn, #33 promoted ✓, open questions incl. new #SIZE-STACK, rolled theme summaries + new hypothesis), `cardio_mpm_slots.md` (6 slots), `current_phase.txt` (unchanged).
+
+
+================================================================================
+## DESIGN 48 -- 2026-07-10 02:56:08
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All files updated and validated. Batch 48 is fully designed. Here's the summary.
+
+## Batch 48 — done
+
+**What B47 showed (read from 6 progress.txt + 3 dashboards, ranked by LoopScore):**
+
+| slot | Δ | LS | peak | area | loopiness | chir |
+|---|---|---|---|---|---|---|
+| spin06_neg | ω−0.6 | **0.519** | 0.604 | 0.380 | 0.860 | 0.861 |
+| spin06_rep | ω0.6 (rep) | **0.518** | 0.615 | 0.368 | 0.845 | 0.863 |
+| spin04 | ω0.4 | 0.514 | 0.563 | 0.386 | 0.965 | 0.861 |
+| spin06_rot12 | rot1.2 | 0.508 | 0.610 | 0.378 | 0.821 | 0.855 |
+| spin06_dev35 | dev0.35 | 0.489 | 0.597 | 0.317 | 0.773 | 0.851 |
+| spin08 | ω0.8 | 0.397 | 0.598 | 0.249 | 0.560 | 0.818 |
+
+**Three findings:** (1) **spin1_06 REPLICATED** (0.518 ≈ B46 0.510, peak 0.615 ≈ 0.626) → a rare non-regression, now a ✓ established op point ~0.51. (2) **Biggest surprise — the wrong-sign control TIED the winner** (0.519 vs 0.518, morphology identical, loop chirality unflipped): spin's ω sign is *inert*, not the chirality knob it was designed as — replicates B45. (3) **STACK-NULL**: neither rot1.2 nor dev0.35 added enclosed area on top of spin (max loopiness 0.821, no slot ≥1.0) → peak-excursion and enclosed-AREA are antagonistic under spin; the real residual (area ~0.37) is unmoved by any composition.
+
+**Batch 48 design** (parent = spin1_06, one variable each) attacks the enclosed-area ceiling:
+- **fs_strch10 / fs_strch20** (EXPLOIT) — re-open Frank–Starling, now *justified*: it was null at rot1.0 because loops were half-scale (λ≈1); spin06 supplies bigger excursions, so β·(λ−1) may finally bite.
+- **rot14** (EXPLOIT) — was the STACK-NULL step-size-limited or truly rotation-saturated?
+- **dev15 / rot20** (EXPLORE) — fibre-family axis under spin; spin + over-rotation family.
+- **nospin** (CONTROL) — spin ablation.
+
+Pre-registered: SIZE-BREAK confirmer = peak≥0.65 ∧ chir≥0.83 ∧ area≥0.42; FS re-open = fs peak >0.615 monotone with chir held.
+
+**Files written:** `analysis_cardio_mpm.md` (dated Batch 48 section), `knowledge_cardio_mpm.md` (distilled: B47 result, fact #33 consolidated, #SIZE-STACK→STACK-NULL + new #AREA-CEILING, #PHASE3-MANIFOLD(c) closed for spin, theme summaries trimmed to last 4), `cardio_mpm_slots.md` (6 slots). **Phase gate: HOLD PHASE3** — terminal manifold phase, no ✓ axis regressed; `current_phase.txt` unchanged.
+
+
+================================================================================
+## DESIGN 49 -- 2026-07-10 09:26:12
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All five deliverables are complete. Here's the summary of **Batch 49**:
+
+## What surprised me in B48
+**Frank–Starling (`--stretch_activation`) — a DOSE-CONFIRMED NULL at B45 — came back as the batch's top-2 LS and best science.** On the spin base it *bit*: at β=2 it hit **area_ratio 0.422** (batch-max holding chirality) with **chir held 0.862**, peak 0.646. The B45 null was **regime-bound, not structural** — verified in code (`active_stress.py:73`, `T*=(1+β(λ−1)).clamp(min=0)`, λ=|F·n|): at half-scale λ≈1 so FS is *identically inert*; spin supplies the larger excursion that lets λ deviate from 1.
+
+## B48 ranking (LoopScore)
+| rank | slot | Δ | LS | peak | area | chir | loopiness |
+|---|---|---|---|---|---|---|---|
+| 1 | **fs_strch10** | β1.0 | **0.528** | 0.604 | 0.360 | 0.868 | 0.825 |
+| 2 | fs_strch20 | β2.0 | 0.522 | 0.646 | **0.422** | 0.862 | 0.812 |
+| 3 | nospin | spin OFF | 0.503 | 0.505 | 0.372 | 0.859 | **1.127** |
+| 4 | rot14 | rot1.4 | 0.493 | 0.626 | 0.452 | 0.858 | 1.032 |
+| 5 | dev15 | dev0.15 | 0.475 | 0.542 | 0.317 | 0.851 | 0.929 |
+| 6 | rot20 | rot2.0 | 0.406 | 0.596 | 0.352 | 0.804 | 0.687 |
+
+**Winners:** best optimizer = fs_strch10 (0.528); best science = fs_strch20 (first chirality-holding area lever). Two routes to area now exist (spin+FS = *bigger-thinner*; nospin = *smaller-rounder* at real loopiness 1.127) but the real prize — big peak **and** real loopiness together — is still unreached.
+
+## B49 design — Frank–Starling dose-confirmation
+A clean **within-batch β dose ladder {−1, 0, 1, 2, 3, 4}** on the spin1_06 base, each slot varying only `--stretch_activation` (kills B48's cross-batch β=0 confound): `fs0` anchor · `fs1`/`fs2` replicate · `fs3`/`fs4` extend (does peak break 0.65?) · `fsN`=−1 wrong-sign causal control (clamp-safe). 
+- **Confirmer:** peak≥0.65 ∧ chir≥0.83 ∧ area≥0.42 → SIZE frontier definitively broken.
+- **Dose-confirm → FS ✓:** area rises monotone in β at held chir, fsN drops area.
+- **Falsifier → re-null:** area flat, fsN≈fs0.
+
+## Files updated
+- `analysis_cardio_mpm.md` — dated Batch 49 section (surprise, table, hypothesis, design)
+- `knowledge_cardio_mpm.md` — B48 result bullet; Rejected "Frank–Starling null" reclassified **✗→◐ regime-bound**; Open-Q #AREA-CEILING updated (FS-route re-opened, rot-routes closed on chir cost)
+- `cardio_mpm_slots.md` — 6-slot β ladder
+- **Phase gate:** `current_phase.txt` stays **PHASE3** — the morphology manifold isn't fully mapped (real-scale family unreached, FS lever ◐ pending dose-confirm); no ✓ Phase-2 axis regressed (freeze holds).
+
+
+================================================================================
+## DESIGN 51 -- 2026-07-10 22:19:55
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All files updated and numbers verified. Here's the Batch 51 summary.
+
+## Batch 51 — done
+
+**First, a bookkeeping catch-up.** At session start the ledger/analysis/`slots.md` were stale — reverted to B48-state by a `signaling`-branch checkout (the #E-tau working-tree clobber), while the archives show **B49 and B50 both actually ran**. `train.py` was *not* clobbered (flags intact, grep-verified, b49/b50 ran clean). I recovered both from `archive/p3_b49_*` and `archive/p3_b50_*` and distilled them.
+
+**The surprise (B50).** Base **amplitude** — dead as a size lever across the whole campaign (amp>10 → overshoot, facts #4/#25/#31) — **converts to enclosed AREA when Frank–Starling is active.** On the FS-β2 parent, the within-batch amp ladder (one variable) gave area 0.380→0.400→**0.431** and minor-axis 0.895→0.943→**0.968 (≈real)** at **chir held** and **no overshoot** (ampL 0.010). The clincher is the `amp14_b0` control (amp14, FS **off**): area collapses to 0.382 ≈ ctrl, minor to 0.853 — extra drive goes to clean work (energy→0.961), not enclosure. **The amp→area conversion is FS-gated.** Dashboards confirm: FS-on rescues the weak upper nodes into fat loops; FS-off leaves them thin/radial.
+
+**Verdicts recorded:**
+- **B49:** Frank–Starling **dose-confirmed ✓** (LS 0.507→0.545 peak β2, area 0.359→0.407, chir held, wrong-sign β=−1 worst) → promoted from a Rejected null to **Established mechanism #34**, op point β2.
+- **B50:** facts #4/#25/#31 ("amp→overshoot not size") are **regime-bound to FS-off; overturned under FS.** gain-ceiling still inert (#28); soft floor still an overshoot lever (#26, slo20 batch-max LS 0.541 but area flat).
+- **Winners:** best optimizer = slo20 (0.541, overshoot lever, single-draw, not the frontier); best science = **amp14 + its FS-off control** (the FS-gated amp→area discovery, area 0.431 batch-max, minor≈real).
+
+**Residual now = loop GEOMETRY, not area.** amp+FS grows a bigger *fat ellipse* (loopiness stuck ~0.80 — area and bbox grow together); spin (#33) still antagonizes enclosure. Prize 2/3 met (area 0.431≥0.42 ∧ chir 0.873≥0.83; peak 0.639<0.65).
+
+**B51 designed** (parent = amp14 + FS β2 + spin1_06; each slot = one variable): `ctrl` anchor · `amp15` (push to the [10,15] ceiling) · `slo20` (does the overshoot floor stack?) · `spin03` and `nospin` (explore — **does removing spin round the enlarged loop toward the big-AND-round physiological corner?**) · `amp14_b0` (FS-off ablation, n=2). Balance 2 exploit · 2 explore · 2 control. **Prize confirmer:** any slot loopiness≥1.0 ∧ area≥0.40 ∧ peak≥0.60 ∧ chir≥0.83.
+
+**Phase gate: HOLD PHASE3** (terminal manifold phase; no Phase-4 checklist). No ✓ Phase-2 axis regressed at B49/B50 (DIRECTION chir 0.85–0.87 held; SHAPE minor 0.968≈real is a *best-yet*). `current_phase.txt` unchanged.
+
+
+================================================================================
+## DESIGN 52 -- 2026-07-11 04:55:54
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All files updated and the slots file is well-formed (6 slots: β ladder {2,3,4,1,0} on the round nospin base at `spin_k 0, rot 1.0`, plus `rot15` at `rot 1.5`). Each changes exactly one variable.
+
+## Batch 52 — done
+
+**What surprised me in B51:** the hypothesis "removing spin rounds the loop *and* holds peak → physiological corner" was **half-refuted, and the failed half is the finding.** As spin ω went 0.6→0.3→0, the loop rounded monotone (loopiness **0.816→1.025→1.136** >real, area **0.377→0.409**) at **chir held** — but **peak fell monotone (0.622→0.588→0.525)** and minor fell too. amp+FS did *not* supply the peak: **spin is the peak-excursion source; amp+FS supplies area/roundness.** Peak⊥roundness is now a clean 3-point spin Pareto dial, and it's **LS-neutral** (top 4 slots within ±0.005).
+
+**B51 ranking (by LS):** nospin **0.520** > slo20 0.519 > amp15 0.517 > ctrl 0.515 > spin03 0.494 > amp14_b0 0.484.
+- **Prize NOT met** — no slot hit peak≥0.60 ∧ loopiness≥1.0 ∧ area≥0.40 ∧ chir≥0.83.
+- **Amp ceiling closed** (amp15 ≈ amp14 on area/peak → amp×FS saturates ~14).
+- **FS-gate reconfirmed n≥2** (amp14_b0 FS-off area 0.321 < 0.377, worst LS).
+
+**B52 design — attack the frontier with the biological size lever.** Hypothesis: on the *round* (nospin) base the excursion is larger/rounder, so fibre stretch λ deviates further from 1 and **Frank–Starling may bite harder / peak higher than its β2 optimum on the spin base** (B49). Smallest distinguishing experiment = a **β dose ladder {0,1,2,3,4} on the nospin base** (each slot only β) + one over-rotation explore:
+
+| slot | role | Δ | question |
+|---|---|---|---|
+| ctrl | control | — | replicate nospin (single-draw 0.520 stable?) |
+| fsb3 / fsb4 | exploit | β3 / β4 | does FS raise PEAK past 0.525 on the round base → break the frontier? |
+| fsb1 | explore/dose | β1 | below-optimum arm (confirms FS effect is monotone-causal) |
+| fsb0 | control/ablation | β0 | FS-gate on the round base |
+| rot15 | explore | rot 1.5 | figure-eight family with spin OFF + FS ON (never mapped) |
+
+**Phase gate:** stays **PHASE3** — the manifold is not fully mapped (the physiological corner is unreached, now sharpened to a peak⊥roundness frontier), and no ✓ Phase-2 axis regressed at B51 (chir, minor, LS_SD, enclosure all in-range). Updated analysis log, knowledge ledger (#33 spin dose-laddered, #34 amp-ceiling closed, #PEAK-ON-ROUND opened), and slots file.
+
+
+================================================================================
+## DESIGN 53 -- 2026-07-11 11:28:03
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All files are updated and the slots are well-formed. Here's the Batch 53 summary.
+
+## Batch 53 — cardio-MPM, PHASE3
+
+**Read B52 (round-base β ladder + rot1.5 explore), ranked by LoopScore:**
+
+| slot | β / rot | LS | peak | area | loopiness | chir | minor | ampL |
+|---|---|---|---|---|---|---|---|---|
+| fsb3 | β3 | **0.525** | 0.522 | 0.383 | 1.137 | 0.865 | 0.779 | 0.020 |
+| ctrl | β2 | 0.520 | 0.522 | 0.394 | 1.119 | 0.862 | 0.739 | 0.015 |
+| fsb4 | β4 | 0.509 | 0.518 | 0.389 | 1.112 | 0.865 | 0.765 | 0.017 |
+| **rot15** | rot1.5 | 0.503 | **0.557** | **0.437** | 1.042 | **0.853** | **0.877** | **0.006** |
+| fsb0 | β0 (FS off) | 0.487 | 0.494 | 0.352 | 1.111 | 0.852 | 0.784 | 0.029 |
+| fsb1 | β1 | 0.470 | 0.512 | 0.383 | 1.112 | 0.839 | 0.813 | 0.023 |
+
+**Biggest surprise:** the throwaway explore slot **rot15** (over-rotation, spin OFF, FS β2, amp14) held chirality (0.853 ≈ rot1.0's 0.862) while lifting area to 0.437, minor to 0.877, peak to 0.557 — the *closest point yet to the physiological corner* (3/4; only peak < 0.60), at the cleanest overshoot (ampL 0.006). This **contradicts B44's dose-confirmed "over-rotation trades chirality for size" law** — which was established on the amp10/spin-inclusive base. Spin-off on the round base, over-rotation buys enclosure with **no chir cost** → the chir-cost is regime-bound (n=1, must dose-confirm).
+
+**B52's own hypothesis falsified:** FS on the round base peaks at β≈2 then plateaus (peak 0.494→0.522→plateau) — the FS optimum is **base-independent** and its ~0.52 peak cap is structural; FS cannot supply peak on any base. Best optimizer = fsb3 (0.525, noise-tied plateau, no real gain); best science = rot15.
+
+**Files updated:** analysis (Batch 53 section + design), knowledge ledger (Current-best B53 entry; #32 regime caveat; #34 FS base-independence; Open-Q #PEAK-ON-ROUND answered, new #OVERROT-ROUND). Phase stays **PHASE3** (no axis regressed; manifold not fully mapped — physiological corner still unreached).
+
+**B53 designed (6 slots):** a rot dose ladder **{1.0, 1.25, 1.5, 1.75, 2.0}** spin-off on the round base (each slot only `--rot_stress`) + a **rot1.5 + spin** stack. This dose-confirms whether over-rotation is a chirality-holding enclosure lever on the round base and whether peak can cross 0.60 (the corner). Balance: 1 control · 2 exploit · 3 explore; amplitude 14, fields coarse.
+
+
+================================================================================
+## DESIGN 54 -- 2026-07-11 17:54:01
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All deliverables are complete and the ledger structure is intact. Here's the summary of **Batch 54** (PHASE 3).
+
+## What I did
+
+**Read B53 results** (6 slots, converged 2399it) — progress.txt + the 3×3 dashboards (primary evidence).
+
+**Biggest surprise (two-part):**
+1. **The B52 "over-rotation-on-round = chir-holding enclosure lever" FAILED to replicate** — B53 rot15 area landed **0.379 < ctrl 0.410** (Nth single-draw regression). Area is *non-monotone* in rot on the round base: it falls ctrl→rot1.75 then **threshold-jumps at rot2.0** (B44's figure-eight-onset pattern), and chir declines mildly. So over-rotation-on-round is a **threshold figure-eight lever, not a smooth enclosure lever** → I **retracted the ◐ B52 claim** in fact #32.
+2. **rot2.0 reaches the AGGREGATE physiological corner** (area 0.475, peak 0.598≈0.60, loopiness 0.997, minor 0.953, chir 0.834 — all near-real) **yet LS is only 0.472** (< op point) because the loops individually **tangle** (a −0.17 node, self-crossing in the 3×3). Key insight: **the aggregate enclosure_row corner ≠ the per-node LS optimum** — the size↔quality frontier is real in per-node LS-space. Meanwhile **rot1.5+spin ω0.6** hit **real peak 0.640, all-positive (min +0.41), LS 0.513** — the best new composition, but thin (loopiness 0.765).
+
+**Ranking:** ctrl(rot1.0) 0.515 > rot15_spin 0.513 > rot125=rot15 0.496 > rot20 0.472 > rot175 0.453.
+Best optimizer = ctrl (rot1.0); best science = rot2.0 (aggregate corner).
+
+**Files updated:** analysis log (dated B54 section), knowledge ledger (distilled — new top bullet, #32 retraction, #33 spin-composition, Open-Q #OVERROT-ROUND answered + new #CORNER-COMPOSITION, refreshed theme summaries + B54 hypothesis, trimmed stale bullets to stay compact).
+
+**B54 design** — parent = rot15_spin; a **rot ladder {1.0,1.5,1.75,2.0} under fixed spin ω0.6** (each slot one variable) + spin04 down-dose + nospin ablation, to find which composition maximizes peak at loopiness≥0.9 all-positive (cleanest corner approach) and to confirm rot15_spin isn't a single draw. 2 control · 2 exploit · 2 explore/ablation.
+
+**Phase gate:** HOLD **PHASE3** (terminal manifold phase — instruction defines no Phase-4/exit checklist). Freeze held: no ✓ Phase-2 axis regressed at the op point.
+
+**user_input.md:** the standing 2026-07-09 note (test `mpm_spin` + `stretch_activation` on the frontier) — both operators are now established (#33/#34) and in active use in the batch; nothing new pending.
+
+
+================================================================================
+## DESIGN 55 -- 2026-07-12 00:26:48
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Batch 55 designed and all memory files updated. Summary:
+
+## What surprised me in B54
+**The physiological-corner confirmer FIRED — but at spin ω0.4, not the ω0.6 we designed the ladder around.** The *down-dose* slot `spin04` (rot1.5 + spin ω0.4) cleared all four corner thresholds at once: peak **0.621**, area **0.490** (batch-max), loopiness **0.937**, chir **0.860** — with ampL **0.000** (zero overshoot) and an all-positive 3×3. That's the first *single operator composition* to land the full physiological loop family (over-rotation × moderate active-torque × Frank–Starling) = the Phase-3 deliverable.
+
+Second surprise: **enclosed area has an interior spin optimum.** At rot1.5, spin raises peak monotonically (0.546→0.677) but rounds loopiness down monotonically (1.031→0.833), so area = peak²·loopiness peaks in the *middle* at ω≈0.4 (0.490 > nospin 0.430, > ω0.6 0.458).
+
+Two caveats keep it ◐: it's a **single draw** (campaign law: these regress), and its LS 0.519 sits *below* the tighter rot1.0+spin loop (**0.536**) — per-node LS still prefers the small clean loop (corner ≠ LS-optimum).
+
+## B55 (2 orthogonal dose ladders crossing at the spin04 corner)
+| slot | Δ (one var) | tests |
+|---|---|---|
+| ctrl | replicate | corner holds n=2? |
+| spin03 / spin05 | ω 0.3 / 0.5 @rot1.5 | is area **unimodal peaking ω0.4**? |
+| rot125 / rot10 | rot 1.25 / 1.0 @ω0.4 | LS-opt vs corner across rot |
+| rot20 | rot 2.0 @ω0.4 | does low spin clean the over-rotation tangle? |
+
+Balance: 1 control · 3 exploit · 2 explore. **Winners reported:** best optimizer = rot10_spin (LS 0.536); best scientific = spin04 (corner fires + interior-area optimum).
+
+**Phase gate:** `current_phase.txt` stays **PHASE3** (terminal open-ended manifold map; no Phase-4 exit checklist). The corner is a manifold *milestone*, not a phase exit — it needs dose-confirmation. No ✓ Phase-2 axis regressed at the op points. No train.py edit needed (reused existing operators).
+
+Files updated: `analysis_cardio_mpm.md` (Batch 55 section + design), `knowledge_cardio_mpm.md` (new top bullet, #33 interior-area clause, corner milestone), `cardio_mpm_slots.md` (6 slots).
+
+
+================================================================================
+## DESIGN 56 -- 2026-07-12 06:53:20
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Batch 56 is fully designed and all memory files are updated. Summary:
+
+## Batch 56 — done
+
+**Read B55 (6 slots, 2399it), ranked on LoopScore:**
+`rot125 0.529` ≈ `rot10 0.528` ≈ `ctrl 0.527` > `spin03 0.514` > `rot20 0.497` > `spin05 0.480` (top-3 within ±0.002 = noise tie).
+
+**Biggest surprise + the science:**
+1. **The physiological corner DOSE-CONFIRMS (◐→✓, n=2).** Both `ctrl` (rot1.5/ω0.4: 0.612/0.447/0.917/0.864) and `spin03` (rot1.5/ω0.3: 0.613/0.471/0.983/0.854, rounder+bigger) fire the full corner (peak≥0.60 ∧ area≥0.42 ∧ loopiness≥0.90 ∧ chir≥0.83, clean). Dashboards show fat closed ellipses superposing on green, all-positive 3×3. → the physiological-corner composition is now **established**.
+2. **The corner ≠ LS-optimum tension DISSOLVES at ω0.4** — at fixed ω0.4 the LS ladder is flat across rot1.0/1.25/1.5 (0.528/0.529/0.527); lowering spin ω0.6→ω0.4 lifted the rot1.5 corner LS 0.499→0.527. The corner is now **both** the deliverable **and** the LS op point (size↔quality tension is spin-magnitude-dependent, not fundamental).
+3. **B54's "interior enclosed-area optimum at ω0.4" is REFUTED** — the clean same-batch spin ladder gives area *monotone-down* (0.471→0.447→0.431); spin⊥enclosure holds on the over-rotated base too (less spin = rounder+bigger).
+4. rot2.0 dashboard confirms the **figure-eight onset** (negative node −0.05, self-crossing multi-lobe loops).
+
+**Files updated:** `analysis_cardio_mpm.md` (dated B56 section), `knowledge_cardio_mpm.md` (MILESTONE promoted ◐→✓; #32 tension resolved; #33 interior-optimum refuted; new B56 Current-best bullet), `cardio_mpm_slots.md`.
+
+**B56 design (parent = spin03, rot1.5/ω0.3; each slot one variable):**
+- `ctrl` (control) — replicate the corner op point
+- `spin02` (exploit) — ω0.2, lower-spin corner edge (round+enlarge, peak≥0.60?)
+- `rot165` (exploit) — rot1.65, upper-rot edge (max-area corner, loopiness≥0.90?)
+- `nospin` (ablation) — spin_k 0, completes rot1.5 spin ladder + tests "corner needs spin for peak"
+- `rot25` / `rot30` (explore) — map the figure-eight/decohered-tangle family (next manifold family)
+
+**Phase gate:** `current_phase.txt` stays **PHASE3** — physiological-ellipse family axis is now ✓, but figure-eight/tangle/mirror families remain ◐/open. No ✓ Phase-2 axis regressed (freeze holds). Open agenda = confirm the max-area corner op point + characterize the figure-eight family.
+
+
+================================================================================
+## DESIGN 57 -- 2026-07-12 13:26:47
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Batch 57 complete. Here's the summary.
+
+## What surprised me in B56 (the driver of B57)
+
+**The max-area corner fired via BOTH designed routes, and the *lower*-spin route won on LoopScore.** `spin02` (rot1.5, ω0.2) hit the full bigger corner — peak 0.609 · area 0.505 · loopiness 1.073 · chir 0.855, all-positive (min +0.17) — *and* was the LS winner (0.522). `rot165` (rot1.65) fired it too with minor axis 0.958 ≈ real. Both n=1 at their exact point → ◐.
+
+Two supporting surprises:
+- **The corner needs spin.** The `nospin` ablation dropped peak below 0.60 (0.551) → enclosed area is *unimodal* in spin, peaking at ω≈0.2, not monotone to ω0 (nospin starves peak faster than roundness rises). This is a **new interior optimum at ω0.2**, lower than B54's refuted ω0.4 — refines mechanism #33.
+- **The figure-eight/tangle arm is now dose-mapped.** rot 1.5→1.65→2.5→3.0 monotonically collapses loopiness (0.998→0.703) and decays chirality (0.859→0.709); peak/area peak at rot2.5 (0.706/0.552, campaign records) then roll off. Still ◐ (n=1/rung).
+
+## B57 design (parent = spin02, rot1.5 ω0.2; one variable each)
+One hypothesis — *the max-area corner is a low-but-nonzero-spin ridge (ω≈0.2) at moderate over-rotation, and the two size routes stack:*
+- **spin01 / ctrl / spin03** (ω 0.1/0.2/0.3) — within-batch spin ladder to **settle the flip-flopping interior-area optimum** + corner replicate n=2 (3 EXPLOIT/CONTROL)
+- **rot165** (rot1.65 × ω0.2) — do the two max-area routes **stack**? (EXPLOIT)
+- **rot25** (rot2.5) — **promote the figure-eight family ◐→✓** (EXPLORE)
+- **fdev45** (fibre_dev 0.45) — probe a genuinely **new fibre-heterogeneity "fanned" family** orthogonal to the rot/spin arc (EXPLORE)
+
+No `cardio_mpm_train.py` edit needed (all flags pre-exist).
+
+## Phase gate
+`current_phase.txt` **stays PHASE3**. Manifold map incomplete: corner family ✓, but figure-eight family ◐ (needs the rot2.5 replicate), fibre-heterogeneity and mirror families ✗ open. Freeze check passed — no ✓ Phase-2 axis regressed (all corner slots held chir 0.845–0.859, enclosure intact).
+
+Files updated: `analysis_cardio_mpm.md` (Batch 57 section), `knowledge_cardio_mpm.md` (milestone + B57 bullet + #33 refinement), `cardio_mpm_slots.md` (6 slots).
+
+
+================================================================================
+## DESIGN 58 -- 2026-07-12 20:05:21
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Everything checks out: `--fibre_dev` is a float bound applied as `fibre_dev · tanh(SIREN)`, so 0.25–0.65 are all valid (well under the 1.5708 default) and higher values genuinely widen the per-region orientation-heterogeneity envelope — confirming the mechanism. Phase stays PHASE3, 6 slots written.
+
+## Batch 58 complete — summary
+
+**Read B57 (6 slots, 2399it). The surprise: the "explore" probe won.**
+
+`fdev45` — fibre_dev raised **0.25→0.45** (the only variable off the ω0.2 corner), designed to reveal a *worse* off-optimum family — instead **won the batch at LS 0.545** (campaign-high stable) with the **fullest physiological corner yet**: peak 0.605 ∧ area 0.501 (batch-max) ∧ loopiness 1.051 ∧ chir 0.868 (batch-max), ampL 0.001, **all nodes positive** (node 0 rescued +0.15→+0.33; dashboards show a visibly wavier fibre quiver).
+
+**Ranking by LS:** fdev45 **0.545** > spin03 0.511 > spin01 0.500 > rot25 0.489 (fig-8 records) > rot165 0.485 > ctrl **0.433** (low draw — B56 spin02 same config was 0.522).
+
+**Three findings:**
+1. **Fibre_dev optimum shifts UP on the composed corner** [◐ n=1]. The "peaks ~0.25" prior (#5/#31/#36) is regime-bound to the rot1.0 elastic regime; on the over-rotation×spin×FS base, more heterogeneity rescues the still-radial weak nodes and lifts every enclosure axis. The one clean caveat: ctrl drew low, so the delta is partly inflated → **must dose-confirm**.
+2. **Spin ladder {0.1,0.2,0.3} is flat within noise** — B56's "area unimodal at ω0.2" was a single draw (refutes that refinement of #33).
+3. **Figure-eight arm reconfirmed → ✓** — rot {1.5,1.65,2.5} monotone peak↑/area↑ (records at rot2.5) with loopiness↓/chir↓ + a negative node.
+
+**Updated:** analysis log (dated Batch 58 section), knowledge ledger (top bullet + milestone + facts #5, #33), slots file.
+
+**B58 designed** — fibre_dev dose ladder **{0.25, 0.35, 0.45, 0.55, 0.65}** at the ω0.2 corner (dose-confirm the shifted optimum, replicate fdev45 to n=2, bracket via decoherence at 0.65) + **rot1.65×fdev0.45** stack toward a bigger max-area corner. 3 exploit · 2 explore · 1 control, one variable each.
+
+**Phase gate:** stays **PHASE3** — the fibre-heterogeneity corner-filler axis is ◐ (B58 dose-confirms); no ✓ axis regressed (DIRECTION chir batch-best 0.868 at the winner). Both winners this batch = **fdev45** (best optimizer *and* best science).
+
+
+================================================================================
+## DESIGN 59 -- 2026-07-13 02:31:53
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Everything is consistent. Here's the Batch 59 summary.
+
+## Batch 59 — read B58, designed B59
+
+**Biggest surprise (B58): the falsifier fired.** The fibre_dev dose ladder came back **flat** — not the "shifted optimum" B57 claimed. On the composed corner, LS across `{0.25, 0.35, 0.45, 0.55}` is 0.524 / 0.517 / **0.544** / 0.517 (a ±0.014 band), rolling off only to 0.502 at 0.65. Critically, **fdev25 did *not* anchor a bottom** — it drew the batch-max peak (0.613) and tied the winner. So B57's "optimum shifts up to 0.45" was a **misattribution to the B57 `ctrl` low draw (0.433)**. fibre_dev is a **broad plateau [0.25, 0.55]** — the composed base *widened* heterogeneity tolerance without moving the peak. `fdev45` still replicates (0.544 ≈ B57 0.545, n=2) → stable op point, just not superior.
+
+**Corner is now base-robust:** all 6 slots fired the full physiological corner (peak 0.58–0.61, area 0.44–0.50, loopiness ≥ real, chir 0.85–0.87, ampL≈0, energy ≈0.98) across fibre_dev[0.25,0.65] × rot[1.5,1.65]. The "high-heterogeneity family" (fdev0.65) is a **null** — no tangle, just uniformity roll-off.
+
+**The residual is singular and invariant: SIZE.** Peak ~0.60, area ~0.50 at energy ~0.98 — the tissue does the right *total work* but under-concentrates it into the peak excursion, and *no orientation/rotation knob moves this ceiling.*
+
+**B59 experiment (one question):** *Does the drag/overdamping regime set the corner's size ceiling?* Drag has been pinned at 40 since the pre-composition era and never re-tested as a size lever on the corner. A 5-rung **drag ladder {25,30,35,40,55}** off the fdev45 corner tests whether less dissipation lets the excursion travel further (peak/area↑ toward real, FS capping overshoot) — with `drag40` as an n=3 anchor and **`rotneg` (rot_stress −1.5)** mapping the one untested family axis (mirror/chirality-flip: does chir flip, or is rot sign inert like spin?).
+- Confirmer: peak/area rise monotone as drag falls, chir/loop/ampL held → size ceiling is drag-set, SIZE reopens.
+- Falsifier: flat or overshoot re-explodes → the peak ceiling is structural to the FS-elastic language (a clean ✓ null).
+
+**Phase gate:** stays **PHASE3**. Corner ✓ (base-robust, didn't regress), figure-eight ✓, radial-stub ✓, high-heterogeneity family ✓-closed-as-null; **mirror family (rot<0) ✗ open** and **SIZE ceiling ✗ open** — these two set the agenda. No ✓ axis regressed (fdev45 replicated). Files updated: `analysis_cardio_mpm.md`, `knowledge_cardio_mpm.md` (B57 "shift up" reclassified → plateau), `cardio_mpm_slots.md`.
+
+*(user_input.md acknowledged — the 2026-07-09 spin/Frank–Starling operator directive is already fully integrated; both are established corner ingredients.)*
+
+
+================================================================================
+## DESIGN 60 -- 2026-07-13 09:05:12
+================================================================================
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Batch 60 is fully designed and all memory files are updated. Summary:
+
+## B60 done — reading B59, then designing the temporal-asymmetry experiment
+
+**What surprised me in B59:** the DRAG hypothesis *falsified with a flipped ranking*. I predicted lower drag → bigger excursion; instead **LS rose weakly with *more* drag** (drag25 0.488 → 30 0.521 → 35 0.527 → 40 0.536 → 55 0.539) and **peak/area stayed dead flat** (peak_ratio 0.56–0.61, no trend). Lowering drag to 25 only *re-added overshoot* (ampL 0.018) and gave the worst LS. → the corner SIZE ceiling (peak ~0.60 at energy ~0.95 ≈ real) is **structural to the FS-elastic language, not drag-set** — a dose-confirmed ✓ null.
+
+**Second finding:** `rotneg` (rot_stress −1.5) **did not flip chirality** (chir held 0.852) — the learned fibre field absorbs the sign and re-derives correct handedness. rot-sign is chirality-inert (generalizes #33); the **mirror/chirality-flip family is a NULL** → closes the last open family axis.
+
+**The key observation driving B60:** SIZE is now confirmed inert to *every* mechanical lever (orientation, spin, gain, amp, drag) at energy already ≈ real. So the residual isn't force — it's **temporal**: real peak/energy is higher than sim (real motion is a sharper systolic excursion). The one untested-on-the-corner axis is the **pulse time profile** — the whole corner era ran a symmetric pulse (`--pulse_skew 1.0`).
+
+**B60 experiment** — a 6-rung `pulse_skew` dose ladder {0.7, 1.0, 1.5, 2.0, 2.5, 3.5} on the drag40 corner (one variable per slot): does sharp-systole/slow-diastole asymmetry concentrate the ~real energy into a bigger peak **now that FS caps the recoil overshoot** that made skew a mere shape/overshoot lever in the old radial regime (fact #27)? This is a methodologically-clean regime-transfer test — skew=2.0 directly re-runs the B25 value. Split: 3 exploit (1.5/2.0/2.5) · 2 explore (0.7 reverse control, 3.5 decoherence probe) · 1 control (1.0 anchor, n=4).
+
+**Phase gate:** `current_phase.txt` stays **PHASE3** — the generative-manifold phase is terminal (no PHASE4 token). No ✓ axis regressed (corner replicated at 0.536); mirror family closed as null this batch; SIZE ceiling remains the one open axis, now narrowed from "magnitude" to "temporal."
+
+Files updated: `analysis_cardio_mpm.md` (dated B60 section), `knowledge_cardio_mpm.md` (new Current-best bullet + milestone + fact #27 regime caveat), `cardio_mpm_slots.md` (6 slots).

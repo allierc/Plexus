@@ -136,8 +136,10 @@ class Level(nn.Module):
     def __init__(
         self,
         name: str,
-        level: int,
-        state: torch.Tensor,                        # [N, d]   dynamic state
+        depth: int = 0,                             # hierarchy DEPTH (0 = leaf); a scale hint only.
+                                                    # (Was `level` -- renamed to free the word "level"
+                                                    #  from the set/depth overload; `level=` still accepted.)
+        state: torch.Tensor = None,                 # [N, d]   dynamic state
         embedding: Optional[torch.Tensor] = None,   # [N, e]   learnable a_i
         parent: Optional[torch.Tensor] = None,      # [N]      index into the PARENT SET (the map pi_{this->parent})
         edge_index: Optional[torch.Tensor] = None,  # [2, E]   lateral relation
@@ -152,7 +154,8 @@ class Level(nn.Module):
     ):
         super().__init__()
         self.name = name
-        self.level = level                          # a depth hint only; containment is by `parent_name`, not by integer
+        # `depth` is a scale hint only; containment is by `parent_name`, not by integer.
+        self.depth = depth
         self.parent_name = parent_name              # which set contains this one (None for a top-level set)
         self.role = role
         # Incidence maps (the second kind of map): an EDGE-SET's elements are connections,
@@ -229,7 +232,7 @@ class Level(nn.Module):
         return int(self.active.sum())
 
     def __repr__(self):
-        return (f"Level({self.name!r}, level={self.level}, n={self.n}, "
+        return (f"Level({self.name!r}, depth={self.depth}, n={self.n}, "
                 f"active={self.n_active}, d={self.state.shape[-1]})")
 
     # --- cardinality primitives (the engine-level structural machinery) ----- #
@@ -478,7 +481,22 @@ class Operator(nn.Module):
     """
 
     KIND: Optional[str] = None
-    LEVEL: Optional[str] = None
+    # The biological SET this operator acts on -- its primary INPUT set. Stamped by
+    # `@register_operator(set=...)`. (Was `LEVEL`, a misnomer: `set="cell"` names a
+    # *set*, never a hierarchy depth or a runtime Level. See `signature()`.)
+    SET: Optional[str] = None
+    # --- typed signature (Plexus2 sec. 2.1): an operator is a typed MORPHISM between
+    # sets. Declarative metadata, like MECHANISM_TAGS -- the validator, atlas and docs
+    # read it; the engine does not. Maps are PART of the signature: Plexus2 folds maps
+    # INTO the operator (there is no standalone Map primitive), so an operator names the
+    # maps it traverses here rather than the language carrying a separate `M`. Defaults
+    # describe a single-set morphism on SET; fill INPUTS/OUTPUTS/READS/WRITES/MAPS on
+    # operators that gather/scatter along maps (signal, aggregate, deposit, ...).
+    INPUTS: list = []                   # input sets (empty => [SET])
+    OUTPUTS: list = []                  # output sets (empty => [SET])
+    READS: list = []                    # state blocks consumed, by name, e.g. ["voltage", "w"]
+    WRITES: list = []                   # state blocks produced, by name, e.g. ["voltage"]
+    MAPS: list = []                     # named maps traversed, e.g. ["pre", "post"] or ["parent"]
     # What this operator's returned delta IS, so the engine knows how to integrate it.
     # One vocabulary (Axis A; = the spec `emit:` value on merged operators), see EMITS:
     #   "velocity"         -- delta is dx/dt     -> engine: x += dt*delta
@@ -495,6 +513,12 @@ class Operator(nn.Module):
     # only; a dimension-generic operator (reads D = pos.shape[-1], no hard-coded 2) sets
     # [2, 3] (or more). The 2D-specific kernels (MLS-MPM) stay [2].
     SUPPORTED_DIMS: list = [2]
+    # A per-IMPLEMENTATION capability (Plexus2 sec. 5): whether gradients flow through this
+    # implementation's forward. The contract is fixed; two implementations of it may differ
+    # here (a differentiable Neural-ODE vs a black-box/non-diff solver), so an inverse loop
+    # can filter `get_contract(name).capabilities()` for the differentiable ones. Default
+    # True -- the pure-torch operators are differentiable.
+    DIFFERENTIABLE: bool = True
     # The integration invariant is enforced per-operator on frame 0 (see engine.run):
     # an operator that legitimately writes a set's `state` -- a structural op (divide/
     # die rewrites the buffer) or a derived-state readout (aggregate centroid) -- sets
@@ -534,6 +558,22 @@ class Operator(nn.Module):
 
     def forward(self, H: Hierarchy, mask: Optional[torch.Tensor] = None) -> dict[str, torch.Tensor]:
         raise NotImplementedError
+
+    @classmethod
+    def signature(cls) -> dict:
+        """The operator's typed signature (Plexus2 sec. 2.1): the sets it maps
+        between, the state it reads/writes, and the maps it traverses. `inputs`/
+        `outputs` default to the single acting set `SET` when not declared. This is
+        the machine-readable form of "operator as typed morphism between sets"; the
+        atlas and (later) the OperatorContract read it -- the engine never does."""
+        one = [cls.SET] if cls.SET else []
+        return {
+            "inputs":  list(cls.INPUTS) or one,
+            "outputs": list(cls.OUTPUTS) or one,
+            "reads":   list(cls.READS),
+            "writes":  list(cls.WRITES),
+            "maps":    list(cls.MAPS),
+        }
 
 
 class Lateral(Operator):

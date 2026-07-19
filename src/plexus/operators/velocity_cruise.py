@@ -24,7 +24,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("velocity_cruise", "cruise", family="motion", level="particle", kind="lateral")
+@register_operator("velocity_cruise", "cruise", family="motion", set="particle", kind="lateral")
 class VelocityCruise(Lateral):                   # (alias `cruise`, one migration cycle)
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                     # speed restoration + isotropic noise are dimension-generic

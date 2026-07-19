@@ -25,7 +25,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("sediment", family="motion", level="cell", kind="lateral")
+@register_operator("sediment", family="motion", set="cell", kind="lateral")
 class Sediment(Lateral):
     EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic

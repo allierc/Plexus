@@ -26,9 +26,16 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("chemotax", family="fields", level="particle", kind="exchange")
+@register_operator("chemotax", family="fields", set="particle", kind="exchange")
 class Chemotax(Exchange):
     EMIT = "velocity"                           # default routing; override in the spec with `emit: mpm_acceleration`
+    # typed signature (Plexus2 sec. 2.1): field -> set (Exchange). Reads the `from:`
+    # field gradient at each node's position, writes a velocity/accel on the node.
+    INPUTS = ["particle"]
+    OUTPUTS = ["particle"]
+    READS = ["pos"]
+    WRITES = ["pos"]                            # gain*grad(field) as a velocity (or mpm_acceleration)
+    MAPS = ["field"]                            # Exchange: a gather map from the `from:` field
     SUPPORTED_DIMS = [2]                         # Field.grad_at is 2D for now (N-D is a follow-up)
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation", "field_templated_flow"]

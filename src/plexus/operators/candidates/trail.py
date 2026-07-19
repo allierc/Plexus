@@ -18,7 +18,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("trail", level="cell", kind="exchange")
+@register_operator("trail", set="cell", kind="exchange")
 class TrailOperator(Exchange):
     REQUIRES_PARAMS = ["from", "turn"]
 

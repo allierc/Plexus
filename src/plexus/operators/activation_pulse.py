@@ -30,7 +30,7 @@ from plexus.models.base import FieldUpdate
 from plexus.models.registry import register_operator
 
 
-@register_operator("activation_pulse", family="fields", level="field", kind="field")
+@register_operator("activation_pulse", family="fields", set="field", kind="field")
 class ActivationPulse(FieldUpdate):
     EMIT = None                       # writes a prescribed field; never engine-integrated
     SUPPORTED_DIMS = [2, 3]           # dimension-generic: N-D Gaussian/uniform profile on the [C,nx,ny(,nz)] field
