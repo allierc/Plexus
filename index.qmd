@@ -96,10 +96,7 @@ composition and the whole rollout stays **differentiable**.
 Qualitatively different dynamical systems, all expressed in the same operator
 language. Each clip below is a single `spec.yaml` over the identical operators and
 schedule grammar — **hover (or tab to) a title to read the exact spec that generated
-it.** The interaction and boids laws are validated to floating-point precision against
-[ParticleGraph](https://github.com/allierc/ParticleGraph); every movie is a
-black-background, full-frame point splat, so the *dynamics* — not the chrome — is what
-you compare across systems.
+it.**
 
 ::: {.callout-note collapse="true"}
 ## How a clip is made
