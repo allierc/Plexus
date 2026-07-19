@@ -447,45 +447,6 @@ config/attractors/thomas.yaml</pre></span></span>
 </div>
 ```
 
-## Mechanistic inverse modelling
-
-Because every operator carries a differentiable implementation, gradients propagate
-through a composition of *explicit* biological mechanisms rather than through opaque
-simulator code. This changes what inference means. Classical calibration assumes the
-mechanism is already correct and only tunes parameters — effective when the forward
-model is complete, but misleading when a mechanism is *missing*, since optimizing the
-present parameters merely compensates for the absent one.
-
-In Plexus, parameters stay attached to named operators — stiffness to mechanical
-operators, reaction rates to biochemical ones, conductances to signalling ones — so
-estimation preserves the mechanistic meaning of the model, and the residual acquires
-one too. A persistent mismatch between simulation and experiment is read not only as
-poor parameters but as evidence that the current operator composition cannot explain
-the data: a **missing operator**.
-
-The same differentiability lets biological designs be *optimized*. Below, a foraging
-colony in a maze is tuned by a UCB search — from a hand-set design (left) to the best
-found (right), which delivers food roughly five-fold faster.
-
-::: {layout-ncol=2}
-{{< video gallery/initial.mp4 title="initial hand-set colony" >}}
-
-{{< video gallery/winner_7.mp4 title="optimized colony (winner 7)" >}}
-:::
-
-The same recipe scales to harder navigation — a porous **pillar** field and a walled
-**maze**, each crossed by a self-generated attractant gradient and tuned by the same
-optimizer, shown from starting point to optimized colony (full runs in
-[Optimization](optimization.qmd)):
-
-{{< video gallery/race_pillars_winner_1.mp4 title="pillars — starting point" >}}
-
-{{< video gallery/race_pillars_winner_8.mp4 title="pillars — optimized (136/154 escape the porous field)" >}}
-
-{{< video gallery/race_maze_hard_winner_1.mp4 title="maze — starting point" >}}
-
-{{< video gallery/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}
-
 ## Agentic mechanistic discovery
 
 Because mechanisms are explicit operators rather than simulator-specific code, they
