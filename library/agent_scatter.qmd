@@ -34,7 +34,7 @@ Agent_scatter (was agent_to_mpm) (agent set -> mpm_grid): the agents deform the 
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `to`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -117,7 +117,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_scatter", "agent_to_mpm", family="coupling", level="cell", kind="exchange")
+@register_operator("agent_scatter", "agent_to_mpm", family="coupling", set="cell", kind="exchange")
 class AgentScatter(Exchange):              # (alias `agent_to_mpm`, one migration cycle)
     EMIT = None                               # writes the grid; consumed by the MPM substep
     SUPPORTED_DIMS = [2, 3]

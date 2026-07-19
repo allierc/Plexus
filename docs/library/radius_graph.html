@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — <span class="math inline">\(\mathcal{R}\!:E\)</span> <strong>Rewire</strong>: rebuild the relation <span class="math inline">\(E\)</span> each tick.</li>
-<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>radius</code></li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -353,7 +353,7 @@ E \;=\; \big\{\,(i,j)\;:\; r_{\min} \le \lVert\mathbf x_i-\mathbf x_j\rVert &lt;
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.geometry <span class="im">import</span> edges_radius_blockwise</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"radius_graph"</span>, family<span class="op">=</span><span class="st">"topology"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"rewire"</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"radius_graph"</span>, family<span class="op">=</span><span class="st">"topology"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"rewire"</span>)</span>
 <span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RadiusGraph(Rewire):</span>
 <span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Set `Level.edge_index` to all live pairs within `radius` (optionally beyond</span></span>
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">    `min_radius`). Blockwise build -&gt; scales to 1e4-1e5 nodes; minimum-image under</span></span>

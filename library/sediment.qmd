@@ -34,7 +34,7 @@ A per-agent constant directional drift (a first-order body force at
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -115,7 +115,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("sediment", family="motion", level="cell", kind="lateral")
+@register_operator("sediment", family="motion", set="cell", kind="lateral")
 class Sediment(Lateral):
     EMIT = "velocity"                                # a velocity delta; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic

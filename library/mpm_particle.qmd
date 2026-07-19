@@ -6,7 +6,7 @@ subtitle: "A material point for MLS-MPM: position + velocity PLUS the per-partic
 ::: {.op-head}
 ![](../figures/icons/set.png){.op-logo}
 
-[`set`]{.op-badge} [`level: 0`]{.op-badge}
+[`set`]{.op-badge} [`depth: 0`]{.op-badge}
 
 A material point for MLS-MPM: position + velocity PLUS the per-particle
 continuum buffers the solver carries (deformation gradient F, affine velocity C,
@@ -38,7 +38,7 @@ subsystem (the operator side is the fenced `mls_mpm_mechanics`).
 
 ## Role in Plexus
 
-- **Level** &mdash; `0` (0 = leaf, higher = container).
+- **Depth** &mdash; `0` (0 = leaf, higher = container).
 - **Is** &mdash; a set of nodes with the state schema below; operators act *within* it (`lateral`), *across* its containment (`aggregate` / `broadcast`), or *onto fields* (`exchange`).
 
 ## State schema
@@ -54,7 +54,7 @@ subsystem (the operator side is the fenced `mls_mpm_mechanics`).
 
 ```python
 @register_entity(
-    "mpm_particle", level=0,
+    "mpm_particle", depth=0,
     state_schema={"pos": (0, 2), "vel": (2, 4)},
     render={"color_by": "node_type", "arrows": None},
 )

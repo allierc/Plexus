@@ -273,7 +273,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
-<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>from</code></li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -430,7 +430,7 @@ window.Quarto = {
 <span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
 <span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"active_force"</span>, <span class="st">"pulse_to_contraction"</span>, family<span class="op">=</span><span class="st">"mechanics"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"active_force"</span>, <span class="st">"pulse_to_contraction"</span>, family<span class="op">=</span><span class="st">"mechanics"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
 <span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ActiveForce(Exchange):                     <span class="co"># (alias `pulse_to_contraction` for one migration cycle)</span></span>
 <span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="st">"mpm_acceleration"</span>           <span class="co"># a body accel the MPM substep consumes as a_ext, not engine-integrated</span></span>
 <span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>]                 <span class="co"># 2D — reads a 2-vector activation gradient / direction field</span></span>

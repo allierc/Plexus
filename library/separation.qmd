@@ -34,7 +34,7 @@ A boids steering rule (Lateral, second-derivative).
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `separation`  (per-type props: `separation`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -96,7 +96,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import neighbour_mean
 
 
-@register_operator("separation", family="interaction", level="particle", kind="lateral")
+@register_operator("separation", family="interaction", set="particle", kind="lateral")
 class Separation(Lateral):
     EMIT = "acceleration"
     SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic

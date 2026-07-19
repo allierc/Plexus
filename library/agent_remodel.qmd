@@ -34,7 +34,7 @@ Agent_remodel (agent set -> mpm_particle stiffness): cells remodel the tissue.
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `to`, `target`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -115,7 +115,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_remodel", family="coupling", level="cell", kind="exchange")
+@register_operator("agent_remodel", family="coupling", set="cell", kind="exchange")
 class AgentRemodel(Exchange):
     EMIT = None
     SUPPORTED_DIMS = [2, 3]

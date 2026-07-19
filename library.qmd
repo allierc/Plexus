@@ -26,7 +26,7 @@ resources:
 ```
 
 
-The whole calculus is **3 sets**, **5 fields**, and **51 operators** (59 primitives in all). Every simulation on this site is a schedule composed from this list &mdash; nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages &mdash; the two objects (**sets** and **fields**) and the **operators** that move state between them:
+Plexus is built from four concepts &mdash; **operators**, **sets**, the **states** each set carries, and **fields**. The validated registry to date is **3 sets**, **5 fields**, and **51 operators** (59 primitives in all); every simulation on this site is a **schedule** composed from this list &mdash; nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages &mdash; the objects the operators act on (**sets**, each with its **state schema**, and **fields**) and the **operators** that move state between them:
 
 ::: {.op-grid}
 <a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds &mdash; the levels a hierarchy is built from.</span></span></a>

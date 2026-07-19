@@ -34,7 +34,7 @@ Set -> field. Each agent adds to the field at its own pixel.
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `to`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -95,11 +95,19 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("deposit", family="fields", level="cell", kind="exchange")
+@register_operator("deposit", family="fields", set="cell", kind="exchange")
 class Deposit(Exchange):
     """object -> field. Writes `to:` field in place; returns {}."""
 
     EMIT = None                                # set->field: scatters onto the grid in place (stigmergy write); returns {} — no integrable delta
+    # typed signature (Plexus2 sec. 2.1): set -> field (Exchange). The true output is
+    # the `to:` field grid, not set state, so WRITES (set-state blocks) is empty and the
+    # field coupling is the "field" map.
+    INPUTS = ["cell"]
+    OUTPUTS = []                               # writes the `to:` field, no set-state output
+    READS = ["pos"]
+    WRITES = []                                # no set-state block written (the grid is mutated in place)
+    MAPS = ["field"]                           # Exchange: a scatter map onto the `to:` field
     SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]

@@ -34,7 +34,7 @@ Mpm_gather (was g2p) (mpm_grid -> particle): the MLS-MPM grid-to-particle gather
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -105,7 +105,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
-@register_operator("mpm_gather", "g2p", family="mpm", level="particle", kind="exchange")
+@register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
 class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
     EMIT = None                                    # advects pos/vel inside the MPM substep (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

@@ -34,7 +34,7 @@ Relation-building (rewire) operators: construct a Level's `edge_index`.
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{R}\!:E$ **Rewire**: rebuild the relation $E$ each tick.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `radius`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -98,7 +98,7 @@ from plexus.models.registry import register_operator
 from plexus.geometry import edges_radius_blockwise
 
 
-@register_operator("radius_graph", family="topology", level="particle", kind="rewire")
+@register_operator("radius_graph", family="topology", set="particle", kind="rewire")
 class RadiusGraph(Rewire):
     """Set `Level.edge_index` to all live pairs within `radius` (optionally beyond
     `min_radius`). Blockwise build -> scales to 1e4-1e5 nodes; minimum-image under

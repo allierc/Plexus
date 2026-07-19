@@ -34,7 +34,7 @@ A FENCED TRANSITIONAL operator wrapping the MLS-MPM solver.
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `youngs`, `C`, `F`, `mass`, `mu`, `la`, `p_vol`  (per-type props: `youngs`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -321,7 +321,7 @@ def mls_mpm_substep(X, V, C, F, mass, mu, la, a_ext, offsets,
 # --------------------------------------------------------------------------- #
 #  The fenced transitional operator
 # --------------------------------------------------------------------------- #
-@register_operator("mls_mpm_mechanics", family="mpm", level="particle", kind="exchange")
+@register_operator("mls_mpm_mechanics", family="mpm", set="particle", kind="exchange")
 class MLSMPMMechanics(Exchange):
     """Compound MLS-MPM mechanics at the particle level (P2G -> grid solve -> G2P ->
     advect). Cell shape/rigidity emerge from the particles' elastic stress; per-cell-

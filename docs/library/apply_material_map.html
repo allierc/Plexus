@@ -269,7 +269,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
 <ul>
 <li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
-<li><strong>Acts on</strong> — <code>particle</code> (the level the operator runs at).</li>
+<li><strong>Acts on</strong> — <code>particle</code> (the set the operator acts on).</li>
 <li><strong>Reads</strong> — <code>from</code>, <code>target</code></li>
 <li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
 <li><strong>Prediction</strong> — <code>none</code>.</li>
@@ -344,7 +344,7 @@ E_i \;=\; E_{\min} + m(\mathbf x_i)\,(E_{\max}-E_{\min}),
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
 <p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/material_map.py"><code>src/plexus/operators/material_map.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"apply_material_map"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, level<span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"apply_material_map"</span>, family<span class="op">=</span><span class="st">"mpm"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"particle"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ApplyMaterialMap(Exchange):</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""field -&gt; set: sample the map at each particle and write a per-particle material</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    parameter. `target: youngs` maps intensity in [0,1] to E in [min,max] and sets the</span></span>

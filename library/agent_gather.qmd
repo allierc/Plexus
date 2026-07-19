@@ -34,7 +34,7 @@ Agent_gather (was mpm_to_agent) (mpm_grid -> agent set): the material drags the 
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `from`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -119,7 +119,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_gather", "mpm_to_agent", family="coupling", level="cell", kind="exchange")
+@register_operator("agent_gather", "mpm_to_agent", family="coupling", set="cell", kind="exchange")
 class AgentGather(Exchange):               # (alias `mpm_to_agent`, one migration cycle)
     EMIT = "velocity"                 # emits an advection velocity; engine integrates pos
     SUPPORTED_DIMS = [2, 3]

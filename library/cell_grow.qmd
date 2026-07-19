@@ -33,8 +33,8 @@ Cell_grow (cell, structural): CELL rest-VOLUME growth -- the biological growth p
 
 ## Role in Plexus
 
-- **Kind** &mdash; $|S|$ **Structural**: change the node set (divide / die / spawn).
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Kind** &mdash; $|S|$ **Structural**: change the entities themselves &mdash; Divide, Die, grow.
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -135,7 +135,7 @@ from plexus.models.base import Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("cell_grow", family="growth", level="cell", kind="structural")
+@register_operator("cell_grow", family="growth", set="cell", kind="structural")
 class CellGrow(Structural):
     EMIT = None                                           # structural: advances `grow_V` + wakes reserve child particles in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

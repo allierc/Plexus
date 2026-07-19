@@ -30,7 +30,7 @@ LIBDIR = os.path.join(ROOT, "library")
 GH = "https://github.com/allierc/Plexus/blob/main"
 
 # fig_ops order; each kind has a one-line gloss and the math symbol from Figure 1.
-KIND_ORDER = ["lateral", "aggregate", "broadcast", "exchange", "field", "rewire", "structural"]
+KIND_ORDER = ["lateral", "aggregate", "broadcast", "exchange", "rewire", "structural", "field"]
 KIND_INFO = {
     "lateral":    ("Lateral", r"$\mathcal{O}_E$",  "within-set interaction over a relation $E$"),
     "aggregate":  ("Aggregate", r"$\textstyle\sum_\pi$", "children &rarr; parent, up the containment $\\pi$"),
@@ -38,7 +38,7 @@ KIND_INFO = {
     "exchange":   ("Exchange", "push / pull", "set &harr; field"),
     "field":      ("Field", r"$\partial_t\phi$",   "a field's own self-dynamics"),
     "rewire":     ("Rewire", r"$\mathcal{R}\!:E$", "rebuild the relation $E$ each tick"),
-    "structural": ("Structural", r"$|S|$",         "change the node set (divide / die / spawn)"),
+    "structural": ("Structural", r"$|S|$",         "change the entities themselves &mdash; Divide, Die, grow"),
 }
 def kind_icon(kind):
     """Icon filename for an operator KIND. The field-dynamics operator (dphi/dt)
@@ -594,7 +594,7 @@ def badge(text: str) -> str:
 
 def render_operator_page(name: str, cls) -> str:
     kind = getattr(cls, "KIND", None)
-    level = getattr(cls, "LEVEL", None)
+    level = getattr(cls, "SET", None) or getattr(cls, "LEVEL", None)   # plexus2: operators act on a SET
     pred = getattr(cls, "PREDICTION", None)
     doc = inspect.getdoc(inspect.getmodule(cls)) or inspect.getdoc(cls) or ""
     e = ENRICH.get(name, {})
@@ -636,7 +636,7 @@ def render_operator_page(name: str, cls) -> str:
     out.append("## Role in Plexus")
     out.append("")
     out.append(f"- **Kind** &mdash; {ksym} **{klabel}**: {kgloss}.")
-    out.append(f"- **Acts on** &mdash; `{level}` (the level the operator runs at).")
+    out.append(f"- **Acts on** &mdash; `{level}` (the set the operator acts on).")
     reads = ", ".join(f"`{x}`" for x in (req + rtp + rbuf)) or "&ndash;"
     out.append(f"- **Reads** &mdash; {reads}"
                + ("" if not rtp else f"  (per-type props: {', '.join('`'+x+'`' for x in rtp)})"))
@@ -781,7 +781,7 @@ def render_field_page(name: str, cls) -> str:
 
 
 def render_set_page(name: str, cls) -> str:
-    level = getattr(cls, "LEVEL", None)
+    depth = getattr(cls, "DEPTH", None)
     doc = clean_prose(inspect.getdoc(cls) or "")
     purpose = first_sentence(doc)
     schema = getattr(cls, "state_schema", None) or getattr(cls, "STATE_SCHEMA", None)
@@ -789,10 +789,10 @@ def render_set_page(name: str, cls) -> str:
     if purpose:
         out.append(f'subtitle: "{purpose}"')
     out += ["---", "", "::: {.op-head}", "![](../figures/icons/set.png){.op-logo}", "",
-            f"{badge('set')} {badge('level: ' + str(level))}", "",
+            f"{badge('set')} {badge('depth: ' + str(depth))}", "",
             doc or "A node kind.", ":::", "",
             "## Role in Plexus", "",
-            f"- **Level** &mdash; `{level}` (0 = leaf, higher = container).",
+            f"- **Depth** &mdash; `{depth}` (0 = leaf, higher = container).",
             "- **Is** &mdash; a set of nodes with the state schema below; operators act *within* it "
             "(`lateral`), *across* its containment (`aggregate` / `broadcast`), or *onto fields* (`exchange`).", ""]
     if isinstance(schema, dict) and schema:
@@ -834,12 +834,13 @@ def render_landing() -> str:
     n = len(ops) + len(fields) + len(sets)
     out = _page_header("Operator library",
                        "Every set, field, and operator in Plexus &mdash; the validated registry to date")
-    out.append(f"The whole calculus is **{len(sets)} sets**, **{len(fields)} fields**, and "
-               f"**{len(ops)} operators** ({n} primitives in all). Every simulation on this site is a "
-               "schedule composed from this list &mdash; nothing else. The catalog is introspected "
-               "live from the registry, so it never drifts from the code. It is split into three "
-               "pages &mdash; the two objects (**sets** and **fields**) and the **operators** that "
-               "move state between them:")
+    out.append(f"Plexus is built from four concepts &mdash; **operators**, **sets**, the **states** "
+               f"each set carries, and **fields**. The validated registry to date is **{len(sets)} sets**, "
+               f"**{len(fields)} fields**, and **{len(ops)} operators** ({n} primitives in all); every "
+               "simulation on this site is a **schedule** composed from this list &mdash; nothing else. "
+               "The catalog is introspected live from the registry, so it never drifts from the code. It "
+               "is split into three pages &mdash; the objects the operators act on (**sets**, each with "
+               "its **state schema**, and **fields**) and the **operators** that move state between them:")
     out.append("")
     out.append('::: {.op-grid}')
     out.append(_nav_card("library_sets.html", "set", "Sets",
@@ -857,9 +858,11 @@ def render_operators() -> str:
     """library_operators.qmd &mdash; operators grouped by kind."""
     ops = R._OPERATOR_REGISTRY
     out = _page_header("Operators",
-                       "How state moves &mdash; grouped by kind, in the visual language of Figure 1")
-    out.append("The logo marks the operator **kind** in the visual language of "
-               "[Figure 1](index.qmd) (`paper/fig_ops.tex`).")
+                       "How state moves &mdash; grouped by family, in the visual language of the operator algebra")
+    out.append("Each operator belongs to one of the elementary **families** of the "
+               "[operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, "
+               "Rewire, Divide and Die; the logo marks the family (`paper/fig_ops.tex`). The registry "
+               "also exposes a **field** self-dynamics kind (a field&rsquo;s own update).")
     out.append("")
     for kind in KIND_ORDER:
         members = sorted(nm for nm, c in ops.items() if getattr(c, "KIND", None) == kind)

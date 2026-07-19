@@ -34,7 +34,7 @@ Mpm_scatter (was p2g) (particle -> mpm_grid): the MLS-MPM particle-to-grid scatt
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `youngs`  (per-type props: `youngs`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -104,7 +104,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
-@register_operator("mpm_scatter", "p2g", family="mpm", level="particle", kind="exchange")
+@register_operator("mpm_scatter", "p2g", family="mpm", set="particle", kind="exchange")
 class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     EMIT = None                 # particle->grid: writes the mpm_grid field in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

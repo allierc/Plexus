@@ -34,7 +34,7 @@ Field -> set. Sample the field on a sensor fan around the heading, steer.
 ## Role in Plexus
 
 - **Kind** &mdash; push / pull **Exchange**: set &harr; field.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `from`, `turn_speed`, `sensor_angle`, `sensor_dist`, `sensor_size`  (per-type props: `turn_speed`, `sensor_angle`, `sensor_dist`, `sensor_size`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -201,7 +201,7 @@ def _read(fld, centers, weights, ssz):
     return (contrib * inwin[:, None, :].float()).sum(-1)                   # [N, S]
 
 
-@register_operator("sense", family="fields", level="cell", kind="exchange")
+@register_operator("sense", family="fields", set="cell", kind="exchange")
 class Sense(Exchange):
     EMIT = None                                 # writes `heading` in place (steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)

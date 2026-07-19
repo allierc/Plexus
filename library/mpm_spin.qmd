@@ -34,7 +34,7 @@ Drive an MLS-MPM body toward slow solid-body rotation (a body force).
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `omega`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -114,7 +114,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("mpm_spin", family="mechanics", level="particle", kind="lateral")
+@register_operator("mpm_spin", family="mechanics", set="particle", kind="lateral")
 class MPMSpin(Lateral):
     EMIT = "mpm_acceleration"   # consumed by the MPM substep as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2, 3]

@@ -34,7 +34,7 @@ Mpm_strain (particle -> particle): the MLS-MPM deformation-gradient + material u
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; &ndash;
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -107,7 +107,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import sub_dt
 
 
-@register_operator("mpm_strain", family="mpm", level="particle", kind="lateral")
+@register_operator("mpm_strain", family="mpm", set="particle", kind="lateral")
 class MPMStrain(Lateral):
     EMIT = None                 # particle->particle: updates F + material in place; returns {} — no delta
     SUPPORTED_DIMS = [2, 3]

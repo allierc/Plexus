@@ -34,7 +34,7 @@ Set. Reflect a self-propelled agent off the domain walls / obstacles.
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `cell` (the level the operator runs at).
+- **Acts on** &mdash; `cell` (the set the operator acts on).
 - **Reads** &mdash; `move_speed`  (per-type props: `move_speed`)
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -129,7 +129,7 @@ def _random_unit(n, D, rng, device):
     return v / v.norm(dim=1, keepdim=True).clamp(min=1e-9)
 
 
-@register_operator("bounce", family="motion", level="cell", kind="lateral")
+@register_operator("bounce", family="motion", set="cell", kind="lateral")
 class Bounce(Lateral):
     EMIT = None                                 # writes `heading` in place (specular wall reflection / obstacle re-head); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic specular wall reflection

@@ -34,7 +34,7 @@ Rides a whole cloud along a dissipative 3D **strange-attractor** vector field $\
 ## Role in Plexus
 
 - **Kind** &mdash; $\mathcal{O}_E$ **Lateral**: within-set interaction over a relation $E$.
-- **Acts on** &mdash; `particle` (the level the operator runs at).
+- **Acts on** &mdash; `particle` (the set the operator acts on).
 - **Reads** &mdash; `system`
 - **Writes / returns** &mdash; emits **no integrated force** &mdash; it mutates a field / relation / membership, or feeds a substep.
 - **Prediction** &mdash; `none`.
@@ -278,7 +278,7 @@ def attractor_velocity(system: str, pos: torch.Tensor, params: dict | None = Non
 # --------------------------------------------------------------------------- #
 #  the operator -- a within-set (lateral) velocity field, engine-integrated
 # --------------------------------------------------------------------------- #
-@register_operator("attractor_flow", family="motion", level="particle", kind="lateral")
+@register_operator("attractor_flow", family="motion", set="particle", kind="lateral")
 class AttractorFlow(Lateral):
     """Advect every particle along a strange-attractor vector field dx/dt = f(x) (see module
     docstring for the ten systems + provenance). A first-derivative flow, so the engine does
