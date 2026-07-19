@@ -465,14 +465,24 @@ biological semantics through operators, sets, states and fields. The
 \toprule
 \textbf{Language} & \textbf{Reference implementation}\\
 \midrule
-Operator & \code{Operator}\\
+Operator (contract) & \code{OperatorContract}\\
+Implementation & an \code{Operator} subclass, registered under a contract\\
 Set & \code{Level}\\
-State & typed tensors stored by a \code{Level}\\
+State & typed tensors stored by a \code{Level} (sliced by its \code{state\_schema})\\
+Map & an index buffer on a \code{Level} (\code{parent}, \code{pre}, \code{post})\\
 Field & \code{Field}\\
 Biological model & \code{Hierarchy}\\
+Registry & \code{@register\_operator} / \code{@register\_entity} / \code{@register\_field}\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+Maps are not a separate runtime object. Consistently with the operator-centric
+view of the main text, a map is an index buffer carried by a \code{Level}
+(\code{parent}/\code{parent\_name} for containment, \code{pre}/\code{post} for
+incidence) and \emph{named} by the operators that traverse it in their typed
+signature --- so the runtime realizes four primitives (operators, sets, states,
+fields), with maps folded into the operator.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -499,22 +509,29 @@ in the Plexus language.
 
 \subsection{Levels}
 
-A \code{Level} is the runtime representation of a biological Set.
+A \code{Level} is the runtime representation of a biological Set. Its elements
+are stored as flat batched tensors (never one object per element).
 
-Each Level contains
+Concretely, a Level carries
 
 \begin{itemize}
-\item the entities belonging to the set,
-\item their typed state,
-\item optional biological types,
-\item the maps relating this Level to other Levels.
+\item a \code{state} tensor and the \code{state\_schema} that names its columns
+(\code{pos}, \code{vel}, \code{voltage}, \ldots);
+\item an integer \code{depth} (a scale hint; 0 for a leaf set);
+\item optional biological \code{types} (parametric variants within the set);
+\item its maps, as index buffers: \code{parent} (with \code{parent\_name}) for
+containment, and \code{pre}/\code{post} for the incidence of an edge-set;
+\item an occupancy vector \code{occ}$\in[0,1]$ marking the live subset, so a
+cardinality-changing operator (Divide/Die) wakes or retires fixed slots without
+resizing.
 \end{itemize}
 
 State is stored as contiguous tensors for computational efficiency, while its
-biological interpretation is determined entirely by the state schema declared
-by the language. Consequently, the runtime never assumes that a particular
-state variable represents position, voltage, concentration or any other
-specific quantity.
+biological interpretation is determined entirely by the \code{state\_schema}
+declared by the language. Consequently, the runtime never assumes that a
+particular state variable represents position, voltage, concentration or any
+other specific quantity: operators read named blocks (\code{lvl.get("pos")})
+rather than hard-coded column offsets.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -534,21 +551,64 @@ implementation dependent.
 
 \subsection{Operators}
 
-Operators are registered independently from the execution engine.
+The runtime realizes the contract/implementation split of Section~5 directly. A
+biological operator is an \code{OperatorContract} --- a fixed record of
+\code{(name, kind, family, set, signature)} together with a dictionary of
+interchangeable \code{implementations} and a \code{default}. Each implementation
+is an \code{Operator} subclass; the contract owns the biology, the subclass owns
+only the numerics.
 
-Every registered operator declares
+An operator is registered by decorating its implementation class. The FIRST
+registration of a name creates the contract from the class's typed
+\code{signature()}; a later registration of the same name with a different
+\code{implementation=} adds an interchangeable implementation to that same
+contract (the engine checks the two share a \code{kind}, so only the numerics may
+differ).
 
-\begin{itemize}
-\item its operator family,
-\item its typed signature,
-\item one or more numerical implementations,
-\item implementation capabilities such as supported dimensions or
-differentiability.
-\end{itemize}
+\begin{lstlisting}[style=yaml,caption={An operator implementation: the decorator names the contract (\code{set}/\code{kind}/\code{family}) and this implementation; the class attributes are the typed signature and the capabilities.},label=lst:op]
+@register_operator("neuron_voltage", set="neuron", kind="lateral",
+                   family="interaction", implementation="hodgkin_huxley")
+class HodgkinHuxley(Lateral):
+    # typed signature -- the biology (Plexus2 sec. 2.1)
+    INPUTS  = ["neuron", "synapse"]   # input sets
+    OUTPUTS = ["neuron"]              # output sets
+    READS   = ["voltage", "w"]        # state consumed
+    WRITES  = ["voltage"]             # state produced
+    MAPS    = ["pre", "post"]         # maps traversed (folded into the operator)
+    # capabilities -- the numerics
+    EMIT           = "velocity"       # integration order of the returned delta
+    SUPPORTED_DIMS = [2, 3]
+    DIFFERENTIABLE = True
+    def forward(self, H, mask=None):
+        ...                           # returns {"neuron": d_voltage}
+\end{lstlisting}
 
-The registry therefore separates biological semantics from numerical
-realization. New numerical methods are introduced by registering additional
-implementations rather than modifying the execution engine.
+Three things follow from this shape.
+
+\paragraph{Signature.} \code{signature()} returns the typed morphism
+\code{\{inputs, outputs, reads, writes, maps\}}, defaulting the sets to the acting
+set \code{SET} when a class leaves them unset. This is the machine-readable form
+of ``operator as a typed morphism between sets''; the validator and the atlas read
+it, the engine never does.
+
+\paragraph{Capabilities.} Each implementation declares \code{SUPPORTED\_DIMS} and
+\code{DIFFERENTIABLE}; the contract's \code{capabilities()} tabulates them across
+implementations, so an inverse loop can select, e.g., the differentiable
+implementation of a contract.
+
+\paragraph{Kind and purity.} Every operator belongs to exactly one \code{KIND} ---
+the seven of the main text (\code{lateral}, \code{aggregate}, \code{broadcast},
+\code{exchange}, \code{field}, \code{rewire}, \code{structural}). Dynamics operators
+are pure: \code{forward} returns a per-set delta and the engine integrates once per
+tick (its order set by \code{EMIT} $\in$ \{\code{velocity}, \code{acceleration},
+\code{mpm\_acceleration}\}); \code{field}/\code{rewire}/\code{structural} operators
+mutate the field, the relation, or the membership in place and return nothing.
+
+Selection is by name: \code{get\_operator(name, implementation)} returns the chosen
+class (the default when none is named), and \code{get\_contract(name)} exposes the
+whole contract. The registry therefore separates biological semantics from
+numerical realization: new numerical methods are new registered implementations,
+never edits to the execution engine.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -560,35 +620,46 @@ applications.
 During each simulation step
 
 \begin{enumerate}
-\item operators are evaluated according to the Schedule,
-\item each operator produces a contribution to the system state,
-\item contributions are accumulated,
-\item the selected numerical backend advances the state.
+\item operators are evaluated in Schedule order,
+\item each dynamics operator returns a per-set delta (or a field/relation/%
+structural operator mutates the grid, the edge set, or the membership in place),
+\item the engine sums the deltas acting on each set,
+\item each set is integrated once, in the order its operators declare
+(\code{EMIT}: first-order \code{velocity} or second-order \code{acceleration}).
 \end{enumerate}
 
-The Schedule therefore implements the operational semantics introduced in the
-main text while remaining independent of the particular numerical solver.
+Because operators are pure and nothing is written in place except the explicitly
+allowed buffers, gradients flow through the sums and the integrator, so the whole
+rollout stays differentiable. The Schedule therefore implements the operational
+semantics of the main text while remaining independent of the particular
+numerical implementations it composes.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{Model specification}
 
-Biological models are described declaratively rather than procedurally.
+Biological models are described declaratively rather than procedurally, as a
+single \code{spec.yaml} with blocks \code{general} / \code{sets} / \code{fields} /
+\code{operators} / \code{schedule}. An operator line names the contract
+(\code{op}) and, optionally, which implementation to run
+(\code{implementation:}); omitting it selects the contract's default, so a
+single-implementation spec is written exactly as before.
 
-A specification defines
+A specification therefore defines
 
 \begin{itemize}
-\item biological Levels,
-\item their state schemas,
+\item biological Levels and their state schemas,
 \item Fields,
-\item instantiated Operators,
-\item the execution Schedule,
-\item the numerical implementations selected for each operator.
+\item the operators to instantiate, each with its selected implementation,
+\item the execution Schedule.
 \end{itemize}
 
-Before execution, the specification is validated against the typed signatures
-declared by the registered operators, ensuring that every operator, state
-variable and required map is available.
+Before execution the specification is validated against the registered
+contracts: an unknown operator, an unknown \code{implementation} for a known
+operator, a missing required parameter, a selector on an undeclared set/field, or
+an unresolved schedule token is rejected up front --- so a spec that loads is
+runnable, and the capability checks (e.g.\ \code{SUPPORTED\_DIMS}) run against the
+implementation that will actually execute.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -597,17 +668,24 @@ variable and required map is available.
 The reference implementation follows a strict separation of concerns.
 
 \begin{itemize}
-\item The language defines biological semantics.
-\item The registry stores biological operator contracts.
-\item Implementations realize these contracts numerically.
-\item The execution engine evaluates operator compositions.
-\item Numerical backends solve the resulting dynamical system.
+\item The language (\code{sets} / \code{states} / \code{fields} / \code{operators})
+defines biological semantics.
+\item The registry stores each operator as an \code{OperatorContract} with its
+implementations.
+\item Implementations (\code{Operator} subclasses) realize those contracts
+numerically.
+\item The validator (\code{schema.py}) admits only well-formed, runnable specs.
+\item The execution engine (\code{engine.py}) builds the \code{Hierarchy} and
+iterates the Schedule; it never contains mechanism-specific code.
 \end{itemize}
 
-Consequently, extending Plexus never requires modifying the execution engine.
-New biological mechanisms are introduced by defining new operator contracts,
-whereas new numerical methods are introduced by registering additional
-implementations of existing operators.
+A single audit (\code{tools/audit\_operator\_registry.py}) enforces the contract
+across the whole registry --- every operator has a valid \code{family} and
+\code{kind}, a canonical \code{EMIT}, and a \code{SUPPORTED\_DIMS}$\subseteq\{2,3\}$
+--- so the vocabulary cannot silently drift. Consequently, extending Plexus never
+requires modifying the execution engine: new biological mechanisms are new operator
+contracts, and new numerical methods are additional implementations of existing
+operators.
 
 The reference implementation therefore mirrors the architecture proposed in the
 main text: the language remains stable while implementations and numerical
@@ -699,18 +777,22 @@ literature.
 Every entry in the atlas records
 
 \begin{itemize}
-\item the operator name,
-\item its family,
-\item its typed signature,
-\item biological interpretation,
-\item known implementations,
-\item originating publications,
-\item reference repositories,
+\item the operator name, family and kind,
+\item its typed signature (input/output sets, state read/written, maps),
+\item its implementations and their capabilities (supported dimensions,
+differentiability),
+\item its biological interpretation (\code{MECHANISM\_TAGS}) and the role of each
+tunable parameter (\code{PARAM\_ROLES}),
+\item originating publications and reference repositories,
 \item validation status.
 \end{itemize}
 
-Consequently the atlas simultaneously documents biological mechanisms,
-available numerical realizations, and scientific provenance.
+The current registry already carries most of this per operator --- name, family,
+kind, acting set, typed signature, implementations, capabilities, mechanism tags
+and parameter roles, with provenance kept in the operator's docstring; the
+atlas adds the cross-framework publication and repository record.
+Consequently the atlas simultaneously documents biological mechanisms, available
+numerical realizations, and scientific provenance.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -809,19 +891,22 @@ distinct operator contracts.
 
 \subsection{Register the operator and its implementations}
 
-Once defined, the operator is added to the registry together with one or more
-numerical implementations. The registry records
+Once defined, the operator is added to the registry by decorating its
+implementation class with \code{@register\_operator(name, set=, kind=, family=,
+implementation=)} (Listing~\ref{lst:op}). The decorator creates the contract on
+the first implementation of a name and records
 
 \begin{itemize}
-\item the canonical operator name,
-\item its operator family,
-\item its typed signature,
-\item the available implementations,
-\item their numerical capabilities,
-\item their differentiability,
-\item their scientific provenance.
+\item the canonical operator name (plus any aliases), family and kind,
+\item its typed signature, declared as the class attributes \code{INPUTS} /
+\code{OUTPUTS} / \code{READS} / \code{WRITES} / \code{MAPS},
+\item the available implementations, keyed by \code{implementation} name,
+\item their capabilities (\code{SUPPORTED\_DIMS}, \code{DIFFERENTIABLE}),
+\item their scientific provenance (in the class docstring).
 \end{itemize}
 
+A second numerical method for the same mechanism reuses the same \code{name} with a
+new \code{implementation=} and is checked to share the contract's \code{kind}.
 Registration makes the mechanism available to every compatible Plexus model
 without introducing biological knowledge into the execution engine.
 
@@ -837,6 +922,11 @@ Every implementation should satisfy four requirements:
 \item its numerical behaviour is verified;
 \item its scientific provenance is preserved.
 \end{enumerate}
+
+In the reference implementation the first three are gated concretely: the registry
+audit (\code{audit\_operator\_registry.py}) checks the declared contract, schema
+validation checks that a spec using the operator loads, and a minimal live spec
+plus the test suite check its numerical behaviour.
 
 Validation establishes structural and numerical consistency, but does not by
 itself establish biological validity. The latter must be assessed through
