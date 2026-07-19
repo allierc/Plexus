@@ -15,7 +15,20 @@ import os
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-NPZ = os.path.join(HERE, "..", "cardio", "cardio_real.npz")
+
+def _find_npz():
+    """Resolve cardio_real.npz across layouts (first existing wins). The data file was
+    relocated into cardio_mpm/ (co-located with the training code); the historical location
+    was the sibling ../cardio/. Search co-located first, then the old path."""
+    cands = [os.path.join(HERE, "cardio_real.npz"),
+             os.path.join(HERE, "..", "cardio", "cardio_real.npz"),
+             os.path.join(HERE, "..", "cardio_mpm", "cardio_real.npz")]
+    for c in cands:
+        if os.path.exists(c):
+            return c
+    return cands[0]                                   # co-located default (clearest error path)
+
+NPZ = _find_npz()
 DOM_LO, DOM_HI = 0.15, 0.85          # MPM sheet domain (matches the spec's block: [0.15,0.15,0.85,0.85])
 DOM = DOM_HI - DOM_LO
 

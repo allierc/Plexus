@@ -1,35 +1,40 @@
-# User input (ACKNOWLEDGED — Batch 2, 2026-06-26)
+# User input — PHASE 3: TWO operators to test the size↔direction frontier
 
-_Posted 2026-06-26._
+_Posted 2026-07-09._
 
-## Move toward STRUCTURAL questions, not only parameter sweeps
+## Why the frontier is now a TESTABLE hypothesis, not a closed result
 
-Your parameter map is good (LS≈0.589 at gain0=0.5, co-learn, 2400it; scalar model clustering 0.567–0.589 = near
-its ceiling). But the open questions are still parameter-centric ("which gain0 / depth / lever is best").
-Now that one-knob optimization is saturating, spend real effort on the STRUCTURAL question added to the
-instruction (in "The LoopScore metric"):
+B44 closed SIZE ✓ as "bounded by a size↔direction frontier" — but that frontier was established with **no
+active-torque and no length-dependent-tension operator in the language**; the only chirality source was
+`rot_stress` (which couples size and chirality through one knob). Per NEVER-TRUST-OPTIMIZATION, a conclusion
+under one operator language is a HYPOTHESIS under an extended one. Two new operators (engine-ready,
+**default-OFF = exact baseline**, unit-tested) each attack the frontier from a different direction:
 
-**Which morphology dimensions does LoopScore actually reward, and how strongly?**
-(size · openness · chirality · aspect · axis orientation · temporal phase · position)
+## Operator 1 — ACTIVE TORQUE (`mpm_spin`): chirality decoupled from the contraction axis
 
-Concretely, this batch and the next:
+**`--spin_omega <ω> --spin_k <k>`** injects a rigid-rotation body force `v_rot = ω·perp(x−c)` (grounded in
+SAMoS's alignment torque). `ω` sign = chirality sense (+CCW/−CW); `spin_k=0` = OFF. It supplies circulation
+**independent of `rot_stress`**: reach real SIZE via over-rotation/`--tau`, then restore chirality with the
+torque.
 
-1. **Measure the LS sensitivity ranking (do this first, once).** Take the real GT loops and perturb ONE
-   morphology dimension at a time by a controlled amount; record ΔLS for each. Build a small
-   `make_loopscore_sensitivity.py` (analogous to the topology-zoo montage) → a table + montage. Tag the
-   result `[engineering]` — it characterises the metric and underwrites every mechanism claim.
+## Operator 2 — FRANK–STARLING (`--stretch_activation <β>`): stretch-regulated size, no overshoot
 
-2. **Use it to EXPLAIN your best parameter finding, don't just report it.** You observed gain0=0.5 > 0.854.
-   Which morphology dimension does lowering gain0 move (likely loop SIZE), and is that the dimension LS is
-   most sensitive to here? Turn "gain0=0.5 is best" into "gain0=0.5 wins because it shrinks loop size, the
-   axis LS rewards most in this regime." Same for depth and co-learn.
+Scales active tension by local fibre stretch: `T *= 1 + β·(λ−1)`, `λ = |F·n|` (Chaste NHS/Niederer form).
+Real cardiomyocytes contract HARDER when stretched — a size lever that's *self-limiting* (regulated by length,
+not raw drive), so it may enlarge loops **without** the overshoot that killed amplitude/gain (facts #4/#25) and
+**without** the chirality cost of over-rotation. `β=0` = OFF. This is the biologically authentic candidate.
 
-3. **Find the bottleneck dimension.** Across the interior nodes, on which morphology axis do the sim loops
-   differ MOST from the real loops (after your best fit)? That axis — not the next parameter tweak — is
-   where the model needs a new mechanism. If the scalar model truly caps at ~0.59, say which dimension it
-   cannot reach and why (e.g. it cannot produce per-region size/chirality variation), and design the next
-   mechanism (e.g. coarse SIREN stiffness) to target THAT axis specifically.
+## Experiment (one operator-variable per slot; freeze rule = raise size AND hold chirality/enclosure)
 
-Keep optimizing LS in parallel, but a batch that delivers (1)+(3) — the metric's sensitivity and the
-bottleneck axis — is more valuable right now than another +0.01 of LS. Report findings as
-`parameter → morphology dimension → LoopScore`, the mapping that is the actual deliverable.
+- `ctrl` — a known frontier point (`rot2.5` or `--tau 0.05`): high peak_ratio, LOW chir.
+- **Torque route:** frontier point + `--spin_omega 0.3/0.6/1.0 --spin_k 20` (dose), plus `--spin_omega −0.6`
+  (wrong sign, causal control). Does chir_match climb back to ~0.85 while peak_ratio stays high?
+- **Frank–Starling route:** the ELASTIC op point (dev25, chir≈0.85) + `--stretch_activation 0.5/1.0/2.0`
+  (dose). Does peak_ratio rise past ~0.53 while chir_match HOLDS ~0.85 (no over-rotation needed)?
+- Read the FULL `enclosure_row`. **Confirmer:** any slot lands peak_ratio ≥0.8 AND chir_match ≥0.83 → the
+  frontier BREAKS, **SIZE reopens as solved** under the extended language. **Falsifier:** neither route recovers
+  chirality at high size → the frontier is genuinely structural (SIZE stays ✓-closed).
+
+Both operators default-off (verified byte-baseline); `active_stress` β-guard is safe for all specs. This is the
+`residual → hypothesis → operator → extended language` loop applied to the campaign's deepest result — with a
+torque route and a stretch-activation route so you can compare mechanisms on the same frontier.
