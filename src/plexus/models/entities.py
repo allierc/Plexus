@@ -22,7 +22,7 @@ from plexus.models.registry import register_entity
 
 
 @register_entity(
-    "particle", level=0,
+    "particle", depth=0,
     state_schema={"pos": (0, 2), "vel": (2, 4)},
     render={"color_by": "node_type", "arrows": "vel"},
 )
@@ -41,7 +41,7 @@ def _lame(E, nu: float = _NU):
 
 
 @register_entity(
-    "mpm_particle", level=0,
+    "mpm_particle", depth=0,
     state_schema={"pos": (0, 2), "vel": (2, 4)},
     render={"color_by": "node_type", "arrows": None},
 )
@@ -168,7 +168,7 @@ class MPMParticle:
 
 
 @register_entity(
-    "cell", level=1,
+    "cell", depth=1,
     state_schema={"pos": (0, 2), "vel": (2, 4)},
     render={"color_by": "node_type", "arrows": "vel"},
 )

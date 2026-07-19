@@ -22,7 +22,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("polarity_flow_align", "flow_align", family="polarity", level="cell", kind="exchange")
+@register_operator("polarity_flow_align", "flow_align", family="polarity", set="cell", kind="exchange")
 class PolarityFlowAlign(Exchange):               # (alias `flow_align`, one migration cycle)
     EMIT = None                                 # writes `heading` in place (flow-alignment steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]

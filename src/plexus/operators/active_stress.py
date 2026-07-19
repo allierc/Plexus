@@ -28,7 +28,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", level="particle", kind="exchange")
+@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
 class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
     EMIT = None                         # stress is consumed by the MPM substep, not integrated
     SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2

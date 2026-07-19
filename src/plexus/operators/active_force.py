@@ -28,7 +28,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("active_force", "pulse_to_contraction", family="mechanics", level="particle", kind="exchange")
+@register_operator("active_force", "pulse_to_contraction", family="mechanics", set="particle", kind="exchange")
 class ActiveForce(Exchange):                     # (alias `pulse_to_contraction` for one migration cycle)
     EMIT = "mpm_acceleration"           # a body accel the MPM substep consumes as a_ext, not engine-integrated
     SUPPORTED_DIMS = [2]                 # 2D — reads a 2-vector activation gradient / direction field

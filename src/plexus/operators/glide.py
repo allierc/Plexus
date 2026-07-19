@@ -21,7 +21,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("glide", family="motion", level="cell", kind="lateral")
+@register_operator("glide", family="motion", set="cell", kind="lateral")
 class Glide(Lateral):
     EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)

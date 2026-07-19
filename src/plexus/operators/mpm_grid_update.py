@@ -20,7 +20,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import sub_dt
 
 
-@register_operator("mpm_grid_update", family="mpm", level="field", kind="field")
+@register_operator("mpm_grid_update", family="mpm", set="field", kind="field")
 class MPMGridUpdate(FieldUpdate):
     EMIT = None                                 # field->field grid solve: writes grid velocity in place; returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

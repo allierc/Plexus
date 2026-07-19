@@ -20,7 +20,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("graze", level="cell", kind="exchange")
+@register_operator("graze", set="cell", kind="exchange")
 class GrazeOperator(Exchange):
     REQUIRES_PARAMS = ["from", "rate"]
 

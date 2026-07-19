@@ -53,6 +53,7 @@ class OpSpec:
     on: Selector
     to: Optional[str] = None        # target field (Exchange scatter)
     frm: Optional[str] = None       # source field (Exchange gather)
+    impl: Optional[str] = None      # which numerical implementation of the op's contract (default: the sole one)
     params: dict = field(default_factory=dict)
 
 
@@ -76,7 +77,7 @@ class Spec:
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
 
 
-_RESERVED = {"op", "at", "to", "from"}
+_RESERVED = {"op", "at", "to", "from", "implementation"}
 # No schedule builtins: `aggregate` and `diffuse` are ordinary registered operators
 # now, and integration is implicit (end of tick). Every schedule token must resolve
 # to a declared operator.
@@ -169,13 +170,21 @@ def load(path: str) -> Spec:
     ops = []
     for o in raw["operators"]:
         name = o["op"]
+        impl = o.get("implementation")
+        # resolve the SELECTED implementation of the operator's contract; capability
+        # checks below then run against the implementation that will actually execute.
         try:
-            cls = registry.get_operator(name)
+            cls = registry.get_operator(name, impl)
         except KeyError:
+            try:
+                contract = registry.get_contract(name)
+            except KeyError:
+                raise ValueError(
+                    f"operator {name!r} not in registry. Available: "
+                    f"{sorted(registry._OPERATOR_REGISTRY)}")
             raise ValueError(
-                f"operator {name!r} not in registry. Available: "
-                f"{sorted(registry._OPERATOR_REGISTRY)}"
-            )
+                f"operator {name!r} has no implementation {impl!r}; "
+                f"available: {sorted(contract.implementations)}")
         kind = getattr(cls, "KIND", None)
         if kind not in KINDS:
             raise ValueError(
@@ -236,7 +245,7 @@ def load(path: str) -> Spec:
                         f"operator {name!r} requires property {prop!r} on every type of "
                         f"{owner!r}; missing on type {tname!r}. "
                         f"(declared in {cls.__name__}.REQUIRES_TYPE_PROPS)")
-        ops.append(OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"), params=params))
+        ops.append(OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"), impl=impl, params=params))
 
     # --- warn about per-type properties no operator reads (typo guard) ------ #
     used_props = set()

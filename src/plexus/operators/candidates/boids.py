@@ -12,7 +12,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("boids", level="cell", kind="lateral")
+@register_operator("boids", set="cell", kind="lateral")
 class BoidsOperator(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__()
