@@ -4,16 +4,6 @@ resources:
   - gallery/
 ---
 
-::: {.callout-note appearance="simple"}
-**Operators adapted from prior work.** Plexus re-implements published simulation code
-as registered operators: attraction–repulsion and boids from
-[ParticleGraph](https://github.com/allierc/ParticleGraph); the slime-mould (Physarum)
-agent from [Sebastian Lague's Slime-Simulation](https://github.com/SebLague/Slime-Simulation);
-softened self-gravity from Philip Mocz's *Create Your Own N-body Simulation* (2020); the
-continuum solver from MLS-MPM (Hu et al. 2018); and the strange attractors from their
-originating papers (Lorenz 1963, Rössler 1976, Sprott 1994, …).
-:::
-
 We introduce **Plexus**, a typed intermediate representation for biological
 mechanisms. Rather than defining yet another simulator, Plexus defines a common
 language whose primary objects are **biological operators**. Every operator specifies
@@ -101,7 +91,7 @@ trajectory, and renders the movie — no per-simulation code, only the spec diff
 
 ```{=html}
 <style>
-.sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:1rem 0 2.4rem}
+.sim-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1.1rem;margin:.6rem 0 2.4rem}
 .sim-gallery.g3{grid-template-columns:repeat(3,1fr)}
 @media (max-width:560px){.sim-gallery.g3{grid-template-columns:repeat(2,1fr)}}
 .sim-card{margin:0}
@@ -113,11 +103,13 @@ trajectory, and renders the movie — no per-simulation code, only the spec diff
   background:#1e1e1e;border-radius:7px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:.5rem .7rem;text-align:left;cursor:auto}
 .sim-name:hover .sim-spec,.sim-name:focus .sim-spec{display:block}
 .sim-spec pre{margin:0;font-size:.72em;line-height:1.3;white-space:pre;color:#e9e9e9;background:none;border:none;padding:0}
-.opk{font-size:.8em;color:#888}
+.opk{font-size:.8em;color:#888;margin-bottom:.2rem}
+.opk-ref{font-size:.76em;color:#999;font-style:italic;margin:.1rem 0 .2rem}
 </style>
 
 <h3>Interaction &amp; flocking — validated against ParticleGraph</h3>
 <p class="opk">Lateral operators over a radius neighbour graph: a per-type force law (attraction–repulsion) and the three boids rules that sum to flocking.</p>
+<p class="opk-ref">Reference — attraction–repulsion and boids adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.).</p>
 <div class="sim-gallery">
   <figure class="sim-card">
     <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -373,6 +365,7 @@ descriptions:
 
 <h3>Stigmergy — Physarum slime</h3>
 <p class="opk">A set + a scalar field, coupled: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network. One operator schedule; the network class is set by the spec (turn rate, deposit/decay, species count).</p>
+<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -737,6 +730,7 @@ descriptions:
 
 <h3>Continuum mechanics — MLS-MPM</h3>
 <p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Only the material model + scene change between these.</p>
+<p class="opk-ref">Reference — the continuum solver is MLS-MPM (Hu et&nbsp;al. 2018).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/material_multi.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -1132,6 +1126,7 @@ plotting:
 
 <h3>Inverse-square law — self-gravity &amp; electrostatics</h3>
 <p class="opk">One <code>squared_law</code> operator, two regimes: <code>law: gravity</code> (mass, always attract, all-pairs) collapses a disc into a galaxy; <code>law: coulomb</code> (signed charge, like-repel) is a plasma.</p>
+<p class="opk-ref">Reference — softened self-gravity after Philip Mocz’s <em>Create Your Own N-body Simulation</em> (2020); Coulomb after <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/inverse_square.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -1357,7 +1352,7 @@ descriptions:
       <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre># coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
 # charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
 # squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
-general: {name: coulomb_6_3d, seed: 0, n_frames: 32000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   particle:
     n: 960
@@ -1384,21 +1379,21 @@ plotting:
     q_n2: [0.75, 0, 0]
     q_p3: [0.5, 0.5, 0.5]
     q_n3: [0.5, 0.5, 0.5]
-  splat_size: 1.9
+  splat_size: 2.6
   splat_res: 820
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a dense cluster of particles centered in the frame against a black
-      background. Over time, the particles exhibit subtle fluctuations in their spatial distribution while
-      maintaining a cohesive, roughly spherical shape. The red and blue particles appear to be interspersed
-      within the larger population of grey particles. There is no significant expansion or contraction
-      of the overall cluster throughout the sequence.
-    objects: &#x27;The scene contains three distinct sets of small, point-like particles: red, blue, and grey.
-      The grey particles are the most numerous and form the primary bulk of the central cluster. The red
-      and blue particles are scattered throughout the grey mass, appearing as smaller subsets. All particles
-      are uniform in size and are arranged in a disordered, stochastic distribution.&#x27;</pre></span></span>
+    description: A cluster of particles begins in a highly compact, organized spherical arrangement. Over
+      time, the particles begin to move outward from the center, causing the cluster to expand. The expansion
+      becomes increasingly chaotic as the particles spread further into the surrounding space. By the
+      final frame, the cluster has significantly loosened, with many individual particles drifting away
+      from the core.
+    objects: The scene contains a large collection of small, spherical particles. These particles are
+      primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
+      interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
+      their individual shapes but lose their tight spatial connection.</pre></span></span>
       <span class="sim-cap">a 3D charged cloud settling into a self-screened arrangement</span>
     </figcaption>
   </figure>
@@ -1406,6 +1401,7 @@ descriptions:
 
 <h3>Strange attractors — <code>attractor_flow</code></h3>
 <p class="opk">A single lateral operator rides a whole cloud along a dissipative 3D chaotic flow ẋ = f(x); a tiny seed is stretched-and-folded until the cloud <em>is</em> the attractor. Ten systems ship; six shown.</p>
+<p class="opk-ref">Reference — each system cites its originating paper (Lorenz 1963, Rössler 1976, Sprott 1994, …).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/attractor_lorenz.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -1663,6 +1659,7 @@ plotting:
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
 <p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>cell_diffuse</code> → <code>turing_react</code>), cells coloured by activator. The Gray–Scott feed/kill regimes on a 2D cell disc (coral, holes, spots), and the same reaction–diffusion on a 3D cell shell.</p>
+<p class="opk-ref">Reference — Gray–Scott and Brusselator reaction–diffusion, after their originating models.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/turing_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -1987,6 +1984,7 @@ schedule:
 </div>
 
 ```
+
 
 
 
