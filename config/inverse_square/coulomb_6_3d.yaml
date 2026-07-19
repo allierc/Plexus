@@ -1,7 +1,7 @@
 # coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
 # charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
 # squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
-general: {name: coulomb_6_3d, seed: 0, n_frames: 32000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   particle:
     n: 960
@@ -28,18 +28,18 @@ plotting:
     q_n2: [0.75, 0, 0]
     q_p3: [0.5, 0.5, 0.5]
     q_n3: [0.5, 0.5, 0.5]
-  splat_size: 1.9
+  splat_size: 2.6
   splat_res: 820
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_particle:
-    description: The simulation shows a dense cluster of particles centered in the frame against a black
-      background. Over time, the particles exhibit subtle fluctuations in their spatial distribution while
-      maintaining a cohesive, roughly spherical shape. The red and blue particles appear to be interspersed
-      within the larger population of grey particles. There is no significant expansion or contraction
-      of the overall cluster throughout the sequence.
-    objects: 'The scene contains three distinct sets of small, point-like particles: red, blue, and grey.
-      The grey particles are the most numerous and form the primary bulk of the central cluster. The red
-      and blue particles are scattered throughout the grey mass, appearing as smaller subsets. All particles
-      are uniform in size and are arranged in a disordered, stochastic distribution.'
+    description: A cluster of particles begins in a highly compact, organized spherical arrangement. Over
+      time, the particles begin to move outward from the center, causing the cluster to expand. The expansion
+      becomes increasingly chaotic as the particles spread further into the surrounding space. By the
+      final frame, the cluster has significantly loosened, with many individual particles drifting away
+      from the core.
+    objects: The scene contains a large collection of small, spherical particles. These particles are
+      primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
+      interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
+      their individual shapes but lose their tight spatial connection.
