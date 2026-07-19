@@ -75,8 +75,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
 <link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<script src="site_libs/quarto-contrib/videojs/video.min.js"></script>
-<link href="site_libs/quarto-contrib/videojs/video-js.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -216,7 +214,6 @@ window.Quarto = {
   <li><a href="#four-concepts-seven-operators" id="toc-four-concepts-seven-operators" class="nav-link" data-scroll-target="#four-concepts-seven-operators">Four concepts, seven operators</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
-  <li><a href="#mechanistic-inverse-modelling" id="toc-mechanistic-inverse-modelling" class="nav-link" data-scroll-target="#mechanistic-inverse-modelling">Mechanistic inverse modelling</a></li>
   <li><a href="#agentic-mechanistic-discovery" id="toc-agentic-mechanistic-discovery" class="nav-link" data-scroll-target="#agentic-mechanistic-discovery">Agentic mechanistic discovery</a></li>
   <li><a href="#the-operator-atlas" id="toc-the-operator-atlas" class="nav-link" data-scroll-target="#the-operator-atlas">The operator atlas</a></li>
   <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
@@ -636,30 +633,6 @@ config/attractors/thomas.yaml</pre></span></span>
     </figcaption>
   </figure>
 </div>
-</section>
-<section id="mechanistic-inverse-modelling" class="level2">
-<h2 class="anchored" data-anchor-id="mechanistic-inverse-modelling">Mechanistic inverse modelling</h2>
-<p>Because every operator carries a differentiable implementation, gradients propagate through a composition of <em>explicit</em> biological mechanisms rather than through opaque simulator code. This changes what inference means. Classical calibration assumes the mechanism is already correct and only tunes parameters — effective when the forward model is complete, but misleading when a mechanism is <em>missing</em>, since optimizing the present parameters merely compensates for the absent one.</p>
-<p>In Plexus, parameters stay attached to named operators — stiffness to mechanical operators, reaction rates to biochemical ones, conductances to signalling ones — so estimation preserves the mechanistic meaning of the model, and the residual acquires one too. A persistent mismatch between simulation and experiment is read not only as poor parameters but as evidence that the current operator composition cannot explain the data: a <strong>missing operator</strong>.</p>
-<p>The same differentiability lets biological designs be <em>optimized</em>. Below, a foraging colony in a maze is tuned by a UCB search — from a hand-set design (left) to the best found (right), which delivers food roughly five-fold faster.</p>
-<div>
-
-</div>
-<div class="quarto-layout-panel" data-layout-ncol="2">
-<div class="quarto-layout-row">
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video1" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="initial hand-set colony"><source src="gallery/initial.mp4"></video></div>
-</div>
-<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
-<div class="quarto-video"><video id="video_shortcode_videojs_video2" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="optimized colony (winner 7)"><source src="gallery/winner_7.mp4"></video></div>
-</div>
-</div>
-</div>
-<p>The same recipe scales to harder navigation — a porous <strong>pillar</strong> field and a walled <strong>maze</strong>, each crossed by a self-generated attractant gradient and tuned by the same optimizer, shown from starting point to optimized colony (full runs in <a href="./optimization.html">Optimization</a>):</p>
-<div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — starting point"><source src="gallery/race_pillars_winner_1.mp4"></video></div>
-<div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — optimized (136/154 escape the porous field)"><source src="gallery/race_pillars_winner_8.mp4"></video></div>
-<div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — starting point"><source src="gallery/race_maze_hard_winner_1.mp4"></video></div>
-<div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — optimized (150/160 solve the labyrinth)"><source src="gallery/race_maze_hard_winner_5.mp4"></video></div>
 </section>
 <section id="agentic-mechanistic-discovery" class="level2">
 <h2 class="anchored" data-anchor-id="agentic-mechanistic-discovery">Agentic mechanistic discovery</h2>
@@ -1264,12 +1237,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>videojs(video_shortcode_videojs_video1);</script>
-<script>videojs(video_shortcode_videojs_video2);</script>
-<script>videojs(video_shortcode_videojs_video3);</script>
-<script>videojs(video_shortcode_videojs_video4);</script>
-<script>videojs(video_shortcode_videojs_video5);</script>
-<script>videojs(video_shortcode_videojs_video6);</script>
 
 
 
