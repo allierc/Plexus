@@ -1,5 +1,5 @@
 ---
-title: "The slime inverse problem"
+title: "The inverse problem"
 subtitle: "Recovering the generating spec from a simulation"
 lightbox: auto
 ---

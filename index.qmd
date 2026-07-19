@@ -1,6 +1,5 @@
 ---
 title: "Plexus"
-subtitle: "A typed intermediate representation for biological mechanisms"
 resources:
   - gallery/
 ---
@@ -2045,7 +2044,7 @@ mechanism through which the language itself evolves.
   mechanistic inverse modelling, agentic discovery, and the operator atlas.
 - **[Optimization](optimization.qmd)** — a slime-style foraging colony tuned end-to-end
   by a black-box search over its spec, from maze to porous-pillar navigation.
-- **[Slime inverse problem](inverse.qmd)** — fitting a Physarum network to a target by
+- **[Inverse problem](inverse.qmd)** — fitting a Physarum network to a target by
   gradient descent through the operators.
 
 The full framework — numerical implementations, mechanistic inverse modelling, the
