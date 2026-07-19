@@ -16,7 +16,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("drag", family="motion", level="particle", kind="lateral")
+@register_operator("drag", family="motion", set="particle", kind="lateral")
 class Drag(Lateral):
     EMIT = "acceleration"            # emits an acceleration
     SUPPORTED_DIMS = [2, 3]                      # acts on the D-vector velocity, dimension-generic

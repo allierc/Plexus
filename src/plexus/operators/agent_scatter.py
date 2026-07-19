@@ -27,7 +27,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_scatter", "agent_to_mpm", family="coupling", level="cell", kind="exchange")
+@register_operator("agent_scatter", "agent_to_mpm", family="coupling", set="cell", kind="exchange")
 class AgentScatter(Exchange):              # (alias `agent_to_mpm`, one migration cycle)
     EMIT = None                               # writes the grid; consumed by the MPM substep
     SUPPORTED_DIMS = [2, 3]

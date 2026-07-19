@@ -20,7 +20,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
 
 
-@register_operator("mpm_gather", "g2p", family="mpm", level="particle", kind="exchange")
+@register_operator("mpm_gather", "g2p", family="mpm", set="particle", kind="exchange")
 class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
     EMIT = None                                    # advects pos/vel inside the MPM substep (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     SUPPORTED_DIMS = [2, 3]

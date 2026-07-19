@@ -47,7 +47,7 @@ class PrescribedField(Field):
         return gx, gy
 
 
-@register_operator("playback", family="fields", level="field", kind="field")
+@register_operator("playback", family="fields", set="field", kind="field")
 class Playback(FieldUpdate):
     """field <- data: set the field grid to the current tick's video frame (looping).
     Reads the engine's current frame from `H.frame`. Mutates the field, returns {}."""

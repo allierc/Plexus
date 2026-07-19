@@ -25,7 +25,7 @@ from plexus.models.registry import register_operator
 from plexus.operators.mpm_grid import stencil_offsets, bspline
 
 
-@register_operator("agent_remodel", family="coupling", level="cell", kind="exchange")
+@register_operator("agent_remodel", family="coupling", set="cell", kind="exchange")
 class AgentRemodel(Exchange):
     EMIT = None
     SUPPORTED_DIMS = [2, 3]

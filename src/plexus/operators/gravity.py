@@ -23,7 +23,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("gravity", family="mechanics", level="cell", kind="lateral")
+@register_operator("gravity", family="mechanics", set="cell", kind="lateral")
 class GravityOperator(Lateral):
     EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
     # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never

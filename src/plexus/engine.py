@@ -193,17 +193,18 @@ def _field_colors(H: Hierarchy, sim: Spec, fld) -> np.ndarray:
 
 
 def _entity_meta(sname: str) -> tuple[dict, dict, int]:
-    """(state_schema, render, level) for a set name, from the entity registry,
-    falling back to the position+velocity default for unregistered names."""
+    """(state_schema, render, depth) for a set name, from the entity registry,
+    falling back to the position+velocity default for unregistered names. `depth`
+    is the hierarchy-depth integer (was the overloaded `level`)."""
     try:
         ent = get_entity(sname)
         schema = getattr(ent, "STATE_SCHEMA", None) or DEFAULT_STATE_SCHEMA
         render = getattr(ent, "RENDER", None) or DEFAULT_RENDER
-        level = getattr(ent, "LEVEL", None)
-        level = level if level is not None else 0
+        depth = getattr(ent, "DEPTH", None)
+        depth = depth if depth is not None else 0
     except KeyError:
-        schema, render, level = DEFAULT_STATE_SCHEMA, DEFAULT_RENDER, 0
-    return schema, render, level
+        schema, render, depth = DEFAULT_STATE_SCHEMA, DEFAULT_RENDER, 0
+    return schema, render, depth
 
 
 def _resolve_schema(s: dict, D: int) -> StateSchema:
@@ -240,8 +241,8 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
         state[:, w0:w1] = torch.tensor([float(x) for x in weights], device=device).reshape(E, w1 - w0)
     occ = torch.ones(E, device=device)
     parent_idx = torch.zeros(E, dtype=torch.long, device=device)
-    _, render, level = _entity_meta(sname)
-    lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
+    _, render, depth = _entity_meta(sname)
+    lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema,
                 parent=parent_idx, parent_name=s["parent"],
                 pre=pre, post=post, pre_name=s["pre"], post_name=s["post"], role=s.get("role"))
     lvl.render = render
@@ -282,7 +283,7 @@ def _resolve_emit(sim: Spec) -> dict:
     is a modelling error, raised here."""
     modes: dict[str, str] = {}
     for o in sim.operators:
-        emit = o.params.get("emit") or getattr(get_operator(o.op), "EMIT", None)
+        emit = o.params.get("emit") or getattr(get_operator(o.op, o.impl), "EMIT", None)
         if emit not in ("velocity", "acceleration"):
             continue                                   # None / mpm_acceleration: no engine-integrated set delta
         s = o.on.set
@@ -381,7 +382,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         n = int(s["n"])
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
-        _, render, level = _entity_meta(sname)         # render hints + level from the registry
+        _, render, depth = _entity_meta(sname)         # render hints + depth from the registry
         schema = _resolve_schema(s, D)                 # StateSchema: pos/vel default, or the set's `state:` block
         dim = schema.dim
         state = torch.zeros(buffer, dim, device=device)
@@ -409,7 +410,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         occ = torch.zeros(buffer, device=device); occ[:n] = 1.0
         # the runtime SET object: wraps the state tensor [buffer, 2D] (pos|vel columns per the
         # schema) + the live-mask `occ` + the schema; operators read/write it via H.level(name).
-        lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema)
+        lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
         if head is not None:
@@ -443,7 +444,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for cell_grow to wake
         per_tot = per + reserve
-        _, render, level = _entity_meta(sname)         # render hints + level from the registry
+        _, render, depth = _entity_meta(sname)         # render hints + depth from the registry
         schema = _resolve_schema(s, H.dim)             # StateSchema: pos/vel default (like top-level sets), or a `state:` block
         dim = schema.dim
         has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
@@ -482,7 +483,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             occ[is_reserve] = 0.0
             if has_pos:
                 state[is_reserve, px0:px1] = ppos[is_reserve]     # park the dormant pool at the parent centre
-        lvl = Level(sname, level=level, state=state, occ=occ, state_schema=schema,
+        lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render
         _assign_types(lvl, s, H, device)
@@ -668,7 +669,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)
     #    is enforced HERE by the engine, so no operator special-cases the clock.
     inst = [(o.op,
-             get_operator(o.op)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
+             get_operator(o.op, o.impl)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on,
              (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
             for o in sim.operators]

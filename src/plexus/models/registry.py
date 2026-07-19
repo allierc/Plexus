@@ -15,18 +15,20 @@ loop, can enumerate "everything that can run at level k".
 
 Usage
 -----
-    @register_operator("signal", level="cell", kind="lateral")
+    @register_operator("signal", set="neuron", kind="lateral")
     class SignalOperator(Operator):
         ...
 
     op_cls   = get_operator("signal")
-    at_cell  = operators_at_level("cell")        # -> {name: cls, ...}
+    at_neuron = operators_at_set("neuron")       # -> {name: cls, ...}
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 _ENTITY_REGISTRY: dict[str, type] = {}
-_OPERATOR_REGISTRY: dict[str, type] = {}
+_OPERATOR_REGISTRY: dict[str, type] = {}    # name -> DEFAULT implementation class (enumeration / back-compat)
 _FIELD_REGISTRY: dict[str, type] = {}
 
 
@@ -49,27 +51,121 @@ def _make_decorator(registry: dict, label: str, **tag_defaults):
     return register
 
 
-# tag_defaults declare which tags every entry carries (None until set).
-register_entity = _make_decorator(_ENTITY_REGISTRY, "Entity", level=None)
-register_operator = _make_decorator(_OPERATOR_REGISTRY, "Operator", level=None, kind=None)
+# tag_defaults declare which tags every entry carries (None until set). Canonical tags:
+#   entity `depth=` -- the hierarchy DEPTH integer (0 = leaf).
+register_entity = _make_decorator(_ENTITY_REGISTRY, "Entity", depth=None)
 register_field = _make_decorator(_FIELD_REGISTRY, "Field", couples_to=None, frame=None)
+
+
+# --------------------------------------------------------------------------- #
+#  Operator contract + implementations (Plexus2 sec. 5)
+# --------------------------------------------------------------------------- #
+@dataclass
+class OperatorContract:
+    """A biological operator: a FIXED typed signature (its biology) with one or more
+    interchangeable numerical IMPLEMENTATIONS (their numerics). The contract owns
+    name/kind/family/signature; each implementation owns only how the delta is computed
+    plus its capabilities (supported dims, differentiability). Selecting an
+    implementation is a numerical choice, never a biological one --
+    `{op: neuron_voltage, implementation: hodgkin_huxley}` vs `... implementation: gnn}`
+    is the same contract. The default is the sole / first-registered implementation, so
+    every existing single-implementation spec is unaffected."""
+    name: str
+    kind: str | None = None
+    family: str | None = None
+    set: str | None = None
+    signature: dict = field(default_factory=dict)
+    implementations: dict = field(default_factory=dict)   # impl_name -> class
+    default: str | None = None
+
+    def get(self, implementation: str | None = None) -> type:
+        impl = implementation or self.default
+        if impl not in self.implementations:
+            raise KeyError(
+                f"operator {self.name!r} has no implementation {impl!r}; "
+                f"available: {sorted(self.implementations)}")
+        return self.implementations[impl]
+
+    def capabilities(self) -> dict:
+        """Per-implementation capability table: supported dims + differentiability."""
+        return {i: {"dims": list(getattr(c, "SUPPORTED_DIMS", [])),
+                    "differentiable": bool(getattr(c, "DIFFERENTIABLE", True))}
+                for i, c in self.implementations.items()}
+
+
+_OP_CONTRACTS: dict[str, OperatorContract] = {}   # name -> contract (signature + all implementations)
+
+
+def register_operator(*names: str, implementation: str | None = None, **tags):
+    """Register an operator implementation. The FIRST registration of a name creates its
+    contract (from the class's typed `signature()`); a later registration of the SAME name
+    with a different `implementation=` adds an interchangeable implementation to that same
+    contract. `set=`/`kind=`/`family=` and any other tag are stamped as UPPER-case class
+    attributes (SET / KIND / FAMILY ...). One decorator may list alias names, which each
+    resolve to the same class."""
+    tags.setdefault("set", None)
+    tags.setdefault("kind", None)
+    def decorator(cls):
+        for k, v in tags.items():
+            setattr(cls, k.upper(), v)
+        cls.REGISTERED_NAMES = list(names)
+        impl = implementation or "default"
+        cls.IMPLEMENTATION = impl
+        for name in names:
+            contract = _OP_CONTRACTS.get(name)
+            if contract is None:
+                contract = OperatorContract(
+                    name=name, kind=getattr(cls, "KIND", None),
+                    family=getattr(cls, "FAMILY", None), set=getattr(cls, "SET", None),
+                    signature=cls.signature() if hasattr(cls, "signature") else {},
+                    default=impl)
+                _OP_CONTRACTS[name] = contract
+                _OPERATOR_REGISTRY[name] = cls          # default impl: enumeration + back-compat
+            else:
+                if impl in contract.implementations:
+                    raise ValueError(
+                        f"operator {name!r} already has implementation {impl!r} "
+                        f"({contract.implementations[impl].__name__})")
+                # implementations of one contract must share its biology (kind); only the
+                # numerics may differ.
+                if getattr(cls, "KIND", None) != contract.kind:
+                    raise ValueError(
+                        f"operator {name!r} implementation {impl!r} has kind "
+                        f"{getattr(cls, 'KIND', None)!r}, but the contract's kind is "
+                        f"{contract.kind!r}; implementations may differ only in numerics.")
+            contract.implementations[impl] = cls
+        return cls
+    return decorator
 
 
 def get_entity(name: str) -> type:
     return _ENTITY_REGISTRY[name]
 
 
-def get_operator(name: str) -> type:
-    return _OPERATOR_REGISTRY[name]
+def get_operator(name: str, implementation: str | None = None) -> type:
+    """The implementation class for operator `name` -- the default, or the named
+    `implementation`. Raises KeyError if the operator or the implementation is unknown."""
+    return _OP_CONTRACTS[name].get(implementation)
+
+
+def get_contract(name: str) -> OperatorContract:
+    """The full operator contract (signature + every registered implementation)."""
+    return _OP_CONTRACTS[name]
 
 
 def get_field(name: str) -> type:
     return _FIELD_REGISTRY[name]
 
 
+def operators_at_set(set_name: str) -> dict[str, type]:
+    """All operators registered to act on `set_name` (the LLM's action set for that
+    biological set). `set_name` is a set like "cell"/"neuron", not a depth."""
+    return {n: c for n, c in _OPERATOR_REGISTRY.items() if getattr(c, "SET", None) == set_name}
+
+
 def operators_at_level(level: str) -> dict[str, type]:
-    """All operators registered to act at `level` (the LLM's action set)."""
-    return {n: c for n, c in _OPERATOR_REGISTRY.items() if getattr(c, "LEVEL", None) == level}
+    """Deprecated alias for `operators_at_set` (the arg names a set, never a depth)."""
+    return operators_at_set(level)
 
 
 def operators_of_kind(kind: str) -> dict[str, type]:
@@ -114,7 +210,7 @@ def catalog_summary() -> str:
         return str(getattr(c, name, None))
     lines = ["# entities"]
     for n, c in sorted(_ENTITY_REGISTRY.items()):
-        lines.append(f"  {n:18s} level={tag(c, 'LEVEL')}")
+        lines.append(f"  {n:18s} depth={tag(c, 'DEPTH')}")
     lines.append("# operators (by family; canonical names, aliases in parens)")
     canon = [(n, c) for n, c in _OPERATOR_REGISTRY.items()
              if getattr(c, "REGISTERED_NAMES", [n])[0] == n]        # skip aliases
@@ -126,7 +222,7 @@ def catalog_summary() -> str:
         for n, c in ops:
             al = getattr(c, "REGISTERED_NAMES", [n])[1:]
             alias = f"  (alias {', '.join(al)})" if al else ""
-            lines.append(f"  {n:20s} level={tag(c, 'LEVEL'):10s} kind={tag(c, 'KIND'):10s} emit={tag(c, 'EMIT')}{alias}")
+            lines.append(f"  {n:20s} set={tag(c, 'SET'):10s} kind={tag(c, 'KIND'):10s} emit={tag(c, 'EMIT')}{alias}")
             tags = getattr(c, "MECHANISM_TAGS", None)
             if tags:
                 lines.append(f"      tags:  {', '.join(tags)}")

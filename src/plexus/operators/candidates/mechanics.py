@@ -15,7 +15,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("mechanics", level="cell", kind="lateral")
+@register_operator("mechanics", set="cell", kind="lateral")
 class MechanicsOperator(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__()
