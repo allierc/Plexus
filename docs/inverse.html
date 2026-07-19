@@ -41,6 +41,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
 <link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -235,26 +238,11 @@ window.Quarto = {
 </section>
 <section id="results-do-we-recover-the-parameters" class="level2">
 <h2 class="anchored" data-anchor-id="results-do-we-recover-the-parameters">Results: do we recover the parameters?</h2>
-<p>The figure below is the explicit answer, parameter by parameter (true in black, recovered in green, values in the unit cube <span class="math inline">\(u\in[0,1]\)</span>). For a single type the field parameters and <code>move_speed</code> are exact; <code>turn_speed</code>, <code>sensor_angle</code> and <code>sensor_dist</code> recover to a few percent; <code>cross</code> is <em>held</em> because a single type cannot constrain it. For <strong>four types every parameter including <code>cross</code> is recovered</strong> (<code>cross</code> u-error <span class="math inline">\(0.008\)</span> at four types, <span class="math inline">\(0.012\)</span> at two). Across four random single-type targets the <code>sensor_angle</code> u-error is <span class="math inline">\(0.015\,/\,0.158\,/\,0.092\,/\,0.051\)</span> — the spread tracks how much lateral field structure each target presents to the sensors.</p>
-<div id="fig-params" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-params-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="figures/fig_inverse_params.png" class="img-fluid quarto-figure quarto-figure-center figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-params-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: <strong>Parameter recovery, true vs.&nbsp;recovered</strong> (unit-cube <span class="math inline">\(u\)</span>; bars <strong>true</strong> (black) vs <strong>recovered</strong> (green)). <strong>(a)</strong> single-type target, field loss <span class="math inline">\(+\)</span> position loss: field and motion parameters recovered, but <code>cross</code> is <em>held</em> at its true value (grey hatched bar) — a single type cannot constrain it, so the matching bars are <em>not</em> a recovery. <strong>(b)</strong> four-type slime: the same scheme genuinely <em>learns</em> <code>cross</code> (gold band). <strong>(c)</strong> <em>pure position-only loss with no field loss</em> (the field is free-run and never observed): motion and sensing parameters still recover, but the <em>field</em> parameters (red band) do <em>not</em> — they are unidentifiable from particle motion alone over the usable horizon. A latent field needs its own observation.
-</figcaption>
-</figure>
-</div>
+<p>The recovery is explicit, parameter by parameter, with values in the unit cube <span class="math inline">\(u\in[0,1]\)</span>. For a single type the field parameters and <code>move_speed</code> are exact; <code>turn_speed</code>, <code>sensor_angle</code> and <code>sensor_dist</code> recover to a few percent; <code>cross</code> is <em>held</em> because a single type cannot constrain it. For <strong>four types every parameter including <code>cross</code> is recovered</strong> (<code>cross</code> u-error <span class="math inline">\(0.008\)</span> at four types, <span class="math inline">\(0.012\)</span> at two). Across four random single-type targets the <code>sensor_angle</code> u-error is <span class="math inline">\(0.015\,/\,0.158\,/\,0.092\,/\,0.051\)</span> — the spread tracks how much lateral field structure each target presents to the sensors.</p>
 <p>The recovered spec does not match the target frame-for-frame — the process is stochastic — but produces the <strong>same topology</strong>: the same filament network, loop density and length scale.</p>
-<div id="fig-evolution" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-evolution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="figures/fig_inverse_evolution.png" class="img-fluid quarto-figure quarto-figure-center figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-evolution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: <strong>Ground truth vs.&nbsp;recovered</strong> over time (cells, then the chemical field). The recovered spec reproduces the target <em>topologically</em>, not pixel-for-pixel.
-</figcaption>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="figures/fig_inverse_evolution.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1"><img src="figures/fig_inverse_evolution.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 </section>
@@ -290,26 +278,22 @@ Figure&nbsp;2: <strong>Ground truth vs.&nbsp;recovered</strong> over time (cells
 <h3 class="anchored" data-anchor-id="showcase-single-type-target">Showcase single-type target</h3>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_00.png" class="img-fluid figure-img"></p>
-<figcaption>Showcase single-type target, cell evolution: ground truth vs best methods.</figcaption>
+<p><a href="figures/fig_inverse_gal_00.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2"><img src="figures/fig_inverse_gal_00.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_01.png" class="img-fluid figure-img"></p>
-<figcaption>Showcase single-type target, chemical field evolution: ground truth vs best methods.</figcaption>
+<p><a href="figures/fig_inverse_gal_01.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3"><img src="figures/fig_inverse_gal_01.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_02.png" class="img-fluid figure-img"></p>
-<figcaption>Showcase single-type target, cell evolution: ground truth vs baselines.</figcaption>
+<p><a href="figures/fig_inverse_gal_02.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4"><img src="figures/fig_inverse_gal_02.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_03.png" class="img-fluid figure-img"></p>
-<figcaption>Showcase single-type target, chemical field evolution: ground truth vs baselines.</figcaption>
+<p><a href="figures/fig_inverse_gal_03.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5"><img src="figures/fig_inverse_gal_03.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 </section>
@@ -317,38 +301,32 @@ Figure&nbsp;2: <strong>Ground truth vs.&nbsp;recovered</strong> over time (cells
 <h3 class="anchored" data-anchor-id="three-further-single-type-targets">Three further single-type targets</h3>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_04.png" class="img-fluid figure-img"></p>
-<figcaption>Target 1, cell evolution: ground truth vs position-loss recovery.</figcaption>
+<p><a href="figures/fig_inverse_gal_04.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6"><img src="figures/fig_inverse_gal_04.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_05.png" class="img-fluid figure-img"></p>
-<figcaption>Target 1, chemical field evolution: ground truth vs position-loss recovery.</figcaption>
+<p><a href="figures/fig_inverse_gal_05.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7"><img src="figures/fig_inverse_gal_05.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_06.png" class="img-fluid figure-img"></p>
-<figcaption>Target 2, cell evolution: ground truth vs position-loss recovery.</figcaption>
+<p><a href="figures/fig_inverse_gal_06.png" class="lightbox" data-gallery="quarto-lightbox-gallery-8"><img src="figures/fig_inverse_gal_06.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_07.png" class="img-fluid figure-img"></p>
-<figcaption>Target 2, chemical field evolution: ground truth vs position-loss recovery.</figcaption>
+<p><a href="figures/fig_inverse_gal_07.png" class="lightbox" data-gallery="quarto-lightbox-gallery-9"><img src="figures/fig_inverse_gal_07.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_08.png" class="img-fluid figure-img"></p>
-<figcaption>Target 3, cell evolution: ground truth vs position-loss recovery.</figcaption>
+<p><a href="figures/fig_inverse_gal_08.png" class="lightbox" data-gallery="quarto-lightbox-gallery-10"><img src="figures/fig_inverse_gal_08.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_09.png" class="img-fluid figure-img"></p>
-<figcaption>Target 3, chemical field evolution: ground truth vs position-loss recovery.</figcaption>
+<p><a href="figures/fig_inverse_gal_09.png" class="lightbox" data-gallery="quarto-lightbox-gallery-11"><img src="figures/fig_inverse_gal_09.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 </section>
@@ -356,26 +334,22 @@ Figure&nbsp;2: <strong>Ground truth vs.&nbsp;recovered</strong> over time (cells
 <h3 class="anchored" data-anchor-id="two-type-and-four-type-slime-cross-now-recovered">Two-type and four-type slime — <code>cross</code> now recovered</h3>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_10.png" class="img-fluid figure-img"></p>
-<figcaption>2-type slime, cell evolution: ground truth vs recovery (<code>cross</code> now recovered).</figcaption>
+<p><a href="figures/fig_inverse_gal_10.png" class="lightbox" data-gallery="quarto-lightbox-gallery-12"><img src="figures/fig_inverse_gal_10.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_11.png" class="img-fluid figure-img"></p>
-<figcaption>2-type slime, chemical field evolution: ground truth vs recovery (<code>cross</code> now recovered).</figcaption>
+<p><a href="figures/fig_inverse_gal_11.png" class="lightbox" data-gallery="quarto-lightbox-gallery-13"><img src="figures/fig_inverse_gal_11.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_12.png" class="img-fluid figure-img"></p>
-<figcaption>4-type slime, cell evolution: ground truth vs recovery (<code>cross</code> now recovered).</figcaption>
+<p><a href="figures/fig_inverse_gal_12.png" class="lightbox" data-gallery="quarto-lightbox-gallery-14"><img src="figures/fig_inverse_gal_12.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_inverse_gal_13.png" class="img-fluid figure-img"></p>
-<figcaption>4-type slime, chemical field evolution: ground truth vs recovery (<code>cross</code> now recovered).</figcaption>
+<p><a href="figures/fig_inverse_gal_13.png" class="lightbox" data-gallery="quarto-lightbox-gallery-15"><img src="figures/fig_inverse_gal_13.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></a></p>
 </figure>
 </div>
 
@@ -959,6 +933,38 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
 
 
 
