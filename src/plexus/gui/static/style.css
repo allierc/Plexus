@@ -61,7 +61,8 @@ code{color:var(--accent);background:#12151a;padding:1px 4px;border-radius:2px}
 /* ---- main 3-column ---- */
 #main{display:grid;grid-template-columns:206px 1fr 264px;min-height:0}
 aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;min-height:0}
-#inspector{border-right:none;border-left:1px solid var(--line)}
+#inspector{border-right:none;border-left:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column}
+#inspector .insp-body{flex:1 1 auto;overflow-y:auto}
 .panel-title{position:sticky;top:0;background:var(--panel);z-index:2;
   padding:7px 10px;font-size:10px;letter-spacing:2px;color:var(--ink-dim);
   border-bottom:1px solid var(--line);text-transform:uppercase}
@@ -105,20 +106,17 @@ aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto
 .lg-line.field{border-top-color:var(--field)}
 .lg-line.sched{border-top:0;height:0;border-bottom:1.5px dashed #7a8494}
 
-/* ---- mp4 viewer (bottom-right) ---- */
-.media{position:absolute;right:12px;bottom:12px;width:300px;background:var(--panel);
-  border:1px solid var(--line3);border-radius:3px;overflow:hidden;
-  box-shadow:0 8px 24px -12px #000}
+/* ---- mp4 viewer (pinned at the bottom of the inspector column) ---- */
+.media{flex:none;background:var(--panel2);border-top:1px solid var(--line2)}
 .media.collapsed .media-video{display:none}
-.media-h{display:flex;align-items:center;gap:7px;padding:5px 8px;
-  background:var(--panel2);border-bottom:1px solid var(--line2);cursor:default}
+.media-h{display:flex;align-items:center;gap:7px;padding:5px 9px;cursor:default}
 .media-dot{width:6px;height:6px;border-radius:50%;background:var(--good);flex:none}
-.media-name{color:var(--ink-bright);font-size:10px;overflow:hidden;
+.media-name{color:var(--ink-bright);font-size:9.5px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .media-btn{background:transparent;border:none;color:var(--ink-dim);cursor:pointer;
   font-size:12px;line-height:1;padding:0 3px}
 .media-btn:hover{color:var(--ink-bright)}
-.media-video{display:block;width:100%;background:#000;max-height:230px}
+.media-video{display:block;width:100%;background:#000;max-height:150px}
 
 /* ---- svg nodes ---- */
 .node{cursor:default}

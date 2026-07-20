@@ -47,6 +47,9 @@ def catalog():
 # --------------------------------------------------------------------------- #
 def _allowed_roots():
     roots = [REPO_ROOT]
+    gd = os.path.join(REPO_ROOT, "graphs_data")   # symlink -> the dataset/output tree (mp4s live there)
+    if os.path.exists(gd):
+        roots.append(os.path.realpath(gd))
     extra = os.environ.get("PLEXUS_GUI_ROOTS", "")
     roots += [r for r in extra.split(os.pathsep) if r]
     return [os.path.realpath(r) for r in roots]
@@ -64,24 +67,46 @@ def _layout_path(spec_path: str) -> str:
     return base + ".gui.json"
 
 
-def _media_for(spec_path: str):
-    """A rendered mp4 sitting next to the spec (the run output), plus a poster frame."""
-    d = os.path.dirname(spec_path)
+def _find_media_in(d: str):
+    """Best mp4 (+ poster png) in directory `d`, or None."""
     if not os.path.isdir(d):
         return None
-    video = os.path.join(d, "movie.mp4")
-    if not os.path.isfile(video):
-        mp4s = sorted(f for f in os.listdir(d) if f.lower().endswith(".mp4"))
-        if not mp4s:
-            return None
-        video = os.path.join(d, mp4s[0])
+    files = os.listdir(d)
+    mp4s = [f for f in files if f.lower().endswith(".mp4")]
+    if not mp4s:
+        return None
+    # prefer movie.mp4, then a *particle* render, then any movie*, then first
+    def vrank(f):
+        fl = f.lower()
+        return (fl != "movie.mp4", "particle" not in fl, not fl.startswith("movie"), fl)
+    video = os.path.join(d, sorted(mp4s, key=vrank)[0])
     m = {"video": "/media?path=" + quote(video), "name": os.path.basename(video)}
-    for p in ("strip.png", "fig_final.png", "poster.png"):
-        pp = os.path.join(d, p)
-        if os.path.isfile(pp):
-            m["poster"] = "/media?path=" + quote(pp)
-            break
+    pngs = [f for f in files if f.lower().endswith(".png")]
+    if pngs:
+        def prank(f):
+            fl = f.lower()
+            return ("final" not in fl, "strip" not in fl, fl)   # a final/strip frame makes the best poster
+        m["poster"] = "/media?path=" + quote(os.path.join(d, sorted(pngs, key=prank)[0]))
     return m
+
+
+def _media_for(spec_path: str):
+    """A rendered mp4 for this spec: next to it (prototype archive dirs) or under
+    `graphs_data/<...>/` (the dataset/output tree for `config/*.yaml` runs)."""
+    cands = [os.path.dirname(spec_path)]
+    rel = os.path.relpath(spec_path, REPO_ROOT)
+    parts = rel.split(os.sep)
+    # config/<cat>/<name>.yaml -> graphs_data/<cat>/<name>/
+    if len(parts) > 1 and parts[0] == "config":
+        stem = os.path.splitext(os.sep.join(parts[1:]))[0]
+        cands.append(os.path.join(REPO_ROOT, "graphs_data", stem))
+    # generic fallback: graphs_data/<full-path-stem>/
+    cands.append(os.path.join(REPO_ROOT, "graphs_data", os.path.splitext(rel)[0]))
+    for d in cands:
+        m = _find_media_in(d)
+        if m:
+            return m
+    return None
 
 
 # --------------------------------------------------------------------------- #
