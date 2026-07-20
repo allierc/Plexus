@@ -176,7 +176,7 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>And because every Plexus simulation is a composition of <strong>differentiable</strong> operators, a <em>design</em> can be optimized, not just simulated. A slime-style foraging colony — built from the same <code>deposit</code> / <code>diffuse</code> / <code>sense</code> / <code>glide</code> operators as the <a href="./index.html#what-it-looks-like">Physarum networks</a> — is tuned by a black-box <strong>UCB</strong> search over its spec parameters, from a hand-set design (left) to the best found (right), which delivers food roughly <strong>five-fold faster</strong>.</p>
+<p>And because a Plexus design is just a <strong>spec</strong> — a handful of numbers over a fixed operator set — that design can be <em>optimized</em>, not only simulated. The forager here is a colony of <strong>deformable cells</strong>: each cell is a soft elastic body simulated with <strong>MPM</strong> (the material-point method), and the colony navigates by <strong>chemotaxis</strong> — sensing an attractant gradient that points toward the food and climbing it — coordinated by boids flocking, with MPM handling the physical push against walls and neighbours. A black-box <strong>UCB</strong> search tunes the spec’s parameters — motility speed and turn rate, sensing gain, material stiffness (<code>youngs</code>), cell size and count, and the four boids weights — from a hand-set design (left) to the best found (right), which delivers food roughly <strong>five-fold faster</strong>.</p>
 <div>
 
 </div>
@@ -192,14 +192,14 @@ ul.task-list li input[type="checkbox"] {
 </div>
 <section id="harder-navigation" class="level2">
 <h2 class="anchored" data-anchor-id="harder-navigation">Harder navigation</h2>
-<p>The same recipe scales to harder navigation — a porous <strong>pillar</strong> field and a walled <strong>maze</strong>, each crossed by a self-generated attractant gradient and tuned by the same optimizer. Each strip runs left → right, from its starting point to the optimized colony.</p>
+<p>The same recipe scales to harder navigation — a porous <strong>pillar</strong> field and a walled <strong>maze</strong>, each crossed by climbing a food-attractant gradient that itself flows around the obstacles, and tuned by the same optimizer. Each strip runs left → right, from its starting point to the optimized colony.</p>
 <p><strong>Pillars — a porous field</strong></p>
 <div class="quarto-video"><video id="video_shortcode_videojs_video3" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — starting point"><source src="gallery/race_pillars_winner_1.mp4"></video></div>
 <div class="quarto-video"><video id="video_shortcode_videojs_video4" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="pillars — optimized (136/154 escape the porous field)"><source src="gallery/race_pillars_winner_8.mp4"></video></div>
 <p><strong>Maze — a walled labyrinth</strong></p>
 <div class="quarto-video"><video id="video_shortcode_videojs_video5" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — starting point"><source src="gallery/race_maze_hard_winner_1.mp4"></video></div>
 <div class="quarto-video"><video id="video_shortcode_videojs_video6" class="video-js vjs-default-skin vjs-fluid" controls="" preload="auto" data-setup="{}" title="maze — optimized (150/160 solve the labyrinth)"><source src="gallery/race_maze_hard_winner_5.mp4"></video></div>
-<p>The colony never “sees” the maze — it only reads its own attractant gradient — yet the optimizer discovers spec parameters that route the population through the labyrinth. Same operators, same engine; only the spec changed.</p>
+<p>The colony never “sees” the maze — it only reads a local food-attractant gradient — yet the optimizer discovers spec parameters that route the population through the labyrinth. Same operators, same engine; only the spec changed.</p>
 
 
 </section>

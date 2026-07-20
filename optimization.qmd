@@ -5,12 +5,15 @@ resources:
   - gallery/
 ---
 
-And because every Plexus simulation is a composition of **differentiable** operators, a
-*design* can be optimized, not just simulated. A slime-style foraging colony — built from the
-same `deposit` / `diffuse` / `sense` / `glide` operators as the
-[Physarum networks](index.qmd#what-it-looks-like) — is tuned by a black-box **UCB** search over its spec
-parameters, from a hand-set design (left) to the best found (right), which delivers food
-roughly **five-fold faster**.
+And because a Plexus design is just a **spec** — a handful of numbers over a fixed operator
+set — that design can be *optimized*, not only simulated. The forager here is a colony of
+**deformable cells**: each cell is a soft elastic body simulated with **MPM** (the
+material-point method), and the colony navigates by **chemotaxis** — sensing an attractant
+gradient that points toward the food and climbing it — coordinated by boids flocking, with
+MPM handling the physical push against walls and neighbours. A black-box **UCB** search tunes
+the spec's parameters — motility speed and turn rate, sensing gain, material stiffness
+(`youngs`), cell size and count, and the four boids weights — from a hand-set design (left) to
+the best found (right), which delivers food roughly **five-fold faster**.
 
 ::: {layout-ncol=2}
 {{< video gallery/initial.mp4 title="initial hand-set colony" >}}
@@ -21,8 +24,9 @@ roughly **five-fold faster**.
 ## Harder navigation
 
 The same recipe scales to harder navigation — a porous **pillar** field and a walled **maze**,
-each crossed by a self-generated attractant gradient and tuned by the same optimizer. Each strip
-runs left → right, from its starting point to the optimized colony.
+each crossed by climbing a food-attractant gradient that itself flows around the obstacles, and
+tuned by the same optimizer. Each strip runs left → right, from its starting point to the
+optimized colony.
 
 **Pillars — a porous field**
 
@@ -36,6 +40,6 @@ runs left → right, from its starting point to the optimized colony.
 
 {{< video gallery/race_maze_hard_winner_5.mp4 title="maze — optimized (150/160 solve the labyrinth)" >}}
 
-The colony never “sees” the maze — it only reads its own attractant gradient — yet the optimizer
-discovers spec parameters that route the population through the labyrinth. Same operators, same
-engine; only the spec changed.
+The colony never “sees” the maze — it only reads a local food-attractant gradient — yet the
+optimizer discovers spec parameters that route the population through the labyrinth. Same
+operators, same engine; only the spec changed.
