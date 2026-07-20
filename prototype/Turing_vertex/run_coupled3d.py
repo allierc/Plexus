@@ -68,7 +68,7 @@ def presets():
     (Fig 5 tubulation needs the apical/basal + bending mechanics in shell_ops.py -- deferred.)"""
     BR = {"implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0}
     base = dict(lumen=True, R=6.0, dt=0.02, chi=5.0, d_a=0.05, d_h=0.7, react=BR,
-                s0=5.3, mu=0.02, vmax=1.0, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.35, k_lloyd=0.3,
+                s0=5.3, mu=0.02, vmax=1.0, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.35, k_lloyd=5.0,
                 lam_ref=0.25, rho_lam=1.0, a_sw=1.0, hill=2.0)                 # UNIFORM growth (activator-independent)
     # Fig 5: activator-driven (mitogen) QUASI-STATIC growth on the apical/basal SHELL mechanics +
     # membrane_bending (prevents single-cell spikes -> coherent folds) + lumen_pressure (area growth
@@ -238,29 +238,21 @@ def render(pos_t, act_t, occ_t, outdir, name, lumen, R, thickness=0.8, face_mode
     def label(ax, txt):
         ax.text2D(0.02, 0.98, txt, transform=ax.transAxes, color="white", fontsize=7, va="top", family="monospace")
 
-    # strip: CLOSED external views @0 / 50% / 100% (front, front, back) + cross-section @100%
-    # (the cross-section reveals the lumen -- no artificial cutaway hole)
+    # strip: TWO ROWS at 0 / 50 / 100% -- row 1 = 3D external (closed), row 2 = cross-section
+    # (reveals the lumen; both rows share the SAME extent `box`, so growth reads across time).
     picks = [0, T // 2, T - 1]
-    views = [(22, 35), (22, 35), (22, 215)]
-    tags = ["external", "external", "external back"]
-    sfig = plt.figure(figsize=(4 * PANEL, PANEL)); sfig.patch.set_facecolor("black")
-    last = None
+    sfig = plt.figure(figsize=(3 * PANEL, 2 * PANEL)); sfig.patch.set_facecolor("black")
+    hb = box * 0.82        # widen the 2D axis so the cross-section matches the 3D cube's apparent scale
     for i, t in enumerate(picks):
         cp, av, cen, ncell = frame(t)
-        if t == T - 1:
-            last = (cp, av, cen)
-        ax = sfig.add_subplot(1, 4, i + 1, projection="3d"); ax.set_facecolor("black")
-        poly3d(ax, cp, av, cen); ax.view_init(*views[i])
-        label(ax, f"{name}\n{tags[i]} {int(100*t/(T-1))}%\nN={ncell}  activator(red)")
-    # cross-section (last frame): the monolayer reads as an activator-coloured ring around the lumen
-    pf, av, cen = last
-    axc = sfig.add_subplot(1, 4, 4); axc.set_facecolor("black")
-    for poly, a in _prism_slice(pf, av, 2, float(cen[2])):
-        axc.fill(poly[:, 0], poly[:, 1], facecolor=CMAP(norm(a)), alpha=0.95, edgecolor="black", lw=0.5)
-    hb = box * 0.5
-    axc.set_xlim(cen[0] - hb, cen[0] + hb); axc.set_ylim(cen[1] - hb, cen[1] + hb)
-    axc.set_aspect("equal"); axc.axis("off")
-    sfig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02)
+        ax = sfig.add_subplot(2, 3, i + 1, projection="3d"); ax.set_facecolor("black")    # row 1: 3D external
+        poly3d(ax, cp, av, cen); ax.view_init(22, 35)
+        axc = sfig.add_subplot(2, 3, i + 4); axc.set_facecolor("black")                   # row 2: cross-section
+        for poly, a in _prism_slice(cp, av, 2, float(cen[2])):
+            axc.fill(poly[:, 0], poly[:, 1], facecolor=CMAP(norm(a)), alpha=0.95, edgecolor="black", lw=0.5)
+        axc.set_xlim(cen[0] - hb, cen[0] + hb); axc.set_ylim(cen[1] - hb, cen[1] + hb)
+        axc.set_aspect("equal"); axc.axis("off")
+    sfig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     sfig.savefig(os.path.join(outdir, "strip.png"), dpi=120, facecolor="black"); plt.close(sfig)
 
     # movie: rotating CLOSED external view (no cutaway)

@@ -23,7 +23,8 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-from scipy.spatial import Delaunay, ConvexHull, cKDTree
+from scipy.spatial import Delaunay, ConvexHull, cKDTree, SphericalVoronoi
+from scipy.spatial import QhullError
 
 from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
@@ -287,8 +288,8 @@ class SurfaceLloyd(Lateral):
         try:
             sv = SphericalVoronoi(dirs, radius=1.0, center=np.zeros(3))
             sv.sort_vertices_of_regions()
-        except Exception:
-            return {self.at: v_full}
+        except (QhullError, ValueError, IndexError):     # genuine geometric degeneracy only --
+            return {self.at: v_full}                      # NOT a blanket swallow (that once hid a missing import)
         Vv = sv.vertices
         tgt = np.array([Vv[reg].mean(0) if len(reg) >= 3 else dirs[i]
                         for i, reg in enumerate(sv.regions)])
