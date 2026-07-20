@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plexus · spec editor</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand"><span class="glyph">◤</span> PLEXUS<span class="sub">/ spec</span></div>
+  <div class="spec-path" id="specPath" title="current spec">— no spec —</div>
+  <div class="spacer"></div>
+  <div class="toolbar">
+    <button id="btnNew"  class="tbtn">NEW</button>
+    <button id="btnLoad" class="tbtn">LOAD</button>
+    <button id="btnValidate" class="tbtn">VALIDATE</button>
+    <button id="btnSave" class="tbtn accent">SAVE</button>
+    <label class="toggle"><input type="checkbox" id="tglSchedule" checked> flow</label>
+    <button id="btnFit" class="tbtn ghost" title="fit to view">⊹</button>
+  </div>
+</header>
+
+<div id="statusbar">
+  <span id="validPill" class="pill">—</span>
+  <span id="statusMsg" class="statusmsg"></span>
+  <span class="spacer"></span>
+  <span id="counts" class="counts"></span>
+</div>
+
+<div id="main">
+  <aside id="palette">
+    <div class="panel-title">OPERATORS <span id="palCount" class="dim"></span></div>
+    <input id="palFilter" class="filter" placeholder="filter…" spellcheck="false">
+    <div id="palList" class="pal-list"></div>
+  </aside>
+
+  <div id="canvas-wrap">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" class="grid-dot"></circle>
+        </pattern>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6.5" refY="2.5" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L6,2.5 L0,5 Z" class="arrowhead"></path>
+        </marker>
+      </defs>
+      <rect id="bg" x="-100000" y="-100000" width="200000" height="200000" fill="url(#grid)"></rect>
+      <g id="world">
+        <g id="edges"></g>
+        <g id="nodes"></g>
+        <g id="wire"></g>
+      </g>
+    </svg>
+    <div id="emptyState" class="empty">
+      <div class="glyph-lg">◣◢</div>
+      <div>load a <code>spec.yaml</code> — or drop an operator to start</div>
+    </div>
+
+    <div id="legend" class="legend">
+      <div class="lg-row"><span class="lg-line act"></span>operator → set/field (acts on)</div>
+      <div class="lg-row"><span class="lg-line field"></span>field exchange (in reads · out writes)</div>
+      <div class="lg-row"><span class="lg-line sched"></span>schedule order (execution flow)</div>
+    </div>
+
+    <div id="media" class="media hidden">
+      <div class="media-h">
+        <span class="media-dot"></span>
+        <span id="mediaName" class="media-name">movie.mp4</span>
+        <span class="spacer"></span>
+        <button id="mediaCollapse" class="media-btn" title="collapse">–</button>
+        <button id="mediaClose" class="media-btn" title="hide">✕</button>
+      </div>
+      <video id="mediaVideo" class="media-video" controls preload="metadata" loop muted></video>
+    </div>
+  </div>
+
+  <aside id="inspector">
+    <div class="panel-title">INSPECT</div>
+    <div id="inspBody" class="insp-body"><div class="dim pad">nothing selected</div></div>
+  </aside>
+</div>
+
+<footer id="schedule">
+  <div class="sched-title">SCHEDULE <span class="dim">›› execution order</span></div>
+  <div id="schedRail" class="sched-rail"></div>
+</footer>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><span>LOAD SPEC</span><button id="modalClose" class="tbtn ghost">✕</button></div>
+    <input id="specFilter" class="filter" placeholder="filter specs…" spellcheck="false">
+    <div id="specList" class="spec-list"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
