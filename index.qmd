@@ -853,7 +853,7 @@ descriptions:
     objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
 plotting:
   background: black</pre></span></span>
-      <span class="sim-cap">an Exchange field sets per-region stiffness (a material map)</span>
+      <span class="sim-cap">an exchange field sets per-region stiffness (four quadrants); each pacemaker pulse contracts the tissue inward, then it relaxes elastically between beats</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1657,7 +1657,7 @@ plotting:
 </div>
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>cell_diffuse</code> → <code>turing_react</code>), cells coloured by activator. The Gray–Scott feed/kill regimes on a 2D cell disc (coral, holes, spots), and the same reaction–diffusion on a 3D cell shell.</p>
+<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>), cells coloured by activator. Gray–Scott regimes on a 2D cell disc — the coral regime, and one reaction (F=0.037) at two diffusion couplings χ (fine vs coarse) — and the same reaction–diffusion on a 3D cell shell.</p>
 <p class="opk-ref">Reference — Gray–Scott and Brusselator reaction–diffusion, after their originating models.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -1708,14 +1708,14 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">Lateral graph-diffusion + reaction — the coral regime (F=0.055)</span>
+      <span class="sim-cap">graph-diffusion + reaction — the coral regime (F=0.055)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_holes.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_chi_small.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">holes<span class="sim-spec"><pre>general:
-  name: turing2d_holes
+      <span class="sim-name" tabindex="0">fine maze (χ=0.2)<span class="sim-spec"><pre>general:
+  name: turing2d_chi_small
   seed: 0
   n_frames: 6000
   dt: 1.0
@@ -1749,23 +1749,23 @@ operators:
   at: cell
   d_a: 0.08
   d_h: 0.16
-  chi: 0.4
+  chi: 0.2
 - op: react
   at: cell
   implementation: gray_scott
-  F: 0.039
-  kk: 0.058
+  F: 0.037
+  kk: 0.06
 schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">the same operators, another regime — inverse spots / holes (F=0.039)</span>
+      <span class="sim-cap">the same reaction (F=0.037) at half the diffusion coupling χ — a finer-wavelength maze</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">spots<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">coarse spirals (χ=0.4)<span class="sim-spec"><pre>general:
   name: turing2d_spots
   seed: 0
   n_frames: 6000
@@ -1810,7 +1810,7 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">the same operators — classic Turing spots (F=0.037)</span>
+      <span class="sim-cap">the same reaction (F=0.037), larger χ — broad, coarse spiral waves</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2118,6 +2118,7 @@ schedule:
 </div>
 
 ```
+
 
 
 
