@@ -35,6 +35,7 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
     REQUIRES_PARAMS = ["from", "direction_from"]
     MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
     PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}
+    REFERENCE = "Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; Marchetti, M. C. et al. (2013). Rev. Mod. Phys. 85:1143."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

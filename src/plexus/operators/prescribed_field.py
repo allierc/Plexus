@@ -57,6 +57,7 @@ class Playback(FieldUpdate):
     REQUIRES_PARAMS = []        # no required params — `_at` (the field to advance) is engine-injected
     MECHANISM_TAGS = ["prescribed_field", "video_playback", "data_driven_field"]
     PARAM_ROLES = {}            # reads no tunable params (only the structural `_at`)
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

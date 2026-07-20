@@ -149,8 +149,9 @@ def render(pos_dec, shp, outdir, name, lumen, R, seconds=10.0, movie_frames=70):
             poly = _slice_polygon(ct, axis, c0)
             if poly is not None:
                 ax.fill(poly[:, 0], poly[:, 1], facecolor=cmap(norm(s)), alpha=0.92, edgecolor="white", lw=0.5)
-        ax.set_xlim(cen[o[0]] - box / 2, cen[o[0]] + box / 2); ax.set_ylim(cen[o[1]] - box / 2, cen[o[1]] + box / 2)
-        ax.set_aspect("equal"); ax.axis("off")
+        hb = box * 0.82                                   # widen so the 2D slice matches the 3D panels'
+        ax.set_xlim(cen[o[0]] - hb, cen[o[0]] + hb)       # apparent scale (mplot3d draws the cube with margin)
+        ax.set_ylim(cen[o[1]] - hb, cen[o[1]] + hb); ax.set_aspect("equal"); ax.axis("off")
 
     def label(ax, txt, is3d=True):
         (ax.text2D if is3d else ax.text)(0.02, 0.98, txt, transform=ax.transAxes, color="white",

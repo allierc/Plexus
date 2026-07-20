@@ -32,6 +32,7 @@ class Diffuse(FieldUpdate):
     REQUIRES_PARAMS = []                        # no required params — target field comes from `at:` (engine-injected)
     MECHANISM_TAGS = ["diffusion", "field_smoothing", "laplacian"]
     PARAM_ROLES = {"rate": "diffusion_rate"}
+    REFERENCE = "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -70,6 +71,7 @@ class DiffuseSpectral(FieldUpdate):
     REQUIRES_PARAMS = []
     MECHANISM_TAGS = ["diffusion", "field_smoothing", "spectral"]
     PARAM_ROLES = {"rate": "diffusion_coefficient"}
+    REFERENCE = "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

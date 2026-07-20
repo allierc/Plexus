@@ -40,6 +40,7 @@ class Chemotax(Exchange):
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["gradient_following", "field_templated_aggregation", "field_templated_flow"]
     PARAM_ROLES = {"gain": "field_sensitivity", "noise": "exploration_noise"}
+    REFERENCE = "Keller, E. F. & Segel, L. A. (1971). Model for chemotaxis. J. Theor. Biol. 30:225-234."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

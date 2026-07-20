@@ -105,6 +105,7 @@ class Sense(Exchange):
     REQUIRES_TYPE_PROPS = ["turn_speed", "sensor_angle", "sensor_dist", "sensor_size"]
     MECHANISM_TAGS = ["trail_following", "stigmergy", "physarum_sensing"]
     PARAM_ROLES = {"cross": "inter_species_coupling_sign", "noise": "steer_noise"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

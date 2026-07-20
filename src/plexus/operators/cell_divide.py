@@ -27,6 +27,7 @@ class CellDivide(Structural):
     REQUIRES_PARAMS = []                              # no required params — `rate` falls back to per-type div_rate else 0
     MECHANISM_TAGS = ["proliferation", "mitosis", "growth"]
     PARAM_ROLES = {"rate": "division_rate", "max_occ": "homeostatic_ceiling"}
+    REFERENCE = "Okuda, S. et al. (2015). Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech. Model. Mechanobiol. 12:627-644."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

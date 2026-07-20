@@ -52,6 +52,7 @@ class VelocityAlign(Lateral):                    # (alias `alignment`, one migra
     MECHANISM_TAGS = ["velocity_alignment", "collective_motion", "vicsek"]
     PARAM_ROLES = {"a": "alignment_strength", "gate": "neighbour_weighting",
                    "r": "contact_radius", "noise": "orientation_noise"}
+    REFERENCE = "Vicsek, T. et al. (1995). Novel type of phase transition in a system of self-driven particles. Phys. Rev. Lett. 75:1226-1229."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

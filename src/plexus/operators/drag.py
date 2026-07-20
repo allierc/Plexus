@@ -23,6 +23,7 @@ class Drag(Lateral):
     REQUIRES_PARAMS = ["k"]                     # drag coefficient
     MECHANISM_TAGS = ["viscous_drag", "friction", "damping"]
     PARAM_ROLES = {"k": "drag_coefficient", "noise": "thermal_noise"}
+    REFERENCE = "Stokes, G. G. (1851). On the effect of the internal friction of fluids on the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

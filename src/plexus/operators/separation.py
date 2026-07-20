@@ -21,6 +21,7 @@ class Separation(Lateral):
     REQUIRES_TYPE_PROPS = ["separation"]
     MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]
     PARAM_ROLES = {"scale": "separation_strength"}
+    REFERENCE = "Reynolds, C. W. (1987). Flocks, herds and schools. SIGGRAPH Comput. Graph. 21(4):25-34."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
