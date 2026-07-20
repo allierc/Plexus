@@ -784,60 +784,54 @@ schedule:
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/turing_shell_big_spots.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/turing_two_species.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">spots (sphere)<span class="sim-spec"><pre>general:
-  name: turing_shell_big_spots
+      <span class="sim-name" tabindex="0">two species (red/blue)<span class="sim-spec"><pre>general:
+  name: turing2d_two_species
   seed: 0
-  n_frames: 20000
-  dt: 0.2
+  n_frames: 6000
+  dt: 1.0
   boundary: free
-  dim: 3
+  dim: 2
   world:
-  - 20.8
-  - 20.8
-  - 20.8
+  - 49.4
+  - 49.4
 sets:
   cell:
-    n: 1400
+    n: 4000
     state:
       chem:
         width: 2
         integration: first_order
         boundary: free
       xyz:
-        width: 3
+        width: 2
         integration: none
         boundary: free
 fields: {}
 operators:
 - op: aggregate_seed
   at: cell
-  mode: shell
-  seed_mode: noise
-  radius: 8.0
+  mode: disc
+  radius: 19.0
   k: 6
+  seed_frac: 0.12
   before_frame: 1
-  a0: 1.0
-  h0: 3.0
-  noise: 0.03
 - op: graph_diffuse
   at: cell
-  d_a: 0.05
-  d_h: 0.5
-  chi: 6.4
-  norm: true
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.4
 - op: react
   at: cell
-  implementation: brusselator
-  gamma: 0.02
-  A: 1.0
-  B: 3.0
+  implementation: gray_scott
+  F: 0.039
+  kk: 0.058
 schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">reaction–diffusion on a 3D cell shell — coarse spots</span>
+      <span class="sim-cap">both Gray–Scott morphogens at once — activator (red) and substrate (blue) on white</span>
     </figcaption>
   </figure>
 </div>
