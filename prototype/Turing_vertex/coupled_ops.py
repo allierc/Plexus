@@ -435,9 +435,12 @@ class Lloyd2D(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
+        # k_lloyd = FRACTION toward the polygon area-centroid per TICK (dt-independent; 1.0 = full Lloyd
+        # step). Divided by dt below to undo the engine's x += dt*v, so the realised move is exactly
+        # k_lloyd*(centroid - pos). (Was multiplied by k_lloyd only -> true step dt*k_lloyd, ~1%/tick.)
         self.k_lloyd = float(params["k_lloyd"])
         self.pad = float(params.get("pad", 0.4))
-        self.vmax = float(params.get("vmax", 2.0))
+        self.dt = float(params.get("dt", 1.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -459,9 +462,11 @@ class Lloyd2D(Lateral):
             if abs(A) > 1e-9:                                # polygon area-centroid (proper Lloyd target)
                 cent[i, 0] = ((x + xn) * cross).sum() / (6 * A)
                 cent[i, 1] = ((y + yn) * cross).sum() / (6 * A)
-        v = self.k_lloyd * (torch.as_tensor(cent, device=dev, dtype=pos.dtype) - pos[idx])
-        if self.vmax > 0:
-            vn = v.norm(dim=1, keepdim=True)
-            v = torch.where(vn > self.vmax, v * (self.vmax / vn.clamp(min=1e-9)), v)
-        v_full[idx] = v
+        disp = self.k_lloyd * (cent - pos_np)            # desired move THIS TICK (numpy)
+        # anti-overshoot: cap per-tick move at 0.7 * mean cell size (sqrt of mean polygon area)
+        good = ok > 0
+        spacing = np.sqrt(np.abs(area[good]).mean()) if good.any() else 1.0
+        dn = np.linalg.norm(disp, axis=1, keepdims=True); cap = 0.7 * spacing
+        disp = np.where(dn > cap, disp * (cap / np.clip(dn, 1e-9, None)), disp)
+        v_full[idx] = torch.as_tensor(disp, device=dev, dtype=pos.dtype) / self.dt   # x += dt*v == disp
         return {self.at: v_full}

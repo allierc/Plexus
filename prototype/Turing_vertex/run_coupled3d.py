@@ -68,7 +68,7 @@ def presets():
     (Fig 5 tubulation needs the apical/basal + bending mechanics in shell_ops.py -- deferred.)"""
     BR = {"implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0}
     base = dict(lumen=True, R=6.0, dt=0.02, chi=5.0, d_a=0.05, d_h=0.7, react=BR,
-                s0=5.3, mu=0.02, vmax=1.0, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.35, k_lloyd=5.0,
+                s0=5.3, mu=0.02, vmax=1.0, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.35, k_lloyd=1.5,
                 lam_ref=0.25, rho_lam=1.0, a_sw=1.0, hill=2.0)                 # UNIFORM growth (activator-independent)
     # Fig 5: activator-driven (mitogen) QUASI-STATIC growth on the apical/basal SHELL mechanics +
     # membrane_bending (prevents single-cell spikes -> coherent folds) + lumen_pressure (area growth
@@ -86,9 +86,19 @@ def presets():
         return {"implementation": "gray_scott", "F": F, "kk": kk}
     gs = dict(lumen=True, R=8.0, dt=0.35, norm=False, seed_mode="scatter", seed_frac=0.04,
               d_a=0.08, d_h=0.16, chi=0.28, react=GS(0.058, 0.063), compile=False,   # growing N -> vectorised eager (32x, robust)
-              s0=5.3, mu=0.006, vmax=0.6, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.2, k_lloyd=0.15,
+              s0=5.3, mu=0.006, vmax=0.6, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.2, k_lloyd=0.5,
               lam_ref=0.006, rho_lam=1.0, a_sw=0.25, hill=2.0,                    # UNIFORM growth (real vertex mechanics)
               v0noise=0.3, reset_noise=0.4, retess_every=5, lloyd_every=3)        # multi-rate: topology/5, lloyd/3 ticks
+    # Fig 4 morphogens on the VESICLE mechanics: same nice-cell params as fig4_vesicle (dt=0.02, k_lloyd=5,
+    # k_bend=0.35, stiff mechanics) -- ONLY the RD model swaps to Gray-Scott. RD is pure coloring
+    # (activator-INDEPENDENT growth), so the cells stay vesicle-uniform. Gray-Scott needs a big timestep to
+    # develop, so instead of dt=0.35 (which detunes the mechanics -> noisy shell) we keep dt=0.02 and
+    # TIME-RESCALE the RD 35x (react `rate` + diffuse `chi`): identical pattern, stable mechanics -- the
+    # Turing/vertex timescale separation (Okuda Dt_m chemistry vs Dt_v mechanics).
+    gsv = dict(n0=600, buffer=3000, frames=3000, norm=False, seed_mode="scatter", seed_frac=0.04,
+               d_a=0.08, d_h=0.16, chi=9.8, lam_ref=0.15)
+    def GSV(F, kk):
+        return {"implementation": "gray_scott", "F": F, "kk": kk, "rate": 35.0}
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
@@ -96,6 +106,9 @@ def presets():
         dict(gs, name="fig4_coral",     n0=1000, buffer=2600, frames=9000, react=GS(0.058, 0.063)),   # coral on growing vesicle
         dict(gs, name="fig4_labyrinth", n0=1000, buffer=2600, frames=9000, react=GS(0.029, 0.054)),   # labyrinth
         dict(gs, name="fig4_holes",     n0=1000, buffer=2600, frames=9000, react=GS(0.039, 0.058)),   # holes
+        dict(base, name="fig4_coral_v",     **gsv, react=GSV(0.058, 0.063)),   # coral   on vesicle mechanics
+        dict(base, name="fig4_labyrinth_v", **gsv, react=GSV(0.029, 0.054)),   # labyrinth "
+        dict(base, name="fig4_holes_v",     **gsv, react=GSV(0.039, 0.058)),   # holes    "
         dict(base5, name="fig5_tube_thick", n0=500, buffer=2400, frames=1600, chi=6.0, d_h=0.8),  # big domains -> thick tubes
         dict(base5, name="fig5_tube_thin",  n0=500, buffer=2400, frames=1600, chi=2.5, d_h=0.5),  # small domains -> thin tubes
     ]
@@ -141,7 +154,7 @@ def make_spec(p, V0):
          "reset_noise": p.get("reset_noise", 0.0)},
     ]
     if p.get("k_lloyd", 0) > 0:                          # tangential relaxation -> equal-area hexagonal cells
-        ops.append({"op": "surface_lloyd", "at": "cell", "k_lloyd": p["k_lloyd"], "vmax": p["vmax"],
+        ops.append({"op": "surface_lloyd", "at": "cell", "k_lloyd": p["k_lloyd"], "dt": p["dt"],
                     "every": p.get("lloyd_every", 1)})   # multi-rate: this slow relaxation needn't run every tick
     if mech == "shell":                                 # Fig 5: apical/basal monolayer + lumen pressure
         ops.append({"op": "voronoi_tension_shell", "at": "cell", "s0": p["s0"], "V0": V0,
