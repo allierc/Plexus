@@ -2105,7 +2105,7 @@ plotting:
   </figure>
 </div>
 
-<h3 class="anchored">Strange attractors — <code>attractor_flow</code></h3>
+<h3 class="anchored">Strange attractors</h3>
 <p class="opk">A single lateral operator rides a whole cloud along a dissipative 3D chaotic flow ẋ = f(x); a tiny seed is stretched-and-folded until the cloud <em>is</em> the attractor. Ten systems ship; six shown.</p>
 <p class="opk-ref">Reference — each system cites its originating paper (Lorenz 1963, Rössler 1976, Sprott 1994, …).</p>
 <div class="sim-gallery g3">
@@ -2591,7 +2591,7 @@ descriptions:
       <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre># coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
 # charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
 # squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
-general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.000003, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.000006, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   particle:
     n: 960
