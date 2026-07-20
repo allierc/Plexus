@@ -271,8 +271,14 @@ class SurfaceLloyd(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
+        # k_lloyd is the FRACTION of the way to the Voronoi centroid to move PER TICK (dt-independent):
+        # 1.0 = one full Lloyd iteration each tick, ~0.5 = half-step. This op EMITs a velocity that the
+        # engine integrates as x += dt*v, so we divide by dt below to undo that -> the realised move is
+        # exactly k_lloyd*(centroid - pos) regardless of dt. (The old code multiplied by k_lloyd WITHOUT
+        # dividing by dt, so the true step was dt*k_lloyd ~ 0.6% of the way per tick at k=0.3, dt=0.02 --
+        # far too weak to counter division scatter, which is why the cells degraded to triangular.)
         self.k_lloyd = float(params["k_lloyd"])
-        self.vmax = float(params.get("vmax", 1.0))
+        self.dt = float(params.get("dt", 1.0))           # engine frame dt (undoes x += dt*v)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -295,11 +301,14 @@ class SurfaceLloyd(Lateral):
                         for i, reg in enumerate(sv.regions)])
         tgt = tgt / np.clip(np.linalg.norm(tgt, axis=1)[:, None], 1e-9, None)
         target_pos = c + r[:, None] * tgt                # same radius, Voronoi-centroid direction
-        v = self.k_lloyd * torch.as_tensor(target_pos - pos_np, device=dev, dtype=pos.dtype)
-        if self.vmax > 0:
-            vn = v.norm(dim=1, keepdim=True)
-            v = torch.where(vn > self.vmax, v * (self.vmax / vn.clamp(min=1e-9)), v)
-        v_full[idx] = v
+        disp = self.k_lloyd * (target_pos - pos_np)      # desired tangential move THIS TICK
+        # anti-overshoot: cap the per-tick move at 0.7 * the mean cell spacing on the shell, so a
+        # defect cell with a far-off centroid can't jump across its neighbours and tangle the mesh.
+        spacing = np.sqrt(4.0 * np.pi * float(r.mean()) ** 2 / n)
+        dn = np.linalg.norm(disp, axis=1, keepdims=True)
+        cap = 0.7 * spacing
+        disp = np.where(dn > cap, disp * (cap / np.clip(dn, 1e-9, None)), disp)
+        v_full[idx] = torch.as_tensor(disp, device=dev, dtype=pos.dtype) / self.dt   # x += dt*v == disp
         return {self.at: v_full}
 
 

@@ -78,7 +78,7 @@ def presets():
     for r in regimes:
         rr = dict(grow, **r); nm = rr.pop("name")
         out.append(dict(rr, name=f"couple2d_{nm}"))                            # plain (vertex_tension only)
-        out.append(dict(rr, name=f"couple2d_{nm}_lloyd", k_lloyd=2.0))         # + planar Lloyd -> uniform cells
+        out.append(dict(rr, name=f"couple2d_{nm}_lloyd", k_lloyd=0.8))         # + planar Lloyd -> uniform cells
     return out
 
 
@@ -97,7 +97,7 @@ def _ops2d(p, A, B, seed_mode):
         {"op": "vertex_tension_2d", "at": "cell", "p0": p["p0"], "K_A": 1.0, "K_P": 0.5, "mu": 0.2},
     ]
     if p.get("k_lloyd", 0) > 0:                      # planar Lloyd -> uniform hexagonal cells
-        ops.append({"op": "lloyd_2d", "at": "cell", "k_lloyd": p["k_lloyd"]})
+        ops.append({"op": "lloyd_2d", "at": "cell", "k_lloyd": p["k_lloyd"], "dt": p.get("dt", 0.2)})
     return ops
 
 

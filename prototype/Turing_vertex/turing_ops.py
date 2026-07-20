@@ -177,7 +177,7 @@ class GrayScott(Lateral):
     READS = ["chem"]; WRITES = ["chem"]
     MAPS = []                                                # local (no map traversed)
     MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott", "self_replication"]
-    PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate"}
+    PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "rate": "reaction_time_scale"}
     REFERENCE = ("Pearson, J. E. (1993). Complex patterns in a simple system. Science 261:189-192; "
                  "Gray, P. & Scott, S. K. (1984). Chem. Eng. Sci. 39:1087-1097.")
 
@@ -185,6 +185,9 @@ class GrayScott(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
         self.F = float(params["F"]); self.kk = float(params["kk"])
+        self.rate = float(params.get("rate", 1.0))          # time-scale the WHOLE RD (with diffuse chi) so the
+        #                                                     pattern develops at a fine mechanics dt -- pure time
+        #                                                     rescale, identical pattern (Turing/vertex separation)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -193,7 +196,7 @@ class GrayScott(Lateral):
         uvv = u * v * v
         dv = uvv - (self.F + self.kk) * v
         du = -uvv + self.F * (1.0 - u)
-        return {self.at: torch.stack([dv, du], dim=1) * lvl.occ[:, None]}
+        return {self.at: self.rate * torch.stack([dv, du], dim=1) * lvl.occ[:, None]}
 
 
 @register_operator("react", set="cell", kind="lateral", family="fields",
