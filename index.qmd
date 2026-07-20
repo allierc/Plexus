@@ -359,7 +359,7 @@ descriptions:
 </div>
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>), cells coloured by activator. Gray–Scott regimes on a 2D cell disc — the coral regime, and one reaction (F=0.037) at two diffusion couplings χ (fine vs coarse) — and the same reaction–diffusion on a 3D cell shell.</p>
+<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>) — Turing's two-species activator–inhibitor system. Each column is one regime shown on a 2D cell disc (top) and a 3D cell shell (bottom): the coral regime, a fine maze (small χ), and a diverging activator view (high → red, low → blue, balanced → white).</p>
 <p class="opk-ref">Reference — Gray–Scott and Brusselator reaction–diffusion, after their originating models.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -465,10 +465,10 @@ schedule:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_two_species.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">coarse spirals (χ=0.4)<span class="sim-spec"><pre>general:
-  name: turing2d_spots
+      <span class="sim-name" tabindex="0">two species (2D)<span class="sim-spec"><pre>general:
+  name: turing2d_two_species
   seed: 0
   n_frames: 6000
   dt: 1.0
@@ -506,13 +506,13 @@ operators:
 - op: react
   at: cell
   implementation: gray_scott
-  F: 0.037
-  kk: 0.06
+  F: 0.039
+  kk: 0.058
 schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">the same reaction (F=0.037), larger χ — broad, coarse spiral waves</span>
+      <span class="sim-cap">Turing's activator–inhibitor as a diverging map — activator high (red), low (blue), balanced (white)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -626,22 +626,22 @@ schedule:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_shell_big_spots.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_two_species_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">spots (sphere)<span class="sim-spec"><pre>general:
-  name: turing_shell_big_spots
+      <span class="sim-name" tabindex="0">two species (3D)<span class="sim-spec"><pre>general:
+  name: turing_two_species_3d
   seed: 0
-  n_frames: 20000
-  dt: 0.2
+  n_frames: 10000
+  dt: 0.35
   boundary: free
   dim: 3
   world:
-  - 20.8
-  - 20.8
-  - 20.8
+  - 28.6
+  - 28.6
+  - 28.6
 sets:
   cell:
-    n: 1400
+    n: 2400
     state:
       chem:
         width: 2
@@ -656,30 +656,28 @@ operators:
 - op: aggregate_seed
   at: cell
   mode: shell
-  seed_mode: noise
-  radius: 8.0
+  seed_mode: scatter
+  radius: 11.0
   k: 6
   before_frame: 1
-  a0: 1.0
-  h0: 3.0
-  noise: 0.03
+  seed_frac: 0.04
+  noise: 0.02
 - op: graph_diffuse
   at: cell
-  d_a: 0.05
-  d_h: 0.5
-  chi: 6.4
-  norm: true
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.28
+  norm: false
 - op: react
   at: cell
-  implementation: brusselator
-  gamma: 0.02
-  A: 1.0
-  B: 3.0
+  implementation: gray_scott
+  F: 0.039
+  kk: 0.058
 schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">reaction–diffusion on a 3D cell shell — coarse spots</span>
+      <span class="sim-cap">the same activator–inhibitor diverging view wrapped on a 3D cell shell</span>
     </figcaption>
   </figure>
 </div>
@@ -2117,6 +2115,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
