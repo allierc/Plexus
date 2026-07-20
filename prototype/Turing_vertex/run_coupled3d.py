@@ -97,8 +97,11 @@ def presets():
     # Turing/vertex timescale separation (Okuda Dt_m chemistry vs Dt_v mechanics).
     gsv = dict(n0=600, buffer=3000, frames=3000, norm=False, seed_mode="scatter", seed_frac=0.04,
                d_a=0.08, d_h=0.16, chi=9.8, lam_ref=0.15)
-    def GSV(F, kk):
-        return {"implementation": "gray_scott", "F": F, "kk": kk, "rate": 35.0}
+    # per-regime time-rescale: chi (diffusion) must stay under the explicit-diffusion CFL limit
+    # (dt*d_h*chi*degree < ~0.4). The robust high-feed coral tolerates chi=9.8/rate=35; the delicate
+    # low-feed labyrinth (F=0.029) diverges there, so it runs gentler chi/rate over more frames.
+    def GSV(F, kk, rate=35.0):
+        return {"implementation": "gray_scott", "F": F, "kk": kk, "rate": rate}
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
@@ -106,9 +109,11 @@ def presets():
         dict(gs, name="fig4_coral",     n0=1000, buffer=2600, frames=9000, react=GS(0.058, 0.063)),   # coral on growing vesicle
         dict(gs, name="fig4_labyrinth", n0=1000, buffer=2600, frames=9000, react=GS(0.029, 0.054)),   # labyrinth
         dict(gs, name="fig4_holes",     n0=1000, buffer=2600, frames=9000, react=GS(0.039, 0.058)),   # holes
-        dict(base, name="fig4_coral_v",     **gsv, react=GSV(0.058, 0.063)),   # coral   on vesicle mechanics
-        dict(base, name="fig4_labyrinth_v", **gsv, react=GSV(0.029, 0.054)),   # labyrinth "
-        dict(base, name="fig4_holes_v",     **gsv, react=GSV(0.039, 0.058)),   # holes    "
+        dict(base, name="fig4_coral_v",     **gsv, react=GSV(0.058, 0.063)),                       # coral
+        dict(base, name="fig4_labyrinth_v", **{**gsv, "chi": 5.6, "frames": 5000},                 # labyrinth: CFL-safe
+             react=GSV(0.029, 0.054, rate=20.0)),
+        dict(base, name="fig4_holes_v",     **{**gsv, "chi": 6.5, "frames": 5000},                 # holes: more dev
+             react=GSV(0.039, 0.058, rate=25.0)),
         dict(base5, name="fig5_tube_thick", n0=500, buffer=2400, frames=1600, chi=6.0, d_h=0.8),  # big domains -> thick tubes
         dict(base5, name="fig5_tube_thin",  n0=500, buffer=2400, frames=1600, chi=2.5, d_h=0.5),  # small domains -> thin tubes
     ]
