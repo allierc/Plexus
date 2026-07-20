@@ -283,6 +283,7 @@ class Divide2x(Structural):
         self.offset = float(params.get("offset", 0.15))
         self.block = params.get("block", "a0")               # size block: a0 (2D area) | v0 (3D volume)
         self.tangential = bool(params.get("tangential", True))  # 3D: place daughter IN the tissue-surface plane (Okuda)
+        self.reset_noise = float(params.get("reset_noise", 0.0))  # daughter target-size spread -> stays asynchronous
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device
@@ -302,8 +303,13 @@ class Divide2x(Structural):
             if b is not None and b.dim() >= 1 and b.shape[0] == lvl.n and b is not lvl.state:
                 b[slots] = b[parents].clone()
         # split target size back to base for BOTH; place the daughter beside the mother
-        lvl.state[parents, sa] = base
-        lvl.state[slots, sa] = base
+        if self.reset_noise > 0:                             # spread daughters -> asynchronous next cycle
+            g = getattr(H, "rng", None)
+            lvl.state[parents, sa] = base * (1 + self.reset_noise * (torch.rand(cap, generator=g, device=dev) - 0.5))
+            lvl.state[slots, sa] = base * (1 + self.reset_noise * (torch.rand(cap, generator=g, device=dev) - 0.5))
+        else:
+            lvl.state[parents, sa] = base
+            lvl.state[slots, sa] = base
         px0, px1 = lvl.state_schema["pos"]; D = px1 - px0    # dim-aware (2 or 3)
         parent_pos = lvl.state[parents, px0:px1]
         rnd = torch.rand(cap, D, generator=getattr(H, "rng", None), device=dev) - 0.5
@@ -320,6 +326,29 @@ class Divide2x(Structural):
         if hasattr(lvl, "birth"):
             lvl.birth[slots] = 1.0
         return {}
+
+
+# --------------------------------------------------------------------------- #
+#  Vectorised 2D shape energy (padded rings; torch.compile-able). One scalar E.
+# --------------------------------------------------------------------------- #
+def _shape_energy_2d(pos, ghosts, tri_t, ring_t, ok_t, a0, P0, K_A, K_P):
+    allp = torch.cat([pos, ghosts], 0)
+    cc = _circ_torch(allp[tri_t])
+    verts = cc[ring_t]                                        # [n, Vmax, 2] ordered polygon vertices
+    nxt = torch.roll(verts, -1, dims=1)
+    area = 0.5 * (verts[..., 0] * nxt[..., 1] - nxt[..., 0] * verts[..., 1]).sum(1).abs()
+    perim = (nxt - verts).norm(dim=-1).sum(1)
+    return ((K_A * (area - a0) ** 2 + K_P * (perim - P0) ** 2) * ok_t).sum()
+
+
+_shape_energy_2d_compiled = None
+def _energy_fn_2d(use_compile):
+    global _shape_energy_2d_compiled
+    if not use_compile:
+        return _shape_energy_2d
+    if _shape_energy_2d_compiled is None:
+        _shape_energy_2d_compiled = torch.compile(_shape_energy_2d, dynamic=True)
+    return _shape_energy_2d_compiled
 
 
 # --------------------------------------------------------------------------- #
@@ -350,6 +379,7 @@ class VertexTension2D(Lateral):
         self.p0 = float(params.get("p0", 3.9)); self.mu = float(params.get("mu", 0.2))
         self.pad = float(params.get("pad", 0.4))
         self.vmax = float(params.get("vmax", 2.0))           # clamp |velocity| -- degenerate boundary polygons blow up
+        self.compile = bool(params.get("compile", False))    # torch.compile the vectorised shape energy
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -369,15 +399,10 @@ class VertexTension2D(Lateral):
         ghosts_t = torch.as_tensor(ghosts, device=dev, dtype=pos_full.dtype)
         ring_t = torch.as_tensor(ring, device=dev)
         ok_t = torch.as_tensor(ok, device=dev)
+        efn = _energy_fn_2d(self.compile)
         with torch.enable_grad():
             pos = pos_live.detach().requires_grad_(True)
-            allp = torch.cat([pos, ghosts_t], 0)
-            cc = _circ_torch(allp[tri_t])
-            verts = cc[ring_t]                               # [n, Vmax, 2]
-            nxt = torch.roll(verts, -1, dims=1)
-            area = 0.5 * (verts[..., 0] * nxt[..., 1] - nxt[..., 0] * verts[..., 1]).sum(1).abs()
-            perim = (nxt - verts).norm(dim=-1).sum(1)
-            E = ((self.K_A * (area - a0) ** 2 + self.K_P * (perim - P0) ** 2) * ok_t).sum()
+            E = efn(pos, ghosts_t, tri_t, ring_t, ok_t, a0, P0, self.K_A, self.K_P)
             grad = torch.autograd.grad(E, pos)[0]
         v = self.mu * torch.nan_to_num(-grad) * ok_t[:, None]
         vn = v.norm(dim=1, keepdim=True)                     # clamp per-cell speed (boundary-degeneracy guard)
