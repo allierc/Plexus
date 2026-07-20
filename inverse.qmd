@@ -159,24 +159,44 @@ simulations run from the **recovered** parameters, and **columns are time**
 
 ### Three further single-type targets
 
-![](figures/fig_inverse_gal_04.png){fig-align="center"}
+Three more random single-type targets, in addition to the showcase, each recovered
+with the best method — 8D position-loss — and shown both as the cells and as the
+chemical field. The layout is the same as above: the **top row is the ground-truth
+run**, the **bottom row is a run from the recovered eight-number spec**, and columns
+are time (*t* = 0 → 200). How tightly the sensing parameters recover depends on the
+target — `sensor_angle` is pinned when the target presents rich lateral field
+structure to the sensors and left looser when it does not (across four such targets
+its unit-cube error ranged 0.015–0.158) — so these three cases probe the method on
+targets of varying difficulty.
 
-![](figures/fig_inverse_gal_05.png){fig-align="center"}
+![**Target 1 — cells.** Ground truth (top) vs the 8D position-loss recovery (bottom). The field parameters and `move_speed` recover exactly and the sensing parameters to a few percent, so the recovered run condenses from noise into the same filament network as the target. As everywhere on this page the agreement is topological — matching branch density and characteristic length — rather than a frame-for-frame overlay. Columns are time (*t* = 0 → 200).](figures/fig_inverse_gal_04.png){fig-align="center"}
 
-![](figures/fig_inverse_gal_06.png){fig-align="center"}
+![**Target 1 — chemical field.** The same two runs drawn as the deposited trail field instead of the agents. Because the field parameters (`deposit`, `diffuse`, `decay`) recover to about 10⁻³, the ground-truth and recovered fields are nearly indistinguishable at every timepoint.](figures/fig_inverse_gal_05.png){fig-align="center"}
 
-![](figures/fig_inverse_gal_07.png){fig-align="center"}
+![**Target 2 — cells.** A second random target, ground truth vs position-loss recovery. This target offers the sensors less lateral field structure, so its `sensor_angle` is among the least tightly pinned of the set — yet the recovered network still reproduces the target's density and length scale. It illustrates the identifiability finding directly: what the topology does not constrain, the fit leaves loose, while the well-constrained parameters stay exact.](figures/fig_inverse_gal_06.png){fig-align="center"}
 
-![](figures/fig_inverse_gal_08.png){fig-align="center"}
+![**Target 2 — chemical field.** The same runs as the trail field; even for the harder target the field is an almost exact match, because the field half of the spec is the linear, well-identified one.](figures/fig_inverse_gal_07.png){fig-align="center"}
 
-![](figures/fig_inverse_gal_09.png){fig-align="center"}
+![**Target 3 — cells.** A third random target. Ground truth vs the position-loss recovery, again matching the target topology across the full time course rather than pixel-for-pixel, and with the sensing parameters recovering more tightly here than for Target 2.](figures/fig_inverse_gal_08.png){fig-align="center"}
+
+![**Target 3 — chemical field.** The recovered field tracks the ground-truth field in structure at every timepoint; the two are separated only by the stochastic seed, not by the fitted parameters.](figures/fig_inverse_gal_09.png){fig-align="center"}
 
 ### Two-type and four-type slime — `cross` now recovered
 
-![](figures/fig_inverse_gal_10.png){fig-align="center"}
+A single type cannot constrain the inter-type coupling `cross`, so in the panels
+above it is *held* at ground truth. With several cell types the field carries one
+channel per type and each cell reads a blend of its own channel and the total over
+all channels, weighted by `cross` — so now `cross` drives the dynamics and becomes
+identifiable, more sharply as the number of types grows (unit-cube error 0.012 at
+two types, 0.008 at four). These montages show the two-type and four-type targets
+recovered in **full**: cells are coloured by type and the multi-channel field is
+drawn as a per-species colour composite, with ground truth on top, the recovery
+below, and time across the columns.
 
-![](figures/fig_inverse_gal_11.png){fig-align="center"}
+![**Two-type — cells.** Ground truth vs full recovery, cells coloured by type. With two channels present, `cross` becomes identifiable (unit-cube error 0.012) and *every* parameter of the spec is recovered — not only the ones a single type could pin. The two types segregate into interleaved networks, and the recovered run reproduces that inter-type arrangement over time (columns are time, *t* = 0 → 200).](figures/fig_inverse_gal_10.png){fig-align="center"}
 
-![](figures/fig_inverse_gal_12.png){fig-align="center"}
+![**Two-type — chemical field.** The two trail channels shown as a per-species colour composite. The recovered field reproduces the inter-type mixing that makes `cross` observable in the first place — where each species deposits and how strongly it reads the other.](figures/fig_inverse_gal_11.png){fig-align="center"}
 
-![](figures/fig_inverse_gal_13.png){fig-align="center"}
+![**Four-type — cells.** Four types make `cross` the most sharply identifiable of all (unit-cube error 0.008), and the recovered spec reproduces the target down to that inter-type coupling. Cells are coloured by type, ground truth on top and recovery below; the richer multi-channel structure gives the fit more constraints, so accuracy improves as the type count rises.](figures/fig_inverse_gal_12.png){fig-align="center"}
+
+![**Four-type — chemical field.** The four-channel field as a per-species colour composite, ground truth vs recovery. The matching per-species structure across the four channels is exactly what pins `cross` at four types, closing the last gap left by the single-type case.](figures/fig_inverse_gal_13.png){fig-align="center"}
