@@ -1278,6 +1278,7 @@ operators:
   cnoise: 0.04
   seed_mode: noise
   seed_frac: 0.04
+  v0noise: 0.0
   before_frame: 1
 - op: voronoi_graph_3d
   at: cell
@@ -1308,10 +1309,12 @@ operators:
   block: v0
   ratio: 2.0
   offset: 0.12
+  reset_noise: 0.0
 - op: surface_lloyd
   at: cell
-  k_lloyd: 0.3
-  vmax: 1.0
+  k_lloyd: 1.5
+  dt: 0.02
+  every: 1
 - op: voronoi_tension_3d
   at: cell
   s0: 5.3
@@ -1322,6 +1325,8 @@ operators:
   mu: 0.02
   lumen: true
   vmax: 1.0
+  compile: false
+  retess_every: 1
 - op: membrane_bending
   at: cell
   k_bend: 0.35
@@ -2591,7 +2596,7 @@ descriptions:
       <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre># coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
 # charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
 # squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
-general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.000006, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.000024, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   particle:
     n: 960
@@ -2633,7 +2638,7 @@ descriptions:
       primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
       interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
       their individual shapes but lose their tight spatial connection.</pre></span></span>
-      <span class="sim-cap">a 3D charged cloud settling into a self-screened arrangement</span>
+      <span class="sim-cap">a 3D charged cloud expanding in space as like charges repel</span>
     </figcaption>
   </figure>
 </div>
