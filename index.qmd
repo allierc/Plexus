@@ -365,8 +365,8 @@ descriptions:
   </figure>
 </div>
 
-<h3>Stigmergy — Physarum slime</h3>
-<p class="opk">A set + a scalar field, coupled: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network. One operator schedule; the network class is set by the spec (turn rate, deposit/decay, species count).</p>
+<h3>Stigmergy — Physarum slime (one species, a disc colony)</h3>
+<p class="opk">A set of agents coupled to a scalar field: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network (one schedule: <code>deposit → diffuse → decay → sense → steer</code>). Here a <b>single</b> species is seeded in a disc (<code>spawn: disc</code>), so the colony stays a bounded circular web; the three differ only in turn rate and sensor geometry.</p>
 <p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -422,7 +422,7 @@ descriptions:
       internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
       outward in all directions. All objects are a consistent teal-green color and are set against a solid
       black background.</pre></span></span>
-      <span class="sim-cap">Exchange + Lateral — deposit into a field, sense it, steer up it: a self-organizing network</span>
+      <span class="sim-cap">exchange + lateral — deposit into a field, sense it, steer up it: a self-organizing network</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -531,9 +531,15 @@ descriptions:
       in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
       are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
       is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
-      <span class="sim-cap">the same operators, low deposit — thin, filamentous strands</span>
+      <span class="sim-cap">the same operators, low turning — thin, radiating filaments</span>
     </figcaption>
   </figure>
+</div>
+
+<h3>Stigmergy — Physarum slime (many species, space-filling)</h3>
+<p class="opk">The <b>same</b> schedule, but agents are now seeded <b>uniformly</b> across the field (<code>spawn: random</code>) and split into 4–8 species, each depositing and sensing its own trail channel with cross-species inhibition (<code>cross: −1</code>). That is why this row looks so unlike the discs above: instead of one bounded colony, the networks fill the whole plane and segregate into distinct interwoven colours.</p>
+<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
+<div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/slime_four.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
@@ -591,7 +597,7 @@ descriptions:
       lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
       uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
       in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
-      <span class="sim-cap">four types over four field channels, one shared schedule</span>
+      <span class="sim-cap">four types over four trail channels, one shared schedule</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -655,7 +661,7 @@ descriptions:
       These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
       a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
       and are distributed evenly across the entire field of view.</pre></span></span>
-      <span class="sim-cap">six types coupled through a shared field — richer networks</span>
+      <span class="sim-cap">six types coupled through cross-inhibition — richer networks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -725,7 +731,7 @@ descriptions:
       loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
       and orange. Each individual filament is very small in width but spans across large portions of the
       frame, creating a high-frequency texture.</pre></span></span>
-      <span class="sim-cap">eight types — the most restrained, most-channelled web</span>
+      <span class="sim-cap">eight types — the most restrained deposit, the most finely channelled web</span>
     </figcaption>
   </figure>
 </div>
@@ -1869,22 +1875,22 @@ schedule:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_shell_labyrinth.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_shell_chi_small.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">labyrinth (sphere)<span class="sim-spec"><pre>general:
-  name: turing_shell_labyrinth
+      <span class="sim-name" tabindex="0">fine maze (sphere)<span class="sim-spec"><pre>general:
+  name: turing_shell_chi_small
   seed: 0
   n_frames: 10000
   dt: 0.35
   boundary: free
   dim: 3
   world:
-  - 20.8
-  - 20.8
-  - 20.8
+  - 28.6
+  - 28.6
+  - 28.6
 sets:
   cell:
-    n: 1600
+    n: 3200
     state:
       chem:
         width: 2
@@ -1900,7 +1906,7 @@ operators:
   at: cell
   mode: shell
   seed_mode: scatter
-  radius: 8.0
+  radius: 11.0
   k: 6
   before_frame: 1
   seed_frac: 0.04
@@ -1909,18 +1915,18 @@ operators:
   at: cell
   d_a: 0.08
   d_h: 0.16
-  chi: 0.28
+  chi: 0.2
   norm: false
 - op: react
   at: cell
   implementation: gray_scott
-  F: 0.029
-  kk: 0.054
+  F: 0.037
+  kk: 0.06
 schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">reaction–diffusion on a 3D cell shell — the labyrinth regime</span>
+      <span class="sim-cap">the same fine-maze reaction (F=0.037, small χ) wrapped on a 3D cell shell</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2118,6 +2124,7 @@ schedule:
 </div>
 
 ```
+
 
 
 
