@@ -50,3 +50,6 @@ config/material/material_stiffcoarse_*.yaml
 graphs_data
 *.npz
 *.bak_*
+
+# GUI node-editor layout sidecars (per-spec canvas positions, not source)
+*.gui.json
