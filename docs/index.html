@@ -176,8 +176,7 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#a-typed-intermediate-representation" id="toc-a-typed-intermediate-representation" class="nav-link active" data-scroll-target="#a-typed-intermediate-representation">A typed intermediate representation</a></li>
-  <li><a href="#four-concepts-seven-operators" id="toc-four-concepts-seven-operators" class="nav-link" data-scroll-target="#four-concepts-seven-operators">Four concepts, seven operators</a></li>
+  <li><a href="#four-concepts-seven-operators" id="toc-four-concepts-seven-operators" class="nav-link active" data-scroll-target="#four-concepts-seven-operators">Four concepts, seven operators</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
   <li><a href="#agentic-mechanistic-discovery" id="toc-agentic-mechanistic-discovery" class="nav-link" data-scroll-target="#agentic-mechanistic-discovery">Agentic mechanistic discovery</a></li>
@@ -209,11 +208,8 @@ window.Quarto = {
 
 
 <p>We introduce <strong>Plexus</strong>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are <strong>biological operators</strong>. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an <strong>algebra of biological operators</strong>. Second, to <strong>decompose the existing corpus</strong> of simulation models into this common language. Third, to construct <strong>differentiable implementations</strong> of these operators so that mechanistic models can be directly inferred from biological data.</p>
-<section id="a-typed-intermediate-representation" class="level2">
-<h2 class="anchored" data-anchor-id="a-typed-intermediate-representation">A typed intermediate representation</h2>
-<p>Just as modern compilers separate programming languages from their implementations through an <strong>intermediate representation</strong>, Plexus separates biological mechanisms from their numerical implementations. Every operator is defined by a <strong>typed signature</strong> — <em>what</em> biological transformation it performs — and one or more <strong>implementations</strong> — <em>how</em> it is numerically realized. The signature is the biological contract; the implementation is a numerical choice.</p>
+<p>Just as compilers separate programming languages from their implementations through an <strong>intermediate representation</strong>, Plexus separates biological mechanisms from their numerical implementations. Every operator is defined by a <strong>typed signature</strong> — <em>what</em> biological transformation it performs — and one or more <strong>implementations</strong> — <em>how</em> it is numerically realized. The signature is the biological contract; the implementation is a numerical choice.</p>
 <p>Every operator may admit multiple implementations satisfying the same signature: a mechanical interaction by Material Point Methods, finite elements, vertex or phase-field models; a signalling operator by Hodgkin–Huxley equations, Neural ODEs or graph neural networks. Because a mechanism is stated once, independently of its solver, existing simulation frameworks become <strong>complementary backends</strong> implementing a common intermediate representation rather than competing modelling paradigms.</p>
-</section>
 <section id="four-concepts-seven-operators" class="level2">
 <h2 class="anchored" data-anchor-id="four-concepts-seven-operators">Four concepts, seven operators</h2>
 <p>The language is built around four fundamental concepts: <strong>operators</strong>, <strong>sets</strong> (collections of biological entities across scales — particles, cells, neurons, synapses, tissues), the <strong>states</strong> each element carries, and <strong>fields</strong> (continuous quantities defined over space — morphogens, pressure, potentials). A biological model is a composition of operators acting on these objects.</p>
@@ -971,6 +967,376 @@ schedule:
 - voronoi_graph
 - voronoi_tension</pre></span></span>
       <span class="sim-cap">the same shape energy below p₀* — the tissue jams into a rigid hexagonal packing</span>
+    </figcaption>
+  </figure>
+</div>
+
+<h3 class="anchored">Turing × vertex — patterning a growing tissue</h3>
+<p class="opk">The two preceding models composed: a vertex tissue that <b>grows and divides</b> (<code>growth</code> → <code>divide_2x</code> → <code>vertex_tension_2d</code>) while a reaction–diffusion pattern runs on its cell graph (<code>graph_diffuse</code> → <code>react</code>). Cells are Voronoi polygons coloured by the Turing activator (red); the disc expands and re-tessellates as it patterns, and the last panel wraps the same coupling onto a growing 3D vesicle.</p>
+<p class="opk-ref">Reference — coupled reaction–diffusion + vertex growth after Okuda et&nbsp;al. (2018).</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card figure">
+    <video src="gallery/turing_couple2d_bigspots.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">spots (growing)<span class="sim-spec"><pre>general:
+  name: coupled2d_couple2d_bigspots
+  seed: 0
+  n_frames: 4000
+  dt: 0.2
+  boundary: free
+  dim: 2
+  world:
+  - 66.0
+  - 66.0
+sets:
+  cell:
+    n: 400
+    buffer: 5200
+    state:
+      pos:
+        width: 2
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 2
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      a0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: coupled_seed_2d
+  at: cell
+  radius: 11.0
+  a0: 1.0
+  a_mean: 1.0
+  h_mean: 3.0
+  noise: 0.04
+  seed_mode: noise
+  seed_frac: 0.04
+  before_frame: 1
+- op: voronoi_graph_2d
+  at: cell
+- op: graph_diffuse
+  at: cell
+  d_a: 0.05
+  d_h: 0.5
+  chi: 0.75
+  norm: false
+- op: react
+  at: cell
+  implementation: brusselator
+  gamma: 0.05
+  A: 1.0
+  B: 3.0
+- op: growth
+  at: cell
+  lam_ref: 0.004
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+- op: divide_2x
+  at: cell
+  ratio: 2.0
+- op: vertex_tension_2d
+  at: cell
+  p0: 3.9
+  K_A: 1.0
+  K_P: 0.5
+  mu: 0.2
+schedule:
+- coupled_seed_2d
+- voronoi_graph_2d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- vertex_tension_2d</pre></span></span>
+      <span class="sim-cap">brusselator spots on a tissue that grows and divides</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_couple2d_coral.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">coral (growing)<span class="sim-spec"><pre>general:
+  name: coupled2d_couple2d_coral
+  seed: 0
+  n_frames: 9000
+  dt: 0.2
+  boundary: free
+  dim: 2
+  world:
+  - 66.0
+  - 66.0
+sets:
+  cell:
+    n: 400
+    buffer: 5200
+    state:
+      pos:
+        width: 2
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 2
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      a0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: coupled_seed_2d
+  at: cell
+  radius: 11.0
+  a0: 1.0
+  a_mean: 1.0
+  h_mean: 3.0
+  noise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  before_frame: 1
+- op: voronoi_graph_2d
+  at: cell
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.28
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.058
+  kk: 0.063
+- op: growth
+  at: cell
+  lam_ref: 0.004
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+- op: divide_2x
+  at: cell
+  ratio: 2.0
+- op: vertex_tension_2d
+  at: cell
+  p0: 3.9
+  K_A: 1.0
+  K_P: 0.5
+  mu: 0.2
+schedule:
+- coupled_seed_2d
+- voronoi_graph_2d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- vertex_tension_2d</pre></span></span>
+      <span class="sim-cap">Gray–Scott coral (F=0.058) on the same growing, dividing tissue</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_couple2d_labyrinth.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">labyrinth (growing)<span class="sim-spec"><pre>general:
+  name: coupled2d_couple2d_labyrinth
+  seed: 0
+  n_frames: 9000
+  dt: 0.2
+  boundary: free
+  dim: 2
+  world:
+  - 66.0
+  - 66.0
+sets:
+  cell:
+    n: 400
+    buffer: 5200
+    state:
+      pos:
+        width: 2
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 2
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      a0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: coupled_seed_2d
+  at: cell
+  radius: 11.0
+  a0: 1.0
+  a_mean: 1.0
+  h_mean: 3.0
+  noise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  before_frame: 1
+- op: voronoi_graph_2d
+  at: cell
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 0.28
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.029
+  kk: 0.054
+- op: growth
+  at: cell
+  lam_ref: 0.004
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+- op: divide_2x
+  at: cell
+  ratio: 2.0
+- op: vertex_tension_2d
+  at: cell
+  p0: 3.9
+  K_A: 1.0
+  K_P: 0.5
+  mu: 0.2
+schedule:
+- coupled_seed_2d
+- voronoi_graph_2d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- vertex_tension_2d</pre></span></span>
+      <span class="sim-cap">Gray–Scott labyrinth (F=0.029) on the growing tissue</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/turing_couple3d_vesicle.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">vesicle (3D)<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_vesicle
+  seed: 0
+  n_frames: 1000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world:
+  - 48.0
+  - 48.0
+  - 48.0
+sets:
+  cell:
+    n: 600
+    buffer: 3000
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      v0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: tissue_seed_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+  v0: 1.441717262131954
+  a_mean: 1.0
+  h_mean: 3.0
+  cnoise: 0.04
+  seed_mode: noise
+  seed_frac: 0.04
+  before_frame: 1
+- op: voronoi_graph_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+- op: graph_diffuse
+  at: cell
+  d_a: 0.05
+  d_h: 0.7
+  chi: 5.0
+  norm: true
+- op: react
+  at: cell
+  implementation: brusselator
+  gamma: 2.0
+  A: 1.0
+  B: 3.0
+- op: growth
+  at: cell
+  block: v0
+  lam_ref: 0.25
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+  cap: 2.0
+- op: divide_2x
+  at: cell
+  block: v0
+  ratio: 2.0
+  offset: 0.12
+- op: surface_lloyd
+  at: cell
+  k_lloyd: 0.3
+  vmax: 1.0
+- op: voronoi_tension_3d
+  at: cell
+  s0: 5.3
+  radius: 6.0
+  V0: 1.441717262131954
+  K_V: 10.0
+  K_S: 1.0
+  mu: 0.02
+  lumen: true
+  vmax: 1.0
+- op: membrane_bending
+  at: cell
+  k_bend: 0.35
+  vmax: 1.0
+schedule:
+- tissue_seed_3d
+- voronoi_graph_3d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- surface_lloyd
+- voronoi_tension_3d
+- membrane_bending</pre></span></span>
+      <span class="sim-cap">the same coupling in 3D — a growing vesicle (with a lumen) patterned by brusselator spots</span>
     </figcaption>
   </figure>
 </div>
@@ -2225,7 +2591,7 @@ descriptions:
       <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre># coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
 # charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
 # squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
-general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.0000015, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.000003, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
 sets:
   particle:
     n: 960
