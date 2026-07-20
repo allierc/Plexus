@@ -40,7 +40,7 @@
 \end{scope}
 \node[anchor=north,align=center] at (E |- 0,-15mm){\textbf{Exchange}\\push / pull};
 % --- structure operators: Rewire (edges E), Divide / Die (node set |S|) ---
-\begin{scope}[shift={(128mm,2mm)},local bounding box=RW]
+\begin{scope}[shift={(128mm,-5.5mm)},local bounding box=RW]
   \node[n] (rc){};
   \node[n,above right=1.5mm and 5mm of rc](rn1){};
   \node[n,below right=1.5mm and 4mm of rc](rn2){};
@@ -55,7 +55,7 @@
   \draw[a] (m)--(g3); \draw[a] (m)--(g4);
 \end{scope}
 \node[anchor=north,align=center] at (DV |- 0,-15mm){\textbf{Divide}\\$w\!\to\!\tfrac{w}{2},\tfrac{w}{2}$};
-\begin{scope}[shift={(190mm,0)},local bounding box=DE]
+\begin{scope}[shift={(190mm,-5.5mm)},local bounding box=DE]
   \node[n,densely dashed,fill=cset!3] (z){};
   \node[right=8mm of z] (nul) {$\varnothing$};
   \draw[a] (z)--(nul);
