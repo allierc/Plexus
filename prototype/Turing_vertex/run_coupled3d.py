@@ -85,9 +85,10 @@ def presets():
     def GS(F, kk):
         return {"implementation": "gray_scott", "F": F, "kk": kk}
     gs = dict(lumen=True, R=8.0, dt=0.35, norm=False, seed_mode="scatter", seed_frac=0.04,
-              d_a=0.08, d_h=0.16, chi=0.28, react=GS(0.058, 0.063),
-              s0=5.3, mu=0.006, vmax=0.3, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.15, k_lloyd=0.12,
-              lam_ref=0.0016, rho_lam=1.0, a_sw=0.25, hill=2.0)                   # UNIFORM slow growth (dt=0.35)
+              d_a=0.08, d_h=0.16, chi=0.28, react=GS(0.058, 0.063), compile=True,
+              s0=5.3, mu=0.006, vmax=0.6, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.2, k_lloyd=0.15,
+              lam_ref=0.006, rho_lam=1.0, a_sw=0.25, hill=2.0,                    # UNIFORM growth (real vertex mechanics)
+              v0noise=0.3, reset_noise=0.4)                                       # asynchronous cell cycle -> gradual division
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
@@ -125,7 +126,7 @@ def make_spec(p, V0):
     ops = [
         {"op": "tissue_seed_3d", "at": "cell", "radius": p["R"], "lumen": p["lumen"], "v0": V0,
          "a_mean": A, "h_mean": B / A, "cnoise": 0.04, "seed_mode": seed_mode,
-         "seed_frac": p.get("seed_frac", 0.04), "before_frame": 1},
+         "seed_frac": p.get("seed_frac", 0.04), "v0noise": p.get("v0noise", 0.0), "before_frame": 1},
         {"op": "voronoi_graph_3d", "at": "cell", "radius": p["R"], "lumen": p["lumen"]},
         {"op": "graph_diffuse", "at": "cell", "d_a": p["d_a"], "d_h": p["d_h"], "chi": p["chi"],
          "norm": p.get("norm", True)},
@@ -136,7 +137,8 @@ def make_spec(p, V0):
     ops += [
         {"op": "growth", "at": "cell", "block": "v0", "lam_ref": p["lam_ref"], "rho_lam": p["rho_lam"],
          "a_sw": p["a_sw"], "hill": p["hill"], "cap": p["ratio"]},
-        {"op": "divide_2x", "at": "cell", "block": "v0", "ratio": p["ratio"], "offset": 0.12},
+        {"op": "divide_2x", "at": "cell", "block": "v0", "ratio": p["ratio"], "offset": 0.12,
+         "reset_noise": p.get("reset_noise", 0.0)},
     ]
     if p.get("k_lloyd", 0) > 0:                          # tangential relaxation -> equal-area hexagonal cells
         ops.append({"op": "surface_lloyd", "at": "cell", "k_lloyd": p["k_lloyd"], "vmax": p["vmax"]})
@@ -146,9 +148,10 @@ def make_spec(p, V0):
         ops.append({"op": "membrane_bending", "at": "cell", "k_bend": p["k_bend"], "vmax": p["vmax"]})
         ops.append({"op": "lumen_pressure", "at": "cell", "k_lumen": p.get("k_lumen", 0.005),
                     "v_target_scale": p.get("v_target_scale", 1.1), "mu": p.get("mu_lumen", 0.02), "vmax": p["vmax"]})
-    else:                                               # Fig 4: spherical-ghost Voronoi (uniform growth, inflation)
+    else:                                               # Fig 4: spherical-ghost Voronoi (vectorised + torch.compiled)
         ops.append({"op": "voronoi_tension_3d", "at": "cell", "s0": p["s0"], "radius": p["R"], "V0": V0,
-                    "K_V": p["K_V"], "K_S": p["K_S"], "mu": p["mu"], "lumen": p["lumen"], "vmax": p["vmax"]})
+                    "K_V": p["K_V"], "K_S": p["K_S"], "mu": p["mu"], "lumen": p["lumen"], "vmax": p["vmax"],
+                    "compile": p.get("compile", True)})
         ops.append({"op": "membrane_bending", "at": "cell", "k_bend": p["k_bend"], "vmax": p["vmax"]})
     return _wrap(p, ops, W)
 
