@@ -31,6 +31,7 @@ class Sediment(Lateral):
     SUPPORTED_DIMS = [2, 3]                           # uniform drift is dimension-generic
     REQUIRES_PARAMS = []                             # no required params — all knobs optional (defaults in __init__)
     PARAM_ROLES = {"g": "sediment_magnitude", "gx": "sediment_x", "gy": "sediment_y"}
+    REFERENCE = "Stokes, G. G. (1851). Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling)."
     MECHANISM_TAGS = ["body_force", "differential_sedimentation"]
 
     def __init__(self, params, device="cpu"):

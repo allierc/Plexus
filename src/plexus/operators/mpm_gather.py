@@ -29,6 +29,7 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
     MECHANISM_TAGS = ["grid_to_particle", "advection"]
     PARAM_ROLES = {"dt_sub": "substep_timestep", "wall_damp": "wall_restitution",
                    "wall_contact": "contact_layer_thickness", "vmax": "speed_cap"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM G2P); Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

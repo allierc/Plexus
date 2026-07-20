@@ -19,6 +19,7 @@ class Decay(FieldUpdate):
     REQUIRES_PARAMS = []                        # no required params — field target from `at:`; `rate` optional
     MECHANISM_TAGS = ["evaporation", "field_decay", "stigmergy"]
     PARAM_ROLES = {"rate": "evaporation_rate"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

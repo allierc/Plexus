@@ -20,6 +20,7 @@ class Cohesion(Lateral):
     REQUIRES_TYPE_PROPS = ["cohesion"]
     MECHANISM_TAGS = ["cohesion", "collective_motion"]
     PARAM_ROLES = {"scale": "cohesion_strength"}
+    REFERENCE = "Reynolds, C. W. (1987). Flocks, herds and schools: a distributed behavioral model. SIGGRAPH Comput. Graph. 21(4):25-34."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

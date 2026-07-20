@@ -34,6 +34,7 @@ class AgentScatter(Exchange):              # (alias `agent_to_mpm`, one migratio
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["agent_to_grid", "active_stress_source"]
     PARAM_ROLES = {"agent_mass": "effective_agent_mass", "k": "push_gain"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
