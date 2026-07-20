@@ -370,6 +370,34 @@ class VoronoiTension3D(Lateral):
         self.pad = float(params.get("pad", 0.15 * float(params["radius"])))
         self.vmax = float(params.get("vmax", 0.0))           # >0: clamp |velocity| (degenerate-polyhedron guard; needed when V0 grows)
         self.compile = bool(params.get("compile", False))    # torch.compile the vectorised shape energy
+        self.retess_every = max(1, int(params.get("retess_every", 1)))  # topology refresh cadence (multi-rate; 1=exact/tick)
+        self._topo = None; self._tick = 0                    # cached CONNECTIVITY (tet + hull tris); ghosts recomputed/tick
+
+    def _topology(self, pos_np, n, dev, dtype):
+        """Tessellate + per-cell hull -> cached connectivity (tet, tri_idx, mask, ok). The expensive
+        part (Delaunay + N ConvexHulls); reused for `retess_every` ticks, refreshed on cell-count change."""
+        ghosts_np = ghost_points(pos_np, self.lumen, self.pad)
+        allp_np, tet, incident = _tessellate(pos_np, ghosts_np)
+        cc_np = _circ_np(allp_np[tet])
+        rows, ok, Fmax = [], np.zeros(n, np.float32), 4
+        for i in range(n):
+            inc = incident[i]
+            if len(inc) < 4:
+                rows.append(None); continue
+            try:
+                g = np.asarray(inc)[ConvexHull(cc_np[inc]).simplices]
+            except Exception:
+                rows.append(None); continue
+            rows.append(g); ok[i] = 1.0; Fmax = max(Fmax, len(g))
+        tri_idx = np.zeros((n, Fmax, 3), np.int64); tmask = np.zeros((n, Fmax), np.float32)
+        for i in range(n):
+            if rows[i] is not None:
+                F = len(rows[i]); tri_idx[i, :F] = rows[i]; tmask[i, :F] = 1.0
+        return dict(n=n, ng=len(ghosts_np),
+                    tet=torch.as_tensor(tet, device=dev),
+                    tri_idx=torch.as_tensor(tri_idx, device=dev),
+                    tmask=torch.as_tensor(tmask, device=dev, dtype=dtype),
+                    okt=torch.as_tensor(ok, device=dev))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -383,30 +411,18 @@ class VoronoiTension3D(Lateral):
             return {self.at: v_full}
         pos_live = pos_full[idx]
         pos_np = pos_live.detach().cpu().numpy().astype(np.float64)
-        ghosts_np = ghost_points(pos_np, self.lumen, self.pad)
-        allp_np, tet, incident = _tessellate(pos_np, ghosts_np)
-        cc_np = _circ_np(allp_np[tet])
-        # per-cell hull topology -> PADDED batched (vectorised; ~32x over the old Python loop)
-        rows, ok, Fmax = [], np.zeros(n, np.float32), 4
-        for i in range(n):
-            inc = incident[i]
-            if len(inc) < 4:
-                rows.append(None); continue
-            try:
-                h = ConvexHull(cc_np[inc])
-            except Exception:
-                rows.append(None); continue
-            g = np.asarray(inc)[h.simplices]                  # [F,3] global tet indices of this cell's hull tris
-            rows.append(g); ok[i] = 1.0; Fmax = max(Fmax, len(g))
-        tri_idx = np.zeros((n, Fmax, 3), np.int64); tmask = np.zeros((n, Fmax), np.float32)
-        for i in range(n):
-            if rows[i] is not None:
-                F = len(rows[i]); tri_idx[i, :F] = rows[i]; tmask[i, :F] = 1.0
-        tet_t = torch.as_tensor(tet, device=dev)
-        ghosts_t = torch.as_tensor(ghosts_np, device=dev, dtype=pos_full.dtype)
-        tri_idx_t = torch.as_tensor(tri_idx, device=dev)
-        tmask_t = torch.as_tensor(tmask, device=dev, dtype=pos_full.dtype)
-        okt = torch.as_tensor(ok, device=dev)
+        # multi-rate topology cache: rebuild connectivity every `retess_every` ticks OR when the cell
+        # count changes (division). The boundary GHOSTS + circumcentres are recomputed EVERY tick from
+        # the current positions (cheap), so the boundary tracks inflation; only the connectivity lags.
+        self._tick += 1
+        if (self._topo is None or self._topo["n"] != n or self._tick % self.retess_every == 0):
+            self._topo = self._topology(pos_np, n, dev, pos_full.dtype)
+        T = self._topo
+        ghosts_t = torch.as_tensor(ghost_points(pos_np, self.lumen, self.pad), device=dev, dtype=pos_full.dtype)
+        if ghosts_t.shape[0] != T["ng"]:                     # ghost count drifted -> force a rebuild
+            self._topo = self._topology(pos_np, n, dev, pos_full.dtype); T = self._topo
+            ghosts_t = torch.as_tensor(ghost_points(pos_np, self.lumen, self.pad), device=dev, dtype=pos_full.dtype)
+        tet_t, tri_idx_t, tmask_t, okt = T["tet"], T["tri_idx"], T["tmask"], T["okt"]
         v0 = (lvl.get("v0")[idx, 0] if "v0" in lvl.state_schema
               else torch.full((n,), self.V0, device=dev))
         S0 = self.s0 * v0.clamp(min=1e-6) ** (2.0 / 3.0)

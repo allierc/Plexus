@@ -85,10 +85,10 @@ def presets():
     def GS(F, kk):
         return {"implementation": "gray_scott", "F": F, "kk": kk}
     gs = dict(lumen=True, R=8.0, dt=0.35, norm=False, seed_mode="scatter", seed_frac=0.04,
-              d_a=0.08, d_h=0.16, chi=0.28, react=GS(0.058, 0.063), compile=True,
+              d_a=0.08, d_h=0.16, chi=0.28, react=GS(0.058, 0.063), compile=False,   # growing N -> vectorised eager (32x, robust)
               s0=5.3, mu=0.006, vmax=0.6, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.2, k_lloyd=0.15,
               lam_ref=0.006, rho_lam=1.0, a_sw=0.25, hill=2.0,                    # UNIFORM growth (real vertex mechanics)
-              v0noise=0.3, reset_noise=0.4)                                       # asynchronous cell cycle -> gradual division
+              v0noise=0.3, reset_noise=0.4, retess_every=5, lloyd_every=3)        # multi-rate: topology/5, lloyd/3 ticks
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
@@ -141,7 +141,8 @@ def make_spec(p, V0):
          "reset_noise": p.get("reset_noise", 0.0)},
     ]
     if p.get("k_lloyd", 0) > 0:                          # tangential relaxation -> equal-area hexagonal cells
-        ops.append({"op": "surface_lloyd", "at": "cell", "k_lloyd": p["k_lloyd"], "vmax": p["vmax"]})
+        ops.append({"op": "surface_lloyd", "at": "cell", "k_lloyd": p["k_lloyd"], "vmax": p["vmax"],
+                    "every": p.get("lloyd_every", 1)})   # multi-rate: this slow relaxation needn't run every tick
     if mech == "shell":                                 # Fig 5: apical/basal monolayer + lumen pressure
         ops.append({"op": "voronoi_tension_shell", "at": "cell", "s0": p["s0"], "V0": V0,
                     "K_V": p["K_V"], "K_S": p["K_S"], "mu": p["mu"], "thickness": thick, "vmax": p["vmax"]})
@@ -151,7 +152,8 @@ def make_spec(p, V0):
     else:                                               # Fig 4: spherical-ghost Voronoi (vectorised + torch.compiled)
         ops.append({"op": "voronoi_tension_3d", "at": "cell", "s0": p["s0"], "radius": p["R"], "V0": V0,
                     "K_V": p["K_V"], "K_S": p["K_S"], "mu": p["mu"], "lumen": p["lumen"], "vmax": p["vmax"],
-                    "compile": p.get("compile", True)})
+                    "compile": p.get("compile", False),      # vectorised eager is robust on growing N
+                    "retess_every": p.get("retess_every", 1)})   # multi-rate: cache topology, refresh every K ticks + on division
         ops.append({"op": "membrane_bending", "at": "cell", "k_bend": p["k_bend"], "vmax": p["vmax"]})
     return _wrap(p, ops, W)
 
