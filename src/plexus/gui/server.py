@@ -1,0 +1,393 @@
+"""A zero-dependency backend for the Plexus spec node-editor.
+
+Stdlib `http.server` only. Three jobs:
+
+  * serve the static frontend (`static/`),
+  * expose the registry-driven operator catalog (`/api/catalog`),
+  * load / validate / save `spec.yaml` files, plus a node-layout sidecar so the
+    canvas remembers where you placed things.
+
+Validation reuses `plexus.schema.load` verbatim -- the same gatekeeper the engine
+trusts -- so "valid in the editor" == "runnable". Binds to localhost.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import os
+import posixpath
+import tempfile
+import traceback
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs, unquote, quote
+
+import yaml
+
+import plexus.schema as schema
+from plexus.gui.catalog import build_catalog
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATIC = os.path.join(HERE, "static")
+# repo root: .../Plexus  (src/plexus/gui -> up 3)
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+
+_CATALOG = None   # built once, lazily
+
+
+def catalog():
+    global _CATALOG
+    if _CATALOG is None:
+        _CATALOG = build_catalog()
+    return _CATALOG
+
+
+# --------------------------------------------------------------------------- #
+#  path safety: only touch .yaml files inside allowed roots
+# --------------------------------------------------------------------------- #
+def _allowed_roots():
+    roots = [REPO_ROOT]
+    extra = os.environ.get("PLEXUS_GUI_ROOTS", "")
+    roots += [r for r in extra.split(os.pathsep) if r]
+    return [os.path.realpath(r) for r in roots]
+
+
+def _safe_spec_path(path: str) -> str:
+    p = os.path.realpath(os.path.abspath(os.path.expanduser(path)))
+    if not any(p == r or p.startswith(r + os.sep) for r in _allowed_roots()):
+        raise PermissionError(f"path outside allowed roots: {path}")
+    return p
+
+
+def _layout_path(spec_path: str) -> str:
+    base, _ = os.path.splitext(spec_path)
+    return base + ".gui.json"
+
+
+def _media_for(spec_path: str):
+    """A rendered mp4 sitting next to the spec (the run output), plus a poster frame."""
+    d = os.path.dirname(spec_path)
+    if not os.path.isdir(d):
+        return None
+    video = os.path.join(d, "movie.mp4")
+    if not os.path.isfile(video):
+        mp4s = sorted(f for f in os.listdir(d) if f.lower().endswith(".mp4"))
+        if not mp4s:
+            return None
+        video = os.path.join(d, mp4s[0])
+    m = {"video": "/media?path=" + quote(video), "name": os.path.basename(video)}
+    for p in ("strip.png", "fig_final.png", "poster.png"):
+        pp = os.path.join(d, p)
+        if os.path.isfile(pp):
+            m["poster"] = "/media?path=" + quote(pp)
+            break
+    return m
+
+
+# --------------------------------------------------------------------------- #
+#  spec <-> ordered yaml
+# --------------------------------------------------------------------------- #
+_OP_KEY_ORDER = ("op", "at", "implementation", "to", "from")
+_GEN_KEY_ORDER = ("name", "seed", "n_frames", "dt", "boundary", "dim", "world",
+                  "record_cap", "field_record_cap", "obstacles")
+
+
+def _order_op(o: dict) -> dict:
+    d = {}
+    for k in _OP_KEY_ORDER:
+        if k in o and o[k] not in (None, ""):
+            d[k] = o[k]
+    for k, v in o.items():
+        if k not in d and k not in _OP_KEY_ORDER:
+            d[k] = v
+    return d
+
+
+def _order_general(g: dict) -> dict:
+    d = {}
+    for k in _GEN_KEY_ORDER:
+        if k in g and g[k] is not None:
+            d[k] = g[k]
+    for k, v in g.items():
+        if k not in d:
+            d[k] = v
+    return d
+
+
+def _ordered_spec(spec: dict) -> dict:
+    top = {}
+    top["general"] = _order_general(spec.get("general", {}) or {})
+    top["sets"] = spec.get("sets", {}) or {}
+    top["fields"] = spec.get("fields", {}) or {}
+    top["operators"] = [_order_op(o) for o in spec.get("operators", []) or []]
+    top["schedule"] = spec.get("schedule", []) or []
+    if spec.get("plotting"):
+        top["plotting"] = spec["plotting"]
+    for k, v in spec.items():
+        if k not in top:
+            top[k] = v
+    return top
+
+
+def _dump_yaml(spec: dict) -> str:
+    return yaml.safe_dump(_ordered_spec(spec), sort_keys=False,
+                          default_flow_style=False, allow_unicode=True)
+
+
+def _validate(spec: dict):
+    """Run the real schema validator on a temp copy. Returns (ok, error)."""
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write(_dump_yaml(spec))
+            tmp = f.name
+        schema.load(tmp)
+        return True, None
+    except Exception as e:  # noqa: BLE001 -- surface any validation error verbatim
+        return False, str(e)
+    finally:
+        if tmp and os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+# --------------------------------------------------------------------------- #
+#  spec discovery
+# --------------------------------------------------------------------------- #
+def _list_specs():
+    out = []
+    scan = [
+        os.path.join(REPO_ROOT, "prototype"),
+        os.path.join(REPO_ROOT, "config"),
+    ]
+    for root in scan:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, _dirs, files in os.walk(root):
+            for fn in files:
+                if fn.endswith((".yaml", ".yml")):
+                    full = os.path.join(dirpath, fn)
+                    out.append({
+                        "path": full,
+                        "rel": os.path.relpath(full, REPO_ROOT),
+                    })
+    out.sort(key=lambda d: d["rel"])
+    return out
+
+
+# --------------------------------------------------------------------------- #
+#  HTTP
+# --------------------------------------------------------------------------- #
+class Handler(BaseHTTPRequestHandler):
+    server_version = "PlexusGUI/0.1"
+    protocol_version = "HTTP/1.1"   # keep-alive -> smoother <video> range seeking
+
+    def log_message(self, fmt, *args):  # quieter console
+        pass
+
+    # -- helpers ---------------------------------------------------------- #
+    def _send_json(self, obj, code=200):
+        body = json.dumps(obj).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_file(self, path, ctype):
+        try:
+            with open(path, "rb") as f:
+                body = f.read()
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_media(self, path):
+        """Serve an mp4/png next to a spec, with HTTP Range support so <video> can seek."""
+        if not path:
+            return self.send_error(400)
+        try:
+            sp = _safe_spec_path(path)
+        except Exception:
+            return self.send_error(403)
+        if not os.path.isfile(sp):
+            return self.send_error(404)
+        ctype = _ctype(sp)
+        size = os.path.getsize(sp)
+        rng = self.headers.get("Range")
+        start, end = 0, size - 1
+        partial = False
+        if rng and rng.startswith("bytes="):
+            partial = True
+            try:
+                s, e = rng[6:].split("-", 1)
+                start = int(s) if s else 0
+                end = int(e) if e else size - 1
+                end = min(end, size - 1)
+                if start > end or start < 0:
+                    start, end, partial = 0, size - 1, False
+            except Exception:
+                start, end, partial = 0, size - 1, False
+        length = end - start + 1
+        try:
+            self.send_response(206 if partial else 200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Accept-Ranges", "bytes")
+            if partial:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Content-Length", str(length))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            with open(sp, "rb") as f:
+                f.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass   # client seeked/closed the stream — normal for <video>
+
+    def _read_json(self):
+        n = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(n) if n else b"{}"
+        return json.loads(raw.decode("utf-8"))
+
+    # -- GET -------------------------------------------------------------- #
+    def do_GET(self):
+        u = urlparse(self.path)
+        route = u.path
+        q = parse_qs(u.query)
+
+        if route == "/" or route == "/index.html":
+            return self._send_file(os.path.join(STATIC, "index.html"), "text/html; charset=utf-8")
+
+        if route.startswith("/static/"):
+            rel = posixpath.normpath(unquote(route[len("/static/"):]))
+            if rel.startswith(".."):
+                return self.send_error(403)
+            full = os.path.join(STATIC, rel)
+            return self._send_file(full, _ctype(full))
+
+        if route == "/api/catalog":
+            return self._send_json(catalog())
+
+        if route == "/api/specs":
+            return self._send_json({"specs": _list_specs(), "repo_root": REPO_ROOT})
+
+        if route == "/media":
+            return self._serve_media((q.get("path") or [None])[0])
+
+        if route == "/api/spec":
+            path = (q.get("path") or [None])[0]
+            if not path:
+                return self._send_json({"error": "missing ?path"}, 400)
+            try:
+                sp = _safe_spec_path(path)
+                with open(sp) as f:
+                    raw = f.read()
+                parsed = yaml.safe_load(raw) or {}
+                ok, err = _validate(parsed)
+                layout = None
+                lp = _layout_path(sp)
+                if os.path.exists(lp):
+                    with open(lp) as f:
+                        layout = json.load(f)
+                return self._send_json({
+                    "path": sp, "rel": os.path.relpath(sp, REPO_ROOT),
+                    "raw": raw, "spec": parsed, "layout": layout,
+                    "valid": ok, "error": err, "media": _media_for(sp),
+                })
+            except Exception as e:  # noqa: BLE001
+                return self._send_json({"error": str(e)}, 400)
+
+        return self.send_error(404)
+
+    # -- POST ------------------------------------------------------------- #
+    def do_POST(self):
+        u = urlparse(self.path)
+        route = u.path
+        try:
+            data = self._read_json()
+        except Exception as e:  # noqa: BLE001
+            return self._send_json({"error": f"bad json: {e}"}, 400)
+
+        if route == "/api/validate":
+            ok, err = _validate(data.get("spec", {}))
+            yamltext = None
+            try:
+                yamltext = _dump_yaml(data.get("spec", {}))
+            except Exception as e:  # noqa: BLE001
+                ok, err = False, f"yaml dump failed: {e}"
+            return self._send_json({"valid": ok, "error": err, "yaml": yamltext})
+
+        if route == "/api/save":
+            path = data.get("path")
+            spec = data.get("spec", {})
+            layout = data.get("layout")
+            if not path:
+                return self._send_json({"error": "missing path"}, 400)
+            try:
+                sp = _safe_spec_path(path)
+            except Exception as e:  # noqa: BLE001
+                return self._send_json({"error": str(e)}, 400)
+            ok, err = _validate(spec)
+            if not ok and not data.get("force"):
+                return self._send_json({"saved": False, "valid": False, "error": err})
+            try:
+                with open(sp, "w") as f:
+                    f.write(_dump_yaml(spec))
+                if layout is not None:
+                    with open(_layout_path(sp), "w") as f:
+                        json.dump(layout, f, indent=1)
+            except Exception as e:  # noqa: BLE001
+                return self._send_json({"saved": False, "error": str(e)}, 500)
+            return self._send_json({"saved": True, "valid": ok, "error": err,
+                                    "path": sp, "rel": os.path.relpath(sp, REPO_ROOT)})
+
+        if route == "/api/layout":
+            # persist just the node layout without touching the spec
+            path = data.get("path")
+            layout = data.get("layout")
+            if not path:
+                return self._send_json({"error": "missing path"}, 400)
+            try:
+                sp = _safe_spec_path(path)
+                with open(_layout_path(sp), "w") as f:
+                    json.dump(layout, f, indent=1)
+            except Exception as e:  # noqa: BLE001
+                return self._send_json({"error": str(e)}, 400)
+            return self._send_json({"saved": True})
+
+        return self.send_error(404)
+
+
+def _ctype(path):
+    ext = os.path.splitext(path)[1].lower()
+    return {
+        ".html": "text/html; charset=utf-8",
+        ".js": "application/javascript; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".json": "application/json",
+        ".svg": "image/svg+xml",
+        ".woff2": "font/woff2",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+    }.get(ext, "application/octet-stream")
+
+
+def serve(host="127.0.0.1", port=8765):
+    httpd = ThreadingHTTPServer((host, port), Handler)
+    return httpd
