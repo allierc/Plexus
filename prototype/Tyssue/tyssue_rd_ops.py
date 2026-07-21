@@ -102,10 +102,11 @@ class CellRDSeed(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
         self.seed = int(params.get("seed", 0))
-        self.mode = params.get("mode", "scatter")               # "noise" (Brusselator/GM) | "scatter" (Gray-Scott)
+        self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" (localized source)
         self.seed_frac = float(params.get("seed_frac", 0.06))   # (scatter) fraction of strong activator seeds
         self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
         self.noise = float(params.get("noise", 0.04))
+        self.patch_z = float(params.get("patch_z", 0.6))        # (patch) activate cells with cen_z > patch_z x z_max
 
     def forward(self, H, mask=None):
         clvl = H.level(self.at); vlvl = H.level(self.vat); m = getattr(vlvl, "_mesh", None)
@@ -113,7 +114,13 @@ class CellRDSeed(Structural):
             return {}
         nF = m["nF"]; dev = clvl.state.device
         g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
-        if self.mode == "noise":                                # Brusselator: homogeneous steady state + noise
+        if self.mode == "patch":                                # localized activation source (a bud/tube driver)
+            a = torch.full((nF,), 0.02, device=dev)
+            if "cen" in clvl.state_schema:
+                ci0, ci1 = clvl.state_schema["cen"]; zc = clvl.state[:nF, ci0 + 2]
+                a = torch.where(zc > self.patch_z * float(zc.max()), torch.ones(nF, device=dev), a)
+            u = torch.ones(nF, device=dev)
+        elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
             a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
             u = (self.B / self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
         else:                                                   # Gray-Scott: substrate=1 + scattered activator nuclei

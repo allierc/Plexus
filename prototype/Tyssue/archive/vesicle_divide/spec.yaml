@@ -3,6 +3,7 @@ general:   # run-level settings
   seed: 0   # RNG seed
   n_frames: 220   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 300
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
@@ -54,6 +55,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   max_div: 10
 - op: topo_snapshot_3d
   at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
 schedule:   # the order the operators run each frame
 - seed_mesh_3d
 - vesicle_growth

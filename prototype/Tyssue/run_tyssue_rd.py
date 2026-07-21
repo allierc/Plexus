@@ -37,6 +37,7 @@ except Exception:
 
 import plexus.operators   # noqa: F401
 import tyssue_ops3d        # noqa: F401  seed_mesh_3d + shape_energy_3d + vesicle_growth + divide_3d + topo_snapshot_3d
+import tyssue_t1_ops3d     # noqa: F401  reconnect_t1_3d (anneal division defects -> rounded cells over long runs)
 import tyssue_rd_ops       # noqa: F401  cell_* RD ops
 from tyssue_ops3d import build_sphere_mesh
 import plexus.schema as S
@@ -57,36 +58,42 @@ def presets():
     #      name           rd     n_cells frames grow    divide
     return [("coral",        GS,    1200,  500,   0.0,    False),
             ("spots",        BRUSS, 1200,  500,   0.0,    False),
-            ("rd_coral_grow", GS,    500,   450,   0.002,  True)]   # coral + SLOW (quasi-static) uniform grow + division
+            ("rd_coral_grow", GS,    150,   220,   0.003,  True)]   # EXACTLY vesicle_divide (150c/220f/grow0.003/max_div10) + coral colouring
 
 
 def make_spec(name, rd, n_cells, frames, grow, divide, buf, cbuf):
     dt = rd["dt"]
-    ops = [
-        {"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS,
-         "jitter": JITTER, "p0": 3.72, "seed": SEED, "before_frame": 1},
-        {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.1,
-         "Lambda": 0.3, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": dt,
-         "relax_iters": 22 if (grow > 0 or divide) else 6,       # growth+division needs full relaxation to stay smooth
-         "eta": 0.08, "cap_frac": 0.12},
-        {"op": "cell_geometry_3d", "at": "cell"},
-        {"op": "cell_adjacency", "at": "cell"},
-        {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, **rd["seed"]},
-        {"op": "cell_diffuse", "at": "cell", **rd["diffuse"]},
-        {"op": "cell_react", "at": "cell", **rd["react"]},
-    ]
-    sched = ["seed_mesh_3d", "shape_energy_3d", "cell_geometry_3d", "cell_adjacency",
-             "cell_rd_seed", "cell_diffuse", "cell_react"]
+    rec_cap = 300                                                     # bound recorded frames (else long runs OOM)
+    sstride = max(1, (frames + rec_cap) // rec_cap)                   # recording stride; snapshots match it
+    # VERTEX MECHANICS in the SAME order as vesicle_divide (growth -> shape_energy -> T1 -> divide), then
+    # the RD ops (which only COLOUR the cells). rd_coral_grow == vesicle_divide + reaction-diffusion.
+    ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS,
+            "jitter": JITTER, "p0": 3.72, "seed": SEED, "before_frame": 1}]
+    sched = ["seed_mesh_3d"]
     if grow > 0:
-        ops.append({"op": "vesicle_growth", "at": "vertex", "rate": grow, "every": 1})
-        sched.append("vesicle_growth")            # UNIFORM growth (no morphogen bulge yet)
+        ops.append({"op": "vesicle_growth", "at": "vertex", "rate": grow, "every": 1, "max_scale": 2.5})
+        sched.append("vesicle_growth")            # capped -> PLATEAUS (~1400 cells); BEFORE shape_energy (== vesicle_divide)
+    ops.append({"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0,
+                "Gamma": 0.1, "Lambda": 0.5, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": dt,    # == vesicle_divide (clean)
+                "relax_iters": 26 if (grow > 0 or divide) else 6, "eta": 0.08, "cap_frac": 0.12})
+    sched.append("shape_energy_3d")
     if divide:
+        ops.append({"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2,
+                    "max_flips": max(20, n_cells // 15)})             # T1 anneals division defects -> rounded cells
+        sched.append("reconnect_t1_3d")
         ops.append({"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "p0": 3.72,
-                    "every": 2, "max_div": max(10, n_cells // 20), "cell_set": "cell"})  # scale w/ size -> uniform sizes
-        sched.append("divide_3d")                                     # daughters inherit the morphogen
-        ops.append({"op": "topo_snapshot_3d", "at": "vertex"}); sched.append("topo_snapshot_3d")
+                    "every": 2, "max_div": max(10, n_cells // 20), "cell_set": "cell"})  # daughters inherit the morphogen
+        sched.append("divide_3d")
+    ops += [{"op": "cell_geometry_3d", "at": "cell"},            # --- RD (colouring only), after the mechanics ---
+            {"op": "cell_adjacency", "at": "cell"},
+            {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, **rd["seed"]},
+            {"op": "cell_diffuse", "at": "cell", **rd["diffuse"]},
+            {"op": "cell_react", "at": "cell", **rd["react"]}]
+    sched += ["cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
+    if divide:
+        ops.append({"op": "topo_snapshot_3d", "at": "vertex", "every": sstride}); sched.append("topo_snapshot_3d")
     cfg = {
-        "general": {"name": f"tyssue_rd_{name}", "seed": SEED, "n_frames": frames, "dt": dt,
+        "general": {"name": f"tyssue_rd_{name}", "seed": SEED, "n_frames": frames, "dt": dt, "record_cap": rec_cap,
                     "boundary": "free", "dim": 3, "world": [8 * RADIUS, 8 * RADIUS, 8 * RADIUS]},
         "sets": {"vertex": {"n": buf},
                  "cell": {"n": cbuf, "state": {"chem": {"width": 2, "integration": "first_order"},
@@ -112,7 +119,7 @@ def run_all(only=None):
             continue
         odir = os.path.join(OUT, name); os.makedirs(odir, exist_ok=True)
         mesh0, nF = _mesh(n_cells); Nv = mesh0["Nv"]
-        buf = int(Nv * (5.0 if divide else 1.0)); cbuf = int(nF * (5.0 if divide else 1.0))
+        buf = int(Nv * (4.0 if divide else 1.0)); cbuf = int(nF * (4.0 if divide else 1.0))   # cap+plateau -> ~1500 cells, 4x is ample
         print(f"[tyssue_rd] {name}: {rd['react']['implementation']} grow={grow} divide={divide}  (Nv={Nv}, cells={nF})", flush=True)
         rec = {"name": name, "react": rd["react"]["implementation"], "grow": grow, "divide": divide, "Nv": Nv, "cells": nF}
         try:

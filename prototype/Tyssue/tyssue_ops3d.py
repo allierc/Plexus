@@ -49,7 +49,7 @@ def build_sphere_mesh(n, r=1.0, jitter=0.0, seed=0):
             np.array(ef, np.int64), len(faces))
 
 
-def face_geometry_3d(pos, es, et, ef, nF):
+def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     """Per-face 3D area (Newell area-vector magnitude), perimeter, centroid, and the PER-CELL wedge
     volume v_f = (1/3)(cen_f . N_f) -- the volume of the pyramid from the sphere centre to the face.
     The lumen volume is just sum_f v_f, but keeping it per-cell lets each cell carry its own volume
@@ -58,13 +58,31 @@ def face_geometry_3d(pos, es, et, ef, nF):
     length = (t - s).norm(dim=-1)
     cross = torch.cross(s, t, dim=-1)                        # consecutive-vertex cross products
     dev, dt = pos.device, pos.dtype
+    if eocc is not None:                                     # reservoir: zero out dead (padding) half-edges
+        length = length * eocc; cross = cross * eocc[:, None]; sw = s * eocc[:, None]; w = eocc
+    else:
+        sw = s; w = torch.ones_like(length)
     N = 0.5 * torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, cross)   # area vector / face
     area = N.norm(dim=-1)
     perim = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, length)
-    cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, torch.ones_like(length))
-    cen = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, s) / cnt.clamp(min=1)[:, None]
+    cnt = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, w)
+    cen = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, sw) / cnt.clamp(min=1)[:, None]
     vf = (1.0 / 3.0) * (cen * N).sum(dim=-1)                 # per-cell wedge volume (sum = lumen volume)
     return area, perim, cen, vf
+
+
+def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam, eocc, vocc):
+    """Explicit-arg AVM shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
+    change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
+    `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
+    the K_* / Lam / Gam coefficients are compile-time constants."""
+    area, perim, cen, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
+    E = (K_A * (area - A0) ** 2 + K_P * (perim - P0) ** 2 + 0.5 * Gam * perim ** 2) * alive
+    line = (pos[et] - pos[es]).norm(dim=-1) * eocc          # line tension over live half-edges only
+    E = E.sum() + Lam * line.sum()
+    E = E + K_V * ((vf - V0f) ** 2 * alive).sum()
+    E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()   # radial over live vertices only
+    return E
 
 
 @register_operator("seed_mesh_3d", set="vertex", kind="structural", family="growth")
@@ -104,7 +122,9 @@ class SeedMesh3D(Structural):
                          V0f=vf.detach().clone(),               # PER-CELL target wedge volume (v_eq per cell)
                          Vbirth=vf.detach().clone(),            # volume at birth -> cell divides when it doubles
                          V0=float(vf.sum()),
-                         R0=float(np.linalg.norm(verts, axis=1).mean()), verts0=verts)
+                         R0=float(np.linalg.norm(verts, axis=1).mean()), verts0=verts,
+                         # RESERVOIR fixed sizes for the compiled mechanics (verts<=Nbuf; faces~V/2; half-edges~3V)
+                         Nv_max=Nbuf, nF_max=Nbuf // 2 + 64, Ebuf=4 * Nbuf)
         return {}
 
 
@@ -136,26 +156,23 @@ class ShapeEnergy3D(Lateral):
         self.eta = float(params.get("eta", 0.08)); self.cap_frac = float(params.get("cap_frac", 0.12))
         # Lloyd-like tangential regularization (AVM analog of Turing's surface_lloyd): rounds cells
         self.smooth_iters = int(params.get("smooth_iters", 0)); self.smooth_w = float(params.get("smooth_w", 0.0))
+        # torch.compile the (autograd-differentiated) energy: ~2.4x on a FIXED mesh, but DIVISION changes
+        # nF every other frame -> torch.compile recompiles each time -> 20x SLOWER. So default OFF; only
+        # enable (compile=True) for fixed-topology runs (static RD, growth without division).
+        # torch.compile the energy via a fixed-size RESERVOIR (occ-masked padding so shapes never change
+        # under division). Measured: a CLEAR ~2.4x win only for FIXED-topology runs (buffer == live count
+        # -> no padding); for growing/dividing meshes the padding computes over the oversized buffer and
+        # the one-time compile cost only amortizes over very long runs, so it is net SLOWER. Hence
+        # OPT-IN (compile=True) -- use it for the static RD; the default is the fast live-only path.
+        self.use_compile = bool(params.get("compile", False))
+        self._efn = torch.compile(_shape_energy_core, dynamic=False) if self.use_compile else _shape_energy_core
 
-    def _energy(self, pos, m):
-        area, perim, cen, vf = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
-        alive = m["alive"]
-        E = (self.K_A * (area - m["A0"]) ** 2 + self.K_P * (perim - m["P0"]) ** 2) * alive
-        if self.Gamma:                                           # cortical contractility (rounds cells; tyssue FaceContractility)
-            E = E + 0.5 * self.Gamma * perim ** 2 * alive
-        E = E.sum() + self.Lambda * (pos[m["E_trgt"]] - pos[m["E_srce"]]).norm(dim=-1).sum()
-        # PER-CELL volume elasticity (Turing_vertex Eq.3 / tyssue ClosedMonolayer): each cell holds its
-        # own wedge volume near v_eq, so growth (ramping v_eq per cell) inflates every cell locally and
-        # a local dip is penalised -- the shell expands smoothly and resists buckling, no kinematic push.
-        E = E + self.K_V * ((vf - m["V0f"]) ** 2 * alive).sum()
-        if self.K_R:                                             # soft radial constraint (a bending-like term):
-            E = E + self.K_R * ((pos.norm(dim=1) - m["R0"]) ** 2).sum()   # keeps vertices near the shell -> smooth
-        return E
-
-    def _grad(self, pos, m):
+    def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc):
         with torch.enable_grad():
-            p = pos.detach().requires_grad_(True)
-            g = torch.autograd.grad(self._energy(p, m), p)[0]
+            p = p.detach().requires_grad_(True)
+            E = self._efn(p, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
+                          self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc)
+            g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
 
     def forward(self, H, mask=None):
@@ -164,13 +181,39 @@ class ShapeEnergy3D(Lateral):
         m = getattr(lvl, "_mesh", None)
         if m is None:
             return {self.at: v_full}
-        Nv = m["Nv"]; x0 = pos_full[:Nv].detach().clone(); x = x0.clone()
+        Nv = int(m["Nv"]); nF = int(m["nF"]); es = m["E_srce"]; et = m["E_trgt"]; ef = m["E_face"]
+        E = es.shape[0]; dev = pos_full.device; dt = pos_full.dtype
+        x0 = pos_full[:Nv].detach().clone()
+        R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
         with torch.no_grad():
-            cap = self.cap_frac * (x[m["E_trgt"]] - x[m["E_srce"]]).norm(dim=-1).mean().clamp(min=1e-6)
-        for _ in range(max(1, self.relax_iters)):
-            step = -(self.eta * self.mu) * self._grad(x, m)
-            nrm = step.norm(dim=1, keepdim=True)
-            x = x + step * torch.clamp(cap / (nrm + 1e-12), max=1.0)
+            cap = self.cap_frac * (x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-6)
+        if self.use_compile:
+            # RESERVOIR path: pad to fixed buffer sizes (dead slots masked by occ) -> compiled once
+            Nvm = int(m.get("Nv_max", Nv)); Fm = int(m.get("nF_max", nF)); Em = int(m.get("Ebuf", E))
+            z = torch.zeros
+            xp = z(Nvm, 3, device=dev, dtype=dt); xp[:Nv] = x0
+            esp = z(Em, dtype=torch.long, device=dev); esp[:E] = es
+            etp = z(Em, dtype=torch.long, device=dev); etp[:E] = et
+            efp = z(Em, dtype=torch.long, device=dev); efp[:E] = ef
+            eocc = z(Em, device=dev, dtype=dt); eocc[:E] = 1.0
+            vocc = z(Nvm, device=dev, dtype=dt); vocc[:Nv] = 1.0
+            A0p = z(Fm, device=dev, dtype=dt); A0p[:nF] = m["A0"]
+            P0p = z(Fm, device=dev, dtype=dt); P0p[:nF] = m["P0"]
+            V0fp = z(Fm, device=dev, dtype=dt); V0fp[:nF] = m["V0f"]
+            alivep = z(Fm, device=dev, dtype=dt); alivep[:nF] = m["alive"]
+            for _ in range(max(1, self.relax_iters)):
+                step = -(self.eta * self.mu) * self._grad(xp, esp, etp, efp, Fm, A0p, P0p, V0fp,
+                                                          alivep, R0t, eocc, vocc)
+                xp = xp + step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            x = xp[:Nv]
+        else:
+            # LIVE-ONLY path (default, fast): relax the live vertices, energy over live faces/edges
+            eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
+            x = x0.clone()
+            for _ in range(max(1, self.relax_iters)):
+                step = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, m["A0"], m["P0"],
+                                                          m["V0f"], m["alive"], R0t, eocc, vocc)
+                x = x + step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
         if self.smooth_iters and self.smooth_w > 0:      # Lloyd-like tangential regularization -> rounder cells
             es, et = m["E_srce"], m["E_trgt"]
             ones = torch.ones(es.shape[0], device=x.device, dtype=x.dtype)
@@ -202,6 +245,7 @@ class VesicleGrowth(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
         self.rate = float(params.get("rate", 0.004)); self.every = int(params.get("every", 1))
+        self.max_scale = float(params.get("max_scale", 1e9))    # cap the linear growth -> the shell PLATEAUS
         self._k = 0
 
     def forward(self, H, mask=None):
@@ -211,7 +255,11 @@ class VesicleGrowth(Structural):
         self._k += 1
         if self._k % self.every != 0:
             return {}
+        gs = float(m.get("gscale", 1.0))
+        if gs >= self.max_scale:                                # plateaued: stop inflating (division then stops too)
+            return {}
         g = 1.0 + self.rate
+        m["gscale"] = gs * g                                     # cumulative linear scale (radius factor)
         m["A0"] = m["A0"] * (g * g)                              # area ~ radius^2
         m["P0"] = m["P0"] * g                                    # perimeter ~ radius
         m["V0f"] = m["V0f"] * (g ** 3)                           # per-cell target volume ~ radius^3
@@ -345,10 +393,14 @@ class TopoSnapshot3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device); self.at = params.get("_at", "vertex")
+        self.every = int(params.get("every", 1)); self._k = 0   # store at the RECORDING stride (else OOM on long runs)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
+            return {}
+        self._k += 1                                            # store at tick 1 (~frame 0) then every `every` ticks,
+        if not (self._k == 1 or self._k % self.every == 0):     # matching the engine's recorded set frames -> aligned
             return {}
         m.setdefault("hist", []).append(dict(
             E_srce=m["E_srce"].detach().cpu().numpy().copy(),

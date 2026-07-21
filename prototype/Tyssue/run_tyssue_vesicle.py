@@ -78,11 +78,12 @@ def make_spec(name, p0, buf, grow_rate, divide, n_cells, frames):
         ops.append({"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "p0": p0,
                     "every": 2, "max_div": mxd})  # gradual, staggered volume-doubling cell cycle (Turing fig4)
         sched.append("divide_3d")                # split cells whose wedge volume doubled (edge-midpoint septum)
-        ops.append({"op": "topo_snapshot_3d", "at": "vertex"})
-        sched.append("topo_snapshot_3d")         # record the (changing) mesh each frame for rendering
+        sstride = max(1, ((frames or FRAMES) + 300) // 300)   # record/snapshot stride -> bound memory on long runs
+        ops.append({"op": "topo_snapshot_3d", "at": "vertex", "every": sstride})
+        sched.append("topo_snapshot_3d")         # record the (changing) mesh at the recording stride for rendering
     cfg = {
         "general": {"name": f"tyssue_ves_{name}", "seed": SEED, "n_frames": frames or FRAMES, "dt": 1.0,
-                    "boundary": "free", "dim": 3, "world": [6 * RADIUS, 6 * RADIUS, 6 * RADIUS]},
+                    "record_cap": 300, "boundary": "free", "dim": 3, "world": [6 * RADIUS, 6 * RADIUS, 6 * RADIUS]},
         "sets": {"vertex": {"n": buf}},
         "fields": {},
         "operators": ops,

@@ -1,10 +1,12 @@
 {
  "name": "coral",
  "react": "gray_scott",
+ "grow": 0.0,
+ "divide": false,
  "Nv": 2396,
  "cells": 1200,
- "a_lo": 0.017,
- "a_hi": 0.395,
  "a_std": 0.131,
- "patterned": true
+ "patterned": true,
+ "cells_end": 1200,
+ "n_div": 0
 }
