@@ -822,7 +822,7 @@ schedule:
   <figure class="sim-card">
     <video src="gallery/turing_couple2d_bigspots.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">spots (growing)<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">spots<span class="sim-spec"><pre>general:
   name: coupled2d_couple2d_bigspots
   seed: 0
   n_frames: 4000
@@ -908,7 +908,7 @@ schedule:
   <figure class="sim-card">
     <video src="gallery/turing_couple2d_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">coral (growing)<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
   name: coupled2d_couple2d_coral
   seed: 0
   n_frames: 9000
@@ -993,7 +993,7 @@ schedule:
   <figure class="sim-card">
     <video src="gallery/turing_couple2d_labyrinth.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">labyrinth (growing)<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">labyrinth<span class="sim-spec"><pre>general:
   name: coupled2d_couple2d_labyrinth
   seed: 0
   n_frames: 9000
@@ -1078,7 +1078,7 @@ schedule:
   <figure class="sim-card">
     <video src="gallery/turing_couple3d_vesicle.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">spots (vesicle)<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">spots<span class="sim-spec"><pre>general:
   name: coupled3d_fig4_vesicle
   seed: 0
   n_frames: 1000
@@ -1191,16 +1191,228 @@ schedule:
   <figure class="sim-card">
     <video src="gallery/turing_couple3d_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">coral (vesicle)<span class="sim-spec"><pre>prototype/Turing_vertex/archive/fig4_coral_v/spec.yaml
-(spec not archived)</pre></span></span>
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_coral_v
+  seed: 0
+  n_frames: 3000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world:
+  - 48.0
+  - 48.0
+  - 48.0
+sets:
+  cell:
+    n: 600
+    buffer: 3000
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      v0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: tissue_seed_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+  v0: 1.441717262131954
+  a_mean: 1.0
+  h_mean: 3.0
+  cnoise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  v0noise: 0.0
+  before_frame: 1
+- op: voronoi_graph_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 9.8
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.058
+  kk: 0.063
+  rate: 35.0
+- op: growth
+  at: cell
+  block: v0
+  lam_ref: 0.15
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+  cap: 2.0
+  lam_gain: 1.0
+- op: divide_2x
+  at: cell
+  block: v0
+  ratio: 2.0
+  offset: 0.12
+  reset_noise: 0.0
+- op: surface_lloyd
+  at: cell
+  k_lloyd: 1.5
+  dt: 0.02
+  every: 1
+- op: voronoi_tension_3d
+  at: cell
+  s0: 5.3
+  radius: 6.0
+  V0: 1.441717262131954
+  K_V: 10.0
+  K_S: 1.0
+  mu: 0.02
+  lumen: true
+  vmax: 1.0
+  compile: false
+  retess_every: 1
+- op: membrane_bending
+  at: cell
+  k_bend: 0.35
+  vmax: 1.0
+schedule:
+- tissue_seed_3d
+- voronoi_graph_3d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- surface_lloyd
+- voronoi_tension_3d
+- membrane_bending</pre></span></span>
       <span class="sim-cap">Gray–Scott coral wrapped on a growing 3D vesicle</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_couple3d_holes.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">holes (vesicle)<span class="sim-spec"><pre>prototype/Turing_vertex/archive/fig4_holes_v/spec.yaml
-(spec not archived)</pre></span></span>
+      <span class="sim-name" tabindex="0">holes<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_holes_v
+  seed: 0
+  n_frames: 5000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world:
+  - 48.0
+  - 48.0
+  - 48.0
+sets:
+  cell:
+    n: 600
+    buffer: 3000
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      v0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: tissue_seed_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+  v0: 1.441717262131954
+  a_mean: 1.0
+  h_mean: 3.0
+  cnoise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  v0noise: 0.0
+  before_frame: 1
+- op: voronoi_graph_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 6.5
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.039
+  kk: 0.058
+  rate: 25.0
+- op: growth
+  at: cell
+  block: v0
+  lam_ref: 0.15
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+  cap: 2.0
+  lam_gain: 1.0
+- op: divide_2x
+  at: cell
+  block: v0
+  ratio: 2.0
+  offset: 0.12
+  reset_noise: 0.0
+- op: surface_lloyd
+  at: cell
+  k_lloyd: 1.5
+  dt: 0.02
+  every: 1
+- op: voronoi_tension_3d
+  at: cell
+  s0: 5.3
+  radius: 6.0
+  V0: 1.441717262131954
+  K_V: 10.0
+  K_S: 1.0
+  mu: 0.02
+  lumen: true
+  vmax: 1.0
+  compile: false
+  retess_every: 1
+- op: membrane_bending
+  at: cell
+  k_bend: 0.35
+  vmax: 1.0
+schedule:
+- tissue_seed_3d
+- voronoi_graph_3d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- surface_lloyd
+- voronoi_tension_3d
+- membrane_bending</pre></span></span>
       <span class="sim-cap">Gray–Scott holes (inverse spots) on a growing 3D vesicle</span>
     </figcaption>
   </figure>
@@ -2498,12 +2710,13 @@ descriptions:
       primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
       interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
       their individual shapes but lose their tight spatial connection.</pre></span></span>
-      <span class="sim-cap">a 3D charged cloud expanding in space as like charges repel</span>
+      <span class="sim-cap">a 3D charged cloud expanding in space</span>
     </figcaption>
   </figure>
 </div>
 
 ```
+
 
 
 
