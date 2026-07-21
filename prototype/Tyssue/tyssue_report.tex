@@ -544,7 +544,7 @@ ring. Getting that bookkeeping right keeps the mesh a valid closed surface: each
 $\Delta V\!=\!2,\ \Delta E\!=\!3,\ \Delta F\!=\!1$, so $V\!-\!E\!+\!F$ is invariant. A standalone check
 (reorienting the SphericalVoronoi outward first, so every directed edge is unique) confirms
 Euler $=2$ across dozens of divisions; \emph{in the engine} the growing, dividing vesicle proliferates
-$150\!\to\!487$ cells over $337$ divisions in $220$ frames and still verifies \texttt{closed = true,
+$150\!\to\!521$ cells over $371$ divisions in $220$ frames and still verifies \texttt{closed = true,
 Euler = 2} (Fig.~\ref{fig:vesdiv}). Pacing follows the Turing\_vertex \texttt{fig4\_vesicle} reference
 (volume-doubling, a few divisions per frame) so the tissue proliferates gradually. Two subtleties were
 worth fixing: divisions must be chosen \emph{unbiased} --- selecting the first ready cells in face-index
@@ -574,10 +574,10 @@ anneal better.
 \caption{\textbf{A dividing (proliferating) vesicle} (\texttt{vesicle\_divide}), $0/33/66/100\%$,
 framed to the final extent. The vesicle grows by per-cell volume elasticity \emph{and} its cells divide
 by a volume-doubling cell cycle (edge-midpoint septum): the shell inflates from $R\!\approx\!5$ to
-$\approx\!9.5$ while the cell count grows $150\!\to\!487$, so cells stay near constant size
+$\approx\!9.5$ while the cell count grows $150\!\to\!521$, so cells stay near constant size
 (top: 3D shell; bottom: cross-section, a ring of ever more, smaller cells around the lumen). Division
 is chosen unbiased (shuffled candidates, random septum direction) so it fills the sphere uniformly. The
-closed surface stays valid throughout ($\texttt{Euler}=2$ after all $337$ divisions), line tension
+closed surface stays valid throughout ($\texttt{Euler}=2$ after all $371$ divisions), line tension
 keeping the fresh daughters well-shaped.}
 \label{fig:vesdiv}
 \end{figure}
@@ -604,13 +604,56 @@ timestep $\mathrm{d}t=0.02$, so the whole sim runs at that step and \texttt{shap
 the same $\mathrm{d}t$ so the mechanics still relaxes fully each frame. A self-organised activator
 pattern emerges across the closed shell (Fig.~\ref{fig:coral}), coloured white$\to$red.
 
-Crucially the pattern couples to \emph{topological change}. In \texttt{rd\_coral\_grow} the same coral
-runs while the vesicle grows (quasi-statically) and \emph{divides}: \texttt{divide\_3d} now propagates
-the mother's \texttt{chem} to its daughters (the kept face keeps the mother's state, the new face
-inherits a copy), so the Turing field rides the proliferating tissue coherently rather than being
-scrambled by division ($500\!\to\!1402$ cells, the labyrinth intact). This is the substrate for the
-morphogenesis proper --- morphogen-driven growth (bulge/divide where $a$ is high) on a \emph{fluid}
-($p_0\!>\!3.81$) shell where T1 lets the tissue flow, the bridge to tubes.
+Crucially the pattern couples to \emph{topological change}. By construction \texttt{rd\_coral\_grow}
+is \emph{exactly the dividing vesicle of Fig.~\ref{fig:vesdiv} plus the coral colouring}: its mechanical
+schedule (growth $\to$ shape energy $\to$ T1 $\to$ division) is that of \texttt{vesicle\_divide}
+verbatim, and the reaction--diffusion ops only \emph{read} the mesh (aggregate vertices to cell
+centroids, integrate \texttt{chem}) --- they never move a vertex. We verified that the hard way: a
+controlled triple at identical mechanics --- \texttt{grow\_only}, \texttt{grow\_divide}, and
+\texttt{grow\_divide}$+$RD --- gave \emph{byte-identical vertex trajectories} for the last two, so the
+morphogen is provably pure colouring. The one genuine coupling runs the other way:
+\texttt{divide\_3d} propagates the mother's \texttt{chem} to its daughters (the kept face retains the
+mother's state, the new face inherits a copy), so the Turing field rides the proliferating tissue
+coherently instead of being scrambled by division. At the vesicle\_divide scale ($150\!\to\!518$ cells)
+the labyrinth develops cleanly on the growing, dividing shell.
+
+\paragraph{The synchronised division wave, and the stochastic cell cycle that breaks it.} Scaling the
+same recipe up --- to $500$ cells over $1000$ frames, for a finer pattern --- exposed a real
+instability, and it took the controlled experiment above to show it was \emph{not} the
+reaction--diffusion. Because every cell is born at the same volume and grows uniformly, they all cross
+the volume-doubling threshold \emph{in lockstep}: the cell count climbs in flat $+100$-per-frame steps
+(a wave capped only by \texttt{max\_div}), so the shell is driven under sustained \emph{max-rate}
+division for the entire growth ramp. Fresh, unrelaxed daughters accumulate faster than the bounded
+Euler relaxation can smooth them and the (face-referenced) shell roughness at mid-ramp blows up to
+$0.38$ (worst frame $1.7$) --- the transient ``grey'' of exposed cell walls --- annealing back only
+once growth plateaus. The fix is the one real epithelia use: \emph{cell-cycle-time variability}. Two
+knobs make the division \emph{stochastic}: a \emph{stochastic volume seed} (\texttt{vseed\_cv} on
+\texttt{seed\_mesh\_3d}) gives each cell a random initial cell-cycle phase so the \emph{first} wave is
+desynchronised, and a \emph{stochastic cell cycle} (\texttt{cycle\_cv} on \texttt{divide\_3d}) draws
+each daughter's next division threshold from a Gaussian so later generations stay spread out. With
+CV$=0.4$ the lockstep wave becomes a smooth ramp (cells climb gradually from frame $0$), the mid-ramp
+roughness drops two orders of magnitude ($0.38\!\to\!0.004$), and \texttt{rd\_coral\_grow\_big}
+proliferates $500\!\to\!1994$ cells while staying smooth throughout --- a finer coral labyrinth on the
+larger shell (Fig.~\ref{fig:coralgrow}). The lesson repeats the document's refrain: the artefact
+\emph{looked} like a shading or reaction--diffusion bug, but it was a \emph{synchronisation} property
+of the mechanics, cured by restoring the biological noise a deterministic cell cycle had omitted.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/rd_coral_grow_big/strip.png}
+\caption{\textbf{Coral reaction--diffusion riding a growing, dividing vesicle}
+(\texttt{rd\_coral\_grow\_big}), $0/33/66/100\%$. The Gray-Scott labyrinth (cell state \texttt{chem},
+coloured white$\to$red by activator) develops on a shell that grows by per-cell volume elasticity and
+proliferates $500\!\to\!1994$ cells; \texttt{divide\_3d} hands each daughter a copy of the mother's
+morphogen so the pattern stays coherent across division. A \emph{stochastic cell cycle} (per-cell
+random cycle length, CV$=0.4$) desynchronises division: without it the cells double in lockstep and the
+shell roughens $\sim\!100\times$ at mid-growth (a grey band of exposed walls); with it the shell stays
+smooth throughout (top: 3D; bottom: cross-section).}
+\label{fig:coralgrow}
+\end{figure}
+
+This is the substrate for the morphogenesis proper --- morphogen-driven growth (bulge/divide where $a$
+is high) on a \emph{fluid} ($p_0\!>\!3.81$) shell where T1 lets the tissue flow, the bridge to tubes.
 
 \begin{figure}[h]
 \centering
@@ -626,6 +669,31 @@ round Turing spots --- \texttt{react} is an interchangeable contract.}
 
 \section*{Field notes}
 \emph{Dated log of what actually worked or failed --- the hard-won part.}
+
+\paragraph{3D division at scale (2026-07-21) --- a synchronised division wave, not a rendering bug.}
+\begin{itemize}\itemsep2pt
+\item \textbf{The controlled experiment that exonerated the reaction--diffusion.}
+\texttt{rd\_coral\_grow} rendered a transient grey band mid-growth that looked like a broken coral or a
+shading bug. The decisive test was to strip it to a triple at \emph{identical} mechanics ---
+\texttt{grow\_only}, \texttt{grow\_divide}, and \texttt{grow\_divide}$+$RD --- and compare
+\emph{vertex trajectories}. The last two were byte-identical, so the reaction--diffusion is provably
+pure colouring; \texttt{grow\_only} was smooth, so the roughness came from \emph{division under growth},
+at scale. A per-frame trace nailed it: the cell count climbs in flat $+100$/frame steps (all cells
+doubling together, a wave capped by \texttt{max\_div}) and the face-referenced roughness spikes to
+$0.38$ (worst $1.7$) across the whole ramp. What the eye reported as ``grey'' was a
+\emph{synchronisation}, not a mesh error.
+\item \textbf{Stochastic cell cycle: the biological noise the model had omitted.} A deterministic
+volume-doubling cycle with identical birth volumes \emph{must} synchronise under uniform growth; real
+tissues don't, because cell-cycle times vary. Adding that variability --- a random initial phase at
+seed (\texttt{vseed\_cv}) and a Gaussian per-division threshold (\texttt{cycle\_cv}) --- turns the
+lockstep wave into a smooth ramp and drops the mid-ramp roughness $0.38\!\to\!0.004$, letting the coral
+scale to $500\!\to\!1994$ cells cleanly. One parameter --- but only after the controlled experiment
+localised the cause; guessing at shading or T1 tuning would have chased the symptom.
+\item \textbf{Honest metrics matter (again).} The first roughness number was inflated by unused
+reservoir vertices sitting at the origin. Restricting the metric to \emph{face-referenced} vertices ---
+those that actually tile the shell --- gave the true $0.38\!\to\!0.004$ and matched the rendered strip.
+Same lesson as the bow-tie faces below: measure the geometric thing you mean.
+\end{itemize}
 
 \paragraph{Stage 2 (2026-07-21) --- topology operators, and where the cheap division breaks.}
 \begin{itemize}\itemsep2pt
@@ -705,19 +773,21 @@ Pinning vertices of degree $<3$ (those on the ragged Voronoi border) holds the f
 exclude any face touching a pinned vertex.
 \end{itemize}
 
-\paragraph{[next] active driving, edge-midpoint division, and the lift to 3D tubes.}
-The bounded Euler step (above) resolved the integrator bottleneck, so the remaining increments
-are structural. (i) A genuine \texttt{cell} \emph{set} (state $a_0$, type, \texttt{chem}, and
-\texttt{alive} via occupancy) as a second Level, making the model a true two-level hierarchy: a
-\texttt{cell\_geometry} \emph{Aggregate} (vertices$\to$cell area/perimeter) and a cross-set
-\texttt{shape\_energy} that reads $a_0$ from the cell and broadcasts force to the vertices. This
-is both fuller \texttt{plexus2} compliance (it exercises the set hierarchy and Aggregate/Broadcast
-families the single-set version folds away) and the required substrate for the reaction-diffusion.
-(ii) Edge-midpoint division (a straight-line split with decidable angle, Brodland--Veldhuis),
-cell elimination, and rosettes. (iii) The lift to a monolayer / 3D vesicle
-(\texttt{cell\_volume}
-elasticity + the IH/HI 3D reconnections, both already catalogued in the extraction, \S4) --- the
-substrate on which Okuda's morphogen-driven \emph{tubes} become reachable, now that force balance
-and explicit reconnection exist.
+\paragraph{[next] morphogen-driven tubes and branching.}
+The structural increments that were ``next'' in the earlier notes are now \emph{done}: the genuine
+two-level hierarchy (a \texttt{cell} set carrying \texttt{chem}, fed by a \texttt{cell\_geometry}
+Aggregate), edge-midpoint division with a decidable long-axis angle, and the lift to the closed 3D
+monolayer (per-cell volume elasticity $+$ surface T1) all exist and are exercised above; the
+reaction--diffusion runs on the cell set and rides division; and the division wave is tamed by a
+stochastic cell cycle. What remains are the morphogenesis \emph{targets} from Turing\_vertex, and they
+reuse every operator above unchanged --- only the coupling and the fluidity are new dials.
+(i)~\emph{Morphogen-driven growth}: \texttt{morphogen\_growth\_3d} grows a cell's target volume where
+the activator $a$ is high, so a localised Turing patch on a \emph{fluid} ($p_0\!>\!3.81$) shell, where
+T1 lets the tissue flow and its cells divide (handing the activator to their daughters), should
+\emph{bud and extend into a tube} rather than jam into a spike (Turing\_vertex Fig.~5). (ii)~Lowering
+the reaction--diffusion feed drives that patch to \emph{branch} (Fig.~6). The exploratory \texttt{tube}
+runner --- the same schedule with the morphogen$\to$growth coupling switched on and $p_0$ raised into
+the fluid regime --- is the current front; stabilising the bud against the fluid shell's tendency to
+balloon is the open problem.
 
 \end{document}

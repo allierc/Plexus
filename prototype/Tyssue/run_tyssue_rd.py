@@ -55,20 +55,22 @@ BRUSS = dict(react=dict(implementation="brusselator", gamma=2.0, A=1.0, B=3.0),
 
 
 def presets():
-    #      name           rd     n_cells frames grow    divide
-    return [("coral",        GS,    1200,  500,   0.0,    False),
-            ("spots",        BRUSS, 1200,  500,   0.0,    False),
-            ("rd_coral_grow", GS,    150,   220,   0.003,  True)]   # EXACTLY vesicle_divide (150c/220f/grow0.003/max_div10) + coral colouring
+    #      name              rd     n_cells frames grow    divide  cv    (cv>0 = stochastic cell cycle: desync'd division)
+    return [("coral",            GS,    1200,  500,   0.0,    False,  0.0),
+            ("spots",            BRUSS, 1200,  500,   0.0,    False,  0.0),
+            ("rd_coral_grow",    GS,    150,   220,   0.003,  True,   0.0),   # EXACTLY vesicle_divide (150c/220f) + coral
+            ("rd_coral_grow_big", GS,   500,   1000,  0.002,  True,   0.4)]   # SCALED: stochastic cell cycle breaks the
+    #    synchronised division wave -> stays clean at 500c/1000f -> finer coral pattern
 
 
-def make_spec(name, rd, n_cells, frames, grow, divide, buf, cbuf):
+def make_spec(name, rd, n_cells, frames, grow, divide, cv, buf, cbuf):
     dt = rd["dt"]
     rec_cap = 300                                                     # bound recorded frames (else long runs OOM)
     sstride = max(1, (frames + rec_cap) // rec_cap)                   # recording stride; snapshots match it
     # VERTEX MECHANICS in the SAME order as vesicle_divide (growth -> shape_energy -> T1 -> divide), then
     # the RD ops (which only COLOUR the cells). rd_coral_grow == vesicle_divide + reaction-diffusion.
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS,
-            "jitter": JITTER, "p0": 3.72, "seed": SEED, "before_frame": 1}]
+            "jitter": JITTER, "p0": 3.72, "seed": SEED, "before_frame": 1, "vseed_cv": cv}]  # stochastic volume seed
     sched = ["seed_mesh_3d"]
     if grow > 0:
         ops.append({"op": "vesicle_growth", "at": "vertex", "rate": grow, "every": 1, "max_scale": 2.5})
@@ -81,8 +83,8 @@ def make_spec(name, rd, n_cells, frames, grow, divide, buf, cbuf):
         ops.append({"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2,
                     "max_flips": max(20, n_cells // 15)})             # T1 anneals division defects -> rounded cells
         sched.append("reconnect_t1_3d")
-        ops.append({"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "p0": 3.72,
-                    "every": 2, "max_div": max(10, n_cells // 20), "cell_set": "cell"})  # daughters inherit the morphogen
+        ops.append({"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv,
+                    "p0": 3.72, "every": 2, "max_div": max(10, n_cells // 20), "cell_set": "cell"})  # daughters inherit morphogen
         sched.append("divide_3d")
     ops += [{"op": "cell_geometry_3d", "at": "cell"},            # --- RD (colouring only), after the mechanics ---
             {"op": "cell_adjacency", "at": "cell"},
@@ -114,16 +116,16 @@ def _mesh(n_cells):
 
 
 def run_all(only=None):
-    for name, rd, n_cells, frames, grow, divide in presets():
+    for name, rd, n_cells, frames, grow, divide, cv in presets():
         if only and name not in only:
             continue
         odir = os.path.join(OUT, name); os.makedirs(odir, exist_ok=True)
         mesh0, nF = _mesh(n_cells); Nv = mesh0["Nv"]
         buf = int(Nv * (4.0 if divide else 1.0)); cbuf = int(nF * (4.0 if divide else 1.0))   # cap+plateau -> ~1500 cells, 4x is ample
-        print(f"[tyssue_rd] {name}: {rd['react']['implementation']} grow={grow} divide={divide}  (Nv={Nv}, cells={nF})", flush=True)
-        rec = {"name": name, "react": rd["react"]["implementation"], "grow": grow, "divide": divide, "Nv": Nv, "cells": nF}
+        print(f"[tyssue_rd] {name}: {rd['react']['implementation']} grow={grow} divide={divide} cv={cv}  (Nv={Nv}, cells={nF})", flush=True)
+        rec = {"name": name, "react": rd["react"]["implementation"], "grow": grow, "divide": divide, "cv": cv, "Nv": Nv, "cells": nF}
         try:
-            sim, cfg = make_spec(name, rd, n_cells, frames, grow, divide, buf, cbuf)
+            sim, cfg = make_spec(name, rd, n_cells, frames, grow, divide, cv, buf, cbuf)
             write_spec(cfg, os.path.join(odir, "spec.yaml"))
             Hf, out = engine_run(sim, device="cpu")
             emesh = Hf.level("vertex")._mesh; hist = emesh.get("hist")

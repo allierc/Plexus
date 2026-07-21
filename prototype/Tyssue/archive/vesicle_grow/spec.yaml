@@ -3,6 +3,7 @@ general:   # run-level settings
   seed: 0   # RNG seed
   n_frames: 120   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 300
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
@@ -32,6 +33,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   K_A: 1.0   # area-elasticity stiffness
   K_P: 1.0   # perimeter-elasticity stiffness
   Lambda: 0.1
+  Gamma: 0.0
   K_V: 1.0
   K_R: 0.4
   mu: 1.0   # mobility (overdamped)
