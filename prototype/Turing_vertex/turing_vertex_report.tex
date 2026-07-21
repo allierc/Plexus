@@ -272,25 +272,31 @@ flattens. This is the same wall as \S5 from the other side: the fast spherical S
 elongation is gated on the coherent vertex mechanics (shared vertices + force balance + T1), i.e.\ a true
 vertex model such as Tyssue --- the natural next substrate.
 
-\paragraph{Dividing directly on activation.} A cleaner coupling still is to divide cells \emph{directly}
-where the activator is on, at a per-tick rate, rather than routing through growth-then-size (a one-line
-\texttt{divide\_2x} option, \texttt{act\_rate}/\texttt{act\_thr}). This concentrates proliferation exactly
-at the morphogen domains and gives the most \emph{pattern-faithful} extrusion of the whole exploration
-(Fig.~\ref{fig:actdiv}): the tightest-gated pure variant (\texttt{ext4\_tight}, threshold $0.3$) reaches
-$\mathrm{corr}(a,r)\!=\!0.29$ --- higher than any growth-driven config and second only to the original
-broad-lobe \texttt{coral\_ext} ($0.31$) --- on a clean monolayer, the lobes visibly tracking the activator
-bands. It trades a little height ($\mathrm{protr}_{\max}\!=\!1.36$ vs $1.44$) for faithfulness. The stable
-window is narrow: combining direct division \emph{with} growth, or raising the rate, over-proliferates and
-blows the RD CFL to NaN. So direct pattern$\to$proliferation is the cleanest coupling on this mechanics ---
-but the same neck-coherence wall still caps the height.
+\paragraph{Dividing directly on activation.} The cleanest coupling of all is to divide cells
+\emph{directly} where the activator is on, rather than routing through growth-then-size (a one-line
+\texttt{divide\_2x} option). The subtlety is that the per-tick division probability must be \emph{graded}
+in the activator, $p=\texttt{act\_rate}\cdot a^{n}/(a^{n}+a_{\text{thr}}^{n})$: a hard threshold lets pale
+cells that merely exceed it divide at the \emph{full} rate, so low-activator cells proliferate too (a flaw
+we caught by eye and fixed). With the graded, sharply-gated rate (\texttt{ext5\_sharp}, $a_{\text{thr}}
+\!=\!0.35,\ n\!=\!6$), proliferation is confined to the deep-activator cells --- Fig.~\ref{fig:actdiv}
+shows the signature directly in the cell \emph{sizes}: the activator (dark) bands fill with small, densely
+packed daughters and bulge outward, while the low-activator regions keep their large original cells and
+stay flat. This is the most \emph{pattern-faithful} extrusion of the whole study, $\mathrm{corr}(a,r)
+\!=\!0.42$ --- well above the best growth-driven config ($0.23$) and the broad-lobe \texttt{coral\_ext}
+($0.31$) --- on a clean monolayer. The stable window is narrow (combining direct division \emph{with}
+growth, or too high a rate, over-proliferates and blows the RD CFL to NaN). So direct, activation-graded
+proliferation is the tightest pattern$\to$morphology coupling available on this mechanics; the residual
+neck-coherence wall still caps the \emph{height} ($\mathrm{protr}_{\max}\!\approx\!1.4$), which is what the
+vertex model would relieve.
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.92\textwidth]{archive/ext4_tight/strip.png}
-\caption{\textbf{Divide-on-activation} (\texttt{ext4\_tight}): cells divide \emph{directly} where the
-activator exceeds a threshold, no growth. The most pattern-faithful extrusion
-($\mathrm{corr}(a,r)\!=\!0.29$) --- the lobes and protrusions sit on the activator (dark) bands, on a
-clean single-sheet monolayer (cross-section, bottom).}
+\includegraphics[width=0.92\textwidth]{archive/ext5_sharp/strip.png}
+\caption{\textbf{Divide-on-activation, activator-graded} (\texttt{ext5\_sharp}): division probability
+$\propto\mathrm{Hill}(\text{activator})$, no growth. Proliferation is confined to the activator (dark)
+bands --- read it off the cell sizes: dark bands are small, dense divided cells that bulge out; pale
+regions keep their large, undivided cells and stay flat. The most pattern-faithful extrusion of the study,
+$\mathrm{corr}(a,r)\!=\!0.42$, on a clean single-sheet monolayer (cross-section, bottom).}
 \label{fig:actdiv}
 \end{figure}
 
