@@ -98,6 +98,8 @@ class SeedMesh3D(Structural):
         self.n = int(params.get("n_cells", 150)); self.R = float(params.get("radius", 5.0))
         self.jitter = float(params.get("jitter", 0.15)); self.p0 = float(params.get("p0", 3.9))
         self.seed = int(params.get("seed", 0))
+        self.vseed_cv = float(params.get("vseed_cv", 0.0))       # STOCHASTIC VOLUME SEED: per-cell random cell-cycle
+        #   phase at t=0 (spread of the initial division threshold) -> desynchronises the FIRST division wave
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device; dt = lvl.state.dtype
@@ -115,10 +117,15 @@ class SeedMesh3D(Structural):
         eft = torch.as_tensor(ef, device=dev)
         area, perim, cen, vf = face_geometry_3d(pos[:Nv], est, ett, eft, nF)
         A0 = float(area.mean()); P0 = self.p0 * (A0 ** 0.5)
+        if self.vseed_cv > 0:                                    # random initial cell-cycle phase per cell
+            dj = np.clip(1.0 + self.vseed_cv * np.random.default_rng(self.seed + 101).standard_normal(nF), 0.4, 1.8)
+        else:
+            dj = np.ones(nF)                                     # all cells born in phase (synchronised)
         lvl._mesh = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
+                         divjit=torch.as_tensor(dj, dtype=dt, device=dev),   # per-cell division-threshold multiplier
                          V0f=vf.detach().clone(),               # PER-CELL target wedge volume (v_eq per cell)
                          Vbirth=vf.detach().clone(),            # volume at birth -> cell divides when it doubles
                          V0=float(vf.sum()),
@@ -284,10 +291,22 @@ class Divide3D(Structural):
         self.at = params.get("_at", "vertex")
         self.factor = float(params.get("factor", 2.0))           # divide when volume >= factor x birth volume
         self.reset_noise = float(params.get("reset_noise", 0.12))  # per-cell threshold jitter -> staggered (gradual) divisions
+        self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
+        #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
+        #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
         self.p0 = float(params.get("p0", 3.72))
         self.every = int(params.get("every", 3)); self._k = 0
         self.max_div = int(params.get("max_div", 20))            # cap divisions per call for stability
         self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
+
+    def _fresh_djit(self, rng, n=1):
+        """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
+        cell cycles; otherwise the legacy uniform +/-reset_noise jitter. Clamped so thresholds stay sane."""
+        if self.cycle_cv > 0:
+            v = np.clip(1.0 + self.cycle_cv * rng.standard_normal(n), 0.4, 1.8)
+        else:
+            v = 1.0 + self.reset_noise * (rng.random(n) * 2 - 1)
+        return v if n > 1 else float(v[0])
 
     def forward(self, H, mask=None):
         from tyssue_topology_ops3d import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
@@ -314,7 +333,7 @@ class Divide3D(Structural):
         rng = np.random.default_rng(12345 + self._k)
         djit = m.get("divjit")                                   # per-cell threshold jitter -> staggered divisions
         if djit is None:
-            djit = (1.0 + self.reset_noise * (np.random.default_rng(777).random(nF) * 2 - 1)).tolist()
+            djit = self._fresh_djit(np.random.default_rng(777), nF).tolist()
         else:
             djit = djit.detach().cpu().numpy().tolist()
         cand = [f for f in range(nF) if alive[f] > 0 and vf[f] >= self.factor * djit[f] * Vbirth[f]
@@ -341,9 +360,9 @@ class Divide3D(Structural):
                 continue
             half = vf[f] * 0.5                                    # each daughter is born at half the volume
             A0[f] *= 0.5; V0f[f] *= 0.5; Vbirth[f] = half         # daughter A (kept at index f)
-            djit[f] = 1.0 + self.reset_noise * (rng.random() * 2 - 1)                       # fresh jittered thresholds
+            djit[f] = self._fresh_djit(rng)                       # fresh (desync'd) cell-cycle thresholds
             A0.append(A0[f]); V0f.append(V0f[f]); Vbirth.append(half); alive.append(1.0)   # daughter B
-            djit.append(1.0 + self.reset_noise * (rng.random() * 2 - 1))
+            djit.append(self._fresh_djit(rng))
             daughter_mothers.append(f)
             ndone += 1
         if ndone == 0:
