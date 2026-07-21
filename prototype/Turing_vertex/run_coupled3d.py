@@ -130,9 +130,9 @@ def presets():
              "hill": 4.0, "lam_ref": 0.25}, react=GSV(0.058, 0.063)),
         # --- WAVE 5: GRADED divide-on-activation -- per-tick prob = act_rate*Hill(a), so pale cells barely
         # divide (fixes wave-4's hard-threshold flaw where any cell over 0.3 divided at the full rate) ---
-        EXT("ext5_graded",  rho_lam=0.0, lam_gain=0.0, act_rate=0.010, act_thr=0.30, act_hill=4.0),  # deep-red fast, pale ~0
-        EXT("ext5_sharp",   rho_lam=0.0, lam_gain=0.0, act_rate=0.014, act_thr=0.35, act_hill=6.0),  # sharper: only the peak
-        EXT("ext5_mid",     rho_lam=0.0, lam_gain=0.0, act_rate=0.012, act_thr=0.25, act_hill=4.0),  # slightly broader
+        EXT("ext5_graded",  rho_lam=0.0, lam_gain=0.0, act_rate=0.0025, act_thr=0.30, act_hill=4.0),  # deep-red fast, pale ~0
+        EXT("ext5_sharp",   rho_lam=0.0, lam_gain=0.0, act_rate=0.0035, act_thr=0.35, act_hill=6.0),  # sharpest: only the peak
+        EXT("ext5_mid",     rho_lam=0.0, lam_gain=0.0, act_rate=0.0030, act_thr=0.25, act_hill=4.0),  # slightly broader
         dict(base, name="fig4_labyrinth_v", **{**gsv, "chi": 5.6, "frames": 5000},                 # labyrinth: CFL-safe
              react=GSV(0.029, 0.054, rate=20.0)),
         dict(base, name="fig4_holes_v",     **{**gsv, "chi": 6.5, "frames": 5000},                 # holes: more dev
