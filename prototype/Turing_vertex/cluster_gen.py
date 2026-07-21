@@ -42,7 +42,8 @@ def _ssh(cmd, timeout=90):
         return None
 
 
-def submit(preset):
+def _bsub_cmd(preset):
+    """Write the preset's job script and return its `cd ... && bsub ...` command string."""
     os.makedirs(LOGDIR, exist_ok=True)
     script = os.path.join(LOGDIR, f"{preset}.sh")
     with open(script, "w") as f:
@@ -56,18 +57,19 @@ def submit(preset):
     os.chmod(script, 0o755)
     out = cpath(os.path.join(LOGDIR, f"{preset}.out")); err = out[:-4] + ".err"
     gpu = f"-gpu num=1 " if GPU != "0" else ""
-    # NB: do NOT `source` the LSF profile in the command -- it hangs the non-interactive SSH; bsub is
-    # already on PATH and functional (matches cardio_mpm_cluster).
-    bsub = (f"cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}-q {QUEUE} -W {WALL} "
+    # NB: do NOT `source` the LSF profile -- it hangs the non-interactive SSH; bsub is already on PATH.
+    return (f"cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}-q {QUEUE} -W {WALL} "
             f"-J tv_{preset} -o {out} -e {err} bash -l {cpath(script)}")
-    r = _ssh(bsub, timeout=150)                              # bsub is fast; the SSH RESPONSE can lag
-    m = re.search(r"Job <(\d+)>", (r.stdout if r else "") or "")
-    if m:
-        print(f"  {preset:24s} -> job {m.group(1)}  ({QUEUE}, -n {NCPUS}{', gpu' if gpu else ''})")
-    else:
-        # a slow/absent SSH response is NOT proof of failure -- bsub often submitted anyway; check --status.
-        se = (r.stderr if r else "SSH response timeout (job may still have submitted -- run --status)").strip()
-        print(f"  {preset:24s} -> no job id returned ({se}); verify with --status")
+
+
+def submit(presets):
+    # ONE ssh call with all bsubs chained -- sequential per-job round-trips time out on this laggy link.
+    chain = " ; ".join(_bsub_cmd(p) for p in presets)
+    r = _ssh(chain, timeout=200)
+    ids = re.findall(r"Job <(\d+)>", (r.stdout if r else "") or "")
+    print(f"[cluster_gen] {len(ids)}/{len(presets)} jobs returned ids: {', '.join(ids) if ids else '(none)'}")
+    if len(ids) < len(presets):
+        print("  (a lagging SSH response can truncate ids even when bsub succeeded -- verify with --status)")
 
 
 def status():
@@ -82,6 +84,5 @@ if __name__ == "__main__":
     if args[0] == "--status":
         status(); sys.exit(0)
     print(f"[cluster_gen] submitting {len(args)} preset(s) to {QUEUE} as {SSH}:")
-    for preset in args:
-        submit(preset)
+    submit(args)
     print("[cluster_gen] use `python cluster_gen.py --status` to watch; logs in cluster_logs/")
