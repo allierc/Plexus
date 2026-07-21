@@ -56,19 +56,22 @@ def submit(preset):
     os.chmod(script, 0o755)
     out = cpath(os.path.join(LOGDIR, f"{preset}.out")); err = out[:-4] + ".err"
     gpu = f"-gpu num=1 " if GPU != "0" else ""
-    bsub = (f"source {LSF} && cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}-q {QUEUE} -W {WALL} "
+    # NB: do NOT `source` the LSF profile in the command -- it hangs the non-interactive SSH; bsub is
+    # already on PATH and functional (matches cardio_mpm_cluster).
+    bsub = (f"cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}-q {QUEUE} -W {WALL} "
             f"-J tv_{preset} -o {out} -e {err} bash -l {cpath(script)}")
-    r = _ssh(bsub)
+    r = _ssh(bsub, timeout=150)                              # bsub is fast; the SSH RESPONSE can lag
     m = re.search(r"Job <(\d+)>", (r.stdout if r else "") or "")
     if m:
         print(f"  {preset:24s} -> job {m.group(1)}  ({QUEUE}, -n {NCPUS}{', gpu' if gpu else ''})")
     else:
-        so = (r.stdout if r else "").strip(); se = (r.stderr if r else "SSH timeout").strip()
-        print(f"  {preset:24s} -> SUBMIT FAILED: {so} {se}")
+        # a slow/absent SSH response is NOT proof of failure -- bsub often submitted anyway; check --status.
+        se = (r.stderr if r else "SSH response timeout (job may still have submitted -- run --status)").strip()
+        print(f"  {preset:24s} -> no job id returned ({se}); verify with --status")
 
 
 def status():
-    r = _ssh(f"source {LSF} && bjobs -J 'tv_*' -o 'jobid stat job_name queue exec_host' 2>/dev/null")
+    r = _ssh("bjobs -J 'tv_*' -o 'jobid stat job_name queue exec_host' 2>/dev/null")
     print(r.stdout if r and r.stdout.strip() else "  (no tv_* jobs in queue)")
 
 
