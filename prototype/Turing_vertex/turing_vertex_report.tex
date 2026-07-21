@@ -1,0 +1,258 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{parskip}
+
+\title{\textbf{Coupling discrete Turing reaction--diffusion to a 3D vertex model:\\
+what transfers cleanly, and what needs force balance}}
+\author{Notes from a \texttt{plexus2} prototype of Okuda et al.\ (2018)}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We report the lessons from building a \texttt{plexus2} prototype that couples a \emph{discrete}
+Turing reaction--diffusion (RD) system to a 3D vertex / self-propelled-Voronoi model on a growing
+epithelial vesicle, following Okuda \emph{et al.}, \emph{Sci.\ Rep.} \textbf{8}:2386 (2018). Four
+findings stand out. \textbf{(1)} When growth is morphogen-\emph{independent}, the RD is a passive
+\emph{colouring} of the cells: it never touches the mechanics. Apparent ``noise'' in Gray--Scott
+patterns was therefore not a chemistry problem but a \emph{timestep} artefact --- the coarse step
+Gray--Scott needs to develop ($\Delta t\!=\!0.35$) destabilises the vertex mechanics, which had to
+be detuned to stay stable. Running the mechanics at a fine, stable step ($\Delta t\!=\!0.02$) while
+\emph{time-rescaling} the RD by a single rate multiplier recovers a clean epithelium carrying the
+coral / labyrinth / holes patterns (cell-shape roughness $0.04$ vs.\ $0.24$). This is exactly the
+chemistry-vs-mechanics timescale separation ($\Delta t_m \ll \Delta t_v$) of the original model.
+\textbf{(2)} A latent operator bug --- a missing \texttt{SphericalVoronoi} import silently swallowed
+by a broad \texttt{except} --- had made the tangential (Lloyd) relaxation a \emph{total no-op} for
+the operator's entire life; the cell uniformity seen in earlier renders came \emph{entirely} from a
+render-side cosmetic, which masked the dead physics. \textbf{(3)} Reproducing morphogen-driven
+\emph{tubulation} (their Fig.~5) is qualitatively harder: an overdamped, single-step vertex
+relaxation \emph{without} force-balance iteration or topological reconnection converts localised
+growth into \emph{global} chaotic buckling, uncorrelated with the morphogen
+($\mathrm{corr}(a,r)\!\approx\!0$), rather than local tubes. \textbf{(4)} A working alternative
+sidesteps the fragile shell mechanics entirely: amplifying the (already present, but weak)
+activator-dependent \emph{division} into a sharp $\sim\!4{:}1$ ON/OFF contrast on the fast, stable
+spherical mechanics produces \emph{localised} extrusion that tracks the morphogen
+($\mathrm{corr}(a,r)\!=\!0.31$ vs.\ $\approx\!0$ for the shell), while the monolayer stays clean --
+the high-activator domains bulge out into lobes.
+\end{abstract}
+
+\section{The model in one paragraph}
+One \texttt{cell} set carries three independently integrated state blocks: position \texttt{pos}
+(the vertex coordinate), morphogens \texttt{chem}\,$=\,[a,h]$ (a Gray--Scott or Brusselator RD on
+the cell--cell adjacency graph, so mechanical deformation reshapes the diffusion), and a target
+size \texttt{v0} that a Hill-saturating growth law inflates. Division wakes a dormant buffer slot
+when \texttt{v0} reaches its threshold. Mechanics is an overdamped shape energy
+$U=\sum_j K_V(V_j-V_j^{0})^2 + K_S S_j$ over ghost-bounded Voronoi cells; the force is
+$-\nabla U$ by autodiff through the tetrahedral circumcentres. Each of these is a \texttt{plexus2}
+operator (a typed morphism on the set) composed by a schedule; different operators run at different
+cadences, which is how the multiple timescales are expressed.
+
+\section{What transferred cleanly: Fig.~4 (patterns on a growing vesicle)}
+In Fig.~4 growth is \emph{activator-independent} (homogeneous), so the RD only colours the cells.
+The naive Gray--Scott vesicle looked badly corrupted --- a lumpy, non-epithelial surface --- and it
+was tempting to blame the reaction--diffusion. It was not: the mechanics was simply being integrated
+at Gray--Scott's coarse $\Delta t\!=\!0.35$, far outside the vertex model's stability window. The fix
+is to \emph{decouple the timescales}: keep the mechanics at the fine step that makes it clean
+($\Delta t\!=\!0.02$, the same parameters that produce a nice Brusselator vesicle) and speed the RD
+up by a rate multiplier $\rho$ (with the diffusion coefficient scaled to match), so the identical
+pattern develops in the same number of frames. Roughly $\rho\!\approx\!\Delta t_{\text{coarse}}/
+\Delta t_{\text{fine}}$; the only ceiling is the explicit-diffusion CFL limit
+($\Delta t\,d_h\,\chi\,\bar{k}\lesssim 0.4$), which the delicate low-feed labyrinth regime hits first
+and which must be respected per regime. The result (Fig.~\ref{fig:coral}) is a uniform epithelium
+carrying the branching coral pattern, with shell roughness $0.04$ against $0.24$ for the coarse-step
+version. The take-away is general: \emph{when a signal does not feed back on shape, do not let its
+integration timescale dictate the mechanics'}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.92\textwidth]{archive/fig4_coral_v/strip.png}
+\caption{\textbf{Gray--Scott coral on the vesicle mechanics} (\texttt{fig4\_coral\_v}), at
+$0/50/100\%$ of the run. Top: closed external view; bottom: cross-section through the monolayer and
+lumen. Cells are uniform (near-hexagonal) and the shell is smooth; the reaction--diffusion is a pure
+colouring of a clean epithelium. $N\!:\!600\!\to\!3000$, roughness $0.04$.}
+\label{fig:coral}
+\end{figure}
+
+\section{A cautionary tale: the silent no-op}
+The uniform cells above depend on a tangential (Lloyd) relaxation that moves each cell toward its
+spherical-Voronoi centroid. That operator had \emph{never once} executed: the module imported
+\texttt{Delaunay, ConvexHull, cKDTree} but not \texttt{SphericalVoronoi}, so every call raised
+\texttt{NameError}, which fell into a blanket \texttt{except Exception: return zeros}. The knob was
+inert --- \texttt{k\_lloyd} $0.3/1.0/2.0$ gave byte-identical output. The uniformity previously
+visible came entirely from a \emph{render-side} Lloyd pass (a cosmetic applied only when drawing).
+The moment we honoured ``uniformity should come from physics, not the render'' and drew the true
+cells, the dead operator was exposed. Two lessons: a broad \texttt{except} around a geometry call can
+hide a programming error for the lifetime of a component; and a cosmetic post-process can mask a
+missing mechanism indefinitely. The fix was one import plus narrowing the handler to the genuine
+Qhull degeneracies; the operator was also made timestep-independent (move a fixed \emph{fraction}
+toward the centroid per tick, capped at $0.7\times$ the cell spacing).
+
+\section{What did not transfer: Fig.~5 (tubulation)}
+Fig.~5 makes the activator a \emph{mitogen}: high-activator cells grow, and on a closed sheet the
+locally excess area must buckle out of plane into tubes --- no explicit extrusion force. We
+implemented the coupling (a Hill switch from activator concentration to target-volume growth) on the
+apical/basal ``shell'' mechanics, and swept $\sim\!15$ configurations of domain size, growth rate,
+bending, surface tension, and lumen pressure. \emph{None} produced clean tubes. The behaviour is
+bimodal: gentle growth or stiff bending gives a perfectly smooth sphere (no buckling), while enough
+growth gives \emph{global} chaotic buckling that tears the monolayer into a blob. Decisively, the
+correlation between activator concentration and radial protrusion is $\approx\!0$ in every case: the
+bulges are \emph{not} where the activator is --- it is generic Euler buckling of an over-grown,
+lumen-pressurised shell, not localised extrusion.
+
+Three mechanics ingredients are missing, all present in the original: (i) \emph{force-balance
+iteration} --- Okuda solves the overdamped balance to residual $<\!10^{-5}$ each $\Delta t_v$,
+whereas a single explicit step lets individual cells spike rather than forming coherent folds;
+(ii) \emph{topological reconnection} (RNR / T1), without which cells jam instead of flowing into a
+tube; and (iii) a tractable per-cell tessellation --- our \texttt{ConvexHull}-per-cell shell becomes
+pathologically slow, even hanging, exactly in the heavily-deformed regime tubes require. Clean
+tubulation is thus gated on a vectorised, force-balance-iterated shell mechanics plus a reconnection
+operator, not on more parameter tuning.
+
+\section{Field notes: what we learned about the model}
+Grouped by subsystem. The numbers are the values that actually worked --- or failed --- in this
+prototype; they are the hard-won part and the main reason for this document.
+
+\paragraph{Timescales --- the master knob.}
+\begin{itemize}\itemsep2pt
+\item Gray--Scott needs a large step ($\Delta t\!\approx\!0.35$) to develop in $\sim\!10^4$ frames;
+the overdamped vertex model is stable only for $\Delta t\!\lesssim\!0.05$. Irreconcilable at a
+single step.
+\item Resolution: run mechanics at $\Delta t\!=\!0.02$ and multiply the RD rate by
+$\rho\!\approx\!\Delta t_{\text{coarse}}/\Delta t_{\text{fine}}\!\approx\!17.5$, scaling the
+diffusion prefactor $\chi$ by the \emph{same} $\rho$ so the reaction:diffusion ratio --- and thus
+the pattern --- is preserved. A pure time-rescaling: identical pattern, stable mechanics.
+\item Explicit graph-diffusion is stable only while
+$\Delta t\,d_h\,\chi\,\langle k\rangle\!\lesssim\!0.4$. With $d_h\!=\!0.16,\ \langle k\rangle\!
+\approx\!14,\ \Delta t\!=\!0.02$ this caps $\chi\!\lesssim\!9$. Robust high-feed coral
+($F\!=\!0.058$) tolerates $\chi\!=\!9.8,\rho\!=\!35$; the delicate low-feed labyrinth
+($F\!=\!0.029$) \emph{diverges to NaN} there and needs $\chi\!=\!5.6,\rho\!=\!20$ over more frames.
+Tune the rescaling \emph{per regime}.
+\end{itemize}
+
+\paragraph{Tangential (Lloyd) relaxation.}
+\begin{itemize}\itemsep2pt
+\item Make it timestep-independent: move a fixed fraction \texttt{k\_lloyd} of the way to the
+spherical-Voronoi centroid per tick, then divide by $\Delta t$ to undo the engine's
+$x\!\mathrel{+}=\!\Delta t\,v$. \texttt{k\_lloyd} is then a clean fraction ($1.0$ = one full Lloyd
+step/tick; $1.5$ slightly overshoots and converges faster). Cap the per-tick move at
+$0.7\times$ mean spacing so a defect cell cannot jump neighbours and tangle the mesh.
+\item It uses \texttt{SphericalVoronoi} of the cell \emph{direction} vectors, which degenerates once
+the surface is non-spherical --- so it is valid on the vesicle, \emph{not} on Fig-5 tubes.
+\end{itemize}
+
+\paragraph{Morphogen $\to$ growth (the coupling).}
+\begin{itemize}\itemsep2pt
+\item $\lambda=\lambda_{\text{ref}}\big(\rho + g\,\mathrm{Hill}(a)\big),\ \mathrm{Hill}(a)=
+a^{\alpha}/(a^{\alpha}+a_{\text{sw}}^{\alpha})$. $\rho$ is the OFF multiple, $\rho+g$ the ON one.
+\item $a_{\text{sw}}$ \emph{must} sit inside the activator's actual range or the switch never fires.
+The Gray--Scott activator peaks near $0.4$, so $a_{\text{sw}}\!=\!1.0$ gives
+$\mathrm{Hill}\!\approx\!0.16$ (a feeble $16\%$ contrast); $a_{\text{sw}}\!\approx\!0.2$ makes it
+bite. $\alpha\!=\!4$ gives a near-step switch.
+\item Even ``homogeneous'' Fig-4 growth ($\rho\!=\!1$) carries the Hill term, so high-activator
+domains already bulge weakly. Amplify with $g$ ($\rho\!=\!0.5,g\!=\!1.5\!\Rightarrow\!4{:}1$) for
+real localised proliferation.
+\end{itemize}
+
+\paragraph{Division.}
+\begin{itemize}\itemsep2pt
+\item \texttt{divide\_2x} fires when $v^0$ reaches $\texttt{ratio}\!\times\!$base
+($v_{\text{th}}\!=\!\tfrac43 v_{\text{ref}}$); the daughter wakes a dormant buffer slot, both reset
+to base, and the daughter inherits the mother's \texttt{chem}. Faster growth $\Rightarrow$ earlier
+division $\Rightarrow$ local density $\Rightarrow$ local area excess --- the buckling driver.
+\item \texttt{reset\_noise} spreads daughter target sizes so the cycle stays asynchronous (no
+division waves). Fixed-buffer occupancy: division stops when the buffer is full.
+\end{itemize}
+
+\paragraph{Mechanics --- two flavours; know which.}
+\begin{itemize}\itemsep2pt
+\item \emph{Spherical-ghost} \texttt{voronoi\_tension\_3d}: fast (vectorised, $\sim\!32\times$ over
+the per-cell loop), stable, keeps a clean monolayer --- but the global ghost sphere \emph{fights}
+local deformation, so at most mild bumps. Right for Fig 4 and the differential-growth route.
+\item \emph{Per-cell apical/basal shell} \texttt{voronoi\_tension\_shell}: allows local buckling but
+needs a scipy \texttt{ConvexHull} per cell; under heavy deformation this is pathologically slow and
+can \emph{hang} (observed 77-min hang, 84-min no-finish). Not viable for tubes un-vectorised.
+\item Stiff volume vs.\ surface, $K_V/K_S\!\approx\!10$ (incompressible cells). Bending
+$k_{\text{bend}}$ HIGH ($0.6$--$0.8$) forbids out-of-plane curvature $\to$ no buckle;
+$k_{\text{bend}}\!\approx\!0.45$ permits it.
+\end{itemize}
+
+\paragraph{Fig-5 buckling phenomenology (all negative, all informative).}
+\begin{itemize}\itemsep2pt
+\item Bimodal: gentle growth / stiff bending $\to$ smooth sphere; enough growth $\to$ global chaotic
+buckle that tears the monolayer. No clean-tube window in between.
+\item \texttt{lumen\_pressure} holds the closed vesicle rigid, so area is stored until it releases as
+one global Euler buckle at a random site --- morphology decoupled from the pattern. Removing the
+lumen did \emph{not} localise it ($\mathrm{corr}(a,r)$ stayed $\approx\!0$).
+\end{itemize}
+
+\paragraph{Diagnostics that earned their keep.}
+\begin{itemize}\itemsep2pt
+\item \emph{roughness} $=\mathrm{std}/\mathrm{mean}$ of cell radii ($0.04$ clean, $0.24$ corrupted);
+\emph{\% hexagons} (closed sphere tops out $\sim\!70\%$; a bounded 2D disc lower, its boundary ring
+never hexagonal); \emph{PROTR} $=$ 99th-percentile$/$median radius ($\approx\!1$ sphere, $>\!1.4$
+protrusions); \emph{$\mathrm{corr}(a,r)$} $=$ the decisive extrusion-is-localised test.
+\end{itemize}
+
+\paragraph{Performance / engineering.}
+\begin{itemize}\itemsep2pt
+\item Multi-rate composition via an engine \texttt{every:K} gate plus an intra-operator topology
+cache (\texttt{retess\_every}): mechanics reuses the tessellation for $K$ ticks, pattern preserved,
+$\sim\!1.7\times$ at $K\!=\!10$.
+\item \texttt{torch.compile} gives $\sim\!50\times$ on the fixed-$N$ energy but recompiles when $N$
+grows (division) --- keep it off for growing runs. CPU/scipy is the real bottleneck; on the cluster,
+one dedicated node per generation ($\sim\!3\times$ over contended local runs).
+\end{itemize}
+
+\section{Discussion: a cleaner route to extrusion}
+The negative result above is informative. Localised growth on a \emph{closed, pressurised} vesicle
+tends to store area until it releases as a single global buckle at a random site --- morphology
+decoupled from the pattern. A better substrate for \emph{local} extrusion is the fast, stable
+\emph{spherical} mechanics used for Fig.~4 (it never breaks the monolayer), driven by \emph{localised
+proliferation} rather than global inflation.
+
+Strikingly, that mechanism is already latent in the Fig.~4 runs. Even ``homogeneous'' growth carries
+a Hill term, $\dot v^0 = \lambda_{\text{ref}}\big(\rho + \mathrm{Hill}(a)\big)$, so high-activator
+cells already divide somewhat faster and their domains bulge slightly outward --- the small
+extrusions one can see in the coral cross-section. They are weak only because the switch was mis-set
+($a_{\text{sw}}\!=\!1.0$ while the Gray--Scott activator peaks near $0.4$, so $\mathrm{Hill}\approx
+0.16$). Introducing a gain, $\dot v^0 = \lambda_{\text{ref}}\big(\rho + g\,\mathrm{Hill}(a)\big)$
+with $\rho\!=\!0.5,\,g\!=\!1.5$ and $a_{\text{sw}}$ moved into the activator's actual range, turns
+this into a sharp $2\times$-ON / $0.5\times$-OFF ($4{:}1$) \emph{division} contrast that concentrates
+proliferation --- and hence out-of-plane buckling --- at the morphogen domains, on mechanics that
+stay stable and cheap.
+
+This works (Fig.~\ref{fig:ext}). The high-activator domains bulge outward into coherent lobes, the
+monolayer stays intact (roughness $0.058$, cells $54\%$ hexagonal), and crucially the deformation now
+\emph{tracks the signal}: $\mathrm{corr}(\text{activator},\text{radius})\!=\!0.31$, against
+$\approx\!0$ for every shell-mechanics attempt. It is not yet the fully elongated tubes of the
+original --- for that the force-balance and reconnection ingredients of \S5 are still needed --- but
+it is genuine, localised, morphogen-driven extrusion on a substrate that never breaks. This reframes
+tubulation as \emph{patterned proliferation} on a robust substrate rather than differential growth on
+a fragile deformable shell.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.92\textwidth]{archive/fig4_coral_ext/strip.png}
+\caption{\textbf{Locally-favoured extrusion} (\texttt{fig4\_coral\_ext}): the same coral RD on the
+fast spherical mechanics, but with a $4{:}1$ activator-driven division contrast
+($\rho\!=\!0.5,g\!=\!1.5,a_{\text{sw}}\!=\!0.2$). The high-activator (dark) domains extrude outward
+into lobes while low-activator regions stay flat; the cross-section (bottom) shows the monolayer
+lobing out where the signal is high, and remaining a clean single sheet.
+$\mathrm{corr}(a,r)\!=\!0.31$.}
+\label{fig:ext}
+\end{figure}
+
+Two methodological points recur. First, \emph{signalling is geometry-coupled but not
+mechanics-coupled unless you say so}: keeping that boundary explicit turned an intractable ``noisy
+patterning'' problem into a one-line timescale fix. Second, in a typed-operator language the right
+unit of change is often a new \emph{implementation} or \emph{parameter} of an existing contract (the
+$4{:}1$ growth is still the \texttt{growth} operator), not a new operator --- ``prototype freely,
+promote mechanisms conservatively.''
+
+\end{document}
