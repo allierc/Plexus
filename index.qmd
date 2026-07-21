@@ -357,7 +357,7 @@ descriptions:
 </div>
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>) — Turing's two-species activator–inhibitor system. Each column is one regime shown on a 2D cell disc (top) and a 3D cell shell (bottom): the coral regime, a fine maze (small χ), and a diverging activator view (high → red, low → blue, balanced → white).</p>
+<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>) — Turing's two-species activator–inhibitor system, on a 2D cell disc: the coral regime, a fine maze (small χ), and a diverging activator view (high → red, low → blue, balanced → white).</p>
 <p class="opk-ref">Reference — Gray–Scott and Brusselator reaction–diffusion, after their originating models.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -511,171 +511,6 @@ schedule:
 - graph_diffuse
 - react</pre></span></span>
       <span class="sim-cap">Turing's activator–inhibitor as a diverging map — activator high (red), low (blue), balanced (white)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_shell_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">coral (sphere)<span class="sim-spec"><pre>general:
-  name: turing_shell_coral
-  seed: 0
-  n_frames: 10000
-  dt: 0.35
-  boundary: free
-  dim: 3
-  world:
-  - 20.8
-  - 20.8
-  - 20.8
-sets:
-  cell:
-    n: 1600
-    state:
-      chem:
-        width: 2
-        integration: first_order
-        boundary: free
-      xyz:
-        width: 3
-        integration: none
-        boundary: free
-fields: {}
-operators:
-- op: aggregate_seed
-  at: cell
-  mode: shell
-  seed_mode: scatter
-  radius: 8.0
-  k: 6
-  before_frame: 1
-  seed_frac: 0.04
-  noise: 0.02
-- op: graph_diffuse
-  at: cell
-  d_a: 0.08
-  d_h: 0.16
-  chi: 0.28
-  norm: false
-- op: react
-  at: cell
-  implementation: gray_scott
-  F: 0.058
-  kk: 0.063
-schedule:
-- aggregate_seed
-- graph_diffuse
-- react</pre></span></span>
-      <span class="sim-cap">the same reaction–diffusion on a 3D cell shell</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_shell_chi_small.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">fine maze (sphere)<span class="sim-spec"><pre>general:
-  name: turing_shell_chi_small
-  seed: 0
-  n_frames: 10000
-  dt: 0.35
-  boundary: free
-  dim: 3
-  world:
-  - 28.6
-  - 28.6
-  - 28.6
-sets:
-  cell:
-    n: 3200
-    state:
-      chem:
-        width: 2
-        integration: first_order
-        boundary: free
-      xyz:
-        width: 3
-        integration: none
-        boundary: free
-fields: {}
-operators:
-- op: aggregate_seed
-  at: cell
-  mode: shell
-  seed_mode: scatter
-  radius: 11.0
-  k: 6
-  before_frame: 1
-  seed_frac: 0.04
-  noise: 0.02
-- op: graph_diffuse
-  at: cell
-  d_a: 0.08
-  d_h: 0.16
-  chi: 0.2
-  norm: false
-- op: react
-  at: cell
-  implementation: gray_scott
-  F: 0.037
-  kk: 0.06
-schedule:
-- aggregate_seed
-- graph_diffuse
-- react</pre></span></span>
-      <span class="sim-cap">the same fine-maze reaction (F=0.037, small χ) wrapped on a 3D cell shell</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_two_species_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">two species (3D)<span class="sim-spec"><pre>general:
-  name: turing_two_species_3d
-  seed: 0
-  n_frames: 10000
-  dt: 0.35
-  boundary: free
-  dim: 3
-  world:
-  - 28.6
-  - 28.6
-  - 28.6
-sets:
-  cell:
-    n: 2400
-    state:
-      chem:
-        width: 2
-        integration: first_order
-        boundary: free
-      xyz:
-        width: 3
-        integration: none
-        boundary: free
-fields: {}
-operators:
-- op: aggregate_seed
-  at: cell
-  mode: shell
-  seed_mode: scatter
-  radius: 11.0
-  k: 6
-  before_frame: 1
-  seed_frac: 0.04
-  noise: 0.02
-- op: graph_diffuse
-  at: cell
-  d_a: 0.08
-  d_h: 0.16
-  chi: 0.28
-  norm: false
-- op: react
-  at: cell
-  implementation: gray_scott
-  F: 0.039
-  kk: 0.058
-schedule:
-- aggregate_seed
-- graph_diffuse
-- react</pre></span></span>
-      <span class="sim-cap">the same activator–inhibitor diverging view wrapped on a 3D cell shell</span>
     </figcaption>
   </figure>
 </div>
@@ -2936,6 +2771,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
