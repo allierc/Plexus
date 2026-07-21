@@ -248,6 +248,35 @@ $\mathrm{corr}(a,r)\!=\!0.31$.}
 \label{fig:ext}
 \end{figure}
 
+\paragraph{Can the lobes be elongated? (a cluster sweep).}
+We ran a parameter sweep on the L4 cluster to push the lobes toward tubes. Two findings. \emph{(i)
+``Run longer'' is the wrong lever, and it is dangerous.} Letting the tissue over-grow (bigger buffer,
+more frames) both \emph{relaxes} the protrusions back to a sphere once growth saturates
+($\mathrm{protr}_{\max}$ falls $1.27\!\to\!1.08$, $\mathrm{corr}\to0$) and, worse, packs cells so
+densely at the activator domains that the explicit-diffusion \emph{CFL is violated} --- the RD blows
+up to NaN (a silent failure we now catch with an \texttt{act\_nan} flag). The extrusion lives in a
+finite $N\!\sim\!3000$ window. \emph{(ii) Sharper division contrast elongates --- but toward
+spikes.} At the productive scale, raising the ON/OFF contrast from $4{:}1$ to $\sim\!6.7{:}1$
+($\rho\!=\!0.3,g\!=\!1.7$) is the only lever that clearly extends the tips
+($\mathrm{protr}_{\max}\!=\!1.46$, the tallest we reached), and the tips stay red (activator-led). But
+Fig.~\ref{fig:contrast} shows what ``taller'' means here: the broad lobes sharpen into pointed
+\emph{fingers} --- individual cells and small clusters shooting out --- rather than coherent tubes.
+Lowering surface tension ($K_S\!=\!0.4$--$0.25$) helps mildly ($\mathrm{protr}_{\max}\!\approx\!1.2$--$1.27$).
+This is the same wall as \S5 from the other side: the fast spherical SPV mechanics can \emph{localise}
+growth beautifully but cannot hold a coherent extended neck, so hard-driving it yields spikes, not
+tubes. Clean elongation is gated on the coherent vertex mechanics (shared vertices + force balance +
+T1), i.e.\ a true vertex model such as Tyssue --- which is the natural next substrate.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.92\textwidth]{archive/ext2_contrast/strip.png}
+\caption{\textbf{Elongation by sharper contrast} (\texttt{ext2\_contrast}, $6.7{:}1$): the tallest
+protrusions we reached ($\mathrm{protr}_{\max}\!=\!1.46$), tips still activator-led (red). But the
+extrusions sharpen into pointed \emph{fingers}/spikes rather than coherent tubes --- the signature of
+driving growth harder on a mechanics that lacks shared vertices and force balance.}
+\label{fig:contrast}
+\end{figure}
+
 Two methodological points recur. First, \emph{signalling is geometry-coupled but not
 mechanics-coupled unless you say so}: keeping that boundary explicit turned an intractable ``noisy
 patterning'' problem into a one-line timescale fix. Second, in a typed-operator language the right
