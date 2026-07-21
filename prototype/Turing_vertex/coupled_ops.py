@@ -293,7 +293,8 @@ class Divide2x(Structural):
         # DIRECT activator-gated division: divide a cell where the activator is on, at a per-tick rate,
         # bypassing the grow-to-size chain. Concentrates proliferation exactly at the morphogen domains.
         self.act_rate = float(params.get("act_rate", 0.0))       # 0 = size-only (Okuda); >0 = also divide on activation
-        self.act_thr = float(params.get("act_thr", 0.2))         # activator threshold for direct division
+        self.act_thr = float(params.get("act_thr", 0.2))         # activator half-max for the graded division rate
+        self.act_hill = float(params.get("act_hill", 4.0))       # graded steepness: rate = act_rate*Hill(a); low-a ~0
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device
@@ -302,10 +303,12 @@ class Divide2x(Structural):
         sz = lvl.state[:, sa]
         live = lvl.occ > 0
         ready_m = live & (sz >= self.ratio * base)               # Okuda size-controlled division
-        if self.act_rate > 0.0:                                  # + direct activator-gated division (this work)
-            a = lvl.get("chem")[:, 0]
+        if self.act_rate > 0.0:                                  # + activator-GRADED division (this work)
+            a = lvl.get("chem")[:, 0].clamp(min=0.0)
+            an = a.pow(self.act_hill)                             # per-tick divide prob = act_rate * Hill(a):
+            p = self.act_rate * an / (an + self.act_thr ** self.act_hill + 1e-12)   # deep-red cells fast, pale cells ~0
             draw = torch.rand(lvl.n, generator=getattr(H, "rng", None), device=dev)
-            ready_m = ready_m | (live & (a > self.act_thr) & (draw < self.act_rate))
+            ready_m = ready_m | (live & (draw < p))
         ready = ready_m.nonzero(as_tuple=True)[0]
         free = (~live).nonzero(as_tuple=True)[0]
         cap = min(int(ready.numel()), int(free.numel()))

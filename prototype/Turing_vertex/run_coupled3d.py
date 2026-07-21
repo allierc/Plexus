@@ -128,11 +128,11 @@ def presets():
         # Localized proliferation -> local out-of-plane buckling at the activator domains.
         dict(base, name="fig4_coral_ext", **{**gsv, "rho_lam": 0.5, "lam_gain": 1.5, "a_sw": 0.2,
              "hill": 4.0, "lam_ref": 0.25}, react=GSV(0.058, 0.063)),
-        # --- WAVE 4: "divide on activation" (user idea) -- direct activator-gated division ---
-        EXT("ext4_actdiv",   rho_lam=0.0, lam_gain=0.0, act_rate=0.003, act_thr=0.2),  # PURE: grow ONLY by act-division
-        EXT("ext4_actgrow",  act_rate=0.002, act_thr=0.2),                             # act-division ON TOP of 4:1 growth
-        EXT("ext4_tight",    rho_lam=0.0, lam_gain=0.0, act_rate=0.005, act_thr=0.3),  # pure, tighter (higher thr+rate)
-        EXT("ext4_fast",     rho_lam=0.0, lam_gain=0.0, act_rate=0.008, act_thr=0.2),  # pure, faster proliferation
+        # --- WAVE 5: GRADED divide-on-activation -- per-tick prob = act_rate*Hill(a), so pale cells barely
+        # divide (fixes wave-4's hard-threshold flaw where any cell over 0.3 divided at the full rate) ---
+        EXT("ext5_graded",  rho_lam=0.0, lam_gain=0.0, act_rate=0.010, act_thr=0.30, act_hill=4.0),  # deep-red fast, pale ~0
+        EXT("ext5_sharp",   rho_lam=0.0, lam_gain=0.0, act_rate=0.014, act_thr=0.35, act_hill=6.0),  # sharper: only the peak
+        EXT("ext5_mid",     rho_lam=0.0, lam_gain=0.0, act_rate=0.012, act_thr=0.25, act_hill=4.0),  # slightly broader
         dict(base, name="fig4_labyrinth_v", **{**gsv, "chi": 5.6, "frames": 5000},                 # labyrinth: CFL-safe
              react=GSV(0.029, 0.054, rate=20.0)),
         dict(base, name="fig4_holes_v",     **{**gsv, "chi": 6.5, "frames": 5000},                 # holes: more dev
@@ -180,7 +180,8 @@ def make_spec(p, V0):
          "a_sw": p["a_sw"], "hill": p["hill"], "cap": p["ratio"], "lam_gain": p.get("lam_gain", 1.0)},
         {"op": "divide_2x", "at": "cell", "block": "v0", "ratio": p["ratio"], "offset": 0.12,
          "reset_noise": p.get("reset_noise", 0.0),
-         "act_rate": p.get("act_rate", 0.0), "act_thr": p.get("act_thr", 0.2)},
+         "act_rate": p.get("act_rate", 0.0), "act_thr": p.get("act_thr", 0.2),
+         "act_hill": p.get("act_hill", 4.0)},
     ]
     if p.get("k_lloyd", 0) > 0:                          # tangential relaxation -> equal-area hexagonal cells
         ops.append({"op": "surface_lloyd", "at": "cell", "k_lloyd": p["k_lloyd"], "dt": p["dt"],
