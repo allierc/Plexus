@@ -239,6 +239,7 @@ class Divide3D(Structural):
         self.p0 = float(params.get("p0", 3.72))
         self.every = int(params.get("every", 3)); self._k = 0
         self.max_div = int(params.get("max_div", 20))            # cap divisions per call for stability
+        self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
 
     def forward(self, H, mask=None):
         from tyssue_topology_ops3d import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
@@ -273,6 +274,7 @@ class Divide3D(Structural):
         rng.shuffle(cand)                                        # unbiased when more cells are ready than max_div
         cand = cand[:self.max_div]                               # (else cand[:n] sweeps in pole-to-pole face order)
         ndone = 0
+        daughter_mothers = []                                    # mother face index of each appended daughter (order)
         for f in cand:
             if len(pos) + 2 > buf:                                # respect the vertex buffer
                 break
@@ -294,6 +296,7 @@ class Divide3D(Structural):
             djit[f] = 1.0 + self.reset_noise * (rng.random() * 2 - 1)                       # fresh jittered thresholds
             A0.append(A0[f]); V0f.append(V0f[f]); Vbirth.append(half); alive.append(1.0)   # daughter B
             djit.append(1.0 + self.reset_noise * (rng.random() * 2 - 1))
+            daughter_mothers.append(f)
             ndone += 1
         if ndone == 0:
             return {}
@@ -320,6 +323,17 @@ class Divide3D(Structural):
         m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
+        # propagate the cell morphogen to daughters: each appended cell (new index nF+i) inherits its
+        # mother's cell state so the RD pattern rides along through division (seg_A keeps the mother's).
+        if self.cell_set is not None and daughter_mothers:
+            clvl = H.level(self.cell_set)
+            if clvl is not None and clvl.state.shape[0] >= nF2:
+                cst = clvl.state.clone()
+                for i, mother in enumerate(daughter_mothers):
+                    cst[nF + i] = cst[mother]                    # daughter inherits all mother cell state (chem, ...)
+                clvl.state = cst
+                if getattr(clvl, "occ", None) is not None:
+                    cocc = torch.zeros(clvl.state.shape[0], device=clvl.state.device); cocc[:nF2] = 1.0; clvl.occ = cocc
         return {}
 
 

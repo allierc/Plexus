@@ -32,6 +32,7 @@ except Exception:
 
 import plexus.operators   # noqa: F401
 import tyssue_ops3d        # noqa: F401  seed_mesh_3d + shape_energy_3d
+import tyssue_t1_ops3d     # noqa: F401  reconnect_t1_3d (surface T1 annealer)
 from tyssue_ops3d import build_sphere_mesh, face_polygons_3d
 import plexus.schema as S
 from plexus.engine import run as engine_run
@@ -70,6 +71,9 @@ def make_spec(name, p0, buf, grow_rate, divide, n_cells, frames):
                 "relax_iters": relax, "eta": 0.08, "cap_frac": 0.12})
     sched.append("shape_energy_3d")
     if divide:
+        ops.append({"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2,
+                    "max_flips": max(20, n_cells // 15)})
+        sched.append("reconnect_t1_3d")          # T1 neighbour exchange -> anneal division defects (regularise)
         mxd = max(10, n_cells // 20)              # divisions/call scale with tissue size (clears each wave)
         ops.append({"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "p0": p0,
                     "every": 2, "max_div": mxd})  # gradual, staggered volume-doubling cell cycle (Turing fig4)

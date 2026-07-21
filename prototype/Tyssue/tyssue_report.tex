@@ -557,9 +557,14 @@ vertices), which yields compact daughters instead of elongated slivers. (ii)~\em
 contractility} $\tfrac12\Gamma\sum_f P_f^2$, the perimeter term that rounds each cell. Together they
 drop the shape index from $\sim\!4.2$ to $\sim\!3.9$ \emph{emergently} (a geometric Lloyd smoothing
 would also round the cells, but it is a fairing hack, not physics, so we discarded it). The last step
-toward the regular-hexagon floor is \emph{T1 neighbour exchange}, the annealing mechanism, still to be
-added; note the sphere mandates $\ge\!12$ pentagonal defects (Euler), so perfect hexagons are not the
-target. \emph{At scale} (the fig4 test: $600\!\to\!2367$ cells over $1000$ frames) the shell stays
+toward the regular-hexagon floor is \emph{T1 neighbour exchange}, the annealing mechanism, now added as
+\texttt{reconnect\_t1\_3d} (a \textbf{Rewire} op, the 3D sibling of the 2D \texttt{t1\_transition}):
+every interior edge shorter than a threshold is flipped by a local four-cell neighbour exchange
+($A$--$B$ lose the edge, the far cells $C$--$D$ gain it), collapsing the edge to its midpoint and
+reopening it perpendicular in the tangent plane. It keeps $V,E,F$ (and Euler) fixed and only reconnects;
+a standalone check confirms the shell stays closed with Euler$=2$ through $200+$ flips. Adding it to the
+dividing vesicle anneals the division defects and drops the shape index a further $3.96\!\to\!3.88$.
+Note the sphere mandates $\ge\!12$ pentagonal defects (Euler), so perfect hexagons are not the target. \emph{At scale} (the fig4 test: $600\!\to\!2367$ cells over $1000$ frames) the shell stays
 \texttt{closed, Euler}$=2$, roughness $0.008$, shape index $3.84$ --- rounder at scale, as more cells
 anneal better.
 
@@ -597,9 +602,15 @@ transposed verbatim from Turing\_vertex \texttt{fig4\_coral}: $\gamma=2,A=1,B=3$
 gives round Turing spots. The Brusselator's fast-inhibitor diffusion is only stable at the fig4
 timestep $\mathrm{d}t=0.02$, so the whole sim runs at that step and \texttt{shape\_energy\_3d} is given
 the same $\mathrm{d}t$ so the mechanics still relaxes fully each frame. A self-organised activator
-pattern emerges across the closed shell (Fig.~\ref{fig:coral}), coloured white$\to$red --- the
-substrate for morphogen-driven growth (bulge where $a$ is high) and division, the coral-morphogenesis
-next step.
+pattern emerges across the closed shell (Fig.~\ref{fig:coral}), coloured white$\to$red.
+
+Crucially the pattern couples to \emph{topological change}. In \texttt{rd\_coral\_grow} the same coral
+runs while the vesicle grows (quasi-statically) and \emph{divides}: \texttt{divide\_3d} now propagates
+the mother's \texttt{chem} to its daughters (the kept face keeps the mother's state, the new face
+inherits a copy), so the Turing field rides the proliferating tissue coherently rather than being
+scrambled by division ($500\!\to\!1402$ cells, the labyrinth intact). This is the substrate for the
+morphogenesis proper --- morphogen-driven growth (bulge/divide where $a$ is high) on a \emph{fluid}
+($p_0\!>\!3.81$) shell where T1 lets the tissue flow, the bridge to tubes.
 
 \begin{figure}[h]
 \centering
