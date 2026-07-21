@@ -1,16 +1,20 @@
 {
- "name": "tube",
+ "name": "tube_1",
  "p0": 3.9,
  "grow": 0.006,
  "Nv": 796,
  "cells": 400,
- "cells_end": 1229,
- "n_div": 829,
- "n_t1": 6435,
+ "cells_end": 758,
+ "n_div": 358,
+ "n_t1": 3600,
  "extent": [
-  17.07,
-  17.97,
-  18.37
+  10.0,
+  10.28,
+  18.27
  ],
- "aspect": 1.076
+ "aspect": 1.827,
+ "hollow_frac": 0.063,
+ "hollow_dev_mean": 5.8,
+ "hollow_max": 0.078,
+ "hollow_mean": 0.042
 }

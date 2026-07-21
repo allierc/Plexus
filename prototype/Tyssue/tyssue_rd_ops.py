@@ -107,6 +107,14 @@ class CellRDSeed(Structural):
         self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
         self.noise = float(params.get("noise", 0.04))
         self.patch_z = float(params.get("patch_z", 0.6))        # (patch) activate cells with cen_z > patch_z x z_max
+        self.n_spots = int(params.get("n_spots", 5))            # (cones) number of fixed radial activation foci
+        self.cone_deg = float(params.get("cone_deg", 18.0))     # (cones) half-angle of each activation cone
+
+    def _cone_dirs(self):
+        """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5)."""
+        i = np.arange(self.n_spots) + 0.5
+        phi = np.arccos(1 - 2 * i / self.n_spots); theta = np.pi * (1 + 5 ** 0.5) * i
+        return np.stack([np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)], 1)
 
     def forward(self, H, mask=None):
         clvl = H.level(self.at); vlvl = H.level(self.vat); m = getattr(vlvl, "_mesh", None)
@@ -119,6 +127,15 @@ class CellRDSeed(Structural):
             if "cen" in clvl.state_schema:
                 ci0, ci1 = clvl.state_schema["cen"]; zc = clvl.state[:nF, ci0 + 2]
                 a = torch.where(zc > self.patch_z * float(zc.max()), torch.ones(nF, device=dev), a)
+            u = torch.ones(nF, device=dev)
+        elif self.mode == "cones":                              # N FIXED radial activation cones (Fig 5 multi-tube):
+            a = torch.full((nF,), 0.02, device=dev)             # each cone's tip stays activated as it extends ->
+            if "cen" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
+                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
+                d = cen / (cen.norm(dim=1, keepdim=True) + 1e-9)
+                dirs = torch.as_tensor(self._cone_dirs(), dtype=cen.dtype, device=dev)
+                cosmax = (d @ dirs.T).max(dim=1).values
+                a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
         elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
             a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)

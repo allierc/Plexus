@@ -1,9 +1,9 @@
 general:   # run-level settings
-  name: tyssue_tube_tube   # run name (-> archive/<name>/)
+  name: tyssue_tube_tube_1   # run name (-> archive/<name>/)
   seed: 0   # RNG seed
-  n_frames: 240   # number of simulation frames
+  n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  record_cap: 300
+  record_cap: 502
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
@@ -39,8 +39,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
 - op: cell_rd_seed
   at: cell   # the set this operator acts on
   mode: patch
-  patch_z: 0.82
-  before_frame: 3   # run this operator once, before the given frame
+  patch_z: 0.9
 - op: morphogen_growth_3d
   at: vertex   # the set this operator acts on
   cell_set: cell
@@ -59,12 +58,12 @@ operators:   # the operators to instantiate (each realises one mechanism)
   K_R: 0.02
   mu: 1.0   # mobility (overdamped)
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 28   # inner bounded-Euler relaxation steps per frame
+  relax_iters: 40   # inner bounded-Euler relaxation steps per frame
   eta: 0.08   # relaxation step size
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
 - op: reconnect_t1_3d
   at: vertex   # the set this operator acts on
-  l_th_frac: 0.3
+  l_th_frac: 0.28
   every: 1   # run this operator every N frames
   max_flips: 50
 - op: divide_3d
@@ -76,6 +75,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   every: 2   # run this operator every N frames
   max_div: 20
   cell_set: cell
+  g1_ramp: false
 - op: topo_snapshot_3d
   at: vertex   # the set this operator acts on
   every: 1   # run this operator every N frames
