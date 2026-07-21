@@ -42,6 +42,7 @@ class AggregateSeed(Structural):
     MECHANISM_TAGS = ["cell_aggregate", "initial_condition", "adjacency_graph"]
     PARAM_ROLES = {"mode": "disc|shell|ball", "radius": "aggregate_radius", "k": "n_neighbours",
                    "seed_frac": "activator_patch_fraction"}
+    REFERENCE = "Plexus (this work); cf. Okuda, S. et al. (2018). Sci. Rep. 8:2386 (cell aggregate initial condition)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -123,6 +124,7 @@ class CellDiffuse(Lateral):
     First-order in the chemistry, so EMIT=velocity."""
     SUPPORTED_DIMS = [2, 3]
     EMIT = "velocity"
+    INTEGRAND = "chem"                                        # coupled: -> the chem block (pure-Turing: chem IS the coordinate)
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["d_a", "d_h", "chi"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]
@@ -130,6 +132,8 @@ class CellDiffuse(Lateral):
     MAPS = ["edge_index"]                                    # the cell--cell adjacency relation
     MECHANISM_TAGS = ["diffusion", "graph_laplacian", "junctional_transport", "turing"]
     PARAM_ROLES = {"d_a": "activator_diffusivity", "d_h": "substrate_diffusivity", "chi": "spatial_scale"}
+    REFERENCE = ("Okuda, S. et al. (2018). Combining Turing and 3D vertex models... Sci. Rep. 8:2386 (Eq. 2, "
+                 "junctional transport); Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -166,18 +170,24 @@ class GrayScott(Lateral):
     """
     SUPPORTED_DIMS = [2, 3]
     EMIT = "velocity"
+    INTEGRAND = "chem"
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["F", "kk"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]
     READS = ["chem"]; WRITES = ["chem"]
     MAPS = []                                                # local (no map traversed)
     MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott", "self_replication"]
-    PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate"}
+    PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "rate": "reaction_time_scale"}
+    REFERENCE = ("Pearson, J. E. (1993). Complex patterns in a simple system. Science 261:189-192; "
+                 "Gray, P. & Scott, S. K. (1984). Chem. Eng. Sci. 39:1087-1097.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
         self.F = float(params["F"]); self.kk = float(params["kk"])
+        self.rate = float(params.get("rate", 1.0))          # time-scale the WHOLE RD (with diffuse chi) so the
+        #                                                     pattern develops at a fine mechanics dt -- pure time
+        #                                                     rescale, identical pattern (Turing/vertex separation)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -186,7 +196,7 @@ class GrayScott(Lateral):
         uvv = u * v * v
         dv = uvv - (self.F + self.kk) * v
         du = -uvv + self.F * (1.0 - u)
-        return {self.at: torch.stack([dv, du], dim=1) * lvl.occ[:, None]}
+        return {self.at: self.rate * torch.stack([dv, du], dim=1) * lvl.occ[:, None]}
 
 
 @register_operator("react", set="cell", kind="lateral", family="fields",
@@ -201,6 +211,7 @@ class GiererMeinhardt(Lateral):
     """
     SUPPORTED_DIMS = [2, 3]
     EMIT = "velocity"
+    INTEGRAND = "chem"
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["rho"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]
@@ -208,6 +219,7 @@ class GiererMeinhardt(Lateral):
     MAPS = []
     MECHANISM_TAGS = ["reaction", "activator_inhibitor", "turing", "gierer_meinhardt"]
     PARAM_ROLES = {"rho": "reaction_rate", "kappa": "saturation", "rho0": "activator_baseline"}
+    REFERENCE = "Gierer, A. & Meinhardt, H. (1972). A theory of biological pattern formation. Kybernetik 12:30-39."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -240,6 +252,7 @@ class Brusselator(Lateral):
     """
     SUPPORTED_DIMS = [2, 3]
     EMIT = "velocity"
+    INTEGRAND = "chem"
     DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["gamma", "A", "B"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]
@@ -247,6 +260,7 @@ class Brusselator(Lateral):
     MAPS = []
     MECHANISM_TAGS = ["reaction", "activator_inhibitor", "turing", "brusselator", "round_spots"]
     PARAM_ROLES = {"gamma": "reaction_rate", "A": "feed", "B": "conversion"}
+    REFERENCE = "Prigogine, I. & Lefever, R. (1968). Symmetry breaking instabilities in dissipative systems. II. J. Chem. Phys. 48:1695-1700."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

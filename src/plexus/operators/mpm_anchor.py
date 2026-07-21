@@ -26,6 +26,7 @@ class MPMAnchor(Lateral):
     REQUIRES_PARAMS = ["k"]
     MECHANISM_TAGS = ["substrate_anchor", "boundary_condition", "rest_restoring"]
     PARAM_ROLES = {"k": "anchor_stiffness", "ring": "boundary_width", "mode": "anchor_extent"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

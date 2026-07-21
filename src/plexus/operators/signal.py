@@ -53,6 +53,7 @@ class Signal(Lateral):
         "bias": "resting_drive",
         "weight": "synapse_weight_block",
     }
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

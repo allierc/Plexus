@@ -29,6 +29,7 @@ class Glide(Lateral):
     MECHANISM_TAGS = ["self_propulsion", "motility", "active_brownian"]
     REQUIRES_TYPE_PROPS = ["move_speed"]
     PARAM_ROLES = {"noise": "translational_noise"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

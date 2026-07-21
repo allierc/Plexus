@@ -58,9 +58,9 @@ def GS(F, kk):
 def presets():
     # --- bigger round spots: Brusselator, chi/gamma up ~4x -> ~2x wavelength ---
     ps = [
-        dict(name="ball_big", mode="ball", N=2400, R=8.0, k=12, chi=6.4, dt=0.2, frames=20000,
+        dict(name="ball_big", mode="ball", N=4000, R=11.0, k=12, chi=6.4, dt=0.2, frames=20000,
              norm=True, seed="noise", d_a=0.05, d_h=0.5, react=BR(0.02)),
-        dict(name="shell_big_spots", mode="shell", N=1400, R=8.0, k=6, chi=6.4, dt=0.2, frames=20000,
+        dict(name="shell_big_spots", mode="shell", N=4000, R=11.0, k=6, chi=6.4, dt=0.2, frames=20000,
              norm=True, seed="noise", d_a=0.05, d_h=0.5, react=BR(0.02)),
     ]
     # --- Gray-Scott regimes (coral / holes / labyrinth), on BOTH the ball and the shell ---
@@ -69,7 +69,7 @@ def presets():
     regimes = [("coral", 0.058, 0.063), ("holes", 0.039, 0.058), ("labyrinth", 0.029, 0.054)]
     for mode, N in (("ball", 2400), ("shell", 1600)):
         for nm, F, kk in regimes:
-            ps.append(dict(name=f"{mode}_{nm}", mode=mode, N=N, R=8.0, k=6, chi=0.28, dt=0.35,
+            ps.append(dict(name=f"{mode}_{nm}", mode=mode, N=N, R=11.0, k=6, chi=0.28, dt=0.35,
                            frames=10000, norm=False, seed="scatter", d_a=0.08, d_h=0.16, react=GS(F, kk)))
     return ps
 
@@ -130,27 +130,17 @@ def render(xyz, act, outdir, name, mode, seconds=12.0, max_frames=170):
     def label(ax, txt):
         ax.text2D(0.02, 0.98, txt, transform=ax.transAxes, color="white", fontsize=7, va="top", family="monospace")
 
-    # strip: external 3D @ 0/50/100%, then a 4th panel.
-    #   ball  -> a flat 2D cross-section (thin central x-slab, plotted y-z) -- see inside;
-    #   shell -> an external back view.
-    ball = (mode == "ball")
+    # strip: external 3D @ 0/50/100%, then a 4th external back view (shell kept closed).
     sfig = plt.figure(figsize=(4 * PANEL, PANEL)); sfig.patch.set_facecolor("black")
     for i, fr in enumerate((0.0, 0.5, 1.0)):
         t = int(fr * (T - 1))
         ax = sfig.add_subplot(1, 4, i + 1, projection="3d"); ax.set_facecolor("black")
         _scatter(ax, x, y, z, act[t], vmin, vmax, s, box); ax.view_init(18, 35)
         label(ax, f"{name}\nexternal {int(100*fr)}%\nactivator (red)")
-    if ball:
-        cyv, czv = float(y.mean()), float(z.mean())
-        keep = ~((x > cx) & (y > cyv) & (z > czv))            # remove the +++ octant -> a wedge cutaway
-        ax = sfig.add_subplot(1, 4, 4, projection="3d"); ax.set_facecolor("black")
-        _scatter(ax, x[keep], y[keep], z[keep], act[-1][keep], vmin, vmax, s, box)
-        ax.view_init(24, 45)                                  # look into the removed corner -> interior faces
-        label(ax, f"{name}\ninternal cutaway\nactivator (red)")
-    else:
-        ax = sfig.add_subplot(1, 4, 4, projection="3d"); ax.set_facecolor("black")
-        _scatter(ax, x, y, z, act[-1], vmin, vmax, s, box); ax.view_init(18, 215)
-        label(ax, f"{name}\nexternal back\nactivator (red)")
+    # 4th panel: an external back view (no interior cutaway -- keep the shell closed).
+    ax = sfig.add_subplot(1, 4, 4, projection="3d"); ax.set_facecolor("black")
+    _scatter(ax, x, y, z, act[-1], vmin, vmax, s, box); ax.view_init(18, 215)
+    label(ax, f"{name}\nexternal back\nactivator (red)")
     sfig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02)
     sfig.savefig(os.path.join(outdir, "strip.png"), dpi=120, facecolor="black"); plt.close(sfig)
 

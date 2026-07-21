@@ -31,6 +31,7 @@ class VelocityCruise(Lateral):                   # (alias `cruise`, one migratio
     REQUIRES_PARAMS = ["v0"]
     MECHANISM_TAGS = ["self_propulsion", "vicsek", "active_matter"]
     PARAM_ROLES = {"v0": "cruising_speed", "noise": "orientation_noise", "chirality": "rotational_bias"}
+    REFERENCE = "Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian particles with energy depots. Phys. Rev. Lett. 80:5044-5047."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

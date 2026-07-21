@@ -26,6 +26,7 @@ class MPMStrain(Lateral):
     REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
     MECHANISM_TAGS = ["elastic_strain", "plastic_flow", "incompressible_volume"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM); Sulsky, D. et al. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

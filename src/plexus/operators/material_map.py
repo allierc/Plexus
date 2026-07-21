@@ -105,6 +105,7 @@ class ApplyMaterialMap(Exchange):
     SUPPORTED_DIMS = [2, 3]
     MECHANISM_TAGS = ["material_map", "heterogeneous_stiffness", "symmetry_breaking"]
     PARAM_ROLES = {"min": "param_lo", "max": "param_hi", "target": "material_parameter"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM material model)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
