@@ -1,0 +1,19 @@
+{
+ "name": "vesicle_divide",
+ "p0": 3.72,
+ "grow_rate": 0.003,
+ "divide": true,
+ "Nv": 296,
+ "cells": 150,
+ "rough_start": 0.0046,
+ "rough_end": 0.0102,
+ "shape_start": 3.7958,
+ "shape_end": 3.9555,
+ "radius_start": 4.904,
+ "radius_end": 9.519,
+ "cells_start": 150,
+ "cells_end": 513,
+ "n_div": 363,
+ "closed": true,
+ "euler": 2
+}

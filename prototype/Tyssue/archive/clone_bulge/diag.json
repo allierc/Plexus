@@ -1,0 +1,13 @@
+{
+ "name": "clone_bulge",
+ "p0": 3.72,
+ "amp": 1.0,
+ "sigma": 1.5,
+ "mode": "discrete",
+ "Nv": 503,
+ "cells": 222,
+ "n_clone": 14,
+ "clone_area": 1.8284,
+ "wt_area": 0.8014,
+ "area_ratio": 2.282
+}

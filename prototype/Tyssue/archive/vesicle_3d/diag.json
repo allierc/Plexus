@@ -1,0 +1,17 @@
+{
+ "name": "vesicle_3d",
+ "p0": 3.72,
+ "grow_rate": 0.0,
+ "divide": false,
+ "Nv": 296,
+ "cells": 150,
+ "rough_start": 0.0025,
+ "rough_end": 0.0048,
+ "shape_start": 3.8104,
+ "shape_end": 3.8016,
+ "radius_start": 4.966,
+ "radius_end": 4.965,
+ "cells_start": 150,
+ "cells_end": 150,
+ "n_div": 0
+}

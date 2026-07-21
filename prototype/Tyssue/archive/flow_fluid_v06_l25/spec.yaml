@@ -1,0 +1,49 @@
+general:   # run-level settings
+  name: tyssue_flow_flow_fluid_v06_l25   # run name (-> archive/<name>/)
+  seed: 0   # RNG seed
+  n_frames: 180   # number of simulation frames
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
+  dim: 2   # spatial dimension
+  world:   # world box size
+  - 18.0
+  - 20.0
+sets:   # the biological SETS (Levels) of the model
+  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
+    n: 378   # buffer size (max elements)
+fields: {}   # continuous fields
+operators:   # the operators to instantiate (each realises one mechanism)
+- op: mesh_seed   # build the honeycomb half-edge mesh on the vertex set (frame 0)
+  at: vertex   # the set this operator acts on
+  nx: 14   # lattice columns (cell centres)
+  ny: 16   # lattice rows
+  a: 1.0   # cell spacing (sets the base cell size)
+  border: 1   # rings of border cells to drop (their vertices are pinned)
+  jitter: 0.2   # initial positional disorder
+  p0: 4.1   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  seed: 0   # RNG seed
+  before_frame: 1   # run this operator once, before the given frame
+- op: shape_energy   # AVM shape-energy force on the vertices (bounded Euler); reads target area a0 from the cell set
+  at: vertex   # the set this operator acts on
+  p0: 4.1   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  K_A: 1.0   # area-elasticity stiffness
+  K_P: 1.0   # perimeter-elasticity stiffness
+  mu: 1.0   # mobility (overdamped)
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 4   # inner bounded-Euler relaxation steps per frame
+  eta: 0.1   # relaxation step size
+  v0: 0.06   # active self-propulsion speed (0 = pure relaxation)
+  Dr: 1.0   # rotational diffusion of the self-propulsion direction
+  cap_frac: 0.15   # max per-step move as a fraction of mean edge (the stability cap)
+- op: t1_transition   # reversible T1 neighbour swaps: reconnect edges shorter than l_th
+  at: vertex   # the set this operator acts on
+  l_th: 0.25   # T1 threshold: an edge shorter than this reconnects
+  p0: 4.1   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  every: 1   # run this operator every N frames
+- op: topo_snapshot   # record the per-tick topology so a movie can be rendered
+  at: vertex   # the set this operator acts on
+schedule:   # the order the operators run each frame
+- mesh_seed
+- shape_energy
+- t1_transition
+- topo_snapshot
