@@ -317,4 +317,109 @@ unit of change is often a new \emph{implementation} or \emph{parameter} of an ex
 $4{:}1$ growth is still the \texttt{growth} operator), not a new operator --- ``prototype freely,
 promote mechanisms conservatively.''
 
+\section{The gap to Figure~5, and the Tyssue bridge}
+This prototype set out to reach Okuda's tubulation (Fig.~5) and branching (Fig.~6) and did not --- but
+the failure is now precisely located, and a parallel prototype (\texttt{prototype/Tyssue}) is already
+most of the way across the gap.
+
+\paragraph{The gap, in the language of the model ladder.} Confluent-tissue mechanics forms a ladder of
+increasingly permissive representations, distinguished by \emph{what the degrees of freedom are}. At the
+bottom sits the \emph{Self-Propelled-Voronoi} (SPV) model we used: the only DOF are the cell
+\emph{centres}, and each cell's shape is not stored but \emph{read off}, every step, as the Voronoi
+region of the centres (Bi 2016; Sussman 2017). One rung up is the \emph{vertex model}, whose DOF are the
+shared tri-cellular \emph{junctions}: cells are generic polygons with explicit edges and line tensions,
+free to take shapes no Voronoi partition admits. At the top is the full 3D vertex / deformable-cell
+model (Okuda 2018; SimuCell3D), where each cell is a polyhedron with an apical (lumen-facing) and basal
+surface, an enclosed volume, and a dynamically reconnecting network.
+
+A tube is exactly what the bottom rung cannot hold. It is (i) a high-aspect-ratio junctional network far
+from any Voronoi tessellation of the centres --- which the SPV forces the geometry back onto at every
+step; (ii) an intrinsically 3D object with two principal curvatures and an apical/basal axis --- which a
+planar point-tessellation has no coordinates for; and (iii) defined by an enclosed \emph{lumen} --- of
+which the SPV has no notion. This is why our extrusion \emph{localised} superbly (graded
+divide-on-activation, $\mathrm{corr}\!=\!0.42$) but its \emph{height} plateaued at $\mathrm{protr}_{\max}
+\!\approx\!1.4$: with the shape slaved to the centres and no way to store a coherent neck, driving growth
+harder gave single-cell spikes, not tubes. \emph{The wall is representational, not parametric.}
+
+\paragraph{What Okuda's tube actually needs} --- four coupled ingredients, none native to the SPV.
+\emph{(1) Quasi-static force balance:} the overdamped vertex equations solved to residual $<\!10^{-5}$
+\emph{between} growth steps (Eq.~1; $\tau_{\text{cycle}}\!=\!50\!\gg\!\Delta t_v\!=\!0.005$).
+\emph{(2) Incompressible cells $+$ surface tension:} $U=\sum_j\tfrac12 k_v(v_j-v_{\text{eq},j})^2+\kappa_s
+s_j$, $k_v\!=\!10\!\gg\!\kappa_s\!=\!0.2$ (Eq.~3) --- growth of a cell's target volume must be absorbed
+by shape change, not compression. \emph{(3) Reversible network reconnection (the 3D T1):} any edge below
+$\Delta l_{\text{th}}\!=\!0.05$ reconnects, attempted every $\Delta t_r\!=\!1.0$ --- the topology change
+that lets a bump \emph{flow} into a tube. \emph{(4) Activator$\to$growth:} a discrete Gierer--Meinhardt
+mitogen (Hill $\alpha\!=\!10$ step at $\rho_{\text{sw}}\!=\!0.5$, Eqs.~7--8), the spot self-maintaining at
+the growing tip. Tube diameter tracks the steady domain size $\propto\chi^{1/4}\phi^{1/2}$ (thick:
+$\chi\!=\!0.1,\gamma\!=\!1$; thin: $\chi\!=\!0.01,\gamma\!=\!100$).
+
+\paragraph{Tubes, branches, undulations are one knob apart.} The \emph{same} growing vesicle gives
+undulation, tubulation, or branching depending only on the ratio of patterning rate $\gamma$ to
+deformation rate $1/\tau_{\text{cycle}}$ --- the \emph{hysteresis} of the Turing pattern on the growing
+domain. $\gamma\!=\!100$ (pattern outruns growth) $\to$ domains wander $\to$ \emph{undulation} (Fig.~7);
+$\gamma\!=\!1$ (domains held in place) $\to$ persistent tip zones $\to$ \emph{tubes} (Fig.~5);
+$\gamma\!=\!0.01$ with small domains ($\chi\!=\!0.01$) $\to$ division-induced morphogen dilution
+repatterns a spot into separated sub-spots $\to$ \emph{branching} (Fig.~6). The last is a genuinely
+\emph{discrete-cell} effect: because the RD is homogeneous \emph{per cell}, growth/division inject a
+cell-scale discontinuity that, under high hysteresis, seeds the branch --- precisely where a discrete
+vertex model does work a continuum cannot.
+
+\paragraph{Rigidity is the precondition.} Whether a tissue \emph{can} tubulate is set by the shape-index
+transition (Bi 2015): at $p_0\!=\!P_0/\sqrt{A_0}\!\approx\!3.81$ the T1 barrier vanishes and the sheet
+fluidises. Below it the sheet jams (growth builds stress but the wall cannot flow); above it, it flows.
+Okuda does not tune $p_0$ --- he sets the reconnection \emph{cadence} ($\Delta t_r\!\ll\!\tau_{\text{cycle}}$)
+so the tissue is quasi-statically fluid. Two ratios thus select morphology: reconnection-vs-growth (must
+be fluid to tube at all) and patterning-vs-growth (undulate/tube/branch). Our SPV had \emph{neither} knob
+--- no explicit T1, no shape-index handle --- the same gap seen from the rigidity side.
+
+\paragraph{The Tyssue bridge (parallel prototype).} We built \texttt{prototype/Tyssue}, a true vertex
+model (AVM) as \texttt{plexus2} operators, expressly to supply the two ingredients the Voronoi route
+lacks --- force-balance iteration and explicit T1 --- under the \emph{same} shape-energy contract. It is
+already well across the gap. In 2D it reproduces the $p_0^*\!\approx\!3.81$ rigidity transition from
+genuine force balance (residual energy collapses $\sim\!4$ orders across $p_0^*$, no timestep tuning ---
+the SPV's ``master-knob'' problem gone), with validated T1, oriented division, apoptosis, growth and RD
+operators. In 3D it already carries a closed epithelial \emph{vesicle} half-edge mesh
+(\texttt{seed\_mesh\_3d}), a 3D shape energy with a \emph{per-cell lumen} volume (\texttt{shape\_energy\_3d}
+--- the incompressibility $+$ surface tension of Eq.~3), 3D cell \emph{division} (\texttt{divide\_3d}),
+quasi-static growth, and a \texttt{vesicle\_fig4} preset reproducing our Fig.~4 growth scale on the true
+mesh.
+
+\paragraph{The continuing steps to Fig.~5, then Fig.~6.} Against Okuda's ingredient list, Tyssue needs,
+in order:
+\begin{enumerate}\itemsep1pt
+\item \textbf{A 3D reconnection --- the one genuinely missing mechanics op.} A 3D T1 / IH--HI reconnection
+on the vesicle mesh (only the 2D T1 exists today), triggered below an edge-length threshold on a slow
+cadence ($\Delta t_r\!\ll\!\tau_{\text{cycle}}$). This is what lets a bump \emph{extend} into a tube rather
+than jam; Barton's continuous shrink-to-point edge flip is the robust recipe if a discrete threshold
+proves brittle under large deformation.
+\item \textbf{Couple the RD to the 3D mesh.} Tyssue's RD runs in 2D today and the vesicle grows
+\emph{uniformly}; run the discrete Gierer--Meinhardt (or Gray--Scott) on the vesicle's cell adjacency,
+flux $\propto$ (shared face area)/(cell volume) so pattern and geometry co-evolve (Eq.~2), reduced to the
+two knobs $\chi$ (diameter) and $\gamma$ (hysteresis).
+\item \textbf{Port the winning growth coupling onto the mesh.} Carry over exactly what won here ---
+activator-\emph{graded} proliferation ($\dot v_{\text{eq}}\!\propto\!\mathrm{Hill}(a)$, or divide-on-activation
+at the graded rate, $\mathrm{corr}\!=\!0.42$) --- with oriented (Hertwig) division. On the true mesh,
+force balance and T1 should convert the SPV's spiky fingers into coherent constant-diameter tubes.
+\emph{With these three, the prototype should tubulate.}
+\item \textbf{Sweep $(\chi,\gamma)$.} Reproduce the morphology diagram (Fig.~8) on a $\sim\!2000$-cell
+vesicle: $\gamma\!=\!100\to$ undulation, $\gamma\!=\!1\to$ tube, $\gamma\!=\!0.01,\chi\!=\!0.01\to$
+branching; verify the $\chi^{1/4}$ diameter scaling.
+\item \textbf{Preserve per-cell discreteness for branching.} Keep the RD field homogeneous \emph{per cell}
+and run high hysteresis, so division-induced dilution injects the cell-scale perturbation that splits a
+domain into a branch (Fig.~6).
+\end{enumerate}
+The lumen is already in \texttt{shape\_energy\_3d}; membrane bending can be added later to set thin-tube
+undulation vs.\ thick-tube straightness. Caveat: the whole ladder assumes quasi-static mechanics and slow
+growth --- if real tip-driven branching (traction, motility) is later needed, the active machinery of the
+AVM/SPV (Barton 2017; Bi 2016) is the natural next layer on the 3D geometry.
+
+\paragraph{In sum.} The Turing$\times$vertex \emph{coupling} was never the hard part --- Fig.~4 shows a
+clean epithelium carrying any Turing pattern, and the extrusion experiments show morphogen-graded
+proliferation localises deformation faithfully ($\mathrm{corr}\!=\!0.42$). The hard part is the
+\emph{mechanics substrate}: tubes and branches need shared junction vertices, an enclosed lumen,
+quasi-static force balance, and reversible reconnection. The SPV cannot provide them; the parallel Tyssue
+vertex model already provides most, and is \emph{three well-defined operators} --- a 3D~T1, an RD-on-mesh
+coupling, and the graded-growth port --- from Fig.~5, and \emph{one regime knob} ($\gamma$) beyond that
+from Fig.~6.
+
 \end{document}
