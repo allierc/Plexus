@@ -220,8 +220,13 @@ class Growth(Lateral):
     """The mechanochemical coupling (Okuda Eqs 7-8): the activator is a mitogen, so a cell's
     target area grows at a Hill-saturating rate in the activator concentration,
 
-        da0/dt = lam_ref * ( rho_lam + (a^n / (a^n + a_sw^n)) )
+        da0/dt = lam_ref * ( rho_lam + lam_gain * (a^n / (a^n + a_sw^n)) )
 
+    `rho_lam` is the OFF (low-activator) growth multiple, `rho_lam + lam_gain` the ON (high-activator)
+    one -- so with rho_lam=0.5, lam_gain=1.5 a switched-ON cell grows 2x and a switched-OFF cell 0.5x
+    (a 4:1 division contrast that CONCENTRATES proliferation -- and hence out-of-plane buckling -- at
+    the activator domains: locally-favoured extrusion). `a_sw` must sit inside the activator's actual
+    range for the switch to bite (Gray-Scott peaks ~0.4, so a_sw~0.2, not 1.0).
     Reads chem[activator]; writes the a0 block (INTEGRAND='a0', integrated as its own block)."""
     SUPPORTED_DIMS = [2, 3]
     EMIT = "velocity"
@@ -233,7 +238,7 @@ class Growth(Lateral):
     MAPS = []
     MECHANISM_TAGS = ["growth", "mitogen", "hill", "mechanochemical_coupling", "proliferation"]
     PARAM_ROLES = {"lam_ref": "reference_growth_rate", "a_sw": "activator_half_saturation",
-                   "rho_lam": "basal_growth", "hill": "hill_coefficient"}
+                   "rho_lam": "off_growth_multiple", "lam_gain": "on_minus_off_gain", "hill": "hill_coefficient"}
     REFERENCE = "Okuda, S. et al. (2018). Sci. Rep. 8:2386 (Eqs. 7-8, activator-driven growth); Hill, A. V. (1910). J. Physiol. 40:iv-vii."
 
     def __init__(self, params, device="cpu"):
@@ -242,6 +247,7 @@ class Growth(Lateral):
         self.lam_ref = float(params["lam_ref"])
         self.a_sw = float(params.get("a_sw", 1.0))
         self.rho_lam = float(params.get("rho_lam", 0.0))
+        self.lam_gain = float(params.get("lam_gain", 1.0))   # ON = rho_lam + lam_gain; OFF = rho_lam
         self.hill = float(params.get("hill", 2.0))
         self.cap = float(params.get("cap", 2.0))             # stop growing at cap*base (the division size)
         self.block = params.get("block", "a0")               # size block: a0 (2D target area) | v0 (3D target volume)
@@ -251,7 +257,7 @@ class Growth(Lateral):
         lvl = H.level(self.at)
         a = lvl.get("chem")[:, 0].clamp(min=0.0)             # activator concentration
         an = a.pow(self.hill)
-        lam = self.lam_ref * (self.rho_lam + an / (an + self.a_sw ** self.hill + 1e-9))
+        lam = self.lam_ref * (self.rho_lam + self.lam_gain * an / (an + self.a_sw ** self.hill + 1e-9))
         # cap at the division size: when the buffer is full a cell cannot divide, so without this
         # its target size would grow unbounded and over-compress the (jammed) core.
         base = float(getattr(lvl, self.block + "_base", 1.0))

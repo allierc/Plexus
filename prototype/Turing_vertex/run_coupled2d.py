@@ -78,7 +78,7 @@ def presets():
     for r in regimes:
         rr = dict(grow, **r); nm = rr.pop("name")
         out.append(dict(rr, name=f"couple2d_{nm}"))                            # plain (vertex_tension only)
-        out.append(dict(rr, name=f"couple2d_{nm}_lloyd", k_lloyd=0.8))         # + planar Lloyd -> uniform cells
+        out.append(dict(rr, name=f"couple2d_{nm}_lloyd", k_lloyd=0.15))         # + planar Lloyd -> uniform cells
     return out
 
 

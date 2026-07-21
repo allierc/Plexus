@@ -110,6 +110,12 @@ def presets():
         dict(gs, name="fig4_labyrinth", n0=1000, buffer=2600, frames=9000, react=GS(0.029, 0.054)),   # labyrinth
         dict(gs, name="fig4_holes",     n0=1000, buffer=2600, frames=9000, react=GS(0.039, 0.058)),   # holes
         dict(base, name="fig4_coral_v",     **gsv, react=GSV(0.058, 0.063)),                       # coral
+        # LOCALLY-FAVOURED EXTRUSION: same fast/stable coral_v mechanics, but AMPLIFY the (already
+        # present but weak) activator-driven growth into a 4:1 division contrast -- ON cells grow 2x,
+        # OFF cells 0.5x -- and drop a_sw into the GS activator's actual range so the Hill switch bites.
+        # Localized proliferation -> local out-of-plane buckling at the activator domains.
+        dict(base, name="fig4_coral_ext", **{**gsv, "rho_lam": 0.5, "lam_gain": 1.5, "a_sw": 0.2,
+             "hill": 4.0, "lam_ref": 0.25}, react=GSV(0.058, 0.063)),
         dict(base, name="fig4_labyrinth_v", **{**gsv, "chi": 5.6, "frames": 5000},                 # labyrinth: CFL-safe
              react=GSV(0.029, 0.054, rate=20.0)),
         dict(base, name="fig4_holes_v",     **{**gsv, "chi": 6.5, "frames": 5000},                 # holes: more dev
@@ -154,7 +160,7 @@ def make_spec(p, V0):
         return _wrap(p, ops, W)
     ops += [
         {"op": "growth", "at": "cell", "block": "v0", "lam_ref": p["lam_ref"], "rho_lam": p["rho_lam"],
-         "a_sw": p["a_sw"], "hill": p["hill"], "cap": p["ratio"]},
+         "a_sw": p["a_sw"], "hill": p["hill"], "cap": p["ratio"], "lam_gain": p.get("lam_gain", 1.0)},
         {"op": "divide_2x", "at": "cell", "block": "v0", "ratio": p["ratio"], "offset": 0.12,
          "reset_noise": p.get("reset_noise", 0.0)},
     ]
