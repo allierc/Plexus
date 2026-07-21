@@ -102,6 +102,11 @@ def presets():
     # low-feed labyrinth (F=0.029) diverges there, so it runs gentler chi/rate over more frames.
     def GSV(F, kk, rate=35.0):
         return {"implementation": "gray_scott", "F": F, "kk": kk, "rate": rate}
+    # extrusion-ELONGATION sweep (cluster): fig4_coral_ext localises extrusion (corr 0.31) but the lobes
+    # are broad bumps -- can they be ELONGATED? extc = the coral_ext coupling; EXT() varies one lever each.
+    extc = dict(gsv, rho_lam=0.5, lam_gain=1.5, a_sw=0.2, hill=4.0, lam_ref=0.25, buffer=4500)
+    def EXT(nm, **ov):
+        return dict(base, name=nm, **{**extc, "react": GSV(0.058, 0.063), **ov})
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
@@ -116,6 +121,14 @@ def presets():
         # Localized proliferation -> local out-of-plane buckling at the activator domains.
         dict(base, name="fig4_coral_ext", **{**gsv, "rho_lam": 0.5, "lam_gain": 1.5, "a_sw": 0.2,
              "hill": 4.0, "lam_ref": 0.25}, react=GSV(0.058, 0.063)),
+        # --- elongation sweep: (1) run longer  (2) sharper contrast / bigger division  (3) other levers ---
+        EXT("ext_long",      frames=6000),                              # 1: just run longer (more growth)
+        EXT("ext_longer",    frames=9000, buffer=6000),                 # 1b: longer + bigger buffer (keep growing)
+        EXT("ext_ratio8",    rho_lam=0.25, lam_gain=1.75, frames=6000), # 2: sharper 8:1 ON/OFF division contrast
+        EXT("ext_divratio",  ratio=3.0, frames=6000),                   # 2b: bigger division threshold (larger cells)
+        EXT("ext_fastgrow",  lam_ref=0.40, frames=5000),                # 3a: faster overall growth
+        EXT("ext_selective", a_sw=0.30, hill=8.0, frames=6000),         # 3b: only the peak grows -> narrower/taller
+        EXT("ext_softsurf",  K_S=0.5, frames=6000),                     # 3c: lower surface tension (less resistance)
         dict(base, name="fig4_labyrinth_v", **{**gsv, "chi": 5.6, "frames": 5000},                 # labyrinth: CFL-safe
              react=GSV(0.029, 0.054, rate=20.0)),
         dict(base, name="fig4_holes_v",     **{**gsv, "chi": 6.5, "frames": 5000},                 # holes: more dev
@@ -295,9 +308,13 @@ def render(pos_t, act_t, occ_t, outdir, name, lumen, R, thickness=0.8, face_mode
 def diagnostics(pos_t, act_t, occ_t):
     n0, nT = int((occ_t[0] > 0).sum()), int((occ_t[-1] > 0).sum())
     L = occ_t[-1] > 0; c = pos_t[-1][L].mean(0); rad = np.linalg.norm(pos_t[-1][L] - c, axis=1)
-    aT = act_t[-1][L]
+    aT = act_t[-1][L]; med = float(np.median(rad))
+    protr = float(np.percentile(rad, 99) / max(med, 1e-9))       # protrusion height (>1.4 = real bumps)
+    protr_max = float(rad.max() / max(med, 1e-9))                # tip extension (elongation: how far the tip reaches)
+    corr = float(np.corrcoef(aT, rad)[0, 1]) if aT.std() > 1e-6 else 0.0   # activator<->radius: is extrusion localised?
     return dict(n_start=n0, n_end=nT, grew=bool(nT > n0 * 1.15),
                 roughness=round(float(rad.std() / max(rad.mean(), 1e-9)), 3),
+                protr=round(protr, 3), protr_max=round(protr_max, 3), corr_act_rad=round(corr, 3),
                 v_std=round(float(aT.std()), 3), patterned=bool(aT.std() > 0.1),
                 nan=bool(np.isnan(pos_t[-1]).any()))
 
