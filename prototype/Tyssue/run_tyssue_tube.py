@@ -47,8 +47,12 @@ RADIUS, JITTER, SEED = 5.0, 0.16, 0
 
 
 def presets():
-    #      name    n_cells frames p0    grow_rate a_sw patch_z l_th_frac  cv   (Okuda Fig 5: quasi-static + fluid)
-    return [("tube", 400,   500,   3.90, 0.008,    0.5, 0.90,   0.28,     0.4)]
+    #      name     n_cells frames p0    grow_rate a_sw patch_z l_th_frac  cv   (Okuda Fig 5: quasi-static + fluid)
+    #  growth-rate sweep (tip mitogen rate): faster tip growth -> longer/thinner tube (Fig 5 tubulation).
+    return [("tube_1", 400,  500,   3.90, 0.006,    0.5, 0.90,   0.28,     0.4),
+            ("tube_2", 400,  500,   3.90, 0.010,    0.5, 0.90,   0.28,     0.4),
+            ("tube_3", 400,  500,   3.90, 0.012,    0.5, 0.90,   0.28,     0.4),
+            ("tube_4", 400,  500,   3.90, 0.008,    0.5, 0.90,   0.28,     0.4)]
 
 
 def make_spec(name, n_cells, frames, p0, grow_rate, a_sw, patch_z, l_th_frac, cv, buf, cbuf, g1=False):
@@ -79,12 +83,12 @@ def make_spec(name, n_cells, frames, p0, grow_rate, a_sw, patch_z, l_th_frac, cv
         {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv,
          "p0": p0, "every": 2, "max_div": max(10, n_cells // 20), "cell_set": "cell",
          "g1_ramp": g1},  # stochastic cycle + G1 ramp (daughter v_eq = birth volume) -> smooth proliferating tip
-        {"op": "topo_snapshot_3d", "at": "vertex", "every": max(1, (frames + 300) // 300)},
+        {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},   # record EVERY frame -> posf/hist aligned
     ]
     sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_rd_seed", "morphogen_growth_3d",
              "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {
-        "general": {"name": f"tyssue_tube_{name}", "seed": SEED, "n_frames": frames, "dt": 1.0, "record_cap": 300,
+        "general": {"name": f"tyssue_tube_{name}", "seed": SEED, "n_frames": frames, "dt": 1.0, "record_cap": frames + 2,
                     "boundary": "free", "dim": 3, "world": [12 * RADIUS, 12 * RADIUS, 12 * RADIUS]},
         "sets": {"vertex": {"n": buf},
                  "cell": {"n": cbuf, "state": {"chem": {"width": 2, "integration": "first_order"},
