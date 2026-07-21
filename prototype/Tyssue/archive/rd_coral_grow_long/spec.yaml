@@ -1,19 +1,20 @@
 general:   # run-level settings
-  name: tyssue_rd_spots   # run name (-> archive/<name>/)
+  name: tyssue_rd_rd_coral_grow_long   # run name (-> archive/<name>/)
   seed: 0   # RNG seed
   n_frames: 500   # number of simulation frames
-  dt: 0.02   # time step (a label: the bounded-Euler relaxation is per-frame)
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 502
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
-  - 30.0
-  - 30.0
-  - 30.0
+  - 40.0
+  - 40.0
+  - 40.0
 sets:   # the biological SETS (Levels) of the model
   vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 2396   # buffer size (max elements)
+    n: 2960   # buffer size (max elements)
   cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
-    n: 1200   # buffer size (max elements)
+    n: 1500   # buffer size (max elements)
     state:   # per-element state blocks (name: {width, integration})
       chem:
         width: 2   # number of scalar columns in this state block
@@ -26,25 +27,46 @@ fields: {}   # continuous fields
 operators:   # the operators to instantiate (each realises one mechanism)
 - op: seed_mesh_3d
   at: vertex   # the set this operator acts on
-  n_cells: 1200
+  n_cells: 150
   radius: 5.0
   jitter: 0.16   # initial positional disorder
   p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
+  vseed_cv: 0.4
+- op: vesicle_growth
+  at: vertex   # the set this operator acts on
+  rate: 0.003   # growth rate of the target area per frame
+  every: 1   # run this operator every N frames
+  max_scale: 2.5
 - op: shape_energy_3d
   at: vertex   # the set this operator acts on
   p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   K_A: 1.0   # area-elasticity stiffness
   K_P: 1.0   # perimeter-elasticity stiffness
-  Lambda: 0.1
+  Gamma: 0.1
+  Lambda: 0.5
   K_V: 1.0
   K_R: 0.4
   mu: 1.0   # mobility (overdamped)
-  dt: 0.02   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 3   # inner bounded-Euler relaxation steps per frame
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
   eta: 0.08   # relaxation step size
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
+- op: reconnect_t1_3d
+  at: vertex   # the set this operator acts on
+  l_th_frac: 0.35
+  every: 2   # run this operator every N frames
+  max_flips: 20
+- op: divide_3d
+  at: vertex   # the set this operator acts on
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.4
+  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  every: 2   # run this operator every N frames
+  max_div: 10
+  cell_set: cell
 - op: cell_geometry_3d
   at: cell   # the set this operator acts on
 - op: cell_adjacency
@@ -53,26 +75,31 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: cell   # the set this operator acts on
   seed: 0   # RNG seed
   before_frame: 3   # run this operator once, before the given frame
-  mode: noise
-  A: 1.0
-  B: 3.0
-  noise: 0.04
+  mode: scatter
+  seed_frac: 0.06
 - op: cell_diffuse
   at: cell   # the set this operator acts on
-  d_a: 0.05
-  d_h: 0.7
-  chi: 5.0
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
 - op: cell_react
   at: cell   # the set this operator acts on
-  implementation: brusselator
-  gamma: 2.0
-  A: 1.0
-  B: 3.0
+  implementation: gray_scott
+  F: 0.055
+  kk: 0.062
+  rate: 1.0   # growth rate of the target area per frame
+- op: topo_snapshot_3d
+  at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
 schedule:   # the order the operators run each frame
 - seed_mesh_3d
+- vesicle_growth
 - shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
 - cell_geometry_3d
 - cell_adjacency
 - cell_rd_seed
 - cell_diffuse
 - cell_react
+- topo_snapshot_3d

@@ -71,7 +71,8 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
     return area, perim, cen, vf
 
 
-def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam, eocc, vocc):
+def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
+                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0):
     """Explicit-arg AVM shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
@@ -82,7 +83,51 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     E = E.sum() + Lam * line.sum()
     E = E + K_V * ((vf - V0f) ** 2 * alive).sum()
     E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()   # radial over live vertices only
+    if K_bend > 0 and twin_face is not None:
+        # DIHEDRAL bending (Wardetzky hinge): penalise the angle between a cell face's outward normal and
+        # the normal of the cell across each shared edge -> smooths sharp cell-to-cell FOLDS (the hollow /
+        # inverted-cap tilt the metric flags), high-frequency, WITHOUT flattening gentle whole-shell curvature
+        # (unlike the radial K_R). Newell area vector per face -> unit normal; sum over half-edges (edge twice).
+        s = pos[es]; t = pos[et]
+        crossN = torch.cross(s, t, dim=-1) * eocc[:, None]
+        Nf = 0.5 * torch.zeros(nF, 3, device=pos.device, dtype=pos.dtype).index_add(0, ef, crossN)
+        nhat = Nf / (Nf.norm(dim=-1, keepdim=True) + 1e-12)
+        cosang = (nhat[ef] * nhat[twin_face]).sum(dim=-1)       # cos(dihedral) per half-edge
+        E = E + K_bend * ((1.0 - cosang) * eocc).sum()
+    if K_lumen > 0:
+        # GLOBAL LUMEN INCOMPRESSIBILITY: penalise the shell for enclosing LESS volume than a sphere of
+        # its current total area. A buckled/wrinkled shell ALWAYS encloses less (isoperimetric inequality),
+        # so this is the one constraint that distinguishes a sphere from a per-cell-volume-preserving
+        # buckle -- which the per-cell wedge term (a pyramid from the origin) and local area/perim cannot.
+        # Relative deficit -> scale-invariant. (Coral only; a tube is NOT the max-volume shape -> off there.)
+        A_tot = (area * alive).sum()
+        V_sphere = A_tot ** 1.5 / (6.0 * 3.14159265358979 ** 0.5)
+        V_tot = (vf * alive).sum()
+        E = E + K_lumen * ((V_tot - V_sphere) / (V_sphere + 1e-9)) ** 2
     return E
+
+
+def _relax_subset(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, mech, move_mask, iters):
+    """Bounded-Euler shape-energy descent that moves ONLY the vertices in `move_mask` (the fresh
+    daughters + their one-ring after a division). Heals the just-cut caps in place so a division never
+    leaves an inverted cap for the global relaxation to (fail to) fix. Reuses `_shape_energy_core`."""
+    dev, dt = pos.device, pos.dtype
+    eocc = torch.ones(es.shape[0], device=dev, dtype=dt); vocc = torch.ones(pos.shape[0], device=dev, dtype=dt)
+    R0t = torch.as_tensor(float(R0), device=dev, dtype=dt)
+    with torch.no_grad():
+        cap = mech["cap_frac"] * (pos[et] - pos[es]).norm(dim=-1).mean().clamp(min=1e-6)
+    mm = move_mask.to(dt)[:, None]
+    x = pos.clone()
+    for _ in range(iters):
+        with torch.enable_grad():
+            xg = x.detach().requires_grad_(True)
+            E = _shape_energy_core(xg, es, et, ef, nF, A0, P0, V0f, alive, R0t, mech["K_A"], mech["K_P"],
+                                   mech["K_V"], mech["K_R"], mech["Lambda"], mech["Gamma"], eocc, vocc)
+            g = torch.nan_to_num(torch.autograd.grad(E, xg)[0])
+        step = -mech["eta"] * g
+        step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+        x = x + step * mm                                        # only the fresh region moves
+    return x.detach()
 
 
 @register_operator("seed_mesh_3d", set="vertex", kind="structural", family="growth")
@@ -157,10 +202,23 @@ class ShapeEnergy3D(Lateral):
         self.K_A = float(params.get("K_A", 1.0)); self.K_P = float(params.get("K_P", 1.0))
         self.p0 = float(params.get("p0", 3.9)); self.Lambda = float(params.get("Lambda", 0.1))
         self.K_V = float(params.get("K_V", 0.5)); self.K_R = float(params.get("K_R", 0.0))
+        # DIHEDRAL bending (Wardetzky): penalises adjacent-cell normal deviation -> smooths the local folds
+        # the hollow metric flags (division-injected cap tilts). High-frequency: unlike the radial K_R it
+        # does NOT flatten gentle whole-shell/tube curvature. 0 = off (default). See _shape_energy_core.
+        self.K_bend = float(params.get("K_bend", 0.0))
+        # GLOBAL LUMEN incompressibility (isoperimetric): penalise enclosing less volume than a sphere of
+        # the current area -> distinguishes sphere from a per-cell-volume-preserving buckle. 0=off. Coral only.
+        self.K_lumen = float(params.get("K_lumen", 0.0))
         self.Gamma = float(params.get("Gamma", 0.0))             # cortical contractility (1/2)Gamma*P^2 -> rounds cells
         self.mu = float(params.get("mu", 1.0))
         self.dt = float(params.get("dt", 1.0)); self.relax_iters = int(params.get("relax_iters", 6))
         self.eta = float(params.get("eta", 0.08)); self.cap_frac = float(params.get("cap_frac", 0.12))
+        # ANTI-INVERSION filtered step (IPC-analog, differentiable): hollow caps are inverting faces
+        # (signed wedge volume v_f flips sign at the division septum). Each bounded-Euler substep, scale
+        # back the move of any vertex whose incident face would drop v_f below `antiinv` x median(v_f) --
+        # a move that only makes an already-inverted face WORSE is blocked, a recovering move is allowed.
+        # Straight-through (scale detached) so the rollout stays differentiable. 0 = off (default).
+        self.antiinv = float(params.get("antiinv", 0.0))
         # Lloyd-like tangential regularization (AVM analog of Turing's surface_lloyd): rounds cells
         self.smooth_iters = int(params.get("smooth_iters", 0)); self.smooth_w = float(params.get("smooth_w", 0.0))
         # torch.compile the (autograd-differentiated) energy: ~2.4x on a FIXED mesh, but DIVISION changes
@@ -174,13 +232,39 @@ class ShapeEnergy3D(Lateral):
         self.use_compile = bool(params.get("compile", False))
         self._efn = torch.compile(_shape_energy_core, dynamic=False) if self.use_compile else _shape_energy_core
 
-    def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc):
+    def _antiinv_scale(self, x, step, es, et, ef, nF, eocc, vf_ref, floor):
+        """Straight-through per-vertex step scale (detached) that halves the move of any vertex whose
+        incident face would drop its signed wedge volume below `floor` AND below its current value ---
+        i.e. block moves that push a face toward inversion, allow recovering moves. A few backtracks."""
+        scale = torch.ones(x.shape[0], 1, device=x.device, dtype=x.dtype)
+        for _ in range(5):
+            _, _, _, vf = face_geometry_3d(x + step * scale, es, et, ef, nF, eocc)
+            bad = (vf < floor) & (vf < vf_ref)                   # per-face: inverting and getting worse
+            if not bool(bad.any()):
+                break
+            badv = torch.zeros(x.shape[0], device=x.device, dtype=x.dtype)
+            badv.index_add_(0, es, bad.to(x.dtype)[ef] * eocc)   # half-edge src vertices of the bad faces
+            scale = torch.where((badv > 0)[:, None], scale * 0.5, scale)
+        return scale.detach()
+
+    def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc, twin_face=None):
         with torch.enable_grad():
             p = p.detach().requires_grad_(True)
             E = self._efn(p, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
-                          self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc)
+                          self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc, self.K_bend,
+                          twin_face, self.K_lumen)
             g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
+
+    @staticmethod
+    def _twin_faces(es, et, ef, Nv):
+        """Per half-edge -> the face on the OTHER side of that (undirected) edge, for the dihedral term.
+        Twin of half-edge (u->v) is the half-edge (v->u); match by integer key. Closed mesh: always found."""
+        key = es * Nv + et; twinkey = et * Nv + es
+        order = torch.argsort(key); ks = key[order]
+        pos = torch.searchsorted(ks, twinkey).clamp(max=key.shape[0] - 1)
+        found = ks[pos] == twinkey
+        return torch.where(found, ef[order[pos]], ef)          # fallback to self (no penalty) if no twin
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); pos_full = lvl.get("pos")
@@ -190,6 +274,8 @@ class ShapeEnergy3D(Lateral):
             return {self.at: v_full}
         Nv = int(m["Nv"]); nF = int(m["nF"]); es = m["E_srce"]; et = m["E_trgt"]; ef = m["E_face"]
         E = es.shape[0]; dev = pos_full.device; dt = pos_full.dtype
+        m["mech"] = dict(K_A=self.K_A, K_P=self.K_P, K_V=self.K_V, K_R=self.K_R, Lambda=self.Lambda,
+                         Gamma=self.Gamma, eta=self.eta, cap_frac=self.cap_frac)   # for divide_3d local relax
         x0 = pos_full[:Nv].detach().clone()
         R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
         with torch.no_grad():
@@ -216,11 +302,20 @@ class ShapeEnergy3D(Lateral):
         else:
             # LIVE-ONLY path (default, fast): relax the live vertices, energy over live faces/edges
             eocc = torch.ones(E, device=dev, dtype=dt); vocc = torch.ones(Nv, device=dev, dtype=dt)
+            twin = self._twin_faces(es, et, ef, Nv) if self.K_bend > 0 else None   # dihedral neighbour faces
             x = x0.clone()
+            floor = None
+            if self.antiinv > 0:                                 # anti-inversion floor = frac of median live wedge vol
+                _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
+                floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
             for _ in range(max(1, self.relax_iters)):
                 step = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, m["A0"], m["P0"],
-                                                          m["V0f"], m["alive"], R0t, eocc, vocc)
-                x = x + step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+                                                          m["V0f"], m["alive"], R0t, eocc, vocc, twin)
+                step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+                if floor is not None:                            # block any substep that drives a face toward inversion
+                    _, _, _, vf_cur = face_geometry_3d(x, es, et, ef, nF, eocc)
+                    step = step * self._antiinv_scale(x, step, es, et, ef, nF, eocc, vf_cur, floor)
+                x = x + step
         if self.smooth_iters and self.smooth_w > 0:      # Lloyd-like tangential regularization -> rounder cells
             es, et = m["E_srce"], m["E_trgt"]
             ones = torch.ones(es.shape[0], device=x.device, dtype=x.dtype)
@@ -296,8 +391,27 @@ class Divide3D(Structural):
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
         self.p0 = float(params.get("p0", 3.72))
         self.every = int(params.get("every", 3)); self._k = 0
-        self.max_div = int(params.get("max_div", 20))            # cap divisions per call for stability
+        self.max_div = int(params.get("max_div", 20))            # cap divisions per call for stability (absolute floor)
+        # LIVE-scaled division cap: max_div is otherwise a FIXED absolute count set from the INITIAL cell count,
+        # so on a long run the live count grows (150->~1400) while the cap stays 10 -> ready cells backlog behind
+        # it, keep ramping v_eq while queued, then divide oversized -> tip strain -> hollow caps. A fractional cap
+        # bounds the division RATE (<= frac of live cells per call), so the cap grows with the tissue. Off (0) by
+        # default so existing presets are unchanged.
+        self.max_div_frac = float(params.get("max_div_frac", 0.0))
+        # LOCAL DAUGHTER RELAX: after the septum, run a few bounded-Euler shape-energy steps on ONLY the
+        # fresh daughters + their one-ring, so a division never hands the global relaxation an inverted
+        # cap (the sole source of hollow cells -- growth alone never makes one). Uses the coeffs stashed
+        # on m["mech"] by shape_energy_3d. 0 = off (default); the coral/tube fix sets it > 0.
+        self.local_relax = int(params.get("local_relax", 0))
         self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
+        # G1 RAMP (SimuCell3D/tyssue "birth-at-target"): set each daughter's TARGET volume v_eq to its ACTUAL
+        # birth volume instead of mother_target/2. The division trigger is ACTUAL volume (vf>=2*Vbirth) but v_eq
+        # is set by ramped morphogen growth, so an actively-growing tip cell has mother_V0f >> vf; halving it
+        # leaves a fresh daughter with target >> actual and (since K_V dominates tension 5-50x) K_V drives the
+        # tiny face hard -> inverted/hollow caps at the proliferating tip. Birth-at-target removes the mismatch;
+        # morphogen_growth_3d then re-ramps activated daughters as their G1 regrowth. Off by default so other
+        # presets (vesicle_divide/fig4) are unchanged; the tube preset turns it on.
+        self.g1_ramp = bool(params.get("g1_ramp", False))
 
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
@@ -338,8 +452,9 @@ class Divide3D(Structural):
             djit = djit.detach().cpu().numpy().tolist()
         cand = [f for f in range(nF) if alive[f] > 0 and vf[f] >= self.factor * djit[f] * Vbirth[f]
                 and rings[f] is not None and len(rings[f]) >= 4]
-        rng.shuffle(cand)                                        # unbiased when more cells are ready than max_div
-        cand = cand[:self.max_div]                               # (else cand[:n] sweeps in pole-to-pole face order)
+        rng.shuffle(cand)                                        # unbiased when more cells are ready than the cap
+        cap_div = self.max_div if self.max_div_frac <= 0 else max(self.max_div, int(self.max_div_frac * nF))
+        cand = cand[:cap_div]                                    # (else cand[:n] sweeps in pole-to-pole face order)
         ndone = 0
         daughter_mothers = []                                    # mother face index of each appended daughter (order)
         for f in cand:
@@ -358,10 +473,15 @@ class Divide3D(Structural):
             res = divide_face_3d(rings, pos, f, ea=ea, eb=eb)
             if res is None:
                 continue
-            half = vf[f] * 0.5                                    # each daughter is born at half the volume
-            A0[f] *= 0.5; V0f[f] *= 0.5; Vbirth[f] = half         # daughter A (kept at index f)
+            half = vf[f] * 0.5                                    # each daughter is born at half the actual volume
+            if self.g1_ramp:                                     # birth-at-target: v_eq = actual birth volume (no K_V mismatch);
+                iso = A0[f] / max(V0f[f], 1e-12) ** (2.0 / 3.0)  # keep A0 isoperimetric-consistent A0 ~ v_eq^{2/3}
+                a0d = iso * half ** (2.0 / 3.0); v0d = half       # (P0 = p0*sqrt(A0) recomputed below)
+            else:
+                a0d = A0[f] * 0.5; v0d = V0f[f] * 0.5             # legacy: half the mother's targets
+            A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
             djit[f] = self._fresh_djit(rng)                       # fresh (desync'd) cell-cycle thresholds
-            A0.append(A0[f]); V0f.append(V0f[f]); Vbirth.append(half); alive.append(1.0)   # daughter B
+            A0.append(a0d); V0f.append(v0d); Vbirth.append(half); alive.append(1.0)   # daughter B
             djit.append(self._fresh_djit(rng))
             daughter_mothers.append(f)
             ndone += 1
@@ -390,6 +510,15 @@ class Divide3D(Structural):
         m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
+        if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
+            esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
+            newv = torch.zeros(Nv2, dtype=torch.bool, device=dev); newv[Nv:Nv2] = True   # appended septum verts
+            touch = newv[esT] | newv[etT]                        # half-edges incident to a fresh vertex
+            ring = newv.clone(); ring[etT[touch]] = True; ring[esT[touch]] = True         # + their one-ring
+            posf = lvl.state[:Nv2, px0:px1].detach().clone()
+            xr = _relax_subset(posf, esT, etT, efT, nF2, m["A0"], m["P0"], m["V0f"], m["alive"],
+                               float(m["R0"]), m["mech"], ring, self.local_relax)
+            st2 = lvl.state.clone(); st2[:Nv2, px0:px1] = xr; lvl.state = st2
         # propagate the cell morphogen to daughters: each appended cell (new index nF+i) inherits its
         # mother's cell state so the RD pattern rides along through division (seg_A keeps the mother's).
         if self.cell_set is not None and daughter_mothers:

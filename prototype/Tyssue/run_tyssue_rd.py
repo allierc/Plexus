@@ -59,14 +59,17 @@ def presets():
     return [("coral",            GS,    1200,  500,   0.0,    False,  0.0),
             ("spots",            BRUSS, 1200,  500,   0.0,    False,  0.0),
             ("rd_coral_grow",    GS,    150,   220,   0.003,  True,   0.0),   # EXACTLY vesicle_divide (150c/220f) + coral
-            ("rd_coral_grow_big", GS,   500,   1000,  0.002,  True,   0.4)]   # SCALED: stochastic cell cycle breaks the
+            ("rd_coral_grow_big", GS,   500,   1000,  0.002,  True,   0.4),   # SCALED: stochastic cell cycle breaks the
+            ("rd_coral_grow_long", GS,  150,   500,   0.003,  True,   0.4)]   # LONG rd_coral_grow (cv=0.4 -> uniform)
     #    synchronised division wave -> stays clean at 500c/1000f -> finer coral pattern
 
 
 def make_spec(name, rd, n_cells, frames, grow, divide, cv, buf, cbuf):
     dt = rd["dt"]
-    rec_cap = 300                                                     # bound recorded frames (else long runs OOM)
-    sstride = max(1, (frames + rec_cap) // rec_cap)                   # recording stride; snapshots match it
+    rec_cap = frames + 2               # record EVERY frame so posf (engine) and hist (topo_snapshot) are the
+    sstride = 1                        # SAME length. A mismatched stride (posf longer than hist) makes the
+    #   render/diagnostic pair positions with the WRONG frame's topology -> scrambled rings -> phantom
+    #   "hollow" cells. Aligning the two recordings is the fix (the hollow-cell scare was entirely this).
     # VERTEX MECHANICS in the SAME order as vesicle_divide (growth -> shape_energy -> T1 -> divide), then
     # the RD ops (which only COLOUR the cells). rd_coral_grow == vesicle_divide + reaction-diffusion.
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS,
@@ -121,7 +124,7 @@ def run_all(only=None):
             continue
         odir = os.path.join(OUT, name); os.makedirs(odir, exist_ok=True)
         mesh0, nF = _mesh(n_cells); Nv = mesh0["Nv"]
-        buf = int(Nv * (4.0 if divide else 1.0)); cbuf = int(nF * (4.0 if divide else 1.0))   # cap+plateau -> ~1500 cells, 4x is ample
+        buf = int(Nv * (10.0 if divide else 1.0)); cbuf = int(nF * (10.0 if divide else 1.0))   # headroom for long dividing runs (~1500+ cells)
         print(f"[tyssue_rd] {name}: {rd['react']['implementation']} grow={grow} divide={divide} cv={cv}  (Nv={Nv}, cells={nF})", flush=True)
         rec = {"name": name, "react": rd["react"]["implementation"], "grow": grow, "divide": divide, "cv": cv, "Nv": Nv, "cells": nF}
         try:

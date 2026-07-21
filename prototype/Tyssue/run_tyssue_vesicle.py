@@ -129,27 +129,33 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None):
     ax.set_box_aspect((1, 1, 1)); ax.axis("off"); ax.view_init(elev=18, azim=azim)
 
 
-def _draw_cross(ax, pos, mesh, p0, level=0.0, act=None, inner=INNER, Lbox=None):
-    """Cross-section of the MONOLAYER at z=level. Each junction edge crossing the plane gives one
-    apical (outer) point; its basal counterpart is that point scaled inward. Connecting them draws the
-    LATERAL wall of the junction, so the band is partitioned into individual cells (white, activation
-    LUT), edged black; the hollow centre is the lumen."""
+def _draw_cross(ax, pos, mesh, p0, level=0.0, act=None, inner=INNER, Lbox=None, axis=2):
+    """Cross-section of the MONOLAYER at (coordinate `axis`)=level. Each junction edge crossing the
+    plane gives one apical (outer) point; its basal counterpart is that 3D point scaled toward the
+    centre, projected. Connecting them draws the LATERAL wall of the junction, so the band is
+    partitioned into individual cells (white), edged black; the hollow centre is the lumen. axis=2 is
+    the equatorial (horizontal) cut used for the sphere/vesicle; axis=1 gives a VERTICAL LONGITUDINAL
+    cut (plot x--z) that runs up the axis of a tube."""
     from matplotlib.patches import Polygon as MplPoly
     ax.clear(); ax.set_facecolor("black")
     es, et = mesh["E_srce"], mesh["E_trgt"]
-    pts = []
+    keep = [i for i in range(3) if i != axis]                  # the two plotted coordinates
+    P = []
     for e in range(len(es)):
         a = pos[int(es[e])]; b = pos[int(et[e])]
-        if (a[2] - level) * (b[2] - level) < 0:
-            fr = (level - a[2]) / (b[2] - a[2]); pts.append((a + fr * (b - a))[:2])
-    if pts:
-        ap = np.array(pts); ap = ap[np.argsort(np.arctan2(ap[:, 1], ap[:, 0]))]
-        ba = ap * inner                                                   # basal = apical scaled inward
-        for i in range(len(ap)):                                          # one filled quad per cell (white), edged black
+        if (a[axis] - level) * (b[axis] - level) < 0:
+            fr = (level - a[axis]) / (b[axis] - a[axis]); P.append(a + fr * (b - a))   # 3D crossing point
+    if P:
+        P = np.array(P)
+        ap = P[:, keep]; ba = (P * inner)[:, keep]             # apical 2D; basal = 3D scaled to centre, projected
+        c = ap.mean(0) if axis != 2 else np.zeros(2)           # equatorial ring: around origin (unchanged); else centroid
+        order = np.argsort(np.arctan2(ap[:, 1] - c[1], ap[:, 0] - c[0]))
+        ap = ap[order]; ba = ba[order]
+        for i in range(len(ap)):                               # one filled quad per cell (white), edged black
             j = (i + 1) % len(ap)
-            quad = np.array([ba[i], ap[i], ap[j], ba[j]])
-            ax.add_patch(MplPoly(quad, closed=True, facecolor="white", edgecolor="black", lw=0.5, zorder=1))
-    L = Lbox if Lbox is not None else RADIUS * 2.1              # wider box so the ring renders to scale with the 3D sphere (mplot3d shrinks it)
+            ax.add_patch(MplPoly(np.array([ba[i], ap[i], ap[j], ba[j]]), closed=True,
+                                 facecolor="white", edgecolor="black", lw=0.5, zorder=1))
+    L = Lbox if Lbox is not None else RADIUS * 2.1             # box so the section renders to scale with the 3D view
     ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_aspect("equal"); ax.axis("off")
 
 
