@@ -549,12 +549,19 @@ Euler = 2} (Fig.~\ref{fig:vesdiv}). Pacing follows the Turing\_vertex \texttt{fi
 (volume-doubling, a few divisions per frame) so the tissue proliferates gradually. Two subtleties were
 worth fixing: divisions must be chosen \emph{unbiased} --- selecting the first ready cells in face-index
 order sweeps pole-to-pole because the Fibonacci seeding numbers faces that way, so we shuffle the
-candidates and randomise the septum direction --- and, as in 2D, fresh daughters are triangular until
-line tension ($\Lambda$) rounds them. The shell inflates ($R\!\approx\!5\!\to\!9.5$) at roughly constant
-cell size --- true proliferative growth, not mere stretching. Full regularisation of the neighbour
-topology division creates (recovering uniform hexagons, shape index $\to\!3.72$) is the province of
-\emph{T1 neighbour exchange}, the emergent annealing mechanism; the surface-mesh T1 is the next step
-(a geometric Lloyd smoothing would round the cells but is a fairing hack, not the physics).
+candidates and randomise the septum direction --- and daughters must be kept \emph{compact}. On the
+last point we followed a literature sweep (tyssue's \texttt{monolayer\_topology}, Turing\_vertex, cellGPU):
+the emergent fix is not a smoothing pass but two mechanisms already in the physics. (i)~\emph{Long-axis}
+(Hertwig) division --- the septum cuts perpendicular to the cell's longest axis (an SVD of the cell's
+vertices), which yields compact daughters instead of elongated slivers. (ii)~\emph{Cortical
+contractility} $\tfrac12\Gamma\sum_f P_f^2$, the perimeter term that rounds each cell. Together they
+drop the shape index from $\sim\!4.2$ to $\sim\!3.9$ \emph{emergently} (a geometric Lloyd smoothing
+would also round the cells, but it is a fairing hack, not physics, so we discarded it). The last step
+toward the regular-hexagon floor is \emph{T1 neighbour exchange}, the annealing mechanism, still to be
+added; note the sphere mandates $\ge\!12$ pentagonal defects (Euler), so perfect hexagons are not the
+target. \emph{At scale} (the fig4 test: $600\!\to\!2367$ cells over $1000$ frames) the shell stays
+\texttt{closed, Euler}$=2$, roughness $0.008$, shape index $3.84$ --- rounder at scale, as more cells
+anneal better.
 
 \begin{figure}[h]
 \centering
@@ -568,6 +575,42 @@ is chosen unbiased (shuffled candidates, random septum direction) so it fills th
 closed surface stays valid throughout ($\texttt{Euler}=2$ after all $337$ divisions), line tension
 keeping the fresh daughters well-shaped.}
 \label{fig:vesdiv}
+\end{figure}
+
+\section{Goal 2: Turing reaction--diffusion on the cell set}
+The two-level hierarchy pays off again for morphogenesis. The morphogen lives on the \emph{cell} set as
+state \texttt{chem}$=[a,h]$ (a first-class biological DOF, not derivable from vertex geometry), while
+the mechanical \emph{vertex} set holds the shell. Three operators run the reaction--diffusion each
+frame: \texttt{cell\_geometry\_3d} (an \textbf{Aggregate}: vertices $\to$ per-cell centroid),
+\texttt{cell\_adjacency} (a \textbf{Rewire}: the cell--cell neighbour graph) and
+\texttt{cell\_diffuse}\,$+$\,\texttt{cell\_react} (\textbf{Lateral} field updates that integrate
+\texttt{chem}).
+
+Two points are worth stating. First, \emph{how we get cell neighbours without a Voronoi}: in the AVM
+the cells \emph{are} the faces of the half-edge mesh, so two cells are neighbours iff they share a mesh
+\emph{edge} --- \texttt{cell\_adjacency} groups the half-edges by their vertex pair and links the two
+faces that share each edge. The mesh topology already \emph{is} the adjacency graph; no Delaunay/Voronoi
+of cell centres is needed (that is only how the Self-Propelled-Voronoi sibling builds \emph{its} graph).
+Second, \texttt{react} is a plexus2 \emph{contract} with interchangeable implementations: on the same
+cell set, \texttt{gray\_scott} gives a coral/labyrinth and \texttt{brusselator} (its parameters
+transposed verbatim from Turing\_vertex \texttt{fig4\_coral}: $\gamma=2,A=1,B=3$; $d_a=0.05, d_h=0.7$)
+gives round Turing spots. The Brusselator's fast-inhibitor diffusion is only stable at the fig4
+timestep $\mathrm{d}t=0.02$, so the whole sim runs at that step and \texttt{shape\_energy\_3d} is given
+the same $\mathrm{d}t$ so the mechanics still relaxes fully each frame. A self-organised activator
+pattern emerges across the closed shell (Fig.~\ref{fig:coral}), coloured white$\to$red --- the
+substrate for morphogen-driven growth (bulge where $a$ is high) and division, the coral-morphogenesis
+next step.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/coral/strip.png}
+\caption{\textbf{Live Turing reaction--diffusion on the vesicle cell set} (\texttt{coral}, Gray-Scott),
+$0/33/66/100\%$. The morphogen is CELL state; diffusion runs on the cell--cell adjacency read straight
+from the half-edge table (no Voronoi). From faint noise a self-organised coral/labyrinth activator
+pattern grows across the closed shell (top: 3D, coloured white$\to$red by activator; bottom:
+cross-section). The \texttt{spots} preset swaps in the Brusselator (fig4 params) on the same set for
+round Turing spots --- \texttt{react} is an interchangeable contract.}
+\label{fig:coral}
 \end{figure}
 
 \section*{Field notes}

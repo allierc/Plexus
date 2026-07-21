@@ -1,0 +1,10 @@
+{
+ "name": "coral",
+ "react": "gray_scott",
+ "Nv": 2396,
+ "cells": 1200,
+ "a_lo": 0.017,
+ "a_hi": 0.395,
+ "a_std": 0.131,
+ "patterned": true
+}

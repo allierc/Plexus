@@ -220,7 +220,7 @@ class VesicleGrowth(Structural):
         return {}
 
 
-@register_operator("divide_3d", set="vertex", kind="structural", family="divide")
+@register_operator("divide_3d", set="vertex", kind="structural", family="growth")
 class Divide3D(Structural):
     """In-surface cell division on the vesicle -- the sheet-division analog (tyssue
     sheet_topology.cell_division) lifted to the closed sphere. A cell divides when its wedge volume
