@@ -3,12 +3,13 @@ general:   # run-level settings
   seed: 0   # RNG seed
   n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 300
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
-  - 30.0
-  - 30.0
-  - 30.0
+  - 40.0
+  - 40.0
+  - 40.0
 sets:   # the biological SETS (Levels) of the model
   vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
     n: 2396   # buffer size (max elements)
@@ -37,12 +38,13 @@ operators:   # the operators to instantiate (each realises one mechanism)
   p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   K_A: 1.0   # area-elasticity stiffness
   K_P: 1.0   # perimeter-elasticity stiffness
-  Lambda: 0.1
+  Gamma: 0.1
+  Lambda: 0.3
   K_V: 1.0
   K_R: 0.4
   mu: 1.0   # mobility (overdamped)
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 3   # inner bounded-Euler relaxation steps per frame
+  relax_iters: 6   # inner bounded-Euler relaxation steps per frame
   eta: 0.08   # relaxation step size
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
 - op: cell_geometry_3d

@@ -1,12 +1,12 @@
 {
  "name": "rd_coral_grow",
  "react": "gray_scott",
- "grow": 0.002,
+ "grow": 0.003,
  "divide": true,
- "Nv": 996,
- "cells": 500,
- "a_std": 0.1412,
+ "Nv": 296,
+ "cells": 150,
+ "a_std": 0.1427,
  "patterned": true,
- "cells_end": 2492,
- "n_div": 1992
+ "cells_end": 518,
+ "n_div": 368
 }
