@@ -1,0 +1,128 @@
+# Plexus operator-atlas record for tyssue (DamCB), per plexus2 App. B & H.
+# Built by systematically decomposing tyssue's subsystems into Plexus primitives
+# (sets / states / fields / maps / operators). Status legend:
+#   existing   -- already a Plexus contract (tyssue adds an implementation)
+#   refine     -- an existing contract whose typed signature tyssue extends
+#   new        -- a genuinely new biological/numerical contract
+repository: DamCB/tyssue
+paper: "Theis, Gay, et al. -- tyssue: an epithelium simulation library (JOSS 2021); models after Bi et al. Nat.Phys. 2015, Okuda et al. 2013"
+model_family: half_edge_vertex_model            # 2D sheet / 2.5D / 3D bulk / monolayer
+scale: [vertex, edge, face, cell, tissue]
+
+# ---------------------------------------------------------------------------
+# SETS & STATES  (only vert.pos is an integrated mechanical DOF; the rest are
+# derived readouts recomputed every step by the geometry DAG `update_all`)
+# ---------------------------------------------------------------------------
+sets:
+  vert:  {dof: [x, y, z], mask: is_active, derived: [rho, height, segment]}   # THE mechanical DOF
+  edge:  {maps: [srce, trgt, face, cell, opposite], derived: [length, sub_area, sub_vol, ucoords, normals]}  # half-edge = incidence carrier
+  face:  {derived: [area, perimeter, num_sides, centroid], mask: is_alive, targets: [prefered_area, prefered_perimeter, contractility]}
+  cell:  {derived: [vol, area, num_faces], mask: is_alive, targets: [prefered_vol]}   # 3D bulk / monolayer only
+fields:
+  settings: [lumen_vol, geometry, boundaries, barrier_radius, R_in, R_out]     # global scalar fields
+  v_repulsion: "precomputed cell-cell repulsion potential sampled on a spatial grid (collision)"
+
+# ---------------------------------------------------------------------------
+# MAPS  (Plexus index-buffers on the edge Level; two engine primitives realize
+# every geometry & force operator)
+# ---------------------------------------------------------------------------
+maps:
+  srce/trgt: {relation: "edge->vert incidence", broadcast: upcast_srce/trgt, aggregate: sum_srce/trgt}
+  face:      {relation: "edge->face containment", broadcast: upcast_face, aggregate: sum_face/mean_face}
+  cell:      {relation: "edge->cell containment", broadcast: upcast_cell, aggregate: sum_cell/mean_cell}
+  opposite:  {relation: "edge->edge twin", op: get_opposite, kind: rewire}
+
+# ---------------------------------------------------------------------------
+# OPERATORS  (raw tyssue mechanism -> normalized Plexus contract)
+# ---------------------------------------------------------------------------
+operators:
+
+  # --- geometry readout DAG (aggregate/broadcast; feed-forward before every force eval) ---
+  geometry:
+    - {raw: update_dcoords/ucoords/length, norm: edge_vector/edge_length, family: geometry, kind: lateral,  status: existing}
+    - {raw: update_perimeters,             norm: perimeter,               family: geometry, kind: aggregate, status: existing}
+    - {raw: update_centroid,               norm: face_centroid,           family: geometry, kind: aggregate, status: existing}
+    - {raw: update_normals+update_areas,   norm: face_area,               family: geometry, kind: aggregate, status: existing, impls: [shoelace_2d, subtriangle_3d]}
+    - {raw: update_vol (bulk/2.5D),        norm: cell_volume,             family: geometry, kind: aggregate, status: existing, impls: [prism_2p5d, tetra_3d]}
+    - {raw: update_lumen_vol,              norm: lumen_volume,            family: geometry, kind: aggregate, status: existing, note: "aggregate->scalar (divergence over boundary faces)"}
+    - {raw: update_height,                 norm: vert_height_2p5d,        family: geometry, kind: field,     status: new, note: "2.5D radial scaffold"}
+
+  # --- mechanics effectors (all write a force onto vert; additively superposed by model_factory) ---
+  mechanics:
+    - {raw: LineTension,          norm: line_tension,          kind: lateral,   status: existing, energy: "gamma*l/2"}
+    - {raw: PerimeterElasticity,  norm: perimeter_elasticity,  kind: aggregate, status: existing, energy: "kp/2*(P-P0)^2"}
+    - {raw: FaceContractility,    norm: contractility,         kind: aggregate, status: existing, energy: "Gamma/2*P^2"}
+    - {raw: FaceAreaElasticity/CellAreaElasticity, norm: area_elasticity, kind: aggregate, status: existing, energy: "KA/2*(A-A0)^2"}
+    - {raw: FaceVolumeElasticity/CellVolumeElasticity, norm: volume_elasticity, kind: aggregate, status: existing, energy: "KV/2*(V-V0)^2"}
+    - {raw: SurfaceTension,       norm: surface_tension,       kind: aggregate, status: existing, energy: "sigma*A"}
+    - {raw: LumenVolumeElasticity/LumenAreaElasticity, norm: lumen_pressure, kind: aggregate, status: existing, note: "quadratic-penalty impl of the global-volume constraint (proto lumen_pressure is const-pressure)"}
+    - {raw: LengthElasticity/BorderElasticity, norm: length_elasticity, kind: lateral, status: new, energy: "kl/2*(l-l0)^2", note: "edge Hookean spring w/ rest length; distinct from line_tension"}
+    - {raw: RadialTension/ApicoBasalTension, norm: apico_basal_tension, kind: exchange, status: new, energy: "radial_tension*height"}
+    - {raw: BarrierElasticity/MidlineBoundary, norm: boundary_constraint, kind: exchange, status: new, note: "external soft-wall penalty (barrier membrane / midline)"}
+    - {raw: Repulsion,            norm: repulsion,             kind: exchange,  status: refine, note: "cell-cell repulsion by sampling a precomputed grid field"}
+    - {raw: LineViscosity,        norm: edge_friction,         kind: lateral,   status: new, note: "dissipative (mobility matrix), not a potential"}
+
+  # --- topology (rewire + structural) ---
+  topology:
+    - {raw: type1_transition,     norm: reconnect_T1,   kind: rewire,     status: new, ingredients: [collapse_edge, split_vert, prune_le3_faces], dim: 2d}
+    - {raw: IH_transition/HI_transition, norm: reconnect_3d, kind: rewire, status: new, note: "same reconnect contract, 3D bulk numerics (OI/OH split-cases)", dim: 3d}
+    - {raw: face_division (sheet_topology), norm: divide_face, kind: structural, status: existing, note: "atomic face split; reused by 2D & 3D divide_cell"}
+    - {raw: cell_division (sheet/bulk/monolayer), norm: divide_cell, kind: structural, status: existing, impls: [2d, 3d, monolayer]}
+    - {raw: remove_face,          norm: extrude_face,   kind: structural, status: existing, note: "collapse face to a vertex (T3 / apical extrusion)"}
+    - {raw: remove_cell,          norm: remove_cell,    kind: structural, status: existing, note: "3D cell analogue of extrude_face"}
+    - {raw: drop_face,            norm: remove_face_hole, kind: structural, status: refine, note: "die variant that leaves a HOLE (no collapse)"}
+    - {raw: close_face/close_cell/drop_two_sided_faces/merge_border_edges, norm: mesh_cleanup, kind: rewire, status: new, note: "restore closed manifold after every reconnect/divide/extrude"}
+    - {raw: fix_pinch,            norm: repair_pinched, kind: structural, status: new, dim: 3d}
+    - {raw: "find_IHs/find_HIs/get_division_edges/condition_4i/4ii", norm: "(selection predicates, not operators)", kind: guard, status: n/a}
+
+  # --- solvers = implementations of ONE "relax mechanics to equilibrium" contract ---
+  solvers:
+    - {raw: QSSolver.find_energy_min, norm: force_balance, impl: quasistatic_minimize_to_residual, status: new,
+       note: "scipy L-BFGS to grad~0; THE force-balance iteration the Turing_vertex prototype lacked. Our shape_energy emulates it with an inner GD relax loop."}
+    - {raw: EulerSolver (viscous), norm: overdamped_relax, impl: forward_euler, status: existing, note: "dr/dt = -gradU/eta, one step"}
+    - {raw: isotropic_solver,      norm: force_balance, impl: uniform_scale_relax, status: new, note: "reduced 1-DOF pre-relaxation"}
+
+  # --- behaviors = scheduled compositions (the EventManager IS a Plexus schedule) ---
+  behaviors:
+    - {raw: EventManager,   norm: schedule, status: new, note: "dynamic, self-re-enqueuing ordered composition (two deques + clock)"}
+    - {raw: grow/shrink,    norm: growth,   kind: field, status: existing, note: "scale prefered_area/vol"}
+    - {raw: contract/increase_linear_tension, norm: actomyosin_contraction, kind: field/broadcast, status: refine}
+    - {raw: ab_pull,        norm: apico_basal_pull, kind: broadcast, status: new}
+    - {raw: apoptosis,      norm: apoptosis, status: new, decomposition: "shrink(vol) + ab_pull + neighbor contract + reconnect_T1 (until 3-sided) + extrude_face"}
+    - {raw: division,       norm: division,  status: existing, decomposition: "grow(vol) until crit + divide_cell (+lineage rewire)"}
+    - {raw: constriction/delamination, norm: delamination, status: new, decomposition: "contract + stochastic ab_pull + reconnect + extrude"}
+
+  # --- collisions (mechanics-augmenting constraint) ---
+  collisions:
+    - {raw: auto_collisions/solve_sheet_collisions, norm: collision_constraint, kind: lateral/exchange, status: new,
+       note: "detect face-face self-intersection (CGAL) -> resolve by vertex repulsion (2D) or separating-plane projection (3D)"}
+
+  # --- generation / seed ---
+  generation:
+    - {raw: hexa_grid/three_faces_sheet, norm: seed/mesh_honeycomb, status: existing, note: "prototype mesh_seed bootstraps this via a Voronoi of a hex lattice"}
+    - {raw: from_2d_voronoi/from_3d_voronoi, norm: seed/voronoi, status: existing}
+    - {raw: ellipsoid/spherical_sheet/generate_ring, norm: seed/closed_surface, status: existing}
+    - {raw: extrude (apical->bulk), norm: seed/extrude_monolayer, kind: structural, status: new, note: "2D sheet -> 3D monolayer lift"}
+
+# ---------------------------------------------------------------------------
+# SATURATION  (plexus2 App H: does tyssue add implementations, refine signatures,
+# or contribute new contracts?)
+# ---------------------------------------------------------------------------
+saturation:
+  mechanics: "SATURATED -- the shape-energy family (line_tension, perimeter/area/volume elasticity,
+              contractility, surface_tension, lumen_pressure) are all EXISTING Plexus contracts;
+              tyssue adds analytic-gradient implementations. Genuinely new mechanics contracts:
+              length_elasticity, apico_basal_tension, boundary_constraint, edge_friction."
+  topology:  "NEW -- reconnect_T1/IH/HI, mesh_cleanup, repair_pinched are absent from the current
+              prototype (which had implicit Voronoi retessellation, no explicit reconnection).
+              divide_cell / extrude_face map to existing divide/die contracts."
+  numerics:  "NEW -- the quasistatic force_balance solver (minimize-to-residual) is the ingredient
+              the Turing_vertex report identified as missing for tubulation."
+  structure: "NEW -- the EventManager schedule (dynamic self-re-enqueuing composition) and the
+              collision_constraint operator are new first-class constructs."
+  headline:  "tyssue confirms the plexus2 thesis: its mechanics saturate against the existing
+              algebra (adding implementations), while it contributes new TOPOLOGY, SOLVER,
+              CONSTRAINT and SCHEDULE contracts -- exactly the three atlas-growth outcomes."
+
+status: inspected            # candidate | inspected | normalized | implemented
+implemented_here: [seed/mesh_honeycomb (mesh_seed), "AVM shape energy = line_tension+contractility+area_elasticity (shape_energy)", "force_balance (inner GD relax loop)"]

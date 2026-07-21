@@ -1,0 +1,669 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{parskip}
+
+\title{\textbf{A true vertex model for epithelial mechanics in \texttt{plexus2}:\\
+force balance, explicit T1, and what the Voronoi route could not do}}
+\author{Notes from a \texttt{plexus2} prototype of \texttt{tyssue} (DamCB)}
+\date{July 2026 --- \emph{living document, updated as the prototype progresses}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This is the companion to the Turing--vertex prototype. There we modelled epithelial mechanics
+as a \emph{Self-Propelled Voronoi} (SPV) tissue --- each cell a point, the polygon its Voronoi
+cell, the mesh re-tessellated every tick so neighbour exchanges (T1) were implicit. That report
+closed on a clear diagnosis: clean \emph{tubulation} was gated not on chemistry but on two
+mechanics ingredients the Voronoi route structurally lacks --- (i) \emph{force-balance iteration}
+and (ii) an \emph{explicit reconnection} (T1) operator. Here we build the sibling implementation:
+a \emph{true vertex model} (AVM) after \texttt{tyssue}, whose degrees of freedom are the
+\emph{vertices} of a half-edge mesh, in which those two ingredients are native. The same
+epithelial shape-energy contract, a genuinely different numerical realisation --- the ``one
+contract, many implementations'' thesis of \texttt{plexus2}~\S5, made concrete. This document
+records the model-deciphering as it happens; findings are added as each stage lands.
+\textbf{[Results sections are filled in incrementally --- see the dated field notes.]}
+\end{abstract}
+
+\section{Two implementations of one contract}
+Both prototypes realise the same biological operator --- an epithelial \emph{mechanical
+interaction} whose energy is a per-cell area/perimeter shape energy
+\[
+E \;=\; \sum_f \Big[ K_A (A_f - A_f^0)^2 + K_P (P_f - P_f^0)^2 \Big]
+        \;+\; \tfrac12\Gamma \sum_f P_f^2 \;+\; \Lambda \sum_e \ell_e/2 ,
+\]
+with a target shape index $p_0 = P^0/\sqrt{A^0}$ tuning a rigidity transition at
+$p_0^\ast\!\approx\!3.81$. They differ only in \emph{how} the polygons and their motion are
+represented:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{3.1cm}p{5.3cm}p{5.3cm}@{}}
+\toprule
+ & \textbf{SPV} (Turing\_vertex) & \textbf{AVM} (this prototype, \texttt{tyssue}) \\
+\midrule
+degrees of freedom & cell \emph{centres} (points) & mesh \emph{vertices} (half-edge mesh) \\
+polygon & Voronoi cell of the centres & explicit face = ring of shared vertices \\
+adjacency / T1 & re-tessellate each tick $\Rightarrow$ \emph{implicit} & \emph{explicit} local edge collapse\,+\,split \\
+force balance & overdamped Euler steps & gradient descent to residual (quasistatic) \\
+cost & Delaunay per tick (scipy) & one scatter-add + one autograd pass \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The AVM is the missing sibling: it supplies force balance and explicit T1, which is exactly
+what the SPV report identified as the tubulation bottleneck. Concretely, both are registered
+\texttt{plexus2} operators acting on a \texttt{set}; the SPV acts on a \texttt{cell} set, the
+AVM on a \texttt{vertex} set with the faces carried as a half-edge table.
+
+\paragraph{The original (Okuda) is a 3D vertex model --- this is the 2D rung of that ladder.}
+Okuda \emph{et al.}\ is a \emph{true 3D} vertex model: cells are polyhedra sharing polygonal
+faces, the DOF are the junction vertices $\mathbf r_i$ (overdamped
+$\eta_i(\dot{\mathbf r}_i-\mathbf V_{fi})=-\nabla_i U$), the energy
+$U=\sum_j \tfrac12 k_v(v_j-v_j^{\mathrm{eq}})^2+\kappa_s s_j$ is over each cell's polyhedral
+\emph{volume} and \emph{surface}, the balance is iterated to residual $<10^{-5}$ every
+$\Delta t_v$, neighbour changes are explicit \emph{reversible network reconnection} (RNR / T1)
+every $\Delta t_r$, and division inserts a new face. The prototype here is the \emph{2D} rung of
+that same ladder --- vertices, force balance, explicit T1 --- with an area/perimeter energy
+standing in for volume/surface. That is deliberate: 2D is where T1 is a clean edge flip, so we
+validate force balance and reconnection there first. tyssue itself carries the 3D rungs
+(\texttt{Monolayer}/\texttt{Bulk}: \texttt{cell\_volume} elasticity, the IH/HI 3D reconnections,
+\texttt{extrude} apical$\to$3D), all catalogued in the extraction (\S4) --- so the path to Okuda's
+elongated \emph{tubes} (rather than the SPV prototype's differential-growth \emph{lobes}) is to
+lift this 2D core to a monolayer once the 2D topology operators are validated.
+
+\section{The model in one paragraph}
+The mechanical set is the \texttt{vertex} (state \texttt{pos}); the tissue topology is a
+\emph{half-edge table} $(\mathrm{srce},\mathrm{trgt},\mathrm{face})$ ordered counter-clockwise
+around each face, stashed on the vertex \texttt{Level} exactly as the SPV prototype stashed its
+Voronoi rings. Per-face targets $A^0,P^0$ and liveness live alongside it. \texttt{mesh\_seed}
+bootstraps a clean honeycomb by taking the Voronoi tessellation of a triangular lattice
+\emph{once} (outer rings dropped, their shared vertices pinned $\to$ a fixed-border patch), then
+the AVM takes over. \texttt{shape\_energy} computes every face's area and perimeter with a
+single \texttt{index\_add} over the half-edge table, forms the shape energy, and takes the force
+$-\nabla E$ on the vertices by one autograd pass; an inner loop of \texttt{relax\_iters} gradient
+steps per tick returns the net displacement as a velocity, so each rendered frame is
+(near-)force-balanced --- the quasistatic force balance the original does with \texttt{scipy}
+L-BFGS, here vectorised and differentiable. Boundary (pinned) vertices are held fixed.
+
+\paragraph{A half-edge primer.}
+A \emph{half-edge} is a \emph{directed} edge $A\!\to\!B$ that belongs to exactly one face; the
+real edge shared by cells $L$ and $R$ is stored as two opposite half-edges. Each is three
+integers $(\mathrm{srce},\mathrm{trgt},\mathrm{face})$:
+\begin{center}\small
+\begin{verbatim}
+             cell L   (interior on the left)
+     ... -> A --------------> B -> ...    half-edge  A->B ,  face = L
+     ... <- A <-------------- B <- ...    half-edge  B->A ,  face = R
+             cell R
+   E_srce[k] = A     E_trgt[k] = B     E_face[k] = L   (one row per half-edge)
+\end{verbatim}
+\end{center}
+A face is the ring of its half-edges in CCW order, so orientation --- and a positive shoelace
+area --- is automatic; the two half-edges of a junction name its two neighbour cells, which is
+exactly what a T1 needs (grab $A\!\to\!B$ in $L$ and $B\!\to\!A$ in $R$, collapse, re-split); and
+per-face area/perimeter are a single \texttt{index\_add} keyed by \texttt{E\_face} (no per-cell
+loop, so the mechanics vectorise). In \texttt{plexus2} terms \texttt{srce}/\texttt{trgt}/%
+\texttt{face} are three index-buffer \emph{maps} on the set: \texttt{srce}/\texttt{trgt} are
+edge$\to$vertex incidence, \texttt{face} is edge$\to$cell containment; gathering a cell value onto
+its half-edges is a \emph{broadcast}, reducing half-edges to a cell is an \emph{aggregate}. Line
+tension is $\Lambda\ell/2$ \emph{per half-edge}, so the two halves sum to $\Lambda\ell$ per real
+edge --- tyssue's half-edge convention.
+
+\section{Design decisions deciphered so far}
+\emph{(These are the modelling choices that were not obvious from the paper and cost thought.)}
+
+\paragraph{Vertices, not cells, are the set.}
+The natural \texttt{plexus2} temptation is to keep the \texttt{cell} set of the SPV prototype and
+bolt a mesh on. That is wrong: the AVM \emph{integrates the vertices}. Cells share vertices, so a
+cell is not an independent particle --- it is a face, a derived readout over a ring of the vertex
+set. The clean mapping is therefore a \texttt{vertex} set (the DOF) plus the half-edge table as
+its topology map; faces never get their own integrated \texttt{Level}. Area/perimeter are
+\emph{aggregate} readouts (vertices\,$\to$\,face), the force is their gradient back on the
+vertices --- a genuine cross-scale (aggregate/broadcast) pair, richer than the single-set SPV.
+
+\paragraph{Bootstrap the mesh from a Voronoi, then leave Voronoi behind.}
+Hand-building a periodic honeycomb half-edge mesh with correct orientation is fiddly and
+error-prone. Taking the Voronoi tessellation of a jittered triangular lattice \emph{once} gives a
+valid honeycomb for free (scipy already de-duplicates the Voronoi vertices globally, so shared
+vertices are shared indices). We keep only interior faces (finite Voronoi regions away from the
+ragged border) and pin the boundary. After frame~0 the Voronoi is never used again --- the mesh
+evolves by force balance and, later, explicit T1.
+
+\paragraph{Force balance = inner relaxation loop, expressed as a velocity.}
+A \texttt{plexus2} dynamics operator must \emph{return a delta}, not mutate positions. To emulate
+tyssue's ``minimise to residual between topology events'' inside that contract, the operator runs
+\texttt{relax\_iters} gradient-descent steps internally and returns
+$v=(x_{\text{relaxed}}-x_0)/\Delta t$; the engine's $x \mathrel{+}= \Delta t\, v$ then lands on the
+relaxed state. The $\Delta t$ cancels, so this is a pure per-frame relaxation and $\Delta t$ is a
+free label --- the opposite of the SPV, where $\Delta t$ was the master knob that detuned the
+mechanics. \emph{This alone answers the SPV report's ``force-balance iteration is missing''.}
+
+\section{Stage 1: force-balanced relaxation and the rigidity transition}
+A jittered honeycomb of $251$ interior cells ($566$ vertices, border pinned) is relaxed to
+force balance by \texttt{shape\_energy} (\texttt{relax\_iters}$=20$ inner steps/frame,
+$120$ frames), sweeping the target shape index $p_0\in[3.6,4.1]$. The residual (relaxed)
+energy per cell and the relaxed mean shape index $\langle q\rangle = P/\sqrt{A}$ are the
+order parameters of the rigidity transition (Bi \emph{et al.}, \emph{Nat.\ Phys.}\ 2015).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{archive/_transition_tyssue2d.png}
+\caption{\textbf{The AVM rigidity transition, from true force balance.} Left: residual energy
+per cell after relaxation drops $\sim\!4$ orders of magnitude across $p_0^\ast\!\approx\!3.81$
+(log scale) --- below it the tissue is \emph{rigid} (a finite energy barrier survives
+relaxation), above it \emph{floppy} (zero-energy ground states exist). Right: the relaxed
+$\langle q\rangle$ \emph{saturates} at the hexagonal floor $\approx\!3.72$ below the
+transition (the cells cannot get rounder than a regular hexagon) and \emph{tracks} $p_0$ above
+it (they hit their target shape at zero cost). No timestep tuning was required.}
+\end{figure}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}rccl@{}}
+\toprule
+$p_0$ & residual $E$/cell & relaxed $\langle q\rangle$ & state \\
+\midrule
+3.60 & $1.50\times10^{-2}$ & 3.725 & rigid (barrier finite; $\langle q\rangle$ pinned at hex floor) \\
+3.70 & $9.3\times10^{-4}$  & 3.725 & near-transition \\
+3.75 & $8\times10^{-6}$    & 3.745 & \emph{knee} --- residual collapses here \\
+3.78 & $2\times10^{-6}$    & 3.778 & floppy ($E\!\to\!0$; $\langle q\rangle$ tracks $p_0$) \\
+3.81 & $1\times10^{-6}$    & 3.808 & floppy \\
+3.84 & $1\times10^{-6}$    & 3.838 & fluid \\
+3.90 & $1\times10^{-6}$    & 3.899 & fluid \\
+4.00 & $2\times10^{-6}$    & 3.999 & fluid \\
+4.10 & $2.1\times10^{-5}$  & 4.099 & fluid \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{archive/solid_3p60/strip.png}\\[3pt]
+\includegraphics[width=0.95\textwidth]{archive/fluid_4p10/strip.png}
+\caption{\textbf{Rigid vs.\ floppy}, $0/15/50/100\%$ of relaxation. \emph{Top}
+(\texttt{solid\_3p60}, $p_0\!=\!3.6$): the jittered honeycomb relaxes to a clean, jammed
+hexagonal packing; every cell is blue (compact, shape index $<3.81$). \emph{Bottom}
+(\texttt{fluid\_4p10}, $p_0\!=\!4.1$): the same tissue relaxes to elongated cells (red,
+shape index tracking $p_0$) at essentially zero energy --- floppy. Border cells (pinned)
+frame the bulk. (Without T1 the fluid tissue cannot yet \emph{flow} past its neighbours ---
+that is Stage 2.)}
+\end{figure}
+
+\section{Operator extraction: the tyssue atlas}
+Beyond completing the tubulation story, tyssue is a rich enough simulator to be worth
+\emph{decomposing in full} into the Plexus operator algebra (plexus2 App.~B \& H). We read every
+subsystem --- \texttt{dynamics}, \texttt{topology}, \texttt{geometry}/\texttt{core},
+\texttt{behaviors}/\texttt{solvers}/\texttt{collisions} --- and normalised each mechanism to a
+typed contract. The full record is \texttt{tyssue\_atlas.yaml}; the structure and the saturation
+result are below.
+
+\paragraph{One structural picture.} tyssue is a \emph{single half-edge \texttt{Level}}: only
+\texttt{vert.pos} is an integrated mechanical DOF; the \texttt{edge} set carries every incidence
+map ($\mathrm{srce},\mathrm{trgt},\mathrm{face},\mathrm{cell},\mathrm{opposite}$); \texttt{face}
+and \texttt{cell} are pure aggregate readouts. Two engine primitives generate everything:
+\texttt{upcast\_*} (gather a face/cell value onto its half-edges $=$ \textbf{broadcast}) and
+\texttt{sum\_*}/\texttt{mean\_*} (scatter-reduce half-edges onto a vert/face/cell $=$
+\textbf{aggregate}). Geometry (\texttt{update\_all}) is a feed-forward aggregate/broadcast DAG;
+mechanics is an \emph{additive superposition} of effector forces onto one \texttt{vert.force}
+accumulator; a \emph{solver} integrates it; an \emph{event manager} schedules structural changes.
+
+\paragraph{On naming --- a deciphering note.} tyssue's central methods are
+\texttt{compute\_energy}, \texttt{compute\_gradient}, \texttt{find\_energy\_min},
+\texttt{update\_all}. \emph{None} is a Plexus operator. plexus2 names an operator by the biological
+\emph{mechanism} it performs (the contract: \texttt{line\_tension}, \texttt{area\_elasticity},
+\texttt{reconnect\_T1}, \texttt{divide\_cell}), and names the numerics separately as an
+\texttt{implementation}. A generic numerical verb is therefore a \emph{signal} that one has found
+not an operator but a \emph{composition} (\texttt{compute\_energy} $=$ the additive superposition
+of the twelve mechanics contracts), a \emph{solver} (\texttt{find\_energy\_min} $=$ an
+implementation of \texttt{force\_balance}), or a \emph{readout pipeline} (\texttt{update\_all} $=$
+the geometry aggregate/broadcast DAG). The extraction's job is precisely to replace these verbs
+with mechanism-named contracts.
+
+\paragraph{Saturation.} The mechanics \emph{saturate} against the existing algebra --- the
+shape-energy family is already in Plexus and tyssue merely adds (analytic-gradient)
+implementations. The genuinely new contributions are in \emph{topology}, \emph{numerics} and
+\emph{structure}. This is exactly the plexus2 prediction: a mature simulator contributes mostly
+implementations of existing contracts, plus a few new operators where the language was thin.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}p{2.6cm}p{7.6cm}p{2.4cm}@{}}
+\toprule
+\textbf{Subsystem} & \textbf{Normalised contracts} & \textbf{vs.\ Plexus} \\
+\midrule
+mechanics & line\_tension, perimeter\_elasticity, contractility, area\_elasticity,
+volume\_elasticity, surface\_tension, lumen\_pressure & \textbf{existing} (saturated) \\
+mechanics (new) & length\_elasticity, apico\_basal\_tension, boundary\_constraint,
+edge\_friction & \textbf{new} \\
+geometry & edge\_length, perimeter, face\_centroid, face\_area, cell\_volume, lumen\_volume
+(aggregate/broadcast readouts) & existing \\
+topology & divide\_cell / divide\_face, extrude\_face / remove\_cell & existing (divide / die) \\
+topology (new) & \textbf{reconnect\_T1} (+3D IH/HI), mesh\_cleanup, repair\_pinched & \textbf{new} \\
+numerics & overdamped\_euler & existing \\
+numerics (new) & \textbf{force\_balance} (quasistatic minimise-to-residual), isotropic & \textbf{new} \\
+structure (new) & \textbf{schedule} (EventManager), \textbf{collision\_constraint} & \textbf{new} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The two boldfaced new contracts --- \texttt{reconnect\_T1} and \texttt{force\_balance} --- are
+exactly the pair the Turing--vertex report named as the tubulation bottleneck. They are not
+incidental: they are what a \emph{true} vertex model has and a Voronoi one cannot.
+
+\section{Stage 2: explicit topology --- T1, division, extrusion}
+The operators the Voronoi route could not have live in a forked module
+(\texttt{tyssue\_topology\_ops.py}, so the mechanics and the topology can evolve separately):
+\texttt{t1\_transition} (rewire; reversible network reconnection = collapse a sub-threshold edge
+and split the merged vertex), \texttt{face\_divide} (structural; a septum splits a cell),
+\texttt{face\_extrude} (structural; collapse a face to a point), and \texttt{face\_growth}
+(structural; inflate the per-cell target area). They mutate the face-ring topology carried on the
+vertex \texttt{Level} and rebuild the flat half-edge table that \texttt{shape\_energy} reads.
+
+\paragraph{Robustness contract.} Every topology mutation is applied to a trial copy, the affected
+faces are validated (three-plus unique vertices, positive signed area), and the change is
+\emph{committed only if valid} --- otherwise it is a silent no-op. The mesh therefore never
+tangles from a bad flip, which matters for unattended runs. A standalone self-test on the
+honeycomb confirms it: T1 fired on $30/40$ shortest edges (the $10$ skips are boundary /
+non-three-regular edges, correctly refused), four divisions and one extrusion all executed, and
+\emph{zero} invalid faces resulted.
+
+\paragraph{In-engine demonstration.} Running \texttt{mesh\_seed} $\to$ \texttt{face\_divide} $\to$
+\texttt{shape\_energy} $\to$ \texttt{t1\_transition} through the engine, a one-shot clonal
+division of $25\%$ of the cells followed by relaxation grows the tissue from $162$ to $198$ cells
+and \emph{stays force-balanced with zero invalid faces} (Fig.~\ref{fig:clonal}). The division
+operator is a genuine \texttt{plexus2} structural operator on the vertex set, and the sheet
+re-relaxes around each new junction.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{archive/clonal_divide/before_after.png}
+\caption{\textbf{Clonal division on the force-balanced AVM} (\texttt{clonal\_divide}). Left: the
+initial honeycomb ($F\!=\!162$). Right: after a one-shot division of $25\%$ of cells and
+relaxation ($F\!=\!198$), coloured by shape index. The mesh stays valid (0 invalid faces) and
+force-balanced --- the structural operator composes cleanly with the mechanics.}
+\label{fig:clonal}
+\end{figure}
+
+\section{The two-level hierarchy: why \texttt{plexus2}, not just \texttt{tyssue}}
+tyssue stores the whole tissue in one flat half-edge dataframe; a ``cell'' there is a \emph{row of
+derived geometry}. \texttt{plexus2} instead makes the cell a first-class biological \emph{set}
+carrying its \emph{own} state --- target area $a_0$, type/fate \texttt{ctype}, and (Goal~2)
+morphogen \texttt{chem} --- none of which is derivable from vertex positions. The model then has
+two Levels, \texttt{vertex} and \texttt{cell}, joined by the half-edge map, with a genuine
+\texttt{cell\_geometry} \emph{Aggregate} (vertices\,$\to$\,cell area/perimeter) and a
+\emph{cross-set} \texttt{shape\_energy} that reads $a_0$ from the cell set and broadcasts the force
+back to the vertices (\texttt{INPUTS=[vertex, cell]}).
+
+The benefit is concrete (Fig.~\ref{fig:clone}), and it must be done \emph{as biology, not as a
+hack}. A first draft assigned fate by fiat --- a \texttt{cell\_paint} operator marked every cell
+inside a hard-coded disc as a different type with a bigger target area. That proved the plumbing
+but it is not a mechanism, so it was retired. In its place: a \texttt{cell\_morphogen} operator
+imposes a smooth \emph{activator} field on the cell state \texttt{chem} (positional information ---
+a Gaussian bump), and a \texttt{morphogen\_growth} operator makes each cell's target area a
+\emph{continuous} response to it,
+\[
+a_0 \;=\; a_0^{\text{base}}\big(\rho + g\,\mathrm{Hill}(a)\big),\qquad
+\mathrm{Hill}(a)=\frac{a^{n}}{a^{n}+a_{\text{sw}}^{n}} ,
+\]
+the Turing--vertex growth coupling, now acting on the cell set. The cross-set \texttt{shape\_energy}
+reads $a_0$ and the tissue \emph{bulges where the activator is high}. The \emph{same} morphogen
+field composes with mechanics in two ways, both principled: a \emph{continuous} response
+(\texttt{morphogen\_growth}, above) gives a graded bulge whose cell area tracks the activator with
+correlation $0.97$; and a \emph{discrete} response (\texttt{cell\_differentiate}) thresholds the
+activator into a genuine cell \emph{type} --- a French-flag fate --- so the cells above threshold
+become a coherent \emph{clone} (Fig.~\ref{fig:clone}) with a larger target area that bulges to
+$2.6\times$ the wild-type, all force-balanced. In tyssue either coupling would be bespoke glue; here
+each is \emph{state on a set} plus a typed operator (\texttt{morphogen $\to$ growth}, or
+\texttt{morphogen $\to$ threshold $\to$ typed mechanics}), and it is exactly the substrate Goal~2
+needs --- swap the imposed bump for a live Turing reaction--diffusion on the cell--cell adjacency and
+the clone becomes a \emph{self-organised, activator-driven bud}. That composability (mechanism $+$
+mechanism through a shared set/operator language) is the payoff of decomposing tyssue into
+\texttt{plexus2} rather than wrapping it.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/clone_bulge/strip.png}
+\caption{\textbf{A genuine cell set: a morphogen differentiates a typed clone that drives mechanics}
+(\texttt{clone\_bulge}), $0/33/66/100\%$. \texttt{cell\_morphogen} imposes a smooth activator field;
+\texttt{cell\_differentiate} thresholds it into a fate (a French-flag rule), so the cells above
+threshold become a coherent \emph{clone} (red) of a genuine cell type with a larger target area; the
+cross-set \texttt{shape\_energy} makes that clone bulge to $2.6\times$ the wild-type (white) cell
+area. The clone is \emph{derived from the morphogen}, not a hard-coded disc --- the retired
+\texttt{cell\_paint} assigned fate by fiat; here fate is state on a set, set by an operator that
+reads a chemical field. This is the bridge to Goal~2 (replace the imposed bump with a live
+reaction--diffusion and the clone self-organises).}
+\label{fig:clone}
+\end{figure}
+
+\section{Recapitulating the \texttt{tyssue-demo} notebooks}
+The canonical \texttt{tyssue} tutorials (\texttt{DamCB/tyssue-demo}) are a natural checklist: one
+demo per mechanism. Rebuilding each as a \texttt{plexus2} operator composition is precisely
+Goal~1. Current coverage ($\checkmark$ sound, $\sim$ partial, $\rightarrow$ next):
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}p{3.9cm}p{4.7cm}p{3.5cm}c@{}}
+\toprule
+\textbf{notebook} & \textbf{shows} & \textbf{our demo} & \\
+\midrule
+00-Basic\_Usage       & build / inspect a sheet          & \texttt{mesh\_seed} + cell set        & $\checkmark$ \\
+01-Geometry           & area / perimeter / length        & \texttt{cell\_geometry} (aggregate)   & $\checkmark$ \\
+02-Visualization      & draw the polygons                & strip + movie renderers               & $\checkmark$ \\
+03-Dynamics           & effectors / energy               & \texttt{shape\_energy}                & $\checkmark$ \\
+04-Solvers            & QS / Euler solvers               & bounded differentiable Euler          & $\checkmark$ \\
+D-FarhadifarModel     & the AVM energy \& rigidity        & \texttt{run\_tyssue2d} transition     & $\checkmark$ \\
+05-Rearangements      & T1 neighbour swaps               & \texttt{t1\_transition} + flow        & $\checkmark$ \\
+C-2DMigration         & active migration                 & \texttt{run\_tyssue\_flow}            & $\checkmark$ \\
+07-EventManager       & scheduling behaviours            & the \texttt{plexus2} schedule         & $\checkmark$ \\
+06-Cell\_Division     & straight-line division by a plane & \texttt{face\_divide\_line}          & $\checkmark$ \\
+B-Apoptosis           & cell death / extrusion           & \texttt{apoptosis}                    & $\checkmark$ \\
+A-RNR (2D)            & multistep reconnection           & \texttt{apoptosis} (shed\,$\to$\,collapse) & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All eleven 2D-relevant notebooks now have a sound \texttt{plexus2} recapitulation. What remains is
+not a 2D mechanism but the \emph{lift to 3D}: the monolayer / bulk geometry and the 3D IH/HI
+reconnections (the 3D half of A-RNR), which are the 3D-vesicle stage (Goal 1bis). The 2D operator
+set --- mechanics, force balance, T1, division, extrusion, RNR, and the two-level morphogen
+coupling --- is complete and cross-validated against the tyssue tutorials.
+
+\paragraph{Straight-line (oriented) division (06).}
+The placeholder through-vertex split (which degraded after $1$--$2$ rounds) is replaced by the
+proper Brodland--Veldhuis division at a \emph{decidable angle}: the plane through a cell's centroid
+cuts its two crossed edges, a new vertex is inserted on each (shared with the neighbour across that
+edge), and a septum joins them --- well-shaped daughters, each targeting \emph{half} the mother's
+area (area conserved, as tyssue halves \texttt{prefered\_area}). Fig.~\ref{fig:divide} divides
+$35\%$ of a relaxed sheet at a fixed angle $\pi/2$ and re-relaxes: $118\!\to\!159$ cells, $0$ invalid
+faces, the oriented (vertical) septa clearly visible --- the decidable division plane the demo is
+about.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/divide_pi2/strip.png}
+\caption{\textbf{Straight-line division at a decidable angle} (\texttt{divide\_pi2}), coloured by
+shape index (blue solid / red fluid). A relaxed honeycomb (left) divides $35\%$ of its cells by a
+plane at $\pi/2$ (vertical septa), adding a vertex on each crossed edge, then re-relaxes to
+$159$ cells with $0$ invalid faces. Recapitulates \texttt{tyssue-demo} 06-Cell\_Division.}
+\label{fig:divide}
+\end{figure}
+
+\paragraph{Apoptosis / cell elimination (B) + reversible network reconnection (A-RNR).}
+The \texttt{apoptosis} operator shrinks the target area of a chosen cell each tick (so
+\texttt{shape\_energy} contracts it) and, once it is small, eliminates it. A naive one-step
+extrusion --- collapse the whole cell to a point --- leaves its six neighbours on a single vertex,
+a degree-$6$ \emph{rosette} the three-regular T1 cannot relax (and collapsing a near-zero sliver is
+numerically unstable). The fix is \emph{multistep} reconnection (Okuda's RNR; the A-RNR notebook, in
+2D): while the cell is small it \emph{sheds a side} by a T1 on its shortest edge
+($6\!\to\!5\!\to\!4\!\to\!3$), and only the resulting \emph{triangle} is collapsed --- to a clean
+degree-$3$ junction. Cell (cortical) \emph{contractility} $\Gamma$ and line tension $\Lambda$ keep
+the shrinking cell and its neighbours round rather than spiky (the neighbours \emph{constrict in},
+apically closing the gap). With that, the cell is eliminated ($56\!\to\!55$, $0$ invalid faces) and
+the tissue \emph{heals}: the neighbours reconnect and relax back to epithelium, no rosette
+(Fig.~\ref{fig:apop}, the dying cell drawn dark grey); the only residue is the local topological defect
+inherent to removing a cell from a hexagonal packing. This closes B-Apoptosis \emph{and} the 2D case
+of A-RNR; the 3D IH/HI reconnections belong to the 3D-vesicle stage.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/apoptose/strip.png}
+\caption{\textbf{Single-cell apoptosis with reversible network reconnection} (\texttt{apoptose}),
+coloured by shape index. A central cell shrinks and is eliminated by \emph{multistep} reconnection:
+it sheds sides by T1 until it is a triangle, which collapses to a degree-$3$ junction. The cell is
+removed ($118\!\to\!117$, $0$ invalid), the neighbours reconnect, and the site heals back to
+force-balanced epithelium --- no rosette, no residual distortion. Recapitulates \texttt{tyssue-demo}
+B-Apoptosis and the 2D case of A-RNR.}
+\label{fig:apop}
+\end{figure}
+
+\paragraph{Integration test: a growing, dividing tissue (and why surface tension matters).}
+The operators compose into a developing tissue: \texttt{face\_growth} inflates each cell's target
+area, \texttt{face\_divide\_line} in cell-cycle mode divides any cell past a threshold at a random
+angle (edge-midpoint, well-shaped daughters each targeting half), \texttt{shape\_energy} holds force
+balance, and \texttt{t1\_transition} resolves short junctions. On a \emph{free} (unpinned) boundary
+the sheet expands as it grows. Three settings proved essential. (i)~A free boundary, so growth is not
+frustrated into over-compression. (ii)~\emph{Line tension} $\Lambda\sum_e\ell_e$ --- without which the
+dividing cells relax into sharp triangular slivers and the free rim spikes into points; it smooths the
+boundary and straightens junctions. (iii)~\emph{Cortical contractility} $\tfrac12\Gamma\sum_f P_f^2$
+--- a per-cell perimeter penalty that rounds each daughter out between divisions instead of letting it
+elongate; without it the tissue drifts uniformly fluid (shape index far above $p_0$) and cells
+sharpen. With line tension \emph{and} contractility the daughters stay round, well-shaped polygons at
+a moderate shape index (this pair also smooths the apoptosis reconnection). The tissue proliferates
+$88\!\to\!176$ cells with $0$ invalid faces --- \emph{sustained} edge-midpoint division
+(Fig.~\ref{fig:grow}), in contrast to the Stage-2 through-vertex placeholder that tangled after
+$1$--$2$ rounds.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/grow_divide/strip.png}
+\caption{\textbf{A growing, dividing tissue} (\texttt{grow\_divide}), coloured by shape index. A free
+honeycomb grows (target areas inflate) and cells divide by straight lines at random angles when they
+pass a size threshold; the sheet expands and re-tessellates, staying valid ($88\!\to\!176$ cells,
+$0$ invalid). Line tension ($\Lambda$) plus cortical contractility ($\Gamma$) keep the daughters
+round and the free rim smooth rather than sharp/triangular. This is the sustained, well-shaped
+proliferation the Stage-2 placeholder could not do.}
+\label{fig:grow}
+\end{figure}
+
+\section{Goal 1bis: the 3D vesicle (surface vertex model)}
+The same operators lift to 3D. A closed spherical half-edge mesh --- the spherical Voronoi of a
+Fibonacci sphere, a Goldberg polyhedron of hexagons and exactly twelve pentagons, with Euler
+characteristic $V\!-\!E\!+\!F=2$ and every edge shared by two faces --- carries the AVM in three
+dimensions. \texttt{shape\_energy\_3d} uses the 3D geometry (a Newell area vector per face, 3D edge
+lengths) plus a \emph{lumen-volume} term $K_V(V-V_0)^2$ that keeps the shell inflated against surface
+tension --- the closure a 2D patch got from pinning. The force is one 3D autograd pass; the bounded
+Euler step carries over unchanged.
+
+One 3D-specific lesson earned its keep. A free surface with area $+$ tension energy and \emph{no
+bending rigidity} \emph{buckles} out of plane (roughness $0.004\!\to\!0.155$) --- exactly as a real
+epithelium does; the lumen term fixes the total volume but not local smoothness. Adding a soft
+radial term $K_R\sum_v(|\mathbf r_v|-R_0)^2$ (a bending-like penalty toward the shell) recovers a
+smooth relaxed vesicle: the roughness stays $\sim\!0.02$ and the cross-section stays circular
+(Fig.~\ref{fig:ves}). This closed, force-balanced shell is the substrate for 3D morphogen-driven
+budding --- the 3D IH/HI reconnections (the 3D half of A-RNR) and a mechanical monolayer (apical/basal,
+with \texttt{cell\_volume} elasticity) are the remaining 3D increments.
+
+The vesicle is rendered as a \emph{monolayer}: each cell is drawn as a prism --- an apical face
+(outer), a basal face (inner, the surface scaled radially inward), and the lateral walls between ---
+so a cell carries many faces, not one flat polygon. The apical faces share the mesh vertices and tile
+edge-to-edge into a closed opaque shell; cells take the Turing white$\to$red activation LUT (here
+activation $=0$, all white, awaiting the Goal 2 reaction--diffusion). The cross-section slices the
+monolayer: each junction edge crossing the plane gives an apical point and its inward-scaled basal
+counterpart, and the connecting segment is that junction's lateral wall, partitioning the shell into
+the individual cells around the lumen (Fig.~\ref{fig:ves}, bottom).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/vesicle_3d/strip.png}
+\caption{\textbf{A 3D epithelial vesicle} (\texttt{vesicle\_3d}), $0/33/66/100\%$. \emph{Top}: the 3D
+monolayer shell --- cells as opaque, edge-to-edge prisms (apical/basal/lateral faces), white
+(activation $=0$) with black junctions. \emph{Bottom}: the monolayer cross-section, rendered to the
+same scale --- a ring of individual cells (apical outer, basal inner, lateral walls) around the hollow
+lumen. A jittered sphere relaxes to a uniform, smooth epithelial shell, held inflated by the volume
+term and kept from buckling by the soft radial term. The true-vertex-model sibling of the
+Turing\_vertex spherical-Voronoi vesicle.}
+\label{fig:ves}
+\end{figure}
+
+\subsection*{Growth by per-cell volume elasticity (the emergent inflation)}
+Growing the vesicle turned out to be the sharpest model-deciphering lesson of the 3D stage. The naive
+recipe --- ramp each cell's target area $A_0$ and a single \emph{global} lumen volume $V_0$, then let
+the shape energy inflate the shell --- \emph{fails}: the sphere lags its targets and the surplus cell
+area buckles out of plane into deep crumples (roughness $0.01\!\to\!0.2$, shape index climbing from
+$3.8$ to $4.4$ --- ``too much fabric on a ball''). Neither slowing the growth, adding relaxation, nor
+strengthening a global lumen pump fixed it, because a \emph{single scalar} $K_V(V-V_0)^2$ constrains
+only the \emph{sum} of the cell volumes: any set of local dips that cancel in the sum is energetically
+free, so buckling is unopposed.
+
+The fix is the mechanism both references already use. tyssue's \texttt{ClosedMonolayer} gives every
+\emph{cell} a \texttt{prefered\_vol} and \texttt{vol\_elasticity} (not just a lumen), and
+Turing\_vertex's Eq.~3 writes the cell energy as $U=\sum_j\big[\tfrac12 k_v(v_j-v_{\mathrm{eq},j})^2
++\kappa_s s_j\big]$ --- a \emph{per-cell} volume elastic energy. So we split the one global lumen term
+into a sum over cells: the lumen volume $V=\sum_f v_f$ with per-cell wedge volumes
+$v_f=\tfrac13(\mathbf{c}_f\!\cdot\!\mathbf N_f)$ (the pyramid from the sphere centre to face $f$), and
+the energy carries $\sum_f K_V\,(v_f-v_{\mathrm{eq},f})^2$. Now each cell holds \emph{its own} volume:
+a local dip lowers that cell's $v_f$ and is penalised, so the term \emph{actively resists buckling},
+and growth is just ramping each $v_{\mathrm{eq},f}$ (with $A_0\propto s^2$, $v_{\mathrm{eq}}\propto
+s^3$). The whole shell then inflates purely by force balance --- no vertex is moved by hand --- from
+radius $\sim\!5$ to $\sim\!7.1$ while staying smooth (roughness $\le 0.01$) and keeping the cells at
+their target shape (index $3.8\!\to\!3.87$), Fig.~\ref{fig:vesgrow}. The lesson: \emph{distributed}
+elastic targets, not a global constraint, are what make morphogenetic expansion emerge and stay
+stable --- the same reason real epithelia use cell-autonomous volume control.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/vesicle_grow/strip.png}
+\caption{\textbf{A growing vesicle} (\texttt{vesicle\_grow}), $0/33/66/100\%$, framed to the final
+extent. Ramping each cell's target volume $v_{\mathrm{eq}}$ inflates the shell through the per-cell
+volume elasticity alone: the sphere (top) and its cross-section ring (bottom) grow self-similarly from
+$R\!\approx\!5$ to $\approx\!7.1$, the cells stay uniform and well-tiled, and the shell stays smooth
+(roughness $\le0.01$). Replacing this per-cell term with a single global lumen volume instead crumples
+the shell --- the emergence of stable expansion requires distributed, not global, volume targets.}
+\label{fig:vesgrow}
+\end{figure}
+
+\subsection*{Division in 3D (a proliferating vesicle)}
+The last 3D increment is cell \emph{division} on the closed shell --- the sphere analog of tyssue's
+\texttt{sheet\_topology.cell\_division} (a face split by a line; the bulk \texttt{monolayer\_topology}
+version with a \texttt{vertical}/\texttt{horizontal} orientation waits for the mechanical monolayer).
+The cell cycle is \emph{volume doubling}: each cell records its birth wedge volume and divides once its
+current volume reaches twice that (\texttt{divide\_3d}). A division splits the cell by an
+\emph{edge-midpoint septum} --- two of its edges are cut at their midpoints ($m_1,m_2$) and a new edge
+$m_1$--$m_2$ separates the daughters. The subtlety unique to 3D: every edge of a closed surface is
+shared by two faces, so cutting an edge \emph{also} inserts the midpoint into the neighbouring cell's
+ring. Getting that bookkeeping right keeps the mesh a valid closed surface: each division adds exactly
+$\Delta V\!=\!2,\ \Delta E\!=\!3,\ \Delta F\!=\!1$, so $V\!-\!E\!+\!F$ is invariant. A standalone check
+(reorienting the SphericalVoronoi outward first, so every directed edge is unique) confirms
+Euler $=2$ across dozens of divisions; \emph{in the engine} the growing, dividing vesicle proliferates
+$150\!\to\!487$ cells over $337$ divisions in $220$ frames and still verifies \texttt{closed = true,
+Euler = 2} (Fig.~\ref{fig:vesdiv}). Pacing follows the Turing\_vertex \texttt{fig4\_vesicle} reference
+(volume-doubling, a few divisions per frame) so the tissue proliferates gradually. Two subtleties were
+worth fixing: divisions must be chosen \emph{unbiased} --- selecting the first ready cells in face-index
+order sweeps pole-to-pole because the Fibonacci seeding numbers faces that way, so we shuffle the
+candidates and randomise the septum direction --- and, as in 2D, fresh daughters are triangular until
+line tension ($\Lambda$) rounds them. The shell inflates ($R\!\approx\!5\!\to\!9.5$) at roughly constant
+cell size --- true proliferative growth, not mere stretching. Full regularisation of the neighbour
+topology division creates (recovering uniform hexagons, shape index $\to\!3.72$) is the province of
+\emph{T1 neighbour exchange}, the emergent annealing mechanism; the surface-mesh T1 is the next step
+(a geometric Lloyd smoothing would round the cells but is a fairing hack, not the physics).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/vesicle_divide/strip.png}
+\caption{\textbf{A dividing (proliferating) vesicle} (\texttt{vesicle\_divide}), $0/33/66/100\%$,
+framed to the final extent. The vesicle grows by per-cell volume elasticity \emph{and} its cells divide
+by a volume-doubling cell cycle (edge-midpoint septum): the shell inflates from $R\!\approx\!5$ to
+$\approx\!9.5$ while the cell count grows $150\!\to\!487$, so cells stay near constant size
+(top: 3D shell; bottom: cross-section, a ring of ever more, smaller cells around the lumen). Division
+is chosen unbiased (shuffled candidates, random septum direction) so it fills the sphere uniformly. The
+closed surface stays valid throughout ($\texttt{Euler}=2$ after all $337$ divisions), line tension
+keeping the fresh daughters well-shaped.}
+\label{fig:vesdiv}
+\end{figure}
+
+\section*{Field notes}
+\emph{Dated log of what actually worked or failed --- the hard-won part.}
+
+\paragraph{Stage 2 (2026-07-21) --- topology operators, and where the cheap division breaks.}
+\begin{itemize}\itemsep2pt
+\item \textbf{Revert-on-invalid is the right contract for topology.} Rather than reason about
+every degenerate case up front, apply the flip/split, validate the touched faces, and roll back if
+any is degenerate. T1 then \emph{never} tangles the mesh --- a refused flip is just a no-op. This
+turned an error-prone operation into a safe one and is why the self-test is clean.
+\item \textbf{Through-vertex division is a $1$--$2$ round operator, not a proliferation engine.}
+Splitting a face by a septum between two of its \emph{existing} vertices adds no new vertices, so
+each split roughly halves a cell using the same corners; after a couple of rounds cells become
+triangles and further splits are refused. Worse, under \emph{uniform growth in a pinned patch} the
+target area outruns the available space, every cell is driven below target, and the sliver
+daughters collapse --- a run with $231$ forced divisions ended as a red tangle
+($79$--$157$ invalid faces). The clean result above deliberately does \emph{one} desynchronised
+round with no global growth. The proper fix (tyssue's own) is \emph{edge-midpoint} division:
+bisect two opposite edges, insert new vertices (shared with the neighbours across those edges), and
+run the septum between them --- well-shaped daughters, sustainable for many rounds. That needs a
+vertex buffer with occupancy and neighbour-edge bookkeeping; it is the next increment.
+\item \textbf{T1-mediated fluidisation (Stage~3) --- first not sound, then fixed by a \emph{bounded}
+Euler step.} The naive attempt failed its own bar: gentle self-propulsion fired $0$ T1s, and the
+drive needed to collapse edges made the floppy ($p_0\!=\!4.1$) sheet \emph{diverge} under a
+fixed-step relaxation (positions overflow, $\sim\!85$ invalid faces) \emph{before} a T1 could
+fluidise it --- the instability was in the \emph{integrator}, not the reconnection (near the
+transition the shape energy is nearly flat, so an explicit step lets vertices cross). The sound
+fix is a \emph{bounded overdamped Euler} step: cap every per-substep move at $15\%$ of the mean
+edge length with \texttt{torch.clamp} --- so no vertex can cross a cell in one step, and the step
+stays \emph{differentiable} (no \texttt{scipy} solver; the rollout must remain differentiable for
+inverse modelling). With that, the sheet stays stable and T1s fire.
+\item \textbf{A second, subtler bug the naked eye caught: bow-tie faces (a false ``valid'').} The
+first ``sound'' dichotomy ($23\times$) was \emph{wrong}. The rendered strips showed black star-shaped
+gaps where cells overlapped: the T1 flip was producing \emph{self-intersecting} (bow-tie) faces,
+and my validity guard --- positive shoelace area, no repeated vertices --- \emph{passed} them,
+because a bow-tie has positive shoelace area. So ``$0$ invalid faces'' was a false pass and the
+big T1 counts were mostly bad flips. Two fixes: (i) a proper \emph{simple-polygon} test (no two
+non-adjacent edges cross) plus a \emph{non-overlap} test on the four faces a flip touches, added to
+the accept criterion; and (ii) the flip now \emph{searches} the insertion side (which side of its
+anchor the gained vertex goes) $\times$ the mirror sign, and commits only a genuinely simple,
+non-overlapping, edge-sharing result. With the honest check the corrected dichotomy is:
+\begin{center}\small
+\begin{tabular}{ccccc}
+\toprule
+$v_0$ & $l_{\text{th}}$ & solid T1 & fluid T1 & ratio \\
+\midrule
+0.06 & 0.25 & 96 & 1413 & $\mathbf{14.7\times}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The fluid still performs $\sim\!15\times$ the T1s of the caged solid (fluid MSD $0.64$ vs solid
+$0.10$ --- cage-breaking), now with a \emph{genuinely} valid, non-overlapping tiling at every frame
+(the strips tile cleanly). The lesson is the one the whole document keeps re-learning: a numeric
+invariant (area $>0$) is not the same as the geometric one you meant (a simple, embedded tiling) ---
+and a rendered movie is a sharper validity check than a scalar. The corrected numbers are smaller
+than the bogus ones, but the physics --- fluid flows, solid jams --- survives.
+\end{itemize}
+
+\paragraph{Stage 1 (2026-07-21) --- force balance is one line, and it just works.}
+\begin{itemize}\itemsep2pt
+\item The inner-relaxation-as-velocity trick (\S3) reaches force balance with no stability
+tuning: $\Delta t$ is a free label, \texttt{eta}$=0.08$, $20$ inner steps/frame. Contrast the
+SPV prototype, whose entire ``noisy pattern'' saga was a \emph{timestep} artefact. Moving the
+DOF from cell centres to mesh vertices \emph{and} minimising to residual removed that whole
+failure mode.
+\item \textbf{The transition sits where the topology puts it.} With a fixed honeycomb (mostly
+hexagons) the residual energy already collapses across $p_0\!\approx\!3.72$--$3.81$: the
+single-cell floor for a regular hexagon is $p_0^\ast(\text{hex})=3.722$, so $\langle q\rangle$
+cannot fall below $\approx\!3.72$ no matter how small $p_0$ is (the \texttt{solid} cases pin
+there). The canonical $3.81$ is the \emph{disordered}-polygon value; sharpening the transition
+to exactly $3.81$ needs T1 rearrangements to populate the pentagon/heptagon classes --- the next
+operator. So the transition is not a fixed number but a readout of the polygon-class
+distribution, which is a topology property.
+\item \textbf{The engine calls \texttt{forward()} under \texttt{no\_grad}.} The autograd force
+needs an explicit \texttt{with torch.enable\_grad()} (as the SPV op also did) --- otherwise
+\texttt{torch.autograd.grad} raises ``does not require grad''. Cost one run to rediscover.
+\item \textbf{Pin the border or the patch curls.} A free (unpinned) bounded sheet contracts
+under perimeter tension and the boundary ring buckles inward, contaminating the bulk statistics.
+Pinning vertices of degree $<3$ (those on the ragged Voronoi border) holds the frame; bulk stats
+exclude any face touching a pinned vertex.
+\end{itemize}
+
+\paragraph{[next] active driving, edge-midpoint division, and the lift to 3D tubes.}
+The bounded Euler step (above) resolved the integrator bottleneck, so the remaining increments
+are structural. (i) A genuine \texttt{cell} \emph{set} (state $a_0$, type, \texttt{chem}, and
+\texttt{alive} via occupancy) as a second Level, making the model a true two-level hierarchy: a
+\texttt{cell\_geometry} \emph{Aggregate} (vertices$\to$cell area/perimeter) and a cross-set
+\texttt{shape\_energy} that reads $a_0$ from the cell and broadcasts force to the vertices. This
+is both fuller \texttt{plexus2} compliance (it exercises the set hierarchy and Aggregate/Broadcast
+families the single-set version folds away) and the required substrate for the reaction-diffusion.
+(ii) Edge-midpoint division (a straight-line split with decidable angle, Brodland--Veldhuis),
+cell elimination, and rosettes. (iii) The lift to a monolayer / 3D vesicle
+(\texttt{cell\_volume}
+elasticity + the IH/HI 3D reconnections, both already catalogued in the extraction, \S4) --- the
+substrate on which Okuda's morphogen-driven \emph{tubes} become reachable, now that force balance
+and explicit reconnection exist.
+
+\end{document}

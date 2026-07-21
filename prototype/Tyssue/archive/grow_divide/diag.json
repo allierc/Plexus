@@ -1,0 +1,11 @@
+{
+ "name": "grow_divide",
+ "p0": 3.75,
+ "rate": 0.006,
+ "ratio": 1.6,
+ "Nv": 213,
+ "F_start": 88,
+ "F_end": 176,
+ "divided": 88,
+ "invalid_faces": 0
+}

@@ -1,0 +1,13 @@
+{
+ "name": "fluid_4p00",
+ "p0": 4.0,
+ "Nv": 566,
+ "nF": 251,
+ "area_err_start": 0.031,
+ "area_err_end": 0.0007,
+ "shape_start": 4.0052,
+ "shape_relaxed": 3.9989,
+ "energy_start": 0.00218,
+ "energy_relaxed": 2e-06,
+ "relaxed": true
+}

@@ -1,0 +1,52 @@
+[tyssue_flow] flow_fluid_v06_l35: p0=4.1 v0=0.06 l_th=0.35 relax=4  (Nv=378, F=162)
+[engine] 180 sim frames -> recording 181 set frames (stride 1), fields every 1 steps (<= 256)
+[engine] === tyssue_flow_flow_fluid_v06_l35 ===  dim=2  world=[18, 20]  boundary=free  dt=1  frames=180
+[engine] sets:      vertex(378)
+[engine] fields:    —
+[engine] operators: growth: mesh_seed, topo_snapshot   mechanics: shape_energy   topology: t1_transition
+           -> T1(cum)=9317  MSD=0.165  invalid=0
+[tyssue_flow] montage -> /groups/saalfeld/home/allierc/Graph/Plexus/prototype/Tyssue/archive
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u10>
+Subject: Job 153141236: <tv_flow_fluid_v06_l35> in cluster <Janelia> Done
+
+Job <tv_flow_fluid_v06_l35> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Tue Jul 21 03:52:07 2026
+Job was executed on host(s) <16*h08u10>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Tue Jul 21 03:52:07 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/Tyssue> was used as the working directory.
+Started at Tue Jul 21 03:52:07 2026
+Terminated at Tue Jul 21 03:52:33 2026
+Results reported at Tue Jul 21 03:52:33 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/Tyssue/cluster_logs/flow_fluid_v06_l35.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   31.19 sec.
+    Max Memory :                                 552 MB
+    Average Memory :                             351.25 MB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                68
+    Run time :                                   25 sec.
+    Turnaround time :                            26 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/Tyssue/cluster_logs/flow_fluid_v06_l35.err> for stderr output of this job.
+
