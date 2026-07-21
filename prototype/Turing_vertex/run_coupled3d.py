@@ -108,9 +108,12 @@ def presets():
     # over-grows AND diverges. WAVE 2 (ext2_*): stay at that scale (buffer 3200, frames 3200) with CFL
     # HEADROOM (chi 8 / rate 30, vs the borderline 9.8/35), and vary the ELONGATION levers (lower surface
     # tension, narrower/sharper domains, stronger contrast) instead of more growth.
-    extc = dict(gsv, rho_lam=0.5, lam_gain=1.5, a_sw=0.2, hill=4.0, lam_ref=0.25, buffer=3200, chi=8.0, frames=3200)
+    # WAVE 3: revert to coral_ext's PROVEN-stable RD (chi 9.8 / rate 35 at N=3000 -- wave-2's 8/30 both
+    # weakened localisation AND still diverged). Sharper contrast elongated (protr_max 1.46) but SPIKED;
+    # test whether bending cleans the spikes while contrast/tension elongate.
+    extc = dict(gsv, rho_lam=0.5, lam_gain=1.5, a_sw=0.2, hill=4.0, lam_ref=0.25, buffer=3000, chi=9.8, frames=3000)
     def EXT(nm, **ov):
-        return dict(base, name=nm, **{**extc, "react": GSV(0.058, 0.063, 30.0), **ov})
+        return dict(base, name=nm, **{**extc, "react": GSV(0.058, 0.063, 35.0), **ov})
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
@@ -125,13 +128,11 @@ def presets():
         # Localized proliferation -> local out-of-plane buckling at the activator domains.
         dict(base, name="fig4_coral_ext", **{**gsv, "rho_lam": 0.5, "lam_gain": 1.5, "a_sw": 0.2,
              "hill": 4.0, "lam_ref": 0.25}, react=GSV(0.058, 0.063)),
-        # --- WAVE 2 elongation levers (N~3000 window, CFL-safe): can we make the lobes narrower/taller? ---
-        EXT("ext2_base",     ),                                         # control: coral_ext at the safe scale
-        EXT("ext2_soft",     K_S=0.4),                                  # lower surface tension -> lobes extend more
-        EXT("ext2_softer",   K_S=0.25),                                 # even lower tension
-        EXT("ext2_selective",a_sw=0.30, hill=8.0),                     # narrower activator domains -> narrower lobes
-        EXT("ext2_contrast", rho_lam=0.3, lam_gain=1.7),               # sharper ON/OFF division contrast
-        EXT("ext2_combo",    K_S=0.3, a_sw=0.30, hill=8.0, rho_lam=0.3, lam_gain=1.7),  # all elongation levers
+        # --- WAVE 3: sharper contrast (the wave-2 winner) at strong-localisation chi; does bending clean spikes? ---
+        EXT("ext3_contrast", rho_lam=0.3, lam_gain=1.7),                        # 6.7:1 contrast @ chi 9.8 (strong corr)
+        EXT("ext3_sharp",    rho_lam=0.2, lam_gain=1.8),                        # 10:1 contrast (push further)
+        EXT("ext3_bend",     rho_lam=0.3, lam_gain=1.7, k_bend=0.6),            # contrast + more bending -> smoother?
+        EXT("ext3_softbend", rho_lam=0.3, lam_gain=1.7, K_S=0.5, k_bend=0.5),   # contrast + low tension + bending
         dict(base, name="fig4_labyrinth_v", **{**gsv, "chi": 5.6, "frames": 5000},                 # labyrinth: CFL-safe
              react=GSV(0.029, 0.054, rate=20.0)),
         dict(base, name="fig4_holes_v",     **{**gsv, "chi": 6.5, "frames": 5000},                 # holes: more dev
