@@ -10,6 +10,8 @@ Operators:
   cell_rd_seed   (structural) -- Gray-Scott initial condition (substrate=1, a central activator spot)
   cell_diffuse   (lateral)    -- graph-Laplacian diffusion of chem on the cell adjacency (EMIT=velocity)
   cell_react     (lateral)    -- Gray-Scott autocatalysis (EMIT=velocity)
+  cell_geometry_3d (aggregate)-- vertices -> per-cell centroid/area
+  morphogen_growth_3d (growth)-- grow each cell's target volume by a Hill fn of its activator -> BUDDING
 """
 from __future__ import annotations
 
@@ -18,8 +20,39 @@ from collections import defaultdict
 import numpy as np
 import torch
 
-from plexus.models.base import Lateral, Rewire, Structural
+from plexus.models.base import Aggregate, Lateral, Rewire, Structural
 from plexus.models.registry import register_operator
+
+
+@register_operator("cell_geometry_3d", set="cell", kind="aggregate", family="hierarchy")
+class CellGeometry3D(Aggregate):
+    """AGGREGATE the 3D vertex mesh -> per-cell centroid + area (the cross-scale readout the RD needs:
+    the activator spot is seeded by centroid, and the pattern is rendered per cell). Reads the stashed
+    half-edge table on the vertex Level; writes cell.cen (+ cell.area) via scatter-add over half-edges."""
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "cen"]
+    MECHANISM_TAGS = ["aggregate", "cell_geometry", "cross_scale"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
+
+    def forward(self, H, mask=None):
+        from tyssue_ops3d import face_geometry_3d
+        clvl = H.level(self.at); vlvl = H.level(self.vat); m = getattr(vlvl, "_mesh", None)
+        if m is None:
+            return {}
+        pos = vlvl.get("pos")[:m["Nv"]]
+        area, _, cen, _ = face_geometry_3d(pos, m["E_srce"], m["E_trgt"], m["E_face"], m["nF"])
+        nF = m["nF"]; st = clvl.state.clone(); sch = clvl.state_schema
+        if "cen" in sch:
+            i0, i1 = sch["cen"]; st[:nF, i0:i1] = cen.detach()
+        if "area" in sch:
+            i0, i1 = sch["area"]; st[:nF, i0:i1] = area.detach()[:, None]
+        clvl.state = st
+        if getattr(clvl, "occ", None) is not None:
+            occ = torch.zeros(clvl.state.shape[0], device=clvl.state.device); occ[:nF] = 1.0; clvl.occ = occ
+        return {}
 
 
 @register_operator("cell_adjacency", set="cell", kind="rewire", family="topology")
@@ -62,25 +95,34 @@ class CellAdjacency(Rewire):
 class CellRDSeed(Structural):
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u]."""
-    SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False
+    SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["initial_condition", "gray_scott"]
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
-        self.r = float(params.get("seed_radius", 2.0)); self.seed = int(params.get("seed", 0))
+        self.seed = int(params.get("seed", 0))
+        self.mode = params.get("mode", "scatter")               # "noise" (Brusselator/GM) | "scatter" (Gray-Scott)
+        self.seed_frac = float(params.get("seed_frac", 0.06))   # (scatter) fraction of strong activator seeds
+        self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
+        self.noise = float(params.get("noise", 0.04))
 
     def forward(self, H, mask=None):
         clvl = H.level(self.at); vlvl = H.level(self.vat); m = getattr(vlvl, "_mesh", None)
-        if m is None or "chem" not in clvl.state_schema or "cen" not in clvl.state_schema:
+        if m is None or "chem" not in clvl.state_schema:
             return {}
-        nF = m["nF"]
-        ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci1]
-        c0 = cen.mean(0); d = (cen - c0).norm(dim=1)
+        nF = m["nF"]; dev = clvl.state.device
         g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
-        jitter = (0.02 * torch.rand(nF, generator=g)).to(clvl.state.device)
-        a = torch.where(d < self.r, torch.full_like(d, 0.5), torch.zeros_like(d)) + jitter
-        u = torch.where(d < self.r, torch.full_like(d, 0.25), torch.ones_like(d))
+        if self.mode == "noise":                                # Brusselator: homogeneous steady state + noise
+            a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
+            u = (self.B / self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
+        else:                                                   # Gray-Scott: substrate=1 + scattered activator nuclei
+            # (a central spot is 2D-disk logic -- on a sphere every cell is equidistant, so scatter/noise)
+            a = (0.04 * torch.rand(nF, generator=g)).to(dev)
+            u = torch.ones(nF, device=dev)
+            nucl = (torch.rand(nF, generator=g) < self.seed_frac).to(dev)
+            a = torch.where(nucl, torch.full_like(a, 0.5), a)
+            u = torch.where(nucl, torch.full_like(u, 0.25), u)
         h0, h1 = clvl.state_schema["chem"]
         st = clvl.state.clone(); st[:nF, h0:h0 + 1] = a[:, None]
         if h1 - h0 > 1:
@@ -147,3 +189,74 @@ class CellReactGrayScott(Lateral):
         du = -uaa + self.F * (1.0 - u)
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: self.rate * torch.stack([da, du], dim=1) * occ}
+
+
+@register_operator("morphogen_growth_3d", set="vertex", kind="structural", family="growth")
+class MorphogenGrowth3D(Structural):
+    """Morphogen-driven growth: each cell's targets grow at a per-cell rate set by a Hill function of
+    its activator (read from the cell set), so the shell BULGES where the Turing activator is high ->
+    self-organised budding/coral. A cross-set coupling (reads cell.chem, writes the vertex mesh targets
+    A0/P0/v_eq); the per-cell volume elasticity then inflates the activated cells by force balance.
+    Uniform vesicle_growth is the a_sw->0 limit."""
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
+        self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
+        self.every = int(params.get("every", 1)); self._k = 0
+
+    def forward(self, H, mask=None):
+        vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
+        if m is None:
+            return {}
+        self._k += 1
+        if self._k % self.every != 0:
+            return {}
+        clvl = H.level(self.cat)
+        if "chem" not in clvl.state_schema:
+            return {}
+        nF = m["nF"]; h0, _ = clvl.state_schema["chem"]
+        dev = m["V0f"].device
+        a = clvl.state[:nF, h0].detach().to(dev)                 # per-cell activator
+        if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
+            m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
+            m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
+        hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
+        s = torch.clamp(m["mg_scale"] * (1.0 + self.rate * hillv), max=self.cap)     # grow while activated, capped
+        m["mg_scale"] = s
+        m["A0"] = m["A0_init"] * (s * s)                         # keep A0/P0/v_eq consistent (area~R^2, vol~R^3)
+        m["P0"] = m["P0_init"] * s
+        m["V0f"] = m["V0f_init"] * (s ** 3)
+        m["V0"] = float(m["V0f"].sum())
+        return {}
+
+
+@register_operator("cell_react", set="cell", kind="lateral", family="fields", implementation="brusselator")
+class CellReactBrusselator(Lateral):
+    """`brusselator` implementation of cell_react (transposed verbatim from Turing_vertex fig4_coral),
+    chem = [a, h] (activator, inhibitor):
+        da/dt = gamma ( A - (B+1) a + a^2 h )
+        dh/dt = gamma ( B a - a^2 h )
+    Homogeneous steady state (a,h) = (A, B/A); Turing-unstable for B > 1 + A^2. Pair with the noise
+    seed (steady state + noise) and a fast-inhibitor diffusion ratio (d_h >> d_a) -> smooth coral."""
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["gamma", "A", "B"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    MECHANISM_TAGS = ["reaction", "activator_inhibitor", "turing", "brusselator"]
+    PARAM_ROLES = {"gamma": "reaction_rate", "A": "feed", "B": "conversion"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.gamma = float(params["gamma"]); self.A = float(params["A"]); self.B = float(params["B"])
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); chem = lvl.get("chem")
+        a = chem[:, 0]; h = chem[:, 1]; a2h = a * a * h
+        da = self.gamma * (self.A - (self.B + 1.0) * a + a2h)
+        dh = self.gamma * (self.B * a - a2h)
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: torch.stack([da, dh], dim=1) * occ}

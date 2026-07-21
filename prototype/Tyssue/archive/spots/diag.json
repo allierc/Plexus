@@ -1,0 +1,10 @@
+{
+ "name": "spots",
+ "react": "brusselator",
+ "Nv": 2396,
+ "cells": 1200,
+ "a_lo": 0.358,
+ "a_hi": 3.822,
+ "a_std": 1.2009,
+ "patterned": true
+}
