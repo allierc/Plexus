@@ -736,18 +736,89 @@ schedule:   # the order the operators run each frame
 </div>
 
 <h3>Turing × vertex — patterning &amp; shaping a growing tissue</h3>
-<p class="opk">Reaction–diffusion and morphogenesis on the <b>true vertex</b> tissue (Tyssue) above: a Gray–Scott coral pattern rides a sheet as it grows and divides, while localized growth buckles a flat sheet out of plane into a tube that caps over — a mushroom.</p>
-<p class="opk-ref">Reference — reaction–diffusion and growth on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex model.</p>
+<p class="opk">Growth, patterning, and shaping on the <b>true vertex</b> tissue (Tyssue) above: a vesicle grows and divides into a closed shell of cells, a Gray–Scott coral pattern rides a sheet as it grows to a few thousand cells, and localized growth buckles a flat sheet out of plane into a tube that caps over — a mushroom.</p>
+<p class="opk-ref">Reference — growth, reaction–diffusion, and morphogenesis on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex model.</p>
 <div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/tyssue_vesicle_grow_divide.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:   # run-level settings
+  name: tyssue_ves_vesicle_grow_divide_500f   # run name (-&gt; archive/&lt;name&gt;/)
+  seed: 0   # RNG seed
+  n_frames: 500   # number of simulation frames
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 502
+  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
+  dim: 3   # spatial dimension
+  world:   # world box size
+  - 30.0
+  - 30.0
+  - 30.0
+sets:   # the biological SETS (Levels) of the model
+  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
+    n: 2368   # buffer size (max elements)
+fields: {}   # continuous fields
+operators:   # the operators to instantiate (each realises one mechanism)
+- op: seed_mesh_3d
+  at: vertex   # the set this operator acts on
+  n_cells: 150
+  radius: 5.0
+  jitter: 0.18   # initial positional disorder
+  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  seed: 0   # RNG seed
+  before_frame: 1   # run this operator once, before the given frame
+- op: vesicle_growth
+  at: vertex   # the set this operator acts on
+  rate: 0.003   # growth rate of the target area per frame
+  every: 1   # run this operator every N frames
+- op: shape_energy_3d
+  at: vertex   # the set this operator acts on
+  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  K_A: 1.0   # area-elasticity stiffness
+  K_P: 1.0   # perimeter-elasticity stiffness
+  Lambda: 0.5
+  Gamma: 0.1
+  K_V: 1.0
+  K_R: 0.4
+  mu: 1.0   # mobility (overdamped)
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
+  eta: 0.08   # relaxation step size
+  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
+- op: reconnect_t1_3d
+  at: vertex   # the set this operator acts on
+  l_th_frac: 0.35
+  every: 2   # run this operator every N frames
+  max_flips: 20
+- op: divide_3d
+  at: vertex   # the set this operator acts on
+  factor: 2.0
+  reset_noise: 0.12
+  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  every: 2   # run this operator every N frames
+  max_div: 10
+- op: topo_snapshot_3d
+  at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
+schedule:   # the order the operators run each frame
+- seed_mesh_3d
+- vesicle_growth
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d</pre></span></span>
+      <span class="sim-cap">a Tyssue vesicle proliferates — every cell grows and divides until the sheet is a closed shell of ~1000 cells</span>
+    </figcaption>
+  </figure>
   <figure class="sim-card">
     <video src="gallery/tyssue_rd_coral_grow.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">coral (growing)<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_rd_rd_coral_grow   # run name (-&gt; archive/&lt;name&gt;/)
+  name: tyssue_rd_rd_coral_grow_long   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
-  n_frames: 220   # number of simulation frames
+  n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  record_cap: 300
+  record_cap: 502
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
@@ -756,9 +827,9 @@ schedule:   # the order the operators run each frame
   - 40.0
 sets:   # the biological SETS (Levels) of the model
   vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 1184   # buffer size (max elements)
+    n: 2960   # buffer size (max elements)
   cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
-    n: 600   # buffer size (max elements)
+    n: 1500   # buffer size (max elements)
     state:   # per-element state blocks (name: {width, integration})
       chem:
         width: 2   # number of scalar columns in this state block
@@ -777,6 +848,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
+  vseed_cv: 0.4
 - op: vesicle_growth
   at: vertex   # the set this operator acts on
   rate: 0.003   # growth rate of the target area per frame
@@ -805,6 +877,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: vertex   # the set this operator acts on
   factor: 2.0
   reset_noise: 0.12
+  cycle_cv: 0.4
   p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   every: 2   # run this operator every N frames
   max_div: 10
@@ -845,18 +918,18 @@ schedule:   # the order the operators run each frame
 - cell_diffuse
 - cell_react
 - topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">a Gray–Scott coral pattern rides a Tyssue tissue as it grows and divides</span>
+      <span class="sim-cap">a Gray–Scott coral pattern rides a Tyssue tissue as it grows and divides to a few thousand cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/tyssue_tube_mushroom.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">mushroom<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_tube_tube   # run name (-&gt; archive/&lt;name&gt;/)
+  name: tyssue_tube_tube_1   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
-  n_frames: 240   # number of simulation frames
+  n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  record_cap: 300
+  record_cap: 502
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
   dim: 3   # spatial dimension
   world:   # world box size
@@ -892,8 +965,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
 - op: cell_rd_seed
   at: cell   # the set this operator acts on
   mode: patch
-  patch_z: 0.82
-  before_frame: 3   # run this operator once, before the given frame
+  patch_z: 0.9
 - op: morphogen_growth_3d
   at: vertex   # the set this operator acts on
   cell_set: cell
@@ -912,12 +984,12 @@ operators:   # the operators to instantiate (each realises one mechanism)
   K_R: 0.02
   mu: 1.0   # mobility (overdamped)
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 28   # inner bounded-Euler relaxation steps per frame
+  relax_iters: 40   # inner bounded-Euler relaxation steps per frame
   eta: 0.08   # relaxation step size
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
 - op: reconnect_t1_3d
   at: vertex   # the set this operator acts on
-  l_th_frac: 0.3
+  l_th_frac: 0.28
   every: 1   # run this operator every N frames
   max_flips: 50
 - op: divide_3d
@@ -929,6 +1001,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   every: 2   # run this operator every N frames
   max_div: 20
   cell_set: cell
+  g1_ramp: false
 - op: topo_snapshot_3d
   at: vertex   # the set this operator acts on
   every: 1   # run this operator every N frames
@@ -2244,6 +2317,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
