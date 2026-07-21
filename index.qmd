@@ -2579,7 +2579,7 @@ descriptions:
       These particles are distributed randomly across the entire frame without any specific geometric
       arrangement or connection. Each particle is uniform in size and appears as a single pixel or a small
       cluster of pixels. The colors are vibrant and contrast sharply against the solid black background.&#x27;</pre></span></span>
-      <span class="sim-cap">the same operator, signed charge — a screened plasma</span>
+      <span class="sim-cap">the same operator, now with signed charge — like charges repel and opposite attract, screening into a plasma</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2636,6 +2636,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
