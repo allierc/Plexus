@@ -736,16 +736,16 @@ schedule:   # the order the operators run each frame
 </div>
 
 <h3>Turing × vertex — patterning &amp; shaping a growing tissue</h3>
-<p class="opk">Reaction–diffusion and morphogenesis on the <b>true vertex</b> tissue (Tyssue) above: a Gray–Scott coral pattern rides a sheet as it grows and divides to a few thousand cells, while localized growth buckles a flat sheet out of plane into a tube that caps over — a mushroom.</p>
+<p class="opk">Reaction–diffusion and morphogenesis on the <b>true vertex</b> tissue (Tyssue) above: a Gray–Scott coral pattern rides a sheet as it grows and divides, while localized growth buckles a flat sheet out of plane into a tube that caps over — a mushroom.</p>
 <p class="opk-ref">Reference — reaction–diffusion and growth on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex model.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/tyssue_rd_coral_grow.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">coral (growing)<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_rd_rd_coral_grow_long   # run name (-&gt; archive/&lt;name&gt;/)
+  name: tyssue_rd_rd_coral_grow   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
-  n_frames: 600   # number of simulation frames
+  n_frames: 220   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
   record_cap: 300
   boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
@@ -756,9 +756,9 @@ schedule:   # the order the operators run each frame
   - 40.0
 sets:   # the biological SETS (Levels) of the model
   vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 10000   # buffer size (max elements)
+    n: 1184   # buffer size (max elements)
   cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
-    n: 5000   # buffer size (max elements)
+    n: 600   # buffer size (max elements)
     state:   # per-element state blocks (name: {width, integration})
       chem:
         width: 2   # number of scalar columns in this state block
@@ -777,12 +777,11 @@ operators:   # the operators to instantiate (each realises one mechanism)
   p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
-  vseed_cv: 0.4
 - op: vesicle_growth
   at: vertex   # the set this operator acts on
   rate: 0.003   # growth rate of the target area per frame
   every: 1   # run this operator every N frames
-  max_scale: 3.5
+  max_scale: 2.5
 - op: shape_energy_3d
   at: vertex   # the set this operator acts on
   p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
@@ -801,15 +800,14 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: vertex   # the set this operator acts on
   l_th_frac: 0.35
   every: 2   # run this operator every N frames
-  max_flips: 250
+  max_flips: 20
 - op: divide_3d
   at: vertex   # the set this operator acts on
   factor: 2.0
   reset_noise: 0.12
-  cycle_cv: 0.4
   p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   every: 2   # run this operator every N frames
-  max_div: 30
+  max_div: 10
   cell_set: cell
 - op: cell_geometry_3d
   at: cell   # the set this operator acts on
@@ -834,7 +832,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   rate: 1.0   # growth rate of the target area per frame
 - op: topo_snapshot_3d
   at: vertex   # the set this operator acts on
-  every: 3   # run this operator every N frames
+  every: 1   # run this operator every N frames
 schedule:   # the order the operators run each frame
 - seed_mesh_3d
 - vesicle_growth
@@ -847,7 +845,7 @@ schedule:   # the order the operators run each frame
 - cell_diffuse
 - cell_react
 - topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">a Gray–Scott coral pattern rides a Tyssue tissue as it grows and divides to a few thousand cells</span>
+      <span class="sim-cap">a Gray–Scott coral pattern rides a Tyssue tissue as it grows and divides</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2246,6 +2244,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
