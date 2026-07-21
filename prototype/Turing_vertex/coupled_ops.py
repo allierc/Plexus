@@ -290,6 +290,10 @@ class Divide2x(Structural):
         self.block = params.get("block", "a0")               # size block: a0 (2D area) | v0 (3D volume)
         self.tangential = bool(params.get("tangential", True))  # 3D: place daughter IN the tissue-surface plane (Okuda)
         self.reset_noise = float(params.get("reset_noise", 0.0))  # daughter target-size spread -> stays asynchronous
+        # DIRECT activator-gated division: divide a cell where the activator is on, at a per-tick rate,
+        # bypassing the grow-to-size chain. Concentrates proliferation exactly at the morphogen domains.
+        self.act_rate = float(params.get("act_rate", 0.0))       # 0 = size-only (Okuda); >0 = also divide on activation
+        self.act_thr = float(params.get("act_thr", 0.2))         # activator threshold for direct division
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device
@@ -297,7 +301,12 @@ class Divide2x(Structural):
         sa, _ = lvl.state_schema[self.block]
         sz = lvl.state[:, sa]
         live = lvl.occ > 0
-        ready = (live & (sz >= self.ratio * base)).nonzero(as_tuple=True)[0]
+        ready_m = live & (sz >= self.ratio * base)               # Okuda size-controlled division
+        if self.act_rate > 0.0:                                  # + direct activator-gated division (this work)
+            a = lvl.get("chem")[:, 0]
+            draw = torch.rand(lvl.n, generator=getattr(H, "rng", None), device=dev)
+            ready_m = ready_m | (live & (a > self.act_thr) & (draw < self.act_rate))
+        ready = ready_m.nonzero(as_tuple=True)[0]
         free = (~live).nonzero(as_tuple=True)[0]
         cap = min(int(ready.numel()), int(free.numel()))
         if cap == 0:
