@@ -1,0 +1,12 @@
+{
+ "name": "vesicle_grow_divide_300f",
+ "frames": 300,
+ "grow": 0.003,
+ "divide": true,
+ "n_cells": 150,
+ "cells_end": 699,
+ "n_div": 549,
+ "hollow_max": 0.0,
+ "hollow_mean": 0.0,
+ "hollow_final": 0.0
+}

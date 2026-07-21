@@ -483,7 +483,7 @@ the individual cells around the lumen (Fig.~\ref{fig:ves}, bottom).
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.98\textwidth]{archive/vesicle_3d/strip.png}
+\includegraphics[width=0.98\textwidth]{archive/vesicle/strip.png}
 \caption{\textbf{A 3D epithelial vesicle} (\texttt{vesicle\_3d}), $0/33/66/100\%$. \emph{Top}: the 3D
 monolayer shell --- cells as opaque, edge-to-edge prisms (apical/basal/lateral faces), white
 (activation $=0$) with black junctions. \emph{Bottom}: the monolayer cross-section, rendered to the
@@ -570,7 +570,7 @@ anneal better.
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.98\textwidth]{archive/vesicle_divide/strip.png}
+\includegraphics[width=0.98\textwidth]{archive/vesicle_grow_divide/strip.png}
 \caption{\textbf{A dividing (proliferating) vesicle} (\texttt{vesicle\_divide}), $0/33/66/100\%$,
 framed to the final extent. The vesicle grows by per-cell volume elasticity \emph{and} its cells divide
 by a volume-doubling cell cycle (edge-midpoint septum): the shell inflates from $R\!\approx\!5$ to
@@ -640,7 +640,9 @@ of the mechanics, cured by restoring the biological noise a deterministic cell c
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.98\textwidth]{archive/rd_coral_grow_big/strip.png}
+\IfFileExists{archive/rd_coral_grow_big/strip.png}%
+  {\includegraphics[width=0.98\textwidth]{archive/rd_coral_grow_big/strip.png}}%
+  {\includegraphics[width=0.98\textwidth]{archive/rd_coral_grow/strip.png}}
 \caption{\textbf{Coral reaction--diffusion riding a growing, dividing vesicle}
 (\texttt{rd\_coral\_grow\_big}), $0/33/66/100\%$. The Gray-Scott labyrinth (cell state \texttt{chem},
 coloured white$\to$red by activator) develops on a shell that grows by per-cell volume elasticity and
@@ -650,6 +652,49 @@ random cycle length, CV$=0.4$) desynchronises division: without it the cells dou
 shell roughens $\sim\!100\times$ at mid-growth (a grey band of exposed walls); with it the shell stays
 smooth throughout (top: 3D; bottom: cross-section).}
 \label{fig:coralgrow}
+\end{figure}
+
+\paragraph{The ``hollow cells'' were a recording artefact, not a physical defect (2026-07-21).} A long
+\texttt{rd\_coral\_grow} (and any dividing vesicle past $\sim\!500$ cells) rendered a shell the
+\texttt{hollow\_flags} diagnostic scored as $\sim\!97\%$ ``hollow'' (folded/inverted caps) --- a striking
+grey/red crumpling that annealed away by the final frame. A long chain of controlled experiments
+established, in order, that it was division-driven, that a \emph{single} division is geometrically clean
+(the Hertwig septum midpoints land \emph{on} the surface and both daughters' normals stay parallel to the
+mother, $\mathbf{n}\!\cdot\!\mathbf{n}_{\text{mother}}=0.995,\,0.998$), and that \emph{no} physical remedy
+touched it --- an anti-inversion filtered step, local daughter relaxation, dihedral bending to
+$K_{\text{bend}}=100$, removing the radial term, tripling the relaxation, even slowing growth (which was
+\emph{worse}). That every plausible mechanical fix failed was the tell: there was no mechanical defect.
+
+The cause was a \textbf{recording misalignment}. The engine records vertex \emph{positions}
+(\texttt{posf}) at one stride while \texttt{topo\_snapshot\_3d} records the changing \emph{mesh topology}
+(\texttt{hist}) at another; on runs long enough to trip a recording stride $>1$ the two arrays end up
+\emph{different lengths} (at $300$ frames \texttt{posf} has $151$ entries, \texttt{hist} $76$). The
+diagnostic and renderer then paired positions from one frame with the half-edge connectivity of
+\emph{another} --- ring vertex indices no longer matched the coordinates, every Newell normal was computed
+from a scrambled polygon, and the metric reported phantom inversions. The proof is one line: the identical
+$300$-frame run with \texttt{topo\_snapshot every}$=2$ (\texttt{posf}$=151$, \texttt{hist}$=76$,
+\emph{misaligned}) scores hollow $0.98$; with \texttt{every}$=1$ (both $301$, \emph{aligned}) it scores
+$\mathbf{0.000}$ throughout. The $220$-frame vesicle looked clean only because at that length the stride was
+$1$ and the recordings happened to stay aligned. Recording topology every frame the positions are recorded
+makes \texttt{vesicle\_grow\_divide} a smooth sphere all the way to $949$ cells (Fig.~\ref{fig:hollow}).
+The lesson is the document's oldest refrain, sharpened: \emph{measure the geometric thing you mean} --- a
+diagnostic that silently pairs two arrays of different provenance will fabricate a defect that no amount of
+physics can fix. (One genuine, mild residue survives the fix: with a deterministic cell cycle the cells
+divide in backlogged waves, so their \emph{areas} spread; the stochastic cell cycle CV$=0.4$ plus a
+live-scaled division cap even them out, as \texttt{rd\_coral\_grow\_big} already showed. The earlier
+\emph{roughness}-metric ``synchronised wave'' result is unaffected --- that metric reads positions only.)
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.98\textwidth]{archive/vesicle_grow_divide_400f/strip.png}
+\caption{\textbf{With aligned recording the dividing vesicle is a smooth sphere --- the ``hollow
+buckling'' was a diagnostic artefact.} The same physics that scored $\sim\!97\%$ ``hollow'' under
+mismatched position/topology recording strides (\texttt{posf}$=151$, \texttt{hist}$=76$ at $300$ frames)
+scores hollow $\le\!0.003$ once the two are recorded on the same stride
+(\texttt{vesicle\_grow\_divide\_400f}, $150\!\to\!949$ cells; top row white render, bottom row coloured by
+the hollow flag). The ``defect'' lived entirely in the diagnostic's frame pairing; the one real residue is
+a mild cell-\emph{area} spread from the deterministic cell cycle.}
+\label{fig:hollow}
 \end{figure}
 
 This is the substrate for the morphogenesis proper --- morphogen-driven growth (bulge/divide where $a$
