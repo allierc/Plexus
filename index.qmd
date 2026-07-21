@@ -681,7 +681,7 @@ schedule:
 </div>
 
 <h3>Epithelial mechanics — vertex model (self-propelled Voronoi)</h3>
-<p class="opk">A confluent tissue as a Voronoi cell graph rebuilt every step (<code>voronoi_graph</code>), with an area + perimeter shape energy pulling each cell toward a target shape index p₀ (<code>voronoi_tension</code>). p₀ tunes a rigidity transition: cells jam into a solid below p₀*≈3.81, flow as a fluid above. Coloured by shape index — <span style="color:#5a7fd0">blue</span> solid, <span style="color:#d06a5a">red</span> fluid.</p>
+<p class="opk">A confluent tissue as a Voronoi cell graph rebuilt every step (<code>voronoi_graph</code>), with an area + perimeter shape energy pulling each cell toward a target shape index p₀ (<code>voronoi_tension</code>). Each cell is a single moving point whose shape is its Voronoi region — a self-propelled Voronoi (SPV) tissue, not an explicit vertex mesh of shared junctions. p₀ tunes a rigidity transition: cells jam into a solid below p₀*≈3.81, flow as a fluid above. Coloured by shape index — <span style="color:#5a7fd0">blue</span> solid, <span style="color:#d06a5a">red</span> fluid.</p>
 <p class="opk-ref">Reference — the self-propelled Voronoi (SPV) vertex model (Bi, Yang, Marchetti &amp; Manning 2016).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -2716,6 +2716,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
