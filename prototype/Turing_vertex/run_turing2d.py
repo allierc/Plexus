@@ -36,7 +36,7 @@ import plexus.schema as S
 from plexus.engine import run as engine_run
 
 OUT = os.path.join(HERE, "archive")
-N, RADIUS, K = 1500, 12.0, 6
+N, RADIUS, K = 4000, 19.0, 6
 FRAMES, DT = 6000, 1.0
 
 

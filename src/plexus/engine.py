@@ -690,7 +690,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     inst = [(o.op,
              get_operator(o.op, o.impl)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on,
-             (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30))))
+             (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30)),
+              max(1, int(o.params.get("every", 1)))))       # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]
     rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields = _setup_recording(sim, H)
     _print_run_summary(sim, H)
@@ -698,11 +699,13 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     def _run_token(token, tick):
         """Run every operator instance named `token` (one schedule token) once,
         enforcing the first-tick integration-invariant guard on non-opted-out operators."""
-        for nm, ob, sel, (after_frame, before_frame) in inst:
+        for nm, ob, sel, (after_frame, before_frame, every) in inst:
             if nm != token:
                 continue
             if not (after_frame <= tick < before_frame):
                 continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
+            if every > 1 and tick % every != 0:
+                continue                                 # multi-rate: run this operator only every `every` ticks
             snap = ({n: l.state.clone() for n, l in H.levels.items()}
                     if tick == 0 and not getattr(ob, "MAY_MUTATE_INTEGRATED_STATE", False) else None)
             deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})

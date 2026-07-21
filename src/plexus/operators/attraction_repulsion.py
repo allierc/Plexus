@@ -36,6 +36,7 @@ class AttractionRepulsion(Lateral):
     MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
     PARAM_ROLES = {"sigma": "interaction_length", "noise": "exploration_noise",
                    "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
+    REFERENCE = "D'Orsogna, M. R. et al. (2006). Self-propelled particles with soft-core interactions. Phys. Rev. Lett. 96:104302."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

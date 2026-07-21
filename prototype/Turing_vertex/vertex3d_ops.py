@@ -26,10 +26,75 @@ import math
 
 import numpy as np
 import torch
-from scipy.spatial import Delaunay, ConvexHull
+from scipy.spatial import Delaunay, ConvexHull, SphericalVoronoi
 
 from plexus.models.base import Lateral, Structural, Rewire
 from plexus.models.registry import register_operator
+
+
+# --------------------------------------------------------------------------- #
+#  Epithelial PRISM builder: monolayer = 2D surface cells (spherical Voronoi)
+#  extruded radially, NOT a 3D Voronoi (which slivers on a thin shell).
+# --------------------------------------------------------------------------- #
+def _poly_area_3d(P):
+    """Area of a (near-planar) 3D polygon, vertices ordered: 0.5*||sum_j P_j x P_{j+1}||."""
+    x = np.cross(P, np.roll(P, -1, axis=0)).sum(0)
+    return 0.5 * float(np.linalg.norm(x))
+
+
+def cell_prisms_3d(pos_np, thickness, center=None, relax=0):
+    """Model a monolayer epithelium as radially EXTRUDED PRISMS.
+
+    Each cell's APICAL face is its cell on the sphere -- a spherical Voronoi polygon of the cell
+    DIRECTIONS (compact, near-regular hexagons/pentagons, unlike the radial slivers a 3D Voronoi
+    gives on a thin shell). Extrude radially by `thickness` to the BASAL face; lateral quads join
+    them -> a one-cell-thick prism. Voronoi vertices take the mean radius of the cells sharing
+    them, so the paving is watertight even on a slightly non-uniform shell.
+
+    Returns (prism_faces, apical_faces, vol, surf, ok):
+      prism_faces[i] -- list of polygon faces (each [k,3]) of cell i's prism (apical, basal, walls)
+      apical_faces[i] -- the apical polygon [k,3] (the outer surface patch)
+      vol[i], surf[i] -- prism volume and total surface area; ok[i] -- valid mask
+    """
+    n = len(pos_np)
+    c = pos_np.mean(0) if center is None else np.asarray(center, float)
+    d = pos_np - c
+    r = np.linalg.norm(d, axis=1)
+    dirs = d / np.clip(r[:, None], 1e-9, None)
+    for _ in range(relax):                                   # optional Lloyd relaxation -> equal areas
+        sv = SphericalVoronoi(dirs, radius=1.0, center=np.zeros(3))
+        sv.sort_vertices_of_regions()
+        newd = np.array([sv.vertices[reg].mean(0) if len(reg) >= 3 else dirs[i]
+                         for i, reg in enumerate(sv.regions)])
+        dirs = newd / np.clip(np.linalg.norm(newd, axis=1)[:, None], 1e-9, None)
+    sv = SphericalVoronoi(dirs, radius=1.0, center=np.zeros(3))
+    sv.sort_vertices_of_regions()
+    V = sv.vertices                                          # [m,3] unit-sphere Voronoi vertices
+    regions = sv.regions                                     # ordered vertex-index list per cell
+    vrad = np.zeros(len(V)); vcnt = np.zeros(len(V))         # per-vertex radius = mean of sharing cells
+    for i, reg in enumerate(regions):
+        for vi in reg:
+            vrad[vi] += r[i]; vcnt[vi] += 1
+    vrad = np.where(vcnt > 0, vrad / np.maximum(vcnt, 1), float(np.mean(r)))
+    h = float(thickness)
+    prism_faces, apical_faces = [None] * n, [None] * n
+    vol = np.zeros(n); surf = np.zeros(n); ok = np.zeros(n, np.float32)
+    for i, reg in enumerate(regions):
+        if len(reg) < 3:
+            continue
+        uv = V[reg]; rr = vrad[reg]                          # ordered unit vertices + their radii
+        apical = uv * (rr + h / 2.0)[:, None] + c            # outer polygon
+        basal = uv * (rr - h / 2.0)[:, None] + c             # inner polygon
+        k = len(reg)
+        walls = [np.array([apical[j], apical[(j + 1) % k], basal[(j + 1) % k], basal[j]])
+                 for j in range(k)]
+        prism_faces[i] = [apical, basal[::-1]] + walls
+        apical_faces[i] = apical
+        Aa, Ab = _poly_area_3d(apical), _poly_area_3d(basal)
+        surf[i] = Aa + Ab + sum(_poly_area_3d(w) for w in walls)
+        vol[i] = 0.5 * (Aa + Ab) * h                         # prism volume ~ mean cross-section * height
+        ok[i] = 1.0
+    return prism_faces, apical_faces, vol, surf, ok
 
 
 # --------------------------------------------------------------------------- #
@@ -160,6 +225,7 @@ class TissueSeed3D(Structural):
     REQUIRES_PARAMS = ["radius"]
     MECHANISM_TAGS = ["tissue_3d", "initial_condition", "aggregate", "vesicle", "lumen"]
     PARAM_ROLES = {"radius": "aggregate_radius", "lumen": "hollow_vesicle", "v0": "target_cell_volume"}
+    REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models... Sci. Rep. 8:2386 (monolayer vesicle / compacted aggregate)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -167,24 +233,47 @@ class TissueSeed3D(Structural):
         self.radius = float(params["radius"])
         self.lumen = bool(params.get("lumen", False))
         self.v0 = float(params.get("v0", 1.0))
+        self.v0noise = float(params.get("v0noise", 0.0))     # per-cell target-volume spread -> ASYNCHRONOUS division
         self.noise = float(params.get("noise", 0.2))
+        self.a_mean = float(params.get("a_mean", 1.0))       # coupling: activator seed (Brusselator steady state)
+        self.h_mean = float(params.get("h_mean", 3.0))       # coupling: inhibitor seed
+        self.cnoise = float(params.get("cnoise", 0.04))
+        self.seed_mode = params.get("seed_mode", "noise")    # noise (Brusselator/GM) | scatter (Gray-Scott)
+        self.seed_frac = float(params.get("seed_frac", 0.04))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
-        N = lvl.state.shape[0]
         dev = lvl.state.device
         c = 0.5 * H.world_size[:3].to(dev)
+        live = (lvl.occ > 0).nonzero(as_tuple=True)[0]       # seed LIVE cells only (growing buffer)
+        N = int(live.numel())
         g = torch.Generator(device="cpu"); g.manual_seed(0)
-        d = torch.randn(N, 3, generator=g); d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
-        if self.lumen:                                       # monolayer shell (vesicle)
+        if self.lumen:                                       # monolayer shell (vesicle): even Fibonacci sphere
+            d = torch.as_tensor(_fib_sphere(N, 1.0, np.zeros(3)) , dtype=torch.float32)
+            d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
             r = self.radius + self.noise * torch.randn(N, 1, generator=g)
-        else:                                                # solid ball (aggregate)
+        else:                                                # solid ball (aggregate): uniform interior
+            d = torch.randn(N, 3, generator=g); d = d / d.norm(dim=1, keepdim=True).clamp(min=1e-9)
             r = torch.rand(N, 1, generator=g).pow(1.0 / 3.0) * self.radius
         pos = (c + (d * r).to(dev))
         px0, px1 = lvl.state_schema["pos"]
-        st = lvl.state.clone(); st[:, px0:px1] = pos
+        st = lvl.state.clone(); st[live, px0:px1] = pos
         if "v0" in lvl.state_schema:
-            a, b = lvl.state_schema["v0"]; st[:, a:b] = self.v0
+            a, b = lvl.state_schema["v0"]
+            spread = (1.0 + self.v0noise * torch.randn(N, 1, generator=g)).clamp(min=0.2).to(dev)
+            st[live, a:b] = self.v0 * spread                 # noisy start -> cells cross v_th at spread times
+            lvl.v0_base = self.v0                             # base target volume (division threshold)
+        if "chem" in lvl.state_schema:                       # coupling: seed the two morphogens on live cells
+            ca, _ = lvl.state_schema["chem"]
+            gg = torch.Generator(device="cpu"); gg.manual_seed(1)
+            if self.seed_mode == "scatter":                  # Gray-Scott: full substrate + scattered activator nuclei
+                v = 0.02 * torch.rand(N, generator=gg).to(dev)
+                v[torch.rand(N, generator=gg).to(dev) < self.seed_frac] = 0.5
+                st[live, ca] = (v + self.cnoise * torch.randn(N, generator=gg).to(dev)).clamp(min=0.0)
+                st[live, ca + 1] = torch.ones(N, device=dev)                                        # substrate u
+            else:                                            # Brusselator/GM: steady state + noise
+                st[live, ca] = (self.a_mean + self.cnoise * torch.randn(N, generator=gg)).to(dev)
+                st[live, ca + 1] = (self.h_mean + self.cnoise * torch.randn(N, generator=gg)).to(dev)
         lvl.state = st
         return {}
 
@@ -200,6 +289,7 @@ class VoronoiGraph3D(Rewire):
     DIFFERENTIABLE = False
     REQUIRES_PARAMS = ["radius"]
     MECHANISM_TAGS = ["voronoi_3d", "delaunay", "retessellation", "confluent"]
+    REFERENCE = "Delaunay, B. (1934). Sur la sphere vide. Bull. Acad. Sci. URSS 6:793-800."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -224,6 +314,32 @@ class VoronoiGraph3D(Rewire):
 
 
 # --------------------------------------------------------------------------- #
+#  Vectorised shape energy (padded batched -> 32x over a per-cell Python loop;
+#  torch.compile fuses it for another ~1.5x). One scalar E over all cells.
+# --------------------------------------------------------------------------- #
+def _shape_energy_3d(pos, ghosts, tet_t, tri_idx, tmask, okt, v0, S0, KV, KS):
+    allp = torch.cat([pos, ghosts], 0)
+    cc = _circ_torch(allp[tet_t])                             # [M,3] tetra circumcentres
+    verts = cc[tri_idx]                                       # [n, Fmax, 3, 3] hull-triangle vertices per cell
+    a, b, c3 = verts[:, :, 0], verts[:, :, 1], verts[:, :, 2]
+    S = (0.5 * torch.linalg.cross(b - a, c3 - a, dim=-1).norm(dim=-1) * tmask).sum(1)
+    ri = pos[:, None, :]                                      # tetrahedra from the cell centre to each hull face
+    V = (((a - ri) * torch.linalg.cross(b - ri, c3 - ri, dim=-1)).sum(-1) * tmask).sum(1).abs() / 6.0
+    return (okt * (KV * (V - v0) ** 2 + KS * (S - S0) ** 2)).sum()
+
+
+_shape_energy_3d_compiled = None
+def _energy_fn_3d(use_compile):
+    """Return the (optionally torch.compiled, dynamic-shape) shape-energy function."""
+    global _shape_energy_3d_compiled
+    if not use_compile:
+        return _shape_energy_3d
+    if _shape_energy_3d_compiled is None:
+        _shape_energy_3d_compiled = torch.compile(_shape_energy_3d, dynamic=True)
+    return _shape_energy_3d_compiled
+
+
+# --------------------------------------------------------------------------- #
 #  Lateral: 3D shape-energy force on the cell centres (overdamped)
 # --------------------------------------------------------------------------- #
 @register_operator("voronoi_tension_3d", set="cell", kind="lateral", family="mechanics")
@@ -242,6 +358,7 @@ class VoronoiTension3D(Lateral):
                       "rigidity_transition", "confluent_tissue", "morphogenesis"]
     PARAM_ROLES = {"s0": "target_shape_index_3d", "K_V": "volume_stiffness", "K_S": "surface_stiffness",
                    "mu": "mobility", "lumen": "hollow_vesicle"}
+    REFERENCE = "Merkel, M. & Manning, M. L. (2018). A geometrically controlled rigidity transition in a model for confluent 3D tissues. New J. Phys. 20:022002."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -251,6 +368,36 @@ class VoronoiTension3D(Lateral):
         self.mu = float(params.get("mu", 1.0))
         self.lumen = bool(params.get("lumen", False))
         self.pad = float(params.get("pad", 0.15 * float(params["radius"])))
+        self.vmax = float(params.get("vmax", 0.0))           # >0: clamp |velocity| (degenerate-polyhedron guard; needed when V0 grows)
+        self.compile = bool(params.get("compile", False))    # torch.compile the vectorised shape energy
+        self.retess_every = max(1, int(params.get("retess_every", 1)))  # topology refresh cadence (multi-rate; 1=exact/tick)
+        self._topo = None; self._tick = 0                    # cached CONNECTIVITY (tet + hull tris); ghosts recomputed/tick
+
+    def _topology(self, pos_np, n, dev, dtype):
+        """Tessellate + per-cell hull -> cached connectivity (tet, tri_idx, mask, ok). The expensive
+        part (Delaunay + N ConvexHulls); reused for `retess_every` ticks, refreshed on cell-count change."""
+        ghosts_np = ghost_points(pos_np, self.lumen, self.pad)
+        allp_np, tet, incident = _tessellate(pos_np, ghosts_np)
+        cc_np = _circ_np(allp_np[tet])
+        rows, ok, Fmax = [], np.zeros(n, np.float32), 4
+        for i in range(n):
+            inc = incident[i]
+            if len(inc) < 4:
+                rows.append(None); continue
+            try:
+                g = np.asarray(inc)[ConvexHull(cc_np[inc]).simplices]
+            except Exception:
+                rows.append(None); continue
+            rows.append(g); ok[i] = 1.0; Fmax = max(Fmax, len(g))
+        tri_idx = np.zeros((n, Fmax, 3), np.int64); tmask = np.zeros((n, Fmax), np.float32)
+        for i in range(n):
+            if rows[i] is not None:
+                F = len(rows[i]); tri_idx[i, :F] = rows[i]; tmask[i, :F] = 1.0
+        return dict(n=n, ng=len(ghosts_np),
+                    tet=torch.as_tensor(tet, device=dev),
+                    tri_idx=torch.as_tensor(tri_idx, device=dev),
+                    tmask=torch.as_tensor(tmask, device=dev, dtype=dtype),
+                    okt=torch.as_tensor(ok, device=dev))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -264,42 +411,31 @@ class VoronoiTension3D(Lateral):
             return {self.at: v_full}
         pos_live = pos_full[idx]
         pos_np = pos_live.detach().cpu().numpy().astype(np.float64)
-        ghosts_np = ghost_points(pos_np, self.lumen, self.pad)
-        allp_np, tet, incident = _tessellate(pos_np, ghosts_np)
-        cc_np = _circ_np(allp_np[tet])
-        # per-cell hull triangulation topology (numpy)
-        cell_tets, cell_tris, ok = [], [], np.zeros(n, np.float32)
-        for i in range(n):
-            inc = incident[i]
-            if len(inc) < 4:
-                cell_tets.append(None); cell_tris.append(None); continue
-            try:
-                h = ConvexHull(cc_np[inc])
-            except Exception:
-                cell_tets.append(None); cell_tris.append(None); continue
-            cell_tets.append(torch.as_tensor(inc, device=dev))
-            cell_tris.append(torch.as_tensor(h.simplices, device=dev)); ok[i] = 1.0
-        tet_t = torch.as_tensor(tet, device=dev)
-        ghosts_t = torch.as_tensor(ghosts_np, device=dev, dtype=pos_full.dtype)
+        # multi-rate topology cache: rebuild connectivity every `retess_every` ticks OR when the cell
+        # count changes (division). The boundary GHOSTS + circumcentres are recomputed EVERY tick from
+        # the current positions (cheap), so the boundary tracks inflation; only the connectivity lags.
+        self._tick += 1
+        if (self._topo is None or self._topo["n"] != n or self._tick % self.retess_every == 0):
+            self._topo = self._topology(pos_np, n, dev, pos_full.dtype)
+        T = self._topo
+        ghosts_t = torch.as_tensor(ghost_points(pos_np, self.lumen, self.pad), device=dev, dtype=pos_full.dtype)
+        if ghosts_t.shape[0] != T["ng"]:                     # ghost count drifted -> force a rebuild
+            self._topo = self._topology(pos_np, n, dev, pos_full.dtype); T = self._topo
+            ghosts_t = torch.as_tensor(ghost_points(pos_np, self.lumen, self.pad), device=dev, dtype=pos_full.dtype)
+        tet_t, tri_idx_t, tmask_t, okt = T["tet"], T["tri_idx"], T["tmask"], T["okt"]
         v0 = (lvl.get("v0")[idx, 0] if "v0" in lvl.state_schema
               else torch.full((n,), self.V0, device=dev))
         S0 = self.s0 * v0.clamp(min=1e-6) ** (2.0 / 3.0)
+        efn = _energy_fn_3d(self.compile)
         with torch.enable_grad():
             pos = pos_live.detach().requires_grad_(True)
-            allp = torch.cat([pos, ghosts_t], 0)
-            cc = _circ_torch(allp[tet_t])
-            E = pos.new_zeros(())
-            for i in range(n):
-                if not ok[i]:
-                    continue
-                verts = cc[cell_tets[i]]; tris = cell_tris[i]
-                a, b, cc3 = verts[tris[:, 0]], verts[tris[:, 1]], verts[tris[:, 2]]
-                S_i = 0.5 * torch.cross(b - a, cc3 - a, dim=-1).norm(dim=-1).sum()
-                ri = pos[i]
-                V_i = (((a - ri) * torch.cross(b - ri, cc3 - ri, dim=-1)).sum(-1)).sum().abs() / 6.0
-                E = E + self.K_V * (V_i - v0[i]) ** 2 + self.K_S * (S_i - S0[i]) ** 2
+            E = efn(pos, ghosts_t, tet_t, tri_idx_t, tmask_t, okt, v0, S0, self.K_V, self.K_S)
             grad = torch.autograd.grad(E, pos)[0]
-        v_full[idx] = self.mu * torch.nan_to_num(-grad)
+        v = self.mu * torch.nan_to_num(-grad)
+        if self.vmax > 0:                                     # clamp per-cell speed (boundary-degeneracy guard)
+            vn = v.norm(dim=1, keepdim=True)
+            v = torch.where(vn > self.vmax, v * (self.vmax / vn.clamp(min=1e-9)), v)
+        v_full[idx] = v
         if mask is not None:
             v_full = v_full * mask[:, None].float()
         return {self.at: v_full}

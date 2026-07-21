@@ -32,6 +32,7 @@ class MPMSpin(Lateral):
     REQUIRES_PARAMS = ["omega"]
     MECHANISM_TAGS = ["solid_body_rotation", "swirl"]
     PARAM_ROLES = {"omega": "angular_velocity", "spin_k": "spin_gain"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

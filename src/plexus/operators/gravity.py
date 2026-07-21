@@ -31,6 +31,7 @@ class GravityOperator(Lateral):
     SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
     REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
     PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
+    REFERENCE = "Newton, I. (1687). Philosophiae Naturalis Principia Mathematica."
     MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
 
     def __init__(self, params, device="cpu"):

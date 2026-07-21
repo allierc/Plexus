@@ -26,6 +26,7 @@ class BroadcastLift(Broadcast):
     REQUIRES_PARAMS = ["stiffness"]
     MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]
     PARAM_ROLES = {"stiffness": "containment_strength"}
+    REFERENCE = "Battaglia, P. W. et al. (2018). arXiv:1806.01261 (graph-network broadcast)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
