@@ -815,7 +815,7 @@ schedule:
   </figure>
 </div>
 
-<h3>Tyssue — a true vertex model</h3>
+<h3>Epithelial mechanics — a true vertex model</h3>
 <p class="opk">Where the tissue above is a self-propelled Voronoi (each cell a single point), <b>Tyssue</b> is an explicit vertex model: cells are polygons that <b>share junction vertices</b>, and those junction vertices — not the cell centres — are the mechanical degrees of freedom. An area + line-tension shape energy (<code>shape_energy</code>) relaxes the mesh toward force balance, with growth, division and cell death as explicit operations on the mesh.</p>
 <p class="opk-ref">Reference — the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex-model library; active vertex model after Farhadifar et&nbsp;al. (2007).</p>
 <div class="sim-gallery g3">
@@ -2936,6 +2936,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
