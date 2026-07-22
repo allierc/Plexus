@@ -401,6 +401,18 @@ explain the observations. Differentiability thus provides more than efficient
 optimization: it enables quantitative comparison between competing mechanistic
 models while preserving their explicit biological structure.
 
+Crucially, because the operator composition is differentiable end to end, the objective need not span the
+entire system: a loss may be \emph{local} in both space and time. It can be evaluated on a chosen
+\emph{subset of entities} --- a region of interest such as the extrusion front where activated and
+quiescent cells meet --- over a \emph{short rollout} of a few tens of steps, rather than on every cell
+across the whole trajectory. Gradients still propagate through the shared operator composition, so a
+\emph{local} objective fine-tunes precisely the mechanism responsible for a local behaviour --- the shape
+of a growth front, the sharpness of a domain boundary, the timing of a rearrangement --- without the cost
+or the averaging-out of a global fit. This \emph{locality} is what makes differentiable refinement
+practical on large, long-lived tissues: the mechanism is global and shared, but the \emph{evidence}
+constraining any single operator is usually confined to a small, transient region, and the loss should be
+placed exactly there.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Agentic mechanistic discovery}
 
