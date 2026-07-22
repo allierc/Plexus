@@ -39,19 +39,20 @@ RADIUS, JITTER, SEED = 5.0, 0.16, 0
 
 
 def presets():
-    #  Okuda uniform-cell homogenisation sweep (rho baseline growth + v_eq capped at vth_frac*v_ref +
-    #  strong K_V). Increment-named so iterations are preserved. cols: name n_cells frames n_spots cone
-    #  grow cv rho vth K_V
-    return [("smoke_hom",  900,   200,   3,   18.0, 0.03, 0.4, 0.15, 1.35, 3.0),   # fast validation of uniform cells
-            ("fig5_2k_1",  2000,  700,   5,   16.0, 0.03, 0.4, 0.15, 1.35, 3.0),   # baseline homogenised
-            ("fig5_2k_2",  2000,  700,   5,   16.0, 0.04, 0.4, 0.10, 1.35, 3.0),   # faster tubes, less baseline
-            ("fig5_2k_3",  2000,  700,   5,   14.0, 0.03, 0.4, 0.15, 1.35, 4.0),   # thinner cones, stiffer volume
-            ("fig5_2k_4",  2000,  700,   6,   16.0, 0.025,0.4, 0.20, 1.40, 3.0),   # more baseline (uniform body)
-            ("fig5_2k_5",  2000,  900,   5,   15.0, 0.035,0.4, 0.12, 1.35, 4.0),   # longer, thin, stiff
-            ("fig5_2k_6",  2000,  700,   5,   16.0, 0.03, 0.4, 0.15, 1.35, 3.0)]   # spare slot for a tuned combo
+    #  CLUSTER param SEARCH (small/short 800c/300f) for uniform-cell TUBES: the tension is v_eq cap
+    #  (uniform) vs protrusion (needs bulge/localized proliferation). Grid over vth (bulge cap), rho
+    #  (baseline growth), cone (spot size). cols: name n_cells frames n_spots cone grow cv rho vth K_V min max
+    g = []
+    for vth in (2.0, 3.0, 4.0):
+        for rho in (0.0, 0.08):
+            for cone in (10.0, 14.0):
+                nm = f"sw_v{int(vth * 10)}_r{int(rho * 100)}_c{int(cone)}"
+                g.append((nm, 800, 300, 5, cone, 0.025, 0.4, rho, vth, 3.0, 3, 14))
+    g.append(("smoke_hom", 900, 200, 3, 18.0, 0.03, 0.4, 0.15, 1.35, 3.0, 3, 14))
+    return g
 
 
-def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, buf, cbuf):
+def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, min_cyc, max_cyc, buf, cbuf):
     dt = 1.0    # cones define the activator directly (no Turing reaction) -> no CFL constraint
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS, "jitter": JITTER,
             "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": cv},
@@ -64,7 +65,8 @@ def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V,
             "eta": 0.08, "cap_frac": 0.12},                            # fluid; radial ~off so tubes leave the sphere
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": max(40, n_cells // 8)},
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv,
-            "p0": 3.90, "every": 2, "max_div": 12, "max_div_frac": 0.02, "cell_set": "cell"},   # uniform cells
+            "p0": 3.90, "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell",
+            "min_cycle": min_cyc, "max_cycle": max_cyc},                # volume-primary + bounded duration
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]     # ALIGNED recording
     sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_rd_seed", "morphogen_growth_3d",
              "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
@@ -108,17 +110,17 @@ def count_spots(a, mesh, thr):
 
 
 def run_all(only=None):
-    for name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V in presets():
+    for name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, min_cyc, max_cyc in presets():
         if only and name not in only:
             continue
         odir = os.path.join(OUT, name); os.makedirs(odir, exist_ok=True)
         verts, es, et, ef, nF = build_sphere_mesh(n_cells, RADIUS, JITTER, SEED); Nv = verts.shape[0]
         buf = int(Nv * 4.0); cbuf = int(nF * 4.0)   # ~4x seed headroom; bounds every-frame-recording memory
-        print(f"[fig5] {name}: n={n_cells} frames={frames} spots={n_spots} cone={cone_deg} grow={grow} rho={rho} vth={vth} K_V={K_V}  (Nv={Nv}, cells={nF})", flush=True)
+        print(f"[fig5] {name}: n={n_cells} frames={frames} spots={n_spots} cone={cone_deg} grow={grow} rho={rho} vth={vth} K_V={K_V} dur=({min_cyc},{max_cyc})  (Nv={Nv}, cells={nF})", flush=True)
         rec = {"name": name, "n_cells": n_cells, "frames": frames, "n_spots": n_spots, "grow": grow,
-               "cv": cv, "rho": rho, "vth": vth, "K_V": K_V}
+               "cv": cv, "rho": rho, "vth": vth, "K_V": K_V, "min_cyc": min_cyc, "max_cyc": max_cyc}
         try:
-            sim, cfg = make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, buf, cbuf)
+            sim, cfg = make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, min_cyc, max_cyc, buf, cbuf)
             write_spec(cfg, os.path.join(odir, "spec.yaml"))
             Hf, out = engine_run(sim, device="cpu")
             emesh = Hf.level("vertex")._mesh; hist = emesh.get("hist")
@@ -135,10 +137,15 @@ def run_all(only=None):
             from tyssue_diag import hollow_metric
             _, area, _ = hollow_metric(pT, mtT); area = area[area > 0]     # per-cell areas -> uniformity CV
             area_cv = float(area.std() / (area.mean() + 1e-9)) if area.size else 0.0
+            # PROTRUSION: how far the tissue sticks out radially (tube stick-out). 95th pct / median radius.
+            from tyssue_topology_ops3d import rings_from_flat_3d as _rff
+            _rings = _rff(np.asarray(mtT["E_srce"]), np.asarray(mtT["E_trgt"]), np.asarray(mtT["E_face"]), mtT["nF"])
+            _rad = np.array([np.linalg.norm(pT[r].mean(0)) if (r is not None and len(r)) else 0 for r in _rings]); _rad = _rad[_rad > 0]
+            protr = float(np.percentile(_rad, 95) / (np.median(_rad) + 1e-9)) if _rad.size else 1.0
             rec.update(cells_end=int(mtT["nF"]), n_div=int(emesh.get("n_div", 0)), n_t1=int(emesh.get("n_t1", 0)),
                        extent=[round(float(x), 2) for x in ext], aspect=round(float(ext.max() / max(ext.min(), 1e-6)), 3),
                        spots=int(spots), a_std=round(float(aT.std()), 3), hollow_frac=round(hstat["frac"], 3),
-                       area_cv=round(area_cv, 3))
+                       area_cv=round(area_cv, 3), protr=round(protr, 3))
             Rmax = max(float(np.abs(frame(t)[1]).max()) for t in np.linspace(0, T - 1, 20).astype(int))
             L3 = Rmax * 1.06
             picks = [int(round(fr * (T - 1))) for fr in (0.0, 0.33, 0.66, 1.0)]

@@ -29,6 +29,9 @@
 
 \newcommand{\code}[1]{\texttt{#1}}
 
+% GitHub repository as a clickable, line-breakable typewriter link: \ghrepo{org}{name}
+\newcommand{\ghrepo}[2]{\href{https://github.com/#1/#2}{\texttt{#1/\allowbreak#2}}}
+
 \title{\textbf{Plexus}\\[3pt]
 \large A blueprint for differentiable tissue}
 \author{Janelia Research Campus}
@@ -72,7 +75,7 @@ biological mechanisms from their numerical implementations.
 
 This viewpoint defines a broader research program. First, Plexus seeks to construct an algebra of biological operators whose elements can be composed into complex dynamical systems, compared through their observable consequences, and expanded as new mechanisms are discovered. Second, Plexus aims to extract this operator algebra from the existing corpus of biological simulation models. Rather than viewing current frameworks as competing simulators, we regard them as repositories of reusable mechanisms. By decomposing these models into a common language, we seek to identify a compact vocabulary capable of expressing a wide range of biological dynamics across scales. Third, Plexus constructs differentiable counterparts of these operator compositions. Differentiability allows mechanistic models to be fitted directly to biological data, residuals to be interpreted mechanistically, and missing operators intuited. 
 
-Finally, because biological mechanisms are represented in a formal language rather than embedded in simulator-specific code, they become amenable to automated reasoning. The explicit separation between biological semantics and numerical implementations allows agentic systems to operate directly on the language itself, composing, comparing and optimizing mechanistic models without modifying simulator code. The search for biological explanations therefore becomes a search over model structures rather than simulator implementations. In sum, mechanistic discovery can proceed by iteratively assembling operator compositions, fitting them to observations, and extending the language whenever existing operators prove insufficient.
+Finally, because biological mechanisms are represented in a formal language rather than embedded in simulator-specific code, they become amenable to automated reasoning. The explicit separation between biological semantics and numerical implementations allows agentic systems to operate directly on the language itself, composing, comparing and optimizing mechanistic models without modifying simulator code. The search for biological explanations therefore becomes a search over model structures rather than simulator implementations. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -354,12 +357,12 @@ questions. Biological models are compared through the operators they compose,
 whereas numerical methods are compared through the implementations realizing
 those operators.
 
-This separation establishes two independent axes of scientific progress.
-Biological innovation corresponds to discovering new operators or new operator
-compositions, whereas numerical innovation corresponds to developing more
-efficient or more accurate implementations of existing operators. Existing
-simulation frameworks therefore become complementary backends implementing a
-common intermediate representation rather than competing modelling paradigms.
+Because biological mechanisms are represented in a formal language rather than embedded
+in simulator-specific code, they become amenable to automated reasoning. The explicit separation
+between biological semantics and numerical implementations allows agentic systems to operate
+directly on the language itself, composing, comparing and optimizing mechanistic models without
+modifying simulator code. The search for biological explanations therefore becomes a search over
+model structures rather than simulator implementations.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Mechanistic inverse modelling}
@@ -1220,5 +1223,257 @@ Each analysed framework may contribute additional implementations of existing
 operators, refine existing typed signatures, or reveal genuinely new biological
 operators. Consequently, the atlas evolves continuously as new open-source
 simulation frameworks become available.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{An extended repository survey}
+\label{app:survey}
+\catcode`\_=12\relax  % literal underscores in repository slugs (e.g. VM_tissue_growth)
+
+Appendix~\ref{app:corpus} lists the initial reference corpus. This appendix
+expands it into a broader candidate survey of fifty open-source repositories,
+grouped into five mechanism classes. For each repository we record its primary
+model family and the operator families we expect to extract from it. These
+operator families are candidates to be confirmed by source-level inspection
+following the methodology of Appendix~\ref{app:atlas}: the entries reflect what
+each project advertises, not yet a normalized set of registered contracts.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{A. Multicellular and agent-based dynamics}
+
+These are likely the highest-yield sources for cell states, cell--cell
+mechanics, phenotype transitions, growth, division, death, secretion, uptake
+and agent--field coupling. PhysiCell, for example, targets large 2-D/3-D
+multicellular systems, while PhysiBoSS adds intracellular Boolean signalling.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}r p{4.1cm} p{2.9cm} p{5.0cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Repository} & \textbf{Primary model family} & \textbf{Likely operator families}\\
+\midrule
+1 & \ghrepo{MathCancer}{PhysiCell} & Off-lattice cell agents & divide, die, adhere, repel, migrate, secrete, uptake\\
+2 & \ghrepo{PhysiBoSS}{PhysiBoSS} & PhysiCell + Boolean networks & all above + activate, inhibit, switch phenotype\\
+3 & \ghrepo{MathCancer}{BioFVM} & Diffusive microenvironment & diffuse, decay, source, sink, Dirichlet boundary\\
+4 & \ghrepo{Chaste}{Chaste} & Multiscale cell/tissue simulation & cell cycle, forces, PDE coupling, electrophysiology\\
+5 & \ghrepo{CompuCell3D}{CompuCell3D} & Cellular Potts & copy, adhere, constrain volume, chemotax, divide\\
+6 & \ghrepo{BioDynaMo}{biodynamo} & General biological agents & grow, divide, move, interact, diffuse signals\\
+7 & \ghrepo{tissue-forge}{tissue-forge} & Particle biology and chemistry & force, bond, react, diffuse, secrete, assemble\\
+8 & \ghrepo{HaseloffLab}{CellModeller} & Growing microbial cells & elongate, divide, collide, signal, regulate\\
+9 & \ghrepo{RobertGregg}{CellularPotts.jl} & Cellular Potts in Julia & adhere, move, divide, constrain area/volume\\
+10 & \ghrepo{ingewortel}{artistoo} & Browser Cellular Potts & copy, adhesion, volume constraint, chemotaxis\\
+11 & \ghrepo{mathbioleiden}{Tissue-Simulation-Toolkit} & 2-D Cellular Potts & adhesion, motility, PDE signalling, growth\\
+12 & \ghrepo{shabaz}{gpu-cpm} & GPU Cellular Potts & lattice copy, adhesion energy, volume constraint\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+CompuCell3D and Artistoo are explicitly Cellular Potts environments; the Tissue
+Simulation Toolkit is another 2-D Glazier--Graner implementation.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{B. Vertex, Voronoi and epithelial mechanics}
+
+These repositories should yield topology-changing and geometric operators that
+agent-centre models often hide: area and perimeter elasticity, junction
+tension, T1 transitions, cell extrusion, polygon division and boundary
+remodelling. CellGPU covers Voronoi and dynamic vertex models, while Tyssue
+represents epithelial sheets.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}r p{4.1cm} p{2.9cm} p{5.0cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Repository} & \textbf{Primary model family} & \textbf{Likely operator families}\\
+\midrule
+13 & \ghrepo{sussmanLab}{cellGPU} & Voronoi/SPV and vertex & area elasticity, perimeter tension, self-propel, T1\\
+14 & \ghrepo{DamCB}{tyssue} & Epithelial vertex model & contract, stretch, divide, extrude, reconnect\\
+15 & \ghrepo{Pablo1990}{pyVertexModel} & 3-D vertex/scutoid & apical/basal tension, lateral adhesion, topology\\
+16 & \ghrepo{yasuhiroinoue}{PyCellVertex} & 2-D vertex model & growth, division, rearrangement, morphogenesis\\
+17 & \ghrepo{mmarinriera}{VertexModel} & Epithelial vertex dynamics & area force, edge tension, neighbor exchange\\
+18 & \ghrepo{mshagirov}{vertex_simulation} & Cell-monolayer vertex dynamics & relax vertices, constrain boundary, compute energy\\
+19 & \ghrepo{kylechanphy}{TissueSim} & Active vertex model & self-propel, align, deform, rearrange\\
+20 & \ghrepo{vmansov}{clustering_vmodel} & Mutant-cell vertex model & cluster, alter mechanics, relax mesh\\
+21 & \ghrepo{lixinzhi4429}{VM_tissue_growth} & Growing epithelial vertex model & grow, divide, stress-feedback, align polarity\\
+22 & \ghrepo{BanerjeeLab}{HNP_model} & Developmental vertex model & crawl, tension, stress alignment, feedback\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The Python vertex implementations explicitly advertise tissue morphogenesis,
+rearrangements, area/perimeter geometry and boundary constraints.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{C. Spatial molecular and transport processes}
+
+This family is essential because it yields operators below the cell scale:
+Brownian motion, binding, unbinding, unimolecular and bimolecular reactions,
+membrane crossing, adsorption, desorption, compartment transport and surface
+diffusion. Smoldyn, ReaDDy and MCell are complementary particle-based spatial
+simulators; VCell spans deterministic, stochastic, particle and moving-boundary
+models.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}r p{4.1cm} p{2.9cm} p{5.0cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Repository} & \textbf{Primary model family} & \textbf{Likely operator families}\\
+\midrule
+23 & \ghrepo{readdy}{readdy} & Particle reaction--diffusion & diffuse, react, bind, unbind, transform topology\\
+24 & \ghrepo{ssandrews}{Smoldyn} & Brownian molecular particles & diffuse, collide, react, adsorb, cross membrane\\
+25 & \ghrepo{mcellteam}{mcell} & Monte Carlo cellular microphysiology & diffuse, surface-react, release, absorb\\
+26 & \ghrepo{mcellteam}{cellblender} & MCell geometry/model authoring & define compartments, membranes, sources and reactions\\
+27 & \ghrepo{CNS-OIST}{STEPS} & Stochastic reaction--diffusion & react, diffuse, channel flux, membrane current\\
+28 & \ghrepo{virtualcell}{vcell} & Spatial systems biology & ODE, reaction--diffusion, advection, electrophysiology\\
+29 & \ghrepo{GollyGang}{ready} & Cellular automata/PDE exploration & local update, diffuse, react, mesh evolution\\
+30 & \ghrepo{spatial-model-editor}{spatial-model-editor} & Spatial SBML models & compartmentalize, react, diffuse, impose geometry\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{D. Intracellular signalling and biochemical networks}
+
+These projects can supply operators for reaction networks, rule-based molecular
+interactions, state transitions, stochastic events, conservation laws and
+parameterized kinetic laws. VCell and COPASI are foundational mechanistic
+cell-biology platforms, while BioNetGen describes rule-based interactions
+without enumerating every molecular species.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}r p{4.1cm} p{2.9cm} p{5.0cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Repository} & \textbf{Primary model family} & \textbf{Likely operator families}\\
+\midrule
+31 & \ghrepo{copasi}{COPASI} & Biochemical reaction networks & react, catalyze, inhibit, transport, event\\
+32 & \ghrepo{RuleWorld}{bionetgen} & Rule-based biochemical models & bind, unbind, modify, synthesize, degrade\\
+33 & \ghrepo{sys-bio}{tellurium} & Reproducible systems biology & integrate ODE, simulate events, compose models\\
+34 & \ghrepo{sys-bio}{roadrunner} & SBML simulation engine & integrate kinetics, steady state, sensitivity\\
+35 & \ghrepo{pysb}{pysb} & Programmatic rule-based modelling & bind, catalyze, translocate, express, degrade\\
+36 & \ghrepo{GillesPy2}{GillesPy2} & Stochastic biochemical kinetics & stochastic reaction, propensity, event\\
+37 & \ghrepo{StochSS}{StochSS} & Stochastic systems biology & simulate ensembles, spatial reactions, parameter sweep\\
+38 & \ghrepo{AMICI-dev}{AMICI} & Differentiable ODE models & integrate, differentiate, infer parameters\\
+39 & \ghrepo{opencobra}{cobrapy} & Constraint-based metabolism & flux balance, uptake, secrete, constrain reaction\\
+40 & \ghrepo{BhallaLab}{moose-core} & Multiscale cellular simulation & kinetics, diffusion, electrophysiology, signalling\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{E. Neural computation as cellular simulation}
+
+Although these are neuroscience frameworks, they are highly relevant to Plexus
+because they expose another mature corpus of reusable cell-level operators:
+membrane integration, ion-channel gating, axial conduction, synaptic
+transmission, spike generation, delays and plasticity. Chaste itself also
+combines electrophysiology with tissue and cell modelling.
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}r p{4.1cm} p{2.9cm} p{5.0cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Repository} & \textbf{Primary model family} & \textbf{Likely operator families}\\
+\midrule
+41 & \ghrepo{neuronsimulator}{nrn} & Multicompartment neurons & integrate voltage, gate channels, axial current, spike\\
+42 & \ghrepo{brian-team}{brian2} & Equation-defined neural networks & integrate state, threshold, reset, synapse\\
+43 & \ghrepo{nest}{nest-simulator} & Large spiking networks & spike, transmit, delay, plasticity\\
+44 & \ghrepo{arbor-sim}{arbor} & HPC multicompartment neurons & cable solve, channel current, synaptic event\\
+45 & \ghrepo{AllenInstitute}{bmtk} & Brain network models & construct/connect networks, drive, record\\
+46 & \ghrepo{Neurosim-lab}{netpyne} & NEURON network specification & instantiate cells, connect, stimulate, simulate\\
+47 & \ghrepo{LFPy}{LFPy} & Biophysical neurons and fields & membrane current, extracellular field, electrode sample\\
+48 & \ghrepo{jonescompneurolab}{hnn-core} & Cortical circuit biophysics & synaptic drive, dendritic integration, field generation\\
+49 & \ghrepo{neurolib-dev}{neurolib} & Neural mass/whole-brain dynamics & local dynamics, network coupling, delayed propagation\\
+50 & \ghrepo{NeuralEnsemble}{Nengo} & Neural dynamical systems & encode, transform, filter, learn\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{A preliminary atlas record}
+
+For each repository the atlas stores a single record separating the raw
+mechanisms named by the project from their normalized Plexus contracts, together
+with the evidence and validation status:
+
+\begin{lstlisting}[style=yaml,caption={One atlas record per repository: raw mechanisms are separated from their normalized Plexus contracts, with evidence and validation status.},label=lst:atlas-record]
+repository: MathCancer/PhysiCell
+paper: DOI-or-PMID
+model_family: off_lattice_multicellular
+scale:
+  - cell
+  - tissue
+sets:
+  - cell
+  - substrate_voxel
+fields:
+  - oxygen
+  - signalling_substrate
+maps:
+  - cell_cell_neighborhood
+  - cell_voxel_sampling
+operators_raw:
+  - cell_cell_force
+  - phenotype_update
+  - cell_division
+  - apoptosis
+  - substrate_secretion
+  - substrate_uptake
+operators_normalized:
+  - repel
+  - adhere
+  - update_phenotype
+  - divide
+  - die
+  - produce
+  - consume
+evidence:
+  paper_section: ...
+  code_path: ...
+status: candidate | inspected | normalized | implemented
+\end{lstlisting}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{What this corpus should reveal}
+
+The fifty repositories are not fifty independent vocabularies. They repeatedly
+implement the same mechanisms under different names and numerical schemes. A
+preliminary normalization should therefore distinguish the biological mechanism
+from its numerical implementation while preserving a single operator contract.
+For instance, cell division appears as
+
+\begin{itemize}
+\item \textbf{Mechanism:} \code{divide}.
+\item \textbf{Implementations:} vertex split, CPM mitosis, off-lattice daughter
+insertion.
+\item \textbf{Contract:} one cell state and geometry $\to$ two valid
+daughter-cell states and an updated neighbourhood.
+\end{itemize}
+
+Likewise, \code{diffuse} should remain one operator contract even when
+implemented by finite differences, finite volumes, stochastic particles or a
+neural implicit field.
+
+Source-level extraction would begin with twelve high-yield representatives ---
+PhysiCell, CompuCell3D, Chaste, Tissue Forge, BioDynaMo, CellGPU, Tyssue,
+Artistoo, ReaDDy, Smoldyn, VCell and NEURON. Together they span most anticipated
+Plexus relation classes: set\,$\to$\,set, set\,$\to$\,field, field\,$\to$\,set,
+field\,$\to$\,field, topology change, containment and cross-scale coupling. The
+list is broad enough to begin measuring operator \emph{saturation}: after each
+repository we record how many genuinely new normalized contracts appear versus
+aliases of contracts already registered. Saturation --- new frameworks
+contributing implementations rather than new contracts --- is the empirical
+signal that the operator algebra of the main text is complete.
 
 \end{document}
