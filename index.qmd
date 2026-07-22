@@ -948,12 +948,12 @@ schedule:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/fig4_labyrinth_v.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/fig4_coral_v.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">labyrinth<span class="sim-spec"><pre>general:
-  name: coupled3d_fig4_labyrinth_v
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_coral_v
   seed: 0
-  n_frames: 5000
+  n_frames: 3000
   dt: 0.02
   boundary: free
   dim: 3
@@ -1004,14 +1004,14 @@ operators:
   at: cell
   d_a: 0.08
   d_h: 0.16
-  chi: 5.6
+  chi: 9.8
   norm: false
 - op: react
   at: cell
   implementation: gray_scott
-  F: 0.029
-  kk: 0.054
-  rate: 20.0
+  F: 0.058
+  kk: 0.063
+  rate: 35.0
 - op: growth
   at: cell
   block: v0
@@ -1058,7 +1058,7 @@ schedule:
 - surface_lloyd
 - voronoi_tension_3d
 - membrane_bending</pre></span></span>
-      <span class="sim-cap">a labyrinth pattern draws the shell into a lobed, budding shape</span>
+      <span class="sim-cap">a Gray–Scott coral pattern wanders across a deformable vertex shell, gently rippling its surface</span>
     </figcaption>
   </figure>
 </div>
@@ -2361,6 +2361,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
