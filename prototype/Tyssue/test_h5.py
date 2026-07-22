@@ -16,12 +16,13 @@ from tyssue_diag import hollow_metric, hollow_flags
 from tyssue_topology_ops3d import rings_from_flat_3d
 import run_tyssue_fig5 as F
 
-CELLS, FR = 800, 250
+CELLS, FR = 800, 180   # shorter for fast iteration (the vth=2.5 bulge regime is slow -> keep vth low/fast)
 
 
 def score(name, cone, rate, vth):
     verts, es, et, ef, nF = build_sphere_mesh(CELLS, F.RADIUS, F.JITTER, F.SEED); Nv = verts.shape[0]
-    sim, _ = F.make_spec(name, CELLS, FR, 5, cone, rate, 0.15, 0.0, vth, 4.0, 4, 12, int(Nv * 4), int(nF * 4))  # rho=0
+    # rho=0 + max_cycle=inf -> body is truly VOLUME-LOCKED (no growth, no forced division); only cones grow
+    sim, _ = F.make_spec(name, CELLS, FR, 5, cone, rate, 0.15, 0.0, vth, 4.0, 0, 10 ** 9, int(Nv * 4), int(nF * 4))
     Hf, out = engine_run(sim, device="cpu")
     emesh = Hf.level("vertex")._mesh; hist = emesh.get("hist"); posf = out["sets"]["vertex"]["pos"]
     chemf = out["sets"]["cell"]["state"]["chem"]; T = posf.shape[0]
@@ -36,6 +37,7 @@ def score(name, cone, rate, vth):
     print(f"{name:16s} cells->{mt['nF']:4d}  protr={protr:.3f}  area_cv={area_cv:.3f}  hollow={hollow:.3f}  spots={spots}", flush=True)
 
 
-score("H5a_bulge",  12.0, 0.05, 2.5)   # rho=0, moderate bulge
-score("H5a_prolif", 12.0, 0.05, 1.5)   # rho=0, pure uniform proliferation (does incompressible body protrude it?)
-score("H5a_narrow",  8.0, 0.06, 2.0)   # rho=0, narrow+concentrated
+# fast conditions first: does a volume-locked body force protrusion with UNIFORM cells (vth=1.5)?
+score("H5_prolif12", 12.0, 0.05, 1.5)   # rho=0, uniform, cone 12
+score("H5_prolif8",   8.0, 0.06, 1.5)   # rho=0, uniform, narrow cone 8 (more concentrated)
+score("H5_bulge18",  18.0, 0.05, 2.0)   # rho=0, some bulge, wider -- contrast test
