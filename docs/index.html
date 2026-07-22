@@ -892,285 +892,349 @@ schedule:   # the order the operators run each frame
 </div>
 
 <h3 class="anchored">Turing × vertex — patterning &amp; shaping a growing tissue</h3>
-<p class="opk">Growth, patterning, and shaping on the <b>true vertex</b> tissue (Tyssue) above: a vesicle grows and divides into a closed shell of cells, a Gray–Scott coral pattern rides a sheet as it grows to a few thousand cells, and localized growth buckles a flat sheet out of plane into a tube that caps over — a mushroom.</p>
-<p class="opk-ref">Reference — growth, reaction–diffusion, and morphogenesis on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex model.</p>
+<p class="opk">Reaction–diffusion coupled to vesicle mechanics on a deformable vertex shell: the same Gray–Scott chemistry both <b>colours</b> the tissue and <b>drives its shape</b>, so the pattern and the surface buckle together. Three regimes, each shaping the shell a different way.</p>
+<p class="opk-ref">Reference — reaction–diffusion coupled to a vertex-model vesicle (our Turing × vertex prototype).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
-    <video src="gallery/tyssue_vesicle_grow_divide.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/fig4_coral_v.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_ves_vesicle_grow_divide_500f   # run name (-&gt; archive/&lt;name&gt;/)
-  seed: 0   # RNG seed
-  n_frames: 500   # number of simulation frames
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  record_cap: 502
-  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
-  dim: 3   # spatial dimension
-  world:   # world box size
-  - 30.0
-  - 30.0
-  - 30.0
-sets:   # the biological SETS (Levels) of the model
-  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 2368   # buffer size (max elements)
-fields: {}   # continuous fields
-operators:   # the operators to instantiate (each realises one mechanism)
-- op: seed_mesh_3d
-  at: vertex   # the set this operator acts on
-  n_cells: 150
-  radius: 5.0
-  jitter: 0.18   # initial positional disorder
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  seed: 0   # RNG seed
-  before_frame: 1   # run this operator once, before the given frame
-- op: vesicle_growth
-  at: vertex   # the set this operator acts on
-  rate: 0.003   # growth rate of the target area per frame
-  every: 1   # run this operator every N frames
-- op: shape_energy_3d
-  at: vertex   # the set this operator acts on
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  K_A: 1.0   # area-elasticity stiffness
-  K_P: 1.0   # perimeter-elasticity stiffness
-  Lambda: 0.5
-  Gamma: 0.1
-  K_V: 1.0
-  K_R: 0.4
-  mu: 1.0   # mobility (overdamped)
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
-  eta: 0.08   # relaxation step size
-  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
-- op: reconnect_t1_3d
-  at: vertex   # the set this operator acts on
-  l_th_frac: 0.35
-  every: 2   # run this operator every N frames
-  max_flips: 20
-- op: divide_3d
-  at: vertex   # the set this operator acts on
-  factor: 2.0
-  reset_noise: 0.12
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  every: 2   # run this operator every N frames
-  max_div: 10
-- op: topo_snapshot_3d
-  at: vertex   # the set this operator acts on
-  every: 1   # run this operator every N frames
-schedule:   # the order the operators run each frame
-- seed_mesh_3d
-- vesicle_growth
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">a Tyssue vesicle proliferates — every cell grows and divides until the sheet is a closed shell of ~1000 cells</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/tyssue_rd_coral_grow.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">coral (growing)<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_rd_rd_coral_grow_long   # run name (-&gt; archive/&lt;name&gt;/)
-  seed: 0   # RNG seed
-  n_frames: 500   # number of simulation frames
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  record_cap: 502
-  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
-  dim: 3   # spatial dimension
-  world:   # world box size
-  - 40.0
-  - 40.0
-  - 40.0
-sets:   # the biological SETS (Levels) of the model
-  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 2960   # buffer size (max elements)
-  cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
-    n: 1500   # buffer size (max elements)
-    state:   # per-element state blocks (name: {width, integration})
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_coral_v
+  seed: 0
+  n_frames: 3000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world:
+  - 48.0
+  - 48.0
+  - 48.0
+sets:
+  cell:
+    n: 600
+    buffer: 3000
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
       chem:
-        width: 2   # number of scalar columns in this state block
+        width: 2
         integration: first_order
-      cen:   # cell centroid (aggregate readout)
-        width: 3   # number of scalar columns in this state block
-      area:   # cell area (aggregate readout from vertices)
-        width: 1   # number of scalar columns in this state block
-fields: {}   # continuous fields
-operators:   # the operators to instantiate (each realises one mechanism)
-- op: seed_mesh_3d
-  at: vertex   # the set this operator acts on
-  n_cells: 150
-  radius: 5.0
-  jitter: 0.16   # initial positional disorder
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  seed: 0   # RNG seed
-  before_frame: 1   # run this operator once, before the given frame
-  vseed_cv: 0.4
-- op: vesicle_growth
-  at: vertex   # the set this operator acts on
-  rate: 0.003   # growth rate of the target area per frame
-  every: 1   # run this operator every N frames
-  max_scale: 2.5
-- op: shape_energy_3d
-  at: vertex   # the set this operator acts on
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  K_A: 1.0   # area-elasticity stiffness
-  K_P: 1.0   # perimeter-elasticity stiffness
-  Gamma: 0.1
-  Lambda: 0.5
-  K_V: 1.0
-  K_R: 0.4
-  mu: 1.0   # mobility (overdamped)
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
-  eta: 0.08   # relaxation step size
-  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
-- op: reconnect_t1_3d
-  at: vertex   # the set this operator acts on
-  l_th_frac: 0.35
-  every: 2   # run this operator every N frames
-  max_flips: 20
-- op: divide_3d
-  at: vertex   # the set this operator acts on
-  factor: 2.0
-  reset_noise: 0.12
-  cycle_cv: 0.4
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  every: 2   # run this operator every N frames
-  max_div: 10
-  cell_set: cell
-- op: cell_geometry_3d
-  at: cell   # the set this operator acts on
-- op: cell_adjacency
-  at: cell   # the set this operator acts on
-- op: cell_rd_seed
-  at: cell   # the set this operator acts on
-  seed: 0   # RNG seed
-  before_frame: 3   # run this operator once, before the given frame
-  mode: scatter
-  seed_frac: 0.06
-- op: cell_diffuse
-  at: cell   # the set this operator acts on
+        boundary: free
+      v0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: tissue_seed_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+  v0: 1.441717262131954
+  a_mean: 1.0
+  h_mean: 3.0
+  cnoise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  v0noise: 0.0
+  before_frame: 1
+- op: voronoi_graph_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+- op: graph_diffuse
+  at: cell
   d_a: 0.08
   d_h: 0.16
-  chi: 1.3
-- op: cell_react
-  at: cell   # the set this operator acts on
+  chi: 9.8
+  norm: false
+- op: react
+  at: cell
   implementation: gray_scott
-  F: 0.055
-  kk: 0.062
-  rate: 1.0   # growth rate of the target area per frame
-- op: topo_snapshot_3d
-  at: vertex   # the set this operator acts on
-  every: 1   # run this operator every N frames
-schedule:   # the order the operators run each frame
-- seed_mesh_3d
-- vesicle_growth
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- cell_geometry_3d
-- cell_adjacency
-- cell_rd_seed
-- cell_diffuse
-- cell_react
-- topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">a Gray–Scott coral pattern rides a Tyssue tissue as it grows and divides to a few thousand cells</span>
+  F: 0.058
+  kk: 0.063
+  rate: 35.0
+- op: growth
+  at: cell
+  block: v0
+  lam_ref: 0.15
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+  cap: 2.0
+  lam_gain: 1.0
+- op: divide_2x
+  at: cell
+  block: v0
+  ratio: 2.0
+  offset: 0.12
+  reset_noise: 0.0
+- op: surface_lloyd
+  at: cell
+  k_lloyd: 1.5
+  dt: 0.02
+  every: 1
+- op: voronoi_tension_3d
+  at: cell
+  s0: 5.3
+  radius: 6.0
+  V0: 1.441717262131954
+  K_V: 10.0
+  K_S: 1.0
+  mu: 0.02
+  lumen: true
+  vmax: 1.0
+  compile: false
+  retess_every: 1
+- op: membrane_bending
+  at: cell
+  k_bend: 0.35
+  vmax: 1.0
+schedule:
+- tissue_seed_3d
+- voronoi_graph_3d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- surface_lloyd
+- voronoi_tension_3d
+- membrane_bending</pre></span></span>
+      <span class="sim-cap">a Gray–Scott coral pattern wanders across a deformable vertex shell, gently rippling its surface</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
-    <video src="gallery/tyssue_tube_mushroom.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <video src="gallery/fig4_holes_v.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">mushroom<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_tube_tube_1   # run name (-&gt; archive/&lt;name&gt;/)
-  seed: 0   # RNG seed
-  n_frames: 500   # number of simulation frames
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  record_cap: 502
-  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
-  dim: 3   # spatial dimension
-  world:   # world box size
-  - 60.0
-  - 60.0
-  - 60.0
-sets:   # the biological SETS (Levels) of the model
-  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
-    n: 3980   # buffer size (max elements)
-  cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
-    n: 2000   # buffer size (max elements)
-    state:   # per-element state blocks (name: {width, integration})
+      <span class="sim-name" tabindex="0">holes<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_holes_v
+  seed: 0
+  n_frames: 5000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world:
+  - 48.0
+  - 48.0
+  - 48.0
+sets:
+  cell:
+    n: 600
+    buffer: 3000
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
       chem:
-        width: 2   # number of scalar columns in this state block
+        width: 2
         integration: first_order
-      cen:   # cell centroid (aggregate readout)
-        width: 3   # number of scalar columns in this state block
-      area:   # cell area (aggregate readout from vertices)
-        width: 1   # number of scalar columns in this state block
-fields: {}   # continuous fields
-operators:   # the operators to instantiate (each realises one mechanism)
-- op: seed_mesh_3d
-  at: vertex   # the set this operator acts on
-  n_cells: 400
-  radius: 5.0
-  jitter: 0.16   # initial positional disorder
-  p0: 3.9   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  seed: 0   # RNG seed
-  before_frame: 1   # run this operator once, before the given frame
-  vseed_cv: 0.4
-- op: cell_geometry_3d
-  at: cell   # the set this operator acts on
-- op: cell_rd_seed
-  at: cell   # the set this operator acts on
-  mode: patch
-  patch_z: 0.9
-- op: morphogen_growth_3d
-  at: vertex   # the set this operator acts on
-  cell_set: cell
-  rate: 0.006   # growth rate of the target area per frame
-  a_sw: 0.5
-  hill: 4.0
-  cap: 4.0
-- op: shape_energy_3d
-  at: vertex   # the set this operator acts on
-  p0: 3.9   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  K_A: 1.0   # area-elasticity stiffness
-  K_P: 1.0   # perimeter-elasticity stiffness
-  Gamma: 0.05
-  Lambda: 0.2
-  K_V: 1.0
-  K_R: 0.02
-  mu: 1.0   # mobility (overdamped)
-  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 40   # inner bounded-Euler relaxation steps per frame
-  eta: 0.08   # relaxation step size
-  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
-- op: reconnect_t1_3d
-  at: vertex   # the set this operator acts on
-  l_th_frac: 0.28
-  every: 1   # run this operator every N frames
-  max_flips: 50
-- op: divide_3d
-  at: vertex   # the set this operator acts on
-  factor: 2.0
-  reset_noise: 0.12
-  cycle_cv: 0.4
-  p0: 3.9   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
-  every: 2   # run this operator every N frames
-  max_div: 20
-  cell_set: cell
-  g1_ramp: false
-- op: topo_snapshot_3d
-  at: vertex   # the set this operator acts on
-  every: 1   # run this operator every N frames
-schedule:   # the order the operators run each frame
-- seed_mesh_3d
-- cell_geometry_3d
-- cell_rd_seed
-- morphogen_growth_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">localized growth buckles a flat sheet out of plane into a tube that caps over — a mushroom</span>
+        boundary: free
+      v0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: tissue_seed_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+  v0: 1.441717262131954
+  a_mean: 1.0
+  h_mean: 3.0
+  cnoise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  v0noise: 0.0
+  before_frame: 1
+- op: voronoi_graph_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 6.5
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.039
+  kk: 0.058
+  rate: 25.0
+- op: growth
+  at: cell
+  block: v0
+  lam_ref: 0.15
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+  cap: 2.0
+  lam_gain: 1.0
+- op: divide_2x
+  at: cell
+  block: v0
+  ratio: 2.0
+  offset: 0.12
+  reset_noise: 0.0
+- op: surface_lloyd
+  at: cell
+  k_lloyd: 1.5
+  dt: 0.02
+  every: 1
+- op: voronoi_tension_3d
+  at: cell
+  s0: 5.3
+  radius: 6.0
+  V0: 1.441717262131954
+  K_V: 10.0
+  K_S: 1.0
+  mu: 0.02
+  lumen: true
+  vmax: 1.0
+  compile: false
+  retess_every: 1
+- op: membrane_bending
+  at: cell
+  k_bend: 0.35
+  vmax: 1.0
+schedule:
+- tissue_seed_3d
+- voronoi_graph_3d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- surface_lloyd
+- voronoi_tension_3d
+- membrane_bending</pre></span></span>
+      <span class="sim-cap">the spots/holes regime — high-concentration caps push the shell outward into rounded bulges</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/fig4_labyrinth_v.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">labyrinth<span class="sim-spec"><pre>general:
+  name: coupled3d_fig4_labyrinth_v
+  seed: 0
+  n_frames: 5000
+  dt: 0.02
+  boundary: free
+  dim: 3
+  world:
+  - 48.0
+  - 48.0
+  - 48.0
+sets:
+  cell:
+    n: 600
+    buffer: 3000
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: free
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+      v0:
+        width: 1
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: tissue_seed_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+  v0: 1.441717262131954
+  a_mean: 1.0
+  h_mean: 3.0
+  cnoise: 0.04
+  seed_mode: scatter
+  seed_frac: 0.04
+  v0noise: 0.0
+  before_frame: 1
+- op: voronoi_graph_3d
+  at: cell
+  radius: 6.0
+  lumen: true
+- op: graph_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 0.16
+  chi: 5.6
+  norm: false
+- op: react
+  at: cell
+  implementation: gray_scott
+  F: 0.029
+  kk: 0.054
+  rate: 20.0
+- op: growth
+  at: cell
+  block: v0
+  lam_ref: 0.15
+  rho_lam: 1.0
+  a_sw: 1.0
+  hill: 2.0
+  cap: 2.0
+  lam_gain: 1.0
+- op: divide_2x
+  at: cell
+  block: v0
+  ratio: 2.0
+  offset: 0.12
+  reset_noise: 0.0
+- op: surface_lloyd
+  at: cell
+  k_lloyd: 1.5
+  dt: 0.02
+  every: 1
+- op: voronoi_tension_3d
+  at: cell
+  s0: 5.3
+  radius: 6.0
+  V0: 1.441717262131954
+  K_V: 10.0
+  K_S: 1.0
+  mu: 0.02
+  lumen: true
+  vmax: 1.0
+  compile: false
+  retess_every: 1
+- op: membrane_bending
+  at: cell
+  k_bend: 0.35
+  vmax: 1.0
+schedule:
+- tissue_seed_3d
+- voronoi_graph_3d
+- graph_diffuse
+- react
+- growth
+- divide_2x
+- surface_lloyd
+- voronoi_tension_3d
+- membrane_bending</pre></span></span>
+      <span class="sim-cap">a labyrinth pattern draws the shell into a lobed, budding shape</span>
     </figcaption>
   </figure>
 </div>
