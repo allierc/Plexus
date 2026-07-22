@@ -14,10 +14,17 @@ import plexus.operators  # noqa
 import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d  # noqa
 import plexus.schema as S
 from plexus.engine import run as engine_run
-from tyssue_ops3d import build_sphere_mesh
+from tyssue_ops3d import build_sphere_mesh, face_geometry_3d
 from tyssue_diag import hollow_metric, hollow_flags
 from tyssue_topology_ops3d import rings_from_flat_3d
 import run_tyssue_fig5 as F
+import torch
+
+
+def vol_cv(mt, pt):   # cleaner uniformity metric than area_cv when tubes exist (area confounds with geometry)
+    _, _, _, vf = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(np.asarray(mt["E_srce"])),
+                                   torch.as_tensor(np.asarray(mt["E_trgt"])), torch.as_tensor(np.asarray(mt["E_face"])), mt["nF"])
+    vf = vf.numpy(); vf = vf[np.abs(vf) > 1e-9]; return float(vf.std() / (np.abs(vf.mean()) + 1e-9))
 
 R, J, SEED = 5.0, 0.16, 0
 CELLS, FR = 400, 300
@@ -63,9 +70,12 @@ def run(name, chi, rho, vth, rate, a_sw):
     rad = np.array([np.linalg.norm(pt[r].mean(0)) if (r is not None and len(r)) else 0 for r in rings]); rad = rad[rad > 0]
     protr = np.percentile(rad, 95) / (np.median(rad) + 1e-9)
     hollow = float(hollow_flags(pt, mt)[2]["frac"]); spots = F.count_spots(aT, mt, float(np.percentile(aT, 70)))
-    print(f"{name:10s} chi={chi} rho={rho} vth={vth}  cells->{mt['nF']:4d}  protr={protr:.3f}  area_cv={area_cv:.3f}  "
-          f"hollow={hollow:.3f}  spots={spots}  a_range=[{aT.min():.2f},{aT.max():.2f}]", flush=True)
+    vc = vol_cv(mt, pt)
+    print(f"{name:10s} chi={chi} rho={rho} vth={vth}  cells->{mt['nF']:4d}  protr={protr:.3f}  vol_cv={vc:.3f}  "
+          f"area_cv={area_cv:.3f}  hollow={hollow:.3f}  spots={spots}  a_range=[{aT.min():.2f},{aT.max():.2f}]", flush=True)
 
 
-run("h6a", 4.0, 0.10, 2.0, 0.04, 1.8)
-run("h6b", 6.0, 0.05, 2.5, 0.05, 1.8)
+# H6 RD-front coupling: low rho (near-locked body -> protrusion, per H5) + activator boost at the RD spots.
+# a_sw~2.5 matches the Brusselator activator (peaks ~4). Judge uniformity by vol_cv, not area_cv.
+run("h6a_lowrho", 4.0, 0.03, 1.5, 0.05, 2.5)   # near-locked body, uniform cap
+run("h6b_midrho", 4.0, 0.10, 1.5, 0.05, 2.5)   # some body cycling (homogenise) -- does it still protrude?
