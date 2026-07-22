@@ -231,6 +231,10 @@ class MorphogenGrowth3D(Structural):
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
         self.every = int(params.get("every", 1)); self._k = 0
+        # OKUDA uniform-cell mode: growth rate lambda = rate*(rho + Hill(a)); rho = baseline so ALL cells
+        # cycle (the activator sets the RATE, not the size), and v_eq is capped at vth_frac*v_ref so every
+        # cell oscillates in [~2/3, vth_frac]*v_ref -> uniform. rho=0 (default) = legacy activator-only bulge.
+        self.rho = float(params.get("rho", 0.0)); self.vth_frac = float(params.get("vth_frac", 1.35))
 
     def forward(self, H, mask=None):
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
@@ -249,7 +253,13 @@ class MorphogenGrowth3D(Structural):
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
-        s = torch.clamp(m["mg_scale"] * (1.0 + self.rate * hillv), max=self.cap)     # grow while activated, capped
+        s = m["mg_scale"] * (1.0 + self.rate * (self.rho + hillv))    # lambda = rate*(rho baseline + activator)
+        if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
+            v_ref = float(m.get("v_ref", 1.0))                       # vth_frac*v_ref so it cycles (divides), not bulge
+            s_cap = (self.vth_frac * v_ref / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
+            s = torch.minimum(s, s_cap.clamp(min=1.0))
+        else:
+            s = torch.clamp(s, max=self.cap)                        # legacy: activator-only bulge to `cap`
         m["mg_scale"] = s
         m["A0"] = m["A0_init"] * (s * s)                         # keep A0/P0/v_eq consistent (area~R^2, vol~R^3)
         m["P0"] = m["P0_init"] * s

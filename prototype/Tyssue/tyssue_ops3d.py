@@ -174,6 +174,8 @@ class SeedMesh3D(Structural):
                          V0f=vf.detach().clone(),               # PER-CELL target wedge volume (v_eq per cell)
                          Vbirth=vf.detach().clone(),            # volume at birth -> cell divides when it doubles
                          V0=float(vf.sum()),
+                         v_ref=float(vf.median()),              # REFERENCE cell volume (Okuda v_ref) -> uniform cells:
+                         #   morphogen growth caps v_eq at (4/3)v_ref, cells cycle in [2/3,4/3]v_ref centred on v_ref
                          R0=float(np.linalg.norm(verts, axis=1).mean()), verts0=verts,
                          # RESERVOIR fixed sizes for the compiled mechanics (verts<=Nbuf; faces~V/2; half-edges~3V)
                          Nv_max=Nbuf, nF_max=Nbuf // 2 + 64, Ebuf=4 * Nbuf)
@@ -403,6 +405,11 @@ class Divide3D(Structural):
         # cap (the sole source of hollow cells -- growth alone never makes one). Uses the coeffs stashed
         # on m["mech"] by shape_energy_3d. 0 = off (default); the coral/tube fix sets it > 0.
         self.local_relax = int(params.get("local_relax", 0))
+        # DIVISION MODEL = volume-primary + bounded DURATION (Okuda: divide at 2x volume, but the cell-cycle
+        # PERIOD is constrained). min_cycle: a cell may not divide before this many division-calls since birth
+        # (a fast-growing tip cell can't divide instantly -> tighter size CV); max_cycle: force division after
+        # this many calls even if volume < 2x (a stalled cell still cycles). 0/inf = pure volume-doubling.
+        self.min_cycle = int(params.get("min_cycle", 0)); self.max_cycle = int(params.get("max_cycle", 10 ** 9))
         self.cell_set = params.get("cell_set", None)             # if set, daughters inherit the mother's cell state (morphogen)
         # G1 RAMP (SimuCell3D/tyssue "birth-at-target"): set each daughter's TARGET volume v_eq to its ACTUAL
         # birth volume instead of mother_target/2. The division trigger is ACTUAL volume (vf>=2*Vbirth) but v_eq
@@ -450,8 +457,15 @@ class Divide3D(Structural):
             djit = self._fresh_djit(np.random.default_rng(777), nF).tolist()
         else:
             djit = djit.detach().cpu().numpy().tolist()
-        cand = [f for f in range(nF) if alive[f] > 0 and vf[f] >= self.factor * djit[f] * Vbirth[f]
-                and rings[f] is not None and len(rings[f]) >= 4]
+        age = m.get("age")                                       # per-cell age in division-calls since birth
+        age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
+        # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
+        def _ready(f):
+            if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
+                return False
+            vol_ok = vf[f] >= self.factor * djit[f] * Vbirth[f]
+            return (vol_ok and age[f] >= self.min_cycle) or (age[f] >= self.max_cycle)
+        cand = [f for f in range(nF) if _ready(f)]
         rng.shuffle(cand)                                        # unbiased when more cells are ready than the cap
         cap_div = self.max_div if self.max_div_frac <= 0 else max(self.max_div, int(self.max_div_frac * nF))
         cand = cand[:cap_div]                                    # (else cand[:n] sweeps in pole-to-pole face order)
@@ -480,18 +494,20 @@ class Divide3D(Structural):
             else:
                 a0d = A0[f] * 0.5; v0d = V0f[f] * 0.5             # legacy: half the mother's targets
             A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
-            djit[f] = self._fresh_djit(rng)                       # fresh (desync'd) cell-cycle thresholds
+            djit[f] = self._fresh_djit(rng); age[f] = 0           # fresh (desync'd) thresholds; reset cell-cycle age
             A0.append(a0d); V0f.append(v0d); Vbirth.append(half); alive.append(1.0)   # daughter B
-            djit.append(self._fresh_djit(rng))
+            djit.append(self._fresh_djit(rng)); age.append(0)
             daughter_mothers.append(f)
             ndone += 1
         if ndone == 0:
+            m["age"] = torch.as_tensor(np.asarray(age), dtype=dt, device=dev)   # persist ageing even without division
             return {}
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         A0a = np.array([A0[i] for i in keep], np.float64)
         V0fa = np.array([V0f[i] for i in keep], np.float64)
         Vba = np.array([Vbirth[i] for i in keep], np.float64)
         dja = np.array([djit[i] for i in keep], np.float64)
+        agea = np.array([age[i] for i in keep], np.float64)
         alv = np.array([alive[i] for i in keep], np.float64)
         P0a = self.p0 * np.sqrt(np.maximum(A0a, 1e-9))
         Nv2 = len(pos)
@@ -508,6 +524,7 @@ class Divide3D(Structural):
         m["V0f"] = torch.as_tensor(V0fa, dtype=dt, device=dev)
         m["Vbirth"] = torch.as_tensor(Vba, dtype=dt, device=dev)
         m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
+        m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
