@@ -159,6 +159,20 @@ def _draw_cross(ax, pos, mesh, p0, level=0.0, act=None, inner=INNER, Lbox=None, 
     ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_aspect("equal"); ax.axis("off")
 
 
+def make_movie_axes(figm):
+    """Movie layout: a full-frame rotating 3D shell + a SMALL bottom-right cross-section INSET (no bounding
+    box) so the movie also reads as a true MONOLAYER (wall + lumen), the way strip.png's bottom row does."""
+    axm = figm.add_subplot(111, projection="3d"); figm.subplots_adjust(0, 0, 1, 1)
+    axin = figm.add_axes([0.66, 0.0, 0.34, 0.34]); axin.set_facecolor("none"); axin.patch.set_alpha(0.0)
+    return axm, axin
+
+
+def draw_movie_frame(axm, axin, pt, mt, p0, azim, act, L3, L2, cross_axis=1):
+    """Draw one movie frame: rotating 3D shell (axm) + the cross-section inset (axin, no box)."""
+    _draw(axm, pt, mt, p0, azim=azim, act=act, Lbox=L3)
+    _draw_cross(axin, pt, mt, p0, act=act, Lbox=L2, axis=cross_axis); axin.axis("off")
+
+
 def diagnostics(pos_traj, mesh, p0):
     def stats(pos):
         _, area, _, shape = face_polygons_3d(pos, mesh)
