@@ -1,0 +1,109 @@
+general:   # run-level settings
+  name: tyssue_round   # run name (-> archive/<name>/)
+  seed: 0   # RNG seed
+  n_frames: 450   # number of simulation frames
+  dt: 0.02   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 452
+  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
+  dim: 3   # spatial dimension
+  world:   # world box size
+  - 80.0
+  - 80.0
+  - 80.0
+sets:   # the biological SETS (Levels) of the model
+  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
+    n: 26000   # buffer size (max elements)
+  cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
+    n: 13000   # buffer size (max elements)
+    state:   # per-element state blocks (name: {width, integration})
+      chem:
+        width: 2   # number of scalar columns in this state block
+        integration: first_order
+      cen:   # cell centroid (aggregate readout)
+        width: 3   # number of scalar columns in this state block
+      area:   # cell area (aggregate readout from vertices)
+        width: 1   # number of scalar columns in this state block
+fields: {}   # continuous fields
+operators:   # the operators to instantiate (each realises one mechanism)
+- op: load_mesh_3d
+  at: vertex   # the set this operator acts on
+  cell_set: cell
+  ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/prototype/Tyssue/archive/smoke_hom/ckpt.npz
+  before_frame: 1   # run this operator once, before the given frame
+- op: cell_geometry_3d
+  at: cell   # the set this operator acts on
+- op: cell_adjacency
+  at: cell   # the set this operator acts on
+- op: cell_rd_seed
+  at: cell   # the set this operator acts on
+  seed: 0   # RNG seed
+  before_frame: 3   # run this operator once, before the given frame
+  mode: noise
+  A: 1.0
+  B: 3.0
+  noise: 0.04
+- op: cell_diffuse
+  at: cell   # the set this operator acts on
+  d_a: 0.05
+  d_h: 0.7
+  chi: 4.0
+- op: cell_react
+  at: cell   # the set this operator acts on
+  implementation: brusselator
+  gamma: 0.3
+  A: 1.0
+  B: 3.0
+- op: morphogen_growth_3d
+  at: vertex   # the set this operator acts on
+  cell_set: cell
+  rate: 0.03   # growth rate of the target area per frame
+  a_sw: 3.5
+  hill: 4.0
+  rho: 0.0
+  vth_frac: 1.4
+- op: shape_energy_3d
+  at: vertex   # the set this operator acts on
+  p0: 3.9   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  K_A: 1.0   # area-elasticity stiffness
+  K_P: 1.0   # perimeter-elasticity stiffness
+  Gamma: 0.05
+  Lambda: 0.2
+  K_V: 3.0
+  K_R: 0.02
+  mu: 1.0   # mobility (overdamped)
+  dt: 0.02   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
+  eta: 0.08   # relaxation step size
+  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
+- op: reconnect_t1_3d
+  at: vertex   # the set this operator acts on
+  l_th_frac: 0.28
+  every: 1   # run this operator every N frames
+  max_flips: 300
+- op: divide_3d
+  at: vertex   # the set this operator acts on
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.4
+  p0: 3.9   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  every: 2   # run this operator every N frames
+  max_div: 80
+  max_div_frac: 0.02
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+- op: topo_snapshot_3d
+  at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
+schedule:   # the order the operators run each frame
+- load_mesh_3d
+- cell_geometry_3d
+- cell_adjacency
+- cell_rd_seed
+- cell_diffuse
+- cell_react
+- morphogen_growth_3d
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
