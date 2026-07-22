@@ -743,7 +743,7 @@ schedule:   # the order the operators run each frame
     <video src="gallery/tyssue_vh_grow_divide.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_veshom_vh_K4_cv15_d4   # run name (-&gt; archive/&lt;name&gt;/)
+  name: tyssue_vh_K4_cv15_d4   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
   n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
@@ -774,7 +774,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   n_cells: 150
   radius: 5.0
   jitter: 0.18   # initial positional disorder
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  p0: 3.5   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
   vseed_cv: 0.15
@@ -784,22 +784,22 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: vertex   # the set this operator acts on
   cell_set: cell
   rate: 0.03   # growth rate of the target area per frame
-  a_sw: 0.5
+  a_sw: 50.0
   hill: 4.0
   rho: 1.0
   vth_frac: 1.4
 - op: shape_energy_3d
   at: vertex   # the set this operator acts on
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  p0: 3.5   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   K_A: 1.0   # area-elasticity stiffness
   K_P: 1.0   # perimeter-elasticity stiffness
-  Gamma: 0.1
-  Lambda: 0.5
-  K_V: 4.0
+  Gamma: 0.4
+  Lambda: 3.0
+  K_V: 2.0
   K_R: 0.4
   mu: 1.0   # mobility (overdamped)
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
+  relax_iters: 30   # inner bounded-Euler relaxation steps per frame
   eta: 0.08   # relaxation step size
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
 - op: reconnect_t1_3d
@@ -812,7 +812,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   factor: 2.0
   reset_noise: 0.12
   cycle_cv: 0.15
-  p0: 3.72   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  p0: 3.5   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
   every: 2   # run this operator every N frames
   max_div: 12
   max_div_frac: 0.03
@@ -948,117 +948,120 @@ schedule:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/fig4_coral_v.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/tyssue_vh_rd_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
-  name: coupled3d_fig4_coral_v
-  seed: 0
-  n_frames: 3000
-  dt: 0.02
-  boundary: free
-  dim: 3
-  world:
-  - 48.0
-  - 48.0
-  - 48.0
-sets:
-  cell:
-    n: 600
-    buffer: 3000
-    state:
-      pos:
-        width: 3
-        integration: second_order_coordinate
-        boundary: free
-      vel:
-        width: 3
-        integration: second_order_rate
-        boundary: free
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:   # run-level settings
+  name: tyssue_vh_K4_cv15_d4_rd_coral   # run name (-&gt; archive/&lt;name&gt;/)
+  seed: 0   # RNG seed
+  n_frames: 500   # number of simulation frames
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 502
+  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
+  dim: 3   # spatial dimension
+  world:   # world box size
+  - 50.0
+  - 50.0
+  - 50.0
+sets:   # the biological SETS (Levels) of the model
+  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
+    n: 3552   # buffer size (max elements)
+  cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
+    n: 1800   # buffer size (max elements)
+    state:   # per-element state blocks (name: {width, integration})
       chem:
-        width: 2
+        width: 2   # number of scalar columns in this state block
         integration: first_order
-        boundary: free
-      v0:
-        width: 1
-        integration: first_order
-        boundary: free
-fields: {}
-operators:
-- op: tissue_seed_3d
-  at: cell
-  radius: 6.0
-  lumen: true
-  v0: 1.441717262131954
-  a_mean: 1.0
-  h_mean: 3.0
-  cnoise: 0.04
-  seed_mode: scatter
-  seed_frac: 0.04
-  v0noise: 0.0
-  before_frame: 1
-- op: voronoi_graph_3d
-  at: cell
-  radius: 6.0
-  lumen: true
-- op: graph_diffuse
-  at: cell
+      cen:   # cell centroid (aggregate readout)
+        width: 3   # number of scalar columns in this state block
+      area:   # cell area (aggregate readout from vertices)
+        width: 1   # number of scalar columns in this state block
+fields: {}   # continuous fields
+operators:   # the operators to instantiate (each realises one mechanism)
+- op: seed_mesh_3d
+  at: vertex   # the set this operator acts on
+  n_cells: 150
+  radius: 5.0
+  jitter: 0.18   # initial positional disorder
+  p0: 3.5   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  seed: 0   # RNG seed
+  before_frame: 1   # run this operator once, before the given frame
+  vseed_cv: 0.15
+- op: cell_geometry_3d
+  at: cell   # the set this operator acts on
+- op: cell_adjacency
+  at: cell   # the set this operator acts on
+- op: cell_rd_seed
+  at: cell   # the set this operator acts on
+  seed: 0   # RNG seed
+  before_frame: 3   # run this operator once, before the given frame
+  mode: scatter
+  seed_frac: 0.06
+- op: cell_diffuse
+  at: cell   # the set this operator acts on
   d_a: 0.08
   d_h: 0.16
-  chi: 9.8
-  norm: false
-- op: react
-  at: cell
+  chi: 1.3
+- op: cell_react
+  at: cell   # the set this operator acts on
   implementation: gray_scott
-  F: 0.058
-  kk: 0.063
-  rate: 35.0
-- op: growth
-  at: cell
-  block: v0
-  lam_ref: 0.15
-  rho_lam: 1.0
-  a_sw: 1.0
-  hill: 2.0
-  cap: 2.0
-  lam_gain: 1.0
-- op: divide_2x
-  at: cell
-  block: v0
-  ratio: 2.0
-  offset: 0.12
-  reset_noise: 0.0
-- op: surface_lloyd
-  at: cell
-  k_lloyd: 1.5
-  dt: 0.02
-  every: 1
-- op: voronoi_tension_3d
-  at: cell
-  s0: 5.3
-  radius: 6.0
-  V0: 1.441717262131954
-  K_V: 10.0
-  K_S: 1.0
-  mu: 0.02
-  lumen: true
-  vmax: 1.0
-  compile: false
-  retess_every: 1
-- op: membrane_bending
-  at: cell
-  k_bend: 0.35
-  vmax: 1.0
-schedule:
-- tissue_seed_3d
-- voronoi_graph_3d
-- graph_diffuse
-- react
-- growth
-- divide_2x
-- surface_lloyd
-- voronoi_tension_3d
-- membrane_bending</pre></span></span>
-      <span class="sim-cap">a Gray–Scott coral pattern wanders across a deformable vertex shell, gently rippling its surface</span>
+  F: 0.055
+  kk: 0.062
+  rate: 1.0   # growth rate of the target area per frame
+- op: morphogen_growth_3d
+  at: vertex   # the set this operator acts on
+  cell_set: cell
+  rate: 0.03   # growth rate of the target area per frame
+  a_sw: 50.0
+  hill: 4.0
+  rho: 1.0
+  vth_frac: 1.4
+- op: shape_energy_3d
+  at: vertex   # the set this operator acts on
+  p0: 3.5   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  K_A: 1.0   # area-elasticity stiffness
+  K_P: 1.0   # perimeter-elasticity stiffness
+  Gamma: 0.4
+  Lambda: 3.0
+  K_V: 2.0
+  K_R: 0.4
+  mu: 1.0   # mobility (overdamped)
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 30   # inner bounded-Euler relaxation steps per frame
+  eta: 0.08   # relaxation step size
+  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
+- op: reconnect_t1_3d
+  at: vertex   # the set this operator acts on
+  l_th_frac: 0.35
+  every: 2   # run this operator every N frames
+  max_flips: 30
+- op: divide_3d
+  at: vertex   # the set this operator acts on
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.15
+  p0: 3.5   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  every: 2   # run this operator every N frames
+  max_div: 12
+  max_div_frac: 0.03
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 12
+- op: topo_snapshot_3d
+  at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
+schedule:   # the order the operators run each frame
+- seed_mesh_3d
+- cell_geometry_3d
+- cell_adjacency
+- cell_rd_seed
+- cell_diffuse
+- cell_react
+- morphogen_growth_3d
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d</pre></span></span>
+      <span class="sim-cap">a Gray–Scott coral pattern rides the same growing vesicle — red stripes wander across the rounded cells</span>
     </figcaption>
   </figure>
 </div>
@@ -2361,6 +2364,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
