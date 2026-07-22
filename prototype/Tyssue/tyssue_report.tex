@@ -697,6 +697,24 @@ a mild cell-\emph{area} spread from the deterministic cell cycle.}
 \label{fig:hollow}
 \end{figure}
 
+\paragraph{Cell-size homogenisation --- a hypothesis-driven fix (2026-07-22).} On the growing, dividing
+vesicle the cells were too non-uniform (per-cell area CV $\approx\!0.6$; the tube-tip cell volume was
+$1.5\times$ the base with a huge spread, $1.56\pm2.45$ vs $1.07\pm0.35$). Rather than a grid search, three
+falsifiable hypotheses were tested one factor at a time (short $150$-cell/$180$-frame A/Bs, metric $=$
+per-cell area CV). \emph{H1 --- grow by proliferation, not inflation:} \texttt{vesicle\_growth} enlarges
+the shell by ramping every cell's target volume (cells bulge), whereas Okuda grows by \emph{proliferation}
+--- capping $v_{eq}$ at $\tfrac43 v_{ref}$ so each cell cycles in $[\tfrac23,\tfrac43]v_{ref}$ and the
+sphere grows by cell \emph{count}. Switching to \texttt{morphogen\_growth\_3d} with baseline $\rho=1$ and
+the cap cut area CV $0.63\!\to\!0.40$ (validated). \emph{H2 --- tighten division timing:} the dominant
+residue was the loose division-threshold jitter (CV$_{\text{cycle}}=0.4$); tightening to $0.15$ and
+\emph{bounding the cell-cycle duration} (\texttt{min\_cycle}$=4$, \texttt{max\_cycle}$=12$) dropped area
+CV $0.40\!\to\!0.18$ --- the biggest single step. \emph{H3 --- stiffen volume elasticity:} raising
+$K_V\,1\!\to\!4$ so cells track $v_{eq}$ took area CV to $\mathbf{0.17}$ (Okuda-uniform range) and the
+hollow fraction to $\mathbf{0}$: a spotless, uniform shell. The division model is now Okuda's ---
+\emph{volume-primary} ($2\times$ birth volume) \emph{with a bounded cell-cycle duration} --- the two
+competing timing models parameterised together. This uniform substrate is the prerequisite for the
+multi-tube morphogenesis, and it is reached by short, hypothesis-driven steps rather than a blind sweep.
+
 This is the substrate for the morphogenesis proper --- morphogen-driven growth (bulge/divide where $a$
 is high) on a \emph{fluid} ($p_0\!>\!3.81$) shell where T1 lets the tissue flow, the bridge to tubes.
 
