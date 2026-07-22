@@ -107,6 +107,14 @@ class CellRDSeed(Structural):
         self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
         self.noise = float(params.get("noise", 0.04))
         self.patch_z = float(params.get("patch_z", 0.6))        # (patch) activate cells with cen_z > patch_z x z_max
+        self.n_spots = int(params.get("n_spots", 5))            # (cones) number of fixed radial activation foci
+        self.cone_deg = float(params.get("cone_deg", 18.0))     # (cones) half-angle of each activation cone
+
+    def _cone_dirs(self):
+        """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5)."""
+        i = np.arange(self.n_spots) + 0.5
+        phi = np.arccos(1 - 2 * i / self.n_spots); theta = np.pi * (1 + 5 ** 0.5) * i
+        return np.stack([np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)], 1)
 
     def forward(self, H, mask=None):
         clvl = H.level(self.at); vlvl = H.level(self.vat); m = getattr(vlvl, "_mesh", None)
@@ -119,6 +127,15 @@ class CellRDSeed(Structural):
             if "cen" in clvl.state_schema:
                 ci0, ci1 = clvl.state_schema["cen"]; zc = clvl.state[:nF, ci0 + 2]
                 a = torch.where(zc > self.patch_z * float(zc.max()), torch.ones(nF, device=dev), a)
+            u = torch.ones(nF, device=dev)
+        elif self.mode == "cones":                              # N FIXED radial activation cones (Fig 5 multi-tube):
+            a = torch.full((nF,), 0.02, device=dev)             # each cone's tip stays activated as it extends ->
+            if "cen" in clvl.state_schema:                      # N radial tubes. Re-seeded every frame (tracks tips).
+                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
+                d = cen / (cen.norm(dim=1, keepdim=True) + 1e-9)
+                dirs = torch.as_tensor(self._cone_dirs(), dtype=cen.dtype, device=dev)
+                cosmax = (d @ dirs.T).max(dim=1).values
+                a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
         elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
             a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
@@ -214,6 +231,10 @@ class MorphogenGrowth3D(Structural):
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
         self.every = int(params.get("every", 1)); self._k = 0
+        # OKUDA uniform-cell mode: growth rate lambda = rate*(rho + Hill(a)); rho = baseline so ALL cells
+        # cycle (the activator sets the RATE, not the size), and v_eq is capped at vth_frac*v_ref so every
+        # cell oscillates in [~2/3, vth_frac]*v_ref -> uniform. rho=0 (default) = legacy activator-only bulge.
+        self.rho = float(params.get("rho", 0.0)); self.vth_frac = float(params.get("vth_frac", 1.35))
 
     def forward(self, H, mask=None):
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
@@ -232,7 +253,13 @@ class MorphogenGrowth3D(Structural):
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
-        s = torch.clamp(m["mg_scale"] * (1.0 + self.rate * hillv), max=self.cap)     # grow while activated, capped
+        s = m["mg_scale"] * (1.0 + self.rate * (self.rho + hillv))    # lambda = rate*(rho baseline + activator)
+        if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
+            v_ref = float(m.get("v_ref", 1.0))                       # vth_frac*v_ref so it cycles (divides), not bulge
+            s_cap = (self.vth_frac * v_ref / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
+            s = torch.minimum(s, s_cap.clamp(min=1.0))
+        else:
+            s = torch.clamp(s, max=self.cap)                        # legacy: activator-only bulge to `cap`
         m["mg_scale"] = s
         m["A0"] = m["A0_init"] * (s * s)                         # keep A0/P0/v_eq consistent (area~R^2, vol~R^3)
         m["P0"] = m["P0_init"] * s

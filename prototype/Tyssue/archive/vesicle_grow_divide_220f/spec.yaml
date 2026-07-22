@@ -1,0 +1,65 @@
+general:   # run-level settings
+  name: tyssue_ves_vesicle_grow_divide_220f   # run name (-> archive/<name>/)
+  seed: 0   # RNG seed
+  n_frames: 220   # number of simulation frames
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 222
+  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
+  dim: 3   # spatial dimension
+  world:   # world box size
+  - 30.0
+  - 30.0
+  - 30.0
+sets:   # the biological SETS (Levels) of the model
+  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
+    n: 2368   # buffer size (max elements)
+fields: {}   # continuous fields
+operators:   # the operators to instantiate (each realises one mechanism)
+- op: seed_mesh_3d
+  at: vertex   # the set this operator acts on
+  n_cells: 150
+  radius: 5.0
+  jitter: 0.18   # initial positional disorder
+  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  seed: 0   # RNG seed
+  before_frame: 1   # run this operator once, before the given frame
+- op: vesicle_growth
+  at: vertex   # the set this operator acts on
+  rate: 0.003   # growth rate of the target area per frame
+  every: 1   # run this operator every N frames
+- op: shape_energy_3d
+  at: vertex   # the set this operator acts on
+  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  K_A: 1.0   # area-elasticity stiffness
+  K_P: 1.0   # perimeter-elasticity stiffness
+  Lambda: 0.5
+  Gamma: 0.1
+  K_V: 1.0
+  K_R: 0.4
+  mu: 1.0   # mobility (overdamped)
+  dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
+  eta: 0.08   # relaxation step size
+  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
+- op: reconnect_t1_3d
+  at: vertex   # the set this operator acts on
+  l_th_frac: 0.35
+  every: 2   # run this operator every N frames
+  max_flips: 20
+- op: divide_3d
+  at: vertex   # the set this operator acts on
+  factor: 2.0
+  reset_noise: 0.12
+  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  every: 2   # run this operator every N frames
+  max_div: 10
+- op: topo_snapshot_3d
+  at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
+schedule:   # the order the operators run each frame
+- seed_mesh_3d
+- vesicle_growth
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
