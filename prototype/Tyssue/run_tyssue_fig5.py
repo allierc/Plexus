@@ -39,24 +39,28 @@ RADIUS, JITTER, SEED = 5.0, 0.16, 0
 
 
 def presets():
-    #      name        n_cells frames n_spots cone  grow   cv    (Fig 5: N radial activation cones -> N tubes)
-    return [("smoke",      800,   180,   3,    20.0, 0.015, 0.4),   # fast validation of cones -> tubes
-            ("fig5_2k",    2000,  600,   5,    18.0, 0.008, 0.4),   # multi-tube, moderate
-            ("fig5_4k",    2000,  900,   6,    16.0, 0.010, 0.4),   # ~4000 cells, better aspect
-            ("fig5_5k",    2000, 1200,   6,    16.0, 0.012, 0.4),   # ~5000 cells, very elongated
-            ("fig5_3tube", 1500,  700,   3,    20.0, 0.010, 0.4)]   # fewer, cleaner tubes
+    #  Okuda uniform-cell homogenisation sweep (rho baseline growth + v_eq capped at vth_frac*v_ref +
+    #  strong K_V). Increment-named so iterations are preserved. cols: name n_cells frames n_spots cone
+    #  grow cv rho vth K_V
+    return [("smoke_hom",  900,   200,   3,   18.0, 0.03, 0.4, 0.15, 1.35, 3.0),   # fast validation of uniform cells
+            ("fig5_2k_1",  2000,  700,   5,   16.0, 0.03, 0.4, 0.15, 1.35, 3.0),   # baseline homogenised
+            ("fig5_2k_2",  2000,  700,   5,   16.0, 0.04, 0.4, 0.10, 1.35, 3.0),   # faster tubes, less baseline
+            ("fig5_2k_3",  2000,  700,   5,   14.0, 0.03, 0.4, 0.15, 1.35, 4.0),   # thinner cones, stiffer volume
+            ("fig5_2k_4",  2000,  700,   6,   16.0, 0.025,0.4, 0.20, 1.40, 3.0),   # more baseline (uniform body)
+            ("fig5_2k_5",  2000,  900,   5,   15.0, 0.035,0.4, 0.12, 1.35, 4.0),   # longer, thin, stiff
+            ("fig5_2k_6",  2000,  700,   5,   16.0, 0.03, 0.4, 0.15, 1.35, 3.0)]   # spare slot for a tuned combo
 
 
-def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, buf, cbuf):
+def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, buf, cbuf):
     dt = 1.0    # cones define the activator directly (no Turing reaction) -> no CFL constraint
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS, "jitter": JITTER,
             "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": cv},
            {"op": "cell_geometry_3d", "at": "cell"},                    # per-cell centroid (for the cones)
            {"op": "cell_rd_seed", "at": "cell", "mode": "cones", "n_spots": n_spots, "cone_deg": cone_deg},  # re-seed each frame -> tracks the N growing tips
            {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": grow,
-            "a_sw": 0.5, "hill": 4.0, "cap": 8.0},                      # grow v_eq where a cone is active
+            "a_sw": 0.5, "hill": 4.0, "rho": rho, "vth_frac": vth},     # OKUDA: rate*(rho+Hill), v_eq capped -> uniform
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05,
-            "Lambda": 0.2, "K_V": 1.0, "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": 30,
+            "Lambda": 0.2, "K_V": K_V, "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": 30,
             "eta": 0.08, "cap_frac": 0.12},                            # fluid; radial ~off so tubes leave the sphere
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": max(40, n_cells // 8)},
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv,
@@ -104,16 +108,17 @@ def count_spots(a, mesh, thr):
 
 
 def run_all(only=None):
-    for name, n_cells, frames, n_spots, cone_deg, grow, cv in presets():
+    for name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V in presets():
         if only and name not in only:
             continue
         odir = os.path.join(OUT, name); os.makedirs(odir, exist_ok=True)
         verts, es, et, ef, nF = build_sphere_mesh(n_cells, RADIUS, JITTER, SEED); Nv = verts.shape[0]
-        buf = int(Nv * 3.5); cbuf = int(nF * 3.5)   # ~3.5x seed -> supports ~3x cell growth; bounds every-frame-recording memory
-        print(f"[fig5] {name}: n={n_cells} frames={frames} spots={n_spots} cone={cone_deg} grow={grow} cv={cv}  (Nv={Nv}, cells={nF})", flush=True)
-        rec = {"name": name, "n_cells": n_cells, "frames": frames, "n_spots": n_spots, "grow": grow, "cv": cv}
+        buf = int(Nv * 4.0); cbuf = int(nF * 4.0)   # ~4x seed headroom; bounds every-frame-recording memory
+        print(f"[fig5] {name}: n={n_cells} frames={frames} spots={n_spots} cone={cone_deg} grow={grow} rho={rho} vth={vth} K_V={K_V}  (Nv={Nv}, cells={nF})", flush=True)
+        rec = {"name": name, "n_cells": n_cells, "frames": frames, "n_spots": n_spots, "grow": grow,
+               "cv": cv, "rho": rho, "vth": vth, "K_V": K_V}
         try:
-            sim, cfg = make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, buf, cbuf)
+            sim, cfg = make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V, buf, cbuf)
             write_spec(cfg, os.path.join(odir, "spec.yaml"))
             Hf, out = engine_run(sim, device="cpu")
             emesh = Hf.level("vertex")._mesh; hist = emesh.get("hist")
@@ -127,9 +132,13 @@ def run_all(only=None):
             thr = float(np.percentile(aT, 70))
             spots = count_spots(aT, mtT, thr)
             _, _, hstat = hollow_flags(pT, mtT)
+            from tyssue_diag import hollow_metric
+            _, area, _ = hollow_metric(pT, mtT); area = area[area > 0]     # per-cell areas -> uniformity CV
+            area_cv = float(area.std() / (area.mean() + 1e-9)) if area.size else 0.0
             rec.update(cells_end=int(mtT["nF"]), n_div=int(emesh.get("n_div", 0)), n_t1=int(emesh.get("n_t1", 0)),
                        extent=[round(float(x), 2) for x in ext], aspect=round(float(ext.max() / max(ext.min(), 1e-6)), 3),
-                       spots=int(spots), a_std=round(float(aT.std()), 3), hollow_frac=round(hstat["frac"], 3))
+                       spots=int(spots), a_std=round(float(aT.std()), 3), hollow_frac=round(hstat["frac"], 3),
+                       area_cv=round(area_cv, 3))
             Rmax = max(float(np.abs(frame(t)[1]).max()) for t in np.linspace(0, T - 1, 20).astype(int))
             L3 = Rmax * 1.06
             picks = [int(round(fr * (T - 1))) for fr in (0.0, 0.33, 0.66, 1.0)]
