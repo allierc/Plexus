@@ -60,7 +60,7 @@ def build(chi, rho, vth, rate, a_sw, gamma=2.0):
 
 
 def run(name, chi, rho, vth, rate, a_sw, gamma=2.0):
-    sim, mesh0 = build(chi, rho, vth, rate, a_sw)
+    sim, mesh0 = build(chi, rho, vth, rate, a_sw, gamma)   # thread gamma through (H9 spot-size sweep)
     Hf, out = engine_run(sim, device="cpu")
     emesh = Hf.level("vertex")._mesh; hist = emesh.get("hist"); posf = out["sets"]["vertex"]["pos"]
     chemf = out["sets"]["cell"]["state"]["chem"]; T = posf.shape[0]

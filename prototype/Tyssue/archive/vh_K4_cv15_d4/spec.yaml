@@ -1,5 +1,5 @@
 general:   # run-level settings
-  name: tyssue_veshom_vh_K4_cv15_d4   # run name (-> archive/<name>/)
+  name: tyssue_vh_K4_cv15_d4   # run name (-> archive/<name>/)
   seed: 0   # RNG seed
   n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
@@ -30,7 +30,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   n_cells: 150
   radius: 5.0
   jitter: 0.18   # initial positional disorder
-  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  p0: 3.5   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
   vseed_cv: 0.15
@@ -40,22 +40,22 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: vertex   # the set this operator acts on
   cell_set: cell
   rate: 0.03   # growth rate of the target area per frame
-  a_sw: 0.5
+  a_sw: 50.0
   hill: 4.0
   rho: 1.0
   vth_frac: 1.4
 - op: shape_energy_3d
   at: vertex   # the set this operator acts on
-  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  p0: 3.5   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   K_A: 1.0   # area-elasticity stiffness
   K_P: 1.0   # perimeter-elasticity stiffness
-  Gamma: 0.1
-  Lambda: 0.5
-  K_V: 4.0
+  Gamma: 0.4
+  Lambda: 3.0
+  K_V: 2.0
   K_R: 0.4
   mu: 1.0   # mobility (overdamped)
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
-  relax_iters: 26   # inner bounded-Euler relaxation steps per frame
+  relax_iters: 30   # inner bounded-Euler relaxation steps per frame
   eta: 0.08   # relaxation step size
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
 - op: reconnect_t1_3d
@@ -68,7 +68,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   factor: 2.0
   reset_noise: 0.12
   cycle_cv: 0.15
-  p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
+  p0: 3.5   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   every: 2   # run this operator every N frames
   max_div: 12
   max_div_frac: 0.03

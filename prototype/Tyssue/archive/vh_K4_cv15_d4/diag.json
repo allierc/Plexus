@@ -1,15 +1,7 @@
 {
  "name": "vh_K4_cv15_d4",
- "rate": 0.03,
- "K_V": 4.0,
- "cv": 0.15,
- "vth": 1.4,
- "min_cyc": 4,
- "max_cyc": 12,
  "cells_end": 1778,
- "n_div": 1628,
- "area_cv": 0.157,
- "area_cv_mean": 0.17,
- "area_cv_max": 0.231,
- "hollow_frac": 0.02
+ "vol_cv": 0.226,
+ "hollow_frac": 0.004,
+ "rounded": true
 }

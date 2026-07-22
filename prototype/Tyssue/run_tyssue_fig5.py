@@ -39,16 +39,17 @@ RADIUS, JITTER, SEED = 5.0, 0.16, 0
 
 
 def presets():
-    #  CLUSTER param SEARCH (small/short 800c/300f) for uniform-cell TUBES: the tension is v_eq cap
-    #  (uniform) vs protrusion (needs bulge/localized proliferation). Grid over vth (bulge cap), rho
-    #  (baseline growth), cone (spot size). cols: name n_cells frames n_spots cone grow cv rho vth K_V min max
-    g = []
-    for vth in (2.0, 3.0, 4.0):
-        for rho in (0.0, 0.08):
-            for cone in (10.0, 14.0):
-                nm = f"sw_v{int(vth * 10)}_r{int(rho * 100)}_c{int(cone)}"
-                g.append((nm, 800, 300, 5, cone, 0.025, 0.4, rho, vth, 3.0, 3, 14))
-    g.append(("smoke_hom", 900, 200, 3, 18.0, 0.03, 0.4, 0.15, 1.35, 3.0, 3, 14))
+    #  FIG-5 GOAL: grow N tubes from a ~2000-cell vesicle. Validated H5 protrusion mechanism = VOLUME-LOCKED
+    #  body (rho=0 -> unactivated cells don't grow; max_cyc=1e9 -> body never force-divides, stays ~seed
+    #  count so NO bulk-proliferation scale-failure) + N radial activation cones whose tips grow (v_eq up to
+    #  vth*v_ref) and divide -> tubes protrude. cols: name n_cells frames n_spots cone grow cv rho vth K_V min max
+    L = 10 ** 9   # max_cyc=inf -> locked body
+    g = [
+        ("fig5_2k_short", 2000, 120, 5, 12.0, 0.05, 0.15, 0.0, 1.5, 4.0, 0, L),   # VALIDATE protr (short)
+        ("fig5_2k",       2000, 400, 5, 12.0, 0.05, 0.15, 0.0, 1.5, 4.0, 0, L),   # multiple tubes
+        ("fig5_4k",       4000, 500, 6, 10.0, 0.05, 0.15, 0.0, 1.5, 4.0, 0, L),   # ~4000c better aspect
+        ("fig5_5k",       2000, 700, 6,  9.0, 0.06, 0.15, 0.0, 1.6, 4.0, 0, L),   # very elongated (thin fast tips)
+    ]
     return g
 
 
@@ -165,8 +166,14 @@ def run_all(only=None):
                     mt, pt, a = frame(int(t)); act = np.clip((a - np.percentile(a, 5)) / (np.percentile(a, 99) - np.percentile(a, 5) + 1e-9), 0, 1)
                     _draw(axm, pt, mt, 3.90, azim=(2 * j) % 360, act=act, Lbox=L3); wri.grab_frame()
             plt.close(figm)
-            print(f"       -> cells {nF}->{rec['cells_end']} (+{rec['n_div']} div, {rec['n_t1']} T1)  "
-                  f"spots={rec['spots']} aspect={rec['aspect']} extent={rec['extent']} hollow={rec['hollow_frac']}", flush=True)
+            from tube_analysis import analyze                # per-frame hollow count / size CV / tube diameter
+            mf = []
+            for t in np.unique(np.linspace(0, T - 1, 40).astype(int)):
+                mt, pt, _ = frame(int(t)); mf.append((int(t), pt, mt))
+            rec.update(analyze(mf, odir))
+            print(f"       -> cells {nF}->{rec['cells_end']} (+{rec['n_div']} div, {rec['n_t1']} T1)  spots={rec['spots']} "
+                  f"tube_diam={rec['tube_diam_final']} n_tubes={rec['n_tubes_final']} hollow_peak={rec['hollow_n_peak']} "
+                  f"area_cv_peak={rec['area_cv_peak']} (final {rec['area_cv_final']})", flush=True)
         except Exception as e:
             rec["error"] = repr(e); traceback.print_exc()
         json.dump(rec, open(os.path.join(odir, "diag.json"), "w"), indent=1)
