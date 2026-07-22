@@ -733,6 +733,27 @@ round Turing spots --- \texttt{react} is an interchangeable contract.}
 \section*{Field notes}
 \emph{Dated log of what actually worked or failed --- the hard-won part.}
 
+\paragraph{How we proceed --- a hypothesis-driven, metric-gated method (2026-07-22).}
+The morphogenesis stages are worked not by parameter grids but by \emph{small, falsifiable steps}. Each
+step states a hypothesis, is measured by a \emph{dedicated metric whose analysis code is written on the
+spot} (area CV for cell uniformity, a $95^{\text{th}}$-percentile/median radius for tube protrusion, the
+hollow flag for mesh integrity), and is run \emph{cheap-first} (short local A/Bs) before any expensive
+verification is dispatched to the cluster. Two disciplines earn their keep. \emph{One factor at a time:}
+the homogenisation win was only attributable because H1/H2/H3 were isolated (proliferation-not-inflation,
+then tight division timing, then stiff $K_V$). \emph{Inconsistency detection:} the sharpest debugging
+tool is not distrust but a hunt for violations of expected invariants. The recording artefact surfaced
+from one such contradiction --- a $300$-frame run blowing up while its own first $220$ frames (which
+\emph{must} be identical by determinism) stayed clean; that impossibility, not a hunch, forced the
+investigation that found the mis-aligned recording. A live example of the method policing itself: a tube
+experiment ran suspiciously slower than its analog; the proposed cause (a \texttt{max\_cycle} duration
+bound force-dividing the supposedly volume-locked body --- a parameter added for \emph{uniformity}
+silently invalidating a different test's premise) was itself \emph{falsified} on re-run (still slow), and
+the true cause traced to the large-cell bulge regime. Both the catch and the correction are recorded, so
+the method's knowledge base evolves as hypotheses are validated or overturned rather than accreting
+untested lore. (This log, the memory index, and the operator atlas together are that evolving knowledge
+base; formalising it as an explicit, revisable \emph{master knowledge document} --- the memory of an
+autonomous master controller over the three Plexus2 loops --- is the natural next step.)
+
 \paragraph{3D division at scale (2026-07-21) --- a synchronised division wave, not a rendering bug.}
 \begin{itemize}\itemsep2pt
 \item \textbf{The controlled experiment that exonerated the reaction--diffusion.}
