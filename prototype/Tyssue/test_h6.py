@@ -30,14 +30,14 @@ R, J, SEED = 5.0, 0.16, 0
 CELLS, FR = 400, 300
 
 
-def build(chi, rho, vth, rate, a_sw):
+def build(chi, rho, vth, rate, a_sw, gamma=2.0):
     verts, es, et, ef, nF = build_sphere_mesh(CELLS, R, J, SEED); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": CELLS, "radius": R, "jitter": J,
             "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": 0.15},
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
            {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": chi},
-           {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0},
+           {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
            # activator->growth: low body rho + activator boost; v_eq capped (uniform behind the front)
            {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": rate,
             "a_sw": a_sw, "hill": 4.0, "rho": rho, "vth_frac": vth},
@@ -59,7 +59,7 @@ def build(chi, rho, vth, rate, a_sw):
     sim = S.load(path); os.unlink(path); return sim, dict(E_srce=es, E_trgt=et, E_face=ef, nF=nF, Nv=Nv)
 
 
-def run(name, chi, rho, vth, rate, a_sw):
+def run(name, chi, rho, vth, rate, a_sw, gamma=2.0):
     sim, mesh0 = build(chi, rho, vth, rate, a_sw)
     Hf, out = engine_run(sim, device="cpu")
     emesh = Hf.level("vertex")._mesh; hist = emesh.get("hist"); posf = out["sets"]["vertex"]["pos"]
@@ -77,5 +77,8 @@ def run(name, chi, rho, vth, rate, a_sw):
 
 # H6 RD-front coupling: low rho (near-locked body -> protrusion, per H5) + activator boost at the RD spots.
 # a_sw~2.5 matches the Brusselator activator (peaks ~4). Judge uniformity by vol_cv, not area_cv.
-run("h6a_lowrho", 4.0, 0.03, 1.5, 0.05, 2.5)   # near-locked body, uniform cap
-run("h6b_midrho", 4.0, 0.10, 1.5, 0.05, 2.5)   # some body cycling (homogenise) -- does it still protrude?
+# H9: lower gamma (slower reaction) -> longer Turing wavelength -> FEWER, BIGGER spots (no CFL hit) that
+# may be large enough to protrude, unlike the 112 fine spots at gamma=2. rho=0.05 (near-locked body).
+run("h9_g20", 4.0, 0.05, 1.5, 0.05, 2.5, 2.0)   # baseline fine spots
+run("h9_g06", 4.0, 0.05, 1.5, 0.05, 1.5, 0.6)   # bigger spots
+run("h9_g03", 4.0, 0.05, 1.5, 0.05, 1.2, 0.3)   # biggest spots
