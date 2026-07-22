@@ -715,6 +715,22 @@ hollow fraction to $\mathbf{0}$: a spotless, uniform shell. The division model i
 competing timing models parameterised together. This uniform substrate is the prerequisite for the
 multi-tube morphogenesis, and it is reached by short, hypothesis-driven steps rather than a blind sweep.
 
+\paragraph{RD on the homogenised shell --- ``pure colouring'' is only statistical (2026-07-22).}
+Before coupling the Turing activator to growth we sanity-checked the usual claim that the
+reaction--diffusion is \emph{pure colouring}. Adding the Brusselator RD to the homogenised recipe (it
+develops a clean pattern, activator range $0.36$--$4.42$) leaves the morphology \emph{statistically}
+unchanged --- same cell count ($1001$), same area CV ($0.198$ vs $0.199$), same spotless mesh --- yet the
+vertex trajectories \emph{fully diverge} ($\max|\Delta\mathbf{x}|=19$), so it is \emph{not} byte-identical.
+The reason is instructive and was flagged by an inconsistency check: \texttt{morphogen\_growth\_3d}
+\emph{reads} the activator, so even a deliberately inert coupling (\texttt{a\_sw}$=50$, so the growth
+drive is $1\!\to\!1.00006$) is a $6\times10^{-5}$ perturbation, and a growing, dividing tissue is
+\emph{chaotic} --- that nudge amplifies over $400$ frames into an unrelated but statistically identical
+mesh. (The earlier \texttt{rd\_coral} ``byte-identical'' result held only because \emph{its} growth
+operator, \texttt{vesicle\_growth}, never read the activator.) The lesson for the metric ledger:
+``pure colouring'' must be qualified as \emph{statistical} whenever the growth operator consumes the
+field, and trajectory-identity is simply the wrong invariant in a chaotic regime --- agreement of
+cell count and area CV is the right one.
+
 This is the substrate for the morphogenesis proper --- morphogen-driven growth (bulge/divide where $a$
 is high) on a \emph{fluid} ($p_0\!>\!3.81$) shell where T1 lets the tissue flow, the bridge to tubes.
 
