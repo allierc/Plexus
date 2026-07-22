@@ -485,7 +485,19 @@ run diverging from a shorter one over the frames they must share --- signals tha
 persistent residual may indict the \emph{diagnostic} rather than the model, so that a
 mis-measuring metric is corrected before the operator algebra is extended. This gate
 distinguishes ``the model is incomplete'' from ``the measurement is wrong,'' a distinction
-without which an agent elaborates operators to explain an artifact. The master thus keeps a multi-round,
+without which an agent elaborates operators to explain an artifact. A fourth responsibility keeps the
+process honest once the metrics are met: \emph{perfecting}. A satisfied threshold is not the same as
+qualitative fidelity to the reference, and the master must notice discrepancies that \emph{no current
+metric captures} --- cells that are triangular where the reference's are round, a boundary that is ragged
+where it should be smooth --- and treat each as a prompt to author a \emph{new} metric and refine toward
+it. This closes the loop between qualitative observation and quantitative objective: the eye (or the
+reference figure) flags a gap, the master turns the gap into a measurable target, and the loops close it.
+Perfecting is therefore not obsessive polishing but the mechanism by which the goal itself is progressively
+sharpened as the model approaches the reference. It is also a deliberate counterweight to the characteristic
+failure mode of a fast operator, human or agent: advancing to the next stage before the current one is
+genuinely settled. The master holds each stage open until its metric is met and refuses the tempting
+shortcut of ``good enough to move on''; the discipline it supplies --- finish the step, verify it, only
+then proceed --- is precisely the one a hurried operator most often skips. The master thus keeps a multi-round,
 partially-automated discovery on its goals: it holds the objective, proceeds in small
 hypothesis-validated steps on a cheap-to-expensive evaluation ladder, and preserves the
 provenance of what was tried, validated, or falsified.
@@ -1091,15 +1103,15 @@ These frameworks describe multicellular mechanics, growth, adhesion,
 proliferation, remodelling and morphogenesis.
 
 \begin{itemize}
-\item Chaste
-\item CompuCell3D
-\item Morpheus
-\item Tissue Forge
-\item VirtualLeaf
-\item PhysiCell
-\item Active Vertex Model for Cell-Resolution Description of Epithelial Tissue Mechanics
-\item Multicellular Simulations with Shape and Volume Constraints using Optimal Transport
-\item Cell Simulation as Cell Segmentation
+\item \href{https://chaste.github.io}{Chaste}
+\item \href{https://compucell3d.org}{CompuCell3D}
+\item \href{https://morpheus.gitlab.io}{Morpheus}
+\item \href{https://github.com/tissue-forge/tissue-forge}{Tissue Forge}
+\item \href{https://github.com/rmerks/VirtualLeaf2021}{VirtualLeaf}
+\item \href{https://physicell.org}{PhysiCell}
+\item \href{https://doi.org/10.1371/journal.pcbi.1005569}{Active Vertex Model for Cell-Resolution Description of Epithelial Tissue Mechanics}
+\item \href{https://arxiv.org/abs/2402.17086}{Multicellular Simulations with Shape and Volume Constraints using Optimal Transport}
+\item \href{https://doi.org/10.1038/s41592-025-02697-0}{Cell Simulation as Cell Segmentation}
 \end{itemize}
 
 Typical operators extracted from these models include
@@ -1126,9 +1138,9 @@ formation.
 Representative projects include
 
 \begin{itemize}
-\item Morpheus
-\item Reaction-Diffusion Systems in Intracellular Transport and Control
-\item A Programmable Reaction-Diffusion System for Spatiotemporal Cell Signalling Circuit Design
+\item \href{https://morpheus.gitlab.io}{Morpheus}
+\item \href{https://doi.org/10.1002/anie.200905513}{Reaction-Diffusion Systems in Intracellular Transport and Control}
+\item \href{https://doi.org/10.1016/j.cell.2023.12.007}{A Programmable Reaction-Diffusion System for Spatiotemporal Cell Signalling Circuit Design}
 \item SPDEs
 \end{itemize}
 
@@ -1152,8 +1164,8 @@ These frameworks model neuronal signalling and connectome dynamics.
 Representative projects include
 
 \begin{itemize}
-\item Jaxley
-\item BrainPy
+\item \href{https://github.com/jaxleyverse/jaxley}{Jaxley}
+\item \href{https://github.com/brainpy/BrainPy}{BrainPy}
 \item Connectome-GNN
 \end{itemize}
 
@@ -1176,10 +1188,10 @@ collective migration.
 Representative examples include
 
 \begin{itemize}
-\item ERK-mediated mechanochemical wave models
-\item Active Vertex mechanics
-\item Collective cell migration models
-\item Bioelectric morphogenesis
+\item \href{https://doi.org/10.1016/j.devcel.2020.05.011}{ERK-mediated mechanochemical wave models}
+\item \href{https://doi.org/10.1371/journal.pcbi.1005569}{Active Vertex mechanics}
+\item \href{https://doi.org/10.1146/annurev-conmatphys-031218-013516}{Collective cell migration models}
+\item \href{https://doi.org/10.1016/j.cell.2021.02.034}{Bioelectric morphogenesis}
 \end{itemize}
 
 Representative operators include
@@ -1203,11 +1215,11 @@ biological systems.
 Representative projects include
 
 \begin{itemize}
-\item MultiCell: Geometric Learning in Multicellular Development
-\item Differentiable Rendering for 3D Fluorescence Microscopy
-\item Inferring Cell Junction Tension and Pressure from Cell Geometry
-\item Machine Learning Interpretable Models of Cell Mechanics from Protein Images
-\item 3D Single-Cell Shape Analysis using Geometric Deep Learning
+\item \href{https://doi.org/10.1038/s41592-025-02983-x}{MultiCell: Geometric Learning in Multicellular Development}
+\item \href{https://arxiv.org/abs/2303.10440}{Differentiable Rendering for 3D Fluorescence Microscopy}
+\item \href{https://doi.org/10.1242/dev.192773}{Inferring Cell Junction Tension and Pressure from Cell Geometry}
+\item \href{https://doi.org/10.1016/j.cell.2023.11.041}{Machine Learning Interpretable Models of Cell Mechanics from Protein Images}
+\item \href{https://doi.org/10.1101/2022.06.17.496550}{3D Single-Cell Shape Analysis using Geometric Deep Learning}
 \end{itemize}
 
 Typical operators include
@@ -1230,11 +1242,11 @@ observations into structured biological measurements.
 Representative projects include
 
 \begin{itemize}
-\item TissueMiner
-\item ERNet
-\item DeXtrusion
-\item FlowShape
-\item CellRank
+\item \href{https://github.com/mpicbg-scicomp/tissue_miner}{TissueMiner}
+\item \href{https://github.com/charlesnchr/ERnet-v2}{ERNet}
+\item \href{https://gitlab.pasteur.fr/gletort/dextrusion}{DeXtrusion}
+\item \href{https://bitbucket.org/pgmsembryogenesis/flowshape}{FlowShape}
+\item \href{https://github.com/theislab/cellrank}{CellRank}
 \end{itemize}
 
 Representative operators include
@@ -1245,6 +1257,33 @@ Representative operators include
 \item graph construction,
 \item feature extraction,
 \item trajectory inference.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Interactive artificial-life programs}
+
+Alongside the research-grade simulation frameworks above, a broad ecosystem of
+interactive artificial-life and complex-systems programs explores the same
+emergent mechanisms --- self-organization, growth, pattern formation and
+evolution --- often in real time and in the browser. These provide an
+accessible, complementary corpus for the atlas:
+
+\begin{itemize}
+\item \href{https://evolvecode.io/alife/lenia.html}{Lenia}
+\item \href{https://evolvecode.io/alife/evoloop.html}{Evoloops}
+\item \href{https://sandbox-science.com/particle-life}{Particle Life}
+\item \href{https://store.steampowered.com/app/2736860/}{Bibites}
+\item \href{https://thelifeengine.net/}{Life Engine}
+\item \href{https://neuralpatterns.io/}{Convolutional CA}
+\item \href{https://evolvecode.io/alife/gol.html}{Game of Life}
+\item \href{https://www.youtube.com/c/slackermanz}{Multi-neighborhood CA}
+\item \href{https://www.alien-project.org/index.html}{Alien Project}
+\item \href{https://evolvecode.io/alife/aquarium.html}{Germs genetic algorithm}
+\item \href{https://store.steampowered.com/app/264710/}{Subnautica}
+\item \href{https://www.youtube.com/watch?v=iNXzOuc9UWo}{Synthetic Selection}
+\item \href{https://distill.pub/2020/growing-ca/}{Neural CA}
+\item \href{https://znah.net/lenia/}{Particle Lenia}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

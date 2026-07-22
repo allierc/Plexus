@@ -770,6 +770,90 @@ untested lore. (This log, the memory index, and the operator atlas together are 
 base; formalising it as an explicit, revisable \emph{master knowledge document} --- the memory of an
 autonomous master controller over the three Plexus2 loops --- is the natural next step.)
 
+\paragraph{Perfecting --- surface tension rounds the cells (2026-07-22).} A satisfied metric is not
+qualitative fidelity. The homogenised recipe passed on uniformity (vol CV $\sim0.12$) yet the rendered
+cells were visibly \emph{triangular} --- angular slivers thrown off by division and T1 --- where the
+reference's Voronoi-propelled cells are round. No existing metric captured this, so we authored one: the
+median shape index $P/\sqrt{A}$ (a regular hexagon is $3.72$; slivers are higher) and the fraction of
+cells with $\le4$ sides. Hypothesis H10: more \emph{surface tension} (line tension $\Lambda$ and cortical
+contractility $\Gamma$, with a softer volume stiffness $K_V$ and $p_0\!=\!3.5$) rounds the cells. It
+validated cleanly --- shape index $3.94\!\to\!3.81$, sliver fraction $0.035\!\to\!0.017$ (halved) --- at
+a small, acceptable uniformity cost (vol CV $0.17\!\to\!0.21$). The two clean archives
+(\texttt{vh\_K4\_cv15\_d4} and its coral twin) were re-rendered with the rounded parameters. This is
+\emph{perfecting}: a qualitative gap the eye flags, turned into a measurable target and closed --- the
+mechanism by which the goal sharpens as the model approaches the reference, and the discipline a hurried
+operator most often skips.
+
+\paragraph{Cluster submission --- never trust a submit's return (2026-07-22).} Moving the Fig-5-scale
+runs ($\sim2000$ cells) to a dedicated L4 node freed the devcontainer, but exposed a false-completion
+trap. The \texttt{gpu\_l4} queue rejects jobs without an explicit \texttt{-gpu num=1}; more subtly, the
+login link is laggy, so a \texttt{bsub} that \emph{succeeds} can return a truncated reply that reads as
+``$0$ jobs submitted'' --- and, symmetrically, a submit that appears to \emph{time out} may have already
+queued the job (we accidentally created a duplicate this way). The only ground truth is the queue itself.
+The fix, ported from the \texttt{connectome-gnn-cx} poller, is a retry-with-backoff \texttt{--wait}/%
+\texttt{--status} loop that treats any non-empty \texttt{bjobs} output as authoritative and an empty
+queue (or \texttt{DONE}/\texttt{EXIT}) as completion. The generalisable rule for the autonomous loop: an
+action's \emph{reported} outcome is a hint; verify against the world's state before proceeding.
+
+\paragraph{Scaling to Fig-5 size --- uniformity breaks with proliferation, not relaxation (2026-07-22).}
+Taking the homogenised+rounded recipe to Okuda's $\sim2000$-cell start exposed a clean failure: seeding
+$2000$ cells and running $220$ frames blew up to $7128$ cells with vol CV $1.63$ and hollow fraction
+$0.33$ --- and the plain ($dt\!=\!1$) and coral ($dt\!=\!0.02$) runs failed \emph{identically to three
+decimals}, which both falsified a $dt$/cell-cycle hypothesis and re-confirmed RD-as-colouring. Two
+disciplined tests then localised the cause. A \emph{seed sweep} ($500/1000/1500/2000$ cells, fixed
+frames) showed a monotonic degradation --- vol CV $0.37\!\to\!0.63\!\to\!0.86\!\to\!1.08$, hollow
+$0.001\!\to\!0.04\!\to\!0.15\!\to\!0.22$ --- while the shape index stayed rounded ($\sim3.8$) throughout,
+so surface tension holds but bulk uniformity does not. \emph{Fix diagnostics} at $n\!=\!2000$ then
+falsified the two obvious mechanical cures: doubling the relaxation iterations ($30\!\to\!80$) and adding
+radial anti-buckling stiffness ($K_R\!=\!2$) each left vol CV at $1.6$ --- untouched. Only \emph{bounding
+the proliferation} (stopping at $\sim2400$ cells) recovered a clean shell (vol CV $0.51$, hollow $0.04$).
+The lesson: the defect is set by the \emph{proliferation rate} (divisions per frame, which scales with
+cell count), not by how well any single frame is relaxed --- the original clean recipe reached vol CV
+$0.12$ at $1778$ cells precisely because $150$ seeds over $500$ frames divide gently. Fig~5's $2000$-cell
+vesicle is therefore a \emph{start} to be grown into slowly, not a bulk to be proliferated $4\times$; the
+next step grows to $2000$ from a small seed over many frames (and with a gentler per-frame division cap).
+
+\paragraph{Tube coupling --- protrusion and hollowing are the same event, and the metric that revealed it
+(2026-07-22).} The first attempt at RD-driven tubes on $2000$ cells blew up (a few giant cells, an
+exploded cross-section) --- too many large changes at once. Decomposing on a small $150$-cell shell,
+one variable at a time, gave the mechanism. \emph{Coupling ladder} (growth rate at a locked body): at
+rate $0.03$ the shell stays clean but flat (protr $1.08$); at $0.06$ protrusion appears (protr $1.5$)
+\emph{but the hollow count jumps from $2$ to $34$ in the same step}; at $0.12$+ it is strong protrusion
+with catastrophic hollowing ($500$+). There is no clean-protrusion window because, with a volume-locked
+body, an activated cell \emph{inflates faster than it can divide and balloons --- and a ballooned cell
+cap is exactly what the hollow metric flags}. Protrusion-by-inflation \emph{is} hollowing. The natural
+fix (make division keep pace so the tube grows by proliferation, not inflation) was then \emph{falsified}:
+tripling division throughput made hollowing \emph{worse} ($20\!\to\!250$), not better --- more cells is
+more mesh to tangle. (That ladder first showed every high-division run pinned at exactly $890$ cells --- a
+buffer ceiling, not physics; caught and corrected before drawing any conclusion, the same
+verify-the-instrument discipline as the recording artefact.) The contrast with the clean static-cone
+tubes (protr $2.9$, hollow peak $12$) is instructive: the cones \emph{re-seed the activator at the tip
+every frame}, so the activator tracks the growing tip (Okuda: ``the activator stayed around the tip'');
+the RD spots sit where they nucleate and do not follow, so growth disorganises. This whole diagnosis was
+only possible because the single end-frame hollow number ($0.004$, which the movie plainly contradicted)
+was replaced with \emph{per-frame} metrics --- hollow count, size CV, and average tube diameter over time
+--- authored precisely because the eye disagreed with the summary statistic.
+
+\paragraph{Resolving the balloon --- activation width, checkpoint init, and a hard size cap (2026-07-22).}
+Many small archived L4 rounds (each a strip + movie + metric plot) converged the tubing recipe. First,
+\emph{H-narrow}: cones do not balloon because they activate a \emph{narrow} cone (few cells $\to$ narrow
+tube), whereas an RD Turing spot activates a \emph{wide} patch (many cells $\to$ wide balloon). Raising the
+growth switch \texttt{a\_sw} so only each spot's \emph{peak} drives growth cut the peak hollow count
+$787\!\to\!50$ (16$\times$) while keeping protrusion --- but adding any baseline body growth ($\rho\!>\!0$)
+re-flattened it, so a volume-locked body is mandatory. Second, a genuine \emph{mesh checkpoint}: the target
+is morphogenesis \emph{on} a uniform vesicle, so we now save a homogenised run's full state (mesh topology
+$+$ vertex positions $+$ cell activator field) and reload it as the initial condition (\texttt{load\_mesh\_3d},
+a drop-in for the fresh-sphere seed). Initialising from that checkpoint and seeding a few big cone-spots
+reproduces the intended starting picture exactly --- a uniform-celled shell with a handful of large red
+foci --- which then grow tubes. Third, the tube-tip cells grew ``far too big'' because oversized cells
+\emph{backlog behind the per-call division throttle} and keep ramping while queued; the fix is a
+\emph{hard size cap} (\texttt{vcap}) that force-divides any cell above $v_{\mathrm{cap}}\!\cdot\!v_{\mathrm{ref}}$
+\emph{bypassing} the throttle, so no cell --- tip included --- can exceed the cap. A methodological note
+threaded through all of it: two rounds were nearly over-interpreted before catching confounds (a spot-size
+sweep that actually tracked the RD CFL wall via \texttt{chi}; a division-throughput ladder pinned at a cell
+\emph{buffer} ceiling), and one run's ``empty'' movie was a fixed camera zoomed out by a ballooned final
+frame --- fixed with per-frame autoscale. Verify the instrument before trusting the measurement.
+
 \paragraph{3D division at scale (2026-07-21) --- a synchronised division wave, not a rendering bug.}
 \begin{itemize}\itemsep2pt
 \item \textbf{The controlled experiment that exonerated the reaction--diffusion.}

@@ -400,6 +400,10 @@ class Divide3D(Structural):
         # bounds the division RATE (<= frac of live cells per call), so the cap grows with the tissue. Off (0) by
         # default so existing presets are unchanged.
         self.max_div_frac = float(params.get("max_div_frac", 0.0))
+        # HARD CELL-SIZE CAP: force-divide ANY cell whose current volume >= vcap x v_ref, BYPASSING the
+        # per-call throttle (max_div/max_div_frac) so oversized cells never backlog and keep growing. This
+        # bounds the maximum cell size directly (the tube-tip cells that grew "far too big"). 0 = off.
+        self.vcap = float(params.get("vcap", 0.0))
         # LOCAL DAUGHTER RELAX: after the septum, run a few bounded-Euler shape-energy steps on ONLY the
         # fresh daughters + their one-ring, so a division never hands the global relaxation an inverted
         # cap (the sole source of hollow cells -- growth alone never makes one). Uses the coeffs stashed
@@ -468,6 +472,11 @@ class Divide3D(Structural):
         cand = [f for f in range(nF) if _ready(f)]
         rng.shuffle(cand)                                        # unbiased when more cells are ready than the cap
         cap_div = self.max_div if self.max_div_frac <= 0 else max(self.max_div, int(self.max_div_frac * nF))
+        if self.vcap > 0:                                        # HARD size cap: oversized cells ALWAYS divide (not throttled)
+            vref = float(m.get("v_ref", 0.0)) or (float(np.median(vf[vf > 0])) if (vf > 0).any() else 1.0)
+            over = [f for f in range(nF) if alive[f] > 0 and rings[f] is not None and len(rings[f]) >= 4 and vf[f] >= self.vcap * vref]
+            oset = set(over); cand = over + [f for f in cand if f not in oset]   # oversized first
+            cap_div = max(cap_div, len(over))                    # never throttle oversized cells
         cand = cand[:cap_div]                                    # (else cand[:n] sweeps in pole-to-pole face order)
         ndone = 0
         daughter_mothers = []                                    # mother face index of each appended daughter (order)
