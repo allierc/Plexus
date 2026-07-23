@@ -114,6 +114,7 @@ class CellRDSeed(Structural):
         self.cone_deg = float(params.get("cone_deg", 18.0))     # (cones) half-angle of each activation cone
         self.seed_dir = params.get("seed_dir", None)            # (cones, n_spots=1) override the cone axis to a fixed
         #   direction -> aim the tube where we want it (e.g. FRONT of the render camera at elev18/azim30 ~ (.82,.48,.31))
+        self.tip_radius = float(params.get("tip_radius", 2.0))  # (tip mode) 3D radius of the tip-tracking activation cap
 
     def _cone_dirs(self):
         """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5). A given
@@ -144,6 +145,19 @@ class CellRDSeed(Structural):
                 dirs = torch.as_tensor(self._cone_dirs(), dtype=cen.dtype, device=dev)
                 cosmax = (d @ dirs.T).max(dim=1).values
                 a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
+            u = torch.ones(nF, device=dev)
+        elif self.mode == "tip":                                # TIP-TRACKING: a fixed-SIZE cap riding the advancing
+            a = torch.full((nF,), 0.02, device=dev)             # tip -> CONSTANT-diameter extension (a fixed-angle cone
+            if "cen" in clvl.state_schema:                      # widens with radius -> fat lobe; a fixed 3D-size cap
+                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
+                if self.seed_dir is not None:                   # position ALONG the bud axis; tip = the furthest cell
+                    sd = np.asarray(self.seed_dir, float); sd = sd / (np.linalg.norm(sd) + 1e-12)
+                    proj = cen @ torch.as_tensor(sd, dtype=cen.dtype, device=dev)
+                else:
+                    proj = cen.norm(dim=1)
+                tip = cen[int(torch.argmax(proj))]              # current outermost cell (the advancing tip)
+                d3 = (cen - tip).norm(dim=1)                     # 3D distance from the tip (FIXED size, not angle)
+                a = torch.where(d3 < self.tip_radius, torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
         elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
             a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
