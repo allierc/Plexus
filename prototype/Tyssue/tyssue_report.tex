@@ -1337,6 +1337,14 @@ and no amount of relaxation fixes a shape that relaxation removes. The path to a
 is therefore the growth-driven mechanism --- which is what the \textbf{monolayer (apical/basal) operator}
 supplies (true per-cell 3D volume, emergent bending: localized volume growth on a monolayer shell
 \emph{buckles} into a tube as its equilibrium). \texttt{round\_42+} wire it into the tube pipeline.
+\item \textbf{R42 --- monolayer makes thin SPIKES, not clean tubes.} Wired the monolayer (apical/basal) op
+into the tube pipeline. Growth-driven, it \emph{inflates} a few cells into very thin spikes (protr $6\!-\!70$)
+rather than proliferating a wall --- hollow $600\!-\!1075$, CV $5\!-\!9$, \emph{worse} than mid-surface mc8.
+So the monolayer is not a drop-in fix; a clean tube needs the proliferation-built wall (which the mid-surface
+oriented division does better). mc8 remains the cleanest tube.
+\item \textbf{R43 (next) --- THICKER tube.} Since the residual hollow/CV are largely thin-tube artifacts
+(small, high-curvature wall cells), and Okuda's Fig-5 tubes are moderately thick, make the tube thicker
+(bigger tip cap $\Rightarrow$ larger, more uniform wall cells) to lower CV and the false-positive hollow.
 \end{itemize}
 
 \end{document}
