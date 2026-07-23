@@ -111,6 +111,7 @@ class PolarityFlowAlign(Exchange):               # (alias `flow_align`, one migr
     REQUIRES_PARAMS = ["from"]
     MECHANISM_TAGS = ["polarity_velocity_alignment", "flow_alignment"]
     PARAM_ROLES = {"gain": "flow_alignment_rate"}
+    REFERENCE = "Toner, J. & Tu, Y. (1995). Long-range order in a two-dimensional dynamical XY model. Phys. Rev. Lett. 75:4326-4329."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

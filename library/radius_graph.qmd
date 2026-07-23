@@ -109,6 +109,7 @@ class RadiusGraph(Rewire):
     MECHANISM_TAGS = ["radius_graph", "neighbor_search", "rewire"]
     PARAM_ROLES = {"min_radius": "inner_cutoff_radius", "block": "block_size",
                    "compile": "torch.compile the O(N^2) block distance+mask kernel"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

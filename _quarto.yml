@@ -16,8 +16,6 @@ website:
         text: The language
       - text: Library
         menu:
-          - href: library.qmd
-            text: Overview
           - href: library_sets.qmd
             text: Sets
           - href: library_fields.qmd
@@ -29,7 +27,7 @@ website:
       - href: inverse.qmd
         text: Inverse problem
       - href: okuda.qmd
-        text: Okuda case study
+        text: Morphogenesis
     tools:
       - icon: github
         href: https://github.com/allierc/Plexus

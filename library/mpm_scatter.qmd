@@ -113,6 +113,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
                    "a_max": "external-acceleration clamp"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

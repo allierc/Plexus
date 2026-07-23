@@ -138,10 +138,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -162,6 +158,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -323,33 +323,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"from"</span>]</span>
 <span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"polarity_velocity_alignment"</span>, <span class="st">"flow_alignment"</span>]</span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"gain"</span>: <span class="st">"flow_alignment_rate"</span>}</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"agent"</span>)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.frm <span class="op">=</span> params.get(<span class="st">"from"</span>, <span class="st">"mpm_grid"</span>)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gain <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"gain"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.frm)<span class="op">;</span> dev <span class="op">=</span> lvl.state.device</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        h <span class="op">=</span> lvl.heading<span class="op">;</span> X <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)<span class="op">;</span> occ <span class="op">=</span> lvl.occ</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> X.shape[<span class="dv">1</span>]</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        offsets <span class="op">=</span> stencil_offsets(D, dev)<span class="op">;</span> S <span class="op">=</span> offsets.shape[<span class="dv">0</span>]</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        _, weight, flat <span class="op">=</span> bspline(X, g.inv_dx, offsets, g.shape, periodic)</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        vg <span class="op">=</span> (weight[..., <span class="va">None</span>] <span class="op">*</span> g.v[flat].view(lvl.n, S, D)).<span class="bu">sum</span>(<span class="dv">1</span>)     <span class="co"># gathered flow velocity [N,D]</span></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        vg <span class="op">=</span> torch.nan_to_num(vg)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        vmag <span class="op">=</span> vg.norm(dim<span class="op">=-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        vhat <span class="op">=</span> vg <span class="op">/</span> vmag.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        perp <span class="op">=</span> vhat <span class="op">-</span> (vhat <span class="op">*</span> h).<span class="bu">sum</span>(<span class="op">-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>) <span class="op">*</span> h               <span class="co"># component of v_hat perp to n</span></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> h <span class="op">+</span> (<span class="va">self</span>.gain <span class="op">*</span> dt) <span class="op">*</span> perp</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> new_h <span class="op">/</span> new_h.norm(dim<span class="op">=-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> (occ <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">&amp;</span> (vmag[:, <span class="dv">0</span>] <span class="op">&gt;</span> <span class="fl">1e-7</span>)</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>            keep <span class="op">=</span> keep <span class="op">&amp;</span> (mask <span class="op">&gt;</span> <span class="dv">0</span>)</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        lvl.heading <span class="op">=</span> torch.where(keep[:, <span class="va">None</span>], new_h, h)</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Toner, J. &amp; Tu, Y. (1995). Long-range order in a two-dimensional dynamical XY model. Phys. Rev. Lett. 75:4326-4329."</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"agent"</span>)</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.frm <span class="op">=</span> params.get(<span class="st">"from"</span>, <span class="st">"mpm_grid"</span>)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gain <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"gain"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.frm)<span class="op">;</span> dev <span class="op">=</span> lvl.state.device</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        h <span class="op">=</span> lvl.heading<span class="op">;</span> X <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)<span class="op">;</span> occ <span class="op">=</span> lvl.occ</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> X.shape[<span class="dv">1</span>]</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        offsets <span class="op">=</span> stencil_offsets(D, dev)<span class="op">;</span> S <span class="op">=</span> offsets.shape[<span class="dv">0</span>]</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        _, weight, flat <span class="op">=</span> bspline(X, g.inv_dx, offsets, g.shape, periodic)</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        vg <span class="op">=</span> (weight[..., <span class="va">None</span>] <span class="op">*</span> g.v[flat].view(lvl.n, S, D)).<span class="bu">sum</span>(<span class="dv">1</span>)     <span class="co"># gathered flow velocity [N,D]</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        vg <span class="op">=</span> torch.nan_to_num(vg)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        vmag <span class="op">=</span> vg.norm(dim<span class="op">=-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        vhat <span class="op">=</span> vg <span class="op">/</span> vmag.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        perp <span class="op">=</span> vhat <span class="op">-</span> (vhat <span class="op">*</span> h).<span class="bu">sum</span>(<span class="op">-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>) <span class="op">*</span> h               <span class="co"># component of v_hat perp to n</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> h <span class="op">+</span> (<span class="va">self</span>.gain <span class="op">*</span> dt) <span class="op">*</span> perp</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        new_h <span class="op">=</span> new_h <span class="op">/</span> new_h.norm(dim<span class="op">=-</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        keep <span class="op">=</span> (occ <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">&amp;</span> (vmag[:, <span class="dv">0</span>] <span class="op">&gt;</span> <span class="fl">1e-7</span>)</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>            keep <span class="op">=</span> keep <span class="op">&amp;</span> (mask <span class="op">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        lvl.heading <span class="op">=</span> torch.where(keep[:, <span class="va">None</span>], new_h, h)</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

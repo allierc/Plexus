@@ -167,10 +167,6 @@ window.Quarto = {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -191,6 +187,10 @@ window.Quarto = {
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -407,64 +407,66 @@ c \;\leftarrow\; (1-w)\,c \;+\; w\,\overline{c}_{3\times3},
 <span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []                        <span class="co"># no required params — target field comes from `at:` (engine-injected)</span></span>
 <span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"diffusion"</span>, <span class="st">"field_smoothing"</span>, <span class="st">"laplacian"</span>]</span>
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"rate"</span>: <span class="st">"diffusion_rate"</span>}</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.35</span>))     <span class="co"># diffusion weight per unit time</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> fld.grid                                                    <span class="co"># [C, *shape]</span></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="co"># periodic field -&gt; wrap the blur across the seam (`circular`); else edge-clamp.</span></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        pmode <span class="op">=</span> <span class="st">"circular"</span> <span class="cf">if</span> <span class="bu">getattr</span>(fld, <span class="st">"periodic"</span>, <span class="va">False</span>) <span class="cf">else</span> <span class="st">"replicate"</span></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g.dim() <span class="op">==</span> <span class="dv">3</span>:                                               <span class="co"># 2D field [C, nx, ny]</span></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span>pmode)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool2d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)             <span class="co"># 3x3 mean, same size</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                         <span class="co"># 3D field [C, nx, ny, nz]</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span>pmode)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool3d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)            <span class="co"># 3x3x3 mean, same size</span></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        dw <span class="op">=</span> <span class="bu">min</span>(<span class="bu">max</span>(<span class="va">self</span>.rate <span class="op">*</span> dt, <span class="fl">0.0</span>), <span class="fl">1.0</span>)                        <span class="co"># saturate(rate*dt)</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> g <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> dw) <span class="op">+</span> blur <span class="op">*</span> dw</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.35</span>))     <span class="co"># diffusion weight per unit time</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> fld.grid                                                    <span class="co"># [C, *shape]</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        <span class="co"># periodic field -&gt; wrap the blur across the seam (`circular`); else edge-clamp.</span></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        pmode <span class="op">=</span> <span class="st">"circular"</span> <span class="cf">if</span> <span class="bu">getattr</span>(fld, <span class="st">"periodic"</span>, <span class="va">False</span>) <span class="cf">else</span> <span class="st">"replicate"</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g.dim() <span class="op">==</span> <span class="dv">3</span>:                                               <span class="co"># 2D field [C, nx, ny]</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span>pmode)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool2d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)             <span class="co"># 3x3 mean, same size</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                         <span class="co"># 3D field [C, nx, ny, nz]</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>            gp <span class="op">=</span> Fnn.pad(g.unsqueeze(<span class="dv">0</span>), (<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>), mode<span class="op">=</span>pmode)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>            blur <span class="op">=</span> Fnn.avg_pool3d(gp, <span class="dv">3</span>, stride<span class="op">=</span><span class="dv">1</span>).squeeze(<span class="dv">0</span>)            <span class="co"># 3x3x3 mean, same size</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        dw <span class="op">=</span> <span class="bu">min</span>(<span class="bu">max</span>(<span class="va">self</span>.rate <span class="op">*</span> dt, <span class="fl">0.0</span>), <span class="fl">1.0</span>)                        <span class="co"># saturate(rate*dt)</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> g <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> dw) <span class="op">+</span> blur <span class="op">*</span> dw</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span>
 <span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"diffuse"</span>, family<span class="op">=</span><span class="st">"fields"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>,</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>                   implementation<span class="op">=</span><span class="st">"spectral"</span>)</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> DiffuseSpectral(FieldUpdate):</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""`spectral` implementation of the `diffuse` contract: one EXACT heat-kernel step of</span></span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a><span class="co">    dc/dt = D nabla^2 c on a periodic grid -- c_hat *= exp(-D k^2 dt) in Fourier space.</span></span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="co">    Same contract as the finite-difference box-blur (Diffuse); differs only in numerics</span></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="co">    (spectral accuracy, periodic boundary). Differentiable via torch.fft, so an inverse</span></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="co">    loop that filters `capabilities()` for `differentiable` keeps it."""</span></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>]                        <span class="co"># FFT step is 2D here (N-D is a follow-up)</span></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>    DIFFERENTIABLE <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"diffusion"</span>, <span class="st">"field_smoothing"</span>, <span class="st">"spectral"</span>]</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"rate"</span>: <span class="st">"diffusion_coefficient"</span>}</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.35</span>))     <span class="co"># diffusion coefficient D</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> fld.grid                                                    <span class="co"># [C, nx, ny]</span></span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g.dim() <span class="op">!=</span> <span class="dv">3</span>:</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">NotImplementedError</span>(<span class="st">"diffuse:spectral is 2D-only (grid must be [C, nx, ny])"</span>)</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        _, nx, ny <span class="op">=</span> g.shape</span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        kx <span class="op">=</span> fft.fftfreq(nx, device<span class="op">=</span>g.device) <span class="op">*</span> (<span class="dv">2</span> <span class="op">*</span> math.pi)          <span class="co"># radians / cell</span></span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        ky <span class="op">=</span> fft.fftfreq(ny, device<span class="op">=</span>g.device) <span class="op">*</span> (<span class="dv">2</span> <span class="op">*</span> math.pi)</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        k2 <span class="op">=</span> kx[:, <span class="va">None</span>] <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> ky[<span class="va">None</span>, :] <span class="op">**</span> <span class="dv">2</span>                        <span class="co"># [nx, ny]</span></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        decay <span class="op">=</span> torch.exp(<span class="op">-</span><span class="va">self</span>.rate <span class="op">*</span> dt <span class="op">*</span> k2)                         <span class="co"># exact heat kernel</span></span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        ghat <span class="op">=</span> fft.fftn(g, dim<span class="op">=</span>(<span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>))</span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> fft.ifftn(ghat <span class="op">*</span> decay, dim<span class="op">=</span>(<span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>)).real</span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"diffuse"</span>, family<span class="op">=</span><span class="st">"fields"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"field"</span>, kind<span class="op">=</span><span class="st">"field"</span>,</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>                   implementation<span class="op">=</span><span class="st">"spectral"</span>)</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> DiffuseSpectral(FieldUpdate):</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""`spectral` implementation of the `diffuse` contract: one EXACT heat-kernel step of</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="co">    dc/dt = D nabla^2 c on a periodic grid -- c_hat *= exp(-D k^2 dt) in Fourier space.</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a><span class="co">    Same contract as the finite-difference box-blur (Diffuse); differs only in numerics</span></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="co">    (spectral accuracy, periodic boundary). Differentiable via torch.fft, so an inverse</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="co">    loop that filters `capabilities()` for `differentiable` keeps it."""</span></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>]                        <span class="co"># FFT step is 2D here (N-D is a follow-up)</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>    DIFFERENTIABLE <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"diffusion"</span>, <span class="st">"field_smoothing"</span>, <span class="st">"spectral"</span>]</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"rate"</span>: <span class="st">"diffusion_coefficient"</span>}</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."</span></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.35</span>))     <span class="co"># diffusion coefficient D</span></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        g <span class="op">=</span> fld.grid                                                    <span class="co"># [C, nx, ny]</span></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> g.dim() <span class="op">!=</span> <span class="dv">3</span>:</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">NotImplementedError</span>(<span class="st">"diffuse:spectral is 2D-only (grid must be [C, nx, ny])"</span>)</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        _, nx, ny <span class="op">=</span> g.shape</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        kx <span class="op">=</span> fft.fftfreq(nx, device<span class="op">=</span>g.device) <span class="op">*</span> (<span class="dv">2</span> <span class="op">*</span> math.pi)          <span class="co"># radians / cell</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        ky <span class="op">=</span> fft.fftfreq(ny, device<span class="op">=</span>g.device) <span class="op">*</span> (<span class="dv">2</span> <span class="op">*</span> math.pi)</span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        k2 <span class="op">=</span> kx[:, <span class="va">None</span>] <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> ky[<span class="va">None</span>, :] <span class="op">**</span> <span class="dv">2</span>                        <span class="co"># [nx, ny]</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>        decay <span class="op">=</span> torch.exp(<span class="op">-</span><span class="va">self</span>.rate <span class="op">*</span> dt <span class="op">*</span> k2)                         <span class="co"># exact heat kernel</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>        ghat <span class="op">=</span> fft.fftn(g, dim<span class="op">=</span>(<span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>))</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> fft.ifftn(ghat <span class="op">*</span> decay, dim<span class="op">=</span>(<span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>)).real</span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

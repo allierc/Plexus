@@ -233,6 +233,7 @@ class SquaredLaw(Lateral):
                    "all_pairs": "sum over ALL pairs (O(N^2), long-range) vs the neighbour graph",
                    "compile": "torch.compile the all-pairs kernel (big N)",
                    "clamp": "max |acceleration| (0 = unbounded)"}
+    REFERENCE = "Newton, I. (1687). Principia (inverse-square law); Coulomb, C.-A. (1785)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
