@@ -139,19 +139,18 @@ def _scat(ax, cen, val, cmap, title, vlim):
 def _div(ax, cen, born, ncum):
     ax.clear(); ax.set_facecolor("black")
     m = np.asarray(born) > 0.5
-    ax.scatter(cen[~m, 0], cen[~m, 1], cen[~m, 2], s=5, c="dimgray")     # all cells grey
+    ax.scatter(cen[~m, 0], cen[~m, 1], cen[~m, 2], s=2, c="dimgray")     # all cells grey (small)
     if m.any():
-        ax.scatter(cen[m, 0], cen[m, 1], cen[m, 2], s=18, c="red")       # just-divided cells red
-    _axes3d(ax, cen, "cell division")
-    ax.text2D(0.03, 0.93, f"divisions: {ncum}", transform=ax.transAxes, color="white", fontsize=11)
+        ax.scatter(cen[m, 0], cen[m, 1], cen[m, 2], s=5, c="red")        # just-divided cells red
+    _axes3d(ax, cen, f"cell division ({ncum})")                          # count in the title
 
 
 def _track(ax, cen, tracks):
     ax.clear(); ax.set_facecolor("black")
-    ax.scatter(cen[:, 0], cen[:, 1], cen[:, 2], s=2, c="dimgray")        # ALL cells (small dots)
+    ax.scatter(cen[:, 0], cen[:, 1], cen[:, 2], s=2, c="dimgray")        # ALL cells (same small dot)
     for j in range(tracks.shape[1]):
         ax.plot(tracks[:, j, 0], tracks[:, j, 1], tracks[:, j, 2], "-", lw=0.6, alpha=0.7)
-    ax.scatter(tracks[-1, :, 0], tracks[-1, :, 1], tracks[-1, :, 2], s=3, c="white")
+    ax.scatter(tracks[-1, :, 0], tracks[-1, :, 1], tracks[-1, :, 2], s=5, c="white")
     _axes3d(ax, cen, "cell tracking")
 
 
@@ -173,6 +172,17 @@ def _render(folder, name, Q, tracks, idx):
     plt.close(fig); print(f"[analyze] wrote {folder}/analysis.mp4 + quantification.npz", flush=True)
 
 
+def render_only(folder):
+    """Re-render analysis.mp4 from an existing quantification.npz (no sim re-run) -- fast viz iteration."""
+    d = np.load(os.path.join(folder, "quantification.npz"), allow_pickle=True)
+    Q = {k: list(d[k]) for k in ("cen", "act", "force", "pressure", "tension", "vel", "neigh", "born")}
+    Q["t"] = list(d["t"]); Q["nF"] = [len(c) for c in Q["cen"]]
+    _render(folder, os.path.basename(os.path.normpath(folder)), Q, d["tracks"], None)
+
+
 if __name__ == "__main__":
-    folder = sys.argv[1] if len(sys.argv) > 1 else "archive/round_34_900"
-    run(folder, int(sys.argv[2]) if len(sys.argv) > 2 else 48)
+    if len(sys.argv) > 1 and sys.argv[1] == "render":       # analyze_forces.py render <folder>  (fast re-render)
+        render_only(sys.argv[2])
+    else:
+        folder = sys.argv[1] if len(sys.argv) > 1 else "archive/round_34_900"
+        run(folder, int(sys.argv[2]) if len(sys.argv) > 2 else 48)
