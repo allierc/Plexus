@@ -1292,4 +1292,22 @@ across seeds and scales), and \textbf{emerging} (the tube is produced by the loc
 The differentiable force/pressure field makes each of these a measurable objective rather than an aesthetic
 judgement --- which is the point of building the analysis before pushing the phenomenon further.
 
+\paragraph{Okuda's own answer: the process is QUASI-STATIC (2026-07-23).} Re-reading the paper for the
+hollow/stress problem gives the mechanism directly. Okuda writes: \emph{``By assuming a quasi-static process,
+the cell cycle $\tau_{\text{cycle}}$ was set to be much larger than the characteristic time of cell
+deformation, represented by $\eta_c/\kappa_s$''}, and relaxes each configuration until \emph{``the mean
+residual error is under the threshold $E_{\text{th}}$''} before the next event. In words: after every growth
+or division increment the tissue \emph{fully relaxes to force balance} (and reconnects, edge $<\Delta l_{\text{th}}$)
+\emph{before} anything else changes. That is precisely the ``slower growth so cells rearrange'' hypothesis,
+made exact --- and it is exactly what our runs violate: a \emph{fixed} \texttt{relax\_iters} per frame with a
+fast tip-tracking extrusion drives growth faster than the mesh can relax, so the tube is built out of
+never-equilibrated cells (pressure $\sim$3.1, fresh tiny daughters, curvature). The fix is therefore not a
+parameter nudge but a \emph{regime}: relax to a residual threshold (not a fixed iteration count) and keep
+$\tau_{\text{cycle}}\gg\eta_c/\kappa_s$. Two corollaries from the same reading: the constant tube diameter
+comes from the \emph{maintained activator-spot size} (our fixed-radius tip cap already does this), and
+division is \emph{normal to the cell's own longest axis} --- in a quasi-static tube the wall cells elongate
+along the tube, so a plain Hertwig long-axis split already extends it (the forced bud-axis orientation may be
+unnecessary once the dynamics are quasi-static). \texttt{round\_41+} pursue this: relax-to-residual, slow
+cycle, Hertwig division.
+
 \end{document}
