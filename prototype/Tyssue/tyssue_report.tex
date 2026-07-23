@@ -1354,4 +1354,21 @@ partition back, coupled to the wall machinery) and \emph{wall-not-bulge}; and, m
 extrusion-driven $\to$ growth-driven transition a successful monolayer (not the spiky first attempt) would
 need for a genuinely low-stress tube.
 
+\paragraph{R44 --- emergent RD floods (the tip-driver is necessary).} Coupling the emergent Gierer--Meinhardt
+partition (not the tip-driver) to the wall machinery floods (red\_frac $0.7\!-\!0.88$) and over-proliferates
+with \emph{no} tube --- the domain-growth flood recurs over a long run even with $a_0\!=\!0$ and
+amount-conservation. A confined \emph{tip-riding} peak cannot be maintained by the RD alone over a full tube;
+the fixed-size tip-tracking driver is what makes a sustained tube possible. Goal~2 (a clean \emph{RD-driven}
+tube) is not reachable with this RD.
+
+\paragraph{Consolidated state after 23 rounds (R22--44).} Best tube $=$ \texttt{round\_40\_mc8}: aspect
+$\sim$7.5, hollow $176$ (tube-aware), CV $0.63$, $\sim$2700 cells (mid-surface, tip-tracking $+$ oriented
+division $+$ extrusion, $K_V\!=\!6$, staggered cycle). The ``huge hollow'' was $\sim$30\% metric artifact
+(the wall is clean, median dev $26^\circ$); CV is solved by $K_V$. The tube is \emph{extrusion-driven}
+(pressure $\sim$3): relaxation, Hertwig division, thickening, and emergent RD each remove or degrade it. The
+only genuinely low-stress route is \emph{growth-driven} (monolayer, Okuda-quasi-static), but the first wiring
+\emph{spiked} --- likely because division still triggers on the \emph{wedge} volume, not the monolayer's
+$A\!\cdot\!h$, so activated cells \emph{inflate} instead of \emph{dividing}. Fixing the division trigger to the
+monolayer volume is the concrete next step toward a proliferation-built, low-stress tube.
+
 \end{document}
