@@ -69,6 +69,9 @@ def frame_metrics(pt, mt, act=None):
     if act is not None and len(act):
         act = np.asarray(act, float); thr = act.min() + 0.5 * (act.max() - act.min())
         m["red_frac"] = round(float((act > thr).mean()), 3)
+        _, radc = _cell_centroids(pt, mt); ok = radc > 1e-9    # tip_act: corr(activator, radius). +1 = activator
+        if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
+            m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
     m.update(tube_diameter(pt, mt))
     return m
 
@@ -87,7 +90,8 @@ def analyze(frames, OUT):
                 area_cv_final=series[-1]["area_cv"], vol_cv_final=series[-1]["vol_cv"],
                 tube_diam_final=series[-1]["tube_diam"], n_tubes_final=series[-1]["n_tubes"],
                 tube_len_final=series[-1]["tube_len"], protr_final=series[-1]["protr"],
-                red_frac_final=series[-1].get("red_frac", 0.0))
+                red_frac_final=series[-1].get("red_frac", 0.0),
+                tip_act_final=series[-1].get("tip_act", 0.0))
     json.dump({"summary": summ, "series": series}, open(os.path.join(OUT, "metrics.json"), "w"), indent=1)
     fig, ax = plt.subplots(1, 3, figsize=(13.5, 3.4)); fig.patch.set_facecolor("white")
     ax[0].plot(fr, col("hollow_n"), "-", color="crimson"); ax[0].set_title("hollow cell count"); ax[0].set_xlabel("frame")
