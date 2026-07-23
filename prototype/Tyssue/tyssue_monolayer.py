@@ -24,6 +24,20 @@ from plexus.models.registry import register_operator
 from tyssue_ops3d import face_geometry_3d
 
 
+def apical_basal_shells(pos, es, et, ef, nF, h_cell):
+    """Apical (outer) and basal (inner) vertex positions a_i, b_i = x_i +/- (H_i/2) n_i, for RENDERING
+    the monolayer as two offset shells with a visible thickness. Same offset the energy uses."""
+    dev, dt = pos.device, pos.dtype
+    Nv = pos.shape[0]
+    s, t = pos[es], pos[et]
+    Nf = 0.5 * torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, torch.cross(s, t, dim=-1))
+    vn = torch.zeros(Nv, 3, device=dev, dtype=dt).index_add(0, es, Nf[ef])
+    n = vn / (vn.norm(dim=-1, keepdim=True) + 1e-12)
+    cnt = torch.zeros(Nv, device=dev, dtype=dt).index_add(0, es, torch.ones(es.shape[0], device=dev, dtype=dt))
+    hv = torch.zeros(Nv, device=dev, dtype=dt).index_add(0, es, h_cell[ef]) / cnt.clamp(min=1e-9)
+    return pos + 0.5 * hv[:, None] * n, pos - 0.5 * hv[:, None] * n
+
+
 def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
     """Per-cell prism volume v_f and surface s_f (apical+basal+lateral), plus the apical/basal cap areas.
     All differentiable in `pos`. h_cell is per-cell thickness [nF]. eocc masks dead half-edges (or None)."""
@@ -41,20 +55,12 @@ def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
     hv = torch.zeros(Nv, device=dev, dtype=dt).index_add(0, es, h_cell[ef] * ones_e) / cnt_v.clamp(min=1e-9)
     a = pos + 0.5 * hv[:, None] * n                                # apical (outer) shell
     b = pos - 0.5 * hv[:, None] * n                                # basal (inner) shell
-    # cap centroids per face (fan apex for the exact tet decomposition)
-    cnt_f = torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, ones_e)
-    ca = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, a[es] * ones_e[:, None]) / cnt_f.clamp(min=1e-9)[:, None]
-    cb = torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, b[es] * ones_e[:, None]) / cnt_f.clamp(min=1e-9)[:, None]
     a_s, a_t, b_s, b_t = a[es], a[et], b[es], b[et]
-    caf, cbf = ca[ef], cb[ef]
-
-    def det(p, q, r):
-        return (p * torch.cross(q, r, dim=-1)).sum(-1)            # 6x signed tet volume from origin
-
-    # prism volume = (1/6) sum over outward-oriented boundary triangles (apical cap, basal cap reversed,
-    # 2 lateral triangles per edge). Outward orientation verified in monolayer_design.md.
-    tv = (det(caf, a_s, a_t) + det(cbf, b_t, b_s) + det(a_s, a_t, b_t) + det(a_s, b_t, b_s)) * ones_e
-    v_f = (1.0 / 6.0) * torch.zeros(nF, device=dev, dtype=dt).index_add(0, ef, tv)
+    # cell VOLUME = mid-surface area x thickness (v_j = A_mid*h_j). Exact for a flat cell, first-order in
+    # curvature (the O((h/R)^2) prism correction ~0.3% is dropped); ALWAYS positive & differentiable, and
+    # -- the key point -- bending resistance comes from the SURFACE term below (apical!=basal area under
+    # curvature), NOT from the volume, so A_mid*h is the physically correct choice, not just the simple one.
+    v_f = Nf.norm(dim=-1) * h_cell
     # apical / basal cap areas (Newell magnitude, origin-independent)
     Na = 0.5 * torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, torch.cross(a_s, a_t, dim=-1) * ones_e[:, None])
     Nb = 0.5 * torch.zeros(nF, 3, device=dev, dtype=dt).index_add(0, ef, torch.cross(b_s, b_t, dim=-1) * ones_e[:, None])
