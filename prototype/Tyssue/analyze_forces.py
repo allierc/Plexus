@@ -100,14 +100,15 @@ def run(folder, nfr=48):
         Q["force"].append(fmag); Q["pressure"].append(pres.numpy()); Q["tension"].append(tens.numpy())
         Q["vel"].append(vel); Q["neigh"].append(_neighbours(es, et, ef, nF)); Q["born"].append(born); Q["nF"].append(nF)
 
-    # --- tracking: follow ~40 cells from the first analysed frame by nearest centroid ---
-    c0 = Q["cen"][0]; sel = np.linspace(0, len(c0) - 1, min(40, len(c0))).astype(int)
-    tracks = [c0[sel]]
-    for k in range(1, len(Q["cen"])):
-        c = Q["cen"][k]; prev = tracks[-1]
-        nn = np.linalg.norm(c[None, :, :] - prev[:, None, :], axis=2).argmin(1)
-        tracks.append(c[nn])
-    tracks = np.array(tracks)                                    # [frames, n_sel, 3]
+    # --- tracking: sample cells from the FINAL frame (so TUBE cells, born late, are included) and track
+    #     them BACKWARD by nearest centroid -> paths back to their origin ---
+    cL = Q["cen"][-1]; sel = np.linspace(0, len(cL) - 1, min(90, len(cL))).astype(int)
+    bwd = [cL[sel]]
+    for k in range(len(Q["cen"]) - 2, -1, -1):
+        c = Q["cen"][k]; nxt = bwd[-1]
+        nn = np.linalg.norm(c[None, :, :] - nxt[:, None, :], axis=2).argmin(1)
+        bwd.append(c[nn])
+    tracks = np.array(bwd[::-1])                                 # [frames, n_sel, 3], forward order
 
     summary = dict(frames=len(idx), cells_start=Q["nF"][0], cells_end=Q["nF"][-1],
                    force_mean=float(np.mean([f.mean() for f in Q["force"]])),
@@ -122,36 +123,52 @@ def run(folder, nfr=48):
     return summary
 
 
-def _panel(ax, cen, val, cmap, title, vlim=None, tracks=None):
-    ax.clear(); ax.set_facecolor("black")
-    if tracks is not None:
-        for j in range(tracks.shape[1]):                        # cell paths up to now
-            ax.plot(tracks[:, j, 0], tracks[:, j, 1], tracks[:, j, 2], "-", lw=0.7, alpha=0.7)
-        ax.scatter(tracks[-1, :, 0], tracks[-1, :, 1], tracks[-1, :, 2], s=6, c="white")
-    else:
-        v = np.asarray(val); lo, hi = (vlim or (float(np.percentile(v, 3)), float(np.percentile(v, 97) + 1e-9)))
-        ax.scatter(cen[:, 0], cen[:, 1], cen[:, 2], c=v, cmap=cmap, s=7, vmin=lo, vmax=hi)
+def _axes3d(ax, cen, title):
     R_ = float(np.abs(cen).max()) * 1.05
     ax.set_xlim(-R_, R_); ax.set_ylim(-R_, R_); ax.set_zlim(-R_, R_)
     ax.set_box_aspect((1, 1, 1)); ax.view_init(18, 30); ax.set_axis_off()
     ax.set_title(title, color="white", fontsize=9)
 
 
+def _scat(ax, cen, val, cmap, title, vlim):
+    ax.clear(); ax.set_facecolor("black")
+    ax.scatter(cen[:, 0], cen[:, 1], cen[:, 2], c=np.asarray(val), cmap=cmap, s=7, vmin=vlim[0], vmax=vlim[1])
+    _axes3d(ax, cen, title)
+
+
+def _div(ax, cen, born, ncum):
+    ax.clear(); ax.set_facecolor("black")
+    m = np.asarray(born) > 0.5
+    ax.scatter(cen[~m, 0], cen[~m, 1], cen[~m, 2], s=5, c="dimgray")     # all cells grey
+    if m.any():
+        ax.scatter(cen[m, 0], cen[m, 1], cen[m, 2], s=18, c="red")       # just-divided cells red
+    _axes3d(ax, cen, "cell division")
+    ax.text2D(0.03, 0.93, f"divisions: {ncum}", transform=ax.transAxes, color="white", fontsize=11)
+
+
+def _track(ax, cen, tracks):
+    ax.clear(); ax.set_facecolor("black")
+    ax.scatter(cen[:, 0], cen[:, 1], cen[:, 2], s=2, c="dimgray")        # ALL cells (small dots)
+    for j in range(tracks.shape[1]):
+        ax.plot(tracks[:, j, 0], tracks[:, j, 1], tracks[:, j, 2], "-", lw=0.6, alpha=0.7)
+    ax.scatter(tracks[-1, :, 0], tracks[-1, :, 1], tracks[-1, :, 2], s=3, c="white")
+    _axes3d(ax, cen, "cell tracking")
+
+
 def _render(folder, name, Q, tracks, idx):
-    # global colour limits (steady scale across the movie)
     flim = (0, float(np.percentile(np.concatenate(Q["force"]), 97)))
-    plim = float(np.percentile(np.abs(np.concatenate(Q["pressure"])), 97)); plim = (-plim, plim)
+    P = float(np.percentile(np.abs(np.concatenate(Q["pressure"])), 97)); plim = (-P, P)
+    ncum = np.cumsum([float(b.sum()) for b in Q["born"]]).astype(int)
     fig = plt.figure(figsize=(9, 8.4)); fig.patch.set_facecolor("black")
     axes = [fig.add_subplot(2, 2, i + 1, projection="3d") for i in range(4)]
     wri = FFMpegWriter(fps=8, metadata={"title": f"{name} analysis"})
     with wri.saving(fig, os.path.join(folder, "analysis.mp4"), dpi=90):
         for k in range(len(Q["cen"])):
             cen = Q["cen"][k]
-            _panel(axes[0], cen, Q["force"][k], "inferno", "force  |-grad U|", flim)
-            _panel(axes[1], cen, Q["pressure"][k], "coolwarm", "stress  (pressure)", plim)
-            _panel(axes[2], cen, Q["born"][k], "hot", "cell division (just born)", (0, 1))
-            _panel(axes[3], cen, None, None, "cell tracking", tracks=tracks[:k + 1])
-            fig.suptitle(f"{name}   frame {Q['t'][k]}   cells {Q['nF'][k]}", color="white", fontsize=11)
+            _scat(axes[0], cen, Q["force"][k], "inferno", "force  |-grad U|", flim)
+            _scat(axes[1], cen, Q["pressure"][k], "coolwarm", "stress  (pressure)", plim)
+            _div(axes[2], cen, Q["born"][k], int(ncum[k]))
+            _track(axes[3], cen, tracks[:k + 1])
             wri.grab_frame()
     plt.close(fig); print(f"[analyze] wrote {folder}/analysis.mp4 + quantification.npz", flush=True)
 

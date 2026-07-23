@@ -1220,4 +1220,28 @@ tubes (Fig~5 starfish), branching (Fig~6, low $\gamma$), and --- separately --- 
 (profile the first 200 frames, vectorise/\texttt{torch.compile} the hot loops, keep rendering off the critical
 path) so more of the phenomenon space can be swept per hour.
 
+\section{Differentiable mechanics analysis (\texttt{analyze\_forces.py})}
+A standalone tool re-runs a run and quantifies, per cell and per frame, the mechanical fields --- built to be
+\textbf{torch-differentiable} so a downstream loss (expel the tip, relieve tube stress) can be optimised.
+The vertex-model energy is
+\begin{equation}
+U=\sum_{j\in\text{cells}}\Big[K_A(A_j-A_j^0)^2+K_P(P_j-P_j^0)^2+\tfrac12\Gamma P_j^2+K_V(v_j-v_j^{\text{eq}})^2\Big]
+  \;+\;\Lambda\!\!\sum_{e\in\text{edges}}\!\ell_e,
+\end{equation}
+with per-cell area $A_j$, perimeter $P_j$, volume $v_j$ (their targets $A_j^0,P_j^0,v_j^{\text{eq}}$ recorded
+each frame) and edge lengths $\ell_e$. The quantities plotted are:
+\begin{align}
+\textbf{Force (per vertex):}\quad & \mathbf{F}_i=-\,\frac{\partial U}{\partial \mathbf{x}_i}
+  \quad\text{(one autograd pass; per-cell value} = \text{mean } \|\mathbf{F}_i\|\text{ over the cell's ring).}\\
+\textbf{Stress / pressure (per cell):}\quad & p_j=-\frac{\partial U}{\partial v_j}=2K_V\,(v_j^{\text{eq}}-v_j)
+  \quad\text{(}{>}0:\text{ below target volume }\Rightarrow\text{ pushes outward).}\\
+\textbf{Cortical tension (per cell):}\quad & T_j=\frac{\partial U}{\partial P_j}=2K_P(P_j-P_j^0)+\Gamma P_j+\Lambda .
+\end{align}
+Movement is the centroid nearest-neighbour displacement; divisions are cells appended since the previous
+frame; tracking follows cells sampled at the final frame \emph{backward} by nearest centroid (so tube cells,
+born late, are included). Output: \texttt{quantification.npz} (per-frame per-cell tables) $+$ a 2$\times$2
+\texttt{analysis.mp4} (force $\mid$ stress $\mid$ division $\mid$ tracking). On the long tube (aspect $10.7$)
+the tool shows the \emph{tip is the force/pressure hot-spot} --- the tube is under high stress, the concrete
+target for the next optimisation.
+
 \end{document}
