@@ -311,6 +311,22 @@ PRESETS["round_31_c8_chi2"]   = dict(_H31, cone_deg=8.0,  chi=2.0)
 PRESETS["round_31_c8_chi3"]   = dict(_H31, cone_deg=8.0,  chi=3.0)
 PRESETS["round_31_c6_extr12"] = dict(_H31, cone_deg=6.0,  chi=2.0, K_extrude=12.0)   # small spot + strong push
 PRESETS["round_31_c10_chi3"]  = dict(_H31, cone_deg=10.0, chi=3.0)
+# ===== round_32: 2x FRAMES on the THIN tube (user). round_31 c8 (cone8,chi4) gave a thin elongated finger
+# (len/diam~2) with LESS proliferation (1800 cells) than the fat lobe. Hypothesis: less activated material ->
+# slower domain growth -> the thin tube SUSTAINS + ELONGATES over a longer run (unlike round_29's fat lobe that
+# was lost by frame 350). Double frames -> 700-900. seed_dir aims the single tube at the FRONT of the camera
+# (elev18/azim30 -> ~(.82,.48,.31)) so it faces the viewer, not the left.
+_FRONT = [0.82, 0.48, 0.31]
+_H32 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1, a0=0.0, grow_after=100, orient_iface=True, orient_asw=1.2,
+            iface_asw=1.2, K_extrude=8.0, cone_deg=8.0, chi=4.0, seed_dir=_FRONT)
+PRESETS["round_32_c8_700"]      = dict(_H32, frames=700)
+PRESETS["round_32_c8_900"]      = dict(_H32, frames=900)
+PRESETS["round_32_c10c3_700"]   = dict(_H32, frames=700, cone_deg=10.0, chi=3.0)
+PRESETS["round_32_c8_700_p3"]   = dict(_H32, frames=700, K_purse=3.0)                  # neck to keep it thin
+PRESETS["round_32_c8_700_ex12"] = dict(_H32, frames=700, K_extrude=12.0)               # stronger push
+PRESETS["round_32_c8_700_r012"] = dict(_H32, frames=700, rate=0.012)                   # a bit more growth
+PRESETS["round_32_c8_700_ga150"]= dict(_H32, frames=700, grow_after=150)               # settle longer first
+PRESETS["round_32_c8_900_p3"]   = dict(_H32, frames=900, K_purse=3.0)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -326,7 +342,7 @@ def make(p):
         # seed once (before_frame) when rd evolves it OR seed_once=True (a FLAT spot frozen on the cells: no
         # tip-tracking -> the control that should DOME). Else re-seed every frame = tip-riding cones -> tube.
         seed = {"before_frame": 3} if (rd or p.get("seed_once")) else {}
-        ops += [{"op": "cell_rd_seed", "at": "cell", "mode": "cones", "n_spots": p["spots"], "cone_deg": p["cone_deg"], **seed}]
+        ops += [{"op": "cell_rd_seed", "at": "cell", "mode": "cones", "n_spots": p["spots"], "cone_deg": p["cone_deg"], "seed_dir": p.get("seed_dir", None), **seed}]
         sched += ["cell_rd_seed"]
         if rd:
             impl = p.get("rd_impl", "brusselator")
