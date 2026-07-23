@@ -136,6 +136,7 @@ class SeedMesh3D(Structural):
     positions, and stash the edge table + per-face targets (A0, P0) and the lumen target V0."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["vesicle", "epithelial_shell", "spherical", "half_edge_mesh", "initial_condition"]
+    REFERENCE = "Okuda, S. et al. (2013). Reversible network reconnection model for simulating large deformation in 3D tissues. Biomech. Model. Mechanobiol. 12:627-644; tyssue (DamCB)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -195,6 +196,7 @@ class ShapeEnergy3D(Lateral):
     INPUTS = ["vertex"]; OUTPUTS = ["vertex"]; READS = ["pos"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
     MECHANISM_TAGS = ["vertex_model", "shape_energy", "cell_volume_elasticity", "vesicle", "force_balance"]
+    REFERENCE = "Farhadifar, R. et al. (2007). Curr. Biol. 17:2095-2104 (vertex-model shape energy); Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 14:413-421 (3D volume/surface)."
     PARAM_ROLES = {"p0": "target_shape_index", "K_A": "area_stiffness", "K_P": "perimeter_stiffness",
                    "Lambda": "surface_tension", "K_V": "cell_volume_elasticity", "cap_frac": "stability_cap"}
 
@@ -344,6 +346,7 @@ class VesicleGrowth(Structural):
     (grow prefered_vol, minimise) and Turing_vertex Eq.3 (grow v_eq)."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
     MECHANISM_TAGS = ["growth", "isotropic_inflation", "vesicle", "volume_target_scaling"]
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -382,6 +385,7 @@ class Divide3D(Structural):
     its birth volume to half; shape_energy_3d re-balances."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["division", "cell_division", "vesicle", "proliferation", "volume_doubling"]
+    REFERENCE = "Hertwig, O. (1884) (long-axis division rule); tyssue cell_division (DamCB)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -564,6 +568,8 @@ class TopoSnapshot3D(Structural):
     """Record the current mesh (flat half-edge table + vertex count) each frame, so a growing/dividing
     vesicle -- whose topology changes over time -- can be rendered frame by frame."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["recording", "topology_history", "diagnostic"]
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device); self.at = params.get("_at", "vertex")

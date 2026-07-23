@@ -32,6 +32,7 @@ class CellGeometry3D(Aggregate):
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     INPUTS = ["vertex"]; OUTPUTS = ["cell"]; READS = ["pos"]; WRITES = ["area", "cen"]
     MECHANISM_TAGS = ["aggregate", "cell_geometry", "cross_scale"]
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -62,6 +63,7 @@ class CellAdjacency(Rewire):
     reaction-diffusion runs on. (Rebuilt each call so it tracks T1/division if they run.)"""
     SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False
     MECHANISM_TAGS = ["cell_adjacency", "neighbour_graph"]
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -97,6 +99,7 @@ class CellRDSeed(Structural):
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u]."""
     SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["initial_condition", "gray_scott"]
+    REFERENCE = "Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -164,6 +167,7 @@ class CellDiffuse(Lateral):
     REQUIRES_PARAMS = ["d_a", "d_h", "chi"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = ["edge_index"]
     MECHANISM_TAGS = ["diffusion", "graph_laplacian", "turing"]
+    REFERENCE = "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."
     PARAM_ROLES = {"d_a": "activator_diffusivity", "d_h": "substrate_diffusivity", "chi": "spatial_scale"}
 
     def __init__(self, params, device="cpu"):
@@ -198,6 +202,7 @@ class CellReactGrayScott(Lateral):
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
     MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott"]
     PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "rate": "reaction_time_scale"}
+    REFERENCE = "Gray, P. & Scott, S. K. (1984). Chem. Eng. Sci. 39:1087-1097; Pearson, J. E. (1993). Science 261:189-192."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -215,6 +220,37 @@ class CellReactGrayScott(Lateral):
         return {self.at: self.rate * torch.stack([da, du], dim=1) * occ}
 
 
+@register_operator("cell_react", set="cell", kind="lateral", family="fields", implementation="gierer_meinhardt")
+class CellReactGiererMeinhardt(Lateral):
+    """Gierer-Meinhardt activator(a)-inhibitor(h) -- the RD OKUDA uses (ref 37). chem = [a, h]:
+        da/dt = gm_rho * a^2/h - mu_a * a + a0     (SELF-ENHANCING activator: the a^2/h AUTOCATALYSIS is the
+        dh/dt = gm_rho * a^2   - mu_h * h            amplification feedback that self-maintains a localised PEAK)
+    Paired (in cell_diffuse) with a FAST inhibitor (d_h >> d_a via chi) -> lateral inhibition -> a stable
+    localised activator peak WITH A GRADIENT (Okuda's tip spot), unlike Brusselator (decays the seed) or
+    Gray-Scott (substrate-depletion). `rate` time-scales the reaction; a0 is a small basal activator source."""
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    MECHANISM_TAGS = ["reaction", "autocatalysis", "self_enhancing", "turing", "gierer_meinhardt"]
+    PARAM_ROLES = {"gm_rho": "production", "mu_a": "activator_decay", "mu_h": "inhibitor_decay", "a0": "basal_source"}
+    REFERENCE = "Gierer, A. & Meinhardt, H. (1972). A theory of biological pattern formation. Kybernetik 12:30-39."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.gm_rho = float(params.get("gm_rho", 1.0)); self.mu_a = float(params.get("mu_a", 1.0))
+        self.mu_h = float(params.get("mu_h", 1.0)); self.a0 = float(params.get("a0", 0.01))
+        self.rate = float(params.get("rate", 1.0))
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        a = chem[:, 0].clamp(min=0.0); h = chem[:, 1].clamp(min=1e-3)   # h>0: the a^2/h autocatalysis stays finite
+        da = self.gm_rho * a * a / h - self.mu_a * a + self.a0
+        dh = self.gm_rho * a * a - self.mu_h * h
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: self.rate * torch.stack([da, dh], dim=1) * occ}
+
+
 @register_operator("morphogen_growth_3d", set="vertex", kind="structural", family="growth")
 class MorphogenGrowth3D(Structural):
     """Morphogen-driven growth: each cell's targets grow at a per-cell rate set by a Hill function of
@@ -224,6 +260,7 @@ class MorphogenGrowth3D(Structural):
     Uniform vesicle_growth is the a_sw->0 limit."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
     MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
+    REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -280,6 +317,7 @@ class CellReactBrusselator(Lateral):
     REQUIRES_PARAMS = ["gamma", "A", "B"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
     MECHANISM_TAGS = ["reaction", "activator_inhibitor", "turing", "brusselator"]
+    REFERENCE = "Prigogine, I. & Lefever, R. (1968). Symmetry breaking instabilities in dissipative systems. J. Chem. Phys. 48:1695-1700."
     PARAM_ROLES = {"gamma": "reaction_rate", "A": "feed", "B": "conversion"}
 
     def __init__(self, params, device="cpu"):
