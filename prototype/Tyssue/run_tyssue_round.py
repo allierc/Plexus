@@ -170,6 +170,22 @@ PRESETS["round_20_satapex"] = dict(_GMC, sat=1.5, a_sw=1.8, hill=4.0)           
 PRESETS["round_21_a0z"]     = dict(_GMC, a0=0.0, mu_h=0.8)                               # no background seed
 PRESETS["round_21_a0z_sat"] = dict(_GMC, a0=0.0, sat=0.3, mu_h=0.8)                      # + MILD saturation (below ring threshold)
 PRESETS["round_21_subcrit"] = dict(_GMC, a0=0.002, mu_a=1.6, mu_h=0.9)                   # sub-critical: stable low background
+# ===== round_22: FIG 4a -- with the AMOUNT-CONSERVATION fix in (morphogen = amount, c=m/v; growth dilutes),
+# the flood is a gamma (patterning-vs-deformation rate) problem, NOT an a0/regime one (round_21 superseded).
+# Fix chi, sweep gamma = rd_rate/deformation -> reproduce Okuda's three regimes (blur / hold / hold+increase),
+# AND A/B the fix directly: conserve_amount OFF (the old bug: c held while v grows => mass CREATED => spurious
+# tip-feeding) vs ON. Judge from the census (red_frac over frames: blur=floods, hold=localized) + movie.
+_F4 = dict(frames=220, grow_after=40, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt",
+           gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rho=0.0, vth=1.5,
+           rate=0.02, a_sw=1.5, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5)
+PRESETS["round_22_off_g1"]  = dict(_F4, rd_rate=1.0, conserve_amount=False)   # OLD BUG: creates mass -> flood control
+PRESETS["round_22_on_g1"]   = dict(_F4, rd_rate=1.0, conserve_amount=True)    # the FIX at the SAME gamma (direct A/B)
+PRESETS["round_22_g01"]     = dict(_F4, rd_rate=0.1)                          # gamma very low  -> BLUR (dilution outruns RD)
+PRESETS["round_22_g03"]     = dict(_F4, rd_rate=0.3)                          # gamma low
+PRESETS["round_22_g2"]      = dict(_F4, rd_rate=2.0)                          # gamma > 1       -> HOLD
+PRESETS["round_22_g5"]      = dict(_F4, rd_rate=5.0)                          # gamma high      -> HOLD (+spot increase?)
+PRESETS["round_22_slowgrow"]= dict(_F4, rd_rate=1.0, rate=0.008)             # slow deformation = high effective gamma
+PRESETS["round_22_fastgrow"]= dict(_F4, rd_rate=1.0, rate=0.045)             # fast deformation = low  effective gamma -> blur
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -207,7 +223,7 @@ def make(p):
         sched += ["cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
     ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
     #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga},
+    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)},
             {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}]
     sched += ["morphogen_growth_3d", "shape_energy_3d"]
     if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
