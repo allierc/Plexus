@@ -1,11 +1,13 @@
 {
- "test": "V3a_rest",
+ "test": "V3a_stability",
  "substrate": "shell",
  "R0": 5.0,
  "h0": 0.4,
  "n_cells": 220,
- "k_v": 4.0,
+ "k_v": 6.0,
  "kappa_s": 0.2,
- "R_start": 5.0,
- "R_end": 3.904586240727409
+ "gamma": 0.1,
+ "kr": 0.4,
+ "max_radial_dev_start": 2.2633650936736402,
+ "max_radial_dev_end": 0.40812262870543403
 }

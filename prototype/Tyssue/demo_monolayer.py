@@ -74,25 +74,66 @@ def draw(ax3, axc, pos, mesh, hc, field, cmap, vlim, view, slice_axis, slice_pla
     axc.set_aspect("equal"); axc.set_facecolor("black"); axc.set_xticks([]); axc.set_yticks([])
 
 
-def relax(pos0, mesh, V_eq, iters, move_mask=None, eta=0.05, cap_frac=0.10, kappa=KAPPA, kv=KV, rec=None):
+def relax(pos0, mesh, V_eq, iters, move_mask=None, eta=0.05, cap_frac=0.10, kappa=KAPPA, kv=KV, rec=None,
+          smooth_w=0.0, smooth_every=2, gamma=0.06, kr=0.0, r0=0.0):
     es, et, ef, nF = mesh["es"], mesh["et"], mesh["ef"], mesh["nF"]
-    hc = mesh["hc"]; x = pos0.clone()
-    eocc = torch.ones(es.shape[0]); vocc = torch.ones(x.shape[0]); R0t = torch.as_tensor(0.0)
+    hc = mesh["hc"]; x = pos0.clone(); Nv = x.shape[0]
+    eocc = torch.ones(es.shape[0]); vocc = torch.ones(Nv); R0t = torch.as_tensor(float(r0))
+    ones_e = torch.ones(es.shape[0], dtype=x.dtype)
     cap = cap_frac * (x[et] - x[es]).norm(dim=-1).mean()
     mm = None if move_mask is None else move_mask[:, None].to(x.dtype)
     frames = []
     for it in range(iters):
         xg = x.detach().requires_grad_(True)
-        E = _monolayer_energy_core(xg, es, et, ef, nF, hc, V_eq, torch.ones(nF), kv, kappa, 0.0, 0.0, R0t, eocc, vocc)
+        E = _monolayer_energy_core(xg, es, et, ef, nF, hc, V_eq, torch.ones(nF), kv, kappa, 0.0, kr, R0t, eocc, vocc, gamma)
         g = torch.nan_to_num(torch.autograd.grad(E, xg)[0])
         step = -eta * g
         step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
         if mm is not None:
             step = step * mm
         x = (x + step).detach()
+        if smooth_w > 0 and it % smooth_every == 0:
+            # TANGENTIAL Lloyd smoothing -- keeps cells well-shaped without remeshing (T1/division do this in
+            # the real pipeline; a static demo has neither, so 3x localized growth shears cells into slivers).
+            # Project the smoothing displacement onto the tangent plane so it rounds cells WITHOUT flattening
+            # the dome/curvature the physics produced.
+            nbr = torch.zeros_like(x).index_add(0, es, x[et])
+            deg = torch.zeros(Nv, dtype=x.dtype).index_add(0, es, ones_e).clamp(min=1)
+            disp = smooth_w * (nbr / deg[:, None] - x)
+            Nf = 0.5 * torch.zeros(nF, 3, dtype=x.dtype).index_add(0, ef, torch.cross(x[es], x[et], dim=-1))
+            vn = torch.zeros_like(x).index_add(0, es, Nf[ef]); n = vn / (vn.norm(dim=-1, keepdim=True) + 1e-12)
+            disp = disp - (disp * n).sum(-1, keepdim=True) * n
+            if mm is not None:
+                disp = disp * mm
+            x = (x + disp).detach()
         if rec is not None and (it % rec == 0 or it == iters - 1):
             frames.append(x.clone())
     return x, frames
+
+
+def relax_raw(pos, es, et, ef, nF, hc, V_eq, move, iters, eta=0.05, kappa=0.05, kv=4.0,
+              cap_frac=0.10, smooth_w=0.15, smooth_every=2, gamma=0.06):
+    """Bounded-Euler monolayer relaxation on RAW mesh tensors (topology changes between calls -> can't use
+    the mesh-dict relax). move = bool tensor of movable vertices (rim pinned). Tangential Lloyd smoothing."""
+    Nv = pos.shape[0]; x = pos.clone()
+    eocc = torch.ones(es.shape[0]); vocc = torch.ones(Nv); R0t = torch.as_tensor(0.0)
+    ones_e = torch.ones(es.shape[0], dtype=x.dtype); mm = move[:, None].to(x.dtype)
+    cap = cap_frac * (x[et] - x[es]).norm(dim=-1).mean()
+    for it in range(iters):
+        xg = x.detach().requires_grad_(True)
+        E = _monolayer_energy_core(xg, es, et, ef, nF, hc, V_eq, torch.ones(nF), kv, kappa, 0.0, 0.0, R0t, eocc, vocc, gamma)
+        g = torch.nan_to_num(torch.autograd.grad(E, xg)[0]); step = -eta * g
+        step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+        x = (x + step * mm).detach()
+        if smooth_w > 0 and it % smooth_every == 0:
+            nbr = torch.zeros_like(x).index_add(0, es, x[et])
+            deg = torch.zeros(Nv, dtype=x.dtype).index_add(0, es, ones_e).clamp(min=1)
+            disp = smooth_w * (nbr / deg[:, None] - x)
+            Nf = 0.5 * torch.zeros(nF, 3, dtype=x.dtype).index_add(0, ef, torch.cross(x[es], x[et], dim=-1))
+            vn = torch.zeros_like(x).index_add(0, es, Nf[ef]); n = vn / (vn.norm(dim=-1, keepdim=True) + 1e-12)
+            disp = disp - (disp * n).sum(-1, keepdim=True) * n
+            x = (x + disp * mm).detach()
+    return x
 
 
 def save(out, mesh, frames, fielder, cmap, vlim, view, slice_axis, slice_plane, band, titles, params, spin=0.0):
@@ -179,14 +220,19 @@ def demo_V3a():
     mesh = mk_mesh(verts, es, et, ef, nF, H0)
     pos = torch.as_tensor(verts)
     v0, _, _, _, _, _ = geom(pos, mesh, mesh["hc"])
-    _, frames = relax(pos, mesh, v0.detach(), iters=260, rec=12)
-    vl = (float(v0.min()) * 0.8, float(v0.max()))
+    # STABILITY demo: perturb the shell radially, then relax -> the monolayer heals back to a smooth sphere
+    # (mild radial anchor kr = the vesicle's preferred size / lumen; gamma contractility keeps cells clean).
+    gg = np.random.default_rng(0); dirs = pos / pos.norm(dim=1, keepdim=True)
+    pos_p = pos + 0.6 * torch.as_tensor(gg.standard_normal((len(verts), 1))) * dirs
+    _, frames = relax(pos_p, mesh, v0.detach(), iters=300, rec=14, kv=6.0, gamma=0.10, smooth_w=0.04, kr=0.4, r0=R)
+    vl = (float(v0.min()) * 0.9, float(v0.max()) * 1.05)
+    dev0 = float((pos_p.norm(dim=1) - R).abs().max()); dev1 = float((frames[-1].norm(dim=1) - R).abs().max())
     save(os.path.join(HERE, "archive", "mono_V3a_rest_shell"), mesh, frames,
          fielder=lambda p: geom(p, mesh, mesh["hc"])[0].numpy(), cmap="viridis", vlim=vl,
          view=(22, 25), slice_axis=1, slice_plane=0.0, band=0.6,
-         titles=lambda i: ("V3a  rest -> kappa_s/k_v force balance (shell settles smaller, stays spherical)" if i == 0 else ""),
-         params=dict(test="V3a_rest", substrate="shell", R0=R, h0=H0, n_cells=nF, k_v=KV, kappa_s=KAPPA,
-                     R_start=float(pos.norm(dim=1).mean()), R_end=float(frames[-1].norm(dim=1).mean())))
+         titles=lambda i: ("V3a  perturbed shell HEALS -> stable force balance (uniform cells, no spikes)" if i == 0 else ""),
+         params=dict(test="V3a_stability", substrate="shell", R0=R, h0=H0, n_cells=nF, k_v=6.0, kappa_s=KAPPA,
+                     gamma=0.10, kr=0.4, max_radial_dev_start=dev0, max_radial_dev_end=dev1))
 
 
 # ============================ V3b: FLAT buckle ============================
@@ -197,7 +243,7 @@ def demo_V3b():
     _, _, cen, _ = face_geometry_3d(x0, mesh["es"], mesh["et"], mesh["ef"], nF)
     rc = ((cen[:, 0] - L/2)**2 + (cen[:, 1] - L/2)**2).sqrt()
     spot = rc < 2.4                                              # central proliferation spot
-    BOOST = 3.0
+    BOOST = 2.8
     v0, _, _, _, _, _ = geom(x0, mesh, mesh["hc"])
     V_eq = v0.detach().clone(); V_eq[spot] = v0[spot] * BOOST    # raise target volume in the spot
     move = torch.as_tensor(~bmask)                              # pin the rim (clamped edges)
@@ -205,8 +251,9 @@ def demo_V3b():
     x0[:, 2] = x0[:, 2] + 0.4 * torch.exp(-rv / 4.0)
     # buckling INCREASES area (dome>flat), so it only wins when growth dominates surface tension: use the
     # low-kappa_s regime (Okuda's tubulation regime) -- at high kappa_s the spot grows in-plane and stays flat.
+    # SMALL gamma keeps cells clean without suppressing the buckle (contractility resists the area growth).
     KB = 0.05
-    _, frames = relax(x0, mesh, V_eq, iters=700, move_mask=move, eta=0.05, kappa=KB, rec=28)
+    _, frames = relax(x0, mesh, V_eq, iters=650, move_mask=move, eta=0.05, kappa=KB, rec=26, smooth_w=0.10, gamma=0.03)
     save(os.path.join(HERE, "archive", "mono_V3b_buckle_flat"), mesh, frames,
          fielder=lambda p: spot.numpy().astype(float), cmap="YlOrRd", vlim=(0, 1),
          view=(16, -82), slice_axis=1, slice_plane=5.0, band=0.9,

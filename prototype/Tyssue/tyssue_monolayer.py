@@ -73,11 +73,16 @@ def monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc=None):
     return v_f, s_f, A_ap, A_ba
 
 
-def _monolayer_energy_core(pos, es, et, ef, nF, h_cell, V_eq, alive, k_v, kappa_s, Lam, K_R, R0, eocc, vocc):
-    """U = sum_j [ 1/2 k_v (v_j - v_eq_j)^2 + kappa_s s_j ] + Lam*sum_e l_e + K_R*sum_i (|x_i|-R0)^2 .
-    The last two are optional dials (Lam=line tension; K_R=gentle radial anchor, both default 0 in the op)."""
+def _monolayer_energy_core(pos, es, et, ef, nF, h_cell, V_eq, alive, k_v, kappa_s, Lam, K_R, R0, eocc, vocc, gamma=0.0):
+    """U = sum_j [ 1/2 k_v (v_j - v_eq_j)^2 + kappa_s s_j + 1/2 gamma P_j^2 ] + Lam*sum_e l_e + K_R*sum_i (|x_i|-R0)^2 .
+    gamma is a cortical CONTRACTILITY (perimeter^2) that rounds cells and resists shear -- a cell-shape
+    regularizer standing in for the RNR/T1 remeshing Okuda relies on (without it the bare volume+surface
+    energy shears/spikes under large deformation). Lam/K_R are optional dials (both default 0 in the op)."""
     v_f, s_f, _, _ = monolayer_geometry_3d(pos, es, et, ef, nF, h_cell, eocc)
     E = (0.5 * k_v * (v_f - V_eq) ** 2 * alive).sum() + kappa_s * (s_f * alive).sum()
+    if gamma != 0.0:
+        perim = torch.zeros(nF, device=pos.device, dtype=pos.dtype).index_add(0, ef, (pos[et] - pos[es]).norm(dim=-1) * eocc)
+        E = E + 0.5 * gamma * (perim ** 2 * alive).sum()
     if Lam != 0.0:
         E = E + Lam * ((pos[et] - pos[es]).norm(dim=-1) * eocc).sum()
     if K_R != 0.0:
@@ -107,6 +112,7 @@ class MonolayerShapeEnergy3D(Lateral):
         self.at = params.get("_at", "vertex")
         self.k_v = float(params.get("k_v", 4.0)); self.kappa_s = float(params.get("kappa_s", 0.2))
         self.h0 = float(params.get("h0", 0.4))                    # uniform cell thickness (v1: fixed field)
+        self.gamma = float(params.get("gamma", 0.0))             # cortical contractility (cell-shape regularizer)
         self.Lambda = float(params.get("Lambda", 0.0)); self.K_R = float(params.get("K_R", 0.0))
         self.mu = float(params.get("mu", 1.0)); self.dt = float(params.get("dt", 1.0))
         self.relax_iters = int(params.get("relax_iters", 30)); self.eta = float(params.get("eta", 0.08))
@@ -116,7 +122,7 @@ class MonolayerShapeEnergy3D(Lateral):
         with torch.enable_grad():
             x = x.detach().requires_grad_(True)
             E = _monolayer_energy_core(x, es, et, ef, nF, h, V_eq, alive, self.k_v, self.kappa_s,
-                                       self.Lambda, self.K_R, R0t, eocc, vocc)
+                                       self.Lambda, self.K_R, R0t, eocc, vocc, self.gamma)
             g = torch.autograd.grad(E, x)[0]
         return torch.nan_to_num(g)
 
