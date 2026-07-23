@@ -198,6 +198,19 @@ PRESETS["round_23_r010_rd1"] = dict(_F4, rate=0.010, rd_rate=1.0)
 PRESETS["round_23_r010_rd4"] = dict(_F4, rate=0.010, rd_rate=4.0)
 PRESETS["round_23_r008_rd3"] = dict(_F4, rate=0.008, rd_rate=3.0)
 PRESETS["round_23_r006_rd4"] = dict(_F4, rate=0.006, rd_rate=4.0)             # slowest growth + fast RD = strongest hold
+# ===== round_24: GROW THE BUD (issue 2->3). round_23 sweet spot = rd_rate=1, rate=0.010 (confined bud,
+# red_over_tip=1, tip_act=0.8, protr=1.14). Now grow it into a real PROTRUSION: a SINGLE focused spot +
+# steeper growth switch (hill: grow only at the activated tip) + longer run. Hypothesis: protr rises toward
+# a finger while red_over_tip stays ~1 and tip_act stays ~0.8 (confinement + tip-riding preserved).
+_H24 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1)                           # single focused bud, sweet-spot rates
+PRESETS["round_24_1sp_long"]    = dict(_H24, frames=350)
+PRESETS["round_24_1sp_hill5"]   = dict(_H24, frames=350, hill=5.0)
+PRESETS["round_24_1sp_hill8"]   = dict(_H24, frames=350, hill=8.0)
+PRESETS["round_24_1sp_r012h5"]  = dict(_H24, frames=350, hill=5.0, rate=0.012)
+PRESETS["round_24_1sp_asw18h5"] = dict(_H24, frames=350, hill=5.0, a_sw=1.8)
+PRESETS["round_24_1sp_400h5"]   = dict(_H24, frames=400, hill=5.0)
+PRESETS["round_24_1sp_r008h5"]  = dict(_H24, frames=400, hill=5.0, rate=0.008)  # slow+long = biggest confined bud?
+PRESETS["round_24_3sp_long"]    = dict(_F4, rd_rate=1.0, rate=0.010, frames=350)  # 3 spots (compare to single)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
