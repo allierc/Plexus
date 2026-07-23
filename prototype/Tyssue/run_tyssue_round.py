@@ -400,6 +400,19 @@ PRESETS["round_37_kv8"]       = dict(_H37, K_V=8.0)
 PRESETS["round_37_relax45"]   = dict(_H37, relax=45)
 PRESETS["round_37_vcap13_kv6"]= dict(_H37, vcap=1.3, K_V=6.0)
 PRESETS["round_37_relax45_kv6"]=dict(_H37, relax=45, K_V=6.0)
+# ===== round_38: HOLLOW down (goal 3), one lever from the kv6 working point (aspect 10, CV 0.97, hollow 390).
+# Hollow = cell-fold buckling at the tube; DIHEDRAL BENDING (K_bend, Wardetzky hinge) penalises adjacent-cell
+# normal deviation -> smooths the folds WITHOUT flattening the tube's gentle curvature; anti-inversion filtered
+# step (antiinv) blocks a substep that drives a face toward inversion. Keep len/diam ~10, CV low. Base = kv6.
+_H38 = dict(_H37, K_V=6.0)
+PRESETS["round_38_base"]     = dict(_H38)                                    # kv6 control
+PRESETS["round_38_bend1"]    = dict(_H38, K_bend=1.0)
+PRESETS["round_38_bend3"]    = dict(_H38, K_bend=3.0)
+PRESETS["round_38_bend6"]    = dict(_H38, K_bend=6.0)
+PRESETS["round_38_bend10"]   = dict(_H38, K_bend=10.0)
+PRESETS["round_38_ai02"]     = dict(_H38, antiinv=0.2)
+PRESETS["round_38_ai04"]     = dict(_H38, antiinv=0.4)
+PRESETS["round_38_bend3_ai02"]=dict(_H38, K_bend=3.0, antiinv=0.2)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -439,7 +452,7 @@ def make(p):
     ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
     #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
     ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)},
-            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}]
+            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "K_bend": p.get("K_bend", 0.0), "antiinv": p.get("antiinv", 0.0), "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}]
     sched += ["morphogen_growth_3d", "shape_energy_3d"]
     if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
