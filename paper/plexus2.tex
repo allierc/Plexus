@@ -448,11 +448,25 @@ progressively moving from existing models toward new biological knowledge.
 
 \paragraph{Loop I: Understanding.}
 
-The first loop analyses an existing simulation model. Rather than treating the
-simulator as opaque code, the agent decomposes it into Plexus operators,
-identifies the biological mechanisms it implements, and reconstructs an
-explicit mechanistic description. Existing simulation frameworks therefore
-become repositories of reusable biological operators.
+The first loop takes an existing model --- a paper and its repository --- and decomposes it
+into Plexus operators, sets, states and fields, so the biological mechanisms it implements
+become explicit. That decomposition is necessary, but it is only the \emph{entry}: it makes
+the model's \emph{levers} explicit without yet explaining them. Understanding is earned
+afterwards, by \emph{interrogating} the decomposition as a causal system --- learning what
+each operator and parameter does on its own and, the harder part, what it does in
+combination, since mixtures rarely surrender their causal structure to inspection. The
+driving force is therefore not translation but a \emph{hypothesis $\to$ validate/falsify}
+cycle run on the decomposed model: each step states a falsifiable claim about a lever, tests
+it against a dedicated metric, and accumulates the causal map that results. A useful
+operating point is a rough \textbf{70/30 balance of validation to falsification}: pure
+validation only ever confirms hypotheses one already believes (trivial, near-zero
+information), while pure falsification only ever probes the improbable (which mostly breaks as
+expected and never consolidates a working map) --- so most tests should confirm plausible
+levers while a deliberate minority attacks the current understanding, where a surprise is
+most informative. The loop's product is a causal lever-map of the model --- what each
+mechanism buys, and how mechanisms combine --- which is what makes the operators genuinely
+\emph{reusable} rather than merely catalogued, and what later tells Loop~III which lever the
+model \emph{lacks}.
 
 \paragraph{Loop II: Fitting.}
 
@@ -465,11 +479,12 @@ parameters and biological mechanisms.
 \paragraph{Loop III: Discovery.}
 
 The third loop analyses the residual remaining after optimization. Persistent
-discrepancies are interpreted as evidence that the current operator
-composition is incomplete rather than simply poorly parameterized. The agent
-therefore proposes alternative operators, compares competing mechanistic
-hypotheses, and extends the operator algebra whenever existing mechanisms fail
-to explain the observations.
+discrepancies are interpreted as evidence that the current operator composition is
+incomplete rather than simply poorly parameterized. Turning Loop~I's hypothesis-driven
+validate/falsify cycle outward --- from the levers the model \emph{has} to the ones it
+\emph{lacks} --- the agent proposes candidate operators, compares competing mechanistic
+hypotheses, and extends the operator algebra whenever existing mechanisms fail to explain
+the observations.
 
 Together, these three loops transform simulation, inverse modelling and
 hypothesis generation into successive stages of a single scientific workflow.
@@ -534,8 +549,9 @@ contradiction --- a long run diverging from its own shorter prefix), and a false
 area $> 0$, not a simple embedded tiling. An agent that skips this gate elaborates operators
 to explain an artefact.
 \item \textbf{Small, falsifiable, metric-gated steps --- one factor at a time, cheap-first.}
-Isolating proliferation rate, division timing and volume stiffness is what homogenised the
-tissue; a blind sweep would not attribute the win.
+Loop~I's validate/falsify cadence, enforced across every stage: isolating proliferation rate,
+division timing and volume stiffness is what homogenised the tissue; a blind sweep would not
+attribute the win.
 \item \textbf{Perfecting.} A satisfied metric is not qualitative fidelity: the
 triangular-versus-round-cells gap became a newly authored metric (shape index, sliver
 fraction) and a target to close.
