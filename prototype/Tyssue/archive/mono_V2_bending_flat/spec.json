@@ -1,0 +1,11 @@
+{
+ "test": "V2_bending",
+ "substrate": "flat_epithelium",
+ "h0": 0.6,
+ "n_cells": 121,
+ "ratio_flat": 1.0,
+ "ratio_bent": 1.1009591189482564,
+ "surfE_flat": 80.62645762375355,
+ "surfE_bent": 91.85868788454704,
+ "note": "apical(convex outer) area exceeds basal => kappa_s penalises curvature, EMERGENT bending"
+}
