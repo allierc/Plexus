@@ -226,6 +226,20 @@ PRESETS["round_25_a0z_mua14"]  = dict(_H25, a0=0.0, mu_a=1.4)               # no
 PRESETS["round_25_a0z_asw18"]  = dict(_H25, a0=0.0, a_sw=1.8)               # + only strong tip grows
 PRESETS["round_25_a0z_slow"]   = dict(_H25, a0=0.0, rate=0.008)            # + slow growth (higher gamma)
 PRESETS["round_25_a0z_ga100"]  = dict(_H25, a0=0.0, grow_after=100)        # settle even longer
+# ===== round_26: INTERFACE mechanism (issue 3). On the now-stable confined tip-riding bud (round_25
+# a0z_ga100: no flood, protr 1.16, red_over_tip 1.2, tip_act 0.8), apply the red/white-INTERFACE operator --
+# purse-string ring line tension (holds a neck/diameter) + outward extrusion of red (expels the tip) -- to
+# turn the small bud into a TUBE. Hypothesis: protr + tube_len rise with a ~constant tube_diam, red_over_tip
+# stays ~1. Sweep K_purse (ring) x K_extrude (push); ctrl = no interface.
+_H26 = dict(_F4, rd_rate=1.0, rate=0.010, spots=3, frames=350, a0=0.0, grow_after=100, iface_asw=1.2)
+PRESETS["round_26_ctrl"]     = dict(_H26)                                    # no interface (control)
+PRESETS["round_26_purse3"]   = dict(_H26, K_purse=3.0, K_extrude=0.3)        # strong ring
+PRESETS["round_26_extr1"]    = dict(_H26, K_purse=1.0, K_extrude=1.0)        # outward extrusion
+PRESETS["round_26_both2"]    = dict(_H26, K_purse=2.0, K_extrude=0.8)        # ring + extrusion
+PRESETS["round_26_both3"]    = dict(_H26, K_purse=3.0, K_extrude=1.0)        # stronger both
+PRESETS["round_26_purse6"]   = dict(_H26, K_purse=6.0, K_extrude=0.5)        # very strong ring (neck)
+PRESETS["round_26_extr2"]    = dict(_H26, K_purse=1.0, K_extrude=2.0)        # strong extrusion
+PRESETS["round_26_1sp_both"] = dict(_H26, spots=1, K_purse=3.0, K_extrude=1.0)  # single focused tube
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
