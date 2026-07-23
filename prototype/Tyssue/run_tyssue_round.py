@@ -211,6 +211,21 @@ PRESETS["round_24_1sp_asw18h5"] = dict(_H24, frames=350, hill=5.0, a_sw=1.8)
 PRESETS["round_24_1sp_400h5"]   = dict(_H24, frames=400, hill=5.0)
 PRESETS["round_24_1sp_r008h5"]  = dict(_H24, frames=400, hill=5.0, rate=0.008)  # slow+long = biggest confined bud?
 PRESETS["round_24_3sp_long"]    = dict(_F4, rd_rate=1.0, rate=0.010, frames=350)  # 3 spots (compare to single)
+# ===== round_25: SUSTAIN confinement over a long run (issue 1, deeper). round_24 showed amount-conservation
+# only DELAYS the flood (~frame 200): as the body proliferates the domain grows and the Turing pattern REFILLS
+# it (domain-growth insertion). Fix = amount-conservation (correct base state) + keep the BODY white so it
+# neither nucleates new spots nor grows: a0->0 (no basal ignition) and/or sub-critical GM (mu_a up). round_21's
+# a0 idea was right but INCOMPLETE without amount-conservation. Hypothesis: body stays white the whole run ->
+# only the bud grows -> no flood -> the bud persists. Base = round_23 sweet spot, 350 frames.
+_H25 = dict(_F4, rd_rate=1.0, rate=0.010, spots=3, frames=350)
+PRESETS["round_25_a0z"]        = dict(_H25, a0=0.0)                          # no basal ignition of the body
+PRESETS["round_25_a0low"]      = dict(_H25, a0=0.003)                        # low basal
+PRESETS["round_25_a0z_ga80"]   = dict(_H25, a0=0.0, grow_after=80)          # + settle longer before growth
+PRESETS["round_25_subcrit"]    = dict(_H25, mu_a=1.4)                        # sub-critical: stable low body
+PRESETS["round_25_a0z_mua14"]  = dict(_H25, a0=0.0, mu_a=1.4)               # no ignition + sub-critical
+PRESETS["round_25_a0z_asw18"]  = dict(_H25, a0=0.0, a_sw=1.8)               # + only strong tip grows
+PRESETS["round_25_a0z_slow"]   = dict(_H25, a0=0.0, rate=0.008)            # + slow growth (higher gamma)
+PRESETS["round_25_a0z_ga100"]  = dict(_H25, a0=0.0, grow_after=100)        # settle even longer
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
