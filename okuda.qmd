@@ -50,7 +50,8 @@ tissue built elsewhere on this site; the morphogenesis is Okuda's coupling laid 
 ## A gallery of failures
 
 Four moments from the search for the tube — each a failure, each with the lesson it left,
-from the reaction–diffusion choice to the still-open shape of the tube itself.
+from the reaction–diffusion choice to the shape of the tube itself. (It works now — the
+breakthrough is below.)
 
 <style>
 .okuda-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:.8rem 0 1.4rem}
@@ -83,9 +84,39 @@ from the reaction–diffusion choice to the still-open shape of the tube itself.
 </figure>
 <figure class="okuda-card">
   <video src="gallery/tyssue_cauliflower.mp4" autoplay loop muted playsinline></video>
-  <figcaption><b>Cauliflower, not a tube (current front)</b>A Gierer–Meinhardt activator holds
+  <figcaption><b>Cauliflower, not a tube</b>A Gierer–Meinhardt activator holds
   a stable peak and buds the shell — but a <em>wide</em> activation grows the whole patch into a
   lobed cauliflower. The tube needs narrow, tip-riding GM growth.</figcaption>
+</figure>
+</div>
+
+## The breakthrough — a working tube
+
+The front has moved past the cauliflower. The missing dial was **tip-tracking**: a fixed-size
+activator cap, re-seeded each frame at the tissue's outermost cell, that *rides the advancing
+tip* — the minimal honest stand-in for "the activator peak stays at the apex." With it, the
+budding lobe becomes a genuine tube: long, thin, constant-diameter. Every *mechanical* ingredient
+is emergent — confinement from growth-dilution, wall-building oriented division, extrusion that
+rounds and pushes the tip outward; only the tip signal is driven. Diameter is set by the cap
+radius (Okuda's χ role), length by how long it runs.
+
+<div class="okuda-gallery">
+<figure class="okuda-card">
+  <video src="gallery/tyssue_tube_long.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>A long, constant-diameter tube</b>The tip-tracking cap follows the outermost
+  cell, so the tube <em>extends</em> at fixed diameter instead of widening into a lobe — a genuine
+  thin cylinder, not a bud.</figcaption>
+</figure>
+<figure class="okuda-card">
+  <video src="gallery/tyssue_tube_finger.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>Diameter set by the cap</b>A larger activated cap gives a shorter, thicker
+  finger — the tube's diameter tracks the cap radius, reproducing Okuda's qualitative χ→diameter
+  law.</figcaption>
+</figure>
+<figure class="okuda-card">
+  <video src="gallery/tyssue_tube_thin.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>Pushed far out</b>Strong extrusion rounds the flat tip and drives it outward; the
+  cap is seeded to the side so the tube grows in profile against the body.</figcaption>
 </figure>
 </div>
 
@@ -107,9 +138,11 @@ same [role spec](paper/plexus2.pdf) the paper argues for, now grounded in a real
 - **Domain priors and taste.** Reading the smooth activator *gradient* off Okuda's figures —
   rather than a binary switch — reframed the entire coupling.
 
-The tube is not yet emergent. But every failure above has been converted from a symptom into
-a measurable target, which is the whole point: this is what it looks like when a method, not
-just a model, is being fit.
+The tube now forms — the mechanics emergent, the tip signal still a driven stand-in — so the
+question flips from *existence* to *optimisation*: thinner and longer tubes, multiple tubes, and
+branching are now tuning, not search. And every failure above was converted from a symptom into
+a measurable target along the way — which is the whole point: this is what it looks like when a
+method, not just a model, is being fit.
 
 [^okuda]: Okuda, S., Miura, T., Inoue, Y., Adachi, T. & Eiraku, M.
 *Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with
