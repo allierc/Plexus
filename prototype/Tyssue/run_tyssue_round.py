@@ -269,6 +269,20 @@ PRESETS["round_28_extr8_c24_p3"] = dict(_H28, K_extrude=8.0, cone_deg=24.0, K_pu
 PRESETS["round_28_extr12_c24"]   = dict(_H28, K_extrude=12.0, cone_deg=24.0)               # very strong push
 PRESETS["round_28_extr8_chi8"]   = dict(_H28, K_extrude=8.0, cone_deg=24.0, chi=8.0)        # bigger diffusion patch
 PRESETS["round_28_extr8_3sp"]    = dict(_H28, K_extrude=8.0, cone_deg=18.0, spots=3)
+# ===== round_29: ELONGATE the lobe into a TUBE. round_28 made a round budding LOBE (len ~ diam, diameter
+# set by chi, red at the neck). To get a tube (len >> diam), hold the diameter with a PURSE-STRING neck while
+# sustaining tip growth over a LONGER run. Hypothesis: tube_len/diam rises above 1 (elongated), diameter stays
+# ~chi, still confined (over_tip ~1, no flood). Base = the tube-forming recipe (extr8, cone24, oriented).
+_H29 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1, frames=450, a0=0.0, grow_after=100,
+            orient_iface=True, orient_asw=1.2, iface_asw=1.2, K_extrude=8.0, cone_deg=24.0)
+PRESETS["round_29_long"]       = dict(_H29)                                  # just longer (450)
+PRESETS["round_29_purse4"]     = dict(_H29, K_purse=4.0)                     # neck to hold diameter
+PRESETS["round_29_purse8"]     = dict(_H29, K_purse=8.0)                     # strong neck
+PRESETS["round_29_p4_550"]     = dict(_H29, K_purse=4.0, frames=550)         # neck + very long
+PRESETS["round_29_p8_extr12"]  = dict(_H29, K_purse=8.0, K_extrude=12.0)     # strong neck + strong push
+PRESETS["round_29_p6_r012"]    = dict(_H29, K_purse=6.0, rate=0.012)         # neck + a bit more growth
+PRESETS["round_29_p4_chi6"]    = dict(_H29, K_purse=4.0, chi=6.0)            # medium diameter tube
+PRESETS["round_29_p8_550_r012"]= dict(_H29, K_purse=8.0, frames=550, rate=0.012)  # all-in: elongate hard
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
