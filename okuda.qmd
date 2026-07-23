@@ -49,9 +49,8 @@ tissue built elsewhere on this site; the morphogenesis is Okuda's coupling laid 
 
 ## A gallery of failures
 
-Eight moments from the search so far — each a failure, each with the lesson it left. The arc
-runs from mesh bookkeeping, through diagnostics and dynamics, to the still-open shape of the
-tube itself.
+Four moments from the search for the tube — each a failure, each with the lesson it left,
+from the reaction–diffusion choice to the still-open shape of the tube itself.
 
 <style>
 .okuda-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:.8rem 0 1.4rem}
@@ -64,33 +63,6 @@ tube itself.
 </style>
 
 <div class="okuda-gallery">
-<figure class="okuda-card">
-  <video src="gallery/tyssue_okuda_tangle.mp4" autoplay loop muted playsinline></video>
-  <figcaption><b>Through-vertex division → a tangle</b>Splitting a cell between its existing
-  vertices adds no new ones, so after a round or two the daughters are slivers that
-  self-intersect into a red tangle. The cheap split is not a proliferation engine —
-  edge-midpoint division is.</figcaption>
-</figure>
-<figure class="okuda-card">
-  <video src="gallery/tyssue_okuda_crumple.mp4" autoplay loop muted playsinline></video>
-  <figcaption><b>A single global lumen term → crumple</b>One scalar constrains only the
-  <em>sum</em> of cell volumes, so local dips that cancel are free and the surplus area buckles
-  out of plane. Distributed, per-cell volume targets are what make expansion stable.</figcaption>
-</figure>
-<figure class="okuda-card">
-  <video src="gallery/tyssue_okuda_hollow.mp4" autoplay loop muted playsinline></video>
-  <figcaption><b>“97% hollow” → no physical fix worked</b>Anti-inversion, more relaxation,
-  bending stiffness — nothing touched it, because it was not physical: a recording-stride
-  misalignment. <em>Verify the instrument.</em> Aligned, the same run is a smooth shell —
-  shown here.</figcaption>
-</figure>
-<figure class="okuda-card">
-  <video src="gallery/tyssue_okuda_wave.mp4" autoplay loop muted playsinline></video>
-  <figcaption><b>A synchronized division wave → a grey band</b>Born at one volume and grown
-  uniformly, every cell crosses the division threshold in lock-step; fresh daughters pile up
-  faster than relaxation smooths them. Restore the biological noise of a stochastic cell
-  cycle.</figcaption>
-</figure>
 <figure class="okuda-card">
   <video src="gallery/tyssue_okuda_balloon.mp4" autoplay loop muted playsinline></video>
   <figcaption><b>Protrusion-by-inflation = hollowing</b>With a volume-locked body, an activated
