@@ -104,15 +104,15 @@ large, a flat rather than rounded tip. It is a *first* working tube with a lot o
 the point is only that the question has shifted from *whether* a tube forms to *how well* it can
 be made.
 
-::: {style="max-width:440px;margin:1.1rem auto"}
+<div class="okuda-gallery">
 <figure class="okuda-card">
   <video src="gallery/tyssue_tube_long.mp4" autoplay loop muted playsinline></video>
   <figcaption><b>A driven, imperfect tube</b>A tip-tracking cap — <em>driven</em>, not emergent —
   rides the outermost cell, so the tube extends at roughly constant diameter instead of widening
   into a lobe. The mechanics around it are emergent, but the mesh stays rough (hollow cells, uneven
-  cell sizes): far from a clean cylinder, and much is left to do.</figcaption>
+  cell sizes): far from a clean cylinder, and much is left to do. <em>Click to enlarge.</em></figcaption>
 </figure>
-:::
+</div>
 
 ## What the failures demand of the agent next
 
