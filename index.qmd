@@ -951,9 +951,9 @@ schedule:   # the order the operators run each frame
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/tyssue_tubes.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/tyssue_cauliflower.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">tubes<span class="sim-spec"><pre>general:   # run-level settings
+      <span class="sim-name" tabindex="0">cauliflower<span class="sim-spec"><pre>general:   # run-level settings
   name: tyssue_round   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
   n_frames: 200   # number of simulation frames
@@ -1065,7 +1065,7 @@ schedule:   # the order the operators run each frame
 - reconnect_t1_3d
 - divide_3d
 - topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">a Gierer–Meinhardt activator forms a few foci that grow fastest where they peak, budding the growing shell out into protruding tubes</span>
+      <span class="sim-cap">a Gierer–Meinhardt activator drives growth where it peaks, but a wide activation folds the growing shell into a lobed, cauliflower-like morphology rather than clean tubes</span>
     </figcaption>
   </figure>
 </div>
@@ -2368,6 +2368,7 @@ descriptions:
 </div>
 
 ```
+
 
 
 
