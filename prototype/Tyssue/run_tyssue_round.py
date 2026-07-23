@@ -297,6 +297,20 @@ PRESETS["round_30_chi8"]  = dict(_H30, chi=8.0)
 PRESETS["round_30_chi10"] = dict(_H30, chi=10.0)
 PRESETS["round_30_chi14"] = dict(_H30, chi=14.0)
 PRESETS["round_30_chi18"] = dict(_H30, chi=18.0)
+# ===== round_31: SMALLER red spot (user hypothesis). round_28-30 tube is a fat budding LOBE (diam~chi, big
+# cone). A smaller activated patch (small cone_deg + small chi) should give a NARROWER finger and, with less
+# activated material, slower over-proliferation -> the confinement (and the tube) may last longer. Base = the
+# tube recipe (extr8, oriented, a0=0). Judge tube_len/diam (elongated?), diam (smaller?), red_frac (no flood).
+_H31 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1, frames=350, a0=0.0, grow_after=100,
+            orient_iface=True, orient_asw=1.2, iface_asw=1.2, K_extrude=8.0)
+PRESETS["round_31_c6"]        = dict(_H31, cone_deg=6.0,  chi=4.0)
+PRESETS["round_31_c8"]        = dict(_H31, cone_deg=8.0,  chi=4.0)
+PRESETS["round_31_c10"]       = dict(_H31, cone_deg=10.0, chi=4.0)
+PRESETS["round_31_c6_chi2"]   = dict(_H31, cone_deg=6.0,  chi=2.0)
+PRESETS["round_31_c8_chi2"]   = dict(_H31, cone_deg=8.0,  chi=2.0)
+PRESETS["round_31_c8_chi3"]   = dict(_H31, cone_deg=8.0,  chi=3.0)
+PRESETS["round_31_c6_extr12"] = dict(_H31, cone_deg=6.0,  chi=2.0, K_extrude=12.0)   # small spot + strong push
+PRESETS["round_31_c10_chi3"]  = dict(_H31, cone_deg=10.0, chi=3.0)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
