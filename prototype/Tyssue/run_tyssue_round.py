@@ -240,6 +240,20 @@ PRESETS["round_26_both3"]    = dict(_H26, K_purse=3.0, K_extrude=1.0)        # s
 PRESETS["round_26_purse6"]   = dict(_H26, K_purse=6.0, K_extrude=0.5)        # very strong ring (neck)
 PRESETS["round_26_extr2"]    = dict(_H26, K_purse=1.0, K_extrude=2.0)        # strong extrusion
 PRESETS["round_26_1sp_both"] = dict(_H26, spots=1, K_purse=3.0, K_extrude=1.0)  # single focused tube
+# ===== round_27: ORIENTED DIVISION (issue 3, the real one). round_26 showed the mechanical interface op
+# shapes but doesn't BUILD the wall -- new cells must be placed NORMAL to the body. New: divide_3d orient_iface
+# stacks a red cell's daughters ALONG the bud axis (centre->tip), adding wall cells that EXTEND the protrusion
+# instead of widening it. On the stable confined bud (a0z_ga100). Hypothesis: tube_len>0, protr rises, diameter
+# ~constant, red_over_tip stays ~1. Sweep oriented-division +/- extrusion +/- more growth.
+_H27 = dict(_F4, rd_rate=1.0, rate=0.010, spots=3, frames=350, a0=0.0, grow_after=100, iface_asw=1.2, orient_asw=1.2)
+PRESETS["round_27_orient"]        = dict(_H27, orient_iface=True)
+PRESETS["round_27_orient_extr"]   = dict(_H27, orient_iface=True, K_purse=1.0, K_extrude=1.5)
+PRESETS["round_27_orient_both"]   = dict(_H27, orient_iface=True, K_purse=2.0, K_extrude=1.0)
+PRESETS["round_27_orient_r015"]   = dict(_H27, orient_iface=True, rate=0.015)
+PRESETS["round_27_orient_er015"]  = dict(_H27, orient_iface=True, K_extrude=1.5, rate=0.015)
+PRESETS["round_27_1sp_orient"]    = dict(_H27, orient_iface=True, spots=1)
+PRESETS["round_27_1sp_or_extr"]   = dict(_H27, orient_iface=True, spots=1, K_extrude=1.5)
+PRESETS["round_27_orient_long"]   = dict(_H27, orient_iface=True, frames=450)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -284,7 +298,7 @@ def make(p):
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
         sched += ["rd_interface_tension"]
     ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
-            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.4, "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": 4, "max_cycle": 1000000000, "after_frame": ga},
+            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.4, "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": 4, "max_cycle": 1000000000, "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0))},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched += ["reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_round", "seed": 0, "n_frames": p["frames"], "dt": dt, "record_cap": p["frames"] + 2, "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},
