@@ -1147,7 +1147,7 @@ Appendix~\ref{app:atlas}. The objective is to recover the reusable biological
 mechanisms implemented by each project and register them as operators within
 the Plexus language.
 
-The reference corpus is organized into six broad categories.
+The reference corpus is organized into several thematic categories.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1180,6 +1180,66 @@ Typical operators extracted from these models include
 \item neighbour rewiring,
 \item particle--cell aggregation,
 \item optimal transport.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Vertex models and 3D morphogenesis}
+
+Feynman's second blackboard line urges not just creation but the understanding of
+\emph{everything that has already been built}. Reproducing a \emph{known} result --- Okuda
+\emph{et al.}'s autonomous 3D tubulation and branching, a Turing reaction--diffusion coupled to
+a 3D vertex model --- inside Plexus therefore begins by surveying, as exhaustively as we can,
+the vertex-model and morphogenesis literature it descends from and the code that ships with it.
+This focused sub-corpus is that survey.
+
+\paragraph{The Okuda lineage (the reproduction target).}
+\begin{itemize}
+\item \href{https://doi.org/10.1038/s41598-018-20678-6}{Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with undulation, tubulation, and branching} --- Okuda et al.\ (2018), the target.
+\item \href{https://doi.org/10.2142/biophysico.12.0_13}{Three-dimensional vertex model for simulating multicellular morphogenesis} --- Okuda et al.\ (2015), the base 3D vertex model (volume/surface energy, reversible network reconnection).
+\item \href{https://doi.org/10.1007/s10237-012-0430-7}{Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis} --- Okuda et al.\ (2013), the RNR / T1 topology operator.
+\end{itemize}
+
+\paragraph{Vertex-model frameworks that ship code.}
+\begin{itemize}
+\item \href{https://github.com/DamCB/tyssue}{tyssue} --- the true-vertex (AVM) Python framework; the mechanical substrate of our prototype.
+\item \href{https://arxiv.org/abs/2204.07081}{tvm} (Zhang \& Schwarz, 2022; \href{https://github.com/ZhangTao-SJTU/tvm}{code}) --- a maintained 3D space-filling vertex model, a numerical-validation target.
+\item \href{https://arxiv.org/abs/2309.04818}{Graph vertex model} (Sarkar \& Krajnc, 2024; code \href{https://gitlab.com/ijskrajncgroup1/neovm}{neoVM}) --- topology as a graph; 3D reconnection decomposed into elementary T1 moves.
+\item \href{https://github.com/alihashmiii/3D-Vertex-Model}{3D-Vertex-Model} --- a Mathematica port of Okuda's 2012/2013 reconnection model.
+\item \href{https://doi.org/10.1038/s41598-023-45127-x}{Tissue Forge} (2023) --- a general C++/Python vertex-modelling substrate.
+\end{itemize}
+
+\paragraph{Differentiable vertex / morphogenesis models} (nearest to the Plexus architecture).
+\begin{itemize}
+\item \href{https://arxiv.org/abs/2604.06896}{VertAX} (Pasqui et al., 2026; \href{https://github.com/VirtualEmbryo/VertAX}{code}) --- a differentiable JAX vertex model; benchmarks implicit differentiation through equilibrium against an unrolled relaxation loop.
+\item \href{https://arxiv.org/abs/2407.06295}{jax-morph} (Deshpande et al., 2025; \href{https://github.com/fmottes/jax-morph}{code}) --- composable differentiable growth / division / diffusion modules, the closest existing analogue of an operator registry.
+\item \href{https://doi.org/10.64898/2026.07.02.736195}{Differentiable Design for Morphogenesis} (Beker \& Dumitrascu, 2026) --- a differentiable forward tissue model with a GNN-based inverse.
+\item \href{https://arxiv.org/abs/2308.12892}{Mean-field elastic moduli of a 3D cell-based vertex model} (Kim, Zhang \& Schwarz, 2024) --- closed-form moduli to validate a 3D implementation against.
+\end{itemize}
+
+\paragraph{Reaction--diffusion on growing domains} (the dilution term the patterning must carry).
+\begin{itemize}
+\item \href{https://arxiv.org/abs/2308.12196}{Turing patterns on a two-component isotropic growing system, Part~1} (Ledesma-Dur\'an, 2023) --- growth adds a dilution term that makes the homogeneous base state time-dependent.
+\item \href{https://doi.org/10.3934/mbe.2026005}{Base state of growing reaction-dilution systems} (Ledesma-Dur\'an, 2026) --- how patterning conditions change once reaction rates must balance local volume change.
+\end{itemize}
+
+\paragraph{Tube, lumen and sheet morphogenesis} (the target morphology).
+\begin{itemize}
+\item \href{https://doi.org/10.1007/s10409-023-23297-x}{Three-dimensional morphogenesis of epithelial tubes} (Yu \& Li, 2024).
+\item \href{https://doi.org/10.1126/sciadv.adn0172}{Mechanochemical dynamics in multicellular lumens} (Yu et al., 2024).
+\item \href{https://doi.org/10.3389/fcell.2022.932814}{A virtual spherical-shell multicellular platform} (Fujiwara et al., 2022) --- the same shell geometry we build on.
+\item \href{https://arxiv.org/abs/2407.13187}{Growth and shrinkage of tissue sheets on substrates: buds, buckles, and pores} (Noguchi \& Elgeti, 2024).
+\item \href{https://hal.science/hal-03835943}{Computational approaches for simulating luminogenesis} (Fuji et al., 2022).
+\item \href{https://arxiv.org/abs/2209.06753}{Modeling polarity-driven laminar patterns in bilayer tissues} (Moore, Dale \& Woolley, 2023).
+\end{itemize}
+
+\paragraph{Surveys and further corpus.}
+\begin{itemize}
+\item \href{https://doi.org/10.3390/biophysica4040039}{No country for old frameworks? Vertex models and their ongoing reinvention} (Bri\~nas-Pascual et al., 2024).
+\item \href{https://doi.org/10.3390/cells15020177}{Cell-based computational models of organoids: a systematic review} (Neagu et al., 2026).
+\item \href{https://arxiv.org/abs/2604.13827}{Beads, springs and fields in cell biophysics} (Sorichetti et al., 2026).
+\item \href{https://doi.org/10.1007/s11538-021-00968-3}{Modelling cellular interactions and dynamics during kidney morphogenesis} (Cook et al., 2022).
+\item \href{https://doi.org/10.1371/journal.pcbi.1009952}{Avalanches during epithelial tissue growth: a Drosophila eye-disc model} (Courcoubetis et al., 2022).
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
