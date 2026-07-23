@@ -263,10 +263,102 @@ def demo_V3b():
                      z_max_end=float(frames[-1][:, 2].max()), z_min_end=float(frames[-1][:, 2].min())))
 
 
+# ============================ V4: FLAT tube by PROLIFERATION ============================
+def demo_tube():
+    """The actual tubing mechanism: sustained localized growth + IN-PLANE oriented DIVISION at the
+    advancing tip. Proliferation adds the tube wall (a static buckle can only dome; a tube needs new
+    cells), so the buckle EXTENDS into a finger of ~constant diameter (set by the growth-zone radius =
+    Okuda's chi). Rim pinned; growth confined to a cap that rides the tip."""
+    from tyssue_topology_ops3d import rings_from_flat_3d, flat_from_rings_3d, divide_face_3d
+    L, H0, r_tube = 10.0, 0.35, 1.3
+    verts, es, et, ef, nF, bmask = build_flat_mesh(k=19, L=L, jitter=0.4, seed=3)
+    pos = [v.astype(float) for v in verts]
+    es, et, ef = np.asarray(es), np.asarray(et), np.asarray(ef)
+    hc = np.full(nF, H0); axis = np.array([L/2, L/2]); bnd = bmask.copy()
+
+    def T(a): return torch.as_tensor(np.asarray(a))
+    def cellgeom():
+        A, _, cen, _ = face_geometry_3d(T(np.array(pos)), T(es), T(et), T(ef), nF)
+        return A.numpy(), cen.numpy()
+    Abase = float(np.median(cellgeom()[0]))
+    V_eq = (cellgeom()[0] * H0)
+    frames = []                                                 # each: (pos, es, et, ef, nF, hc)
+
+    def record():
+        frames.append((np.array(pos), es.copy(), et.copy(), ef.copy(), nF, hc.copy()))
+    record()
+    for rnd in range(15):
+        A, cen = cellgeom()
+        radial = np.hypot(cen[:, 0] - axis[0], cen[:, 1] - axis[1]); z_tip = cen[:, 2].max()
+        grow = (radial < r_tube) if rnd < 2 else ((radial < r_tube) & (cen[:, 2] > z_tip - 0.9))
+        V_eq[grow] *= 1.45
+        move = ~bnd
+        x = relax_raw(T(np.array(pos)), T(es), T(et), T(ef), nF, T(hc), T(V_eq), T(move),
+                      iters=190, kappa=0.05, kv=4.0, gamma=0.06, smooth_w=0.16)
+        pos = [p for p in x.numpy()]
+        record()
+        # in-plane oriented division of the oversized tip cells (septum normal to the cell's long axis)
+        rings = rings_from_flat_3d(es, et, ef, nF)
+        A, cen = cellgeom(); radial = np.hypot(cen[:, 0] - axis[0], cen[:, 1] - axis[1])
+        cand = [f for f in range(nF) if A[f] > 1.7 * Abase and radial[f] < r_tube * 1.2
+                and rings[f] is not None and len(rings[f]) >= 4]
+        Vl, hl = list(V_eq), list(hc)
+        for f in cand:
+            r = rings[f]; P = np.array([pos[v] for v in r]); c = P.mean(0)
+            _, _, vh = np.linalg.svd(P - c, full_matrices=False); w = vh[1]     # short axis (tangent plane)
+            mids = 0.5 * (P + np.roll(P, -1, 0)); proj = (mids - c) @ w
+            if divide_face_3d(rings, pos, f, project=False, ea=int(np.argmax(proj)), eb=int(np.argmin(proj))) is None:
+                continue
+            Vl[f] = V_eq[f] * 0.5; hl[f] = hc[f]; Vl.append(V_eq[f] * 0.5); hl.append(hc[f])
+        es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
+        es, et, ef, nF = np.asarray(es2), np.asarray(et2), np.asarray(ef2), nF2
+        V_eq = np.array([Vl[i] for i in keep]); hc = np.array([hl[i] for i in keep])
+        if len(pos) > len(bnd):
+            bnd = np.concatenate([bnd, np.zeros(len(pos) - len(bnd), bool)])
+    record()
+    print(f"  tube: {frames[0][4]} -> {frames[-1][4]} cells, tip z {frames[0][0][:,2].max():.2f} -> {frames[-1][0][:,2].max():.2f}")
+
+    # render (per-frame topology): 3D side view coloured by height + axial cross-section
+    out = os.path.join(HERE, "archive", "mono_V4_tube_flat"); os.makedirs(out, exist_ok=True)
+    json.dump(dict(test="V4_tube", substrate="flat_epithelium", h0=H0, r_tube=r_tube,
+                   n_cells_start=frames[0][4], n_cells_end=frames[-1][4],
+                   tip_z_start=float(frames[0][0][:, 2].max()), tip_z_end=float(frames[-1][0][:, 2].max())),
+              open(os.path.join(out, "spec.json"), "w"), indent=1)
+
+    def fmesh(fr):
+        p, e0, e1, e2, nf, h = fr
+        return torch.as_tensor(p), dict(es=T(e0), et=T(e1), ef=T(e2), nF=nf, rings=rings_of(e0, e1, e2, nf),
+                                        hc=torch.as_tensor(h))
+    zmax = max(float(fr[0][:, 2].max()) for fr in frames)
+    nf = len(frames)                                            # weight the strip toward the active (extending) phase
+    idx = np.unique(np.concatenate([[0], np.linspace(int(nf * 0.45), nf - 1, 5).round().astype(int)]))
+    figS = plt.figure(figsize=(24, 8)); figS.patch.set_facecolor("black")
+    for j, i in enumerate(idx):
+        p, m = fmesh(frames[i]); _, cen = None, None
+        _, _, cz, _ = face_geometry_3d(p, m["es"], m["et"], m["ef"], m["nF"])
+        ax3 = figS.add_subplot(2, 6, j + 1, projection="3d"); ax3.set_facecolor("black")
+        axc = figS.add_subplot(2, 6, 6 + j + 1)
+        draw(ax3, axc, p, m, m["hc"], cz.numpy()[:, 2] if cz.ndim > 1 else np.array([c[2] for c in cz.numpy()]),
+             "viridis", (0, zmax), (10, -84), 1, L/2, 0.7, "V4  tube by proliferation (Okuda)" if j == 0 else "")
+    figS.subplots_adjust(0.005, 0.005, 0.995, 0.96, wspace=0.03, hspace=0.03)
+    figS.savefig(os.path.join(out, "strip.png"), dpi=95, facecolor="black"); plt.close(figS)
+    figM = plt.figure(figsize=(9.2, 5.0)); figM.patch.set_facecolor("black"); wri = FFMpegWriter(fps=10)
+    with wri.saving(figM, os.path.join(out, "movie.mp4"), dpi=90):
+        for fr in frames:
+            figM.clf(); p, m = fmesh(fr)
+            _, _, cz, _ = face_geometry_3d(p, m["es"], m["et"], m["ef"], m["nF"])
+            ax3 = figM.add_subplot(1, 2, 1, projection="3d"); ax3.set_facecolor("black")
+            axc = figM.add_subplot(1, 2, 2)
+            draw(ax3, axc, p, m, m["hc"], cz.numpy()[:, 2], "viridis", (0, zmax), (10, -84), 1, L/2, 0.7,
+                 "V4  tube by proliferation (Okuda)")
+            wri.grab_frame()
+    plt.close(figM); print(f"  wrote {out}/")
+
+
 if __name__ == "__main__":
     import sys
     which = sys.argv[1:] or ["V1", "V2", "V3a", "V3b"]
-    fns = {"V1": demo_V1, "V2": demo_V2, "V3a": demo_V3a, "V3b": demo_V3b}
+    fns = {"V1": demo_V1, "V2": demo_V2, "V3a": demo_V3a, "V3b": demo_V3b, "tube": demo_tube}
     for w in which:
         print(f"[demo {w}]"); fns[w]()
     print("DONE")
