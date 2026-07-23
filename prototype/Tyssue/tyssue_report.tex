@@ -1141,4 +1141,40 @@ curvature with \emph{no} explicit $K_{\text{bend}}$. A localised $v_{\text{eq}}$
 outward. (The rest shell settles smaller than $v_{\text{eq}}$ --- the correct $\kappa_s$/$k_v$ force balance,
 a calibration knob.)
 
+\paragraph{The tube, in nine rounds --- an autonomous ledger (2026-07-23).}
+Rounds 22--30 worked the three coupled issues (RD stability, tip-riding, interface orientation) as
+small hypothesis/validation/falsification steps on the L4 cluster (8 jobs/round), and got from ``the
+activator floods'' to ``a $\chi$-diameter tube.''
+\begin{itemize}\itemsep1pt
+\item \textbf{R22 --- amount-conservation \& $\gamma$ (issue 1).} A/B: \emph{off} (conc.\ held while cells
+inflate = mass created) floods to red\_frac 0.46 / over\_tip 3.95; \emph{on} halves it (0.33 / 1.54).
+Regime: fast growth (low $\gamma$) floods (0.66), slow growth (high $\gamma$) holds (0.13) --- Okuda Fig.~4a.
+\item \textbf{R23 --- sweet spot.} Falsified ``fast RD helps'' (rd\_rate$\ge$2 floods-then-collapses, 9k cells).
+Winner \texttt{rate=0.010, rd\_rate=1}: over\_tip 1.0, protr 1.14, tip\_act 0.80, 1929 cells --- a confined
+tip-riding bud (issues 1+2).
+\item \textbf{R24 --- falsified ``longer\,=\,bigger.''} At 350 frames the bud deflates and the activator
+\emph{refills the growing domain} (flood peak 0.9): amount-conservation only \emph{delays} the flood.
+\item \textbf{R25 --- sustain (issue 1, deeper).} $a_0\!\to\!0$ (body can't ignite) $+$ amount-conservation
+keeps the body white the \emph{whole} run: flood peak $0.9\!\to\!0.30$, bud persists, 2300 cells. $a_0$
+was round-21's right idea, incomplete without amount-conservation.
+\item \textbf{R26 --- falsified mechanical-only interface.} Purse-string $+$ extrusion shape the bud but
+build \emph{no wall} (tube\_len 0): the wall needs \emph{cells}, placed by oriented division.
+\item \textbf{R27 --- oriented division (issue 3).} \texttt{divide\_3d orient\_iface}: a red cell's daughters
+stack \emph{along the bud axis} (normal to the body). Alone still a nub --- the patch is sub-$\chi$ and
+in-plane division spreads laterally; extension needs a strong outward push.
+\item \textbf{R28 --- TUBES.} Strong extrusion (K\_extrude$\ge$4) $+$ oriented division $+$ a $\chi$-sized
+spot $\Rightarrow$ \texttt{tube\_len}$\approx$2, \texttt{n\_tubes}=2, red at the neck, confined (over\_tip
+$\approx$1). Diameter tracks $\chi$ (chi4$\to$1.9, chi8$\to$3.3).
+\item \textbf{R29 --- falsified ``elongate by running longer.''} At 450--550 frames the tube is \emph{lost}
+(transient peaking $\sim$frame 350); the purse-string neck did not hold it.
+\item \textbf{R30 --- $\chi\to$diameter law (capstone).} Sweeping $\chi$ at 350 frames, tube diameter rises
+\emph{monotonically} ($\chi$2$\to$1.06 \dots $\chi$8$\to$3.31); above $\chi\!\sim\!8$ it saturates and
+fragments into multiple tubes. Okuda's \emph{qualitative} law ($\chi$ sets the diameter) is reproduced;
+the exponent ($\sim$0.8 in the clean regime, $\sim$0.3 over the full range) only approximates his $1/4$.
+\end{itemize}
+\textbf{Net.} All three issues are mechanistically solved and combine into a $\chi$-diameter budding tube.
+Open: the tube is a \emph{transient} (degrades past $\sim$frame 350 as the domain grows) and a \emph{lobe}
+more than a long cylinder --- sustained elongation (a moving growth zone that truly rides the tip without
+letting the body domain enlarge) is the next front.
+
 \end{document}
