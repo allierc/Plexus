@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Sets – Plexus</title>
+<title>Reproducing Okuda: a blind inverse problem with a known answer – Plexus</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -130,7 +130,7 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Inverse problem</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./okuda.html"> 
+    <a class="nav-link active" href="./okuda.html" aria-current="page"> 
 <span class="menu-text">Okuda case study</span></a>
   </li>  
 </ul>
@@ -146,16 +146,25 @@ ul.task-list li input[type="checkbox"] {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#a-controlled-testbed" id="toc-a-controlled-testbed" class="nav-link active" data-scroll-target="#a-controlled-testbed">A controlled testbed</a></li>
+  <li><a href="#the-approach-in-brief" id="toc-the-approach-in-brief" class="nav-link" data-scroll-target="#the-approach-in-brief">The approach in brief</a></li>
+  <li><a href="#a-gallery-of-failures" id="toc-a-gallery-of-failures" class="nav-link" data-scroll-target="#a-gallery-of-failures">A gallery of failures</a></li>
+  <li><a href="#what-the-failures-demand-of-the-agent-next" id="toc-what-the-failures-demand-of-the-agent-next" class="nav-link" data-scroll-target="#what-the-failures-demand-of-the-agent-next">What the failures demand of the agent next</a></li>
+  </ul>
+</nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Sets</h1>
-<p class="subtitle lead">Node kinds — the levels a hierarchy is built from</p>
+<h1 class="title">Reproducing Okuda: a blind inverse problem with a known answer</h1>
+<p class="subtitle lead">Our journey toward Okuda et al.’s Turing × vertex morphogenesis — a case study for agentic model discovery</p>
 </div>
 
 
@@ -172,30 +181,90 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<style>
-.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
-.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
-  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
-.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
-.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
-.op-card-body{display:flex;flex-direction:column;min-width:0}
-.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
-.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
-.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
-.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
-.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
-.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
-.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
-.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
-</style>
-<div class="op-grid">
-<p><a class="op-card" href="library/particle.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">particle</span><span class="op-card-sub">A point with position + velocity (the interacting-particle / boid leaf).</span></span></a> <a class="op-card" href="library/mpm_particle.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">mpm_particle</span><span class="op-card-sub">A material point for MLS-MPM: position + velocity PLUS the per-particle</span></span></a> <a class="op-card" href="library/cell.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">cell</span><span class="op-card-sub">A set of particles/molecules; its position is an aggregate of its children.</span></span></a></p>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
 </div>
+<div class="callout-body-container">
+<p><strong>The point of this page.</strong> The target is a <em>published</em> simulation, so we know a compact model exists — but we have only the paper, not the code. That makes it the cleanest possible testbed for agentic mechanistic discovery: <strong>if Plexus cannot reconstruct a known model even with strong priors and a known answer, it will not reconstruct an unknown one from real data, where the very existence of a model is in doubt.</strong> Success here is necessary, not sufficient; failure here would be decisive.</p>
+</div>
+</div>
+</div>
+<section id="a-controlled-testbed" class="level2">
+<h2 class="anchored" data-anchor-id="a-controlled-testbed">A controlled testbed</h2>
+<p>The target is Okuda <em>et&nbsp;al.</em> (2018): a Turing reaction–diffusion system discretised at the single-cell level and coupled to a <strong>3D vertex model</strong>, which — by growing a monolayer cell vesicle — reproduces autonomous <em>undulation</em>, <em>tubulation</em>, and <em>branching</em>.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> We have the paper, and with it <strong>strong priors</strong>: a vertex-model tissue, an activator–inhibitor reaction–diffusion, and growth converted from each cell’s activator concentration. We do <strong>not</strong> have the code. Reconstructing the result inside <a href="./index.html">Plexus</a> is therefore a <em>blind</em> reproduction, driven by priors alone.</p>
+<p>That is exactly what makes it the right problem to cut our teeth on. On real experimental data the hardest uncertainty is not the parameters but whether a compact mechanistic model <em>exists at all</em>. Here that question is settled — we know a model exists, and roughly what it is — so this is the <strong>easiest version of the real problem</strong>, a controlled floor test for the <a href="./inverse.html">three-loop agentic discovery</a> the project is built around. What is interesting is precisely that the simulation is <em>blind</em> (no repository) yet the answer is <em>known</em>: strong priors, a fixed target, and full freedom to run the forward model. If the method works nowhere here, it works nowhere.</p>
+<p>This page is the honest record of the attempt <strong>so far</strong> — a gallery of failures, because the failures are where the method actually gets defined.</p>
+</section>
+<section id="the-approach-in-brief" class="level2">
+<h2 class="anchored" data-anchor-id="the-approach-in-brief">The approach in brief</h2>
+<p>The reconstruction runs as the three loops described in the <a href="paper/plexus2.pdf">Plexus paper</a> (§&nbsp;<em>Agentic mechanistic discovery</em>): <strong>Understand</strong> the target by interrogating a decomposed model — a hypothesis → <em>validate / falsify</em> cycle held to a rough <strong>70/30</strong> balance; <strong>Fit</strong> its parameters and fields against the differentiable operators; <strong>Discover</strong> the operators the model still lacks from the residual. A <strong>master</strong> controller holds the goal, authors the success metrics, grounds each hypothesis in Okuda’s text, and — before trusting any measurement — enforces a <em>verify-the- instrument</em> gate. Every stage is a small, metric-gated step, run cheap-first. The mechanical substrate is the true-vertex <a href="./index.html#epithelial-mechanics-a-true-vertex-model">Tyssue</a> tissue built elsewhere on this site; the morphogenesis is Okuda’s coupling laid on top of it.</p>
+</section>
+<section id="a-gallery-of-failures" class="level2">
+<h2 class="anchored" data-anchor-id="a-gallery-of-failures">A gallery of failures</h2>
+<style>
+.okuda-gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin:.8rem 0 1.4rem}
+@media (max-width:640px){.okuda-gallery{grid-template-columns:1fr}}
+.okuda-card{margin:0}
+.okuda-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
+.okuda-card figcaption{margin-top:.45rem;font-size:.86em;line-height:1.4;color:#555}
+.okuda-card b{display:block;color:inherit;margin-bottom:.1rem}
+</style>
+<div class="okuda-gallery">
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_okuda_crumple.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Growth driven too hard</b>An early attempt inflates the activated region faster than the tissue can proliferate; the surplus area buckles out of plane into exposed, hollowing folds. Protrusion-by-inflation <em>is</em> hollowing — there is no clean-protrusion window for a volume-locked body driven this hard.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_okuda_cone.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>A tube — but cheated</b>Re-seeding the activator at a fixed radial tip every frame keeps the growing apex inside a cone, so it <em>does</em> tube. But that tip-riding is a hard-coded geometric crutch, not the emergent, self-maintaining apex Okuda’s coupling is supposed to produce.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_cauliflower.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Emergent, but the wrong shape</b>A Gierer–Meinhardt activator (the self-enhancing system Okuda actually uses) holds a stable peak, and coupling it to growth buds the shell — but a <em>wide</em> activation grows the whole patch, folding a lobed cauliflower rather than a clean tube. Narrow, tip-riding growth is the missing dial; closing that gap is the current front.
+</figcaption>
+</figure>
+</div>
+<p>Behind these three lie the structural failures already crossed, each leaving a lesson that is now part of the method:</p>
+<ul>
+<li><strong>Through-vertex division tangled</strong> after one or two rounds → <em>edge-midpoint</em> division is the proliferation engine.</li>
+<li><strong>A single global lumen-volume term crumpled the shell</strong> — one scalar constrains only the <em>sum</em> of cell volumes, so local dips are free → <em>distributed</em>, per-cell volume targets.</li>
+<li><strong>A “97% hollow” shell that no physics could fix</strong> — because it was not physics: a recording-stride misalignment paired vertex positions with another frame’s connectivity. <em>Verify the instrument before trusting the measurement.</em></li>
+<li><strong>A synchronized division wave</strong> (a grey band of exposed walls) — a deterministic cell cycle lock-steps under uniform growth → restore the biological noise of a <em>stochastic</em> cell cycle.</li>
+<li><strong>The reaction–diffusion choice is decisive</strong> — the Brusselator decays or reorganizes the seed; only Gray–Scott (spot regime) and Gierer–Meinhardt hold a stable, localized peak.</li>
+</ul>
+</section>
+<section id="what-the-failures-demand-of-the-agent-next" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-failures-demand-of-the-agent-next">What the failures demand of the agent next</h2>
+<p>Read as a spec, the journey names the capabilities the autonomous master must carry — the same <a href="paper/plexus2.pdf">role spec</a> the paper argues for, now grounded in a real attempt:</p>
+<ul>
+<li><strong>Goal custody.</strong> Several rounds drifted into locally-sensible sub-problems (homogenising a 2000-cell sphere) and lost the tube; the master’s objective must be held separately from the workers’.</li>
+<li><strong>Temporal perception.</strong> The decisive evidence was in the <em>time course</em> — the grey band forms mid-growth, tip cells balloon early — invisible to an end-frame metric. A dynamics-watching critic is a required agent.</li>
+<li><strong>Verify the instrument.</strong> The “97% hollow” shell and a false “0 invalid faces” (which passed self-intersecting bow-tie polygons) were diagnostic artefacts, not physics.</li>
+<li><strong>Literature grounding.</strong> Reading <em>which</em> reaction–diffusion regime Okuda uses (Gierer–Meinhardt) was the single key unlock.</li>
+<li><strong>Domain priors and taste.</strong> Reading the smooth activator <em>gradient</em> off Okuda’s figures — rather than a binary switch — reframed the entire coupling.</li>
+</ul>
+<p>The tube is not yet emergent. But every failure above has been converted from a symptom into a measurable target, which is the whole point: this is what it looks like when a method, not just a model, is being fit.</p>
 
 
+</section>
 
-</main> <!-- /main -->
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>Okuda, S., Miura, T., Inoue, Y., Adachi, T. &amp; Eiraku, M. <em>Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with undulation, tubulation, and branching.</em> <strong>Scientific Reports</strong> 8, 2386 (2018). <a href="https://doi.org/10.1038/s41598-018-20678-6">doi:10.1038/s41598-018-20678-6</a>.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
