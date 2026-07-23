@@ -427,6 +427,13 @@ class Divide3D(Structural):
         # morphogen_growth_3d then re-ramps activated daughters as their G1 regrowth. Off by default so other
         # presets (vesicle_divide/fig4) are unchanged; the tube preset turns it on.
         self.g1_ramp = bool(params.get("g1_ramp", False))
+        # ORIENTED division at the red/white interface (Okuda's tube mechanism, user issue 3): the dividing
+        # plane of an ACTIVATED (red) cell is oriented so the daughters stack ALONG the bud axis (the
+        # direction from the vesicle centre to the activated tip) instead of by the cell's own long axis.
+        # This adds new cells NORMAL to the body surface -> builds the tube WALL and EXTENDS the protrusion,
+        # rather than widening it. orient_asw = activator threshold that flags an interface/red cell. 0 = off.
+        self.orient_iface = bool(params.get("orient_iface", False))
+        self.orient_asw = float(params.get("orient_asw", 1.0))
 
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
@@ -484,6 +491,18 @@ class Divide3D(Structural):
         cand = cand[:cap_div]                                    # (else cand[:n] sweeps in pole-to-pole face order)
         ndone = 0
         daughter_mothers = []                                    # mother face index of each appended daughter (order)
+        bud_axis = None; a_cells = None                          # ORIENTED interface division: bud axis = centre->red tip
+        if self.orient_iface and self.cell_set is not None:
+            clvl0 = H.level(self.cell_set)
+            if clvl0 is not None and "chem" in clvl0.state_schema:
+                ci0, _ = clvl0.state_schema["chem"]
+                a_cells = clvl0.state[:nF, ci0].detach().cpu().numpy()
+                rc = [np.array([pos[v] for v in rings[f]]).mean(0) for f in range(nF)
+                      if a_cells[f] > self.orient_asw and rings[f] is not None and len(rings[f]) >= 3]
+                if len(rc):
+                    ba = np.mean(rc, 0); nba = float(np.linalg.norm(ba))
+                    if nba > 1e-6:
+                        bud_axis = ba / nba
         for f in cand:
             if len(pos) + 2 > buf:                                # respect the vertex buffer
                 break
@@ -492,6 +511,10 @@ class Divide3D(Structural):
             try:                                                 # to the cell's longest axis -> compact daughters
                 _, _, vh = np.linalg.svd(P - c, full_matrices=False); u = vh[0]
                 n = c / (np.linalg.norm(c) + 1e-9)               # outward (radial) face normal on the sphere
+                if bud_axis is not None and a_cells is not None and f < len(a_cells) and a_cells[f] > self.orient_asw:
+                    ut = bud_axis - float(np.dot(bud_axis, n)) * n   # bud axis in this cell's tangent plane ->
+                    if np.linalg.norm(ut) > 1e-6:                    # daughters separate ALONG the protrusion (extend the
+                        u = ut / np.linalg.norm(ut)                  # wall) instead of by the cell's own long axis
                 w = np.cross(n, u); w = w / (np.linalg.norm(w) + 1e-9)   # short-axis direction in the tangent plane
                 mids = 0.5 * (P + np.roll(P, -1, 0)); proj = (mids - c) @ w
                 ea, eb = int(np.argmax(proj)), int(np.argmin(proj))
