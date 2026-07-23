@@ -372,6 +372,20 @@ PRESETS["round_35_cv10"]    = dict(_H35, rho=0.1, cycle_cv=0.10)            # ti
 PRESETS["round_35_kv6"]     = dict(_H35, rho=0.1, K_V=6.0)                  # stiffer volume -> less buckle
 PRESETS["round_35_vth125"]  = dict(_H35, rho=0.1, vth=1.25)                 # tighter size cap
 PRESETS["round_35_relax45"] = dict(_H35, rho=0.1, relax=45)                 # more force-balance relaxation
+# ===== round_36: CONTROL PROLIFERATION (goals 3,4). round_35: uniform mode crushed CV (4.6->0.5) but ALL hit
+# the 15002 cell buffer (10x growth vs Okuda's ~3x) -> crammed cells buckle -> hollow. So hollow is driven by
+# OVER-PROLIFERATION, not CV. Fix: bring cell count to Okuda scale (~4000) -- slower/shorter growth, vcap OFF
+# (no forced oversize division), smaller tip cap, lower division rate. Hypothesis: ~4000 cells -> hollow<<,
+# CV stays low (uniform mode). Metric: cells_end ~4000, hollow_n_peak low.
+_H36 = dict(_H35, rho=0.1, vcap=0.0, tip_radius=1.0, mdf=0.015)
+PRESETS["round_36_base"]     = dict(_H36, rate=0.008, frames=300)
+PRESETS["round_36_slow"]     = dict(_H36, rate=0.005, frames=400)
+PRESETS["round_36_f250"]     = dict(_H36, rate=0.008, frames=250)
+PRESETS["round_36_tr08"]     = dict(_H36, rate=0.008, frames=300, tip_radius=0.8)
+PRESETS["round_36_rho005"]   = dict(_H36, rate=0.008, frames=300, rho=0.05)
+PRESETS["round_36_maxcyc30"] = dict(_H36, rate=0.008, frames=300, max_cycle=30)
+PRESETS["round_36_mdf008"]   = dict(_H36, rate=0.008, frames=300, mdf=0.008)
+PRESETS["round_36_r006"]     = dict(_H36, rate=0.006, frames=400)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
