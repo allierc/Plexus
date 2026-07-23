@@ -186,6 +186,18 @@ PRESETS["round_22_g2"]      = dict(_F4, rd_rate=2.0)                          # 
 PRESETS["round_22_g5"]      = dict(_F4, rd_rate=5.0)                          # gamma high      -> HOLD (+spot increase?)
 PRESETS["round_22_slowgrow"]= dict(_F4, rd_rate=1.0, rate=0.008)             # slow deformation = high effective gamma
 PRESETS["round_22_fastgrow"]= dict(_F4, rd_rate=1.0, rate=0.045)             # fast deformation = low  effective gamma -> blur
+# ===== round_23: HOLD sweet spot (issue 1->2). round_22 showed slow growth + fast RD (high gamma) HOLDS the
+# pattern (red_frac ~0.1, red_over_tip ~1) while fast growth FLOODS. Now find the fastest growth that still
+# holds a CONFINED spot AND deforms it into a clean bud (protr up, red_over_tip ~1, red at tip). Sweep growth
+# rate x rd_rate around the hold/blur boundary; amount-conservation ON (default).
+PRESETS["round_23_r006_rd2"] = dict(_F4, rate=0.006, rd_rate=2.0)
+PRESETS["round_23_r010_rd2"] = dict(_F4, rate=0.010, rd_rate=2.0)
+PRESETS["round_23_r014_rd2"] = dict(_F4, rate=0.014, rd_rate=2.0)
+PRESETS["round_23_r020_rd2"] = dict(_F4, rate=0.020, rd_rate=2.0)
+PRESETS["round_23_r010_rd1"] = dict(_F4, rate=0.010, rd_rate=1.0)
+PRESETS["round_23_r010_rd4"] = dict(_F4, rate=0.010, rd_rate=4.0)
+PRESETS["round_23_r008_rd3"] = dict(_F4, rate=0.008, rd_rate=3.0)
+PRESETS["round_23_r006_rd4"] = dict(_F4, rate=0.006, rd_rate=4.0)             # slowest growth + fast RD = strongest hold
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
