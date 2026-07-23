@@ -386,6 +386,20 @@ PRESETS["round_36_rho005"]   = dict(_H36, rate=0.008, frames=300, rho=0.05)
 PRESETS["round_36_maxcyc30"] = dict(_H36, rate=0.008, frames=300, max_cycle=30)
 PRESETS["round_36_mdf008"]   = dict(_H36, rate=0.008, frames=300, mdf=0.008)
 PRESETS["round_36_r006"]     = dict(_H36, rate=0.006, frames=400)
+# ===== round_37: SMALL steps from the WORKING tube (round_34_900: aspect 8.4, ~2800 cells, rho=0 tip-mode).
+# round_35/36 (rho>0 uniform + controlled prolif) LOST the tube -- too big a step. Back to the working point;
+# change ONE anti-buckle lever at a time to cut HOLLOW (goal 3) without losing elongation. Hollow comes from
+# oversized inflating tip cells buckling; levers: vcap (force-divide sooner), K_V (stiffer volume), relax (more
+# force balance). Keep len/diam high. Base = round_34_900.
+_H37 = dict(_H34, frames=900)
+PRESETS["round_37_base"]      = dict(_H37)                                   # control = the working tube
+PRESETS["round_37_vcap13"]    = dict(_H37, vcap=1.3)
+PRESETS["round_37_vcap12"]    = dict(_H37, vcap=1.2)
+PRESETS["round_37_kv6"]       = dict(_H37, K_V=6.0)
+PRESETS["round_37_kv8"]       = dict(_H37, K_V=8.0)
+PRESETS["round_37_relax45"]   = dict(_H37, relax=45)
+PRESETS["round_37_vcap13_kv6"]= dict(_H37, vcap=1.3, K_V=6.0)
+PRESETS["round_37_relax45_kv6"]=dict(_H37, relax=45, K_V=6.0)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -485,8 +499,10 @@ def _cross_screen(ax, pos, mesh, act, seed_dir=None, inner=0.82, Lbox=None):
         t = np.asarray(seed_dir, float); t = t / (np.linalg.norm(t) + 1e-12)   # tube axis -> plot HORIZONTAL
         n = dcam - (dcam @ t) * t; nn = np.linalg.norm(n)        # slice normal: camera depth projected off the axis
         d = n / nn if nn > 1e-6 else sv
-        v = np.cross(d, t); v = v / (np.linalg.norm(v) + 1e-12)  # in-plane VERTICAL
-        u = t                                                    # in-plane HORIZONTAL = the tube axis
+        u = t if (t @ su) >= 0 else -t                           # match the 3D screen L/R (no flip vs the 3D view)
+        v = np.cross(d, u); v = v / (np.linalg.norm(v) + 1e-12)  # in-plane VERTICAL
+        if v @ sv < 0:
+            v = -v                                               # match the 3D screen up/down
     else:
         d, u, v = dcam, su, sv
     es, et, ef = np.asarray(mesh["E_srce"]), np.asarray(mesh["E_trgt"]), np.asarray(mesh["E_face"])
