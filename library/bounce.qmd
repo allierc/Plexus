@@ -77,7 +77,7 @@ operators:
 
 ## Related operators
 
-Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd), [`alignment`](alignment.qmd).
+Other **lateral** operators: [`attraction_repulsion`](attraction_repulsion.qmd), [`squared_law`](squared_law.qmd), [`stillinger_weber`](stillinger_weber.qmd), [`attractor_flow`](attractor_flow.qmd), [`cohesion`](cohesion.qmd), [`velocity_align`](velocity_align.qmd).
 
 ## Source
 
@@ -137,6 +137,7 @@ class Bounce(Lateral):
     MECHANISM_TAGS = ["boundary_condition", "wall_reflection", "obstacle_avoidance", "steering"]
     REQUIRES_TYPE_PROPS = ["move_speed"]        # needs the step length it is about to take
     PARAM_ROLES = {"noise": "obstacle_reheading_randomness"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

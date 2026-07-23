@@ -107,6 +107,7 @@ class Centroid(Aggregate):
     REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
     MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]
     PARAM_ROLES = {"child": "source_child_set"}
+    REFERENCE = "Battaglia, P. W. et al. (2018). Relational inductive biases, deep learning, and graph networks. arXiv:1806.01261."
     MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
 
     def __init__(self, params, device="cpu"):

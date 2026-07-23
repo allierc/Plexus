@@ -167,10 +167,6 @@ window.Quarto = {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -191,6 +187,10 @@ window.Quarto = {
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -346,24 +346,25 @@ window.Quarto = {
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"stiffness"</span>]</span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"containment"</span>, <span class="st">"hierarchical_coupling"</span>, <span class="st">"spring"</span>]</span>
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"stiffness"</span>: <span class="st">"containment_strength"</span>}</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.k <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"stiffness"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        child <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> child.state.device</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        pname <span class="op">=</span> <span class="bu">getattr</span>(child, <span class="st">"parent_name"</span>, <span class="va">None</span>)</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pname <span class="kw">is</span> <span class="va">None</span>:</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {<span class="va">self</span>.at: torch.zeros_like(child.get(<span class="st">"pos"</span>))}   <span class="co"># no parent -&gt; zero delta (matches pos dim, 2D/3D)</span></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        parent <span class="op">=</span> H.level(pname)</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        ppos <span class="op">=</span> parent.get(<span class="st">"pos"</span>)[child.parent]     <span class="co"># each child's parent position</span></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        vel <span class="op">=</span> <span class="va">self</span>.k <span class="op">*</span> (ppos <span class="op">-</span> child.get(<span class="st">"pos"</span>)) <span class="op">*</span> child.occ[:, <span class="va">None</span>]</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>            vel <span class="op">=</span> vel <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: vel}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Battaglia, P. W. et al. (2018). arXiv:1806.01261 (graph-network broadcast)."</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.k <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"stiffness"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"particle"</span>)</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        child <span class="op">=</span> H.level(<span class="va">self</span>.at)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> child.state.device</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        pname <span class="op">=</span> <span class="bu">getattr</span>(child, <span class="st">"parent_name"</span>, <span class="va">None</span>)</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pname <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {<span class="va">self</span>.at: torch.zeros_like(child.get(<span class="st">"pos"</span>))}   <span class="co"># no parent -&gt; zero delta (matches pos dim, 2D/3D)</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        parent <span class="op">=</span> H.level(pname)</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        ppos <span class="op">=</span> parent.get(<span class="st">"pos"</span>)[child.parent]     <span class="co"># each child's parent position</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        vel <span class="op">=</span> <span class="va">self</span>.k <span class="op">*</span> (ppos <span class="op">-</span> child.get(<span class="st">"pos"</span>)) <span class="op">*</span> child.occ[:, <span class="va">None</span>]</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>            vel <span class="op">=</span> vel <span class="op">*</span> mask[:, <span class="va">None</span>].<span class="bu">float</span>()</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="va">self</span>.at: vel}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

@@ -138,10 +138,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -162,6 +158,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -356,42 +356,43 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"to"</span>, <span class="st">"target"</span>]</span>
 <span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"tissue_remodelling"</span>, <span class="st">"stiffening"</span>, <span class="st">"fluidisation"</span>]</span>
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"gain"</span>: <span class="st">"remodel_gain"</span>, <span class="st">"rate_attr"</span>: <span class="st">"per_type_remodel_rate"</span>}</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"agent"</span>)</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.to <span class="op">=</span> params.get(<span class="st">"to"</span>, <span class="st">"mpm_grid"</span>)            <span class="co"># grid used only for the transfer geometry</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.target <span class="op">=</span> params.get(<span class="st">"target"</span>, <span class="st">"mpm_particle"</span>)</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gain <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"gain"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate_attr <span class="op">=</span> params.get(<span class="st">"rate_attr"</span>, <span class="st">"remodel_rate"</span>)</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.mu_min <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"mu_min"</span>, <span class="fl">0.5</span>))<span class="op">;</span> <span class="va">self</span>.mu_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"mu_max"</span>, <span class="fl">1.0e4</span>))</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.la_min <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"la_min"</span>, <span class="fl">0.5</span>))<span class="op">;</span> <span class="va">self</span>.la_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"la_max"</span>, <span class="fl">1.0e4</span>))</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.to)<span class="op">;</span> tgt <span class="op">=</span> H.level(<span class="va">self</span>.target)</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="va">self</span>.rate_attr, <span class="va">None</span>)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> rate <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">float</span>(rate.<span class="bu">abs</span>().<span class="bu">max</span>()) <span class="op">==</span> <span class="fl">0.0</span>:</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}                                     <span class="co"># no remodellers -&gt; nothing to do</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        offs <span class="op">=</span> stencil_offsets(tgt.get(<span class="st">"pos"</span>).shape[<span class="dv">1</span>], dev)<span class="op">;</span> S <span class="op">=</span> offs.shape[<span class="dv">0</span>]</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="co"># scatter cells' remodel rate + presence onto the grid (density-normalised mean rate)</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        Xa <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)<span class="op">;</span> _, wa, fa <span class="op">=</span> bspline(Xa, g.inv_dx, offs, g.shape, periodic)</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        occ_a <span class="op">=</span> lvl.occ <span class="cf">if</span> mask <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> lvl.occ <span class="op">*</span> mask.<span class="bu">float</span>()</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        R <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)<span class="op">;</span> Wt <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        R.index_add_(<span class="dv">0</span>, fa, (wa <span class="op">*</span> (rate <span class="op">*</span> occ_a)[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        Wt.index_add_(<span class="dv">0</span>, fa, (wa <span class="op">*</span> occ_a[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        Rn <span class="op">=</span> R <span class="op">/</span> Wt.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)                       <span class="co"># mean remodel rate per cell</span></span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        <span class="co"># gather at material points and update their stiffness multiplicatively</span></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        Xp <span class="op">=</span> tgt.get(<span class="st">"pos"</span>)<span class="op">;</span> _, wp, fp <span class="op">=</span> bspline(Xp, g.inv_dx, offs, g.shape, periodic)</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        Rp <span class="op">=</span> (wp <span class="op">*</span> Rn[fp].view(tgt.n, S)).<span class="bu">sum</span>(<span class="dv">1</span>)          <span class="co"># [Np]</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        factor <span class="op">=</span> torch.exp((<span class="va">self</span>.gain <span class="op">*</span> dt) <span class="op">*</span> Rp)</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        tgt.mu <span class="op">=</span> (tgt.mu <span class="op">*</span> factor).clamp(<span class="va">self</span>.mu_min, <span class="va">self</span>.mu_max)</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        tgt.la <span class="op">=</span> (tgt.la <span class="op">*</span> factor).clamp(<span class="va">self</span>.la_min, <span class="va">self</span>.la_max)</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Plexus (this work)."</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"agent"</span>)</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.to <span class="op">=</span> params.get(<span class="st">"to"</span>, <span class="st">"mpm_grid"</span>)            <span class="co"># grid used only for the transfer geometry</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.target <span class="op">=</span> params.get(<span class="st">"target"</span>, <span class="st">"mpm_particle"</span>)</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gain <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"gain"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate_attr <span class="op">=</span> params.get(<span class="st">"rate_attr"</span>, <span class="st">"remodel_rate"</span>)</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.mu_min <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"mu_min"</span>, <span class="fl">0.5</span>))<span class="op">;</span> <span class="va">self</span>.mu_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"mu_max"</span>, <span class="fl">1.0e4</span>))</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.la_min <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"la_min"</span>, <span class="fl">0.5</span>))<span class="op">;</span> <span class="va">self</span>.la_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"la_max"</span>, <span class="fl">1.0e4</span>))</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.to)<span class="op">;</span> tgt <span class="op">=</span> H.level(<span class="va">self</span>.target)</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="va">self</span>.rate_attr, <span class="va">None</span>)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> rate <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">float</span>(rate.<span class="bu">abs</span>().<span class="bu">max</span>()) <span class="op">==</span> <span class="fl">0.0</span>:</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}                                     <span class="co"># no remodellers -&gt; nothing to do</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        offs <span class="op">=</span> stencil_offsets(tgt.get(<span class="st">"pos"</span>).shape[<span class="dv">1</span>], dev)<span class="op">;</span> S <span class="op">=</span> offs.shape[<span class="dv">0</span>]</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="co"># scatter cells' remodel rate + presence onto the grid (density-normalised mean rate)</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        Xa <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)<span class="op">;</span> _, wa, fa <span class="op">=</span> bspline(Xa, g.inv_dx, offs, g.shape, periodic)</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        occ_a <span class="op">=</span> lvl.occ <span class="cf">if</span> mask <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> lvl.occ <span class="op">*</span> mask.<span class="bu">float</span>()</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        R <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)<span class="op">;</span> Wt <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        R.index_add_(<span class="dv">0</span>, fa, (wa <span class="op">*</span> (rate <span class="op">*</span> occ_a)[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        Wt.index_add_(<span class="dv">0</span>, fa, (wa <span class="op">*</span> occ_a[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        Rn <span class="op">=</span> R <span class="op">/</span> Wt.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)                       <span class="co"># mean remodel rate per cell</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        <span class="co"># gather at material points and update their stiffness multiplicatively</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        Xp <span class="op">=</span> tgt.get(<span class="st">"pos"</span>)<span class="op">;</span> _, wp, fp <span class="op">=</span> bspline(Xp, g.inv_dx, offs, g.shape, periodic)</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        Rp <span class="op">=</span> (wp <span class="op">*</span> Rn[fp].view(tgt.n, S)).<span class="bu">sum</span>(<span class="dv">1</span>)          <span class="co"># [Np]</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        factor <span class="op">=</span> torch.exp((<span class="va">self</span>.gain <span class="op">*</span> dt) <span class="op">*</span> Rp)</span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        tgt.mu <span class="op">=</span> (tgt.mu <span class="op">*</span> factor).clamp(<span class="va">self</span>.mu_min, <span class="va">self</span>.mu_max)</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        tgt.la <span class="op">=</span> (tgt.la <span class="op">*</span> factor).clamp(<span class="va">self</span>.la_min, <span class="va">self</span>.la_max)</span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

@@ -167,10 +167,6 @@ window.Quarto = {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -191,6 +187,10 @@ window.Quarto = {
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -339,17 +339,18 @@ c \;\leftarrow\; \max\!\big(0,\; c - k\,\Delta t\big)
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []                        <span class="co"># no required params — field target from `at:`; `rate` optional</span></span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"evaporation"</span>, <span class="st">"field_decay"</span>, <span class="st">"stigmergy"</span>]</span>
 <span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"rate"</span>: <span class="st">"evaporation_rate"</span>}</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.012</span>))    <span class="co"># evaporation per unit time</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> (fld.grid <span class="op">-</span> <span class="va">self</span>.rate <span class="op">*</span> dt).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">0.0</span>)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Plexus (this work)."</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.field_name <span class="op">=</span> params.get(<span class="st">"_at"</span>) <span class="kw">or</span> params.get(<span class="st">"to"</span>)   <span class="co"># the field at `at:`</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"rate"</span>, <span class="fl">0.012</span>))    <span class="co"># evaporation per unit time</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        fld <span class="op">=</span> H.fields[<span class="va">self</span>.field_name]</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        fld.grid <span class="op">=</span> (fld.grid <span class="op">-</span> <span class="va">self</span>.rate <span class="op">*</span> dt).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">0.0</span>)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>

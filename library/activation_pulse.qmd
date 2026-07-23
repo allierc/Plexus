@@ -136,6 +136,7 @@ class ActivationPulse(FieldUpdate):
     PARAM_ROLES = {"radius": "stimulus_width", "center": "stimulus_site", "clock": "pacemaker_signal",
                    "period": "beat_interval", "duration": "active_width",
                    "max_delay": "phase_delay_gain", "delay_from": "delay_map"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

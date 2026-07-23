@@ -131,6 +131,7 @@ class Pacemaker(FieldUpdate):
     REQUIRES_PARAMS = []        # no required params — all knobs optional (defaults in __init__)
     MECHANISM_TAGS = ["periodic_source", "clock", "pacemaker"]
     PARAM_ROLES = {"period": "beat_interval", "duration": "active_width", "phase": "beat_offset"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
