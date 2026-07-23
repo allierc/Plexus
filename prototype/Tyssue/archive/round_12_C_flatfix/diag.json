@@ -1,0 +1,17 @@
+{
+ "name": "round_12_C_flatfix",
+ "frames": 300,
+ "spots": 3,
+ "cone_deg": 16.0,
+ "seed_once": true,
+ "rho": 0.0,
+ "vth": 1.5,
+ "rate": 0.04,
+ "a_sw": 0.5,
+ "hill": 6.0,
+ "K_V": 4.0,
+ "mdf": 0.03,
+ "relax": 30,
+ "vcap": 1.5,
+ "error": "RuntimeError('The expanded size of the tensor (22000) must match the existing size (22002) at non-singleton dimension 0.  Target sizes: [22000, 3].  Tensor sizes: [22002, 3]')"
+}

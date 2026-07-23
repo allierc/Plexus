@@ -854,6 +854,31 @@ sweep that actually tracked the RD CFL wall via \texttt{chi}; a division-through
 \emph{buffer} ceiling), and one run's ``empty'' movie was a fixed camera zoomed out by a ballooned final
 frame --- fixed with per-frame autoscale. Verify the instrument before trusting the measurement.
 
+\paragraph{Tube emergence needs tip-riding, and the RD choice decides it (2026-07-23).} Pushing for
+\emph{emergent} (not cone-prescribed) tubes forced a mechanism question: why does a \emph{flat} activation
+spot not make a tube? Because growth adds area everywhere in the patch, so a uniformly-activated patch
+inflates as a \emph{dome} (a spherical cap that \emph{widens}); a tube instead needs area added only at the
+\emph{tip}, which then \emph{advances} --- i.e.\ the activation must \emph{ride the tip}. The cones tube
+precisely because they re-seed at a fixed radial direction, so the growing radial tip stays inside the
+cone; that is tip-riding done geometrically, and it is a hard-coded crutch. For it to \emph{emerge}, the
+RD's activator peak must itself stay at the apex --- which is what the smooth activator gradient in Okuda's
+figures is. So we studied the RD \emph{first, in isolation} (growth off, three big spots seeded, watch what
+the RD does): the Brusselator is disqualified --- at low $\gamma$ it decays the seed to a uniform weak
+background, at high $\gamma$ it overrides the seed with its own short-wavelength pattern that fills the
+sphere, and either way its pattern forms only after $\sim$18\,s (the $1/\gamma$ time), far too late.
+Gray--Scott in the \emph{spot} regime ($F\!=\!0.03$) was the only one of eight that held the three seeded
+spots strong, localized and stable. Reading Okuda then closed the loop: their RD is neither of ours but the
+\emph{Gierer--Meinhardt} activator--inhibitor --- a \emph{self-enhancing} activator with a fast lateral
+inhibitor, whose hallmark is exactly a stable, self-maintaining activator \emph{peak with a gradient}. The
+paper is explicit that the tube ``emerg[es] from the coupling of patterning and deformation'': the tip-%
+riding is not hard-coded, it is a property of self-enhancing spot + growth co-evolving on the same
+timescale. The plan follows directly: implement Gierer--Meinhardt, confirm it makes a stable gradient
+peak, then couple growth and measure \texttt{tip\_act} (the activator--radius correlation) to test whether
+the peak rides the tip on its own. A supporting metric note: a spot-count that thresholded at the
+$70^{\text{th}}$ percentile reported ``101 spots'' for the clean Gray--Scott run where the eye saw three ---
+the threshold sat in the noise; counting only cells above half-maximum fixed it. The eye and the metric
+must agree before either is trusted.
+
 \paragraph{3D division at scale (2026-07-21) --- a synchronised division wave, not a rendering bug.}
 \begin{itemize}\itemsep2pt
 \item \textbf{The controlled experiment that exonerated the reaction--diffusion.}
