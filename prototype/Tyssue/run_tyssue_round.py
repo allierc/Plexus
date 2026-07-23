@@ -118,7 +118,59 @@ PRESETS = {
     # 3-peak pattern instead of a forming one. Compare vs round_14 (grow from frame 0).
     "round_15_warm60":  dict(frames=360, grow_after=60,  spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.04, a_sw=1.2, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
     "round_15_warm100": dict(frames=400, grow_after=100, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.04, a_sw=1.2, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    # ===== round_16: LOCALIZE the growth. round_14/15 over-proliferated (~15k cells, wall-killed) -> the
+    # graded coupling grew the whole GM peak+gradient skirt (wide -> dome). Raise a_sw so ONLY the peak APEX
+    # (a>~1.6, GM range ~[0,2.5]) drives growth -> narrow tube + modest cell count + finishes fast. warmup 50.
+    "round_16_apex":  dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.05, a_sw=1.8, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_16_apex2": dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.05, a_sw=1.5, hill=4.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    # ===== round_17: CONTROL THE RUNAWAY. round_16 worked in the INITIATION phase (tip_act 0.8, localized red
+    # lobes) then blew up: growth -> daughters inherit activator -> self-enhance -> flood. Okuda's fix = a
+    # STRONGER/FASTER lateral inhibitor (behind the front cells turn white). Boost inhibition (d_h up, mu_h
+    # down) + slow growth so the RD keeps the peak localized. Faster RD (rd_rate) so inhibition outpaces growth.
+    "round_17_inhib":  dict(frames=250, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=0.7, a0=0.01, d_a=0.05, d_h=1.6, chi=4.0, rd_rate=2.0, rho=0.0, vth=1.5, rate=0.03, a_sw=1.5, hill=4.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_17_inhib2": dict(frames=250, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.2, mu_a=1.0, mu_h=0.6, a0=0.005, d_a=0.04, d_h=2.0, chi=4.0, rd_rate=2.5, rho=0.0, vth=1.5, rate=0.025, a_sw=1.6, hill=4.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    # ===== round_18: 8-JOB GAMMA SWEEP -- map tube <-> branch/cauliflower via the RD-vs-growth TIMESCALE
+    # (Okuda's gamma). High RD-rate / slow growth = RD dominates -> spot locks to ONE tip -> TUBE; slow RD /
+    # fast growth -> growth outruns the RD, re-nucleates on each bud -> BRANCH/cauliflower. + inhibition,
+    # localization, very-slow controls. Census (red_at_tip, red_over_tip) says where each lands. warmup 50.
+    "round_18_gamma1": dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.05,  a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_gamma2": dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=2.0, rho=0.0, vth=1.5, rate=0.04,  a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_gamma3": dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=3.0, rho=0.0, vth=1.5, rate=0.03,  a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_gamma4": dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=4.0, rho=0.0, vth=1.5, rate=0.02,  a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_gamma6": dict(frames=240, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=6.0, rho=0.0, vth=1.5, rate=0.015, a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_inhib":  dict(frames=220, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=0.6, a0=0.01, d_a=0.05, d_h=1.4, chi=4.0, rd_rate=3.0, rho=0.0, vth=1.5, rate=0.02,  a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_apex":   dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=3.0, rho=0.0, vth=1.5, rate=0.03,  a_sw=2.0, hill=4.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_18_vslow":  dict(frames=280, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=4.0, rho=0.0, vth=1.5, rate=0.012, a_sw=1.6, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    # ===== round_19: TEST THE rd_interface_tension OPERATOR (user hypothesis) -- purse-string on the red/white
+    # ring + normal extrusion of red cells -> CYLINDER not ball. H/V/F: ctrl (no interface, should bulge) vs
+    # purse-string vs extrusion vs both. GM base + moderate growth. iface_asw=1.0 (red threshold). Judge by
+    # census (red_at_tip~1 + constant tube_diam = the interface built a tube wall) vs the ctrl's dome.
 }
+_GMB = dict(frames=200, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=2.0, rho=0.0, vth=1.5, rate=0.03, a_sw=1.5, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5, grow_after=50, iface_asw=1.0)
+PRESETS["round_19_ctrl"]  = dict(_GMB, K_purse=0.0, K_extrude=0.0)   # no interface -> should DOME (control)
+PRESETS["round_19_purse"] = dict(_GMB, K_purse=3.0, K_extrude=0.3)   # strong ring
+PRESETS["round_19_extr"]  = dict(_GMB, K_purse=1.0, K_extrude=1.2)   # strong outward extrusion
+PRESETS["round_19_both"]  = dict(_GMB, K_purse=2.0, K_extrude=0.8)   # purse-string + extrusion
+# ===== round_20: CONFINEMENT sweep -- get red_over_tip from ~8 down to ~1 (activator confined to the tip)
+# so the runaway/flood stops. Levers: Meinhardt SATURATION (sat, bounds the peak), strong lateral inhibition
+# (mu_h down, d_h up), slow growth (RD redistributes), + combos. NO interface op yet -- fix confinement first.
+_GMC = dict(frames=200, grow_after=50, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=2.0, rho=0.0, vth=1.5, rate=0.03, a_sw=1.5, hill=3.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5)
+PRESETS["round_20_sat05"]   = dict(_GMC, sat=0.5)                                        # moderate saturation
+PRESETS["round_20_sat10"]   = dict(_GMC, sat=1.0)                                        # strong saturation
+PRESETS["round_20_sat20"]   = dict(_GMC, sat=2.0)                                        # very strong saturation
+PRESETS["round_20_inhib"]   = dict(_GMC, mu_h=0.4, d_h=3.0, rd_rate=3.0)                 # strong lateral inhibition only
+PRESETS["round_20_satinh"]  = dict(_GMC, sat=1.0, mu_h=0.5, d_h=2.0, rd_rate=3.0)        # saturation + inhibition
+PRESETS["round_20_slow"]    = dict(_GMC, sat=1.0, rate=0.01, frames=260)                 # saturation + slow growth
+PRESETS["round_20_combo"]   = dict(_GMC, sat=1.0, mu_h=0.5, d_h=2.0, rd_rate=3.0, rate=0.015, a_sw=1.7, frames=240)  # all
+PRESETS["round_20_satapex"] = dict(_GMC, sat=1.5, a_sw=1.8, hill=4.0)                    # saturation + apex localization
+# ===== round_21: KILL BACKGROUND IGNITION -- the flood starts from a0 seeding the white background + a
+# Turing-unstable RD filling the growing domain. Saturation makes RINGS (bad); inhibition kills the seeds.
+# Try: a0=0 (no background source) + a LOCALIZED-STRUCTURE regime (seeded spots persist, homogeneous state
+# stable, no spontaneous nucleation). Goal: red_over_tip ~1, spots stay FILLED (no ring, no flood).
+PRESETS["round_21_a0z"]     = dict(_GMC, a0=0.0, mu_h=0.8)                               # no background seed
+PRESETS["round_21_a0z_sat"] = dict(_GMC, a0=0.0, sat=0.3, mu_h=0.8)                      # + MILD saturation (below ring threshold)
+PRESETS["round_21_subcrit"] = dict(_GMC, a0=0.002, mu_a=1.6, mu_h=0.9)                   # sub-critical: stable low background
+PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
 def make(p):
@@ -156,11 +208,15 @@ def make(p):
     ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
     #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
     ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga},
-            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12},
-            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
+            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}]
+    sched += ["morphogen_growth_3d", "shape_energy_3d"]
+    if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
+        ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
+        sched += ["rd_interface_tension"]
+    ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
             {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.4, "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": 4, "max_cycle": 1000000000, "after_frame": ga},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched += ["morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched += ["reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_round", "seed": 0, "n_frames": p["frames"], "dt": dt, "record_cap": p["frames"] + 2, "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},
            "sets": {"vertex": {"n": VBUF}, "cell": {"n": CBUF, "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},
            "fields": {}, "operators": ops, "schedule": sched}
@@ -183,12 +239,12 @@ def do(preset):
         lo, hi = float(np.percentile(aT, 5)), float(np.percentile(aT, 99) + 1e-6)
         col = lambda a: np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)
         lbox = lambda pt: (float(np.abs(pt).max()) * 1.12, float(np.abs(pt).max()) * 2.3)   # PER-FRAME autoscale so the init (and every stage) is always visible, not a dot next to a balloon
-        fig = plt.figure(figsize=(17.6, 9.0)); fig.patch.set_facecolor("black")
-        for i, t in enumerate([int(round(fr * (T - 1))) for fr in (0.0, 0.33, 0.66, 1.0)]):
+        fig = plt.figure(figsize=(35.2, 9.0)); fig.patch.set_facecolor("black")   # 8 timepoints, 2 rows x 8 cols (3D / cross)
+        for i, t in enumerate([int(round(fr * (T - 1))) for fr in np.linspace(0.0, 1.0, 8)]):
             mt, pt, a = frame(t); l3, l2 = lbox(pt)
-            ax3 = fig.add_subplot(2, 4, i + 1, projection="3d"); _draw(ax3, pt, mt, 3.90, azim=30, act=col(a), Lbox=l3)
-            ax2 = fig.add_subplot(2, 4, 4 + i + 1); _draw_cross(ax2, pt, mt, 3.90, act=col(a), Lbox=l2, axis=1)
-        fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02); fig.savefig(os.path.join(OUT, "strip.png"), dpi=120, facecolor="black"); plt.close(fig)
+            ax3 = fig.add_subplot(2, 8, i + 1, projection="3d"); _draw(ax3, pt, mt, 3.90, azim=30, act=col(a), Lbox=l3)
+            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _draw_cross(ax2, pt, mt, 3.90, act=col(a), Lbox=l2, axis=1)
+        fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02); fig.savefig(os.path.join(OUT, "strip.png"), dpi=110, facecolor="black"); plt.close(fig)
         figm = plt.figure(figsize=(5.0, 5.2)); figm.patch.set_facecolor("black"); axm, axin = make_movie_axes(figm)
         keep = np.arange(0, T, max(1, T // 110)); wri = FFMpegWriter(fps=11, metadata={"title": preset})
         with wri.saving(figm, os.path.join(OUT, "movie.mp4"), dpi=95):
