@@ -1110,4 +1110,35 @@ stability under growth comes from ``the intrinsic hysteresis in the activator--i
 domain growth'' at $\gamma\!=\!1$. Fixing this is a prerequisite to any tube; see the gap-analysis
 section for the full mechanism map.
 
+\paragraph{Correction: the morphogen must be an AMOUNT, and the flood is a $\gamma$ problem (2026-07-23).}
+The saturation/inhibition confinement levers above were the wrong battle, and re-reading Okuda's Appendix~A
+says why. The evolved morphogen DOF is the molecule \emph{amount} $m_j$ (conserved within the cell); the
+concentration $c_j=m_j/v_j$ appears \emph{only} as the argument of the reaction and flux terms. Our RD
+instead stored a \emph{concentration} and \texttt{morphogen\_growth\_3d} inflated $v_j$ \emph{without touching
+it} --- so every growth step \emph{silently created mass} (the opposite error to the dilution one), which
+\emph{spuriously} helped the peak ride the tip. The fix is structural, not a continuum $-c(\nabla\!\cdot\!v)$
+term: conserve amount by rescaling $c_j\!\leftarrow\!c_j\,(v_{\text{old}}/v_{\text{new}})=c_j\,(s_{\text{prev}}/s)^3$
+as $v_{\text{eq}}\!\sim\!s^3$ grows (division is already correct --- daughters share the mother's $c$, and
+their volumes sum to hers, so amount is conserved). Crucially, dilution is now \emph{load-bearing} and kept,
+not cancelled --- Okuda's intra-domain gradients are \emph{caused} by it. With dilution correct, the flood
+(``the peak washes out'') is Okuda's $\gamma=0.01$ regime: patterning too slow relative to deformation. The
+remedy is a \emph{rate inequality} --- raise $\gamma$ (reaction outruns dilution; his undulation/tubulation
+figures use $\gamma=100$), not saturation. The amplification that makes a bud commit lives on the
+\emph{mechanics}: growth is a steep Hill \emph{switch} on $c$ ($\alpha\gg1$, $\rho_{\text{sw}}=a_{\text{sw}}$
+at the midpoint of the two GM steady states). Next: reproduce Fig.~4a --- fix $\chi$, sweep $\gamma$, and
+recover the three regimes (blur / hold / hold-with-spot-increase) to calibrate the timescale dial before any
+tube run.
+
+\paragraph{Monolayer-thickness operator built (2026-07-23).}
+The C\#1 gap operator (\texttt{monolayer\_design.md}) is implemented as the \texttt{monolayer}
+\emph{implementation} of the \texttt{shape\_energy\_3d} contract (plexus2 sec.~5: same biology, different
+numerics): every cell gets its own 3D volume $+$ surface by offsetting an apical$/$basal shell $\pm h/2$ along
+the \emph{vertex} normal, with Okuda's Eq.~3 energy ($\tfrac12 k_v(v_j-v_{\text{eq}j})^2+\kappa_s s_j$). A
+direct physics test (\texttt{test\_monolayer.py}) confirms the geometry ($\sum v_j/(A\,h_0)=0.988$) and,
+decisively, the \emph{emergent bending} signature: on the curved shell the apical$/$basal area ratio is
+$1.176$ vs.\ the theoretical $((R{+}h/2)/(R{-}h/2))^2=1.174$ --- a $0.2\%$ match, so surface tension penalises
+curvature with \emph{no} explicit $K_{\text{bend}}$. A localised $v_{\text{eq}}$ increase buckles the cap
+outward. (The rest shell settles smaller than $v_{\text{eq}}$ --- the correct $\kappa_s$/$k_v$ force balance,
+a calibration knob.)
+
 \end{document}
