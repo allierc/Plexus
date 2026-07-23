@@ -27,7 +27,8 @@ from tube_analysis import analyze
 import torch
 
 CKPT = os.path.join(HERE, "archive", "smoke_hom", "ckpt.npz")
-VBUF, CBUF = 44000, 22000                                   # buffer >= ckpt (~1500 cells) + long-run growth headroom
+VBUF, CBUF = 30000, 16000                                   # CBUF MUST exceed VBUF/2 (a closed mesh has F ~ V/2 + 2 cells;
+#   CBUF == VBUF/2 overflowed the cell buffer by exactly 2 when division filled the vertex buffer). Margin fixes it.
 
 # few BIG RD spots on the homogenised mesh (gamma low = long wavelength = fewer bigger); rho=0 locked +
 # a_sw narrow (only peak grows -> narrow tube). frames long to elongate.
@@ -98,6 +99,25 @@ PRESETS = {
     "round_12_D_flatride":dict(frames=300, spots=3, cone_deg=16.0, rho=0.0, vth=1.5, rate=0.04, a_sw=0.5, hill=6.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),  # CONTROL: cones re-seed (tip-riding) -> TUBE?
     "round_12_E_gsslow":  dict(frames=300, spots=3, cone_deg=12.0, rd=True, rd_impl="gray_scott", F=0.03, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, rho=0.0, vth=1.5, rate=0.02, a_sw=0.7, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),  # GS graded, SLOW (RD keeps pace)
     "round_12_F_gshida":  dict(frames=300, spots=3, cone_deg=12.0, rd=True, rd_impl="gray_scott", F=0.03, kk=0.062, chi=1.3, d_a=0.15, d_h=0.30, rho=0.0, vth=1.5, rate=0.04, a_sw=0.7, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),  # GS + hi diffusion (spot follows tip?)
+    # ===== round_13: STUDY GIERER-MEINHARDT (Okuda's RD, ref 37) -- rate=0 (no growth), seed 3 spots, watch
+    # if the SELF-ENHANCING a^2/h peak HOLDS the spots as stable localized peaks WITH A GRADIENT (the thing
+    # Brusselator can't and Gray-Scott approximates). Key knob = inhibitor range d_h/d_a (lateral inhibition
+    # -> few big peaks). GM chem=[a,h]; a0 small basal. Judge from movie + spots + act_range.
+    "round_13_gm_base": dict(frames=200, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.0, a_sw=1.0, K_V=4.0, mdf=0.03, relax=30),
+    "round_13_gm_widinh":dict(frames=200, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.03, d_h=1.5, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.0, a_sw=1.0, K_V=4.0, mdf=0.03, relax=30),  # wider inhibition -> fewer bigger peaks
+    "round_13_gm_slowdecay":dict(frames=200, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=0.8, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.0, a_sw=1.0, K_V=4.0, mdf=0.03, relax=30),  # slower activator decay -> stronger peak
+    "round_13_gm_fast": dict(frames=200, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.5, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=2.0, rho=0.0, vth=1.5, rate=0.0, a_sw=1.0, K_V=4.0, mdf=0.03, relax=30),  # faster/stronger -> forms early
+    # ===== round_14: EMERGENCE TEST -- couple GRADED growth onto the stable GM peaks (gm_base holds 3 strong
+    # localized peaks). Does the SELF-ENHANCING peak RIDE the growing tip (tube, tip_act high = emergent Okuda)
+    # or stay at the base (dome)? GM activator ~[0,2.5] so a_sw~1.2; hill=2 = graded (Okuda gradient). rho=0.
+    "round_14_gm_grad":  dict(frames=300, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.04, a_sw=1.2, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_14_gm_slow":  dict(frames=350, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.5, rho=0.0, vth=1.5, rate=0.025, a_sw=1.2, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),  # slow growth, faster RD -> peak keeps pace w/ tip
+    "round_14_gm_strong":dict(frames=300, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=0.8, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.04, a_sw=1.5, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),  # stronger peak (slow decay)
+    # ===== round_15: STABILISE-THEN-GROW (user) -- let the GM pattern amplify to stable peaks FIRST
+    # (grow_after frames of RD-only warmup), THEN switch on growth+division. Growth should act on a settled
+    # 3-peak pattern instead of a forming one. Compare vs round_14 (grow from frame 0).
+    "round_15_warm60":  dict(frames=360, grow_after=60,  spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.04, a_sw=1.2, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
+    "round_15_warm100": dict(frames=400, grow_after=100, spots=3, cone_deg=12.0, rd=True, rd_impl="gierer_meinhardt", gm_rho=1.0, mu_a=1.0, mu_h=1.0, a0=0.01, d_a=0.05, d_h=0.7, chi=4.0, rd_rate=1.0, rho=0.0, vth=1.5, rate=0.04, a_sw=1.2, hill=2.0, K_V=4.0, mdf=0.03, relax=30, vcap=1.5),
 }
 
 
@@ -116,8 +136,11 @@ def make(p):
         ops += [{"op": "cell_rd_seed", "at": "cell", "mode": "cones", "n_spots": p["spots"], "cone_deg": p["cone_deg"], **seed}]
         sched += ["cell_rd_seed"]
         if rd:
-            if p.get("rd_impl", "brusselator") == "gray_scott":   # stable localized SPOTS (Okuda constant diameter)
-                react = {"op": "cell_react", "at": "cell", "implementation": "gray_scott", "F": p.get("F", 0.055), "kk": p.get("kk", 0.062), "rate": 1.0}
+            impl = p.get("rd_impl", "brusselator")
+            if impl == "gray_scott":                              # stable localized SPOTS (substrate depletion)
+                react = {"op": "cell_react", "at": "cell", "implementation": "gray_scott", "F": p.get("F", 0.055), "kk": p.get("kk", 0.062), "rate": p.get("rd_rate", 1.0)}
+            elif impl == "gierer_meinhardt":                      # SELF-ENHANCING a^2/h peak (Okuda's RD, ref 37)
+                react = {"op": "cell_react", "at": "cell", "implementation": "gierer_meinhardt", "gm_rho": p.get("gm_rho", 1.0), "mu_a": p.get("mu_a", 1.0), "mu_h": p.get("mu_h", 1.0), "a0": p.get("a0", 0.01), "rate": p.get("rd_rate", 1.0)}
             else:                                                 # Brusselator (Turing spots); B = activator contrast
                 react = {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p.get("gamma", 0.3), "A": 1.0, "B": p.get("B", 3.0)}
             ops += [{"op": "cell_adjacency", "at": "cell"},
@@ -130,10 +153,12 @@ def make(p):
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": p["chi"]},
                 {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0}]
         sched += ["cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"]},
+    ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
+    #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
+    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga},
             {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12},
             {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
-            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.4, "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": 4, "max_cycle": 1000000000},
+            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.4, "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": 4, "max_cycle": 1000000000, "after_frame": ga},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched += ["morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_round", "seed": 0, "n_frames": p["frames"], "dt": dt, "record_cap": p["frames"] + 2, "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},

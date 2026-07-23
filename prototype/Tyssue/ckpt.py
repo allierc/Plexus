@@ -36,6 +36,7 @@ class LoadMesh3D(Structural):
     reservoir sizes (Nv_max/nF_max/Ebuf) are recomputed to the NEW (larger) buffer so growth has headroom."""
     SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["initial_condition", "checkpoint", "half_edge_mesh"]
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

@@ -879,6 +879,36 @@ $70^{\text{th}}$ percentile reported ``101 spots'' for the clean Gray--Scott run
 the threshold sat in the noise; counting only cells above half-maximum fixed it. The eye and the metric
 must agree before either is trusted.
 
+\paragraph{Tubing --- five coupled requirements (2026-07-23).} The session converged on a compact
+mechanistic account of what a tube actually needs. It is not one ingredient but five that must hold
+together:
+\begin{enumerate}\itemsep2pt
+\item \textbf{Localized, narrow activation --- not a wide/flat patch.} Flat activation grows the
+\emph{whole} patch, so it inflates as a \emph{dome that widens}; a tube needs growth concentrated in a
+narrow region.
+\item \textbf{The activation must ride the tip.} Growth has to be added at the \emph{apex} and
+\emph{advance} with it, or the result is a dome. Cones achieve this \emph{geometrically} (a fixed radial
+direction the growing tip stays inside) --- a hard-coded crutch; the \emph{emergent} route is an RD peak
+that self-maintains at the apex.
+\item \textbf{The RD must hold a stable localized peak --- and the RD choice is decisive.} The
+Brusselator \emph{decays or reorganizes} the seed (fails); Gray--Scott in the spot regime \emph{holds} the
+spots (works); \emph{Gierer--Meinhardt} --- the activator--inhibitor Okuda actually uses (ref.~37) --- is
+\emph{self-enhancing} and \emph{amplifies} the seed into a stable gradient peak (best: the $a^2/h$
+autocatalysis is the amplification feedback).
+\item \textbf{Growth must be graded ($\propto$ activator), not a binary switch.} Then the peak (tip)
+grows \emph{fastest} and growth tapers down the tube --- Okuda's visible gradient. A binary switch grows
+the activated patch uniformly $\to$ dome.
+\item \textbf{Cells stay uniform via a hard size cap} (\texttt{vcap}, force-divide above
+$v_{\mathrm{cap}}v_{\mathrm{ref}}$), \textbf{and the body must be volume-locked} ($\rho\!=\!0$) or body
+inflation flattens the protrusion.
+\end{enumerate}
+The one open question, currently on the cluster: does the Gierer--Meinhardt peak ride the tip \emph{on its
+own} (emergent) once coupled to graded growth --- grown from frame~0, and with a warmup that lets the
+pattern stabilize first? The metric that answers it is \texttt{tip\_act}, the correlation between activator
+and radius: high means the peak sits at the protruding tip (emergent, Okuda-like); low means it stayed at
+the base (a dome). A high \texttt{tip\_act} would mean the tube reproduced \emph{emergently} rather than
+with the geometric cone crutch --- the whole point of the exercise.
+
 \paragraph{3D division at scale (2026-07-21) --- a synchronised division wave, not a rendering bug.}
 \begin{itemize}\itemsep2pt
 \item \textbf{The controlled experiment that exonerated the reaction--diffusion.}
