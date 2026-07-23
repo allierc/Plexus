@@ -63,8 +63,19 @@ def hollow_flags(pos, mesh, dev_deg=50.0, tiny_frac=0.15):
     """Boolean per-cell 'hollow' + a [0,1] score for colouring. A cell is hollow if its cap is folded
     (dev > dev_deg), degenerate-small (area < tiny_frac x median), or under-connected (deg < 3)."""
     dev, area, ndeg = hollow_metric(pos, mesh)
-    devd = np.degrees(dev); med = np.median(area[area > 0]) if (area > 0).any() else 1.0
-    tiny = area < tiny_frac * med
+    devd = np.degrees(dev)
+    # TUBE-AWARE "tiny": compare each cell's area to its EDGE-NEIGHBOURS' mean (local scale), not the GLOBAL
+    # median. A thin tube's cells are uniformly small (vs the big body cells) -> a global test flags the whole
+    # wall as false-positive "hollow"; a local test flags only a genuine sliver (much smaller than its
+    # neighbours). Vectorised via the half-edge twin map.
+    es = np.asarray(mesh["E_srce"]); et = np.asarray(mesh["E_trgt"]); ef = np.asarray(mesh["E_face"]); nF = int(mesh["nF"])
+    Nv = int(max(es.max(), et.max())) + 1
+    key = es * Nv + et; order = np.argsort(key); ks = key[order]
+    p = np.searchsorted(ks, et * Nv + es).clip(max=len(key) - 1)
+    tw = np.where(ks[p] == et * Nv + es, ef[order[p]], ef)      # neighbour face across each half-edge
+    nsum = np.zeros(nF); np.add.at(nsum, ef, area[tw]); ncnt = np.zeros(nF); np.add.at(ncnt, ef, (tw != ef).astype(float))
+    locmean = np.where(ncnt > 0, nsum / np.maximum(ncnt, 1), area)
+    tiny = area < tiny_frac * np.maximum(locmean, 1e-9)         # local (not global) tiny-cell test
     hollow = (devd > dev_deg) | tiny | (ndeg < 3)
     score = np.clip(devd / 70.0, 0.0, 1.0); score[tiny | (ndeg < 3)] = 1.0
     return hollow, score, dict(frac=float(hollow.mean()), n=int(hollow.sum()),

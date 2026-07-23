@@ -427,6 +427,19 @@ PRESETS["round_39_r004_f2000"]= dict(_H39, rate=0.004, frames=2000)
 PRESETS["round_39_r006_t1"]   = dict(_H39, rate=0.006, frames=1500, l_th_frac=0.36, max_flips=500)  # + more T1 rearrangement
 PRESETS["round_39_r005_f1600"]= dict(_H39, rate=0.005, frames=1600)
 PRESETS["round_39_r006_relax"]= dict(_H39, rate=0.006, frames=1500, relax=45)
+# ===== round_40: LOW STRESS + fewer tiny cells. Analysis: tube pressure~3.1 (explosive) + the real "hollow"
+# is fresh tip DAUGHTERS (tiny, area<local) from rapid division. Levers: gentler extrusion (lower K_extrude ->
+# less compressive pressure), g1_ramp (daughters born AT their actual volume -> no tiny-target mismatch),
+# stagger division (min_cycle). Small steps from kv6. Analyse the winner's stress/force next.
+_H40 = dict(_H39, K_V=6.0)
+PRESETS["round_40_base"]      = dict(_H40)                                   # kv6 control (K_extrude 12)
+PRESETS["round_40_ex8"]       = dict(_H40, K_extrude=8.0)                    # gentler extraction
+PRESETS["round_40_ex6"]       = dict(_H40, K_extrude=6.0)
+PRESETS["round_40_g1"]        = dict(_H40, g1_ramp=True)                     # daughters born at target volume
+PRESETS["round_40_ex8_g1"]    = dict(_H40, K_extrude=8.0, g1_ramp=True)
+PRESETS["round_40_mc8"]       = dict(_H40, min_cycle=8)                      # stagger division
+PRESETS["round_40_ex8_mc8"]   = dict(_H40, K_extrude=8.0, min_cycle=8)
+PRESETS["round_40_ex8_g1_mc8"]= dict(_H40, K_extrude=8.0, g1_ramp=True, min_cycle=8)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -472,7 +485,7 @@ def make(p):
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
         sched += ["rd_interface_tension"]
     ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": p.get("l_th_frac", 0.28), "every": p.get("t1_every", 1), "max_flips": p.get("max_flips", 300)},
-            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cycle_cv", 0.4), "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": p.get("min_cycle", 4), "max_cycle": p.get("max_cycle", 1000000000), "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0))},
+            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cycle_cv", 0.4), "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": p.get("min_cycle", 4), "max_cycle": p.get("max_cycle", 1000000000), "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0)), "g1_ramp": p.get("g1_ramp", False)},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched += ["reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_round", "seed": 0, "n_frames": p["frames"], "dt": dt, "record_cap": p["frames"] + 2, "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},
