@@ -1,0 +1,10 @@
+{
+ "test": "V4_tube",
+ "substrate": "flat_epithelium",
+ "h0": 0.35,
+ "r_tube": 1.3,
+ "n_cells_start": 289,
+ "n_cells_end": 380,
+ "tip_z_start": 0.0,
+ "tip_z_end": 2.4771639489483848
+}
