@@ -1,6 +1,6 @@
 ---
 title: "Reproducing Okuda: a blind inverse problem with a known answer"
-subtitle: "Our journey toward Okuda et al.'s Turing × vertex morphogenesis — a case study for agentic model discovery"
+subtitle: "Our journey toward Okuda et al.'s Turing × vertex morphogenesis"
 lightbox: auto
 ---
 
