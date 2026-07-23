@@ -5,7 +5,17 @@ resources:
   - gallery/
 ---
 
-And because a Plexus design is just a **spec** — a handful of numbers over a fixed operator
+::: {.callout-note appearance="simple"}
+**The spec as a design, tuned.** Everywhere else on this site a Plexus **spec** — a handful of
+numbers over a fixed operator set — is *simulated*. Here it is *optimized*: a black-box **UCB**
+search tunes those numbers to improve a design objective. The forager is a colony of
+**deformable cells** — each a soft elastic body under **MPM** — that navigates by **chemotaxis**,
+climbing a food-attractant gradient; the optimizer reshapes its motility, sensing, stiffness and
+flocking until it reaches food far faster and threads pillar fields and mazes. Same operators,
+same engine — only the spec changed.
+:::
+
+Because a Plexus design is just a **spec** — a handful of numbers over a fixed operator
 set — that design can be *optimized*, not only simulated. The forager here is a colony of
 **deformable cells**: each cell is a soft elastic body simulated with **MPM** (the
 material-point method), and the colony navigates by **chemotaxis** — sensing an attractant

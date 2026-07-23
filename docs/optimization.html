@@ -180,7 +180,17 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>And because a Plexus design is just a <strong>spec</strong> — a handful of numbers over a fixed operator set — that design can be <em>optimized</em>, not only simulated. The forager here is a colony of <strong>deformable cells</strong>: each cell is a soft elastic body simulated with <strong>MPM</strong> (the material-point method), and the colony navigates by <strong>chemotaxis</strong> — sensing an attractant gradient that points toward the food and climbing it — coordinated by boids flocking, with MPM handling the physical push against walls and neighbours. A black-box <strong>UCB</strong> search tunes the spec’s parameters — motility speed and turn rate, sensing gain, material stiffness (<code>youngs</code>), cell size and count, and the four boids weights — from a hand-set design (left) to the best found (right), which delivers food roughly <strong>five-fold faster</strong>.</p>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>The spec as a design, tuned.</strong> Everywhere else on this site a Plexus <strong>spec</strong> — a handful of numbers over a fixed operator set — is <em>simulated</em>. Here it is <em>optimized</em>: a black-box <strong>UCB</strong> search tunes those numbers to improve a design objective. The forager is a colony of <strong>deformable cells</strong> — each a soft elastic body under <strong>MPM</strong> — that navigates by <strong>chemotaxis</strong>, climbing a food-attractant gradient; the optimizer reshapes its motility, sensing, stiffness and flocking until it reaches food far faster and threads pillar fields and mazes. Same operators, same engine — only the spec changed.</p>
+</div>
+</div>
+</div>
+<p>Because a Plexus design is just a <strong>spec</strong> — a handful of numbers over a fixed operator set — that design can be <em>optimized</em>, not only simulated. The forager here is a colony of <strong>deformable cells</strong>: each cell is a soft elastic body simulated with <strong>MPM</strong> (the material-point method), and the colony navigates by <strong>chemotaxis</strong> — sensing an attractant gradient that points toward the food and climbing it — coordinated by boids flocking, with MPM handling the physical push against walls and neighbours. A black-box <strong>UCB</strong> search tunes the spec’s parameters — motility speed and turn rate, sensing gain, material stiffness (<code>youngs</code>), cell size and count, and the four boids weights — from a hand-set design (left) to the best found (right), which delivers food roughly <strong>five-fold faster</strong>.</p>
 <div>
 
 </div>
