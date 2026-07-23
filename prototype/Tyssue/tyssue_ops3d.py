@@ -605,11 +605,15 @@ class TopoSnapshot3D(Structural):
         self._k += 1                                            # store at tick 1 (~frame 0) then every `every` ticks,
         if not (self._k == 1 or self._k % self.every == 0):     # matching the engine's recorded set frames -> aligned
             return {}
+        def cp(k):                                              # per-cell mechanical targets (for offline force/stress
+            v = m.get(k)                                        # analysis) -- None-safe numpy copies
+            return v.detach().cpu().numpy().copy() if v is not None and hasattr(v, "detach") else None
         m.setdefault("hist", []).append(dict(
             E_srce=m["E_srce"].detach().cpu().numpy().copy(),
             E_trgt=m["E_trgt"].detach().cpu().numpy().copy(),
             E_face=m["E_face"].detach().cpu().numpy().copy(),
-            nF=int(m["nF"]), Nv=int(m["Nv"])))
+            nF=int(m["nF"]), Nv=int(m["Nv"]),
+            A0=cp("A0"), P0=cp("P0"), V0f=cp("V0f")))           # targets -> analyze_forces reconstructs the energy
         return {}
 
 
