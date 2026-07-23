@@ -254,6 +254,21 @@ PRESETS["round_27_orient_er015"]  = dict(_H27, orient_iface=True, K_extrude=1.5,
 PRESETS["round_27_1sp_orient"]    = dict(_H27, orient_iface=True, spots=1)
 PRESETS["round_27_1sp_or_extr"]   = dict(_H27, orient_iface=True, spots=1, K_extrude=1.5)
 PRESETS["round_27_orient_long"]   = dict(_H27, orient_iface=True, frames=450)
+# ===== round_28: SIZE + PUSH (issue 3, cont.). round_27 gave a tiny NUB: the activated patch is sub-tube-
+# sized (a point, not a chi-diameter disk) and in-plane division spreads laterally so extension needs a strong
+# OUTWARD push that K_extrude<=2 couldn't supply (shape-energy relaxes it away). Fix: bigger spot (cone_deg +
+# chi = tube diameter) + STRONG extrusion + oriented division. Hypothesis: a chi-sized patch pushed hard
+# protrudes into a tube (protr>>1.2, tube_len>0). Decisive test of the mechanical sufficiency.
+_H28 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1, frames=350, a0=0.0, grow_after=100,
+            orient_iface=True, orient_asw=1.2, iface_asw=1.2)
+PRESETS["round_28_extr4"]        = dict(_H28, K_extrude=4.0, cone_deg=16.0)
+PRESETS["round_28_extr8"]        = dict(_H28, K_extrude=8.0, cone_deg=16.0)
+PRESETS["round_28_extr4_c24"]    = dict(_H28, K_extrude=4.0, cone_deg=24.0)
+PRESETS["round_28_extr8_c24"]    = dict(_H28, K_extrude=8.0, cone_deg=24.0)
+PRESETS["round_28_extr8_c24_p3"] = dict(_H28, K_extrude=8.0, cone_deg=24.0, K_purse=3.0)   # push + neck
+PRESETS["round_28_extr12_c24"]   = dict(_H28, K_extrude=12.0, cone_deg=24.0)               # very strong push
+PRESETS["round_28_extr8_chi8"]   = dict(_H28, K_extrude=8.0, cone_deg=24.0, chi=8.0)        # bigger diffusion patch
+PRESETS["round_28_extr8_3sp"]    = dict(_H28, K_extrude=8.0, cone_deg=18.0, spots=3)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
