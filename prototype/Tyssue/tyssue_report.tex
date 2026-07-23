@@ -1326,6 +1326,17 @@ curvature). Fixed to a \emph{tube-aware} local-area test: $390\!\to\!272$.
 $0.97\!\to\!0.63$, tube kept --- fewer simultaneous fresh daughters. \texttt{g1\_ramp} lowers hollow (to 120
 with gentler extrusion) but raises CV; all three combined over-proliferate. Staggering the cycle $=$ a step
 toward quasi-static, and it helps exactly as Okuda predicts.
+\item \textbf{R41 --- the tube is EXTRUSION-driven, not equilibrium (key).} Pushing toward quasi-static
+\emph{destroys} the tube: more relaxation (\texttt{relax60/90}) collapses it to a sphere (aspect $\to$1),
+and Hertwig long-axis division without the forced bud-axis orientation makes no tube either. Only a slower
+cycle (\texttt{mc12}) keeps it. So our tube is held \emph{out of equilibrium} by the \texttt{K\_extrude}
+force --- relax toward force balance and the shape energy pulls it back in. This is the opposite of Okuda,
+whose tube is a \emph{growth-driven quasi-static equilibrium} (the localized proliferation \emph{is} the
+tube, no extrusion). It explains the high pressure ($\sim$3): a forced protrusion is intrinsically stressed,
+and no amount of relaxation fixes a shape that relaxation removes. The path to a sustainable, low-stress tube
+is therefore the growth-driven mechanism --- which is what the \textbf{monolayer (apical/basal) operator}
+supplies (true per-cell 3D volume, emergent bending: localized volume growth on a monolayer shell
+\emph{buckles} into a tube as its equilibrium). \texttt{round\_42+} wire it into the tube pipeline.
 \end{itemize}
 
 \end{document}

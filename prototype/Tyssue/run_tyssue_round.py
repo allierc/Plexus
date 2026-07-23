@@ -16,7 +16,7 @@ try:
 except Exception:
     pass
 import plexus.operators  # noqa
-import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, ckpt  # noqa
+import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa (registers the monolayer op)
 import plexus.schema as S
 from plexus.engine import run as engine_run
 from tyssue_ops3d import face_geometry_3d
@@ -454,6 +454,20 @@ PRESETS["round_41_mc12_relax60"]  = dict(_H41, min_cycle=12, relax=60)
 PRESETS["round_41_hertwig"]       = dict(_H41, orient_iface=False)           # Okuda long-axis division
 PRESETS["round_41_hertwig_relax60"]=dict(_H41, orient_iface=False, relax=60)
 PRESETS["round_41_mc12_hertwig"]  = dict(_H41, min_cycle=12, orient_iface=False)
+# ===== round_42: MONOLAYER (apical/basal) tube -- GROWTH-DRIVEN, the Okuda quasi-static mechanism. R41 showed
+# our extrusion tube is not an equilibrium (relaxation removes it -> high stress). The monolayer op gives each
+# cell a true 3D volume + emergent bending, so localized volume growth on the shell should BUCKLE into a tube
+# as its EQUILIBRIUM (low stress). Low kappa_s buckles (from the demos). Sweep kappa_s x extrusion; analyse the
+# pressure (should be << the extrusion tube's ~3). Base = mc8 working point, monolayer on.
+_H42 = dict(_H41, monolayer=True, mono_kv=6.0, h0=0.4, frames=700, min_cycle=8)
+PRESETS["round_42_k20"]       = dict(_H42, kappa_s=0.2, K_extrude=0.0)       # pure growth, standard tension
+PRESETS["round_42_k05"]       = dict(_H42, kappa_s=0.05, K_extrude=0.0)      # low tension -> buckle (growth only)
+PRESETS["round_42_k05_ex4"]   = dict(_H42, kappa_s=0.05, K_extrude=4.0)      # + gentle extrusion assist
+PRESETS["round_42_k05_ex8"]   = dict(_H42, kappa_s=0.05, K_extrude=8.0)
+PRESETS["round_42_k10_ex4"]   = dict(_H42, kappa_s=0.10, K_extrude=4.0)
+PRESETS["round_42_k05_kv4"]   = dict(_H42, kappa_s=0.05, mono_kv=4.0, K_extrude=4.0)
+PRESETS["round_42_k05_h03"]   = dict(_H42, kappa_s=0.05, h0=0.3, K_extrude=4.0)
+PRESETS["round_42_k05_ex8_r02"]=dict(_H42, kappa_s=0.05, K_extrude=8.0, rate=0.02)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -492,8 +506,14 @@ def make(p):
         sched += ["cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
     ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
     #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)},
-            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "K_bend": p.get("K_bend", 0.0), "antiinv": p.get("antiinv", 0.0), "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}]
+    if p.get("monolayer"):                                     # MONOLAYER (apical/basal) energy: growth-driven,
+        se = {"op": "shape_energy_3d", "implementation": "monolayer", "at": "vertex",   # quasi-static tube (Okuda)
+              "k_v": p.get("mono_kv", 6.0), "kappa_s": p.get("kappa_s", 0.2), "h0": p.get("h0", 0.4),
+              "gamma": p.get("mono_gamma", 0.06), "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30),
+              "eta": 0.08, "cap_frac": 0.12}
+    else:
+        se = {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "K_bend": p.get("K_bend", 0.0), "antiinv": p.get("antiinv", 0.0), "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}
+    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)}, se]
     sched += ["morphogen_growth_3d", "shape_energy_3d"]
     if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
