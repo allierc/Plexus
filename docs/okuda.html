@@ -150,6 +150,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#a-controlled-testbed" id="toc-a-controlled-testbed" class="nav-link active" data-scroll-target="#a-controlled-testbed">A controlled testbed</a></li>
   <li><a href="#the-approach-in-brief" id="toc-the-approach-in-brief" class="nav-link" data-scroll-target="#the-approach-in-brief">The approach in brief</a></li>
   <li><a href="#a-gallery-of-failures" id="toc-a-gallery-of-failures" class="nav-link" data-scroll-target="#a-gallery-of-failures">A gallery of failures</a></li>
+  <li><a href="#the-breakthrough-a-working-tube" id="toc-the-breakthrough-a-working-tube" class="nav-link" data-scroll-target="#the-breakthrough-a-working-tube">The breakthrough — a working tube</a></li>
   <li><a href="#what-the-failures-demand-of-the-agent-next" id="toc-what-the-failures-demand-of-the-agent-next" class="nav-link" data-scroll-target="#what-the-failures-demand-of-the-agent-next">What the failures demand of the agent next</a></li>
   </ul>
 </nav>
@@ -198,7 +199,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="a-gallery-of-failures" class="level2">
 <h2 class="anchored" data-anchor-id="a-gallery-of-failures">A gallery of failures</h2>
-<p>Four moments from the search for the tube — each a failure, each with the lesson it left, from the reaction–diffusion choice to the still-open shape of the tube itself.</p>
+<p>Four moments from the search for the tube — each a failure, each with the lesson it left, from the reaction–diffusion choice to the shape of the tube itself. (It works now — the breakthrough is below.)</p>
 <style>
 .okuda-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:.8rem 0 1.4rem}
 @media (max-width:900px){.okuda-gallery{grid-template-columns:repeat(2,1fr)}}
@@ -234,7 +235,34 @@ ul.task-list li input[type="checkbox"] {
 <video src="gallery/tyssue_cauliflower.mp4" autoplay="" loop="" muted="" playsinline="">
 </video>
 <figcaption>
-<b>Cauliflower, not a tube (current front)</b>A Gierer–Meinhardt activator holds a stable peak and buds the shell — but a <em>wide</em> activation grows the whole patch into a lobed cauliflower. The tube needs narrow, tip-riding GM growth.
+<b>Cauliflower, not a tube</b>A Gierer–Meinhardt activator holds a stable peak and buds the shell — but a <em>wide</em> activation grows the whole patch into a lobed cauliflower. The tube needs narrow, tip-riding GM growth.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-breakthrough-a-working-tube" class="level2">
+<h2 class="anchored" data-anchor-id="the-breakthrough-a-working-tube">The breakthrough — a working tube</h2>
+<p>The front has moved past the cauliflower. The missing dial was <strong>tip-tracking</strong>: a fixed-size activator cap, re-seeded each frame at the tissue’s outermost cell, that <em>rides the advancing tip</em> — the minimal honest stand-in for “the activator peak stays at the apex.” With it, the budding lobe becomes a genuine tube: long, thin, constant-diameter. Every <em>mechanical</em> ingredient is emergent — confinement from growth-dilution, wall-building oriented division, extrusion that rounds and pushes the tip outward; only the tip signal is driven. Diameter is set by the cap radius (Okuda’s χ role), length by how long it runs.</p>
+<div class="okuda-gallery">
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_tube_long.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>A long, constant-diameter tube</b>The tip-tracking cap follows the outermost cell, so the tube <em>extends</em> at fixed diameter instead of widening into a lobe — a genuine thin cylinder, not a bud.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_tube_finger.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Diameter set by the cap</b>A larger activated cap gives a shorter, thicker finger — the tube’s diameter tracks the cap radius, reproducing Okuda’s qualitative χ→diameter law.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_tube_thin.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Pushed far out</b>Strong extrusion rounds the flat tip and drives it outward; the cap is seeded to the side so the tube grows in profile against the body.
 </figcaption>
 </figure>
 </div>
@@ -249,7 +277,7 @@ ul.task-list li input[type="checkbox"] {
 <li><strong>Literature grounding.</strong> Reading <em>which</em> reaction–diffusion regime Okuda uses (Gierer–Meinhardt) was the single key unlock.</li>
 <li><strong>Domain priors and taste.</strong> Reading the smooth activator <em>gradient</em> off Okuda’s figures — rather than a binary switch — reframed the entire coupling.</li>
 </ul>
-<p>The tube is not yet emergent. But every failure above has been converted from a symptom into a measurable target, which is the whole point: this is what it looks like when a method, not just a model, is being fit.</p>
+<p>The tube now forms — the mechanics emergent, the tip signal still a driven stand-in — so the question flips from <em>existence</em> to <em>optimisation</em>: thinner and longer tubes, multiple tubes, and branching are now tuning, not search. And every failure above was converted from a symptom into a measurable target along the way — which is the whole point: this is what it looks like when a method, not just a model, is being fit.</p>
 
 
 </section>
