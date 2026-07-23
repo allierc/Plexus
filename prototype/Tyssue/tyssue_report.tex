@@ -746,6 +746,69 @@ round Turing spots --- \texttt{react} is an interchangeable contract.}
 \label{fig:coral}
 \end{figure}
 
+\section{Gap analysis: Okuda's model vs.\ our prototype (2026-07-23)}
+Having re-read Okuda \emph{et al.}\ (2018, \emph{Sci.\ Rep.}\ \textbf{8}:2386) in full, we can now list
+exactly which of its mechanisms our prototype already carries, which it implements differently, and which
+are genuinely \emph{missing} and would need a new operator. This is the map for the remaining work.
+
+\paragraph{Okuda's recipe in one place.}
+\begin{itemize}\itemsep2pt
+\item \textbf{Mechanics} (Eq.~1,3): overdamped vertex dynamics $\eta(\dot r - V_f)=-\nabla U$, iterated to
+force balance (residual $<E_{\text{th}}$). Energy $U=\sum_j\big[\tfrac12 k_v(v_j-v_{\text{eq}j})^2+\kappa_s
+s_j\big]$ --- per-cell \emph{volume elasticity} $+$ \emph{linear surface tension}. Cells are true \emph{3D
+polyhedra}: each has its own volume $v_j$ and surface area $s_j$.
+\item \textbf{Reaction--diffusion} (Eq.~2): Gierer--Meinhardt, transport $=(D/\text{gap})\times(\text{boundary
+area})$ on the cell graph. $\chi$ (diffusion coeff.)\ sets spot size $=$ tube diameter ($\propto\chi^{1/4}$).
+\item \textbf{Growth} (Eq.~8): $\lambda_j=\lambda_{\text{ref}j}\,\mathrm{Hill}(\rho/\rho_{\text{sw}})^\alpha$
+grows the \emph{equilibrium volume} $v_{\text{eq}j}$; $\lambda_{\text{ref}}$ is a random Gaussian per cell.
+\item \textbf{Division}: plane normal to the long axis, \emph{in the tissue surface} (oriented, in-plane).
+\item \textbf{Reconnection}: RNR/T1 when an edge falls below $\Delta l_{\text{th}}$.
+\item $\boldsymbol\gamma$: the \emph{ratio of patterning to deformation timescales} (the regime knob ---
+$\gamma{=}1$ tubes, $\gamma{=}100$ undulation, $\gamma{=}0.01$ no steady pattern). Stability under growth
+comes from ``the intrinsic \emph{hysteresis} in the activator--inhibitor system with domain growth.''
+\item \textbf{Bending is emergent}: tube straightness follows from diameter (thin undulate, thick straight);
+there is \emph{no} explicit bending energy.
+\end{itemize}
+
+\paragraph{A. Already matched.} Force-balance relaxation; Gierer--Meinhardt RD; diffusion on the cell
+adjacency; Hill-function growth of $v_{\text{eq}}$; oriented in-plane (Hertwig) division; T1/RNR; per-cell
+volume elasticity ($K_V$).
+
+\paragraph{B. Implemented differently --- needs modification.}
+\begin{enumerate}\itemsep2pt
+\item \emph{Energy form.} Okuda $=$ volume elasticity $+$ \emph{linear} surface tension $\kappa_s s$ only. Ours
+carries area/perimeter \emph{targets} $+$ contractility $+$ line tension $+$ a wedge-volume. $\Rightarrow$ add
+a linear surface-tension term; make the area/perimeter targets optional.
+\item \emph{Diffusion weighting.} Okuda weights transport by boundary-area/gap-width (geometric); ours is a
+plain graph Laplacian. $\Rightarrow$ weight \texttt{cell\_diffuse} by shared-edge length $/$ cell volume.
+\item $\gamma$ \emph{as a clean knob} --- expose patterning-rate $\div$ deformation-rate explicitly (we
+approximate it with \texttt{rd\_rate}).
+\item \emph{Random per-cell growth rate} ($\lambda_{\text{ref}}$ Gaussian) --- minor add.
+\end{enumerate}
+
+\paragraph{C. Missing --- needs a new operator.}
+\begin{enumerate}\itemsep2pt
+\item \textbf{True 3D cell geometry (the big one).} Okuda's monolayer is a \emph{shell of 3D cells}: each has
+an apical $+$ basal surface and a \emph{thickness}, hence its own 3D volume $v_j=\text{area}\times\text{height}$
+and 3D surface $s_j$ (apical$+$basal$+$lateral). Our model is a single mid-surface with a \emph{lumen-wedge}
+volume (volume from the sphere centre, not the cell's own volume). $\Rightarrow$ a new \emph{monolayer
+geometry}: apical$+$basal surfaces (a thickness field) giving per-cell 3D volume and surface. This is what
+growth actually inflates in Okuda.
+\item \textbf{Surface-tension energy on the 3D cell surface} ($\kappa_s s$) --- depends on C1.
+\item \textbf{Emergent bending} (the $\chi\to$ straight/undulate phenomenology) --- \emph{falls out} of C1
+(monolayer thickness $\Rightarrow$ diameter-dependent bending rigidity). We have been substituting an
+explicit $K_{\text{bend}}$; Okuda's is emergent, so C1 is the faithful route.
+\end{enumerate}
+
+\paragraph{Reading.} The \emph{immediate} blocker --- the activator flooding the shell under growth --- is
+\emph{geometry-independent}: it is domain-growth pattern insertion (a Turing-unstable RD tiling the enlarging
+shell), triggered by the basal source $a_0$ igniting the background. Fix that first (kill $a_0$; stay in a
+localised-structure/hysteretic regime; saturation is the \emph{wrong} lever --- it converts spots to rings).
+A basic tube can plausibly form in the single-surface model once the RD is confined and growth is localised,
+because a sheet \emph{can} buckle into a finger. But Okuda's \emph{full} phenomenology --- constant diameter
+set by $\chi$, thin-undulate/thick-straight --- \emph{requires} C1, the monolayer thickness. That is the
+single highest-leverage new operator, and the planned next step once the flood is fixed.
+
 \section*{Field notes}
 \emph{Dated log of what actually worked or failed --- the hard-won part.}
 
@@ -1028,5 +1091,23 @@ the reaction--diffusion feed drives that patch to \emph{branch} (Fig.~6). The ex
 runner --- the same schedule with the morphogen$\to$growth coupling switched on and $p_0$ raised into
 the fluid regime --- is the current front; stabilising the bud against the fluid shell's tendency to
 balloon is the open problem.
+
+\paragraph{The activator floods the shell under growth --- diagnosis (2026-07-23).}
+Coupling Gierer--Meinhardt to growth, the activator went from a few clean localised spots to
+nearly-all-red in a handful of frames. Watching the frames pinned the cause: it is \emph{not} stochastic
+and \emph{not} the peak running away --- it is \textbf{domain-growth pattern insertion}. With no growth
+(the rate$=0$ study) GM held three stable spots on a genuinely white background; the flood appears
+\emph{only when the tissue grows}, because a Turing-\emph{unstable} RD tiles the enlarging shell with new
+structures at its natural wavelength. The visible ``white $\to$ light red'' creep is the uniform basal
+source $a_0$ igniting each background cell, which the autocatalysis $a^2/h$ then amplifies. Confinement
+levers were tried and each failed a different way: \emph{Meinhardt saturation} bounds the peak but
+converts spots into \emph{rings} (activated annulus, white centre --- the classic saturated-GM signature),
+\emph{strong inhibition} suppresses the seeds before they establish, and \emph{slow growth} stops the
+flood but starves the pattern (almost no activation). The correct route is therefore to remove the
+background ignition ($a_0\!\to\!0$) and stay in a \emph{localised-structure/hysteretic} regime where
+seeded spots persist and the homogeneous state is stable --- matching Okuda's own explanation that
+stability under growth comes from ``the intrinsic hysteresis in the activator--inhibitor system with
+domain growth'' at $\gamma\!=\!1$. Fixing this is a prerequisite to any tube; see the gap-analysis
+section for the full mechanism map.
 
 \end{document}
