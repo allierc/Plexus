@@ -424,6 +424,25 @@ def _screen_basis(elev=_ELEV, azim=_AZIM):
     return d, u, v
 
 
+def _tube_axis(pos, act=None, frac=93.0):
+    """The ACTUAL tube axis = direction to the outermost region (the tip), computed from geometry each
+    frame (the tip-tracking tip drifts off the seed direction, so slicing by seed_dir misses the tube).
+    Uses the mean of the farthest `frac` percentile vertices; returns a unit vector (or None if no spread)."""
+    r = np.linalg.norm(pos, axis=1)
+    tip = pos[r > np.percentile(r, frac)]
+    if len(tip) < 3:
+        return None
+    ax = tip.mean(0); n = np.linalg.norm(ax)
+    return ax / n if n > 1e-6 else None
+
+
+def _cross_axis(pos, seed_dir):
+    """Actual tube axis if there is a protrusion, else the seed direction (explicit None check -- a numpy
+    array can't be used in `a or b`)."""
+    t = _tube_axis(pos)
+    return t if t is not None else seed_dir
+
+
 def _cross_screen(ax, pos, mesh, act, seed_dir=None, inner=0.82, Lbox=None):
     """Cross-section in the PLANE OF THE TUBING: the slice plane always CONTAINS the tube axis (seed_dir),
     oriented face-on to the camera, so the tube's full length shows in profile along the horizontal,
@@ -479,14 +498,14 @@ def do(preset):
         for i, t in enumerate([int(round(fr * (T - 1))) for fr in np.linspace(0.0, 1.0, 8)]):
             mt, pt, a = frame(t); l3, l2 = lbox(pt)
             ax3 = fig.add_subplot(2, 8, i + 1, projection="3d"); _draw(ax3, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3)
-            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _cross_screen(ax2, pt, mt, col(a), seed_dir=p.get("seed_dir"), Lbox=l2)
+            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _cross_screen(ax2, pt, mt, col(a), seed_dir=_cross_axis(pt, p.get("seed_dir")), Lbox=l2)
         fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02); fig.savefig(os.path.join(OUT, "strip.png"), dpi=110, facecolor="black"); plt.close(fig)
         figm = plt.figure(figsize=(5.0, 5.2)); figm.patch.set_facecolor("black"); axm, axin = make_movie_axes(figm)
         keep = np.arange(0, T, max(1, T // 72)); wri = FFMpegWriter(fps=10, metadata={"title": preset})   # fewer frames -> faster render (matplotlib 3D is slow); not the critical path
         with wri.saving(figm, os.path.join(OUT, "movie.mp4"), dpi=85):
             for j, t in enumerate(keep):
                 mt, pt, a = frame(int(t)); l3, l2 = lbox(pt)     # FIXED camera (no spin) -> tube stays in profile
-                _draw(axm, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3); _cross_screen(axin, pt, mt, col(a), seed_dir=p.get("seed_dir"), Lbox=l2)
+                _draw(axm, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3); _cross_screen(axin, pt, mt, col(a), seed_dir=_cross_axis(pt, p.get("seed_dir")), Lbox=l2)
                 wri.grab_frame()
         plt.close(figm)
         mf = []
