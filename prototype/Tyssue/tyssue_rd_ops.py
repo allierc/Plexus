@@ -240,12 +240,16 @@ class CellReactGiererMeinhardt(Lateral):
         self.gm_rho = float(params.get("gm_rho", 1.0)); self.mu_a = float(params.get("mu_a", 1.0))
         self.mu_h = float(params.get("mu_h", 1.0)); self.a0 = float(params.get("a0", 0.01))
         self.rate = float(params.get("rate", 1.0))
+        # Meinhardt SATURATION kappa: a^2/(h(1+kappa a^2)) bounds the activator peak so self-enhancement can't
+        # run away under growth (keeps the red spot CONFINED -> red_over_tip ~1 instead of flooding). 0 = off.
+        self.sat = float(params.get("sat", 0.0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         chem = lvl.get("chem")
         a = chem[:, 0].clamp(min=0.0); h = chem[:, 1].clamp(min=1e-3)   # h>0: the a^2/h autocatalysis stays finite
-        da = self.gm_rho * a * a / h - self.mu_a * a + self.a0
+        auto = a * a / (h * (1.0 + self.sat * a * a))                   # SATURATED autocatalysis (bounded peak)
+        da = self.gm_rho * auto - self.mu_a * a + self.a0
         dh = self.gm_rho * a * a - self.mu_h * h
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: self.rate * torch.stack([da, dh], dim=1) * occ}
@@ -272,6 +276,10 @@ class MorphogenGrowth3D(Structural):
         # cycle (the activator sets the RATE, not the size), and v_eq is capped at vth_frac*v_ref so every
         # cell oscillates in [~2/3, vth_frac]*v_ref -> uniform. rho=0 (default) = legacy activator-only bulge.
         self.rho = float(params.get("rho", 0.0)); self.vth_frac = float(params.get("vth_frac", 1.35))
+        # OKUDA Appendix A: the morphogen is the AMOUNT m_j (conserved within the cell); the concentration
+        # c_j=m_j/v_j is only READ by the kinetics. We store c_j, so growing v_j must DILUTE c_j to conserve
+        # amount (else we silently CREATE mass each step -> spuriously feeds the tip). On (default) = correct.
+        self.conserve_amount = bool(params.get("conserve_amount", True))
 
     def forward(self, H, mask=None):
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
@@ -283,13 +291,14 @@ class MorphogenGrowth3D(Structural):
         clvl = H.level(self.cat)
         if "chem" not in clvl.state_schema:
             return {}
-        nF = m["nF"]; h0, _ = clvl.state_schema["chem"]
+        nF = m["nF"]; h0, h1 = clvl.state_schema["chem"]
         dev = m["V0f"].device
         a = clvl.state[:nF, h0].detach().to(dev)                 # per-cell activator
         if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
+        s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
         s = m["mg_scale"] * (1.0 + self.rate * (self.rho + hillv))    # lambda = rate*(rho baseline + activator)
         if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
             v_ref = float(m.get("v_ref", 1.0))                       # vth_frac*v_ref so it cycles (divides), not bulge
@@ -302,7 +311,74 @@ class MorphogenGrowth3D(Structural):
         m["P0"] = m["P0_init"] * s
         m["V0f"] = m["V0f_init"] * (s ** 3)
         m["V0"] = float(m["V0f"].sum())
+        if self.conserve_amount:
+            # conserve molecule AMOUNT: c_j <- c_j * (v_old/v_new) = c_j * (s_prev/s)^3 as v_eq grows ~ s^3.
+            # Makes dilution STRUCTURAL (no continuum -c(div.v) term); it is LOAD-BEARING (Okuda's intra-domain
+            # gradients come from it) -> keep it, don't cancel. The flood is a gamma (rate) problem, fixed elsewhere.
+            g_vol = (s / s_prev.clamp(min=1e-9)) ** 3
+            cst = clvl.state.clone()
+            cst[:nF, h0:h1] = cst[:nF, h0:h1] / g_vol.clamp(min=1e-9)[:, None]
+            clvl.state = cst
         return {}
+
+
+@register_operator("rd_interface_tension", set="vertex", kind="lateral", family="mechanics")
+class RDInterfaceTension(Lateral):
+    """The RD-INTERFACE tube mechanism (user hypothesis): a PURSE-STRING line tension on the RED/WHITE
+    interface ring + a NORMAL (outward) EXTRUSION of the red cells. This turns a localized activator disk
+    into a CYLINDER instead of a ball -- the interface cells reorient into the tube neck (holding the
+    diameter), while the red interior is expelled outward (Okuda: constant-diameter tube from a maintained
+    activator spot). Cross-set: reads cell.chem activator, forces on the vertices; EMIT velocity (the engine
+    integrates it alongside shape_energy). K_purse = ring line tension, K_extrude = outward push, a_sw = red
+    threshold. Runs a few bounded-Euler substeps of -grad E per frame, E = K_purse*Sigma_iface l_e - K_extrude*Sigma_red a*r."""
+    SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
+    MAPS = ["E_srce", "E_trgt", "E_face"]
+    MECHANISM_TAGS = ["interface_tension", "purse_string", "extrusion", "tube", "oriented", "cross_scale"]
+    PARAM_ROLES = {"K_purse": "interface_line_tension", "K_extrude": "normal_extrusion", "a_sw": "red_threshold"}
+    REFERENCE = "Plexus (this work); purse-string / apical-constriction tubulation after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.K_purse = float(params.get("K_purse", 1.0)); self.K_extrude = float(params.get("K_extrude", 0.5))
+        self.a_sw = float(params.get("a_sw", 1.0)); self.eta = float(params.get("eta", 0.05))
+        self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
+
+    def forward(self, H, mask=None):
+        from tyssue_ops3d import face_geometry_3d, ShapeEnergy3D
+        vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
+        if m is None or "chem" not in clvl.state_schema:
+            return {}
+        nF = int(m["nF"]); Nv = int(m["Nv"]); dev = vlvl.state.device; dt = vlvl.state.dtype
+        es = torch.as_tensor(m["E_srce"], device=dev, dtype=torch.long)      # robust to numpy/tensor after division
+        et = torch.as_tensor(m["E_trgt"], device=dev, dtype=torch.long)
+        ef = torch.as_tensor(m["E_face"], device=dev, dtype=torch.long)
+        h0, _ = clvl.state_schema["chem"]
+        a = clvl.state[:nF, h0].detach().to(dev)
+        red = (a > self.a_sw).to(dt)                             # per-cell red state
+        twin = ShapeEnergy3D._twin_faces(es, et, ef, Nv)        # neighbour cell across each half-edge
+        iface = (red[ef] != red[twin]).to(dt)                   # 1 on the red/white interface half-edges (the ring)
+        if float(red.sum()) < 1.0 or float(iface.sum()) < 1.0:  # no red spot / no interface yet -> nothing to do
+            return {}
+        px0, px1 = vlvl.state_schema["pos"]
+        x0 = vlvl.state[:, px0:px1].detach()
+        x = x0[:Nv].clone()
+        cap = self.cap_frac * float((x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-3))
+        redpush = (self.K_extrude * a.clamp(min=0.0) * red)                  # per-cell outward magnitude
+        for _ in range(self.iters):                              # DIRECT forces (no autograd): purse-string + extrusion
+            force = torch.zeros(Nv, 3, device=dev, dtype=dt)
+            d = x[et] - x[es]; u = d / (d.norm(dim=-1, keepdim=True) + 1e-9)   # PURSE-STRING: interface edge shortens
+            f = (self.K_purse * iface)[:, None] * u
+            force.index_add_(0, es, f); force.index_add_(0, et, -f)
+            _, _, cen, _ = face_geometry_3d(x, es, et, ef, nF)  # EXTRUSION: red cells pushed radially OUTWARD
+            cdir = cen / (cen.norm(dim=-1, keepdim=True) + 1e-9)
+            force.index_add_(0, es, (redpush[ef])[:, None] * cdir[ef] / 3.0)   # push each cell's src vertices out
+            x = x + (self.eta * force).clamp(-cap, cap)
+        vel = torch.zeros_like(x0)
+        vel[:Nv] = (x - x0[:Nv]) / max(float(getattr(H.config, "dt", 1.0)), 1e-6)
+        occ = vlvl.occ[:, None] if getattr(vlvl, "occ", None) is not None else 1.0
+        return {self.at: vel * occ}
 
 
 @register_operator("cell_react", set="cell", kind="lateral", family="fields", implementation="brusselator")
