@@ -481,6 +481,22 @@ PRESETS["round_43_tr20_ex8"]  = dict(_H43, tip_radius=2.0, K_extrude=8.0)
 PRESETS["round_43_tr25_ex8"]  = dict(_H43, tip_radius=2.5, K_extrude=8.0)
 PRESETS["round_43_tr20_mc12"] = dict(_H43, tip_radius=2.0, min_cycle=12)
 PRESETS["round_43_tr25_relax45"]=dict(_H43, tip_radius=2.5, relax=45)
+# ===== round_44: RD ROLE (goal 2). Best tube (mc8) uses a tip DRIVER (no RD). Bring the emergent Gierer-
+# Meinhardt RD back (a0=0 confinement + amount-conservation from R25) to PARTITION the tissue, coupled to the
+# same wall-building machinery (K_V=6, min_cycle=8, oriented division, extrusion). Does emergent RD + the
+# machinery make a tube (vs the R22-30 capped bud)? RD gets a genuine role (the red/white partition drives
+# growth). Base = the RD confinement recipe + mc8 mechanics, seeded on the left.
+_H44 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1, frames=700, a0=0.0, grow_after=80, orient_iface=True,
+            orient_asw=1.2, iface_asw=1.2, K_extrude=8.0, cone_deg=20.0, K_V=6.0, min_cycle=8, mdf=0.03,
+            vcap=1.5, seed_dir=_LEFT)
+PRESETS["round_44_base"]       = dict(_H44)
+PRESETS["round_44_ex12"]       = dict(_H44, K_extrude=12.0)
+PRESETS["round_44_rd2"]        = dict(_H44, rd_rate=2.0)
+PRESETS["round_44_cone16"]     = dict(_H44, cone_deg=16.0)
+PRESETS["round_44_ex12_cone16"]= dict(_H44, K_extrude=12.0, cone_deg=16.0)
+PRESETS["round_44_r015"]       = dict(_H44, rate=0.015)
+PRESETS["round_44_chi6"]       = dict(_H44, chi=6.0)
+PRESETS["round_44_ex12_r015"]  = dict(_H44, K_extrude=12.0, rate=0.015)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
