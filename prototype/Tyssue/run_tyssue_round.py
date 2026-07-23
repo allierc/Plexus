@@ -413,6 +413,20 @@ PRESETS["round_38_bend10"]   = dict(_H38, K_bend=10.0)
 PRESETS["round_38_ai02"]     = dict(_H38, antiinv=0.2)
 PRESETS["round_38_ai04"]     = dict(_H38, antiinv=0.4)
 PRESETS["round_38_bend3_ai02"]=dict(_H38, K_bend=3.0, antiinv=0.2)
+# ===== round_39: SLOWER GROWTH so cells REARRANGE (user hypothesis). The analysis showed pressure~3.1 at the
+# tube = explosive, unsustainable growth: tip cells inflate/divide faster than T1 can rearrange them -> they
+# buckle -> hollow (systematically >300). Fix: grow SLOWER (lower rate) so per unit growth there is more T1
+# flow -> cells arrange along the tube, stress transmits tube->body. Slower+longer keeps the tube length.
+# One primary lever (rate down), + T1 rearrangement (l_th_frac up, more flips). Base = kv6 (aspect 10).
+_H39 = dict(_H38, K_V=6.0)
+PRESETS["round_39_base"]      = dict(_H39)                                   # kv6 control (rate 0.01, 900f)
+PRESETS["round_39_r006"]      = dict(_H39, rate=0.006)                       # slower (shorter tube -- isolate rate effect)
+PRESETS["round_39_r004"]      = dict(_H39, rate=0.004)
+PRESETS["round_39_r006_f1500"]= dict(_H39, rate=0.006, frames=1500)         # slower + longer -> keep tube length
+PRESETS["round_39_r004_f2000"]= dict(_H39, rate=0.004, frames=2000)
+PRESETS["round_39_r006_t1"]   = dict(_H39, rate=0.006, frames=1500, l_th_frac=0.36, max_flips=500)  # + more T1 rearrangement
+PRESETS["round_39_r005_f1600"]= dict(_H39, rate=0.005, frames=1600)
+PRESETS["round_39_r006_relax"]= dict(_H39, rate=0.006, frames=1500, relax=45)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -457,7 +471,7 @@ def make(p):
     if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
         sched += ["rd_interface_tension"]
-    ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
+    ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": p.get("l_th_frac", 0.28), "every": p.get("t1_every", 1), "max_flips": p.get("max_flips", 300)},
             {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cycle_cv", 0.4), "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": p.get("min_cycle", 4), "max_cycle": p.get("max_cycle", 1000000000), "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0))},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched += ["reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
