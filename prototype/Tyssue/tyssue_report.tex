@@ -1239,7 +1239,13 @@ each frame) and edge lengths $\ell_e$. The quantities plotted are:
 \end{align}
 Movement is the centroid nearest-neighbour displacement; divisions are cells appended since the previous
 frame; tracking follows cells sampled at the final frame \emph{backward} by nearest centroid (so tube cells,
-born late, are included). Output: \texttt{quantification.npz} (per-frame per-cell tables) $+$ a 2$\times$2
+born late, are included). \emph{A note on provenance:} Okuda's paper is written entirely at the level of
+\emph{energy and force balance} (Eq.~1 is $\eta(\dot r-V_f)=-\nabla U$; ``cells generate mechanical forces'')
+--- it never computes a \emph{stress or pressure field} (``stress'' appears once, generically; ``pressure''
+and ``tension'' never). Our per-cell pressure is derived \emph{from his own energy}, $p=-\partial U/\partial
+v=2K_V(v^{\text{eq}}-v)$ (the Eq.~3 volume-elasticity term), so it is fully consistent with his mechanics ---
+but \emph{visualising the stress/pressure distribution is a diagnostic lens Okuda did not apply}. That extra
+lens is precisely what made the hollow defect legible below; the energy-only view would not have. Output: \texttt{quantification.npz} (per-frame per-cell tables) $+$ a 2$\times$2
 \texttt{analysis.mp4} (force $\mid$ stress $\mid$ division $\mid$ tracking). On the long tube (aspect $10.7$)
 the tool shows the \emph{tip is the force/pressure hot-spot} --- the tube is under high stress, the concrete
 target for the next optimisation.
