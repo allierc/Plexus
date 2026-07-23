@@ -1310,4 +1310,22 @@ along the tube, so a plain Hertwig long-axis split already extends it (the force
 unnecessary once the dynamics are quasi-static). \texttt{round\_41+} pursue this: relax-to-residual, slow
 cycle, Hertwig division.
 
+\paragraph{Rounds 37--40 ledger (hollow/CV/stress, small steps from the tube).}
+\begin{itemize}\itemsep1pt
+\item \textbf{R37 --- CV solved.} $K_V\!=\!6$ (stiffer volume) drops area-CV $1.98\!\to\!0.97$ (vol-CV
+$3.6\!\to\!0.7$) while \emph{improving} the tube (aspect $8.4\!\to\!10$). \texttt{vcap}$\downarrow$ hurt.
+\item \textbf{R38 --- K\_bend erratic.} Dihedral bending gave wild aspect ($42$) and over-proliferation;
+not a clean lever.
+\item \textbf{R39 --- ``slower = less hollow'' only via shorter tube.} Slower rate cuts hollow but shortens
+the tube; at matched growth hollow returns. \emph{Hollow scales with tube length}, which prompted the metric
+audit.
+\item \textbf{Metric audit.} 95\% of ``hollow'' cells are in the tube; median wall $\mathrm{dev}=26^\circ$
+(clean), only 4\% inverted. The flags were thin-tube false positives (small-vs-\emph{global}-median + high
+curvature). Fixed to a \emph{tube-aware} local-area test: $390\!\to\!272$.
+\item \textbf{R40 --- stagger division wins.} \texttt{min\_cycle}$=8$: hollow $272\!\to\!176$, CV
+$0.97\!\to\!0.63$, tube kept --- fewer simultaneous fresh daughters. \texttt{g1\_ramp} lowers hollow (to 120
+with gentler extrusion) but raises CV; all three combined over-proliferate. Staggering the cycle $=$ a step
+toward quasi-static, and it helps exactly as Okuda predicts.
+\end{itemize}
+
 \end{document}

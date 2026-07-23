@@ -440,6 +440,20 @@ PRESETS["round_40_ex8_g1"]    = dict(_H40, K_extrude=8.0, g1_ramp=True)
 PRESETS["round_40_mc8"]       = dict(_H40, min_cycle=8)                      # stagger division
 PRESETS["round_40_ex8_mc8"]   = dict(_H40, K_extrude=8.0, min_cycle=8)
 PRESETS["round_40_ex8_g1_mc8"]= dict(_H40, K_extrude=8.0, g1_ramp=True, min_cycle=8)
+# ===== round_41: QUASI-STATIC push (Okuda's regime). R40 showed staggering the cell cycle (min_cycle=8) cuts
+# hollow+CV -- a step toward tau_cycle >> eta/kappa. Push further: MORE relaxation per frame (approximate
+# relax-to-residual) + slower cycle + Hertwig long-axis division (Okuda's rule -- in a quasi-static tube the
+# wall cells elongate along the tube so a plain long-axis split already extends it; the forced bud-axis orient
+# may be unnecessary). Base = mc8 working point (hollow 176, CV 0.63, aspect 7.5). Analyse the winner's stress.
+_H41 = dict(_H40, min_cycle=8)
+PRESETS["round_41_base"]          = dict(_H41)                               # mc8 control
+PRESETS["round_41_relax60"]       = dict(_H41, relax=60)
+PRESETS["round_41_relax90"]       = dict(_H41, relax=90)
+PRESETS["round_41_mc12"]          = dict(_H41, min_cycle=12)
+PRESETS["round_41_mc12_relax60"]  = dict(_H41, min_cycle=12, relax=60)
+PRESETS["round_41_hertwig"]       = dict(_H41, orient_iface=False)           # Okuda long-axis division
+PRESETS["round_41_hertwig_relax60"]=dict(_H41, orient_iface=False, relax=60)
+PRESETS["round_41_mc12_hertwig"]  = dict(_H41, min_cycle=12, orient_iface=False)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
