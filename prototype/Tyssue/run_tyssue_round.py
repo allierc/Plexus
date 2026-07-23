@@ -283,6 +283,20 @@ PRESETS["round_29_p8_extr12"]  = dict(_H29, K_purse=8.0, K_extrude=12.0)     # s
 PRESETS["round_29_p6_r012"]    = dict(_H29, K_purse=6.0, rate=0.012)         # neck + a bit more growth
 PRESETS["round_29_p4_chi6"]    = dict(_H29, K_purse=4.0, chi=6.0)            # medium diameter tube
 PRESETS["round_29_p8_550_r012"]= dict(_H29, K_purse=8.0, frames=550, rate=0.012)  # all-in: elongate hard
+# ===== round_30: CHI -> DIAMETER law (capstone). The tube is a transient peaking ~frame 350 (round_29 showed
+# longer degrades it), so freeze at 350 and cleanly SWEEP chi (Okuda's diffusion coeff = tube diameter control,
+# diam ~ chi^1/4). round_28 hinted chi4->1.9, chi8->3.3. Hypothesis: tube_diam rises monotonically with chi at
+# fixed everything else -- the validated Okuda diameter law on our pipeline. Base = round_28 tube recipe.
+_H30 = dict(_F4, rd_rate=1.0, rate=0.010, spots=1, frames=350, a0=0.0, grow_after=100,
+            orient_iface=True, orient_asw=1.2, iface_asw=1.2, K_extrude=8.0, cone_deg=24.0)
+PRESETS["round_30_chi2"]  = dict(_H30, chi=2.0)
+PRESETS["round_30_chi3"]  = dict(_H30, chi=3.0)
+PRESETS["round_30_chi4"]  = dict(_H30, chi=4.0)
+PRESETS["round_30_chi6"]  = dict(_H30, chi=6.0)
+PRESETS["round_30_chi8"]  = dict(_H30, chi=8.0)
+PRESETS["round_30_chi10"] = dict(_H30, chi=10.0)
+PRESETS["round_30_chi14"] = dict(_H30, chi=14.0)
+PRESETS["round_30_chi18"] = dict(_H30, chi=18.0)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
