@@ -139,25 +139,29 @@ def _scat(ax, cen, val, cmap, title, vlim):
 def _div(ax, cen, born, ncum):
     ax.clear(); ax.set_facecolor("black")
     m = np.asarray(born) > 0.5
-    ax.scatter(cen[~m, 0], cen[~m, 1], cen[~m, 2], s=2, c="dimgray")     # all cells grey (small)
+    ax.scatter(cen[~m, 0], cen[~m, 1], cen[~m, 2], s=2, c="dimgray", alpha=0.12)   # non-dividing: transparent
     if m.any():
-        ax.scatter(cen[m, 0], cen[m, 1], cen[m, 2], s=5, c="red")        # just-divided cells red
+        ax.scatter(cen[m, 0], cen[m, 1], cen[m, 2], s=6, c="red", alpha=0.95)      # dividing: red
     _axes3d(ax, cen, f"cell division ({ncum})")                          # count in the title
 
 
-def _track(ax, cen, tracks):
+def _track(ax, cen, tracks, vel, vthr):
     ax.clear(); ax.set_facecolor("black")
-    ax.scatter(cen[:, 0], cen[:, 1], cen[:, 2], s=2, c="dimgray")        # ALL cells (same small dot)
+    mig = np.asarray(vel) > vthr                                         # only MIGRATING cells (velocity threshold)
+    ax.scatter(cen[~mig, 0], cen[~mig, 1], cen[~mig, 2], s=2, c="dimgray", alpha=0.12)   # slow: transparent
+    if mig.any():
+        ax.scatter(cen[mig, 0], cen[mig, 1], cen[mig, 2], s=6, c="deepskyblue", alpha=0.95)
     for j in range(tracks.shape[1]):
-        ax.plot(tracks[:, j, 0], tracks[:, j, 1], tracks[:, j, 2], "-", lw=0.6, alpha=0.7)
-    ax.scatter(tracks[-1, :, 0], tracks[-1, :, 1], tracks[-1, :, 2], s=5, c="white")
-    _axes3d(ax, cen, "cell tracking")
+        ax.plot(tracks[:, j, 0], tracks[:, j, 1], tracks[:, j, 2], "-", lw=0.6, alpha=0.6)
+    _axes3d(ax, cen, "cell tracking (migrating)")
 
 
 def _render(folder, name, Q, tracks, idx):
     flim = (0, float(np.percentile(np.concatenate(Q["force"]), 97)))
     P = float(np.percentile(np.abs(np.concatenate(Q["pressure"])), 97)); plim = (-P, P)
     ncum = np.cumsum([float(b.sum()) for b in Q["born"]]).astype(int)
+    vall = np.concatenate([v for v in Q["vel"][1:]]) if len(Q["vel"]) > 1 else np.array([0.0])
+    vthr = float(np.percentile(vall, 70))                               # migrating = top-30% velocity
     fig = plt.figure(figsize=(9, 8.4)); fig.patch.set_facecolor("black")
     axes = [fig.add_subplot(2, 2, i + 1, projection="3d") for i in range(4)]
     wri = FFMpegWriter(fps=8, metadata={"title": f"{name} analysis"})
@@ -167,7 +171,7 @@ def _render(folder, name, Q, tracks, idx):
             _scat(axes[0], cen, Q["force"][k], "inferno", "force  |-grad U|", flim)
             _scat(axes[1], cen, Q["pressure"][k], "coolwarm", "stress  (pressure)", plim)
             _div(axes[2], cen, Q["born"][k], int(ncum[k]))
-            _track(axes[3], cen, tracks[:k + 1])
+            _track(axes[3], cen, tracks[:k + 1], Q["vel"][k], vthr)
             wri.grab_frame()
     plt.close(fig); print(f"[analyze] wrote {folder}/analysis.mp4 + quantification.npz", flush=True)
 
