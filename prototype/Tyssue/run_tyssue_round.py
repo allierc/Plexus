@@ -468,6 +468,19 @@ PRESETS["round_42_k10_ex4"]   = dict(_H42, kappa_s=0.10, K_extrude=4.0)
 PRESETS["round_42_k05_kv4"]   = dict(_H42, kappa_s=0.05, mono_kv=4.0, K_extrude=4.0)
 PRESETS["round_42_k05_h03"]   = dict(_H42, kappa_s=0.05, h0=0.3, K_extrude=4.0)
 PRESETS["round_42_k05_ex8_r02"]=dict(_H42, kappa_s=0.05, K_extrude=8.0, rate=0.02)
+# ===== round_43: THICKER tube (Okuda Fig-5 scale) for low hollow+CV. R42 monolayer made thin SPIKES (protr
+# 70, hollow>600, CV>5). Back to mid-surface mc8 (cleanest: hollow 176, CV 0.63) but make the tube THICKER
+# (bigger tip_radius -> bigger, more uniform wall cells -> lower CV + fewer curvature/tiny false-positive
+# hollow). Okuda's tubes are moderately thick, not super-thin. Sweep tip_radius up. Analyse the winner.
+_H43 = dict(_H41, min_cycle=8)
+PRESETS["round_43_base"]      = dict(_H43)                                   # tip_radius 1.5 control
+PRESETS["round_43_tr20"]      = dict(_H43, tip_radius=2.0)
+PRESETS["round_43_tr25"]      = dict(_H43, tip_radius=2.5)
+PRESETS["round_43_tr30"]      = dict(_H43, tip_radius=3.0)
+PRESETS["round_43_tr20_ex8"]  = dict(_H43, tip_radius=2.0, K_extrude=8.0)
+PRESETS["round_43_tr25_ex8"]  = dict(_H43, tip_radius=2.5, K_extrude=8.0)
+PRESETS["round_43_tr20_mc12"] = dict(_H43, tip_radius=2.0, min_cycle=12)
+PRESETS["round_43_tr25_relax45"]=dict(_H43, tip_radius=2.5, relax=45)
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
