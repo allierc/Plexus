@@ -493,46 +493,20 @@ is represented by extending the operator algebra rather than merely adjusting
 parameter values.
 
 \paragraph{Orchestration: loop agents and a master controller.}
-The three loops are naturally realized as autonomous agents coordinated by a
-\emph{master} controller. Each loop agent performs one kind of work --- decomposing
-a model (Understanding), fitting parameters and fields (Fitting), or proposing new
-operators against the residual (Discovery) --- and communicates only through typed
-artifacts on a shared blackboard: a mechanistic model, a set of success metrics with
-current values, the residual, and a queue of falsifiable hypotheses. The master never
-performs the loops' work; it is a state machine whose transition guards are the metrics,
-advancing a stage when its metric is met, invoking Discovery when a residual persists,
-and re-invoking Fitting once a new operator is admitted. Three responsibilities make the
-master more than a scheduler, and each proved decisive in practice. First, it authors and
-extends the \emph{success metrics} themselves during exploration --- morphological or
-data-driven criteria that make ``goal achieved'' a falsifiable test rather than a visual
-impression. Second, it \emph{grounds hypotheses in the literature and reference code}:
-before Discovery proposes an operator, the master consults the source model to seed or
-unstick the hypothesis, so the search over model structures is guided rather than blind.
-Third, it enforces two gates on every proposal --- \emph{compliance}, that a proposed
-operator is a well-typed Plexus contract rather than a simulator-specific patch, and
-\emph{consistency}, an active search for contradictions against expected invariants
-(determinism, conservation laws, monotonic trends, agreement between overlapping runs)
-rather than passive trust in the metric. A violated invariant --- for instance, a longer
-run diverging from a shorter one over the frames they must share --- signals that a
-persistent residual may indict the \emph{diagnostic} rather than the model, so that a
-mis-measuring metric is corrected before the operator algebra is extended. This gate
-distinguishes ``the model is incomplete'' from ``the measurement is wrong,'' a distinction
-without which an agent elaborates operators to explain an artifact. A fourth responsibility keeps the
-process honest once the metrics are met: \emph{perfecting}. A satisfied threshold is not the same as
-qualitative fidelity to the reference, and the master must notice discrepancies that \emph{no current
-metric captures} --- cells that are triangular where the reference's are round, a boundary that is ragged
-where it should be smooth --- and treat each as a prompt to author a \emph{new} metric and refine toward
-it. This closes the loop between qualitative observation and quantitative objective: the eye (or the
-reference figure) flags a gap, the master turns the gap into a measurable target, and the loops close it.
-Perfecting is therefore not obsessive polishing but the mechanism by which the goal itself is progressively
-sharpened as the model approaches the reference. It is also a deliberate counterweight to the characteristic
-failure mode of a fast operator, human or agent: advancing to the next stage before the current one is
-genuinely settled. The master holds each stage open until its metric is met and refuses the tempting
-shortcut of ``good enough to move on''; the discipline it supplies --- finish the step, verify it, only
-then proceed --- is precisely the one a hurried operator most often skips. The master thus keeps a multi-round,
-partially-automated discovery on its goals: it holds the objective, proceeds in small
-hypothesis-validated steps on a cheap-to-expensive evaluation ladder, and preserves the
-provenance of what was tried, validated, or falsified.
+The three loops are realized as autonomous agents coordinated by a \emph{master}: each
+performs one kind of work --- Understanding, Fitting, or Discovery --- and communicates only
+through typed artifacts on a shared blackboard (the mechanistic model, the success metrics
+with current values, the residual, and a queue of falsifiable hypotheses). The master never
+performs the loops' work; it is a state machine whose guards are the metrics --- advancing a
+stage when its metric is met, invoking Discovery when a residual persists, re-invoking Fitting
+once a new operator is admitted. Beyond scheduling it carries a few responsibilities: it
+\emph{authors} the success metrics, so ``goal achieved'' is a falsifiable test rather than a
+visual impression; it \emph{grounds} hypotheses in the reference literature and code before
+Discovery proposes; it gates every proposal on \emph{compliance} (a well-typed Plexus
+contract, not a simulator-specific patch) and \emph{consistency} (an active search for
+violated invariants --- determinism, conservation, agreement between overlapping runs ---
+that separates ``the model is incomplete'' from ``the measurement is wrong''); and it holds
+each stage open until settled, refusing the ``good enough to move on'' shortcut.
 
 \paragraph{The master reproduces a modeller's discipline.}
 These responsibilities are not invented for the machine; they formalise how a careful
