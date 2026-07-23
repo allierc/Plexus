@@ -1177,4 +1177,47 @@ Open: the tube is a \emph{transient} (degrades past $\sim$frame 350 as the domai
 more than a long cylinder --- sustained elongation (a moving growth zone that truly rides the tip without
 letting the body domain enlarge) is the next front.
 
+\section{BREAKTHROUGH: a working tube (rounds 31--34, 2026-07-23)}
+Rounds 22--30 solved the three coupled issues and produced a $\chi$-diameter \emph{budding lobe}, but it was
+a transient that \emph{capped} (protr $\sim$1.4) and could not elongate. Rounds 31--34 broke through to a
+\textbf{genuine tube} --- long, thin, constant-diameter --- and with it the character of the work changes:
+the \emph{emergence} question (can this pipeline make a tube at all?) is answered \textbf{yes}; from here it is
+\emph{optimisation} of a working phenomenon, not a search for it.
+
+\paragraph{The four steps to the breakthrough.}
+\begin{itemize}\itemsep2pt
+\item \textbf{R31 --- a smaller spot gives a thinner, longer finger.} Shrinking the activated patch
+(\texttt{cone\_deg}\,8, \texttt{chi}\,4) turned the fat lobe (len/diam $\sim$0.8) into a \emph{thin finger}
+(\texttt{c8}: len/diam $=1.99$; \texttt{c10\_chi3}: $1.95$), super-confined (redpk 0.05--0.09) with less
+proliferation. Less activated material $\Rightarrow$ slower domain growth $\Rightarrow$ later flood.
+\item \textbf{R32 --- more frames don't elongate it (falsified).} At $2\times$ frames the tube \emph{caps}
+(protr peaks $\sim$1.4 mid-run then degrades) --- because the activation is a \emph{widening patch}, not a
+moving tip. Only \texttt{grow\_after}\,150 (settle longer before growth) sustained it, and still as a lobe.
+\item \textbf{R33 --- TIP-TRACKING: the breakthrough.} The activation must be a fixed-\emph{size} cap that
+\emph{rides the advancing tip} (a fixed-\emph{angle} cone widens with radius $\to$ fat lobe). New seed mode
+\texttt{tip}: each frame re-activate a cap of radius \texttt{tip\_radius} at the current outermost cell, so
+it follows the tip $\to$ \emph{constant-diameter extension}. Result: real long tubes ---
+\texttt{tr25} len/diam $=3.0$, \texttt{tr15\_r015} $=3.4$, \texttt{tr15\_long} (700 frames) len $9.4$,
+\textbf{len/diam $=4.2$} (a genuine thin tube, not a lobe).
+\item \textbf{R34 --- shaping \& viewing.} Thin (\texttt{tip\_radius}\,1.2), strong extrusion to round and push
+the flat tip outward, the spot seeded on the side so the tube grows in \emph{profile}, and a cross-section
+taken \emph{in the plane of the tubing} (contains the tube axis, coloured by activator) so the red protuberance
+reads correctly against the 3D view.
+\end{itemize}
+
+\paragraph{The working recipe (honest scope).} A tube forms from: (i) the emergent-confinement machinery of
+R22--30 --- amount-conservation ($c=m/v$, growth dilutes), $a_0\!\to\!0$ (body stays white), the rate sweet
+spot, oriented interface division (daughters stack along the bud axis $=$ normal to the body); \emph{plus}
+(ii) a \textbf{tip-tracking activation driver} that supplies the sustained, constant-size apical signal the
+emergent RD alone could not maintain (the RD held a confined bud but capped). So the tube is not \emph{fully}
+emergent --- the tip signal is driven --- but every mechanical ingredient (confinement, wall-building
+division, extrusion) is, and the driver is the minimal honest stand-in for ``the activator peak stays at the
+apex.'' Diameter is set by \texttt{tip\_radius} ($=$ Okuda's $\chi$ role); length by frames $\times$ growth.
+
+\paragraph{From here: optimisation, not emergence.} The open directions are now tuning, not existence:
+thinner/longer tubes (\texttt{tip\_radius}, growth, frames), a rounded non-flat tip (tip pressure), multiple
+tubes (Fig~5 starfish), branching (Fig~6, low $\gamma$), and --- separately --- \emph{computation} throughput
+(profile the first 200 frames, vectorise/\texttt{torch.compile} the hot loops, keep rendering off the critical
+path) so more of the phenomenon space can be swept per hour.
+
 \end{document}
