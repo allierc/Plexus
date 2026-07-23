@@ -1244,4 +1244,46 @@ born late, are included). Output: \texttt{quantification.npz} (per-frame per-cel
 the tool shows the \emph{tip is the force/pressure hot-spot} --- the tube is under high stress, the concrete
 target for the next optimisation.
 
+\section{Reading the mechanics: the hollow problem is explosive, decoupled growth (2026-07-23)}
+Running \texttt{analyze\_forces.py} on the current best tube (\texttt{round\_37\_kv6}: aspect $\sim$10, cell
+CV crushed to $0.97$ by stiffening $K_V$ to $6$, the earlier CV goal essentially met) turned the persistent
+\emph{hollow} defect ($>300$ hollow cells, systematically, in every run's \texttt{metrics.png}) from a
+symptom into a diagnosis. The four panels agree:
+\begin{itemize}\itemsep2pt
+\item \textbf{Force} $\|\!-\!\nabla U\|$ is concentrated \emph{entirely in the tube} (wall + neck bright); the
+body is force-free. The tube is the only load-bearing structure --- the body is mechanically idle.
+\item \textbf{Stress / pressure} $p_j=2K_V(v_j^{\text{eq}}-v_j)$ is strongly \emph{positive and localised to
+the tube} (red), the body relaxed (white). Positive $p$ means the tube cells are \emph{below} target volume
+and straining outward: they are compressed by the extrusion and want to expand --- an over-pressurised state.
+\item \textbf{Migration} (velocity-thresholded) is almost all at the \emph{tube tip} (cells being extruded),
+with the body essentially static. The deformation does \emph{not} propagate to the body: the tube is
+mechanically \emph{decoupled}.
+\item \textbf{Division} (births) is localised at the same \emph{tip} --- proliferation coincides exactly with
+the force/pressure/migration hot-spot.
+\end{itemize}
+\textbf{Diagnosis.} Everything piles up at the tip --- pressure, births, migration --- and nothing transmits
+to the body. The growth is \emph{explosive and localised}: tip cells inflate and divide faster than the T1
+network can rearrange them, so they buckle rather than flow into an ordered wall $\Rightarrow$ the hollow
+cells. The pressure being trapped in the tube (not shared with the body) is the mechanical signature of an
+\emph{unsustainable} growth rate.
+
+\textbf{Hypothesis (the new perspective, from the mechanics).} Grow \emph{slower}, so that per unit growth
+there is more T1 flow: cells arrange along the tube, the load transmits tube$\rightarrow$body, the tube
+pressure relaxes, and the hollow buckling disappears. Slower-but-longer runs keep the tube length. This
+reframes the tube as a \emph{quasi-static} morphogenesis (Okuda's regime) rather than a fast extrusion, and
+makes the differentiable stress field (above) the natural objective: minimise tube pressure / equalise it
+tube$\leftrightarrow$body. \texttt{round\_39} tests exactly this (rate $0.006\!\to\!0.004$, longer runs, more
+aggressive T1). The optimisation shifts from ``can we make a tube?'' (solved) through ``clean cells''
+(CV solved by $K_V$) to ``a \emph{sustainable}, low-stress tube'' --- read directly off the force/pressure
+maps, not guessed.
+
+\paragraph{The mature picture.} The morphogenesis is now legible as a coupled \emph{geometry--force--pressure
+dynamics}: the cell geometry sets the energy, the energy gradient is the force, the volume deficit is the
+pressure, and their interplay (mediated by T1 rearrangement and oriented division) drives the shape. Read
+this way, a \emph{good} morphogenesis is one whose dynamics are \textbf{sustainable} (bounded stress,
+tube$\leftrightarrow$body load sharing, no buckling), \textbf{repeatable} (the same rule makes the same tube
+across seeds and scales), and \textbf{emerging} (the tube is produced by the local mechanics, not imposed).
+The differentiable force/pressure field makes each of these a measurable objective rather than an aesthetic
+judgement --- which is the point of building the analysis before pushing the phenomenon further.
+
 \end{document}

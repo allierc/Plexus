@@ -138,10 +138,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -162,6 +158,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -333,108 +333,152 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"particle_to_grid"</span>, <span class="st">"fixed_corotated_stress"</span>]</span>
 <span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"dt_sub"</span>: <span class="st">"MLS-MPM substep dt"</span>, <span class="st">"drag"</span>: <span class="st">"Stokes drag coefficient"</span>,</span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"a_max"</span>: <span class="st">"external-acceleration clamp"</span>}</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.to <span class="op">=</span> params.get(<span class="st">"to"</span>, <span class="st">"mpm_grid"</span>)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dt_sub <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dt_sub"</span>, <span class="fl">2e-4</span>))</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.drag <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"drag"</span>, <span class="fl">0.0</span>))</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.a_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"a_max"</span>, <span class="fl">200.0</span>))</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.to)<span class="op">;</span> dev <span class="op">=</span> p.state.device</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> sub_dt(H, <span class="va">self</span>.dt_sub)</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        nx, ny, inv_dx, dx <span class="op">=</span> g.nx, g.ny, g.inv_dx, g.dx</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> p.F.shape[<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        offsets <span class="op">=</span> stencil_offsets(D, dev)</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        X, V <span class="op">=</span> p.get(<span class="st">"pos"</span>), p.get(<span class="st">"vel"</span>)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        <span class="co"># external per-cell acceleration from the parent set's accumulated delta (gravity)</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        pn <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"parent_name"</span>, <span class="va">None</span>)</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pn <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>            a_cell <span class="op">=</span> H.delta(pn)</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>            a_cell <span class="op">=</span> torch.nan_to_num(a_cell, posinf<span class="op">=</span><span class="va">self</span>.a_max, neginf<span class="op">=-</span><span class="va">self</span>.a_max).clamp(<span class="op">-</span><span class="va">self</span>.a_max, <span class="va">self</span>.a_max)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>            a_ext <span class="op">=</span> a_cell[p.parent]</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>            a_ext <span class="op">=</span> torch.zeros(p.n, D, device<span class="op">=</span>dev)</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        part_accel <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"part_accel"</span>, <span class="va">None</span>)</span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> part_accel <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>            a_ext <span class="op">=</span> a_ext <span class="op">+</span> part_accel</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        <span class="co"># per-particle body force from particle-level force operators (e.g. pulse_to_contraction,</span></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        <span class="co"># drag) -- the symmetric counterpart of the parent-delta path above (gravity).</span></span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        a_ext <span class="op">=</span> a_ext <span class="op">+</span> torch.nan_to_num(H.delta(p.name))</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        V <span class="op">=</span> V <span class="op">+</span> dt <span class="op">*</span> (a_ext <span class="op">-</span> <span class="va">self</span>.drag <span class="op">*</span> V)                       <span class="co"># body force + Stokes drag (local; G2P resets V)</span></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        F, C, mass <span class="op">=</span> p.F, p.C, p.mass</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        <span class="co"># RESIDUAL STRESS / PRESTRESS (optional, default OFF): compute the fixed-corotated stress</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        <span class="co"># relative to a non-identity per-particle REST tensor F_res (multiplicative morphoelastic split</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        <span class="co"># F = Fe . F_res, so Fe = F @ F_res_inv is the elastic part). At the mesh rest state F=I this</span></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        <span class="co"># leaves Fe = F_res_inv != I -&gt; a STANDING PRELOAD; an incompatible F_res(x,y) holds a</span></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        <span class="co"># self-equilibrated residual-stress field. Absent buffer -&gt; byte-identical; F_res=I (alpha=0) -&gt;</span></span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="co"># F @ I = F exactly, so the operator truly ablates. Only the STRESS reference shifts; the</span></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="co"># kinematic F (updated in mpm_strain) is untouched.</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        Fres_inv <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"F_res_inv"</span>, <span class="va">None</span>)</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> Fres_inv <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>            F <span class="op">=</span> F <span class="op">@</span> Fres_inv</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        eye <span class="op">=</span> torch.eye(D, device<span class="op">=</span>dev).expand(p.n, D, D)</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>            a, b, c, d <span class="op">=</span> F[:, <span class="dv">0</span>, <span class="dv">0</span>], F[:, <span class="dv">0</span>, <span class="dv">1</span>], F[:, <span class="dv">1</span>, <span class="dv">0</span>], F[:, <span class="dv">1</span>, <span class="dv">1</span>]</span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> a <span class="op">*</span> d <span class="op">-</span> b <span class="op">*</span> c</span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> torch.linalg.det(F)</span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>        mu, la <span class="op">=</span> p.mu, p.la</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        snow <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_snow"</span>, <span class="va">None</span>)</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> snow <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> snow.<span class="bu">any</span>():                        <span class="co"># snow hardening from the plastic ratio Jp</span></span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>            h <span class="op">=</span> torch.exp((<span class="fl">10.0</span> <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> p.Jp)).clamp(<span class="op">-</span><span class="fl">6.0</span>, <span class="fl">6.0</span>))</span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>            mu <span class="op">=</span> torch.where(snow, p.mu <span class="op">*</span> h, p.mu)</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>            la <span class="op">=</span> torch.where(snow, p.la <span class="op">*</span> h, p.la)</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:                                                 <span class="co"># analytic 2D polar rotation (bit-identical)</span></span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>            cs, sn <span class="op">=</span> (F[:, <span class="dv">0</span>, <span class="dv">0</span>] <span class="op">+</span> F[:, <span class="dv">1</span>, <span class="dv">1</span>]), (F[:, <span class="dv">1</span>, <span class="dv">0</span>] <span class="op">-</span> F[:, <span class="dv">0</span>, <span class="dv">1</span>])</span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>            r <span class="op">=</span> torch.sqrt(cs <span class="op">*</span> cs <span class="op">+</span> sn <span class="op">*</span> sn) <span class="op">+</span> <span class="fl">1e-9</span></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>            cs, sn <span class="op">=</span> cs <span class="op">/</span> r, sn <span class="op">/</span> r</span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>            R <span class="op">=</span> torch.stack([torch.stack([cs, <span class="op">-</span>sn], <span class="op">-</span><span class="dv">1</span>), torch.stack([sn, cs], <span class="op">-</span><span class="dv">1</span>)], <span class="op">-</span><span class="dv">2</span>)</span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                      <span class="co"># SVD polar rotation R = U Vh (proper rotation)</span></span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>            U, sig, Vh <span class="op">=</span> torch.linalg.svd(F)</span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>            U <span class="op">=</span> U.clone()<span class="op">;</span> Vh <span class="op">=</span> Vh.clone()</span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>            negU <span class="op">=</span> torch.det(U) <span class="op">&lt;</span> <span class="dv">0</span><span class="op">;</span> U[negU, :, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>            negV <span class="op">=</span> torch.det(Vh) <span class="op">&lt;</span> <span class="dv">0</span><span class="op">;</span> Vh[negV, <span class="op">-</span><span class="dv">1</span>, :] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>            R <span class="op">=</span> U <span class="op">@</span> Vh</span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>        stress <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> mu[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> ((F <span class="op">-</span> R) <span class="op">@</span> F.transpose(<span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>)) <span class="op">\</span></span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>            <span class="op">+</span> eye <span class="op">*</span> (la <span class="op">*</span> J <span class="op">*</span> (J <span class="op">-</span> <span class="dv">1</span>))[:, <span class="va">None</span>, <span class="va">None</span>]</span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>        <span class="co"># optional MLS-MPM ACTIVE STRESS (-A n n^T from pulse_to_active_stress), added to the</span></span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fixed-corotated elastic stress before the affine scatter. Default off (absent -&gt; None -&gt;</span></span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>        <span class="co"># pure elastic); same units / scaling / scatter as the elastic stress. Same H side-channel</span></span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>        <span class="co"># idiom as part_accel; it feeds the tissue through stress divergence, not a pointwise force.</span></span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>        act <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"active_stress"</span>, <span class="va">None</span>)</span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> act <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a>            stress <span class="op">=</span> stress <span class="op">+</span> act</span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>        stress <span class="op">=</span> (<span class="op">-</span>dt <span class="op">*</span> <span class="dv">4</span> <span class="op">*</span> inv_dx <span class="op">*</span> inv_dx) <span class="op">*</span> p.p_vol[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> stress</span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>        affine <span class="op">=</span> stress <span class="op">+</span> mass[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> C</span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>        fx, weight, flat <span class="op">=</span> bspline(X, inv_dx, offsets, g.shape, periodic)</span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>        <span class="co"># DORMANT particles (occ==0, e.g. a cell_grow reserve) contribute NOTHING to the grid:</span></span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>        <span class="co"># mask the scatter weights by occupancy. Byte-identical when all particles are live.</span></span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>        occ <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"occ"</span>, <span class="va">None</span>)</span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> occ <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>            weight <span class="op">=</span> weight <span class="op">*</span> (occ <span class="op">&gt;</span> <span class="dv">0</span>).to(weight.dtype)[:, <span class="va">None</span>]</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>        dpos_phys <span class="op">=</span> (offsets[<span class="va">None</span>] <span class="op">-</span> fx[:, <span class="va">None</span>, :]) <span class="op">*</span> dx</span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>        mom <span class="op">=</span> mass[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> V[:, <span class="va">None</span>, :] <span class="op">+</span> (affine[:, <span class="va">None</span>] <span class="op">@</span> dpos_phys[..., <span class="va">None</span>]).squeeze(<span class="op">-</span><span class="dv">1</span>)</span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>        gm <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)<span class="op">;</span> gmv <span class="op">=</span> torch.zeros(g.n_cells, D, device<span class="op">=</span>dev)</span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>        gm.index_add_(<span class="dv">0</span>, flat, (weight <span class="op">*</span> mass[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>        gmv.index_add_(<span class="dv">0</span>, flat, (weight[..., <span class="va">None</span>] <span class="op">*</span> mom).reshape(<span class="op">-</span><span class="dv">1</span>, D))</span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>        gc <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>        liquid <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> liquid.<span class="bu">any</span>():                    <span class="co"># liquid colour for the CSF surface tension</span></span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>            lw <span class="op">=</span> (weight <span class="op">*</span> (mass <span class="op">*</span> liquid.to(mass.dtype))[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>)</span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>            gc.index_add_(<span class="dv">0</span>, flat, lw)</span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>        g.m, g.mv, g.c <span class="op">=</span> gm, gmv, gc</span>
-<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994)."</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.to <span class="op">=</span> params.get(<span class="st">"to"</span>, <span class="st">"mpm_grid"</span>)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dt_sub <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dt_sub"</span>, <span class="fl">2e-4</span>))</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.drag <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"drag"</span>, <span class="fl">0.0</span>))</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.a_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"a_max"</span>, <span class="fl">200.0</span>))</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.to)<span class="op">;</span> dev <span class="op">=</span> p.state.device</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> sub_dt(H, <span class="va">self</span>.dt_sub)</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        nx, ny, inv_dx, dx <span class="op">=</span> g.nx, g.ny, g.inv_dx, g.dx</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> p.F.shape[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        offsets <span class="op">=</span> stencil_offsets(D, dev)</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        X, V <span class="op">=</span> p.get(<span class="st">"pos"</span>), p.get(<span class="st">"vel"</span>)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="co"># external per-cell acceleration from the parent set's accumulated delta (gravity)</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        pn <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"parent_name"</span>, <span class="va">None</span>)</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pn <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>            a_cell <span class="op">=</span> H.delta(pn)</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>            a_cell <span class="op">=</span> torch.nan_to_num(a_cell, posinf<span class="op">=</span><span class="va">self</span>.a_max, neginf<span class="op">=-</span><span class="va">self</span>.a_max).clamp(<span class="op">-</span><span class="va">self</span>.a_max, <span class="va">self</span>.a_max)</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>            a_ext <span class="op">=</span> a_cell[p.parent]</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>            a_ext <span class="op">=</span> torch.zeros(p.n, D, device<span class="op">=</span>dev)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        part_accel <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"part_accel"</span>, <span class="va">None</span>)</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> part_accel <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>            a_ext <span class="op">=</span> a_ext <span class="op">+</span> part_accel</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        <span class="co"># per-particle body force from particle-level force operators (e.g. pulse_to_contraction,</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        <span class="co"># drag) -- the symmetric counterpart of the parent-delta path above (gravity).</span></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        a_ext <span class="op">=</span> a_ext <span class="op">+</span> torch.nan_to_num(H.delta(p.name))</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        V <span class="op">=</span> V <span class="op">+</span> dt <span class="op">*</span> (a_ext <span class="op">-</span> <span class="va">self</span>.drag <span class="op">*</span> V)                       <span class="co"># body force + Stokes drag (local; G2P resets V)</span></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        F, C, mass <span class="op">=</span> p.F, p.C, p.mass</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        <span class="co"># RESIDUAL STRESS / PRESTRESS (optional, default OFF): compute the fixed-corotated stress</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        <span class="co"># relative to a non-identity per-particle REST tensor F_res (multiplicative morphoelastic split</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        <span class="co"># F = Fe . F_res, so Fe = F @ F_res_inv is the elastic part). At the mesh rest state F=I this</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        <span class="co"># leaves Fe = F_res_inv != I -&gt; a STANDING PRELOAD; an incompatible F_res(x,y) holds a</span></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="co"># self-equilibrated residual-stress field. Absent buffer -&gt; byte-identical; F_res=I (alpha=0) -&gt;</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="co"># F @ I = F exactly, so the operator truly ablates. Only the STRESS reference shifts; the</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        <span class="co"># kinematic F (updated in mpm_strain) is untouched.</span></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        Fres_inv <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"F_res_inv"</span>, <span class="va">None</span>)</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> Fres_inv <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>            F <span class="op">=</span> F <span class="op">@</span> Fres_inv</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        eye <span class="op">=</span> torch.eye(D, device<span class="op">=</span>dev).expand(p.n, D, D)</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>            a, b, c, d <span class="op">=</span> F[:, <span class="dv">0</span>, <span class="dv">0</span>], F[:, <span class="dv">0</span>, <span class="dv">1</span>], F[:, <span class="dv">1</span>, <span class="dv">0</span>], F[:, <span class="dv">1</span>, <span class="dv">1</span>]</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> a <span class="op">*</span> d <span class="op">-</span> b <span class="op">*</span> c</span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> torch.linalg.det(F)</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        mu, la <span class="op">=</span> p.mu, p.la</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        snow <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_snow"</span>, <span class="va">None</span>)</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> snow <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> snow.<span class="bu">any</span>():                        <span class="co"># snow hardening from the plastic ratio Jp</span></span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>            h <span class="op">=</span> torch.exp((<span class="fl">10.0</span> <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> p.Jp)).clamp(<span class="op">-</span><span class="fl">6.0</span>, <span class="fl">6.0</span>))</span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>            mu <span class="op">=</span> torch.where(snow, p.mu <span class="op">*</span> h, p.mu)</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>            la <span class="op">=</span> torch.where(snow, p.la <span class="op">*</span> h, p.la)</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:                                                 <span class="co"># analytic 2D polar rotation (bit-identical)</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>            cs, sn <span class="op">=</span> (F[:, <span class="dv">0</span>, <span class="dv">0</span>] <span class="op">+</span> F[:, <span class="dv">1</span>, <span class="dv">1</span>]), (F[:, <span class="dv">1</span>, <span class="dv">0</span>] <span class="op">-</span> F[:, <span class="dv">0</span>, <span class="dv">1</span>])</span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>            r <span class="op">=</span> torch.sqrt(cs <span class="op">*</span> cs <span class="op">+</span> sn <span class="op">*</span> sn) <span class="op">+</span> <span class="fl">1e-9</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>            cs, sn <span class="op">=</span> cs <span class="op">/</span> r, sn <span class="op">/</span> r</span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>            R <span class="op">=</span> torch.stack([torch.stack([cs, <span class="op">-</span>sn], <span class="op">-</span><span class="dv">1</span>), torch.stack([sn, cs], <span class="op">-</span><span class="dv">1</span>)], <span class="op">-</span><span class="dv">2</span>)</span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:                                                      <span class="co"># SVD polar rotation R = U Vh (proper rotation)</span></span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>            U, sig, Vh <span class="op">=</span> torch.linalg.svd(F)</span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>            U <span class="op">=</span> U.clone()<span class="op">;</span> Vh <span class="op">=</span> Vh.clone()</span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>            negU <span class="op">=</span> torch.det(U) <span class="op">&lt;</span> <span class="dv">0</span><span class="op">;</span> U[negU, :, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>            negV <span class="op">=</span> torch.det(Vh) <span class="op">&lt;</span> <span class="dv">0</span><span class="op">;</span> Vh[negV, <span class="op">-</span><span class="dv">1</span>, :] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>            R <span class="op">=</span> U <span class="op">@</span> Vh</span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>        stress <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> mu[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> ((F <span class="op">-</span> R) <span class="op">@</span> F.transpose(<span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>)) <span class="op">\</span></span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>            <span class="op">+</span> eye <span class="op">*</span> (la <span class="op">*</span> J <span class="op">*</span> (J <span class="op">-</span> <span class="dv">1</span>))[:, <span class="va">None</span>, <span class="va">None</span>]</span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>        <span class="co"># optional MLS-MPM ACTIVE STRESS (-A n n^T from pulse_to_active_stress), added to the</span></span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>        <span class="co"># fixed-corotated elastic stress before the affine scatter. Default off (absent -&gt; None -&gt;</span></span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>        <span class="co"># pure elastic); same units / scaling / scatter as the elastic stress. Same H side-channel</span></span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>        <span class="co"># idiom as part_accel; it feeds the tissue through stress divergence, not a pointwise force.</span></span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>        act <span class="op">=</span> <span class="bu">getattr</span>(H, <span class="st">"active_stress"</span>, <span class="va">None</span>)</span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> act <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>            stress <span class="op">=</span> stress <span class="op">+</span> act</span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>        stress <span class="op">=</span> (<span class="op">-</span>dt <span class="op">*</span> <span class="dv">4</span> <span class="op">*</span> inv_dx <span class="op">*</span> inv_dx) <span class="op">*</span> p.p_vol[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> stress</span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>        affine <span class="op">=</span> stress <span class="op">+</span> mass[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> C</span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>        fx, weight, flat <span class="op">=</span> bspline(X, inv_dx, offsets, g.shape, periodic)</span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>        <span class="co"># DORMANT particles (occ==0, e.g. a cell_grow reserve) contribute NOTHING to the grid:</span></span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>        <span class="co"># mask the scatter weights by occupancy. Byte-identical when all particles are live.</span></span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>        occ <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"occ"</span>, <span class="va">None</span>)</span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> occ <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>            weight <span class="op">=</span> weight <span class="op">*</span> (occ <span class="op">&gt;</span> <span class="dv">0</span>).to(weight.dtype)[:, <span class="va">None</span>]</span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>        dpos_phys <span class="op">=</span> (offsets[<span class="va">None</span>] <span class="op">-</span> fx[:, <span class="va">None</span>, :]) <span class="op">*</span> dx</span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>        mom <span class="op">=</span> mass[:, <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> V[:, <span class="va">None</span>, :] <span class="op">+</span> (affine[:, <span class="va">None</span>] <span class="op">@</span> dpos_phys[..., <span class="va">None</span>]).squeeze(<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>        gm <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)<span class="op">;</span> gmv <span class="op">=</span> torch.zeros(g.n_cells, D, device<span class="op">=</span>dev)</span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>        gm.index_add_(<span class="dv">0</span>, flat, (weight <span class="op">*</span> mass[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>        gmv.index_add_(<span class="dv">0</span>, flat, (weight[..., <span class="va">None</span>] <span class="op">*</span> mom).reshape(<span class="op">-</span><span class="dv">1</span>, D))</span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>        gc <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)</span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>        liquid <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> liquid.<span class="bu">any</span>():                    <span class="co"># liquid colour for the CSF surface tension</span></span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>            lw <span class="op">=</span> (weight <span class="op">*</span> (mass <span class="op">*</span> liquid.to(mass.dtype))[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>            gc.index_add_(<span class="dv">0</span>, flat, lw)</span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>        g.m, g.mv, g.c <span class="op">=</span> gm, gmv, gc</span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
 
 </main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) become click-to-enlarge */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; background: #000;
+  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function close() {
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc
+            || (v.querySelector('source') && v.querySelector('source').src)
+            || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.classList.contains('open')) close();
+  });
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

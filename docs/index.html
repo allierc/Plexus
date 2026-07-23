@@ -133,10 +133,6 @@ window.Quarto = {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="./library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="./library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -157,6 +153,10 @@ window.Quarto = {
   <li class="nav-item">
     <a class="nav-link" href="./inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -892,7 +892,7 @@ schedule:   # the order the operators run each frame
 </div>
 
 <h3 class="anchored">Turing × vertex — patterning &amp; shaping a growing tissue</h3>
-<p class="opk">Growth and reaction–diffusion on a deformable vertex shell: the tissue first proliferates by growth and division to a couple of thousand cells, then Gray–Scott chemistry both <b>colours</b> the surface and <b>drives its shape</b> — each regime buckling the shell a different way.</p>
+<p class="opk">Growth and reaction–diffusion on a deformable vertex shell: the tissue first proliferates by growth and division to a couple of thousand cells, then reaction–diffusion chemistry both <b>colours</b> the surface and <b>drives its shape</b> — each regime buckling the shell a different way.</p>
 <p class="opk-ref">Reference — growth on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex model; reaction–diffusion coupled to a vertex-model vesicle (our Turing × vertex prototype).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
@@ -1104,6 +1104,124 @@ schedule:   # the order the operators run each frame
 - divide_3d
 - topo_snapshot_3d</pre></span></span>
       <span class="sim-cap">a Gray–Scott coral pattern rides the same growing vesicle — red stripes wander across the rounded cells</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card figure">
+    <video src="gallery/tyssue_cauliflower.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">morphogen + growth<span class="sim-spec"><pre>general:   # run-level settings
+  name: tyssue_round   # run name (-&gt; archive/&lt;name&gt;/)
+  seed: 0   # RNG seed
+  n_frames: 200   # number of simulation frames
+  dt: 0.02   # time step (a label: the bounded-Euler relaxation is per-frame)
+  record_cap: 202
+  boundary: free   # domain boundary (free = unbounded; border vertices are pinned)
+  dim: 3   # spatial dimension
+  world:   # world box size
+  - 80.0
+  - 80.0
+  - 80.0
+sets:   # the biological SETS (Levels) of the model
+  vertex:   # VERTEX set: mesh-vertex positions -- the mechanical DOF
+    n: 30000   # buffer size (max elements)
+  cell:   # CELL set: per-cell biological state (the plexus2 two-level hierarchy)
+    n: 16000   # buffer size (max elements)
+    state:   # per-element state blocks (name: {width, integration})
+      chem:
+        width: 2   # number of scalar columns in this state block
+        integration: first_order
+      cen:   # cell centroid (aggregate readout)
+        width: 3   # number of scalar columns in this state block
+      area:   # cell area (aggregate readout from vertices)
+        width: 1   # number of scalar columns in this state block
+fields: {}   # continuous fields
+operators:   # the operators to instantiate (each realises one mechanism)
+- op: load_mesh_3d
+  at: vertex   # the set this operator acts on
+  cell_set: cell
+  ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/prototype/Tyssue/archive/smoke_hom/ckpt.npz
+  before_frame: 1   # run this operator once, before the given frame
+- op: cell_geometry_3d
+  at: cell   # the set this operator acts on
+- op: cell_rd_seed
+  at: cell   # the set this operator acts on
+  mode: cones
+  n_spots: 3
+  cone_deg: 12.0
+  before_frame: 3   # run this operator once, before the given frame
+- op: cell_adjacency
+  at: cell   # the set this operator acts on
+- op: cell_diffuse
+  at: cell   # the set this operator acts on
+  d_a: 0.05
+  d_h: 0.7
+  chi: 4.0
+- op: cell_react
+  at: cell   # the set this operator acts on
+  implementation: gierer_meinhardt
+  gm_rho: 1.0
+  mu_a: 1.0
+  mu_h: 1.0
+  a0: 0.01   # target cell area (biological state; drives shape_energy)
+  rate: 1.0   # growth rate of the target area per frame
+- op: morphogen_growth_3d
+  at: vertex   # the set this operator acts on
+  cell_set: cell
+  rate: 0.05   # growth rate of the target area per frame
+  a_sw: 1.5
+  hill: 4.0
+  rho: 0.0
+  vth_frac: 1.5
+  after_frame: 50
+- op: shape_energy_3d
+  at: vertex   # the set this operator acts on
+  p0: 3.9   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  K_A: 1.0   # area-elasticity stiffness
+  K_P: 1.0   # perimeter-elasticity stiffness
+  Gamma: 0.05
+  Lambda: 0.2
+  K_V: 4.0
+  K_R: 0.02
+  mu: 1.0   # mobility (overdamped)
+  dt: 0.02   # time step (a label: the bounded-Euler relaxation is per-frame)
+  relax_iters: 30   # inner bounded-Euler relaxation steps per frame
+  eta: 0.08   # relaxation step size
+  cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
+- op: reconnect_t1_3d
+  at: vertex   # the set this operator acts on
+  l_th_frac: 0.28
+  every: 1   # run this operator every N frames
+  max_flips: 300
+- op: divide_3d
+  at: vertex   # the set this operator acts on
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.4
+  p0: 3.9   # target shape index -- the rigidity knob (&lt; ~3.81 solid, &gt; ~3.81 fluid)
+  every: 2   # run this operator every N frames
+  max_div: 120
+  max_div_frac: 0.03
+  vcap: 1.5
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 50
+- op: topo_snapshot_3d
+  at: vertex   # the set this operator acts on
+  every: 1   # run this operator every N frames
+schedule:   # the order the operators run each frame
+- load_mesh_3d
+- cell_geometry_3d
+- cell_rd_seed
+- cell_adjacency
+- cell_diffuse
+- cell_react
+- morphogen_growth_3d
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d</pre></span></span>
+      <span class="sim-cap">a Gierer–Meinhardt activator patterns the cell set and drives growth where it peaks, folding the growing shell out of plane into a lobed shape</span>
     </figcaption>
   </figure>
 </div>
@@ -2434,6 +2552,49 @@ descriptions:
 </section>
 
 </main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) become click-to-enlarge */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; background: #000;
+  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function close() {
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc
+            || (v.querySelector('source') && v.querySelector('source').src)
+            || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.classList.contains('open')) close();
+  });
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

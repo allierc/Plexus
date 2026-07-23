@@ -104,10 +104,6 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="./library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="./library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -128,6 +124,10 @@ ul.task-list li input[type="checkbox"] {
   <li class="nav-item">
     <a class="nav-link" href="./inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -185,14 +185,57 @@ ul.task-list li input[type="checkbox"] {
 .op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
 .op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
 </style>
-<p>Plexus is built from four concepts — <strong>operators</strong>, <strong>sets</strong>, the <strong>states</strong> each set carries, and <strong>fields</strong>. The validated registry to date is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>51 operators</strong> (59 primitives in all); every simulation on this site is a <strong>schedule</strong> composed from this list — nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages — the objects the operators act on (<strong>sets</strong>, each with its <strong>state schema</strong>, and <strong>fields</strong>) and the <strong>operators</strong> that move state between them:</p>
+<p>Plexus is built from four concepts — <strong>operators</strong>, <strong>sets</strong>, the <strong>states</strong> each set carries, and <strong>fields</strong>. The validated registry to date is <strong>3 sets</strong>, <strong>5 fields</strong>, and <strong>52 operators</strong> (60 primitives in all); every simulation on this site is a <strong>schedule</strong> composed from this list — nothing else. The catalog is introspected live from the registry, so it never drifts from the code. It is split into three pages — the objects the operators act on (<strong>sets</strong>, each with its <strong>state schema</strong>, and <strong>fields</strong>) and the <strong>operators</strong> that move state between them:</p>
 <div class="op-grid">
-<p><a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds — the levels a hierarchy is built from.</span></span></a> <a class="op-card" href="library_fields.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">Fields</span><span class="op-card-sub">5 continuum discretizations — coupled to sets through exchange.</span></span></a> <a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">51 operators, grouped by kind — how state moves.</span></span></a></p>
+<p><a class="op-card" href="library_sets.html"><img src="figures/icons/set.png" alt="set"><span class="op-card-body"><span class="op-card-name">Sets</span><span class="op-card-sub">3 node kinds — the levels a hierarchy is built from.</span></span></a> <a class="op-card" href="library_fields.html"><img src="figures/icons/field.png" alt="field"><span class="op-card-body"><span class="op-card-name">Fields</span><span class="op-card-sub">5 continuum discretizations — coupled to sets through exchange.</span></span></a> <a class="op-card" href="library_operators.html"><img src="figures/icons/lateral.png" alt="lateral"><span class="op-card-body"><span class="op-card-name">Operators</span><span class="op-card-sub">52 operators, grouped by kind — how state moves.</span></span></a></p>
 </div>
 
 
 
 </main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) become click-to-enlarge */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; background: #000;
+  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function close() {
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc
+            || (v.querySelector('source') && v.querySelector('source').src)
+            || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.classList.contains('open')) close();
+  });
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

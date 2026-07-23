@@ -106,10 +106,6 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="./library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="./library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -130,6 +126,10 @@ ul.task-list li input[type="checkbox"] {
   <li class="nav-item">
     <a class="nav-link" href="./inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -176,7 +176,17 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>And because a Plexus design is just a <strong>spec</strong> — a handful of numbers over a fixed operator set — that design can be <em>optimized</em>, not only simulated. The forager here is a colony of <strong>deformable cells</strong>: each cell is a soft elastic body simulated with <strong>MPM</strong> (the material-point method), and the colony navigates by <strong>chemotaxis</strong> — sensing an attractant gradient that points toward the food and climbing it — coordinated by boids flocking, with MPM handling the physical push against walls and neighbours. A black-box <strong>UCB</strong> search tunes the spec’s parameters — motility speed and turn rate, sensing gain, material stiffness (<code>youngs</code>), cell size and count, and the four boids weights — from a hand-set design (left) to the best found (right), which delivers food roughly <strong>five-fold faster</strong>.</p>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>The spec as a design, tuned.</strong> Everywhere else on this site a Plexus <strong>spec</strong> — a handful of numbers over a fixed operator set — is <em>simulated</em>. Here it is <em>optimized</em>: a black-box <strong>UCB</strong> search tunes those numbers to improve a design objective. The forager is a colony of <strong>deformable cells</strong> — each a soft elastic body under <strong>MPM</strong> — that navigates by <strong>chemotaxis</strong>, climbing a food-attractant gradient; the optimizer reshapes its motility, sensing, stiffness and flocking until it reaches food far faster and threads pillar fields and mazes. Same operators, same engine — only the spec changed.</p>
+</div>
+</div>
+</div>
+<p>Because a Plexus design is just a <strong>spec</strong> — a handful of numbers over a fixed operator set — that design can be <em>optimized</em>, not only simulated. The forager here is a colony of <strong>deformable cells</strong>: each cell is a soft elastic body simulated with <strong>MPM</strong> (the material-point method), and the colony navigates by <strong>chemotaxis</strong> — sensing an attractant gradient that points toward the food and climbing it — coordinated by boids flocking, with MPM handling the physical push against walls and neighbours. A black-box <strong>UCB</strong> search tunes the spec’s parameters — motility speed and turn rate, sensing gain, material stiffness (<code>youngs</code>), cell size and count, and the four boids weights — from a hand-set design (left) to the best found (right), which delivers food roughly <strong>five-fold faster</strong>.</p>
 <div>
 
 </div>
@@ -205,6 +215,49 @@ ul.task-list li input[type="checkbox"] {
 </section>
 
 </main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) become click-to-enlarge */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; background: #000;
+  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function close() {
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc
+            || (v.querySelector('source') && v.querySelector('source').src)
+            || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.classList.contains('open')) close();
+  });
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
