@@ -343,6 +343,19 @@ PRESETS["round_33_tr15_ex12"] = dict(_H33, tip_radius=1.5, K_extrude=12.0)
 PRESETS["round_33_tr15_r015"] = dict(_H33, tip_radius=1.5, rate=0.015)
 PRESETS["round_33_tr15_long"] = dict(_H33, tip_radius=1.5, frames=700)
 PRESETS["round_33_tr10_ex12"] = dict(_H33, tip_radius=1.0, K_extrude=12.0)   # thinnest + strong push
+# ===== round_34: THIN tube, ROUNDED tip, LEFT (user). round_33 tip-tracking gave long tubes (len/diam 2.5-4);
+# user wants smaller (c6-like thin), a ROUNDED tip pushed outward (now flat) via strong extrusion, MORE frames,
+# and the spot on the LEFT (profile view -- _FRONT grew away from the camera into the far face). seed_dir=_LEFT.
+_LEFT = [0.4, -0.9, 0.15]
+_H34 = dict(_H33, seed_dir=_LEFT, tip_radius=1.2, K_extrude=12.0)
+PRESETS["round_34_700"]        = dict(_H34, frames=700)
+PRESETS["round_34_900"]        = dict(_H34, frames=900)
+PRESETS["round_34_ex16"]       = dict(_H34, frames=700, K_extrude=16.0)                # stronger tip push (rounder)
+PRESETS["round_34_r015"]       = dict(_H34, frames=700, rate=0.015)                    # more growth
+PRESETS["round_34_tr15_900"]   = dict(_H34, frames=900, tip_radius=1.5)
+PRESETS["round_34_tr10_ex16"]  = dict(_H34, frames=700, tip_radius=1.0, K_extrude=16.0)  # thinnest + strongest push
+PRESETS["round_34_r015_900"]   = dict(_H34, frames=900, rate=0.015)
+PRESETS["round_34_ex16_r015"]  = dict(_H34, frames=900, K_extrude=16.0, rate=0.015)    # long + push + growth
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -399,6 +412,46 @@ def make(p):
     sim = S.load(path); os.unlink(path); return sim, cfg
 
 
+_ELEV, _AZIM = 18, 30                                             # the render camera (matches _draw's view_init)
+
+
+def _screen_basis(elev=_ELEV, azim=_AZIM):
+    """Screen frame for the render camera: d = depth (into screen), u = horizontal (right), v = vertical (up)."""
+    er, az = np.deg2rad(elev), np.deg2rad(azim)
+    d = np.array([np.cos(er) * np.cos(az), np.cos(er) * np.sin(az), np.sin(er)])
+    v = np.array([0.0, 0.0, 1.0]) - (np.array([0.0, 0.0, 1.0]) @ d) * d; v /= (np.linalg.norm(v) + 1e-12)
+    u = np.cross(v, d); u /= (np.linalg.norm(u) + 1e-12)
+    return d, u, v
+
+
+def _cross_screen(ax, pos, mesh, act, inner=0.82, Lbox=None):
+    """Cross-section in the SCREEN plane (normal = camera depth) so it matches the 3D view: the tube
+    protuberance shows in profile, coloured by activation (white->red). Edges crossing the mid-plane give
+    the lumen ring; each segment is coloured by its cell's activator."""
+    from matplotlib.patches import Polygon as MplPoly
+    ax.clear(); ax.set_facecolor("black")
+    d, u, v = _screen_basis()
+    es, et, ef = np.asarray(mesh["E_srce"]), np.asarray(mesh["E_trgt"]), np.asarray(mesh["E_face"])
+    proj = pos @ d                                                # signed distance of each vertex to the screen mid-plane
+    aps, bas, cols = [], [], []
+    for e in range(len(es)):
+        s, t = int(es[e]), int(et[e]); fa, fb = proj[s], proj[t]
+        if fa * fb < 0:                                          # edge crosses the plane
+            fr = -fa / (fb - fa); X = pos[s] + fr * (pos[t] - pos[s])
+            aps.append([X @ u, X @ v]); bas.append([(X * inner) @ u, (X * inner) @ v])
+            cols.append(plt.cm.Reds(float(np.clip(act[int(ef[e])], 0, 1))))
+    if aps:
+        aps = np.array(aps); bas = np.array(bas); c = aps.mean(0)
+        order = np.argsort(np.arctan2(aps[:, 1] - c[1], aps[:, 0] - c[0]))
+        aps, bas = aps[order], bas[order]; cols = [cols[i] for i in order]
+        for i in range(len(aps)):
+            j = (i + 1) % len(aps)
+            ax.add_patch(MplPoly(np.array([bas[i], aps[i], aps[j], bas[j]]), closed=True,
+                                 facecolor=cols[i], edgecolor="black", lw=0.4, zorder=1))
+    L = Lbox if Lbox is not None else 11.0
+    ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_aspect("equal"); ax.axis("off")
+
+
 def do(preset):
     p = PRESETS[preset]; OUT = os.path.join(HERE, "archive", preset); os.makedirs(OUT, exist_ok=True)
     sim, cfg = make(p); write_spec(cfg, os.path.join(OUT, "spec.yaml"))
@@ -416,14 +469,16 @@ def do(preset):
         fig = plt.figure(figsize=(35.2, 9.0)); fig.patch.set_facecolor("black")   # 8 timepoints, 2 rows x 8 cols (3D / cross)
         for i, t in enumerate([int(round(fr * (T - 1))) for fr in np.linspace(0.0, 1.0, 8)]):
             mt, pt, a = frame(t); l3, l2 = lbox(pt)
-            ax3 = fig.add_subplot(2, 8, i + 1, projection="3d"); _draw(ax3, pt, mt, 3.90, azim=30, act=col(a), Lbox=l3)
-            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _draw_cross(ax2, pt, mt, 3.90, act=col(a), Lbox=l2, axis=1)
+            ax3 = fig.add_subplot(2, 8, i + 1, projection="3d"); _draw(ax3, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3)
+            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _cross_screen(ax2, pt, mt, col(a), Lbox=l2)
         fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02); fig.savefig(os.path.join(OUT, "strip.png"), dpi=110, facecolor="black"); plt.close(fig)
         figm = plt.figure(figsize=(5.0, 5.2)); figm.patch.set_facecolor("black"); axm, axin = make_movie_axes(figm)
         keep = np.arange(0, T, max(1, T // 110)); wri = FFMpegWriter(fps=11, metadata={"title": preset})
         with wri.saving(figm, os.path.join(OUT, "movie.mp4"), dpi=95):
             for j, t in enumerate(keep):
-                mt, pt, a = frame(int(t)); l3, l2 = lbox(pt); draw_movie_frame(axm, axin, pt, mt, 3.90, (2 * j) % 360, col(a), l3, l2); wri.grab_frame()
+                mt, pt, a = frame(int(t)); l3, l2 = lbox(pt)     # FIXED camera (no spin) -> tube stays in profile
+                _draw(axm, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3); _cross_screen(axin, pt, mt, col(a), Lbox=l2)
+                wri.grab_frame()
         plt.close(figm)
         mf = []
         for t in np.unique(np.linspace(0, T - 1, 40).astype(int)):
