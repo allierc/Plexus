@@ -424,13 +424,22 @@ def _screen_basis(elev=_ELEV, azim=_AZIM):
     return d, u, v
 
 
-def _cross_screen(ax, pos, mesh, act, inner=0.82, Lbox=None):
-    """Cross-section in the SCREEN plane (normal = camera depth) so it matches the 3D view: the tube
-    protuberance shows in profile, coloured by activation (white->red). Edges crossing the mid-plane give
-    the lumen ring; each segment is coloured by its cell's activator."""
+def _cross_screen(ax, pos, mesh, act, seed_dir=None, inner=0.82, Lbox=None):
+    """Cross-section in the PLANE OF THE TUBING: the slice plane always CONTAINS the tube axis (seed_dir),
+    oriented face-on to the camera, so the tube's full length shows in profile along the horizontal,
+    coloured by activation (white->red). Falls back to the screen plane if no tube axis. Edges crossing the
+    mid-plane give the lumen ring; each segment is coloured by its cell's activator."""
     from matplotlib.patches import Polygon as MplPoly
     ax.clear(); ax.set_facecolor("black")
-    d, u, v = _screen_basis()
+    dcam, su, sv = _screen_basis()
+    if seed_dir is not None:                                     # plane contains the tube axis, ~face-on to camera
+        t = np.asarray(seed_dir, float); t = t / (np.linalg.norm(t) + 1e-12)   # tube axis -> plot HORIZONTAL
+        n = dcam - (dcam @ t) * t; nn = np.linalg.norm(n)        # slice normal: camera depth projected off the axis
+        d = n / nn if nn > 1e-6 else sv
+        v = np.cross(d, t); v = v / (np.linalg.norm(v) + 1e-12)  # in-plane VERTICAL
+        u = t                                                    # in-plane HORIZONTAL = the tube axis
+    else:
+        d, u, v = dcam, su, sv
     es, et, ef = np.asarray(mesh["E_srce"]), np.asarray(mesh["E_trgt"]), np.asarray(mesh["E_face"])
     proj = pos @ d                                                # signed distance of each vertex to the screen mid-plane
     aps, bas, cols = [], [], []
@@ -470,14 +479,14 @@ def do(preset):
         for i, t in enumerate([int(round(fr * (T - 1))) for fr in np.linspace(0.0, 1.0, 8)]):
             mt, pt, a = frame(t); l3, l2 = lbox(pt)
             ax3 = fig.add_subplot(2, 8, i + 1, projection="3d"); _draw(ax3, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3)
-            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _cross_screen(ax2, pt, mt, col(a), Lbox=l2)
+            ax2 = fig.add_subplot(2, 8, 8 + i + 1); _cross_screen(ax2, pt, mt, col(a), seed_dir=p.get("seed_dir"), Lbox=l2)
         fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02); fig.savefig(os.path.join(OUT, "strip.png"), dpi=110, facecolor="black"); plt.close(fig)
         figm = plt.figure(figsize=(5.0, 5.2)); figm.patch.set_facecolor("black"); axm, axin = make_movie_axes(figm)
         keep = np.arange(0, T, max(1, T // 110)); wri = FFMpegWriter(fps=11, metadata={"title": preset})
         with wri.saving(figm, os.path.join(OUT, "movie.mp4"), dpi=95):
             for j, t in enumerate(keep):
                 mt, pt, a = frame(int(t)); l3, l2 = lbox(pt)     # FIXED camera (no spin) -> tube stays in profile
-                _draw(axm, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3); _cross_screen(axin, pt, mt, col(a), Lbox=l2)
+                _draw(axm, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3); _cross_screen(axin, pt, mt, col(a), seed_dir=p.get("seed_dir"), Lbox=l2)
                 wri.grab_frame()
         plt.close(figm)
         mf = []
