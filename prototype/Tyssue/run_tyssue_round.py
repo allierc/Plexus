@@ -537,7 +537,9 @@ def do(preset):
             mt = hist[min(t, len(hist) - 1)]
             return mt, posf[t][:mt["Nv"]].astype(np.float64), chemf[t][:mt["nF"], 0]
         mtT, pT, aT = frame(T - 1)
-        lo, hi = float(np.percentile(aT, 5)), float(np.percentile(aT, 99) + 1e-6)
+        asamp = np.concatenate([frame(int(t))[2] for t in np.unique(np.linspace(0, T - 1, 12).astype(int))])
+        lo, hi = float(np.percentile(asamp, 5)), float(np.percentile(asamp, 99) + 1e-6)   # GLOBAL scale over
+        #   sampled frames -> a degenerate final frame no longer washes the whole strip red
         col = lambda a: np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)
         lbox = lambda pt: (float(np.abs(pt).max()) * 1.12, float(np.abs(pt).max()) * 2.3)   # PER-FRAME autoscale so the init (and every stage) is always visible, not a dot next to a balloon
         fig = plt.figure(figsize=(35.2, 9.0)); fig.patch.set_facecolor("black")   # 8 timepoints, 2 rows x 8 cols (3D / cross)
