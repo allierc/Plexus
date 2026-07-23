@@ -144,18 +144,22 @@ def _face_ok_3d(ring, getp):
 # --------------------------------------------------------------------------------------------------
 #  the T1 flip
 # --------------------------------------------------------------------------------------------------
-def t1_flip_3d(rings, pos, e_uv, new_len=None):
+def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None):
     """One surface T1 on interior edge e_uv=(u,v): rewire the four rings A,B,C,D and move u,v apart
     along the tangent-plane perpendicular (projected onto the shell). Mutates `rings` and pos[u],pos[v]
     in place and returns (u,v) on success; returns None (no-op) if the flip is impossible or would break
     an invariant: boundary edge, non-trivalent u/v, C==D, a face < 3 verts, a duplicated vertex in a
-    ring, a broken closed-surface, or a non-simple/inward face for BOTH chiralities x BOTH signs."""
+    ring, a broken closed-surface, or a non-simple/inward face for BOTH chiralities x BOTH signs.
+    OPTIMISATION: pass `emap` (edge->face) and `vf` (vertex->faces) built ONCE by the caller; a successful
+    flip updates them in place (only the 4 faces A,B,C,D change), avoiding an O(F) rebuild per candidate."""
     u, v = int(e_uv[0]), int(e_uv[1])
-    emap = _edge_face_map(rings)
+    if emap is None:
+        emap = _edge_face_map(rings)
     A = emap.get((u, v)); B = emap.get((v, u))
     if A is None or B is None or A == B:
         return None                                          # boundary / degenerate interior edge
-    vf = _vertex_faces(rings)
+    if vf is None:
+        vf = _vertex_faces(rings)
     Cs = vf.get(u, set()) - {A, B}; Ds = vf.get(v, set()) - {A, B}
     if len(Cs) != 1 or len(Ds) != 1:
         return None                                          # u or v not trivalent -> no clean T1
@@ -200,6 +204,17 @@ def t1_flip_3d(rings, pos, e_uv, new_len=None):
             nv = nv * (rm / (np.linalg.norm(nv) + 1e-12))
             getp = lambda i: (nu if i == u else nv if i == v else pos[i])
             if all(_face_ok_3d(r, getp) for r in (nA, nB, nC, nD)):
+                for fid, ro, rn in ((A, rA, nA), (B, rB, nB), (C, rC, nC), (D, rD, nD)):
+                    for i in range(len(ro)):                # keep the passed maps in sync: only A,B,C,D changed
+                        emap.pop((ro[i], ro[(i + 1) % len(ro)]), None)
+                    for i in range(len(rn)):
+                        emap[(rn[i], rn[(i + 1) % len(rn)])] = fid
+                    for w in ro:
+                        s = vf.get(w)
+                        if s is not None:
+                            s.discard(fid)
+                    for w in rn:
+                        vf.setdefault(w, set()).add(fid)
                 rings[A] = nA; rings[B] = nB; rings[C] = nC; rings[D] = nD
                 pos[u] = nu; pos[v] = nv
                 return (u, v)
@@ -243,6 +258,8 @@ class ReconnectT1_3D(Rewire):
         es = m["E_srce"].detach().cpu().numpy(); et = m["E_trgt"].detach().cpu().numpy()
         ef = m["E_face"].detach().cpu().numpy(); nF = int(m["nF"])
         rings = rings_from_flat_3d(es, et, ef, nF)
+        emap = _edge_face_map(rings); vf = _vertex_faces(rings)   # build the adjacency maps ONCE; t1_flip_3d
+        #   updates them incrementally on each successful flip (was rebuilt O(F) per candidate = the hot spot)
         pos = [p.copy() for p in pos_np]
         length = np.linalg.norm(pos_np[et] - pos_np[es], axis=1)
         thr = self.l_th if self.l_th > 0 else self.l_th_frac * float(length.mean())
@@ -255,7 +272,7 @@ class ReconnectT1_3D(Rewire):
             if key in seen or a in used or b in used:
                 continue
             seen.add(key)
-            if t1_flip_3d(rings, pos, (a, b), new_len=thr) is not None:
+            if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf) is not None:
                 used.add(a); used.add(b); ndone += 1
         if ndone == 0:
             return {}
