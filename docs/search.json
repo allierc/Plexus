@@ -3535,6 +3535,13 @@
     "text": "A gallery of failures\nFour moments from the search for the tube — each a failure, each with the lesson it left, from the reaction–diffusion choice to the shape of the tube itself. (It works now — the breakthrough is below.)\n\n\n\n\n\n\nProtrusion-by-inflation = hollowingWith a volume-locked body, an activated cap inflates faster than it can divide and balloons — and a ballooned cap is exactly what the hollow metric flags. There is no clean-protrusion window.\n\n\n\n\n\n\nThe RD choice is decisiveThe Brusselator decays or reorganizes the seed (here it fades to a weak spot); only Gray–Scott in the spot regime and Gierer–Meinhardt hold a stable, localized peak — the ingredient a tube needs.\n\n\n\n\n\n\nCones make tubes — but by a crutchRe-seeding the activator at a fixed radial tip keeps the growing apex inside a cone, so it tubes. That tip-riding is geometric, not emergent; a real tube needs a self-maintaining apex.\n\n\n\n\n\n\nCauliflower, not a tubeA Gierer–Meinhardt activator holds a stable peak and buds the shell — but a wide activation grows the whole patch into a lobed cauliflower. The tube needs narrow, tip-riding GM growth."
   },
   {
+    "objectID": "okuda.html#a-first-tube-driven-and-far-from-clean",
+    "href": "okuda.html#a-first-tube-driven-and-far-from-clean",
+    "title": "Morphogenesis — a case study",
+    "section": "A first tube — driven, and far from clean",
+    "text": "A first tube — driven, and far from clean\nThe front has moved past the cauliflower: the budding lobe can now be pushed into a genuine tube — long, thin, roughly constant-diameter. But it is not emergent as a whole. The sustained apical signal is driven: a fixed-size activator cap, re-seeded each frame at the tissue’s outermost cell, rides the advancing tip — a hand-placed stand-in for “the activator peak stays at the apex,” not something the reaction–diffusion maintains on its own. What is emergent is only the mechanics around it (confinement from growth-dilution, wall-building oriented division, extrusion that pushes the tip out); the diameter follows the cap radius (Okuda’s χ role) and the length the run time. And the result is rough: many hollow cells, a cell-size CV still too large, a flat rather than rounded tip. It is a first working tube with a lot of work remaining — the point is only that the question has shifted from whether a tube forms to how well it can be made.\n\n\n\n\n\nA driven, imperfect tubeA tip-tracking cap — driven, not emergent — rides the outermost cell, so the tube extends at roughly constant diameter instead of widening into a lobe. The mechanics around it are emergent, but the mesh stays rough (hollow cells, uneven cell sizes): far from a clean cylinder, and much is left to do."
+  },
+  {
     "objectID": "okuda.html#what-the-failures-demand-of-the-agent-next",
     "href": "okuda.html#what-the-failures-demand-of-the-agent-next",
     "title": "Morphogenesis — a case study",
@@ -3547,19 +3554,5 @@
     "title": "Morphogenesis — a case study",
     "section": "Footnotes",
     "text": "Footnotes\n\n\nOkuda, S., Miura, T., Inoue, Y., Adachi, T. & Eiraku, M. Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with undulation, tubulation, and branching. Scientific Reports 8, 2386 (2018). doi:10.1038/s41598-018-20678-6.↩︎"
-  },
-  {
-    "objectID": "okuda.html#the-breakthrough-a-working-tube",
-    "href": "okuda.html#the-breakthrough-a-working-tube",
-    "title": "Morphogenesis — a case study",
-    "section": "The breakthrough — a working tube",
-    "text": "The breakthrough — a working tube\nThe front has moved past the cauliflower. The missing dial was tip-tracking: a fixed-size activator cap, re-seeded each frame at the tissue’s outermost cell, that rides the advancing tip — the minimal honest stand-in for “the activator peak stays at the apex.” With it, the budding lobe becomes a genuine tube: long, thin, constant-diameter. Every mechanical ingredient is emergent — confinement from growth-dilution, wall-building oriented division, extrusion that rounds and pushes the tip outward; only the tip signal is driven. Diameter is set by the cap radius (Okuda’s χ role), length by how long it runs.\n\n\n\n\n\nA long, constant-diameter tubeThe tip-tracking cap follows the outermost cell, so the tube extends at fixed diameter instead of widening into a lobe — a genuine thin cylinder, not a bud.\n\n\n\n\n\n\nDiameter set by the capA larger activated cap gives a shorter, thicker finger — the tube’s diameter tracks the cap radius, reproducing Okuda’s qualitative χ→diameter law.\n\n\n\n\n\n\nPushed far outStrong extrusion rounds the flat tip and drives it outward; the cap is seeded to the side so the tube grows in profile against the body."
-  },
-  {
-    "objectID": "okuda.html#a-first-tube-driven-and-far-from-clean",
-    "href": "okuda.html#a-first-tube-driven-and-far-from-clean",
-    "title": "Morphogenesis — a case study",
-    "section": "A first tube — driven, and far from clean",
-    "text": "A first tube — driven, and far from clean\nThe front has moved past the cauliflower: the budding lobe can now be pushed into a genuine tube — long, thin, roughly constant-diameter. But it is not emergent as a whole. The sustained apical signal is driven: a fixed-size activator cap, re-seeded each frame at the tissue’s outermost cell, rides the advancing tip — a hand-placed stand-in for “the activator peak stays at the apex,” not something the reaction–diffusion maintains on its own. What is emergent is only the mechanics around it (confinement from growth-dilution, wall-building oriented division, extrusion that pushes the tip out); the diameter follows the cap radius (Okuda’s χ role) and the length the run time. And the result is rough: many hollow cells, a cell-size CV still too large, a flat rather than rounded tip. It is a first working tube with a lot of work remaining — the point is only that the question has shifted from whether a tube forms to how well it can be made.\n\n\n\n\n\nA driven, imperfect tubeA tip-tracking cap — driven, not emergent — rides the outermost cell, so the tube extends at roughly constant diameter instead of widening into a lobe. The mechanics around it are emergent, but the mesh stays rough (hollow cells, uneven cell sizes): far from a clean cylinder, and much is left to do."
   }
 ]
