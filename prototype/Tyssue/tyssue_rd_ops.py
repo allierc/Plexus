@@ -112,9 +112,14 @@ class CellRDSeed(Structural):
         self.patch_z = float(params.get("patch_z", 0.6))        # (patch) activate cells with cen_z > patch_z x z_max
         self.n_spots = int(params.get("n_spots", 5))            # (cones) number of fixed radial activation foci
         self.cone_deg = float(params.get("cone_deg", 18.0))     # (cones) half-angle of each activation cone
+        self.seed_dir = params.get("seed_dir", None)            # (cones, n_spots=1) override the cone axis to a fixed
+        #   direction -> aim the tube where we want it (e.g. FRONT of the render camera at elev18/azim30 ~ (.82,.48,.31))
 
     def _cone_dirs(self):
-        """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5)."""
+        """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5). A given
+        `seed_dir` overrides the axis (used for n_spots=1 to point the single tube at the camera)."""
+        if self.seed_dir is not None and self.n_spots == 1:
+            v = np.asarray(self.seed_dir, float); return (v / (np.linalg.norm(v) + 1e-12))[None, :]
         i = np.arange(self.n_spots) + 0.5
         phi = np.arccos(1 - 2 * i / self.n_spots); theta = np.pi * (1 + 5 ** 0.5) * i
         return np.stack([np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)], 1)
