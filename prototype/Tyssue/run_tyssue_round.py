@@ -482,8 +482,8 @@ def do(preset):
             ax2 = fig.add_subplot(2, 8, 8 + i + 1); _cross_screen(ax2, pt, mt, col(a), seed_dir=p.get("seed_dir"), Lbox=l2)
         fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02); fig.savefig(os.path.join(OUT, "strip.png"), dpi=110, facecolor="black"); plt.close(fig)
         figm = plt.figure(figsize=(5.0, 5.2)); figm.patch.set_facecolor("black"); axm, axin = make_movie_axes(figm)
-        keep = np.arange(0, T, max(1, T // 110)); wri = FFMpegWriter(fps=11, metadata={"title": preset})
-        with wri.saving(figm, os.path.join(OUT, "movie.mp4"), dpi=95):
+        keep = np.arange(0, T, max(1, T // 72)); wri = FFMpegWriter(fps=10, metadata={"title": preset})   # fewer frames -> faster render (matplotlib 3D is slow); not the critical path
+        with wri.saving(figm, os.path.join(OUT, "movie.mp4"), dpi=85):
             for j, t in enumerate(keep):
                 mt, pt, a = frame(int(t)); l3, l2 = lbox(pt)     # FIXED camera (no spin) -> tube stays in profile
                 _draw(axm, pt, mt, 3.90, azim=_AZIM, act=col(a), Lbox=l3); _cross_screen(axin, pt, mt, col(a), seed_dir=p.get("seed_dir"), Lbox=l2)
