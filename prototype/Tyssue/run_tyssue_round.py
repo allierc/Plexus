@@ -327,6 +327,22 @@ PRESETS["round_32_c8_700_ex12"] = dict(_H32, frames=700, K_extrude=12.0)        
 PRESETS["round_32_c8_700_r012"] = dict(_H32, frames=700, rate=0.012)                   # a bit more growth
 PRESETS["round_32_c8_700_ga150"]= dict(_H32, frames=700, grow_after=150)               # settle longer first
 PRESETS["round_32_c8_900_p3"]   = dict(_H32, frames=900, K_purse=3.0)
+# ===== round_33: TIP-TRACKING seed (sustained elongation). round_32 showed the tube CAPS (~protr 1.4) because
+# the activation is a widening PATCH, not a moving tip cap. New seed_mode="tip": re-activate a fixed-SIZE cap
+# (tip_radius) at the current OUTERMOST cell each frame -> the cap RIDES the advancing tip -> constant-diameter
+# EXTENSION. No RD (the tip cap IS the driver; issues 1-2 don't apply). Hypothesis: tube_len grows with frames,
+# diam ~ tip_radius, len/diam >> 1 (a real long tube, not a lobe). Sweep tip_radius (= tube diameter).
+_H33 = dict(spots=1, cone_deg=8.0, seed_mode="tip", seed_dir=_FRONT, frames=500, grow_after=20,
+            rate=0.010, a_sw=0.5, hill=4.0, rho=0.0, vth=1.5, K_V=4.0, mdf=0.03, relax=30, vcap=1.5,
+            orient_iface=True, orient_asw=0.5, iface_asw=0.5, K_extrude=8.0)
+PRESETS["round_33_tr10"]      = dict(_H33, tip_radius=1.0)
+PRESETS["round_33_tr15"]      = dict(_H33, tip_radius=1.5)
+PRESETS["round_33_tr20"]      = dict(_H33, tip_radius=2.0)
+PRESETS["round_33_tr25"]      = dict(_H33, tip_radius=2.5)
+PRESETS["round_33_tr15_ex12"] = dict(_H33, tip_radius=1.5, K_extrude=12.0)
+PRESETS["round_33_tr15_r015"] = dict(_H33, tip_radius=1.5, rate=0.015)
+PRESETS["round_33_tr15_long"] = dict(_H33, tip_radius=1.5, frames=700)
+PRESETS["round_33_tr10_ex12"] = dict(_H33, tip_radius=1.0, K_extrude=12.0)   # thinnest + strong push
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -341,8 +357,9 @@ def make(p):
         # partition) -- big-spot init AND real RD. rd=False: cones re-seed every frame (pure tip-tracking).
         # seed once (before_frame) when rd evolves it OR seed_once=True (a FLAT spot frozen on the cells: no
         # tip-tracking -> the control that should DOME). Else re-seed every frame = tip-riding cones -> tube.
-        seed = {"before_frame": 3} if (rd or p.get("seed_once")) else {}
-        ops += [{"op": "cell_rd_seed", "at": "cell", "mode": "cones", "n_spots": p["spots"], "cone_deg": p["cone_deg"], "seed_dir": p.get("seed_dir", None), **seed}]
+        smode = p.get("seed_mode", "cones")                     # "cones" (fixed-angle) | "tip" (fixed-size, tip-tracking)
+        seed = {} if smode == "tip" else ({"before_frame": 3} if (rd or p.get("seed_once")) else {})   # tip re-seeds EVERY frame
+        ops += [{"op": "cell_rd_seed", "at": "cell", "mode": smode, "n_spots": p["spots"], "cone_deg": p["cone_deg"], "seed_dir": p.get("seed_dir", None), "tip_radius": p.get("tip_radius", 2.0), **seed}]
         sched += ["cell_rd_seed"]
         if rd:
             impl = p.get("rd_impl", "brusselator")
