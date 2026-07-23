@@ -356,6 +356,22 @@ PRESETS["round_34_tr15_900"]   = dict(_H34, frames=900, tip_radius=1.5)
 PRESETS["round_34_tr10_ex16"]  = dict(_H34, frames=700, tip_radius=1.0, K_extrude=16.0)  # thinnest + strongest push
 PRESETS["round_34_r015_900"]   = dict(_H34, frames=900, rate=0.015)
 PRESETS["round_34_ex16_r015"]  = dict(_H34, frames=900, K_extrude=16.0, rate=0.015)    # long + push + growth
+# ===== round_35: UNIFORM CELLS -> no hollow (user's Fig-5 clue). Diagnosis of round_34: rho=0 uses the legacy
+# INFLATION path (tip cells balloon to 2.5x v_ref -> non-uniform, CV 0.5, hollow 69, a BULGE not a tube wall).
+# Okuda Fig 5 has LOW CV: activator sets growth RATE (not size), cells cap at vth*v_ref and DIVIDE -> uniform.
+# Hypothesis: rho>0 (uniform mode) + tight cycle_cv + bounded max_cycle + stiff K_V drop CV & hollow while the
+# tip PROLIFERATES into the tube. Control rho=0 (old inflation) for the A/B. Metric: area_cv, hollow_n_peak.
+_H35 = dict(spots=1, cone_deg=8.0, seed_mode="tip", seed_dir=_LEFT, tip_radius=1.5, frames=500, grow_after=20,
+            rate=0.02, a_sw=0.5, hill=4.0, rho=0.1, vth=1.35, K_V=4.0, mdf=0.03, relax=30, vcap=1.5,
+            cycle_cv=0.15, min_cycle=4, max_cycle=12, orient_iface=True, orient_asw=0.5, iface_asw=0.5, K_extrude=8.0)
+PRESETS["round_35_rho0"]    = dict(_H35, rho=0.0, vth=2.5)                    # CONTROL: old inflation mode
+PRESETS["round_35_rho01"]   = dict(_H35, rho=0.1)                            # uniform mode
+PRESETS["round_35_rho005"]  = dict(_H35, rho=0.05)                          # tip more dominant vs body
+PRESETS["round_35_rho02"]   = dict(_H35, rho=0.2)
+PRESETS["round_35_cv10"]    = dict(_H35, rho=0.1, cycle_cv=0.10)            # tighter cell-cycle timing
+PRESETS["round_35_kv6"]     = dict(_H35, rho=0.1, K_V=6.0)                  # stiffer volume -> less buckle
+PRESETS["round_35_vth125"]  = dict(_H35, rho=0.1, vth=1.25)                 # tighter size cap
+PRESETS["round_35_relax45"] = dict(_H35, rho=0.1, relax=45)                 # more force-balance relaxation
 PRESETS["round_21_gs"]      = dict(_GMC, rd_impl="gray_scott", F=0.045, kk=0.062, chi=1.3, d_a=0.08, d_h=0.16, a_sw=0.4)  # Gray-Scott stable-spot under growth
 
 
@@ -401,7 +417,7 @@ def make(p):
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
         sched += ["rd_interface_tension"]
     ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
-            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.4, "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": 4, "max_cycle": 1000000000, "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0))},
+            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cycle_cv", 0.4), "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": p.get("min_cycle", 4), "max_cycle": p.get("max_cycle", 1000000000), "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0))},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched += ["reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_round", "seed": 0, "n_frames": p["frames"], "dt": dt, "record_cap": p["frames"] + 2, "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},
