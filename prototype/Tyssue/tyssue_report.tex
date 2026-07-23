@@ -1342,9 +1342,16 @@ into the tube pipeline. Growth-driven, it \emph{inflates} a few cells into very 
 rather than proliferating a wall --- hollow $600\!-\!1075$, CV $5\!-\!9$, \emph{worse} than mid-surface mc8.
 So the monolayer is not a drop-in fix; a clean tube needs the proliferation-built wall (which the mid-surface
 oriented division does better). mc8 remains the cleanest tube.
-\item \textbf{R43 (next) --- THICKER tube.} Since the residual hollow/CV are largely thin-tube artifacts
-(small, high-curvature wall cells), and Okuda's Fig-5 tubes are moderately thick, make the tube thicker
-(bigger tip cap $\Rightarrow$ larger, more uniform wall cells) to lower CV and the false-positive hollow.
+\item \textbf{R43 --- ``thicker'' falsified.} A bigger tip cap activates more cells $\Rightarrow$
+over-proliferation ($2700\!\to\!8400$ cells) $\Rightarrow$ hollow \emph{up} ($176\!\to\!1111$). mc8
+(\texttt{tip\_radius}$=1.5$) stays the best tube.
 \end{itemize}
+\textbf{Where the tube stands.} The best tube is \texttt{round\_40\_mc8}: mid-surface, tip-tracking $+$
+oriented division $+$ extrusion, $K_V\!=\!6$, staggered cycle --- aspect $\sim$7.5, hollow $176$ (tube-aware),
+CV $0.63$, $\sim$2700 cells. The main mid-surface levers are explored; this is the quality floor for the
+extrusion-driven mechanism. Two open goals remain: \emph{RD role} (R44: bring the emergent Gierer--Meinhardt
+partition back, coupled to the wall machinery) and \emph{wall-not-bulge}; and, more fundamentally, the
+extrusion-driven $\to$ growth-driven transition a successful monolayer (not the spiky first attempt) would
+need for a genuinely low-stress tube.
 
 \end{document}
