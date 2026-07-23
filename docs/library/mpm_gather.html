@@ -138,10 +138,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -162,6 +158,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -338,68 +338,112 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"grid_to_particle"</span>, <span class="st">"advection"</span>]</span>
 <span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"dt_sub"</span>: <span class="st">"substep_timestep"</span>, <span class="st">"wall_damp"</span>: <span class="st">"wall_restitution"</span>,</span>
 <span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"wall_contact"</span>: <span class="st">"contact_layer_thickness"</span>, <span class="st">"vmax"</span>: <span class="st">"speed_cap"</span>}</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.frm <span class="op">=</span> params.get(<span class="st">"from"</span>, <span class="st">"mpm_grid"</span>)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dt_sub <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dt_sub"</span>, <span class="fl">2e-4</span>))</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.wall_damp <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"wall_damp"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.wall_contact <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"wall_contact"</span>, <span class="fl">0.04</span>))</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.vmax <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"vmax"</span>, <span class="fl">1e9</span>))</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.frm)<span class="op">;</span> dev <span class="op">=</span> p.state.device</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> sub_dt(H, <span class="va">self</span>.dt_sub)</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        inv_dx, dx <span class="op">=</span> g.inv_dx, g.dx</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> p.F.shape[<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        box <span class="op">=</span> [<span class="bu">float</span>(b) <span class="cf">for</span> b <span class="kw">in</span> <span class="bu">getattr</span>(H, <span class="st">"world_size"</span>, torch.tensor([g.width, <span class="fl">1.0</span>]))][:D]</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        offsets <span class="op">=</span> stencil_offsets(D, dev)<span class="op">;</span> S <span class="op">=</span> offsets.shape[<span class="dv">0</span>]</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        X, V <span class="op">=</span> p.get(<span class="st">"pos"</span>), p.get(<span class="st">"vel"</span>)</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        fx, weight, flat <span class="op">=</span> bspline(X, inv_dx, offsets, g.shape, periodic)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        gvn <span class="op">=</span> g.v[flat].view(p.n, S, D)</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        new_V <span class="op">=</span> (weight[..., <span class="va">None</span>] <span class="op">*</span> gvn).<span class="bu">sum</span>(<span class="dv">1</span>)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        dpos_grid <span class="op">=</span> offsets[<span class="va">None</span>] <span class="op">-</span> fx[:, <span class="va">None</span>, :]</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        new_C <span class="op">=</span> <span class="dv">4</span> <span class="op">*</span> inv_dx <span class="op">*</span> (weight[..., <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> (gvn[..., :, <span class="va">None</span>] <span class="op">@</span> dpos_grid[..., <span class="va">None</span>, :])).<span class="bu">sum</span>(<span class="dv">1</span>)</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        new_V <span class="op">=</span> torch.nan_to_num(new_V)</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.wall_damp <span class="op">!=</span> <span class="fl">1.0</span> <span class="kw">and</span> <span class="kw">not</span> periodic:                 <span class="co"># inelastic wall contact (solids)</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>            cb <span class="op">=</span> <span class="va">self</span>.wall_contact</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>            near <span class="op">=</span> torch.zeros(p.n, dtype<span class="op">=</span>torch.<span class="bu">bool</span>, device<span class="op">=</span>dev)</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D):</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>                near <span class="op">=</span> near <span class="op">|</span> (X[:, k] <span class="op">&lt;</span> cb) <span class="op">|</span> (X[:, k] <span class="op">&gt;</span> box[k] <span class="op">-</span> cb)</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>            liquid <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>                near <span class="op">=</span> near <span class="op">&amp;</span> <span class="op">~</span>liquid</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>            new_V <span class="op">=</span> torch.where(near[:, <span class="va">None</span>], new_V <span class="op">*</span> <span class="va">self</span>.wall_damp, new_V)</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        sp <span class="op">=</span> new_V.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        vmax <span class="op">=</span> <span class="bu">min</span>(<span class="va">self</span>.vmax, <span class="fl">0.4</span> <span class="op">*</span> dx <span class="op">/</span> dt)                       <span class="co"># CFL velocity cap</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        new_V <span class="op">=</span> new_V <span class="op">*</span> (sp.clamp(<span class="bu">max</span><span class="op">=</span>vmax) <span class="op">/</span> sp)</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        new_C <span class="op">=</span> torch.nan_to_num(new_C)</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        Xn <span class="op">=</span> torch.nan_to_num(X <span class="op">+</span> dt <span class="op">*</span> new_V, nan<span class="op">=</span><span class="fl">0.5</span>)</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> periodic:</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>            Xn <span class="op">=</span> torch.stack([torch.remainder(Xn[:, k], box[k]) <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D)], dim<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>            Xn <span class="op">=</span> torch.stack([Xn[:, k].clamp(<span class="dv">2</span> <span class="op">*</span> dx, box[k] <span class="op">-</span> <span class="dv">2</span> <span class="op">*</span> dx) <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D)], dim<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="co"># DORMANT particles (occ==0, a cell_grow reserve) are FROZEN -- not advected -- so they sit as a</span></span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="co"># compact reservoir until cell_grow activates + repositions them. Byte-identical when all are live.</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        occ <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"occ"</span>, <span class="va">None</span>)</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> occ <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>            live <span class="op">=</span> occ <span class="op">&gt;</span> <span class="dv">0</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>            Xn <span class="op">=</span> torch.where(live[:, <span class="va">None</span>], Xn, X)</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>            new_V <span class="op">=</span> torch.where(live[:, <span class="va">None</span>], new_V, V)</span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>            new_C <span class="op">=</span> torch.where(live[:, <span class="va">None</span>, <span class="va">None</span>], new_C, p.C)</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>        new <span class="op">=</span> p.state.clone()</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        pa, pb <span class="op">=</span> p.state_schema[<span class="st">"pos"</span>]<span class="op">;</span> va, vb <span class="op">=</span> p.state_schema[<span class="st">"vel"</span>]</span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        new[:, pa:pb] <span class="op">=</span> Xn<span class="op">;</span> new[:, va:vb] <span class="op">=</span> new_V</span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        p.state <span class="op">=</span> new</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        p.C <span class="op">=</span> new_C</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM G2P); Sulsky, D. et al. (1994)."</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.frm <span class="op">=</span> params.get(<span class="st">"from"</span>, <span class="st">"mpm_grid"</span>)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dt_sub <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dt_sub"</span>, <span class="fl">2e-4</span>))</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.wall_damp <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"wall_damp"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.wall_contact <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"wall_contact"</span>, <span class="fl">0.04</span>))</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.vmax <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"vmax"</span>, <span class="fl">1e9</span>))</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.frm)<span class="op">;</span> dev <span class="op">=</span> p.state.device</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> sub_dt(H, <span class="va">self</span>.dt_sub)</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        inv_dx, dx <span class="op">=</span> g.inv_dx, g.dx</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> p.F.shape[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        box <span class="op">=</span> [<span class="bu">float</span>(b) <span class="cf">for</span> b <span class="kw">in</span> <span class="bu">getattr</span>(H, <span class="st">"world_size"</span>, torch.tensor([g.width, <span class="fl">1.0</span>]))][:D]</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        offsets <span class="op">=</span> stencil_offsets(D, dev)<span class="op">;</span> S <span class="op">=</span> offsets.shape[<span class="dv">0</span>]</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        X, V <span class="op">=</span> p.get(<span class="st">"pos"</span>), p.get(<span class="st">"vel"</span>)</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        fx, weight, flat <span class="op">=</span> bspline(X, inv_dx, offsets, g.shape, periodic)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        gvn <span class="op">=</span> g.v[flat].view(p.n, S, D)</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        new_V <span class="op">=</span> (weight[..., <span class="va">None</span>] <span class="op">*</span> gvn).<span class="bu">sum</span>(<span class="dv">1</span>)</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        dpos_grid <span class="op">=</span> offsets[<span class="va">None</span>] <span class="op">-</span> fx[:, <span class="va">None</span>, :]</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        new_C <span class="op">=</span> <span class="dv">4</span> <span class="op">*</span> inv_dx <span class="op">*</span> (weight[..., <span class="va">None</span>, <span class="va">None</span>] <span class="op">*</span> (gvn[..., :, <span class="va">None</span>] <span class="op">@</span> dpos_grid[..., <span class="va">None</span>, :])).<span class="bu">sum</span>(<span class="dv">1</span>)</span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        new_V <span class="op">=</span> torch.nan_to_num(new_V)</span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.wall_damp <span class="op">!=</span> <span class="fl">1.0</span> <span class="kw">and</span> <span class="kw">not</span> periodic:                 <span class="co"># inelastic wall contact (solids)</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>            cb <span class="op">=</span> <span class="va">self</span>.wall_contact</span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>            near <span class="op">=</span> torch.zeros(p.n, dtype<span class="op">=</span>torch.<span class="bu">bool</span>, device<span class="op">=</span>dev)</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D):</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>                near <span class="op">=</span> near <span class="op">|</span> (X[:, k] <span class="op">&lt;</span> cb) <span class="op">|</span> (X[:, k] <span class="op">&gt;</span> box[k] <span class="op">-</span> cb)</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>            liquid <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>                near <span class="op">=</span> near <span class="op">&amp;</span> <span class="op">~</span>liquid</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>            new_V <span class="op">=</span> torch.where(near[:, <span class="va">None</span>], new_V <span class="op">*</span> <span class="va">self</span>.wall_damp, new_V)</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        sp <span class="op">=</span> new_V.norm(dim<span class="op">=</span><span class="dv">1</span>, keepdim<span class="op">=</span><span class="va">True</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-9</span>)</span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        vmax <span class="op">=</span> <span class="bu">min</span>(<span class="va">self</span>.vmax, <span class="fl">0.4</span> <span class="op">*</span> dx <span class="op">/</span> dt)                       <span class="co"># CFL velocity cap</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        new_V <span class="op">=</span> new_V <span class="op">*</span> (sp.clamp(<span class="bu">max</span><span class="op">=</span>vmax) <span class="op">/</span> sp)</span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        new_C <span class="op">=</span> torch.nan_to_num(new_C)</span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        Xn <span class="op">=</span> torch.nan_to_num(X <span class="op">+</span> dt <span class="op">*</span> new_V, nan<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> periodic:</span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>            Xn <span class="op">=</span> torch.stack([torch.remainder(Xn[:, k], box[k]) <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D)], dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>            Xn <span class="op">=</span> torch.stack([Xn[:, k].clamp(<span class="dv">2</span> <span class="op">*</span> dx, box[k] <span class="op">-</span> <span class="dv">2</span> <span class="op">*</span> dx) <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(D)], dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="co"># DORMANT particles (occ==0, a cell_grow reserve) are FROZEN -- not advected -- so they sit as a</span></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="co"># compact reservoir until cell_grow activates + repositions them. Byte-identical when all are live.</span></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        occ <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"occ"</span>, <span class="va">None</span>)</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> occ <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>            live <span class="op">=</span> occ <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>            Xn <span class="op">=</span> torch.where(live[:, <span class="va">None</span>], Xn, X)</span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>            new_V <span class="op">=</span> torch.where(live[:, <span class="va">None</span>], new_V, V)</span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>            new_C <span class="op">=</span> torch.where(live[:, <span class="va">None</span>, <span class="va">None</span>], new_C, p.C)</span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>        new <span class="op">=</span> p.state.clone()</span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>        pa, pb <span class="op">=</span> p.state_schema[<span class="st">"pos"</span>]<span class="op">;</span> va, vb <span class="op">=</span> p.state_schema[<span class="st">"vel"</span>]</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        new[:, pa:pb] <span class="op">=</span> Xn<span class="op">;</span> new[:, va:vb] <span class="op">=</span> new_V</span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        p.state <span class="op">=</span> new</span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        p.C <span class="op">=</span> new_C</span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
 
 </main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) become click-to-enlarge */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; background: #000;
+  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function close() {
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc
+            || (v.querySelector('source') && v.querySelector('source').src)
+            || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.classList.contains('open')) close();
+  });
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

@@ -167,10 +167,6 @@ window.Quarto = {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library.html">
- <span class="dropdown-text">Overview</span></a>
-  </li>  
-        <li>
     <a class="dropdown-item" href="../library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
@@ -191,6 +187,10 @@ window.Quarto = {
   <li class="nav-item">
     <a class="nav-link" href="../inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../okuda.html"> 
+<span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -315,7 +315,7 @@ window.Quarto = {
 </section>
 <section id="related-operators" class="level2">
 <h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/attractor_flow.html"><code>attractor_flow</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>, <a href="../library/alignment.html"><code>alignment</code></a>.</p>
+<p>Other <strong>lateral</strong> operators: <a href="../library/attraction_repulsion.html"><code>attraction_repulsion</code></a>, <a href="../library/squared_law.html"><code>squared_law</code></a>, <a href="../library/stillinger_weber.html"><code>stillinger_weber</code></a>, <a href="../library/attractor_flow.html"><code>attractor_flow</code></a>, <a href="../library/cohesion.html"><code>cohesion</code></a>, <a href="../library/velocity_align.html"><code>velocity_align</code></a>.</p>
 </section>
 <section id="source" class="level2">
 <h2 class="anchored" data-anchor-id="source">Source</h2>
@@ -348,61 +348,105 @@ window.Quarto = {
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> []        <span class="co"># no required params — all knobs optional (defaults in __init__)</span></span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"elastic_strain"</span>, <span class="st">"plastic_flow"</span>, <span class="st">"incompressible_volume"</span>]</span>
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"dt_sub"</span>: <span class="st">"MLS-MPM substep dt"</span>}</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dt_sub <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dt_sub"</span>, <span class="fl">2e-4</span>))</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> dev <span class="op">=</span> p.state.device</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> sub_dt(H, <span class="va">self</span>.dt_sub)</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> p.F.shape[<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        eye <span class="op">=</span> torch.eye(D, device<span class="op">=</span>dev).expand(p.n, D, D)</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        F <span class="op">=</span> (eye <span class="op">+</span> dt <span class="op">*</span> p.C) <span class="op">@</span> p.F</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>            a, b, c, d <span class="op">=</span> F[:, <span class="dv">0</span>, <span class="dv">0</span>], F[:, <span class="dv">0</span>, <span class="dv">1</span>], F[:, <span class="dv">1</span>, <span class="dv">0</span>], F[:, <span class="dv">1</span>, <span class="dv">1</span>]</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> a <span class="op">*</span> d <span class="op">-</span> b <span class="op">*</span> c</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> torch.linalg.det(F)</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        liquid <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> liquid.<span class="bu">any</span>():                    <span class="co"># LIQUID: drop shape memory</span></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>            Jc <span class="op">=</span> J.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>            Jl <span class="op">=</span> torch.sqrt(Jc) <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span> <span class="cf">else</span> Jc.<span class="bu">pow</span>(<span class="fl">1.0</span> <span class="op">/</span> D)     <span class="co"># volume-preserving isotropic reset</span></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>            F <span class="op">=</span> torch.where(liquid[:, <span class="va">None</span>, <span class="va">None</span>], eye <span class="op">*</span> Jl[:, <span class="va">None</span>, <span class="va">None</span>], F)</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>        visco <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_visco"</span>, <span class="va">None</span>)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> visco <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> visco.<span class="bu">any</span>():                      <span class="co"># VISCOELASTIC (Maxwell): PARTIAL shape reset</span></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>            vm <span class="op">=</span> visco                                             <span class="co"># relax F toward isotropic with time-constant tau,</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>            Fv <span class="op">=</span> F[vm]                                             <span class="co"># keeping VOLUME (J) -&gt; stress builds then decays</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>            U, sig, Vh <span class="op">=</span> torch.linalg.svd(Fv)                      <span class="co"># SVD: sig = principal stretches</span></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>            Jl <span class="op">=</span> sig.prod(<span class="op">-</span><span class="dv">1</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>).<span class="bu">pow</span>(<span class="fl">1.0</span> <span class="op">/</span> D)         <span class="co"># isotropic (volume-preserving) target stretch</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> torch.exp(<span class="op">-</span>dt <span class="op">/</span> p.visco_tau[vm].clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>))   <span class="co"># memory retained this substep: a-&gt;1 elastic, a-&gt;0 liquid</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>            sig <span class="op">=</span> Jl[:, <span class="va">None</span>] <span class="op">+</span> (sig <span class="op">-</span> Jl[:, <span class="va">None</span>]) <span class="op">*</span> a[:, <span class="va">None</span>]   <span class="co"># pull stretches toward isotropic (shear relaxes, volume kept)</span></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>            F <span class="op">=</span> F.clone()</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>            F[vm] <span class="op">=</span> U <span class="op">@</span> torch.diag_embed(sig) <span class="op">@</span> Vh</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        snow <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_snow"</span>, <span class="va">None</span>)</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> snow <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> snow.<span class="bu">any</span>():                        <span class="co"># SNOW: clamp singular values, harden via Jp</span></span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>            sm <span class="op">=</span> snow<span class="op">;</span> Fs <span class="op">=</span> F[sm]</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> Fs.shape[<span class="dv">0</span>] <span class="op">&gt;</span> <span class="dv">0</span>:</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>                U, sig, Vh <span class="op">=</span> torch.linalg.svd(Fs)</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> D <span class="op">==</span> <span class="dv">3</span>:                                          <span class="co"># proper-rotation sign fix (MPM_3D)</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>                    U <span class="op">=</span> U.clone()<span class="op">;</span> sig <span class="op">=</span> sig.clone()<span class="op">;</span> Vh <span class="op">=</span> Vh.clone()</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>                    negU <span class="op">=</span> torch.det(U) <span class="op">&lt;</span> <span class="dv">0</span></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>                    U[negU, :, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span> sig[negU, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>                    negV <span class="op">=</span> torch.det(Vh) <span class="op">&lt;</span> <span class="dv">0</span></span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>                    Vh[negV, <span class="op">-</span><span class="dv">1</span>, :] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span> sig[negV, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>                sig_c <span class="op">=</span> sig.clamp(<span class="fl">1.0</span> <span class="op">-</span> <span class="fl">2.5e-2</span>, <span class="fl">1.0</span> <span class="op">+</span> <span class="fl">7.5e-3</span>)</span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>                F <span class="op">=</span> F.clone()<span class="op">;</span> F[sm] <span class="op">=</span> U <span class="op">@</span> torch.diag_embed(sig_c) <span class="op">@</span> Vh</span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>                ratio <span class="op">=</span> sig.prod(<span class="op">-</span><span class="dv">1</span>) <span class="op">/</span> sig_c.prod(<span class="op">-</span><span class="dv">1</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>                Jp <span class="op">=</span> p.Jp.clone()<span class="op">;</span> Jp[sm] <span class="op">=</span> (Jp[sm] <span class="op">*</span> ratio).clamp(<span class="fl">0.6</span>, <span class="fl">20.0</span>)</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>                p.Jp <span class="op">=</span> Jp</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        p.F <span class="op">=</span> F</span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM); Sulsky, D. et al. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196."</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"mpm_particle"</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.dt_sub <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"dt_sub"</span>, <span class="fl">2e-4</span>))</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> dev <span class="op">=</span> p.state.device</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> sub_dt(H, <span class="va">self</span>.dt_sub)</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        D <span class="op">=</span> p.F.shape[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        eye <span class="op">=</span> torch.eye(D, device<span class="op">=</span>dev).expand(p.n, D, D)</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        F <span class="op">=</span> (eye <span class="op">+</span> dt <span class="op">*</span> p.C) <span class="op">@</span> p.F</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>            a, b, c, d <span class="op">=</span> F[:, <span class="dv">0</span>, <span class="dv">0</span>], F[:, <span class="dv">0</span>, <span class="dv">1</span>], F[:, <span class="dv">1</span>, <span class="dv">0</span>], F[:, <span class="dv">1</span>, <span class="dv">1</span>]</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> a <span class="op">*</span> d <span class="op">-</span> b <span class="op">*</span> c</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>            J <span class="op">=</span> torch.linalg.det(F)</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        liquid <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_liquid"</span>, <span class="va">None</span>)</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> liquid <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> liquid.<span class="bu">any</span>():                    <span class="co"># LIQUID: drop shape memory</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>            Jc <span class="op">=</span> J.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>            Jl <span class="op">=</span> torch.sqrt(Jc) <span class="cf">if</span> D <span class="op">==</span> <span class="dv">2</span> <span class="cf">else</span> Jc.<span class="bu">pow</span>(<span class="fl">1.0</span> <span class="op">/</span> D)     <span class="co"># volume-preserving isotropic reset</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>            F <span class="op">=</span> torch.where(liquid[:, <span class="va">None</span>, <span class="va">None</span>], eye <span class="op">*</span> Jl[:, <span class="va">None</span>, <span class="va">None</span>], F)</span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        visco <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_visco"</span>, <span class="va">None</span>)</span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> visco <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> visco.<span class="bu">any</span>():                      <span class="co"># VISCOELASTIC (Maxwell): PARTIAL shape reset</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>            vm <span class="op">=</span> visco                                             <span class="co"># relax F toward isotropic with time-constant tau,</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>            Fv <span class="op">=</span> F[vm]                                             <span class="co"># keeping VOLUME (J) -&gt; stress builds then decays</span></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>            U, sig, Vh <span class="op">=</span> torch.linalg.svd(Fv)                      <span class="co"># SVD: sig = principal stretches</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>            Jl <span class="op">=</span> sig.prod(<span class="op">-</span><span class="dv">1</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>).<span class="bu">pow</span>(<span class="fl">1.0</span> <span class="op">/</span> D)         <span class="co"># isotropic (volume-preserving) target stretch</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>            a <span class="op">=</span> torch.exp(<span class="op">-</span>dt <span class="op">/</span> p.visco_tau[vm].clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>))   <span class="co"># memory retained this substep: a-&gt;1 elastic, a-&gt;0 liquid</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>            sig <span class="op">=</span> Jl[:, <span class="va">None</span>] <span class="op">+</span> (sig <span class="op">-</span> Jl[:, <span class="va">None</span>]) <span class="op">*</span> a[:, <span class="va">None</span>]   <span class="co"># pull stretches toward isotropic (shear relaxes, volume kept)</span></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>            F <span class="op">=</span> F.clone()</span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>            F[vm] <span class="op">=</span> U <span class="op">@</span> torch.diag_embed(sig) <span class="op">@</span> Vh</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        snow <span class="op">=</span> <span class="bu">getattr</span>(p, <span class="st">"is_snow"</span>, <span class="va">None</span>)</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> snow <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> snow.<span class="bu">any</span>():                        <span class="co"># SNOW: clamp singular values, harden via Jp</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>            sm <span class="op">=</span> snow<span class="op">;</span> Fs <span class="op">=</span> F[sm]</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> Fs.shape[<span class="dv">0</span>] <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>                U, sig, Vh <span class="op">=</span> torch.linalg.svd(Fs)</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> D <span class="op">==</span> <span class="dv">3</span>:                                          <span class="co"># proper-rotation sign fix (MPM_3D)</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>                    U <span class="op">=</span> U.clone()<span class="op">;</span> sig <span class="op">=</span> sig.clone()<span class="op">;</span> Vh <span class="op">=</span> Vh.clone()</span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>                    negU <span class="op">=</span> torch.det(U) <span class="op">&lt;</span> <span class="dv">0</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>                    U[negU, :, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span> sig[negU, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>                    negV <span class="op">=</span> torch.det(Vh) <span class="op">&lt;</span> <span class="dv">0</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>                    Vh[negV, <span class="op">-</span><span class="dv">1</span>, :] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span> sig[negV, <span class="op">-</span><span class="dv">1</span>] <span class="op">*=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a>                sig_c <span class="op">=</span> sig.clamp(<span class="fl">1.0</span> <span class="op">-</span> <span class="fl">2.5e-2</span>, <span class="fl">1.0</span> <span class="op">+</span> <span class="fl">7.5e-3</span>)</span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>                F <span class="op">=</span> F.clone()<span class="op">;</span> F[sm] <span class="op">=</span> U <span class="op">@</span> torch.diag_embed(sig_c) <span class="op">@</span> Vh</span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>                ratio <span class="op">=</span> sig.prod(<span class="op">-</span><span class="dv">1</span>) <span class="op">/</span> sig_c.prod(<span class="op">-</span><span class="dv">1</span>).clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)</span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>                Jp <span class="op">=</span> p.Jp.clone()<span class="op">;</span> Jp[sm] <span class="op">=</span> (Jp[sm] <span class="op">*</span> ratio).clamp(<span class="fl">0.6</span>, <span class="fl">20.0</span>)</span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>                p.Jp <span class="op">=</span> Jp</span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        p.F <span class="op">=</span> F</span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 
 </section>
 
 </main> <!-- /main -->
+<style>
+/* gallery videos (those without native controls) become click-to-enlarge */
+.sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
+#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+  display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+#vbox-overlay.open { display: flex; }
+#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 8px; background: #000;
+  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
+  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+#vbox-close:hover { opacity: 1; }
+</style>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<script>
+(function () {
+  var ov = document.getElementById('vbox-overlay'),
+      vv = document.getElementById('vbox-video'),
+      cl = document.getElementById('vbox-close');
+  function open(src) {
+    vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
+    var p = vv.play(); if (p && p.catch) p.catch(function () {});
+  }
+  function close() {
+    ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
+    if (v && v.id !== 'vbox-video' && !v.controls) {
+      var s = v.currentSrc
+            || (v.querySelector('source') && v.querySelector('source').src)
+            || v.getAttribute('src');
+      if (s) { e.preventDefault(); open(s); }
+    }
+  });
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.classList.contains('open')) close();
+  });
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

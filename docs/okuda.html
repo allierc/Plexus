@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>agent_remodel – Plexus</title>
+<title>Morphogenesis — a case study – Plexus</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -20,61 +20,27 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
-<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="../site_libs/quarto-nav/headroom.min.js"></script>
-<script src="../site_libs/clipboard/clipboard.min.js"></script>
-<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="../site_libs/quarto-search/fuse.min.js"></script>
-<script src="../site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="../">
-<script src="../site_libs/quarto-html/quarto.js"></script>
-<script src="../site_libs/quarto-html/popper.min.js"></script>
-<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="../site_libs/quarto-html/anchor.min.js"></script>
-<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark-b53751a350365c71b6c909e95f209ed1.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-cf7604994e62023e09ea883ba0121baa.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-604351351268466cdfc287866a922ca2.min.css" rel="prefetch" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -114,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="../index.html">
+    <a class="navbar-brand" href="./index.html">
     <span class="navbar-title">Plexus</span>
     </a>
   </div>
@@ -125,11 +91,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link" href="../index.html"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="../language.html"> 
+    <a class="nav-link" href="./language.html"> 
 <span class="menu-text">The language</span></a>
   </li>  
   <li class="nav-item dropdown ">
@@ -138,29 +104,29 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-library">    
         <li>
-    <a class="dropdown-item" href="../library_sets.html">
+    <a class="dropdown-item" href="./library_sets.html">
  <span class="dropdown-text">Sets</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../library_fields.html">
+    <a class="dropdown-item" href="./library_fields.html">
  <span class="dropdown-text">Fields</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../library_operators.html">
+    <a class="dropdown-item" href="./library_operators.html">
  <span class="dropdown-text">Operators</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
-    <a class="nav-link" href="../optimization.html"> 
+    <a class="nav-link" href="./optimization.html"> 
 <span class="menu-text">Optimization</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="../inverse.html"> 
+    <a class="nav-link" href="./inverse.html"> 
 <span class="menu-text">Inverse problem</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="../okuda.html"> 
+    <a class="nav-link active" href="./okuda.html" aria-current="page"> 
 <span class="menu-text">Morphogenesis</span></a>
   </li>  
 </ul>
@@ -181,13 +147,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#role-in-plexus" id="toc-role-in-plexus" class="nav-link active" data-scroll-target="#role-in-plexus">Role in Plexus</a></li>
-  <li><a href="#mechanism" id="toc-mechanism" class="nav-link" data-scroll-target="#mechanism">Mechanism</a></li>
-  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#minimal-spec" id="toc-minimal-spec" class="nav-link" data-scroll-target="#minimal-spec">Minimal spec</a></li>
-  <li><a href="#mechanism-search-tags" id="toc-mechanism-search-tags" class="nav-link" data-scroll-target="#mechanism-search-tags">Mechanism-search tags</a></li>
-  <li><a href="#related-operators" id="toc-related-operators" class="nav-link" data-scroll-target="#related-operators">Related operators</a></li>
-  <li><a href="#source" id="toc-source" class="nav-link" data-scroll-target="#source">Source</a></li>
+  <li><a href="#a-controlled-testbed" id="toc-a-controlled-testbed" class="nav-link active" data-scroll-target="#a-controlled-testbed">A controlled testbed</a></li>
+  <li><a href="#the-approach-in-brief" id="toc-the-approach-in-brief" class="nav-link" data-scroll-target="#the-approach-in-brief">The approach in brief</a></li>
+  <li><a href="#a-gallery-of-failures" id="toc-a-gallery-of-failures" class="nav-link" data-scroll-target="#a-gallery-of-failures">A gallery of failures</a></li>
+  <li><a href="#a-first-tube-driven-and-far-from-clean" id="toc-a-first-tube-driven-and-far-from-clean" class="nav-link" data-scroll-target="#a-first-tube-driven-and-far-from-clean">A first tube — driven, and far from clean</a></li>
+  <li><a href="#what-the-failures-demand-of-the-agent-next" id="toc-what-the-failures-demand-of-the-agent-next" class="nav-link" data-scroll-target="#what-the-failures-demand-of-the-agent-next">What the failures demand of the agent next</a></li>
   </ul>
 </nav>
     </div>
@@ -196,8 +160,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">agent_remodel</h1>
-<p class="subtitle lead">Agent_remodel (agent set -&gt; mpm_particle stiffness): cells remodel the tissue.</p>
+<h1 class="title">Morphogenesis — a case study</h1>
 </div>
 
 
@@ -214,190 +177,104 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<div class="op-head">
-<p><img src="../figures/icons/exchange.png" class="op-logo img-fluid"></p>
-<p><span class="op-badge"><code>exchange</code></span> <span class="op-badge"><code>acts on: cell</code></span> <span class="op-badge"><code>prediction: none</code></span></p>
-<p>Agent_remodel (agent set -&gt; mpm_particle stiffness): cells remodel the tissue.</p>
+<div class="callout callout-style-simple callout-note">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
 </div>
+<div class="callout-body-container">
+<p><strong>The point of this page.</strong> The target is a <em>published</em> simulation, so we know a compact model exists — but we have only the paper, not the code. That makes it the cleanest possible testbed for agentic mechanistic discovery: <strong>if Plexus cannot reconstruct a known model even with strong priors and a known answer, it will not reconstruct an unknown one from real data, where the very existence of a model is in doubt.</strong> Success here is necessary, not sufficient; failure here would be decisive.</p>
+</div>
+</div>
+</div>
+<section id="a-controlled-testbed" class="level2">
+<h2 class="anchored" data-anchor-id="a-controlled-testbed">A controlled testbed</h2>
+<p>The target is Okuda <em>et&nbsp;al.</em> (2018): a Turing reaction–diffusion system discretised at the single-cell level and coupled to a <strong>3D vertex model</strong>, which — by growing a monolayer cell vesicle — reproduces autonomous <em>undulation</em>, <em>tubulation</em>, and <em>branching</em>.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> We have the paper, and with it <strong>strong priors</strong>: a vertex-model tissue, an activator–inhibitor reaction–diffusion, and growth converted from each cell’s activator concentration. We do <strong>not</strong> have the code. Reconstructing the result inside <a href="./index.html">Plexus</a> is therefore a <em>blind</em> reproduction, driven by priors alone.</p>
+<p>That is exactly what makes it the right problem to cut our teeth on. On real experimental data the hardest uncertainty is not the parameters but whether a compact mechanistic model <em>exists at all</em>. Here that question is settled — we know a model exists, and roughly what it is — so this is the <strong>easiest version of the real problem</strong>, a controlled floor test for the <a href="./inverse.html">three-loop agentic discovery</a> the project is built around. What is interesting is precisely that the simulation is <em>blind</em> (no repository) yet the answer is <em>known</em>: strong priors, a fixed target, and full freedom to run the forward model. If the method works nowhere here, it works nowhere.</p>
+<p>This page is the honest record of the attempt <strong>so far</strong> — a gallery of failures, because the failures are where the method actually gets defined.</p>
+</section>
+<section id="the-approach-in-brief" class="level2">
+<h2 class="anchored" data-anchor-id="the-approach-in-brief">The approach in brief</h2>
+<p>The reconstruction runs as the three loops described in the <a href="paper/plexus2.pdf">Plexus paper</a> (§&nbsp;<em>Agentic mechanistic discovery</em>): <strong>Understand</strong> the target by interrogating a decomposed model — a hypothesis → <em>validate / falsify</em> cycle held to a rough <strong>70/30</strong> balance; <strong>Fit</strong> its parameters and fields against the differentiable operators; <strong>Discover</strong> the operators the model still lacks from the residual. A <strong>master</strong> controller holds the goal, authors the success metrics, grounds each hypothesis in Okuda’s text, and — before trusting any measurement — enforces a <em>verify-the- instrument</em> gate. Every stage is a small, metric-gated step, run cheap-first. The mechanical substrate is the true-vertex <a href="./index.html#epithelial-mechanics-a-true-vertex-model">Tyssue</a> tissue built elsewhere on this site; the morphogenesis is Okuda’s coupling laid on top of it.</p>
+</section>
+<section id="a-gallery-of-failures" class="level2">
+<h2 class="anchored" data-anchor-id="a-gallery-of-failures">A gallery of failures</h2>
+<p>Four moments from the search for the tube — each a failure, each with the lesson it left, from the reaction–diffusion choice to the shape of the tube itself. (It works now — the breakthrough is below.)</p>
 <style>
-.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.7rem;margin:1rem 0 1.6rem}
-.op-card{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border:1px solid var(--bs-border-color,#dee2e6);
-  border-radius:10px;text-decoration:none;color:inherit;background:var(--bs-body-bg,#fff);transition:.12s}
-.op-card:hover{border-color:#1f77b4;box-shadow:0 2px 8px rgba(31,119,180,.13);transform:translateY(-1px)}
-.op-card img{width:42px;height:42px;flex:0 0 42px;object-fit:contain}
-.op-card-body{display:flex;flex-direction:column;min-width:0}
-.op-card-name{font-weight:600;font-family:var(--bs-font-monospace,monospace);color:#1f77b4}
-.op-card-sub{font-size:.8em;color:#6c757d;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.kind-h{height:1.5em;vertical-align:-.35em;margin-right:.25rem}
-.kind-sym{color:#adb5bd;font-weight:400;margin-left:.3rem}
-.op-head{display:block;border-left:3px solid #1f77b4;padding:.2rem 0 .2rem 1rem;margin:.5rem 0 1.5rem}
-.op-logo{width:74px;height:74px;float:right;margin:-.2rem 0 .4rem 1rem;object-fit:contain}
-.op-badge{font-size:.78em;background:rgba(31,119,180,.1);color:#1f77b4;border-radius:5px;padding:.05rem .4rem;margin-right:.2rem;white-space:nowrap}
-.op-vid{margin:.4rem 0}.op-vid video{width:100%;max-width:520px;border-radius:8px;background:#000;display:block}
-.op-vid figcaption{font-size:.85em;color:#6c757d;margin-top:.3rem;max-width:520px}
+.okuda-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:.8rem 0 1.4rem}
+@media (max-width:900px){.okuda-gallery{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.okuda-gallery{grid-template-columns:1fr}}
+.okuda-card{margin:0}
+.okuda-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
+.okuda-card figcaption{margin-top:.4rem;font-size:.8em;line-height:1.38;color:#555}
+.okuda-card b{display:block;color:inherit;margin-bottom:.1rem}
 </style>
-<section id="role-in-plexus" class="level2">
-<h2 class="anchored" data-anchor-id="role-in-plexus">Role in Plexus</h2>
+<div class="okuda-gallery">
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_okuda_balloon.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Protrusion-by-inflation = hollowing</b>With a volume-locked body, an activated cap inflates faster than it can divide and balloons — and a ballooned cap is exactly what the hollow metric flags. There is no clean-protrusion window.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_okuda_rd.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>The RD choice is decisive</b>The Brusselator decays or reorganizes the seed (here it fades to a weak spot); only Gray–Scott in the spot regime and Gierer–Meinhardt hold a stable, localized peak — the ingredient a tube needs.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_okuda_cone.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Cones make tubes — but by a crutch</b>Re-seeding the activator at a fixed radial tip keeps the growing apex inside a cone, so it tubes. That tip-riding is geometric, not emergent; a real tube needs a self-maintaining apex.
+</figcaption>
+</figure>
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_cauliflower.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>Cauliflower, not a tube</b>A Gierer–Meinhardt activator holds a stable peak and buds the shell — but a <em>wide</em> activation grows the whole patch into a lobed cauliflower. The tube needs narrow, tip-riding GM growth.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="a-first-tube-driven-and-far-from-clean" class="level2">
+<h2 class="anchored" data-anchor-id="a-first-tube-driven-and-far-from-clean">A first tube — driven, and far from clean</h2>
+<p>The front has moved past the cauliflower: the budding lobe can now be pushed into a genuine tube — long, thin, roughly constant-diameter. But it is <strong>not emergent as a whole</strong>. The sustained apical signal is <em>driven</em>: a fixed-size activator cap, re-seeded each frame at the tissue’s outermost cell, rides the advancing tip — a hand-placed stand-in for “the activator peak stays at the apex,” not something the reaction–diffusion maintains on its own. What <em>is</em> emergent is only the mechanics around it (confinement from growth-dilution, wall-building oriented division, extrusion that pushes the tip out); the diameter follows the cap radius (Okuda’s χ role) and the length the run time. And the result is <strong>rough</strong>: many hollow cells, a cell-size CV still too large, a flat rather than rounded tip. It is a <em>first</em> working tube with a lot of work remaining — the point is only that the question has shifted from <em>whether</em> a tube forms to <em>how well</em> it can be made.</p>
+<div class="okuda-gallery">
+<figure class="okuda-card figure">
+<video src="gallery/tyssue_tube_long.mp4" autoplay="" loop="" muted="" playsinline="">
+</video>
+<figcaption>
+<b>A driven, imperfect tube</b>A tip-tracking cap — <em>driven</em>, not emergent — rides the outermost cell, so the tube extends at roughly constant diameter instead of widening into a lobe. The mechanics around it are emergent, but the mesh stays rough (hollow cells, uneven cell sizes): far from a clean cylinder, and much is left to do. <em>Click to enlarge.</em>
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="what-the-failures-demand-of-the-agent-next" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-failures-demand-of-the-agent-next">What the failures demand of the agent next</h2>
+<p>Read as a spec, the journey names the capabilities the autonomous master must carry — the same <a href="paper/plexus2.pdf">role spec</a> the paper argues for, now grounded in a real attempt:</p>
 <ul>
-<li><strong>Kind</strong> — push / pull <strong>Exchange</strong>: set ↔︎ field.</li>
-<li><strong>Acts on</strong> — <code>cell</code> (the set the operator acts on).</li>
-<li><strong>Reads</strong> — <code>to</code>, <code>target</code></li>
-<li><strong>Writes / returns</strong> — emits <strong>no integrated force</strong> — it mutates a field / relation / membership, or feeds a substep.</li>
-<li><strong>Prediction</strong> — <code>none</code>.</li>
-<li><strong>Dimensions</strong> — 2D, 3D.</li>
+<li><strong>Goal custody.</strong> Several rounds drifted into locally-sensible sub-problems (homogenising a 2000-cell sphere) and lost the tube; the master’s objective must be held separately from the workers’.</li>
+<li><strong>Temporal perception.</strong> The decisive evidence was in the <em>time course</em> — the grey band forms mid-growth, tip cells balloon early — invisible to an end-frame metric. A dynamics-watching critic is a required agent.</li>
+<li><strong>Verify the instrument.</strong> The “97% hollow” shell and a false “0 invalid faces” (which passed self-intersecting bow-tie polygons) were diagnostic artefacts, not physics.</li>
+<li><strong>Literature grounding.</strong> Reading <em>which</em> reaction–diffusion regime Okuda uses (Gierer–Meinhardt) was the single key unlock.</li>
+<li><strong>Domain priors and taste.</strong> Reading the smooth activator <em>gradient</em> off Okuda’s figures — rather than a binary switch — reframed the entire coupling.</li>
 </ul>
-</section>
-<section id="mechanism" class="level2">
-<h2 class="anchored" data-anchor-id="mechanism">Mechanism</h2>
-<p>The THIRD coupling (beyond momentum): active cells progressively SOFTEN or RIGIDIFY the MPM material around them – the tissue-remodelling of morphogenesis (cells secreting/degrading matrix, stiffening or fluidising their neighbourhood). Each cell carries a per-type <code>remodel_rate</code> (&gt;0 rigidify, &lt;0 soften, 0 inert). Routed through the grid like every other coupling: cells scatter their rate onto the mpm grid (density-normalised, so it is the <em>mean</em> rate where cells sit), material points gather it, and their Lame moduli drift multiplicatively</p>
-<p>The multiplicative form preserves liquid points (mu=0 stays 0) and never flips sign; the clamps bound the excursion. Grid cells with no cells nearby get rate 0 -&gt; factor 1 -&gt; no change, so only the cell-occupied tissue is remodelled. <code>kind=exchange</code>, <code>EMIT=None</code> (mutates the target set’s buffers in place, returns {}). Schedule it in the OUTER loop (once per frame), like the other body-force couplings.</p>
-</section>
-<section id="parameters" class="level2">
-<h2 class="anchored" data-anchor-id="parameters">Parameters</h2>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>parameter</th>
-<th>role</th>
-<th>default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>to</code></td>
-<td>–</td>
-<td><strong>required</strong></td>
-</tr>
-<tr class="even">
-<td><code>target</code></td>
-<td>–</td>
-<td><strong>required</strong></td>
-</tr>
-<tr class="odd">
-<td><code>gain</code></td>
-<td>remodel_gain</td>
-<td>1.0</td>
-</tr>
-<tr class="even">
-<td><code>rate_attr</code></td>
-<td>per_type_remodel_rate</td>
-<td>“remodel_rate”</td>
-</tr>
-<tr class="odd">
-<td><code>mu_min</code></td>
-<td>–</td>
-<td>0.5</td>
-</tr>
-<tr class="even">
-<td><code>mu_max</code></td>
-<td>–</td>
-<td>1.0e4</td>
-</tr>
-<tr class="odd">
-<td><code>la_min</code></td>
-<td>–</td>
-<td>0.5</td>
-</tr>
-<tr class="even">
-<td><code>la_max</code></td>
-<td>–</td>
-<td>1.0e4</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="minimal-spec" class="level2">
-<h2 class="anchored" data-anchor-id="minimal-spec">Minimal spec</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">operators</span><span class="kw">:</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="kw">{</span><span class="fu">op</span><span class="kw">:</span><span class="at"> agent_remodel</span><span class="kw">,</span><span class="at"> </span><span class="fu">at</span><span class="kw">:</span><span class="at"> cell</span><span class="kw">,</span><span class="at"> </span><span class="fu">to</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">,</span><span class="at"> </span><span class="fu">target</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="mechanism-search-tags" class="level2">
-<h2 class="anchored" data-anchor-id="mechanism-search-tags">Mechanism-search tags</h2>
-<p><strong>Mechanism</strong> — <span class="op-badge"><code>tissue_remodelling</code></span> <span class="op-badge"><code>stiffening</code></span> <span class="op-badge"><code>fluidisation</code></span></p>
-</section>
-<section id="related-operators" class="level2">
-<h2 class="anchored" data-anchor-id="related-operators">Related operators</h2>
-<p>Other <strong>exchange</strong> operators: <a href="../library/deposit.html"><code>deposit</code></a>, <a href="../library/sense.html"><code>sense</code></a>, <a href="../library/chemotax.html"><code>chemotax</code></a>, <a href="../library/active_force.html"><code>active_force</code></a>, <a href="../library/pulse_to_contraction.html"><code>pulse_to_contraction</code></a>, <a href="../library/active_stress.html"><code>active_stress</code></a>.</p>
-</section>
-<section id="source" class="level2">
-<h2 class="anchored" data-anchor-id="source">Source</h2>
-<p><a href="https://github.com/allierc/Plexus/blob/main/src/plexus/operators/agent_remodel.py"><code>src/plexus/operators/agent_remodel.py</code></a> — the registered operator.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""agent_remodel (agent set -&gt; mpm_particle stiffness): cells remodel the tissue.</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">The THIRD coupling (beyond momentum): active cells progressively SOFTEN or RIGIDIFY the MPM</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">material around them -- the tissue-remodelling of morphogenesis (cells secreting/degrading</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">matrix, stiffening or fluidising their neighbourhood). Each cell carries a per-type</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">`remodel_rate` (&gt;0 rigidify, &lt;0 soften, 0 inert). Routed through the grid like every other</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">coupling: cells scatter their rate onto the mpm grid (density-normalised, so it is the *mean*</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">rate where cells sit), material points gather it, and their Lame moduli drift multiplicatively</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">    mu  &lt;- clamp( mu * exp(gain * rate(x) * dt),  mu_min, mu_max )</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">    la  &lt;- clamp( la * exp(gain * rate(x) * dt),  la_min, la_max )</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">The multiplicative form preserves liquid points (mu=0 stays 0) and never flips sign; the clamps</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">bound the excursion. Grid cells with no cells nearby get rate 0 -&gt; factor 1 -&gt; no change, so</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">only the cell-occupied tissue is remodelled. `kind=exchange`, `EMIT=None` (mutates the</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co">target set's buffers in place, returns {}). Schedule it in the OUTER loop (once per frame), like</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co">the other body-force couplings.</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> __future__ <span class="im">import</span> annotations</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.base <span class="im">import</span> Exchange</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.models.registry <span class="im">import</span> register_operator</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plexus.operators.mpm_grid <span class="im">import</span> stencil_offsets, bspline</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="at">@register_operator</span>(<span class="st">"agent_remodel"</span>, family<span class="op">=</span><span class="st">"coupling"</span>, <span class="bu">set</span><span class="op">=</span><span class="st">"cell"</span>, kind<span class="op">=</span><span class="st">"exchange"</span>)</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AgentRemodel(Exchange):</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    EMIT <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    SUPPORTED_DIMS <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">3</span>]</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    REQUIRES_PARAMS <span class="op">=</span> [<span class="st">"to"</span>, <span class="st">"target"</span>]</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    MECHANISM_TAGS <span class="op">=</span> [<span class="st">"tissue_remodelling"</span>, <span class="st">"stiffening"</span>, <span class="st">"fluidisation"</span>]</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    PARAM_ROLES <span class="op">=</span> {<span class="st">"gain"</span>: <span class="st">"remodel_gain"</span>, <span class="st">"rate_attr"</span>: <span class="st">"per_type_remodel_rate"</span>}</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    REFERENCE <span class="op">=</span> <span class="st">"Plexus (this work)."</span></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, params, device<span class="op">=</span><span class="st">"cpu"</span>):</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>(params, device)</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.at <span class="op">=</span> params.get(<span class="st">"_at"</span>, <span class="st">"agent"</span>)</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.to <span class="op">=</span> params.get(<span class="st">"to"</span>, <span class="st">"mpm_grid"</span>)            <span class="co"># grid used only for the transfer geometry</span></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.target <span class="op">=</span> params.get(<span class="st">"target"</span>, <span class="st">"mpm_particle"</span>)</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.gain <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"gain"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rate_attr <span class="op">=</span> params.get(<span class="st">"rate_attr"</span>, <span class="st">"remodel_rate"</span>)</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.mu_min <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"mu_min"</span>, <span class="fl">0.5</span>))<span class="op">;</span> <span class="va">self</span>.mu_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"mu_max"</span>, <span class="fl">1.0e4</span>))</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.la_min <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"la_min"</span>, <span class="fl">0.5</span>))<span class="op">;</span> <span class="va">self</span>.la_max <span class="op">=</span> <span class="bu">float</span>(params.get(<span class="st">"la_max"</span>, <span class="fl">1.0e4</span>))</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, H, mask<span class="op">=</span><span class="va">None</span>):</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        lvl <span class="op">=</span> H.level(<span class="va">self</span>.at)<span class="op">;</span> g <span class="op">=</span> H.field(<span class="va">self</span>.to)<span class="op">;</span> tgt <span class="op">=</span> H.level(<span class="va">self</span>.target)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        rate <span class="op">=</span> <span class="bu">getattr</span>(lvl, <span class="va">self</span>.rate_attr, <span class="va">None</span>)</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> rate <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">float</span>(rate.<span class="bu">abs</span>().<span class="bu">max</span>()) <span class="op">==</span> <span class="fl">0.0</span>:</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {}                                     <span class="co"># no remodellers -&gt; nothing to do</span></span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        dt <span class="op">=</span> <span class="bu">float</span>(<span class="bu">getattr</span>(H.config, <span class="st">"dt"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        periodic <span class="op">=</span> <span class="bu">bool</span>(<span class="bu">getattr</span>(H, <span class="st">"periodic"</span>, <span class="va">False</span>))</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        dev <span class="op">=</span> lvl.state.device</span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        offs <span class="op">=</span> stencil_offsets(tgt.get(<span class="st">"pos"</span>).shape[<span class="dv">1</span>], dev)<span class="op">;</span> S <span class="op">=</span> offs.shape[<span class="dv">0</span>]</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="co"># scatter cells' remodel rate + presence onto the grid (density-normalised mean rate)</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        Xa <span class="op">=</span> lvl.get(<span class="st">"pos"</span>)<span class="op">;</span> _, wa, fa <span class="op">=</span> bspline(Xa, g.inv_dx, offs, g.shape, periodic)</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        occ_a <span class="op">=</span> lvl.occ <span class="cf">if</span> mask <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> lvl.occ <span class="op">*</span> mask.<span class="bu">float</span>()</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>        R <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)<span class="op">;</span> Wt <span class="op">=</span> torch.zeros(g.n_cells, device<span class="op">=</span>dev)</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>        R.index_add_(<span class="dv">0</span>, fa, (wa <span class="op">*</span> (rate <span class="op">*</span> occ_a)[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>        Wt.index_add_(<span class="dv">0</span>, fa, (wa <span class="op">*</span> occ_a[:, <span class="va">None</span>]).reshape(<span class="op">-</span><span class="dv">1</span>))</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        Rn <span class="op">=</span> R <span class="op">/</span> Wt.clamp(<span class="bu">min</span><span class="op">=</span><span class="fl">1e-6</span>)                       <span class="co"># mean remodel rate per cell</span></span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        <span class="co"># gather at material points and update their stiffness multiplicatively</span></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        Xp <span class="op">=</span> tgt.get(<span class="st">"pos"</span>)<span class="op">;</span> _, wp, fp <span class="op">=</span> bspline(Xp, g.inv_dx, offs, g.shape, periodic)</span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        Rp <span class="op">=</span> (wp <span class="op">*</span> Rn[fp].view(tgt.n, S)).<span class="bu">sum</span>(<span class="dv">1</span>)          <span class="co"># [Np]</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        factor <span class="op">=</span> torch.exp((<span class="va">self</span>.gain <span class="op">*</span> dt) <span class="op">*</span> Rp)</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        tgt.mu <span class="op">=</span> (tgt.mu <span class="op">*</span> factor).clamp(<span class="va">self</span>.mu_min, <span class="va">self</span>.mu_max)</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        tgt.la <span class="op">=</span> (tgt.la <span class="op">*</span> factor).clamp(<span class="va">self</span>.la_min, <span class="va">self</span>.la_max)</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The tube now forms — the mechanics emergent, the tip signal still a driven stand-in — so the question flips from <em>existence</em> to <em>optimisation</em>: thinner and longer tubes, multiple tubes, and branching are now tuning, not search. And every failure above was converted from a symptom into a measurable target along the way — which is the whole point: this is what it looks like when a method, not just a model, is being fit.</p>
 
 
 </section>
 
-</main> <!-- /main -->
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>Okuda, S., Miura, T., Inoue, Y., Adachi, T. &amp; Eiraku, M. <em>Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with undulation, tubulation, and branching.</em> <strong>Scientific Reports</strong> 8, 2386 (2018). <a href="https://doi.org/10.1038/s41598-018-20678-6">doi:10.1038/s41598-018-20678-6</a>.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main> <!-- /main -->
 <style>
 /* gallery videos (those without native controls) become click-to-enlarge */
 .sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
@@ -1020,5 +897,5 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 
 
 
-<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+<script src="site_libs/quarto-html/zenscroll-min.js"></script>
 </body></html>
