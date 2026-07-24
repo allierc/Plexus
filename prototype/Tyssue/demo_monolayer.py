@@ -165,6 +165,52 @@ def save(out, mesh, frames, fielder, cmap, vlim, view, slice_axis, slice_plane, 
     print(f"  wrote {out}/  ({len(frames)} frames)")
 
 
+def _analysis_pass(out, frames, k_v, kappa_s, gamma):
+    """Differentiable monolayer mechanics on the recorded frames -> force |-grad U|, pressure 2k_v(V_eq-v),
+    tension gamma*P, and migration (nearest-centroid displacement, robust to division/topology changes).
+    Writes analysis.mp4 + analysis_strip.png + quantification.npz; leaves the geometry strip.png/movie.mp4.
+    frames: list of dict(pos[Nv,3] tensor, es,et,ef tensors, nF, hc[nF], V_eq[nF])."""
+    import mono_buckle as MB
+    Q = {k: [] for k in ("cen", "force", "pressure", "tension", "vel", "z")}
+    prev = None
+    for fr in frames:
+        pos, es, et, ef, nF = fr["pos"], fr["es"], fr["et"], fr["ef"], fr["nF"]
+        hc, V_eq = fr["hc"], fr["V_eq"]
+        force, v_f, s_f, pres, tens = MB.mechanics(pos, es, et, ef, nF, hc, V_eq, k_v, kappa_s, gamma)
+        ne = torch.zeros(nF).index_add(0, ef, torch.ones(es.shape[0])).clamp(min=1)
+        fmag = (torch.zeros(nF).index_add(0, ef, force[es].norm(dim=-1)) / ne).numpy()
+        cen = MB.cell_centroids(pos, es, et, ef, nF)
+        vel = np.zeros(nF)
+        if prev is not None and len(prev):                        # nearest previous centroid -> topology-robust
+            vel = np.linalg.norm(cen[:, None, :] - prev[None, :, :], axis=2).min(1)
+        prev = cen
+        Q["cen"].append(cen); Q["force"].append(fmag); Q["pressure"].append(pres.numpy())
+        Q["tension"].append(tens.numpy()); Q["vel"].append(vel); Q["z"].append(cen[:, 2].copy())
+    np.savez(os.path.join(out, "quantification.npz"), **{k: np.array(Q[k], dtype=object) for k in Q})
+    flim = (0, float(np.percentile(np.concatenate(Q["force"]), 97)) + 1e-9)
+    P = float(np.percentile(np.abs(np.concatenate(Q["pressure"])), 97)) + 1e-9; plim = (-P, P)
+    allv = np.concatenate(Q["vel"][1:]) if len(Q["vel"]) > 1 else np.array([1.0])
+    vlim = (0, float(np.percentile(allv, 95)) + 1e-9)
+    zl = (float(np.min(np.concatenate(Q["z"]))), float(np.max(np.concatenate(Q["z"]))) + 1e-9)
+    panels = [("inferno", "force  |-grad U|", flim, "force"), ("coolwarm", "stress  (pressure)", plim, "pressure"),
+              ("viridis", "migration  (velocity)", vlim, "vel"), ("YlOrRd", "shape  (height)", zl, "z")]
+    fig = plt.figure(figsize=(9.4, 8.2)); fig.patch.set_facecolor("black")
+    axes = [fig.add_subplot(2, 2, i + 1, projection="3d") for i in range(4)]
+    wri = FFMpegWriter(fps=7)
+    with wri.saving(fig, os.path.join(out, "analysis.mp4"), dpi=92):
+        for k in range(len(Q["cen"])):
+            for ax, (cm, t, vl, key) in zip(axes, panels):
+                MB._ax(ax, Q["cen"][k], Q[key][k], cm, t, vl)
+            wri.grab_frame()
+    plt.close(fig)
+    figS = plt.figure(figsize=(18, 4.4)); figS.patch.set_facecolor("black")
+    for j, (cm, t, vl, key) in enumerate(panels):
+        MB._ax(figS.add_subplot(1, 4, j + 1, projection="3d"), Q["cen"][-1], Q[key][-1], cm, t.split("  ")[0], vl)
+    figS.savefig(os.path.join(out, "analysis_strip.png"), dpi=100, facecolor="black"); plt.close(figS)
+    print(f"  analysis -> {out}/analysis.mp4  force={float(np.mean(Q['force'][-1])):.3f} "
+          f"p_absmean={float(np.abs(np.array(Q['pressure'][-1])).mean()):.2f}  ({len(frames)} frames)", flush=True)
+
+
 def mk_mesh(verts, es, et, ef, nF, h0, bmask=None):
     m = dict(es=torch.as_tensor(es), et=torch.as_tensor(et), ef=torch.as_tensor(ef), nF=nF,
              rings=rings_of(es, et, ef, nF), hc=torch.full((nF,), float(h0)), bmask=bmask)
@@ -261,6 +307,10 @@ def demo_V3b():
          params=dict(test="V3b_buckle", substrate="flat_epithelium", h0=H0, n_cells=nF, spot_cells=int(spot.sum()),
                      veq_boost=BOOST, kappa_s=KB, k_v=KV, z_max_start=float(frames[0][:, 2].max()),
                      z_max_end=float(frames[-1][:, 2].max()), z_min_end=float(frames[-1][:, 2].min())))
+    # differentiable force/stress/migration analysis on the SAME recorded frames (fixed mesh here)
+    mono_frames = [dict(pos=f, es=mesh["es"], et=mesh["et"], ef=mesh["ef"], nF=nF, hc=mesh["hc"], V_eq=V_eq)
+                   for f in frames]
+    _analysis_pass(os.path.join(HERE, "archive", "mono_V3b_buckle_flat"), mono_frames, KV, KB, 0.03)
 
 
 # ============================ V4: FLAT tube by PROLIFERATION ============================
@@ -285,7 +335,7 @@ def demo_tube():
     frames = []                                                 # each: (pos, es, et, ef, nF, hc)
 
     def record():
-        frames.append((np.array(pos), es.copy(), et.copy(), ef.copy(), nF, hc.copy()))
+        frames.append((np.array(pos), es.copy(), et.copy(), ef.copy(), nF, hc.copy(), V_eq.copy()))
     record()
     for rnd in range(15):
         A, cen = cellgeom()
@@ -326,7 +376,7 @@ def demo_tube():
               open(os.path.join(out, "spec.json"), "w"), indent=1)
 
     def fmesh(fr):
-        p, e0, e1, e2, nf, h = fr
+        p, e0, e1, e2, nf, h = fr[:6]
         return torch.as_tensor(p), dict(es=T(e0), et=T(e1), ef=T(e2), nF=nf, rings=rings_of(e0, e1, e2, nf),
                                         hc=torch.as_tensor(h))
     zmax = max(float(fr[0][:, 2].max()) for fr in frames)
@@ -353,6 +403,11 @@ def demo_tube():
                  "V4  tube by proliferation (Okuda)")
             wri.grab_frame()
     plt.close(figM); print(f"  wrote {out}/")
+    # differentiable force/stress/migration on the SAME recorded frames (topology changes per frame -> V_eq stored)
+    mono_frames = [dict(pos=torch.as_tensor(p), es=T(e0), et=T(e1), ef=T(e2), nF=nf,
+                        hc=torch.as_tensor(h), V_eq=torch.as_tensor(ve))
+                   for (p, e0, e1, e2, nf, h, ve) in frames]
+    _analysis_pass(out, mono_frames, 4.0, 0.05, 0.06)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\setlength{\emergencystretch}{3em}   % absorb overfull \hbox from long \texttt{} tokens / equations
 \title{\textbf{Three vertex models for epithelial morphogenesis in Plexus2}\\[2pt]
 \large SPV, mid-surface AVM, and the monolayer AVM behind \texttt{mono\_V4\_tube\_flat}}
 \author{Plexus2 prototype note --- \texttt{prototype/Tyssue}}
@@ -51,6 +52,37 @@ with $\mathbf{q}$ the DOF, $\eta$ a friction, and $\mathbf{f}^{\text{active}}$ a
 (self-propulsion, extrusion). Plexus2 integrates this with a \emph{bounded} explicit Euler step (each
 displacement capped at a fraction of the mean edge length) so the rollout stays stable \emph{and}
 differentiable.
+
+\textbf{What is a degree of freedom.} A \emph{degree of freedom} (DOF) is one independent coordinate the
+solver is allowed to move; the state vector $\mathbf{q}$ simply stacks all of them, and \emph{every} geometric
+quantity a model computes --- a cell's area, volume, surface, the energy $U$, and hence the force
+$-\partial U/\partial\mathbf q$ --- is a function of $\mathbf q$ alone. Choosing the DOF is therefore the first
+modelling decision, and it is exactly where the three models part ways: model A takes the DOF to be the
+cell-centre \emph{points} $\mathbf r_i$ (two numbers per cell), while models B and C take them to be the mesh
+\emph{vertices} $\mathbf x_i$ (three numbers per shared junction). Everything else --- how a cell's shape is
+measured, how neighbours are exchanged --- follows from that choice.
+
+\subsection*{Neighbour exchange (T1)}
+A tissue flows by cells swapping neighbours, not by cells changing volume. The elementary move is the
+\emph{T1 transition} (Fig.~\ref{fig:t1}): a short cell--cell interface shrinks to a point (a transient
+four-fold vertex) and re-opens rotated by $90^\circ$. The two cells that shared the edge lose contact, and
+the two cells that were kept apart become neighbours. This is the only way an epithelium of fixed-volume
+cells can rearrange (fluidise) and the reason a high-aspect structure like a tube can form at all --- the wall
+cells must slide past one another as it extends. The three models realise it very differently: in the SPV it
+is \emph{implicit} (re-deriving the Voronoi tessellation each step performs the swap automatically the instant
+two centres' cells stop touching); in the vertex models it is an \emph{explicit} operation --- an edge whose
+length falls below a threshold $\Delta\ell_{\text{th}}$ is surgically flipped (\texttt{reconnect\_t1\_3d}),
+keeping the half-edge mesh closed.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.68\textwidth]{t1_schematic.png}
+\caption{T1 transition (neighbour exchange). \emph{Before:} cells $\alpha,\beta$ (orange) share the short red
+edge; $\gamma,\delta$ (blue) are separated by it. The edge contracts to a four-fold vertex and reopens
+perpendicular. \emph{After:} $\gamma,\delta$ now share the edge and $\alpha,\beta$ are pushed apart. No cell
+changes area; only the connectivity changes.}
+\label{fig:t1}
+\end{figure}
 
 \section{Model A --- Self-Propelled Voronoi (SPV)}
 \textbf{Degrees of freedom.} Each cell $i$ is a single \emph{point} $\mathbf{r}_i$. The tissue is the
@@ -208,6 +240,48 @@ for explicit T1 surgery but able to hold a tube. \emph{B vs C:} the mid-surface 
 gives each cell a real volume $A\,h$ and a real surface, so localized volume growth \emph{buckles} into a
 tube as an \emph{equilibrium} shape (Okuda's growth-driven, quasi-static route), whereas the mid-surface tube
 in the \texttt{round\_*} runs is held out by an added extrusion force (a forced, higher-stress protrusion).
+
+\section{Plexus2 implementation: sets, operators, fields}
+Plexus2 holds the tissue state as named \emph{sets} of elements, each carrying per-element \emph{fields}, and
+advances it with \emph{operators} that read those fields and write forces or topology. The three models map
+onto that structure as below (operator names are the registered \texttt{op} identifiers in the prototype).
+
+\begin{center}\small
+\begin{tabular}{@{}p{1.9cm}p{3.0cm}p{3.6cm}p{4.9cm}@{}}
+\toprule
+ & \textbf{Sets} & \textbf{Fields (per element)} & \textbf{Operators (\texttt{op})} \\
+\midrule
+\textbf{A. SPV} & one \texttt{cell} set (points); neighbour graph \emph{derived} (Delaunay) &
+\texttt{pos} $\mathbf r_i$, heading $\theta_i$; rest \texttt{A0,P0}; morphogen $c_i$ &
+\texttt{cell\_geometry} (Voronoi $A,P$), \texttt{shape\_energy}, \texttt{cell\_adjacency},
+\texttt{t1\_transition} (implicit, re-tessellation), \texttt{face\_divide}, \texttt{cell\_react/diffuse} \\
+\addlinespace
+\textbf{B. mid-surface AVM} & \texttt{vertex} set $+$ half-edge table \texttt{(es,et,ef)} defining the
+\texttt{face}$=$cell set &
+vertex \texttt{pos} $\mathbf x_i$; per-face \texttt{A0,P0,v\_eq,hc}; per-edge $\ell_0$; per-cell morphogen &
+\texttt{cell\_geometry\_3d}, \texttt{shape\_energy\_3d} (default), \texttt{reconnect\_t1\_3d},
+\texttt{divide\_3d}, \texttt{morphogen\_growth\_3d}, \texttt{topo\_snapshot\_3d} \\
+\addlinespace
+\textbf{C. monolayer AVM} & same \texttt{vertex}$+$\texttt{face} sets; apical/basal are \emph{derived}, never
+stored &
+vertex \texttt{pos} $\mathbf x_i$; per-cell thickness \texttt{h}, \texttt{v\_eq}, morphogen \emph{amount}
+$m_j$ &
+\texttt{shape\_energy\_3d} with \texttt{implementation=monolayer} (\texttt{MonolayerShapeEnergy3D}),
+\texttt{reconnect\_t1\_3d}, \texttt{divide\_3d}, \texttt{morphogen\_growth\_3d} (\texttt{conserve\_amount}),
+\texttt{cell\_rd\_seed} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Three points are worth stressing. \emph{(i) The set choice is the DOF choice}: A stores a
+\texttt{cell} set of points, so its only positional field is $\mathbf r_i$; B and C store a \texttt{vertex}
+set, so the positional field is $\mathbf x_i$ and cells are read off the shared half-edge table.
+\emph{(ii) Same operator, two implementations}: B and C are both the \texttt{shape\_energy\_3d} operator --- C
+is a second numerical implementation (\texttt{implementation=monolayer}) of the \emph{same} contract, so the
+surrounding pipeline (growth, T1, division, rollout) is untouched. \emph{(iii) The monolayer adds exactly one
+field}, the per-cell thickness \texttt{h}: the apical/basal vertices $\mathbf a_i,\mathbf b_i$ are recomputed
+from $(\mathbf x_i,\mathbf n_i,\texttt{h})$ every step, never stored --- which is what makes the lift from B to
+C cheap and keeps the state differentiable.
 
 \section{The \texttt{mono\_V4\_tube\_flat} study (what we will make sound)}
 \texttt{mono\_V4} currently extends a lumpy, chaotic tube: growth is confined to a moving tip cap, cells
