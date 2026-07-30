@@ -36,7 +36,7 @@ operators:
 - op: cell_rd_seed
   at: cell
   mode: tip
-  n_spots: 3
+  n_spots: 1
   amp: 2.0
   tip_radius: 1.2
 - op: morphogen_growth_3d
@@ -47,16 +47,16 @@ operators:
   hill: 4.0
   rho: 0.0
   vth_frac: 1.5
-  after_frame: 100
+  after_frame: 20
   dt: 0.02
   conserve_amount: true
 - op: shape_energy_3d
   at: vertex
-  p0: 3.7
+  p0: 3.9
   K_A: 1.0
   K_P: 1.0
-  Gamma: 0.12
-  Lambda: 0.08
+  Gamma: 0.05
+  Lambda: 0.2
   K_V: 6.0
   K_R: 0.02
   K_bend: 0.0
@@ -71,10 +71,10 @@ operators:
   cell_set: cell
   K_purse: 0.0
   K_extrude: 12.0
-  a_sw: 1.2
+  a_sw: 0.5
   eta: 0.05
   iters: 4
-  after_frame: 100
+  after_frame: 20
 - op: reconnect_t1_3d
   at: vertex
   l_th_frac: 0.28
@@ -84,7 +84,7 @@ operators:
   at: vertex
   factor: 2.0
   reset_noise: 0.12
-  cycle_cv: 0.15
+  cycle_cv: 0.4
   p0: 3.9
   every: 1
   max_div: 120
@@ -92,10 +92,10 @@ operators:
   vcap: 1.5
   cell_set: cell
   min_cycle: 8
-  max_cycle: 12
-  after_frame: 100
+  max_cycle: 1000000000
+  after_frame: 20
   orient_iface: true
-  orient_asw: 1.2
+  orient_asw: 0.5
   g1_ramp: false
 - op: topo_snapshot_3d
   at: vertex

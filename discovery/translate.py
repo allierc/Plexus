@@ -101,7 +101,7 @@ def _emit_shape_energy(g, n, ga):
     if g.impl_of(n) == "monolayer":
         return {"op": "shape_energy_3d", "implementation": "monolayer", "at": "vertex",
                 "k_v": float(_p(g, i, "K_V")), "kappa_s": float(_p(g, i, "kappa_s")),
-                "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "Gamma")),
+                "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "mono_gamma")),
                 "mu": 1.0, "dt": DT_GLOBAL, "relax_iters": int(_p(g, i, "relax_iters")),
                 "eta": 0.08, "cap_frac": 0.12}
     return {"op": "shape_energy_3d", "at": "vertex",
@@ -114,8 +114,11 @@ def _emit_shape_energy(g, n, ga):
 
 def _emit_rd_seed(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
-    d = {"op": "cell_rd_seed", "at": "cell", "mode": impl, "n_spots": 3,
-         "amp": float(_p(g, i, "amp"))}
+    # the engine's mode name for a fixed-angle cone is "cones" (plural). Emitting "cone" here
+    # silently fell through to a different seeding mode -- caught by the V9 parameter check.
+    ENGINE_MODE = {"cone": "cones", "tip": "tip", "spot": "cones"}
+    d = {"op": "cell_rd_seed", "at": "cell", "mode": ENGINE_MODE[impl],
+         "n_spots": int(_p(g, i, "n_spots")), "amp": float(_p(g, i, "amp"))}
     if impl == "tip":
         d["tip_radius"] = float(_p(g, i, "tip_radius"))       # re-seeds EVERY frame: tip-tracking
     elif impl == "cone":
@@ -131,9 +134,10 @@ def _emit_react(g, n, ga):
     base = {"op": "cell_react", "at": "cell", "implementation": impl,
             "rate": float(_p(g, i, "rd_rate"))}
     if impl == "gierer_meinhardt":
-        base.update({"gm_rho": 1.0, "mu_a": 1.0, "mu_h": 1.0, "a0": float(_p(g, i, "a0"))})
+        base.update({"gm_rho": 1.0, "mu_a": 1.0, "mu_h": float(_p(g, i, "mu_h")),
+                     "a0": float(_p(g, i, "a0"))})
     elif impl == "gray_scott":
-        base.update({"F": 0.03, "kk": 0.062})
+        base.update({"F": float(_p(g, i, "F")), "kk": float(_p(g, i, "kk"))})
     else:
         base.update({"gamma": float(_p(g, i, "gamma")), "A": 1.0, "B": 3.0})
     return base
@@ -153,18 +157,18 @@ def _emit_divide(g, n, ga):
     return {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12,
             "cycle_cv": float(_p(g, i, "cycle_cv")), "p0": 3.90,
             "every": 1,                                        # D1: the ENGINE owns the clock
-            "max_div": 120, "max_div_frac": 0.03,
+            "max_div": 120, "max_div_frac": float(_p(g, i, "max_div_frac")),
             "vcap": float(_p(g, i, "vcap")), "cell_set": "cell",
             "min_cycle": int(_p(g, i, "min_cycle")), "max_cycle": int(_p(g, i, "max_cycle")),
             "after_frame": ga, "orient_iface": g.impl_of(n) == "orient_iface",
-            "orient_asw": 1.2, "g1_ramp": False}
+            "orient_asw": float(_p(g, i, "orient_asw")), "g1_ramp": False}
 
 
 def _emit_extrude(g, n, ga):
     i = n["id"]
     return {"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell",
             "K_purse": 0.0, "K_extrude": float(_p(g, i, "K_extrude")),
-            "a_sw": 1.2, "eta": 0.05, "iters": 4, "after_frame": ga}
+            "a_sw": float(_p(g, i, "a_sw")), "eta": 0.05, "iters": 4, "after_frame": ga}
 
 
 EMIT = {
@@ -191,7 +195,7 @@ EMIT = {
 
 
 # --------------------------------------------------------------------------- graph -> spec
-def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_after=100,
+def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_after=None,
             record_every=1):
     """Compile a CompositionGraph into a runnable Plexus spec dict.
 
@@ -199,6 +203,8 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
     dangling slot must never reach the cluster (D4: it would silently no-op and its metrics
     would be recorded as evidence that the mechanism cannot work).
     """
+    if grow_after is None:                      # from_preset stashes the preset's grow_after
+        grow_after = int(graph.params.get("_run.grow_after", 100))
     ok, why = graph.is_runnable()
     if not ok:
         raise ValueError(f"refusing to compile a non-runnable composition: {why}")
@@ -308,6 +314,8 @@ def from_preset(p: dict) -> CompositionGraph:
 
     # carry theta across so the compiled spec is numerically the preset, not the defaults
     pm = g.default_params()
+    pm["_run.grow_after"] = int(p.get("grow_after", 0))
+    pm["_run.frames"] = int(p.get("frames", 350))
     node = lambda op: next((o["id"] for o in g.ops if o["op"] == op), None)
     mapping = [
         ("shape_energy_3d", "K_V", p.get("K_V")), ("shape_energy_3d", "relax_iters", p.get("relax")),
@@ -316,13 +324,24 @@ def from_preset(p: dict) -> CompositionGraph:
         ("morphogen_growth_3d", "alpha", p.get("hill")), ("morphogen_growth_3d", "rho", p.get("rho")),
         ("divide_3d", "cycle_cv", p.get("cycle_cv")), ("divide_3d", "min_cycle", p.get("min_cycle")),
         ("divide_3d", "max_cycle", p.get("max_cycle")), ("divide_3d", "vcap", p.get("vcap")),
+        ("divide_3d", "max_div_frac", p.get("mdf")),
+        ("shape_energy_3d", "Gamma", p.get("Gamma")), ("shape_energy_3d", "Lambda", p.get("Lambda")),
+        ("shape_energy_3d", "p0", p.get("p0")),
         ("extrude", "K_extrude", p.get("K_extrude")),
+        ("extrude", "a_sw", p.get("iface_asw", p.get("a_sw"))),
+        ("divide_3d", "orient_asw", p.get("orient_asw", p.get("a_sw"))),
+        ("cell_rd_seed", "n_spots", p.get("spots")),
+        ("cell_react", "F", p.get("F")), ("cell_react", "kk", p.get("kk")),
+        ("cell_react", "mu_h", p.get("mu_h")),
+        ("shape_energy_3d", "mono_gamma", p.get("mono_gamma")),
         ("cell_diffuse", "chi", p.get("chi")), ("cell_diffuse", "d_a", p.get("d_a")),
         ("cell_diffuse", "d_h", p.get("d_h")),
         ("cell_react", "rd_rate", p.get("rd_rate")), ("cell_react", "a0", p.get("a0")),
         ("cell_react", "gamma", p.get("gamma")),
         ("cell_rd_seed", "cone_deg", p.get("cone_deg")),
         ("cell_rd_seed", "tip_radius", p.get("tip_radius")),
+        ("cell_rd_seed", "amp", p.get("amp")),
+        ("reconnect_t1_3d", "l_th", (p.get("l_th_frac") / 7.0) if p.get("l_th_frac") else None),
     ]
     for op, pname, val in mapping:
         nid = node(op)
