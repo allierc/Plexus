@@ -179,10 +179,28 @@ class Certification:
             self.record_defect(d)
         return len(KNOWN_DEFECTS)
 
+    def resolve_defect(self, did, resolved_by, note=""):
+        """Mark a defect resolved. Append-only: a NEW record with the resolution, never an edit
+        of the original -- so the history shows the defect as it was first stated."""
+        cur = {d["did"]: d for d in self.defects()}
+        if did not in cur:
+            raise KeyError(f"unknown defect {did}")
+        d = dict(cur[did])
+        d.update(resolved_by=resolved_by, resolved_t=time.time(),
+                 detail=d["detail"] + f"  [RESOLVED {resolved_by}: {note}]" if note else d["detail"])
+        with open(self.defects_path, "a") as f:
+            f.write(json.dumps(d) + "\n")
+        return d
+
     def defects(self):
         if not os.path.exists(self.defects_path):
             return []
-        return [json.loads(l) for l in open(self.defects_path) if l.strip()]
+        # last record per did wins: resolutions are appended, so the latest state is current
+        out = {}
+        for l in open(self.defects_path):
+            if l.strip():
+                d = json.loads(l); out[d["did"]] = d
+        return list(out.values())
 
     # -- retraction ----------------------------------------------------------------------
     def retract(self, defect_id, affected_claims, affected_runs, reason, reanalysable):

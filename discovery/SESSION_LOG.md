@@ -605,3 +605,82 @@ simulation was not once at fault.
 | **Blocked** | campaign scoring, correctly — the Metrologist refuses admission and `M3` is invalidating |
 
 ---
+## Hour 9 — 2026-07-30 21:00–22:00 EDT
+
+### ✅ THE INSTRUMENT GATE RAN — and it works, in both directions
+
+8 labelled configs submitted 8-way to the L4 partition. Running it exposed **three plumbing
+defects in an hour**, none of them in the physics:
+
+1. **Tracked configs were not portable.** `translate.py` baked an absolute `/workspace/...`
+   checkpoint path into committed configs; the cluster mounts the same export at
+   `/groups/.../Graph`, so **7 of 8 jobs died** with `FileNotFoundError`. Now repo-relative,
+   resolved by the runner against its own location, and declared deliberate in V9.
+2. **`bjobs` hides finished jobs**, so an empty queue could not distinguish *"all finished"* from
+   *"never submitted"* — `wait()` would have reported success on 7 dead jobs. Now `-a`.
+3. **Names are not sufficient either**: `bjobs -a` returns historical jobs, so a previous `EXIT`
+   is indistinguishable from a new `PEND`. Now we parse **job IDs** from a per-submission log.
+
+### 🔴 FINDING 15 — I committed the gate's own failure mode, one level up
+
+First scoring: **GATE FAIL, no metric admissible.** That verdict was wrong, and the reason
+matters. I had taken the eye labels **from the report** — which describes the **archived** runs —
+while scoring **fresh** ones. `round_40_mc8` is a long thin tube in the archive and renders a
+**bud** here (D1d), so I ranked it 4 while it rendered a 2. Judging by provenance instead of by
+looking is precisely what this gate exists to prevent.
+
+Re-labelled from a montage of the actual final frames. What they really are:
+
+| run | renders | was labelled |
+|---|---|---|
+| `ref_uniform_inflation` (900f) | **exploded spiky mess** | "sphere" |
+| `round_44_base` | smooth sphere, tiny nub | "flood" |
+| `round_41_hertwig` / `relax60` / **`round_40_mc8`** | **buds** | bud / bud / **tube** |
+| `round_42_k05`, `round_42_k05_ex4` | **the most elongated** — thin spikes | "spike" |
+
+The monolayer runs are the tube-like ones; `round_40_mc8` is a bud. (Note also that
+`ref_uniform_inflation` is a clean sphere at 130 frames and explodes by 900 — a smoke test at one
+horizon says nothing about another.)
+
+### ✅ GATE PASS, with correct labels — and it names the liars
+
+| metric | τ | verdict |
+|---|---|---|
+| `protr_peak` | **+1.00** | ✅ admissible |
+| `ta_n_tubes_final` | **+1.00** | ✅ admissible |
+| `protr_final` | +0.67 | ✅ admissible |
+| `ta_aspect_len_over_diam` | −0.71 | ❌ **FOOLED** — the metric that scored 9.30 on a bud |
+| `ta_tube_len_final` | +0.18 | ❌ FOOLED |
+| **`retention`** | **−1.00** | ❌ **perfectly anti-correlated** |
+| `n_cells_final` | −0.22 | ❌ no signal |
+
+`M3` is now **confirmed and quarantined** rather than merely suspected: the two `tube_len`-derived
+metrics are excluded from campaign scoring by measurement, not by argument.
+
+### 🔴 FINDING 16 — `retention`, and therefore **Q**, measures "did not change"
+
+τ = −1.00 is not noise, it is an inversion. A sphere that never moved scores **1.000**; the most
+elongated spike scores **0.275**. The ratio rewards **stasis**.
+
+**Q is defined as the same ratio** — aspect after driver-off relaxation ÷ before — so Q inherits
+the defect: *a sphere passes Q trivially.* Q is the campaign's **primary discriminator** in
+`plexus2_discovery`, and `CampaignConfig.success` requires `Q ≥ 0.5`. As specified, that criterion
+would have admitted every sphere in the search space.
+
+Recorded as `M4` (invalidating). The discriminator must be redefined on an **absolute**
+post-relaxation elongation with a floor, not a ratio.
+
+### ⏱ SUMMARY — Hour 9 (21:00–22:00)
+
+| | |
+|---|---|
+| **Done** | instrument gate submitted, run and scored on L4; 6 earlier defects marked resolved; 3 plumbing defects fixed |
+| **Found** | I labelled by provenance instead of by looking (F15); **`retention`/`Q` are inverted** (F16, M4) |
+| **Decided** | campaign scoring may use only `protr_peak`, `ta_n_tubes_final`, `protr_final` |
+| **Next** | redefine Q absolutely; then `vcap` (D1d). The loop still may not start — `D1d` and `M4` are open |
+| **Blocked** | correctly. The Metrologist refuses admission. |
+
+**The gate paid for itself on its first run:** it caught the metric I had already published a
+conclusion from, and the discriminator the whole campaign was specified around.
+
+---

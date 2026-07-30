@@ -1,0 +1,260 @@
+{
+ "labelled": [
+  {
+   "config": "ref_uniform_inflation",
+   "eye": "exploded",
+   "rank": 0,
+   "note": "at 900 frames uniform inflation EXPLODES into spikes (the 130-frame smoke was a clean sphere). Kept as rank 0: it is not a tube, so a metric that scores it high is fooled -- this is the 'lumpy blob scores well' control."
+  },
+  {
+   "config": "round_44_base",
+   "eye": "sphere",
+   "rank": 1,
+   "note": "large smooth sphere with a tiny nub"
+  },
+  {
+   "config": "round_41_hertwig",
+   "eye": "bud",
+   "rank": 2,
+   "note": "sphere + small bud"
+  },
+  {
+   "config": "round_41_relax60",
+   "eye": "bud",
+   "rank": 2,
+   "note": "sphere + small bud"
+  },
+  {
+   "config": "round_40_mc8",
+   "eye": "bud",
+   "rank": 2,
+   "note": "sphere + small bud. The ARCHIVE for this preset is a long thin tube; the clock-fixed substrate renders a bud (Metrologist D1d). We score what ran."
+  },
+  {
+   "config": "round_42_k05",
+   "eye": "spike",
+   "rank": 3,
+   "note": "monolayer, growth-driven: clearly elongated"
+  },
+  {
+   "config": "round_42_k05_ex4",
+   "eye": "spike",
+   "rank": 4,
+   "note": "monolayer + extrusion: the MOST elongated -- a long thin spike"
+  },
+  {
+   "config": "round_21_gs",
+   "eye": "bud",
+   "rank": 2,
+   "note": "Gray-Scott stable-spot regime"
+  }
+ ],
+ "scores": {
+  "ref_uniform_inflation": {
+   "saturated": false,
+   "inert_operators": [
+    "divide_3d"
+   ],
+   "retention": 1.0,
+   "valid_evidence": false,
+   "protr_final": 1.016,
+   "protr_peak": 1.016,
+   "n_cells_final": 500,
+   "red_frac_final": 0.0,
+   "act_max_final": 0.0,
+   "frames": 41,
+   "wall_s": 5.2,
+   "ta_hollow_n_peak": 0,
+   "ta_hollow_n_final": 0,
+   "ta_area_cv_final": 0.122,
+   "ta_vol_cv_final": 0.122,
+   "ta_tube_diam_final": 0.0,
+   "ta_n_tubes_final": 0,
+   "ta_tube_len_final": 0.0,
+   "ta_protr_final": 1.013,
+   "ta_red_frac_final": 0.0,
+   "ta_tip_act_final": 0.0
+  },
+  "round_44_base": {
+   "saturated": false,
+   "inert_operators": [
+    "rd_interface_tension"
+   ],
+   "retention": 1.0,
+   "valid_evidence": false,
+   "protr_final": 1.449,
+   "protr_peak": 1.449,
+   "n_cells_final": 2983,
+   "red_frac_final": 0.109,
+   "act_max_final": 0.993,
+   "frames": 901,
+   "wall_s": 368.7,
+   "ta_hollow_n_peak": 212,
+   "ta_hollow_n_final": 212,
+   "ta_area_cv_final": 0.709,
+   "ta_vol_cv_final": 0.679,
+   "ta_tube_diam_final": 0.0,
+   "ta_n_tubes_final": 0,
+   "ta_tube_len_final": 0.0,
+   "ta_protr_final": 1.24,
+   "ta_red_frac_final": 0.109,
+   "ta_tip_act_final": 0.589
+  },
+  "round_41_hertwig": {
+   "saturated": false,
+   "inert_operators": [],
+   "retention": 0.842,
+   "valid_evidence": true,
+   "protr_final": 1.367,
+   "protr_peak": 1.623,
+   "n_cells_final": 2987,
+   "red_frac_final": 0.015,
+   "act_max_final": 0.972,
+   "frames": 901,
+   "wall_s": 262.3,
+   "ta_hollow_n_peak": 305,
+   "ta_hollow_n_final": 305,
+   "ta_area_cv_final": 0.69,
+   "ta_vol_cv_final": 0.675,
+   "ta_tube_diam_final": 2.074,
+   "ta_n_tubes_final": 1,
+   "ta_tube_len_final": 14.289,
+   "ta_protr_final": 3.108,
+   "ta_red_frac_final": 0.015,
+   "ta_tip_act_final": 0.266,
+   "ta_aspect_len_over_diam": 6.89
+  },
+  "round_41_relax60": {
+   "saturated": false,
+   "inert_operators": [],
+   "retention": 0.86,
+   "valid_evidence": true,
+   "protr_final": 1.415,
+   "protr_peak": 1.645,
+   "n_cells_final": 2912,
+   "red_frac_final": 0.015,
+   "act_max_final": 0.972,
+   "frames": 901,
+   "wall_s": 438.0,
+   "ta_hollow_n_peak": 389,
+   "ta_hollow_n_final": 389,
+   "ta_area_cv_final": 0.693,
+   "ta_vol_cv_final": 0.681,
+   "ta_tube_diam_final": 2.472,
+   "ta_n_tubes_final": 2,
+   "ta_tube_len_final": 7.89,
+   "ta_protr_final": 2.911,
+   "ta_red_frac_final": 0.015,
+   "ta_tip_act_final": 0.288,
+   "ta_aspect_len_over_diam": 3.192
+  },
+  "round_40_mc8": {
+   "saturated": false,
+   "inert_operators": [],
+   "retention": 0.771,
+   "valid_evidence": true,
+   "protr_final": 1.335,
+   "protr_peak": 1.732,
+   "n_cells_final": 2927,
+   "red_frac_final": 0.019,
+   "act_max_final": 0.972,
+   "frames": 901,
+   "wall_s": 328.7,
+   "ta_hollow_n_peak": 367,
+   "ta_hollow_n_final": 364,
+   "ta_area_cv_final": 0.722,
+   "ta_vol_cv_final": 0.689,
+   "ta_tube_diam_final": 1.579,
+   "ta_n_tubes_final": 1,
+   "ta_tube_len_final": 14.687,
+   "ta_protr_final": 3.124,
+   "ta_red_frac_final": 0.019,
+   "ta_tip_act_final": 0.295,
+   "ta_aspect_len_over_diam": 9.301
+  },
+  "round_42_k05": {
+   "saturated": false,
+   "inert_operators": [],
+   "retention": 0.357,
+   "valid_evidence": true,
+   "protr_final": 1.857,
+   "protr_peak": 5.202,
+   "n_cells_final": 2458,
+   "red_frac_final": 0.055,
+   "act_max_final": 0.972,
+   "frames": 901,
+   "wall_s": 535.9,
+   "ta_hollow_n_peak": 786,
+   "ta_hollow_n_final": 750,
+   "ta_area_cv_final": 5.634,
+   "ta_vol_cv_final": 9.582,
+   "ta_tube_diam_final": 0.853,
+   "ta_n_tubes_final": 4,
+   "ta_tube_len_final": 3.194,
+   "ta_protr_final": 21.121,
+   "ta_red_frac_final": 0.055,
+   "ta_tip_act_final": 0.377,
+   "ta_aspect_len_over_diam": 3.744
+  },
+  "round_42_k05_ex4": {
+   "saturated": false,
+   "inert_operators": [],
+   "retention": 0.275,
+   "valid_evidence": true,
+   "protr_final": 2.294,
+   "protr_peak": 8.344,
+   "n_cells_final": 2301,
+   "red_frac_final": 0.014,
+   "act_max_final": 0.972,
+   "frames": 901,
+   "wall_s": 596.9,
+   "ta_hollow_n_peak": 736,
+   "ta_hollow_n_final": 736,
+   "ta_area_cv_final": 4.165,
+   "ta_vol_cv_final": 5.965,
+   "ta_tube_diam_final": 0.498,
+   "ta_n_tubes_final": 4,
+   "ta_tube_len_final": 1.11,
+   "ta_protr_final": 61.419,
+   "ta_red_frac_final": 0.014,
+   "ta_tip_act_final": 0.23,
+   "ta_aspect_len_over_diam": 2.229
+  }
+ },
+ "verdicts": {
+  "ta_aspect_len_over_diam": {
+   "admit": false,
+   "why": "tau=-0.71 FOOLED: a lower-ranked run outscores the top"
+  },
+  "ta_tube_len_final": {
+   "admit": false,
+   "why": "tau=+0.18 FOOLED: a lower-ranked run outscores the top"
+  },
+  "ta_n_tubes_final": {
+   "admit": true,
+   "why": "tau=+1.00"
+  },
+  "protr_final": {
+   "admit": true,
+   "why": "tau=+0.67"
+  },
+  "protr_peak": {
+   "admit": true,
+   "why": "tau=+1.00"
+  },
+  "retention": {
+   "admit": false,
+   "why": "tau=-1.00 FOOLED: a lower-ranked run outscores the top"
+  },
+  "n_cells_final": {
+   "admit": false,
+   "why": "tau=-0.22 FOOLED: a lower-ranked run outscores the top"
+  }
+ },
+ "admitted": [
+  "ta_n_tubes_final",
+  "protr_final",
+  "protr_peak"
+ ],
+ "passed": true
+}
