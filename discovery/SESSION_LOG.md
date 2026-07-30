@@ -790,3 +790,59 @@ learned"**. Fixed: parameter hypotheses carry real predictions and count like an
 
 D1d moves from Open toward a partial answer, by measurement rather than by my reasoning — which
 is the whole point of building the loop.
+
+## Hour 11 — 2026-07-30 23:00–00:00 EDT
+
+### 🔴 FINDING 20 (CRITICAL for the week launch) — the cluster cannot caption, so the Watcher was blind
+
+Every cluster job recorded:
+
+```
+VLM caption UNAVAILABLE: ModuleNotFoundError: No module named 'transformers'
+```
+
+The partition's `connectome-gnn` environment has no `transformers`. So **the Watcher was blind on
+every cluster run** — which is precisely the population a week-long campaign produces. The
+eye/number divergence defence, the thing that has caught more errors in this project than
+anything else, was inert exactly where it matters most.
+
+It failed *loudly* (wrote `UNAVAILABLE` rather than a caption), which is the only reason I found
+it. A silent skip would have left every run looking Watcher-approved.
+
+**Fix**: `caption_wave.py` — captioning moved off the cluster to the devcontainer, which has the
+model and the libraries, with **one model load per wave** instead of one per job. Still
+always-caption: it runs as part of closing the round, before the Analysts and the Watcher (both
+read `description.txt`, and a blind Watcher cannot veto). Verified on the vcap wave: 5 captions,
+one load.
+
+### 🔴 FINDING 18 fixed — stale configs can no longer shadow a round
+
+Configs are now namespaced `r{round:03d}{mode}_{slot}_{hash}` and the round's namespace is
+**purged before writing**. A leftover from an aborted run of the same round number would
+otherwise be picked up by a cluster job — silently running the wrong experiment.
+
+### ✅ Storage bottleneck retracted
+
+I flagged ~400 GB of trajectories as a bottleneck **without checking free space**. Measured: 12
+runs = 454 MB → ~38 MB/run → ~380 GB at 10⁴ runs, against **49 TB free**. It is a non-issue and
+needs no retention policy. Recorded because an unchecked assertion in a design document is the
+same class of error as an unchecked metric.
+
+### ⏱ SUMMARY — Hour 11
+
+| | |
+|---|---|
+| **Done** | F18 config namespacing + purge; F20 caption-per-wave (the Watcher can see again); storage bottleneck retracted on measurement |
+| **Found** | the cluster cannot caption — the single most important week-launch defect so far |
+| **Next** | a COMPOSITION round (the LLM Proposer has still never been called); escalation path; progress reel |
+| **Blocked** | nothing |
+
+### Standing state for a fresh session
+
+- **Nothing running** on the cluster.
+- The loop works end to end in `--mode theta`; `--mode composition` is wired but the **LLM
+  Proposer has never actually been invoked**. That is the next thing to exercise, attended.
+- Open, not hidden: escalation path unbuilt (and the lever-map reframing made it the *main*
+  path); no progress reel yet; Proposer call still blocks the round instead of overlapping.
+- `D1d` partially answered: `vcap=1.5` (the archived working point) is the worst value swept;
+  response is non-monotonic; `vcap=3.0` gives the best sustained protrusion.

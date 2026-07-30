@@ -197,6 +197,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     print(f"ROUND {rid}   mode={mode}   campaign={cfg.name}")
     print("=" * 96)
 
+    _purge_round_configs(rid)          # F18: stale configs must not shadow this round's
     if mode == "theta":
         cands = build_theta_batch(base, param, values, batch)
     else:
@@ -209,7 +210,9 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     # ------------------------------------------------ hypotheses FIRST, then configs
     posed = []
     for i, (g, lbl, sl) in enumerate(cands):
-        nm = f"r{rid:02d}_{i:02d}_{comp_hash(g)[1:7]}" + (f"_{i}" if mode == "theta" else "")
+        # F18: names carry round AND mode AND slot. A previous round's config with a matching
+        # name could otherwise be picked up by a job -- silently running the wrong experiment.
+        nm = f"r{rid:03d}{mode[0]}_{i:02d}_{comp_hash(g)[1:7]}"
         T.write_config(g, nm, frames=frames)
         h = Hypothesis(hid=f"R{rid}.{i}.{comp_hash(g)[1:7]}", comp_hash=comp_hash(g),
                        parent_hash=None, edit=lbl,
@@ -234,6 +237,12 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         print("[round] submission did not land -- aborting rather than scoring nothing")
         return 1
     cluster.wait_for_ids(ids, poll=60)
+
+    # ------------------------------------------------ caption the wave (one model load)
+    # Must happen BEFORE the Analysts and the Watcher: both read description.txt, and a blind
+    # Watcher cannot veto. This is where the cluster's missing `transformers` is worked around.
+    from caption_wave import caption_wave
+    caption_wave(names)
 
     # ------------------------------------------------ analyse + watch + score
     rows = []
@@ -311,6 +320,22 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
 
 
 # --------------------------------------------------------------------------- helpers
+def _purge_round_configs(rid):
+    """Remove any config already carrying THIS round's prefix.
+
+    A stale config from an aborted run of the same round number would otherwise shadow a fresh
+    one, and a cluster job would silently execute the wrong experiment. Found when a dry-run
+    leftover (r01_01_4af688.yaml) shadowed a theta slot.
+    """
+    import glob
+    n = 0
+    for f in glob.glob(os.path.join(ROOT, "config", "okuda", f"r{rid:03d}*.yaml")):
+        os.remove(f); n += 1
+    if n:
+        print(f"  [configs] purged {n} stale config(s) for round {rid}")
+
+
+
 def _theta_prediction(param, v, base_v):
     """A default falsifiable prediction when none was supplied.
 
