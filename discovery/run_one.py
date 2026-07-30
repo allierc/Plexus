@@ -115,6 +115,12 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     cfg_path = os.path.join(CONFIG_DIR, f"{name}.yaml")
     cfg = yaml.safe_load(open(cfg_path))
     disc = cfg.get("_discovery", {})
+    # resolve repo-relative asset paths against THIS checkout, so one tracked config runs both in
+    # the devcontainer (/workspace/...) and on the cluster (/groups/.../Graph/...).
+    for o in cfg["operators"]:
+        ck = o.get("ckpt")
+        if ck and not os.path.isabs(ck):
+            o["ckpt"] = os.path.join(ROOT, ck)
     out_dir = os.path.join(LOG_DIR, name)
     os.makedirs(out_dir, exist_ok=True)
 
@@ -292,6 +298,9 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, relax_frames=60
 def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     """Strip + movie, matching the minisite convention (black bg, activator LUT)."""
     from run_tyssue_vesicle import _draw, make_movie_axes
+    # the minisite / archive convention is 3D shell + a CROSS-SECTION inset taken in the plane
+    # of the tubing, so a protrusion reads correctly against the 3D view.
+    from run_tyssue_round import _cross_screen, _cross_axis
     from matplotlib.animation import FFMpegWriter
     try:
         import imageio_ffmpeg
@@ -305,13 +314,19 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     col = lambda a: np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)
     lbox = lambda pt: float(np.abs(pt).max()) * 1.12
 
-    fig = plt.figure(figsize=(4.4 * n_strip, 4.6))
+    # two rows: 3D shell on top, cross-section beneath, as the archive strips are drawn
+    fig = plt.figure(figsize=(4.4 * n_strip, 9.0))
     fig.patch.set_facecolor("black")
     for i, t in enumerate([int(round(f * (T - 1))) for f in np.linspace(0, 1, n_strip)]):
         pt, mt, a = fr[t]
-        ax = fig.add_subplot(1, n_strip, i + 1, projection="3d")
+        ax = fig.add_subplot(2, n_strip, i + 1, projection="3d")
         _draw(ax, pt, mt, 3.90, azim=30, act=col(a), Lbox=lbox(pt))
-    fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02)
+        ax2 = fig.add_subplot(2, n_strip, n_strip + i + 1)
+        # NO try/except here. Swallowing the error is exactly the silent-no-op pattern this
+        # project keeps being bitten by: the first version caught a TypeError from a wrong
+        # signature and rendered a blank row that looked deliberate.
+        _cross_screen(ax2, pt, mt, col(a), seed_dir=_cross_axis(pt, None), Lbox=lbox(pt) * 2.05)
+    fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
 
@@ -324,6 +339,8 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
         for t in keep:
             pt, mt, a = fr[int(t)]
             _draw(axm, pt, mt, 3.90, azim=30, act=col(a), Lbox=lbox(pt))
+            _cross_screen(axin, pt, mt, col(a), seed_dir=_cross_axis(pt, None),
+                          Lbox=lbox(pt) * 2.05)      # cross-section, minisite convention
             wri.grab_frame()
     plt.close(figm)
     print(f"[{name}] artefacts -> {os.path.relpath(out_dir, ROOT)}/{{strip.png,movie.mp4}}",

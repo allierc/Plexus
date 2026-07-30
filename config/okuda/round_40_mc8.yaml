@@ -29,7 +29,7 @@ operators:
 - op: load_mesh_3d
   at: vertex
   cell_set: cell
-  ckpt: /workspace/Plexus/prototype/Tyssue/archive/smoke_hom/ckpt.npz
+  ckpt: prototype/Tyssue/archive/smoke_hom/ckpt.npz
   before_frame: 1
 - op: cell_geometry_3d
   at: cell

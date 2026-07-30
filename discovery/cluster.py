@@ -117,18 +117,55 @@ def submit(names, frames=None, do_q=False, campaign="campaign"):
         f.write("#!/bin/bash -l\n"
                 + "\n".join(_bsub_cmd(n, frames, do_q, campaign) for n in names) + "\n")
     os.chmod(runner, 0o755)
-    log = cpath(os.path.join(LOGDIR, "_submit.log"))
+    logl = os.path.join(LOGDIR, "_submit.log")
+    if os.path.exists(logl):
+        os.replace(logl, logl + ".prev")     # a fresh log per submission, so IDs are unambiguous
+    log = cpath(logl)
     _ssh(f"nohup bash {cpath(runner)} > {log} 2>&1 < /dev/null &", timeout=30)
     print(f"[cluster] fired {len(names)} bsub(s) DETACHED on {SSH}: "
           f"{', '.join(PREFIX + n for n in names)}")
     print(f"  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.")
     print(f"  verify: python cluster.py --status   (remote submit log: {log})")
+    return submitted_ids(wait_s=25, expect=len(names))
+
+
+def submitted_ids(wait_s=25, expect=None):
+    """Parse the JOB IDs out of the fresh submit log.
+
+    Names are NOT sufficient: `bjobs -a` returns historical jobs, so a previous EXIT with the
+    same name is indistinguishable from a new PEND. IDs are unique per submission, so they are
+    the only sound thing to track.
+    """
+    import re
+    logl = os.path.join(LOGDIR, "_submit.log")
+    t0 = time.time()
+    ids = []
+    while time.time() - t0 < wait_s:
+        if os.path.exists(logl):
+            ids = re.findall(r"Job <(\d+)> is submitted", open(logl, errors="ignore").read())
+            if expect is None or len(ids) >= expect:
+                break
+        time.sleep(2)
+    if expect is not None and len(ids) < expect:
+        print(f"[cluster] ⚠ only {len(ids)}/{expect} bsubs reported an ID -- the rest did NOT "
+              f"land. Do not treat the batch as submitted.")
+    return ids
 
 
 # --------------------------------------------------------------------------- queue
-def status(verbose=True):
-    """Return {job_name: state}. Empty dict == nothing queued (or the link is down; retry)."""
-    out = _ssh_retry(f'bjobs -o "JOBID JOB_NAME STAT" -noheader 2>/dev/null | grep {PREFIX} || true')
+def status(verbose=True, include_done=True):
+    """Return {job_name: state}.
+
+    ⚠ `bjobs` without -a hides FINISHED jobs, so an empty result cannot distinguish
+        "all finished"  from  "never submitted".
+    `wait()` would then report success on a silently failed submission -- the precise failure
+    this driver exists to prevent, reintroduced one level up. We therefore ask for `-a` (which
+    includes DONE/EXIT) and let the caller decide, and `wait_for()` checks EXPECTED names rather
+    than mere queue emptiness.
+    """
+    flag = "-a " if include_done else ""
+    out = _ssh_retry(f'bjobs {flag}-o "JOBID JOB_NAME STAT" -noheader 2>/dev/null '
+                     f'| grep {PREFIX} || true')
     jobs = {}
     if out is None:
         if verbose:
@@ -151,8 +188,73 @@ def status(verbose=True):
     return jobs
 
 
+def wait_for_ids(ids, poll=60, timeout_h=24):
+    """Block until every submitted JOB ID reaches a terminal state. IDs, not names."""
+    ids = set(map(str, ids))
+    if not ids:
+        print("[cluster] no job ids to wait on -- submission did not land")
+        return False
+    t0 = time.time()
+    while time.time() - t0 < timeout_h * 3600:
+        out = _ssh_retry('bjobs -a -o "JOBID STAT" -noheader 2>/dev/null || true')
+        if out is None:
+            print("  queue unreachable -- waiting, not concluding", flush=True)
+        else:
+            st = {}
+            for line in (out.stdout or "").strip().split("\n"):
+                p = line.split()
+                if len(p) >= 2 and p[0] in ids:
+                    st[p[0]] = p[1]
+            active = [i for i in ids if st.get(i) in ("RUN", "PEND")]
+            done = [i for i in ids if st.get(i) == "DONE"]
+            bad = [i for i in ids if st.get(i) == "EXIT"]
+            print(f"  [{time.strftime('%H:%M')}] run/pend={len(active)} done={len(done)} "
+                  f"exit={len(bad)} of {len(ids)}", flush=True)
+            if not active:
+                if bad:
+                    print(f"[cluster] ⚠ {len(bad)} job(s) EXITed: {sorted(bad)}")
+                return not bad
+        time.sleep(poll)
+    return False
+
+
+def wait_for(expected, poll=60, timeout_h=24):
+    """Block until every EXPECTED job has reached a terminal state.
+
+    Checking expected names -- not queue emptiness -- is what distinguishes "finished" from
+    "never submitted". A job that never appears at all is reported as MISSING, loudly, rather
+    than silently counted as done.
+    """
+    expected = {PREFIX + n if not n.startswith(PREFIX) else n for n in expected}
+    t0 = time.time()
+    while time.time() - t0 < timeout_h * 3600:
+        jobs = status(verbose=False)
+        if jobs is None:
+            print("  queue unreachable -- waiting, not concluding", flush=True)
+        else:
+            active = {n for n, s in jobs.items() if s in ("RUN", "PEND")}
+            seen = set(jobs)
+            missing = expected - seen
+            done = {n for n, s in jobs.items() if s in ("DONE", "EXIT")}
+            print(f"  [{time.strftime('%H:%M')}] active={len(active)} done={len(done & expected)}"
+                  f"/{len(expected)} missing={len(missing)}", flush=True)
+            if not (active & expected):
+                if missing:
+                    print(f"[cluster] ⚠ {len(missing)} job(s) NEVER APPEARED: "
+                          f"{sorted(missing)} -- submission did not land; do NOT treat as done")
+                    return False
+                bad = {n for n, s in jobs.items() if s == "EXIT" and n in expected}
+                if bad:
+                    print(f"[cluster] ⚠ {len(bad)} job(s) EXITed: {sorted(bad)}")
+                print(f"[cluster] all {len(expected)} expected jobs terminal")
+                return not bad
+        time.sleep(poll)
+    print("[cluster] wait timed out")
+    return False
+
+
 def wait(poll=60, timeout_h=24):
-    """Block until no pg_* job is RUN or PEND. An unreachable queue is NOT 'done'."""
+    """Legacy: block until no pg_* job is RUN/PEND. Prefer wait_for(expected)."""
     t0 = time.time()
     while time.time() - t0 < timeout_h * 3600:
         jobs = status(verbose=False)
@@ -160,13 +262,10 @@ def wait(poll=60, timeout_h=24):
             print("  queue unreachable -- waiting, not concluding", flush=True)
         else:
             active = {n: s for n, s in jobs.items() if s in ("RUN", "PEND")}
-            print(f"  [{time.strftime('%H:%M')}] active={len(active)} "
-                  f"{'  '.join(sorted(active)[:5])}", flush=True)
+            print(f"  [{time.strftime('%H:%M')}] active={len(active)}", flush=True)
             if not active:
-                print("[cluster] all jobs finished")
                 return True
         time.sleep(poll)
-    print("[cluster] wait timed out")
     return False
 
 
@@ -187,10 +286,13 @@ def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None
     print(f"[cluster] {len(names)} runs in {len(waves)} wave(s) of <= {parallel}")
     for i, wave in enumerate(waves, 1):
         print(f"\n=== wave {i}/{len(waves)}: {', '.join(wave)}")
-        submit(wave, frames=frames, do_q=do_q, campaign=campaign)
-        time.sleep(20)                      # let the detached bsubs land before we poll
-        wait(poll=poll)
+        ids = submit(wave, frames=frames, do_q=do_q, campaign=campaign)
+        if not wait_for_ids(ids, poll=poll):
+            print(f"[cluster] wave {i} did not complete cleanly -- stopping rather than "
+                  f"continuing on partial evidence")
+            return False
     print("\n[cluster] batch complete")
+    return True
 
 
 if __name__ == "__main__":

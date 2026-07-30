@@ -135,8 +135,11 @@ def main():
     # they are per-CALL in the operator and the archived configs ran divide_3d once every 4
     # frames, so preserving the archived behaviour REQUIRES different numbers. V10 checks the
     # factor is exactly right; V9 must not flag it as a fidelity failure.
+    # `ckpt`: PORTABILITY. make() bakes an absolute /workspace path; a tracked config must run
+    # both in the devcontainer and on the cluster, which mount the same export at different
+    # prefixes, so we emit a repo-relative path resolved by run_one against its own location.
     DELIBERATE = {"dt", "every", "max_cycle", "max_div", "record_every",
-                  "min_cycle", "max_div_frac"}
+                  "min_cycle", "max_div_frac", "ckpt"}
     if have_make:
         for name in TRUSTED:
             if name not in specs or name not in presets:
