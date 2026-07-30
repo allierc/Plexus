@@ -103,7 +103,11 @@ CLOCK_COUPLED = {                       # param -> how to convert an archived va
 #   K_V      Its MEANING was never clock-coupled (a per-frame mechanical stiffness). Its
 #            OPTIMALITY was stale only because it was tuned against the division wave -- and the
 #            re-anchoring restores exactly that wave, so K_V = 6.0 is valid again.
-PROVISIONAL_THETA = ("vcap",)   # see the retraction above -- do not treat as settled
+PROVISIONAL_THETA = ("vcap",)   # NOT settled. Metrologist D1d: the clock re-anchoring restores
+#   the CELL COUNT (2927 vs ~2700) but NOT the phenotype -- archived is a long thin tube, the
+#   replay is a small bud. vcap force-divides oversized cells bypassing the throttle, so checking
+#   4x more often splits tip cells the moment they cross instead of letting them ramp while
+#   queued -- and the report attributes the tube tip specifically to that backlog. Sweep required.
 
 # ============================================================================ vocabulary
 # stage           -- the gate; the search opens stages in order
