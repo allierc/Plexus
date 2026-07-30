@@ -1,0 +1,50 @@
+[supervisor] resumed: round 1, 5 runs spent, 1 clusters (1 active), dry 0, stage_gate 2
+================================================================================================
+ROUND 2   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+  [configs] purged 6 stale composition config(s) for round 2
+All three files written within budget. Summary of the Round 2 proposal:
+
+**No pending user input** (user_input.md empty as of 2026-07-30) — acknowledged, nothing to action.
+
+**Round 2 — 6 slots, mode=explore, 3 confirmatory / 2 adversarial**, all single-operator edits on the round-33 recipe control, no parameters touched:
+
+| Slot | Edit | Intent | Checkable prediction |
+|---|---|---|---|
+| s0 | control | control | protr_peak 1.7–4.0 |
+| s1 | −extrude | conf | protr_peak ≤ 1.5 |
+| s2 | −morphogen_growth_3d | conf | protr_peak ≥ 2.0 |
+| s3 | −cell_geometry_3d | adv | protr_peak ≥ 2.0 |
+| s4 | +divide_3d:hertwig | conf | ta_n_tubes_final ≥ 1 |
+| s5 | +vesicle_growth:uniform_ramp | adv | protr_peak ≥ 2.0 |
+
+**Logic:** the solo lever-map is empty (all 8 ops "insufficient") and round 1 (the vcap sweep) gave zero surprise, so this round buys map coverage by **knockout** (three removals = clean single-lever readings) plus two additions hunting for the grown (p_ratio~1) morphology Okuda's phase diagram targets. The **s1/s2 −extrude vs −morphogen_growth_3d dissociation** is the central falsifiable test of round 1's "forced, not grown" verdict.
+
+**Two corrections baked in**, per the operator note and this round's rules:
+- Removed the "R0 forbidden vcap sweep" language the prior draft carried — the sweep is legitimate Loop-II evidence.
+- Fixed numbering (vcap = round 1, this knockout = round 2).
+- Tightened every prediction to admitted metrics only (protr_peak / ta_n_tubes_final); mech_p_ratio is now diagnostic commentary, never the checkable clause, so nothing scores inconclusive.
+
+Files updated: `proposal.json`, `analysis.md` (appended), `memory.md` (revised).
+  [reflection] batch_ok=True :: A well-formed lever-map batch: real control, no settled/wasted slots, each edit carries a genuine falsifiable prediction with an explicit refute condition, and the mechanisms are causal hypotheses rat
+     slot 0: [minor] control prediction band is very wide (protr_peak 1.7-4.0); if the control itself lands near 1.7, the absolute knockout thresholds (<=1.5, >=2.0) lose all discriminating power. A control this loosely bracketed weakens every read that is scored against it.
+     slot 2: [minor] slots 2, 3 and 5 all predict protr_peak >= 2.0 against a fixed absolute threshold rather than relative to the measured control. Combined with slot 1's <=1.5, there is a 1.5-2.0 dead band where an outcome confirms/refutes nothing. Anchor these to control protr_peak (as slot 4 does with protr_final) to avoid ambiguous reads.
+     slot 4: [minor] the refute clause 'ta_n_tubes_final == 0 OR protr_final < control' is sound, but the claim presumes cells are being *born into* an elongating protrusion — if the round-33 bulge is forced/drained (R1) it may contain few dividing cells, so oriented division could be inert rather than wrong. Falsifiable and worth running, just note the null (no effect) is a likely and still-informative outcome, not only the two refute branches.
+     slot 5: [minor] mildly overlaps slot 2 (both interrogate the growth axis); acceptable as a factorial pair (remove growth vs. add uniform growth) but confirm they are not funded at the expense of a second seed on the highest-value slot 1.
+  r002c_00_5e3159  control (parent unchanged)                   control       predict protr_peak 1.7-4.0
+  r002c_01_cba5fe  ('remove_op', 'extrude0')                    confirmatory  predict protr_peak <= 1.5
+  r002c_02_9fdce9  ('remove_op', 'morphogen_growth_3d0')        confirmatory  predict protr_peak >= 2.0
+  r002c_03_560039  ('remove_op', 'cell_geometry_3d0')           adversarial   predict protr_peak >= 2.0
+  r002c_04_a413e0  ('add_op', 'divide_3d', 'hertwig')           confirmatory  predict ta_n_tubes_final >= 1
+  r002c_05_2399b2  ('add_op', 'vesicle_growth', 'uniform_ramp') adversarial   predict protr_peak >= 2.0
+[preflight] cluster job env: OK
+[preflight] PASS
+[cluster] fired 6 bsub(s) DETACHED on allierc@login1: pg_r002c_00_5e3159, pg_r002c_01_cba5fe, pg_r002c_02_9fdce9, pg_r002c_03_560039, pg_r002c_04_a413e0, pg_r002c_05_2399b2
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  [17:13] run/pend=6 done=0 exit=0 of 6
+  [17:14] run/pend=6 done=0 exit=0 of 6
+  [17:15] run/pend=6 done=0 exit=0 of 6
+  [17:16] run/pend=6 done=0 exit=0 of 6
+  [17:17] run/pend=6 done=0 exit=0 of 6
+  [17:18] run/pend=5 done=1 exit=0 of 6

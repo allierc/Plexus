@@ -846,3 +846,127 @@ same class of error as an unchecked metric.
   path); no progress reel yet; Proposer call still blocks the round instead of overlapping.
 - `D1d` partially answered: `vcap=1.5` (the archived working point) is the worst value swept;
   response is non-monotonic; `vcap=3.0` gives the best sustained protrusion.
+
+---
+## Hour 12 — 2026-07-30 16:50–17:20 EDT  (fresh session; Cedric left at 17:00, running overnight)
+
+### The attended composition round was worth every minute — `--mode composition` could never have run
+
+RESUME.md §2 said to run one attended composition round because the LLM Proposer had never been
+called. It was called. **It worked** — valid JSON, control in slot 0, edits copied from the legal
+menu, real falsifiable predictions, and it responded to the Supervisor's adversarial steer. Then
+the round **crashed**, and the crash was the point:
+
+```
+ValueError: intent 'control' not in ('confirmatory', 'adversarial')
+```
+
+`proposer.propose()` REJECTS any proposal whose slot 0 is not `intent: "control"`. `hypothesis.
+INTENTS` did not contain `"control"`. Two halves of the same protocol disagreed about whether a
+control exists and **both enforced their view with a hard error**, so Loop I could never have
+completed a single round. Seven more defects came out of the same hour.
+
+### 🔴 FINDING 21 (the biggest) — the Supervisor had NO persistence
+
+`round`, `spent`, `dry`, `best`, `prox`, `stage_gate` were all re-initialised every process;
+`supervisor.jsonl` was append-only *output*, never read back. In a single long process this is
+invisible. The campaign is specified to run for **weeks across restarts**, and on every restart:
+
+| field | consequence |
+|---|---|
+| `round → 0` | every round is "round 1": config namespace collides, the purge deletes the previous round's configs, hypothesis ids collide — `hypotheses.jsonl` **already held 5 duplicate hids** |
+| `spent → 0` | `terminal()` compares against `budget_runs`, so **the campaign could never stop on budget** |
+| `dry → 0` | dry rounds never accumulate → **escalation was dead at the trigger**, not merely unbuilt at the consumer |
+| `prox → {}` | no cluster is ever frozen, budget never reallocates — the Co-Scientist mechanism that is the whole antidote to "thirty rounds, four ideas" |
+
+Now atomically checkpointed to `campaign/state.json` after every round and escalation, with a
+restart self-test. A corrupt checkpoint **refuses to start** rather than silently resetting the
+counter. Bootstrapped the live campaign from the audit log: it now resumes at round 1 → round 2.
+
+### 🔴 FINDING 22 — the config purge was mode-blind
+
+F18 namespaced configs `r{rid}{mode[0]}_…`, but `_purge_round_configs` globbed `r{rid}*`. So a
+composition round deletes the θ round's configs of the same number. It really did delete two
+committed `r001t_*` files on the first attended run (recovered with `git restore`).
+
+### 🔴 FINDING 23 — the Proposer wrote "forbidden" into persistent memory
+
+It read the ledger, saw the vcap sweep, and recorded it in `memory.md` as *"a forbidden vcap
+parameter sweep"* and *"R0's cardinal sin"*. "Do not propose a parameter change" is a **division
+of labour** (this batch is Loop I), not a verdict on validity — and F19 already established that a
+parameter can carry a hypothesis. Left alone, every future round would inherit the belief that the
+campaign's first real result was a rule violation. Prompt now says so explicitly; `memory.md`
+corrected in place. The next Proposer call picked the correction up and wrote *"the sweep is
+legitimate Loop-II evidence"*.
+
+### 🔴 FINDING 24 — three defects in the prediction scorer, all biasing surprise DOWNWARD
+
+The surprise rate is the campaign's **only** control signal. It was a three-line first-match regex:
+
+- **P1** an *unparseable* prediction returned `True` → recorded **`confirmed`**. The comment
+  claimed such a prediction was "uncounted"; it was not, it was counted as correct.
+- **P2** the parser was **metric-blind** — first comparison anywhere in the string, applied to
+  `protr_peak` whatever metric the clause named. The house error (my metric vs their metric),
+  sitting in the scoring path.
+- **P3** `REFUTED if …` was parsed as the assertion; only clause order saved it.
+
+Replaced by `predict.py` (16 self-tests): every clause parsed with its metric, ranges supported,
+falsifier text discarded, and **`inconclusive` returned rather than a guess**.
+
+### 🔴 FINDING 25 — the headline "surprise 0.40" had never been written down
+
+Measured consequence of P1. The vcap round's five points were posed *before* F19 with the
+placeholder `predicted: "unknown -- sensitivity sweep"`, which parsed to nothing and so resolved
+**`confirmed`**. The persisted surprise rate for the campaign's most informative round was
+**0.00 — "nothing learned"**; the 0.40 in this log had been computed by hand in the narrative and
+never reached the ledger. That is precisely the failure F19 was raised to prevent, still sitting
+in the record because the fix was never backfilled.
+
+Added an append-only `amend()` (originals retained; `grep amended` shows every correction) and
+backfilled the real predictions, re-scored by `predict.score`. **The ledger now computes 0.40
+itself** — outcomes matching the narrative exactly. The 8 orphan hypotheses from aborted runs are
+closed as `inconclusive` instead of dragging the reported mix to 92/8.
+
+### 🔴 FINDING 26 — the θ-mode intent rule was the same tautology `proposer.py` was built to kill
+
+```python
+intent = "confirmatory" if (... or pred.startswith("protr_peak >=")) else "adversarial"
+```
+"Predicts an increase" ⇒ confirmatory. So the surprise rate measures **the sign of the effect**,
+not anyone's belief — exactly the vacuity removed from Loop I (`intent = adversarial if
+lbl.startswith("-")`), reintroduced in Loop II.
+
+### 🔴 FINDING 27 — the minisite Turing × vertex videos can no longer be regenerated
+
+Cedric asked to debug/reproduce the minisite Turing + vertex video before the week launch. The
+front-page section is generated by `prototype/Tyssue/archive_rounded.py` (two mp4s:
+`tyssue_vh_grow_divide`, `tyssue_vh_rd_coral`). It **hard-errors** under the D1 clock fix, because
+it passes `every: 2` and `_engine_owns_clock` now raises on any `every > 1`. But the **engine reads
+the same `every` key**, so the blanket raise also forbids the correct engine-owned cadence — the
+only way to express a multi-rate period at all. Every archived spec carrying `every: 2` was
+permanently unloadable.
+
+Worse, two things about *how* it failed:
+- `json.dump(rec, …)` sat **outside** the try, so the failure **overwrote `archive/<nm>/diag.json`** —
+  the reference metrics — with `{"error": …}`. `archive/` is documented as immutable research
+  record. Merely **importing** the module was enough to do it: there was no `__main__` guard, so
+  `do(False); do(True)` ran as an import side effect. Both reference files were destroyed and
+  restored from git.
+
+Fixes: the raise became an **opt-out** (`engine_clock: true` asserts "this period is written for
+the engine-owned clock"), unmigrated specs still fail loudly; `__main__` guard; failures write
+`diag.error.json` and **re-raise** instead of clobbering; and a `--repro` mode that writes
+`*.repro.*` and **compares to the archive without touching it**.
+
+The clock migration is `every: 2 → 4`, not `2 → 2`: the old true period was 2 (engine) × 2
+(operator) = 4, so writing 2 would silently double the division rate and produce a different movie.
+
+### ⏱ SUMMARY — Hour 12
+
+| | |
+|---|---|
+| **Done** | 8 defects fixed (F21–F27 + the control crash); `predict.py` new with 16 tests; Supervisor checkpointing + restart test; ledger backfilled to a computed 0.40; minisite generator repaired |
+| **Found** | `--mode composition` was structurally unrunnable; the Supervisor never survived a restart; the campaign's headline number was never persisted; the minisite videos were unreproducible AND their reference metrics destroyable by an import |
+| **Running** | round 2 (6 knockout jobs on L4, first real composition round) · full 500-frame reproduction of both minisite videos |
+| **Next** | read round 2; escalation path; progress reel |
+| **Blocked** | nothing |

@@ -138,16 +138,31 @@ def _engine_owns_clock(params, default=1):
     per-call quantity (min_cycle, max_div, max_div_frac) silently meant 4x what it said. That is
     the defect that re-anchored the whole archive.
 
-    Returns 1 always -- the operator never gates. Passing every > 1 is now a hard error rather
-    than a silent 4x, so the bug cannot return by configuration.
+    Returns 1 always -- the operator never gates.
+
+    `every > 1` still hard-errors, because a spec written under the OLD semantics means something
+    different now: its author wrote `every: 2` intending period 2 and silently got 4, so honouring
+    it as 2 would change the run without telling anyone. Such a spec must be read by a human.
+
+    BUT the engine reads THE SAME `every` key (engine.py `max(1, int(o.params.get("every", 1)))`),
+    so a blanket raise also forbids the correct, engine-owned multi-rate cadence -- which is the
+    only way to express "this operator runs every k frames" at all. That made every archived spec
+    carrying `every: 2` permanently unloadable, including the two that generate the Turing x vertex
+    videos on the site's front page.
+
+    So the raise is now an opt-OUT, not a wall: a spec that has been migrated declares
+    `engine_clock: true` next to its `every`, which asserts "this period is written for the
+    engine-owned clock; do not second-guess it". Unmigrated specs still fail loudly.
     """
     e = int(params.get("every", default))
-    if e > 1:
+    if e > 1 and not bool(params.get("engine_clock", False)):
         raise ValueError(
             f"D1: operator-side `every={e}` is no longer supported -- the engine owns the clock. "
-            f"Gate this operator through the schedule instead. (A private period multiplied the "
-            f"engine's, so `every: 2` meant once every 4 frames and every per-call quantity "
-            f"meant 4x what it said.)")
+            f"(A private period multiplied the engine's, so `every: 2` meant once every 4 frames "
+            f"and every per-call quantity meant 4x what it said.) If this spec was written for "
+            f"the OLD semantics, its true period was {e}x the engine's -- convert it and set "
+            f"`every: {e * e}`. Then declare `engine_clock: true` beside it to confirm the period "
+            f"is now engine-owned.")
     return 1
 
 
