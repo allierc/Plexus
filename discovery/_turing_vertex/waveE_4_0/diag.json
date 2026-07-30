@@ -1,8 +1,3 @@
-[engine] 400 sim frames -> recording 401 set frames (stride 1), fields every 2 steps (<= 256)
-[engine] === tv_waveE_4_0 ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=400
-[engine] sets:      cell(1800)  vertex(3552)
-[engine] fields:    —
-[engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
 {
  "name": "waveE_4_0",
  "knobs": {
@@ -54,6 +49,21 @@
  "act_frac_high": 0.3813273340832396,
  "act_nan": false,
  "corr_act_rad": 0.5304105089900654,
+ "mid": {
+  "cells_end": 750,
+  "n_live": 750,
+  "vol_cv": 3.7142023055863502,
+  "hollow_frac": 0.368,
+  "r_med": 31.23658087577321,
+  "r_cv": 0.7326721710947968,
+  "protr": 2.6668687128356736,
+  "protr_p99": 2.533333412572563,
+  "act_mean": 0.15087390710554124,
+  "act_max": 0.3993060290813446,
+  "act_frac_high": 0.42533333333333334,
+  "act_nan": false,
+  "corr_act_rad": 0.8138396327297664
+ },
  "ok": true,
  "secs": 290.5
 }
