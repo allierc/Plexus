@@ -144,6 +144,7 @@ class CellGrow(Structural):
     PARAM_ROLES = {"rate": "growth_rate", "target": "size_inhibition",
                    "aniso": "growth_anisotropy", "tip": "tip_localization",
                    "stress_gain": "mechano_inhibition"}
+    REFERENCE = "Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 12:627-644."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

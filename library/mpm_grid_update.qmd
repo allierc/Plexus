@@ -122,6 +122,7 @@ class MPMGridUpdate(FieldUpdate):
     MECHANISM_TAGS = ["grid_solve", "surface_tension", "boundary_conditions"]
     PARAM_ROLES = {"dt_sub": "substep_timestep", "surface_tension": "interface_cohesion",
                    "wall_damp": "wall_restitution"}
+    REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

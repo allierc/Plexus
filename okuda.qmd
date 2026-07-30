@@ -1,0 +1,144 @@
+---
+title: "Morphogenesis — a case study"
+lightbox: auto
+---
+
+::: {.callout-note appearance="simple"}
+**The point of this page.** The target is a *published* simulation, so we know a
+compact model exists — but we have only the paper, not the code. That makes it the
+cleanest possible testbed for agentic mechanistic discovery: **if Plexus cannot
+reconstruct a known model even with strong priors and a known answer, it will not
+reconstruct an unknown one from real data, where the very existence of a model is in
+doubt.** Success here is necessary, not sufficient; failure here would be decisive.
+:::
+
+## A controlled testbed
+
+The target is Okuda *et&nbsp;al.* (2018): a Turing reaction–diffusion system discretised
+at the single-cell level and coupled to a **3D vertex model**, which — by growing a
+monolayer cell vesicle — reproduces autonomous *undulation*, *tubulation*, and
+*branching*.[^okuda] We have the paper, and with it **strong priors**: a vertex-model
+tissue, an activator–inhibitor reaction–diffusion, and growth converted from each cell's
+activator concentration. We do **not** have the code. Reconstructing the result inside
+[Plexus](index.qmd) is therefore a *blind* reproduction, driven by priors alone.
+
+That is exactly what makes it the right problem to cut our teeth on. On real experimental
+data the hardest uncertainty is not the parameters but whether a compact mechanistic model
+*exists at all*. Here that question is settled — we know a model exists, and roughly what
+it is — so this is the **easiest version of the real problem**, a controlled floor test for
+the [three-loop agentic discovery](inverse.qmd) the project is built around. What is
+interesting is precisely that the simulation is *blind* (no repository) yet the answer is
+*known*: strong priors, a fixed target, and full freedom to run the forward model. If the
+method works nowhere here, it works nowhere.
+
+This page is the honest record of the attempt **so far** — a gallery of failures, because
+the failures are where the method actually gets defined.
+
+## The approach in brief
+
+The reconstruction runs as the three loops described in the
+[Plexus paper](paper/plexus2.pdf) (§&nbsp;*Agentic mechanistic discovery*):
+**Understand** the target by interrogating a decomposed model — a hypothesis → *validate /
+falsify* cycle held to a rough **70/30** balance; **Fit** its parameters and fields against
+the differentiable operators; **Discover** the operators the model still lacks from the
+residual. A **master** controller holds the goal, authors the success metrics, grounds each
+hypothesis in Okuda's text, and — before trusting any measurement — enforces a *verify-the-
+instrument* gate. Every stage is a small, metric-gated step, run cheap-first. The mechanical
+substrate is the true-vertex [Tyssue](index.qmd#epithelial-mechanics-a-true-vertex-model)
+tissue built elsewhere on this site; the morphogenesis is Okuda's coupling laid on top of it.
+
+## A gallery of failures
+
+Four moments from the search for the tube — each a failure, each with the lesson it left,
+from the reaction–diffusion choice to the shape of the tube itself. (It works now — the
+breakthrough is below.)
+
+<style>
+.okuda-gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:.8rem 0 1.4rem}
+@media (max-width:900px){.okuda-gallery{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.okuda-gallery{grid-template-columns:1fr}}
+.okuda-card{margin:0}
+.okuda-card video{width:100%;border-radius:7px;background:#000;display:block;aspect-ratio:1/1;object-fit:cover}
+.okuda-card figcaption{margin-top:.4rem;font-size:.8em;line-height:1.38;color:#555}
+.okuda-card b{display:block;color:inherit;margin-bottom:.1rem}
+</style>
+
+<div class="okuda-gallery">
+<figure class="okuda-card">
+  <video src="gallery/tyssue_okuda_balloon.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>Protrusion-by-inflation = hollowing</b>With a volume-locked body, an activated
+  cap inflates faster than it can divide and balloons — and a ballooned cap is exactly what the
+  hollow metric flags. There is no clean-protrusion window.</figcaption>
+</figure>
+<figure class="okuda-card">
+  <video src="gallery/tyssue_okuda_rd.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>The RD choice is decisive</b>The Brusselator decays or reorganizes the seed
+  (here it fades to a weak spot); only Gray–Scott in the spot regime and Gierer–Meinhardt hold
+  a stable, localized peak — the ingredient a tube needs.</figcaption>
+</figure>
+<figure class="okuda-card">
+  <video src="gallery/tyssue_okuda_cone.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>Cones make tubes — but by a crutch</b>Re-seeding the activator at a fixed
+  radial tip keeps the growing apex inside a cone, so it tubes. That tip-riding is geometric,
+  not emergent; a real tube needs a self-maintaining apex.</figcaption>
+</figure>
+<figure class="okuda-card">
+  <video src="gallery/tyssue_cauliflower.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>Cauliflower, not a tube</b>A Gierer–Meinhardt activator holds
+  a stable peak and buds the shell — but a <em>wide</em> activation grows the whole patch into a
+  lobed cauliflower. The tube needs narrow, tip-riding GM growth.</figcaption>
+</figure>
+</div>
+
+## A first tube — driven, and far from clean
+
+The front has moved past the cauliflower: the budding lobe can now be pushed into a genuine tube
+— long, thin, roughly constant-diameter. But it is **not emergent as a whole**. The sustained
+apical signal is *driven*: a fixed-size activator cap, re-seeded each frame at the tissue's
+outermost cell, rides the advancing tip — a hand-placed stand-in for "the activator peak stays at
+the apex," not something the reaction–diffusion maintains on its own. What *is* emergent is only
+the mechanics around it (confinement from growth-dilution, wall-building oriented division,
+extrusion that pushes the tip out); the diameter follows the cap radius (Okuda's χ role) and the
+length the run time. And the result is **rough**: many hollow cells, a cell-size CV still too
+large, a flat rather than rounded tip. It is a *first* working tube with a lot of work remaining —
+the point is only that the question has shifted from *whether* a tube forms to *how well* it can
+be made.
+
+<div class="okuda-gallery">
+<figure class="okuda-card">
+  <video src="gallery/tyssue_tube_long.mp4" autoplay loop muted playsinline></video>
+  <figcaption><b>A driven, imperfect tube</b>A tip-tracking cap — <em>driven</em>, not emergent —
+  rides the outermost cell, so the tube extends at roughly constant diameter instead of widening
+  into a lobe. The mechanics around it are emergent, but the mesh stays rough (hollow cells, uneven
+  cell sizes): far from a clean cylinder, and much is left to do. <em>Click to enlarge.</em></figcaption>
+</figure>
+</div>
+
+## What the failures demand of the agent next
+
+Read as a spec, the journey names the capabilities the autonomous master must carry — the
+same [role spec](paper/plexus2.pdf) the paper argues for, now grounded in a real attempt:
+
+- **Goal custody.** Several rounds drifted into locally-sensible sub-problems (homogenising a
+  2000-cell sphere) and lost the tube; the master's objective must be held separately from
+  the workers'.
+- **Temporal perception.** The decisive evidence was in the *time course* — the grey band
+  forms mid-growth, tip cells balloon early — invisible to an end-frame metric. A
+  dynamics-watching critic is a required agent.
+- **Verify the instrument.** The "97% hollow" shell and a false "0 invalid faces" (which
+  passed self-intersecting bow-tie polygons) were diagnostic artefacts, not physics.
+- **Literature grounding.** Reading *which* reaction–diffusion regime Okuda uses
+  (Gierer–Meinhardt) was the single key unlock.
+- **Domain priors and taste.** Reading the smooth activator *gradient* off Okuda's figures —
+  rather than a binary switch — reframed the entire coupling.
+
+The tube now forms — the mechanics emergent, the tip signal still a driven stand-in — so the
+question flips from *existence* to *optimisation*: thinner and longer tubes, multiple tubes, and
+branching are now tuning, not search. And every failure above was converted from a symptom into
+a measurable target along the way — which is the whole point: this is what it looks like when a
+method, not just a model, is being fit.
+
+[^okuda]: Okuda, S., Miura, T., Inoue, Y., Adachi, T. & Eiraku, M.
+*Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with
+undulation, tubulation, and branching.* **Scientific Reports** 8, 2386 (2018).
+[doi:10.1038/s41598-018-20678-6](https://doi.org/10.1038/s41598-018-20678-6).

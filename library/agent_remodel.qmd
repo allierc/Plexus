@@ -122,6 +122,7 @@ class AgentRemodel(Exchange):
     REQUIRES_PARAMS = ["to", "target"]
     MECHANISM_TAGS = ["tissue_remodelling", "stiffening", "fluidisation"]
     PARAM_ROLES = {"gain": "remodel_gain", "rate_attr": "per_type_remodel_rate"}
+    REFERENCE = "Plexus (this work)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

@@ -292,6 +292,7 @@ class AttractorFlow(Lateral):
     PARAM_ROLES = {"system": f"which attractor: one of {list(ATTRACTOR_SYSTEMS)}",
                    "scale": "time-rescale the flow (f -> scale*f); >1 = faster",
                    "clamp": "max |velocity| safety cap (0 = off)"}
+    REFERENCE = "Lorenz, E. N. (1963). Deterministic nonperiodic flow. J. Atmos. Sci. 20:130-141."
 
     # spec-line keys that are plumbing/knobs, not per-system physical constants
     _NON_CONST = {"op", "at", "to", "from", "_at", "system", "scale", "clamp",
