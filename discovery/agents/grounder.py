@@ -148,14 +148,14 @@ def ground(question, k=6, sources=None, window=420):
     for name, path, kind in (sources or available()):
         if kind == "pdf":
             for pno, text in _load_pdf(path):
-                s = _score(text.lower(), terms)
+                s = _score(text.lower(), terms, name)
                 if s > 0:
                     hits.append((s, Passage(name, f"p.{pno}", _snippet(text, terms, window))))
         else:
             lines = _load_text(path)
             for i in range(0, len(lines), 40):
                 chunk = "\n".join(lines[i:i + 40])
-                s = _score(chunk.lower(), terms)
+                s = _score(chunk.lower(), terms, name)
                 if s > 0:
                     hits.append((s, Passage(name, f"L{i + 1}", _snippet(chunk, terms, window))))
     hits.sort(key=lambda h: -h[0])
@@ -176,8 +176,24 @@ _STOP = {"the", "and", "for", "with", "that", "this", "are", "was", "were", "doe
          "can", "cannot", "will", "would", "should", "may", "might", "its", "their", "our"}
 
 
-def _score(text, terms):
-    return sum(text.count(t) for t in terms if len(t) > 3)
+def _score(text, terms, source=None):
+    """Length-NORMALISED term overlap, with a prior on the reference model.
+
+    Raw counts let long documents win on common words: a query about tube diameter returned a
+    brain-folding review and a differentiable-rendering paper ahead of okuda.pdf. Normalising by
+    sqrt(length) removes that bias, and matching DISTINCT terms (not total occurrences) rewards
+    a page that covers the whole question rather than repeating one word.
+    """
+    import math
+    hits = [t for t in terms if len(t) > 3 and t in text]
+    if not hits:
+        return 0.0
+    total = sum(text.count(t) for t in hits)
+    coverage = len(hits) / max(1, len([t for t in terms if len(t) > 3]))
+    base = (total / math.sqrt(max(len(text), 1))) * (0.4 + 0.6 * coverage)
+    if source in ("okuda.pdf", "plexus2.tex", "okuda_corpus.md"):
+        base *= 2.5                       # the reference model and the language contract lead
+    return base
 
 
 def _snippet(text, terms, window):
@@ -246,6 +262,73 @@ def gate(hypothesis_claim, k=3):
     return verdict, why, [p.cite() for p in cits]
 
 
+# --------------------------------------------------------------------------- 4. UNDERSTAND
+def understand(question, k=8, width=900):
+    """OPEN-ENDED reading. No fixed claim list, no keyword gate -- just: what does the corpus say?
+
+    `gate()` is deliberately narrow (does this hypothesis contradict something the paper
+    settles?). That narrowness was mistaken for the whole agent. Most of what a modeller needs
+    from the literature is not adjudication but UNDERSTANDING: what regime is this, what sets
+    that length scale, why does this figure look like that. This is that call.
+    """
+    passages = ground(question, k=k, window=width)
+    return {"question": question,
+            "passages": [{"cite": p.cite(), "text": p.text} for p in passages],
+            "sources": sorted({p.source for p in passages})}
+
+
+# --------------------------------------------------------------------------- 5. REPRODUCE A FIGURE
+# Okuda et al. 2018 give EXPLICIT physical parameters per figure, which turns "reproduce the
+# paper" from a vague aspiration into a labelled PHASE DIAGRAM in (chi, gamma):
+#
+#        gamma      0.01            1              100
+#   chi
+#   0.01          branching                    thin tube
+#   0.1                         thick tube     undulation
+#
+# chi  = the diffusion coefficient; the paper states it sets the SPOT SIZE = tube DIAMETER.
+# gamma = the ratio of patterning to deformation timescales -- the regime knob.
+#
+# Reproducing this 2x2 QUALITATIVELY is the campaign's primary scientific target: four distinct
+# morphologies from one composition, separated only by two numbers. It is also the talk figure.
+FIGURES = {
+    "fig5a": dict(figure="Figure 5a", phenotype="thin tube", chi=0.01, gamma=100.0,
+                  shows="time series of THIN tube formation; cells coloured by activator",
+                  criterion="a single high-aspect protrusion of SMALL diameter; activator at the tip"),
+    "fig5b": dict(figure="Figure 5b", phenotype="thick tube", chi=0.1, gamma=1.0,
+                  shows="time series of THICK tube formation; cells coloured by activator",
+                  criterion="a single protrusion of LARGER diameter than fig5a at the same length"),
+    "fig6":  dict(figure="Figure 6", phenotype="branching", chi=0.01, gamma=0.01,
+                  shows="whole-tissue deformation, cells coloured by local mean curvature; "
+                        "plus a time series of the branch structure",
+                  criterion="a protrusion that BIFURCATES -- n_tubes increases over time"),
+    "fig7":  dict(figure="Figure 7", phenotype="undulation", chi=0.1, gamma=100.0,
+                  shows="whole-tissue deformation; cells coloured by activator",
+                  criterion="MANY shallow bumps rather than one deep protrusion -- "
+                            "low protrusion, high spot count"),
+}
+
+
+def figure_target(key, k=3):
+    """What must be reproduced, with the paper's own parameters and a checkable criterion.
+
+    This is what makes 'reproduce the figure' a campaign objective rather than an aspiration:
+    the target is a (chi, gamma) point, a named phenotype, and a criterion the metric bank can
+    evaluate. The DIAGRAM as a whole is the real target -- any single cell can be hit by luck,
+    but four distinct morphologies separated only by two numbers cannot.
+    """
+    f = dict(FIGURES[key])
+    f["citations"] = [p.cite() for p in
+                      ground(f"{f['phenotype']} chi gamma {f['shows']}", k=k)]
+    return f
+
+
+def phase_diagram():
+    """The whole 2x2 as the campaign's qualitative reproduction target."""
+    return {k: {kk: vv for kk, vv in v.items() if kk != "citations"}
+            for k, v in FIGURES.items()}
+
+
 # --------------------------------------------------------------------------- 3. REQUEST
 def name_mechanism(description, k=5):
     """An operator request was filed. Does the literature already name this mechanism?"""
@@ -284,6 +367,18 @@ if __name__ == "__main__":
     print(f"  verdict   : {v}")
     print(f"  why       : {why}")
     print(f"  citations : {cits}\n")
+
+    print("[4] UNDERSTAND -- open-ended, no fixed claim list\n")
+    u = understand("what sets the tube diameter, and what does gamma control?", k=3)
+    for pp in u["passages"][:2]:
+        print(f"  {pp['cite']}\n      {pp['text'][:230]}...\n")
+
+    print("[5] REPRODUCE A FIGURE -- the paper's own parameters as a phase diagram\n")
+    for key in ("fig5a", "fig5b", "fig7", "fig6"):
+        f = FIGURES[key]
+        print(f"  {f['figure']:12} chi={f['chi']:<6} gamma={f['gamma']:<7} -> {f['phenotype']:12}"
+              f" | {f['criterion'][:56]}")
+    print()
 
     print("[3] REQUEST -- does the literature name this mechanism?\n")
     r = name_mechanism("per-cell apical basal thickness giving emergent bending rigidity")
