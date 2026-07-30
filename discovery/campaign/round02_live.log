@@ -98,3 +98,12 @@ Files updated: `proposal.json`, `analysis.md` (appended), `memory.md` (revised).
   [5/5] r002c_05_2399b2: DESCRIPTION: A spherical cluster of particles begins as a smooth, uniform surface with a...
 [caption] 5 run(s) in 135s (one model load, not 5)
   [watcher] r002c_00_5e3159 VETOED -- The description shows a red region vanishing and a ring deforming into a teardrop on a static sphere — no tube
+  [watcher] r002c_04_a413e0 VETOED -- The movie shows structured motion and a growing geometric structure, not a collapsed/degenerate outcome.
+  [critic] r002c_05_2399b2 is not evidence: [<P2_BUFFER_SATURATED: n_cells=15002>]
+  [judge] top pair: agrees with the metric ranking -- Neither description shows a tube (both show only rotation/color-transfer artifacts), but A's protr_peak 1.385 vs B's 1.026 indicat
+
+[rank] kept 2, dropped 2 (never refined)
+  [KEEP] r002c_01_cba5fe  score   1.71  protr_peak  1.39 phen=sphere    watcher=supports   [confirmed]
+  [KEEP] r002c_02_9fdce9  score   1.53  protr_peak  1.03 phen=sphere    watcher=supports   [refuted]  SURPRISE
+  [drop] r002c_00_5e3159  score   -inf  protr_peak  4.03 phen=tube      watcher=CONTRADICTS [refuted]
+  [drop] r002c_04_a413e0  score   -inf  protr_peak  3.20 phen=degenerate watcher=CONTRADICTS [confirmed]
