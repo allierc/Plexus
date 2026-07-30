@@ -84,15 +84,19 @@ CLOCK_COUPLED = {                       # param -> how to convert an archived va
 # PARTIALLY coupled and therefore still provisional: K_V was raised to 6.0 specifically to crush
 # the cell-size CV produced by the division wave; vcap is a per-call bypass. Both are flagged in
 # validate_space (V10) and must be confirmed against the re-anchored baseline.
-# RESOLVED -- each PROVEN, not assumed:
-#   vcap     NOT rate-coupled. Oversized cells bypass the throttle entirely
-#            (`cap_div = max(cap_div, len(over))`), so the SAME cells divide; calling more often
-#            only makes them divide sooner with less overshoot. A timing effect, not a rate.
+# vcap: CLAIM RETRACTED 2026-07-30 (Metrologist RET001). I asserted it was "not rate-coupled --
+#   the same cells divide, only sooner". That is true of ONE cell and false of the POPULATION:
+#   vcap divisions bypass the throttle entirely (`cap_div = max(cap_div, len(over))`), so
+#   checking 4x more often makes oversized cells divide sooner, their daughters begin growing
+#   sooner, and the total division count over a run differs. It is weakly rate-coupled and the
+#   correct rescaling is NOT yet established. Evidence: the re-anchored replay recovered the
+#   archived CELL COUNT (2927 vs ~2700) but not the archived ASPECT (1.73 vs ~7.5), so a
+#   rate-coupled quantity remains uncorrected. OPEN.
 #   cycle_cv NOT clock-coupled. A dimensionless Gaussian CV on the per-cell threshold multiplier.
 #   K_V      Its MEANING was never clock-coupled (a per-frame mechanical stiffness). Its
 #            OPTIMALITY was stale only because it was tuned against the division wave -- and the
 #            re-anchoring restores exactly that wave, so K_V = 6.0 is valid again.
-PROVISIONAL_THETA = ()
+PROVISIONAL_THETA = ("vcap",)   # see the retraction above -- do not treat as settled
 
 # ============================================================================ vocabulary
 # stage           -- the gate; the search opens stages in order

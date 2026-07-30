@@ -420,3 +420,81 @@ Remaining: D1 (operator-side), D5 (lying tags), D10/D11 (ranker wired, bounded c
 instrument gate, and the round driver.
 
 ---
+## Hour 7 — 2026-07-30 19:00–20:00 EDT
+
+Cedric raised: *the vocabulary defaults were set at 15:20 with the rationale "so a
+default-parameter composition starts where our evidence is" — but FINDING 8 came after that and
+nothing marks them stale, so every generated composition starts from a θ tuned for the wrong
+clock.* **Verified, and it was worse than stated.**
+
+### 🔴 FINDING 12 — the per-call / per-frame trap, and a masked correction
+
+From `tyssue_ops3d`: `min_cycle`/`max_cycle` are counted in **division-calls** (`age` is
+"per-cell age in division-calls") and `max_div`/`max_div_frac` are **per-call** throttles. The
+archived configs passed `every: 2`, gated by the engine *and* by the operator's private `self._k`
+— product **4**. So `min_cycle=8` meant 32 frames and `max_div_frac=0.03` meant 0.0075/frame.
+Correcting the clock multiplied every per-call meaning by 4 — precisely the aspect 7.5 → 3.2 of
+FINDING 8.
+
+**A second defect, found while fixing the first.** `cap_div = max(max_div, max_div_frac·nF)`. The
+absolute floor **dominates** at realistic cell counts (nF=1431: `max(120, 42) = 120`), so
+rescaling `max_div_frac` alone was **entirely masked** — my first correction had literally no
+effect. *A correction that looks applied but is masked is worse than none, because it is
+believed.* Both had to move.
+
+Because the factor is exact, the fix is **analytic, not a sweep**: rescale the per-call
+quantities and it becomes behaviour-preserving by construction. Verified identical to the archived
+per-frame budget at nF = 1431 / 2700 / 4000 / 8000 / 16000. New **V10** gate checks the factor.
+**59/59.**
+
+### ✅ Operator-side D1 closed
+
+All five private clocks removed. `_engine_owns_clock()` forces the period to 1 and **raises** on
+`every > 1`, so the defect cannot return by configuration. `_k` survives only as a monotonic tick
+(`divide_3d` seeds an RNG from it). Verified: modules import, `every=2` refused.
+
+### 🆕 The Metrologist — answering "which agent certifies the foundation, and which fixes code"
+
+The honest answer was that **no agent in the roster owned it** — the defect was found by a person
+reading code. Added `agents/metrologist.py`:
+
+- owns the ladder, the instrument gate, and **substrate semantics** (units, clocks, per-call vs
+  per-frame) — the gap this incident exposed;
+- may act **backwards**: a foundation defect issues a **retraction** moving affected claims to
+  Open. Append-only — a new record, never an edit, so the history shows what was believed and why
+  it was withdrawn;
+- **boundary**: no campaign agent may modify the substrate. Metrologist detects and quarantines;
+  an **Engineer** patches a *different artefact* and cannot admit its own fix; the Supervisor
+  gates resumption; the human approves. *The instrument must not be adjustable by the experiment
+  it is measuring.*
+
+Verified: the gate **refuses admission** while invalidating defects are open, naming them.
+
+### 🔴 FINDING 13 — I retracted one of my own claims
+
+I had "proved" `vcap` was not rate-coupled: *"the same cells divide, only sooner."* True of one
+cell, **false of the population** — vcap divisions bypass the throttle, so checking 4× more often
+means daughters start growing sooner and the total division count differs.
+
+The evidence that forced it: the re-anchored replay recovered the archived **cell count**
+(2927 vs ~2700 ✅) but **not the archived aspect** (1.73 vs ~7.5 ❌). A rate-coupled quantity
+remains uncorrected. Recorded as defect `D1c` + retraction `RET000`; `PROVISIONAL_THETA = ("vcap",)`.
+This was reasoned, not measured — which is exactly the failure mode the hypothesis-first protocol
+exists to prevent, and I committed it in my own analysis.
+
+### 📊 Figure added
+
+`plexus2_discovery.pdf` → 18 pp with **Figure 1: the agent roster** — twelve icons, the first ten
+producing or judging evidence, the last two (Metrologist, Engineer) deliberately outside that.
+
+### ⏱ SUMMARY — Hour 7 (19:00–20:00)
+
+| | |
+|---|---|
+| **Done** | clock re-anchoring made analytic and verified at 5 scales; V10 gate; operator-side D1 closed; Metrologist + retraction implemented; agent figure |
+| **Found** | the masked `max_div` correction; **and I retracted my own vcap claim** on evidence |
+| **Decided** | substrate is not editable by the campaign; retraction is append-only |
+| **Next** | 🔴 **OPEN: aspect 1.73 vs archived 7.5.** Cell count matches, so proliferation is re-anchored; something else is rate-coupled. A `vcap` sweep under the fixed clock is the next experiment |
+| **Blocked** | the Metrologist correctly refuses evidence admission until D1/D1b/D3/D4 are marked resolved and the instrument gate passes |
+
+---

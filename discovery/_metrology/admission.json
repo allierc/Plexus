@@ -1,0 +1,13 @@
+{
+ "t": 1785437910.2884355,
+ "substrate_rev": "HEAD",
+ "admit": false,
+ "ladder_failed": [],
+ "instrument_gate": true,
+ "unresolved_invalidating": [
+  "D1",
+  "D1b",
+  "D3",
+  "D4"
+ ]
+}

@@ -1,0 +1,1 @@
+{"rid": "RET000", "defect_id": "D1c", "affected_claims": ["vcap-not-rate-coupled"], "affected_runs": [], "reason": "the assertion was reasoned, not measured, and the re-anchored replay contradicts it", "reanalysable": false, "t": 1785437910.2791805}
