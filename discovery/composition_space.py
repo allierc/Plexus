@@ -48,6 +48,52 @@ import numpy as np
 #   geometry   -- per-cell centroid / area / volume, aggregated from the vertex set
 PORT_TYPES = ("morphogen", "adjacency", "geometry")
 
+# ============================================================================ clock re-anchoring
+#
+# ⚠ THE PER-CALL / PER-FRAME TRAP  (raised 2026-07-30 after FINDING 8)
+#
+# `divide_3d` counts `min_cycle` / `max_cycle` in DIVISION-CALLS (its own docstring: "a cell may
+# not divide before this many division-calls since birth"; `age` is "per-cell age in
+# division-calls"), and `max_div_frac` is a PER-CALL throttle. The archived configs passed
+# `every: 2`, which the ENGINE gated and the operator's private `self._k` ALSO gated -- product 4.
+# So in the archived runs `divide_3d.forward` executed once every FOUR frames:
+#
+#     min_cycle = 8 calls      ==  32 frames        max_div_frac = 0.03/call  ==  0.0075/frame
+#
+# With the clock fixed (`every: 1`, engine owns it) the same numbers mean:
+#
+#     min_cycle = 8 calls      ==   8 frames        max_div_frac = 0.03/call  ==  0.03  /frame
+#
+# i.e. FOUR TIMES the proliferation. Leaving the hand-tuned values as vocabulary defaults would
+# silently start every generated composition at a theta tuned for the wrong clock -- which is
+# exactly what FINDING 8 measured (aspect 7.5 -> 3.2, cells 2700 -> 3335).
+#
+# Because the factor is exact and only `divide_3d` carried `every: 2`, we do NOT need a re-tuning
+# sweep: the archived working point is recoverable analytically by rescaling the per-call
+# quantities. That makes the D1 fix BEHAVIOUR-PRESERVING BY CONSTRUCTION, so any later change in
+# phenotype is attributable to the change that caused it rather than to the clock.
+DIVIDE_CALL_PERIOD_BEFORE_D1 = 4        # engine every=2  x  private self.every=2
+CLOCK_COUPLED = {                       # param -> how to convert an archived value to per-frame
+    "min_cycle":     "multiply by 4  (calls -> frames)",
+    "max_cycle":     "multiply by 4  (calls -> frames)",
+    "max_div_frac":  "divide by 4    (per-call -> per-frame)",
+    "max_div":       "divide by 4    (per-call FLOOR; cap_div = max(max_div, frac*nF), so this "
+                     "DOMINATES at realistic nF -- rescaling frac alone is entirely masked)",
+}
+# NOT clock-coupled (evaluated every frame either way): p0, Gamma, Lambda, h0, relax_iters, l_th.
+# PARTIALLY coupled and therefore still provisional: K_V was raised to 6.0 specifically to crush
+# the cell-size CV produced by the division wave; vcap is a per-call bypass. Both are flagged in
+# validate_space (V10) and must be confirmed against the re-anchored baseline.
+# RESOLVED -- each PROVEN, not assumed:
+#   vcap     NOT rate-coupled. Oversized cells bypass the throttle entirely
+#            (`cap_div = max(cap_div, len(over))`), so the SAME cells divide; calling more often
+#            only makes them divide sooner with less overshoot. A timing effect, not a rate.
+#   cycle_cv NOT clock-coupled. A dimensionless Gaussian CV on the per-cell threshold multiplier.
+#   K_V      Its MEANING was never clock-coupled (a per-frame mechanical stiffness). Its
+#            OPTIMALITY was stale only because it was tuned against the division wave -- and the
+#            re-anchoring restores exactly that wave, so K_V = 6.0 is valid again.
+PROVISIONAL_THETA = ()
+
 # ============================================================================ vocabulary
 # stage           -- the gate; the search opens stages in order
 # role            -- for post-hoc naming and proximity clustering
@@ -95,9 +141,11 @@ OPERATORS = {
         stage=2, role="topology", outputs=[], slots=[], impl_slots={"orient_iface": ["axis"]},
         needs=[],
         impls=["hertwig", "orient_iface"], impl_structural=True,   # long-axis vs bud-axis septum
-        params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 14, 4),
-                "max_cycle": (6, 10**9, 10**9), "vcap": (0.0, 3.0, 1.5),
-                "max_div_frac": (0.005, 0.20, 0.03), "orient_asw": (0.2, 6.0, 1.0)}),
+        params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 64, 16),   # 4 calls x 4
+                "max_cycle": (6, 10**9, 10**9), "vcap": (0.0, 3.0, 1.5),   # vcap: PROVISIONAL
+                "max_div_frac": (0.00125, 0.20, 0.0075),   # 0.03/call / 4 = per-frame
+                "max_div": (4, 480, 30),                   # 120/call / 4 = per-frame FLOOR
+                "orient_asw": (0.2, 6.0, 1.0)}),
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
         impls=["radial_push"], impl_structural=False,

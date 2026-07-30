@@ -130,6 +130,28 @@ def _relax_subset(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, mech, move_mask, 
     return x.detach()
 
 
+def _engine_owns_clock(params, default=1):
+    """D1: the ENGINE owns the operator period; operators must not gate themselves as well.
+
+    Several operators kept a private `every`/`_k` AND were gated by the engine, so the effective
+    period was the PRODUCT. A config saying `every: 2` fired once every FOUR frames, and every
+    per-call quantity (min_cycle, max_div, max_div_frac) silently meant 4x what it said. That is
+    the defect that re-anchored the whole archive.
+
+    Returns 1 always -- the operator never gates. Passing every > 1 is now a hard error rather
+    than a silent 4x, so the bug cannot return by configuration.
+    """
+    e = int(params.get("every", default))
+    if e > 1:
+        raise ValueError(
+            f"D1: operator-side `every={e}` is no longer supported -- the engine owns the clock. "
+            f"Gate this operator through the schedule instead. (A private period multiplied the "
+            f"engine's, so `every: 2` meant once every 4 frames and every per-call quantity "
+            f"meant 4x what it said.)")
+    return 1
+
+
+
 @register_operator("seed_mesh_3d", set="vertex", kind="structural", family="growth")
 class SeedMesh3D(Structural):
     """Frame-0: build a closed spherical half-edge mesh (spherical Voronoi), write the 3D vertex
@@ -351,7 +373,7 @@ class VesicleGrowth(Structural):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
-        self.rate = float(params.get("rate", 0.004)); self.every = int(params.get("every", 1))
+        self.rate = float(params.get("rate", 0.004)); self.every = _engine_owns_clock(params)
         self.max_scale = float(params.get("max_scale", 1e9))    # cap the linear growth -> the shell PLATEAUS
         self._k = 0
 
@@ -359,9 +381,7 @@ class VesicleGrowth(Structural):
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
-        self._k += 1
-        if self._k % self.every != 0:
-            return {}
+        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         gs = float(m.get("gscale", 1.0))
         if gs >= self.max_scale:                                # plateaued: stop inflating (division then stops too)
             return {}
@@ -396,7 +416,7 @@ class Divide3D(Structural):
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
         self.p0 = float(params.get("p0", 3.72))
-        self.every = int(params.get("every", 3)); self._k = 0
+        self.every = _engine_owns_clock(params, default=3); self._k = 0
         self.max_div = int(params.get("max_div", 20))            # cap divisions per call for stability (absolute floor)
         # LIVE-scaled division cap: max_div is otherwise a FIXED absolute count set from the INITIAL cell count,
         # so on a long run the live count grows (150->~1400) while the cap stays 10 -> ready cells backlog behind
@@ -449,9 +469,7 @@ class Divide3D(Structural):
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
-        self._k += 1
-        if self._k % self.every != 0:
-            return {}
+        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         dev = lvl.state.device; dt = lvl.state.dtype; buf = lvl.state.shape[0]
         Nv = m["Nv"]
         pos_np = lvl.get("pos")[:Nv].detach().cpu().numpy().astype(np.float64)
@@ -596,15 +614,13 @@ class TopoSnapshot3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device); self.at = params.get("_at", "vertex")
-        self.every = int(params.get("every", 1)); self._k = 0   # store at the RECORDING stride (else OOM on long runs)
+        self.every = _engine_owns_clock(params); self._k = 0   # engine owns the stride (D1)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
-        self._k += 1                                            # store at tick 1 (~frame 0) then every `every` ticks,
-        if not (self._k == 1 or self._k % self.every == 0):     # matching the engine's recorded set frames -> aligned
-            return {}
+        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         def cp(k):                                              # per-cell mechanical targets (for offline force/stress
             v = m.get(k)                                        # analysis) -- None-safe numpy copies
             return v.detach().cpu().numpy().copy() if v is not None and hasattr(v, "detach") else None

@@ -131,7 +131,12 @@ def main():
     # overriding a preset value gives an identical operator set and different physics. This
     # check compares the actual numbers, excluding the keys we DELIBERATELY changed.
     print("\nV9 PARAMETER FIDELITY -- same numbers, not just same operators?")
-    DELIBERATE = {"dt", "every", "max_cycle", "max_div", "record_every"}   # D1/D2 fixes + caps
+    # dt/every: the D1/D2 fixes. min_cycle/max_cycle/max_div_frac: the CLOCK RE-ANCHORING --
+    # they are per-CALL in the operator and the archived configs ran divide_3d once every 4
+    # frames, so preserving the archived behaviour REQUIRES different numbers. V10 checks the
+    # factor is exactly right; V9 must not flag it as a fidelity failure.
+    DELIBERATE = {"dt", "every", "max_cycle", "max_div", "record_every",
+                  "min_cycle", "max_div_frac"}
     if have_make:
         for name in TRUSTED:
             if name not in specs or name not in presets:
@@ -157,6 +162,34 @@ def main():
                       if diffs else "all mechanism parameters match")
             except Exception as e:
                 check(f"V9 {name}", False, f"{type(e).__name__}: {str(e)[:70]}")
+    else:
+        print("  (skipped -- make() unavailable)")
+
+    # ---------------------------------------------------------------- V10 clock re-anchoring
+    print("\nV10 CLOCK RE-ANCHORING -- are the per-call quantities rescaled by exactly 4?")
+    from composition_space import DIVIDE_CALL_PERIOD_BEFORE_D1 as P
+    if have_make:
+        for name in TRUSTED:
+            if name not in specs or name not in presets:
+                continue
+            try:
+                _, hand = rtr.make(presets[name])
+                h = next((o for o in hand["operators"] if o["op"] == "divide_3d"), None)
+                o = next((o for o in specs[name]["operators"] if o["op"] == "divide_3d"), None)
+                if not h or not o:
+                    continue
+                bad = []
+                if h.get("min_cycle") and o.get("min_cycle") != h["min_cycle"] * P:
+                    bad.append(f"min_cycle {o.get('min_cycle')} != {h['min_cycle']}x{P}")
+                if h.get("max_div_frac") and abs(o.get("max_div_frac", 0)
+                                                 - h["max_div_frac"] / P) > 1e-9:
+                    bad.append(f"max_div_frac {o.get('max_div_frac')} != {h['max_div_frac']}/{P}")
+                check(f"V10 {name}", not bad,
+                      "; ".join(bad) if bad else
+                      f"min_cycle {h.get('min_cycle')}->{o.get('min_cycle')} calls->frames, "
+                      f"max_div_frac {h.get('max_div_frac')}->{o.get('max_div_frac')} per-frame")
+            except Exception as e:
+                check(f"V10 {name}", False, f"{type(e).__name__}: {str(e)[:60]}")
     else:
         print("  (skipped -- make() unavailable)")
 
