@@ -228,8 +228,13 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "act_max_final": round(fm["act_max"][-1], 3),
                "frames": T, "wall_s": round(wall, 1)}
     summary.update(tube)                       # the archive's own definitions, for comparison
+    try:
+        summary.update(mechanics(name, fr, cfg, out_dir))   # force / stress / tension / migration
+    except Exception as e:
+        print(f"[{name}] mechanics FAILED: {type(e).__name__}: {str(e)[:110]}", flush=True)
     if q is not None:
-        summary["Q"] = round(q, 3)
+        summary["Q_protr_after_relax"] = round(q, 3)          # ABSOLUTE, not a ratio (M4)
+        summary["Q_drop"] = round(fm["protr"][-1] - q, 3)     # how much did NOT survive
     rec.add_analysis("metric_v1", summary)
     arch.add(rec)
 
@@ -247,6 +252,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     if movie:
         try:
             render(name, fr, out_dir)
+            describe(name, out_dir)          # VLM caption -- never deferred, never skipped
         except Exception as e:
             print(f"[{name}] render failed: {type(e).__name__}: {e}", flush=True)
             traceback.print_exc()
@@ -287,8 +293,11 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, relax_frames=60
         m = getattr(Hq.level("vertex"), "_mesh", {}) or {}
         hq = m.get("hist", [])
         nv = hq[-1]["Nv"] if hq else pos.shape[1]
-        a_after = protr_of(pos[-1][:nv].astype(np.float64))
-        return a_after / max(protr_before, 1e-9)
+        # M4: Q was final/before -- a RATIO, which the instrument gate showed is perfectly
+        # ANTI-correlated with elongation (tau=-1.00): a sphere that never moved scores 1.0.
+        # Q must be the ABSOLUTE elongation that SURVIVES relaxation, with the pre-relaxation
+        # value reported alongside so the drop is still visible.
+        return protr_of(pos[-1][:nv].astype(np.float64))
     except Exception as e:
         print(f"  [Q] failed: {type(e).__name__}: {str(e)[:90]}", flush=True)
         return None
@@ -345,6 +354,141 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     plt.close(figm)
     print(f"[{name}] artefacts -> {os.path.relpath(out_dir, ROOT)}/{{strip.png,movie.mp4}}",
           flush=True)
+
+
+# --------------------------------------------------------------------------- mechanics
+def mechanics(name, fr, cfg, out_dir, n=24):
+    """Per-cell FORCE / PRESSURE / TENSION / MIGRATION, from the trajectory we already have.
+
+    `analyze_forces.run()` re-runs the simulation to get these; we do not need to. `cell_mechanics`
+    is a pure function of (positions, half-edge table, per-cell targets), and topo_snapshot_3d
+    already stores A0/P0/V0f in the mesh history -- so the fields come for free from the frames
+    on disk. No doubled compute, and every job carries its own mechanical analysis.
+
+    The campaign-critical output is `p_ratio`: mean pressure in the PROTRUDING cells divided by
+    mean pressure in the BODY. Round 41 diagnosed our tube as forced rather than grown precisely
+    from this signature -- pressure ~3 concentrated in the tube while the body sat idle. A
+    growth-driven equilibrium tube should approach 1. It is the direct measurement of the
+    campaign objective, and it is differentiable, so it is also the Loop-II objective.
+    """
+    import torch
+    from analyze_forces import cell_mechanics
+    se = next((o for o in cfg["operators"] if o["op"] == "shape_energy_3d"), {})
+    kA, kP = se.get("K_A", 1.0), se.get("K_P", 1.0)
+    kV = se.get("K_V", se.get("k_v", 4.0))
+    Lam, Gam = se.get("Lambda", 0.2), se.get("Gamma", se.get("gamma", 0.05))
+
+    T = len(fr)
+    idx = np.unique(np.linspace(0, T - 1, min(n, T)).astype(int))
+    rows, prev_cen = [], None
+    for t in idx:
+        pos, mt, act = fr[int(t)]
+        if mt.get("A0") is None or mt.get("V0f") is None:
+            continue
+        x = torch.tensor(pos, dtype=torch.float32)
+        es = torch.as_tensor(mt["E_srce"], dtype=torch.long)
+        et = torch.as_tensor(mt["E_trgt"], dtype=torch.long)
+        ef = torch.as_tensor(mt["E_face"], dtype=torch.long)
+        nF = int(mt["nF"])
+        A0 = torch.as_tensor(mt["A0"], dtype=torch.float32)[:nF]
+        P0 = torch.as_tensor(mt["P0"], dtype=torch.float32)[:nF]
+        V0 = torch.as_tensor(mt["V0f"], dtype=torch.float32)[:nF]
+        f, area, perim, vf, pres, tens, cen = cell_mechanics(
+            x, es, et, ef, nF, A0, P0, V0, kA, kP, kV, Lam, Gam)
+        cen_np = cen.numpy()
+        r = np.linalg.norm(cen_np - cen_np.mean(0), axis=1)
+        prot = r > 1.3 * np.median(r)                      # the protruding cells (tube_analysis defn)
+        fmag = np.linalg.norm(f.numpy(), axis=1)
+        vel = (np.linalg.norm(cen_np[:len(prev_cen)] - prev_cen, axis=1).mean()
+               if prev_cen is not None and len(prev_cen) else 0.0)
+        prev_cen = cen_np
+        pr = pres.numpy()
+        rows.append(dict(t=int(t), n_cells=nF,
+                         force_mean=float(fmag.mean()),
+                         p_body=float(np.abs(pr[~prot]).mean()) if (~prot).any() else 0.0,
+                         p_tube=float(np.abs(pr[prot]).mean()) if prot.any() else 0.0,
+                         tension_mean=float(tens.numpy().mean()),
+                         migration=float(vel), n_protruding=int(prot.sum())))
+    if not rows:
+        print(f"[{name}] mechanics: mesh history carries no per-cell targets -- skipped",
+              flush=True)
+        return {}
+    last = rows[-1]
+    pb = max(last["p_body"], 1e-9)
+    summ = {"mech_force_mean": round(last["force_mean"], 4),
+            "mech_p_body": round(last["p_body"], 4),
+            "mech_p_tube": round(last["p_tube"], 4),
+            "mech_p_ratio": round(last["p_tube"] / pb, 3),     # ~3 forced, ~1 grown (R41)
+            "mech_tension_mean": round(last["tension_mean"], 4),
+            "mech_migration": round(float(np.mean([r["migration"] for r in rows[1:]] or [0])), 5)}
+    np.savez(os.path.join(out_dir, "mechanics.npz"),
+             **{k: np.array([r[k] for r in rows]) for k in rows[0]})
+    _plot_mechanics(rows, name, out_dir)
+    print(f"[{name}] mechanics: p_tube/p_body = {summ['mech_p_ratio']} "
+          f"(~3 = forced protrusion, ~1 = growth-driven equilibrium)", flush=True)
+    return summ
+
+
+def _plot_mechanics(rows, name, out_dir):
+    t = [r["t"] for r in rows]
+    fig, ax = plt.subplots(2, 2, figsize=(9, 6), facecolor="black")
+    for a in ax.ravel():
+        a.set_facecolor("black")
+        for sp in a.spines.values():
+            sp.set_color("0.5")
+        a.tick_params(colors="0.7", labelsize=7)
+    ax[0, 0].plot(t, [r["force_mean"] for r in rows], color="#4da6ff")
+    ax[0, 0].set_title("force  $\\|-\\nabla U\\|$", color="w", fontsize=9)
+    ax[0, 1].plot(t, [r["p_body"] for r in rows], color="w", label="body")
+    ax[0, 1].plot(t, [r["p_tube"] for r in rows], color="#ff4d4d", label="protruding")
+    ax[0, 1].legend(fontsize=6, facecolor="black", labelcolor="w", edgecolor="0.4")
+    ax[0, 1].set_title("pressure  $2K_V(V_0-v)$", color="w", fontsize=9)
+    ax[1, 0].plot(t, [r["tension_mean"] for r in rows], color="#ffd24d")
+    ax[1, 0].set_title("cortical tension", color="w", fontsize=9)
+    ax[1, 1].plot(t, [r["migration"] for r in rows], color="#7bd67b")
+    ax[1, 1].set_title("migration (centroid displacement)", color="w", fontsize=9)
+    fig.suptitle(name, color="w", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "mechanics.png"), dpi=110, facecolor="black")
+    plt.close(fig)
+
+
+# --------------------------------------------------------------------------- VLM caption
+def describe(name, out_dir, n_frames=8):
+    """Caption the run's movie with the local VLM and write it INTO the job's log folder.
+
+    Every job therefore carries its own evidence triple: movie.mp4 + strip.png +
+    description.txt. Captioning is never deferred to an end pass and never disabled -- the
+    caption is simultaneously documentation, the Watcher's input, and a semantic regression
+    test (validation ladder L7: the numbers pass but the picture is wrong).
+    """
+    mp4 = os.path.join(out_dir, "movie.mp4")
+    dst = os.path.join(out_dir, "description.txt")
+    if not os.path.exists(mp4):
+        print(f"[{name}] no movie to describe", flush=True)
+        return None
+    if os.path.exists(dst):
+        return dst
+    vlm = os.path.join(ROOT, "VLLM")
+    sys.path.insert(0, vlm)
+    try:
+        import describe_video as DV
+        from transformers import AutoModelForMultimodalLM, AutoProcessor
+        dev = "cuda:0" if __import__("torch").cuda.is_available() else "cpu"
+        proc = AutoProcessor.from_pretrained(DV.GEMMA)
+        model = AutoModelForMultimodalLM.from_pretrained(DV.GEMMA, dtype="bfloat16",
+                                                         device_map=dev)
+        txt = DV.describe_one(proc, model, mp4, n_frames)
+    except Exception as e:
+        # NOT silent: a missing caption is recorded as such, so the ledger can tell "no caption"
+        # from "caption agreed". A silent skip would let a run look Watcher-approved.
+        txt = None
+        print(f"[{name}] VLM caption UNAVAILABLE: {type(e).__name__}: {str(e)[:110]}", flush=True)
+    with open(dst, "w") as f:
+        f.write(txt if txt else "UNAVAILABLE -- no caption was produced for this run.\n")
+    print(f"[{name}] description -> {os.path.relpath(dst, ROOT)}"
+          + ("" if txt else "  (UNAVAILABLE)"), flush=True)
+    return dst
 
 
 # --------------------------------------------------------------------------- cli

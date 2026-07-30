@@ -56,10 +56,15 @@ class CampaignConfig:
                       "is missing")
     # success criteria, authored BEFORE the search (falsifiable, not an impression)
     success: dict = field(default_factory=lambda: {
-        "aspect_final": ">= 3.0",       # there is a tube at the end, not only a transient
-        "retention": ">= 0.6",          # it is not a peak that collapses
-        "Q": ">= 0.5",                  # it survives driver-off relaxation
-        "no_extrude": True,             # achieved WITHOUT the forcing node
+        # Authored before the search, and REVISED once by the instrument gate (M4): the first
+        # version used `retention` and a RATIO-valued Q, both of which the gate showed reward
+        # STASIS -- a sphere that never moved scored 1.0. Only gate-admissible metrics appear
+        # here now (protr_peak tau=+1.00, n_tubes tau=+1.00, protr_final tau=+0.67).
+        "protr_peak": ">= 3.0",              # it elongates at some point
+        "protr_final": ">= 2.0",             # and is still elongated at the end
+        "Q_protr_after_relax": ">= 2.0",     # ABSOLUTE survival, not a ratio
+        "n_tubes": ">= 1",
+        "no_extrude": True,                  # achieved WITHOUT the forcing node
     })
     batch: int = 24                 # B: candidates proposed per round
     keep_tier1: int = 8             # survive the cheap gate
@@ -180,20 +185,25 @@ def score_run(summary, cfg: CampaignConfig):
     """
     if summary.get("inert_operators") or summary.get("saturated"):
         return -math.inf
-    a = float(summary.get("aspect_final", 0.0))
-    r = float(summary.get("retention", 0.0))
-    q = summary.get("Q")
-    q = float(q) if q is not None else r        # retention stands in for Q when Q is not run
-    # a tube that survives is worth far more than a transient one
-    return a * (0.25 + 0.75 * min(1.0, q))
+    # ONLY gate-admissible metrics (instrument_gate.json). retention and the tube_len-derived
+    # metrics are excluded by measurement: retention is anti-correlated (tau=-1.00) and
+    # ta_aspect_len_over_diam scored 9.30 on a bud.
+    pk = float(summary.get("protr_peak", 0.0))
+    fin = float(summary.get("protr_final", 0.0))
+    q = summary.get("Q_protr_after_relax")
+    q = float(q) if q is not None else fin      # absolute survival; falls back to the final value
+    ntb = float(summary.get("ta_n_tubes_final", 0.0))
+    # elongation that PERSISTS, mildly rewarded for being a single coherent tube
+    return 0.5 * pk + 1.0 * q + 0.25 * min(ntb, 2.0)
 
 
 def meets_success(summary, cfg: CampaignConfig, has_extrude: bool):
-    s = cfg.success
-    ok = (float(summary.get("aspect_final", 0)) >= 3.0
-          and float(summary.get("retention", 0)) >= 0.6
-          and float(summary.get("Q", summary.get("retention", 0))) >= 0.5)
-    if s.get("no_extrude") and has_extrude:
+    ok = (float(summary.get("protr_peak", 0)) >= 3.0
+          and float(summary.get("protr_final", 0)) >= 2.0
+          and float(summary.get("Q_protr_after_relax",
+                                summary.get("protr_final", 0))) >= 2.0
+          and float(summary.get("ta_n_tubes_final", 0)) >= 1)
+    if cfg.success.get("no_extrude") and has_extrude:
         ok = False
     return ok
 
@@ -300,14 +310,24 @@ def propose_batch(frontier, cfg: CampaignConfig, prox: ProximityIndex, rng):
     per_cluster = {}
     order = sorted(frontier, key=lambda g: rng.random())
     for g in order:
-        cid = prox.assign(g) if prox.centroids else "K000"
+        # ALWAYS assign: the guarded form skipped assign() on the very first graph, so no
+        # centroid was ever created and EVERY graph fell into one cluster -- silently throttling
+        # the batch to the per-cluster cap.
+        cid = prox.assign(g)
         if prox.clusters.get(cid, {}).get("frozen"):
             continue
         if per_cluster.get(cid, 0) >= max(2, cfg.batch // 4):
             continue
         edits = g.legal_edits(cfg.stage_gate)
         rng.shuffle(edits)
+        # take SEVERAL edits per parent when the frontier is small -- otherwise the batch size is
+        # silently capped at |frontier| and early rounds are starved. The per-cluster cap still
+        # prevents any one idea monopolising the round.
+        cap = max(2, cfg.batch // 4)
+        taken = 0
         for e, lbl in edits:
+            if taken >= cap or per_cluster.get(cid, 0) >= cap:
+                break
             try:
                 child, _ = g.apply(e)
             except Exception:
@@ -321,7 +341,7 @@ def propose_batch(frontier, cfg: CampaignConfig, prox: ProximityIndex, rng):
             seen.add(h)
             per_cluster[cid] = per_cluster.get(cid, 0) + 1
             out.append((child, lbl, g))
-            break
+            taken += 1
         if len(out) >= cfg.batch:
             break
     return out

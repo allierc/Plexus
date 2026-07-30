@@ -1,3 +1,0 @@
-The vocabulary defaults in composition_space.py (max_div_frac=0.03, cycle_cv=0.40, p0=3.90, Gamma=0.05, Lambda=0.20, h0=0.40) were set at 15:20 with the stated rationale "so a default-parameter composition starts where our evidence is." FINDING 8 came after that, and there's no TODO or note anywhere marking them as stale.
-
-So those defaults still encode the pre-fix working point that FINDING 8 just invalidated — meaning every composition the loop generates currently starts from a θ tuned for the wrong clock. Worth raising with the ws1 session before the campaign scales up; it's a one-line fix conceptually (re-tune the baseline, update defaults) but it silently biases everything downstream if missed.

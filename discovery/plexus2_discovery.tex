@@ -749,6 +749,139 @@ not be adjustable by the experiment it is measuring.} Our situation is sharper t
 published system's, because their measurement is an external wet-lab assay and ours is code
 written by the same project that is being judged.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Which agents are language models, and which must not be}
+\label{sec:whichllm}
+
+Co-Scientist runs six specialised LLM agents under a mechanical supervisor: Generation,
+Reflection (peer review \emph{with search}), Ranking (Elo by simulated scientific debate),
+Proximity, Evolution (refines the top-ranked) and Meta-review (distils patterns and appends them
+to the other agents' prompts --- ``feedback propagation without back-propagation''). Robin uses
+Crow and Falcon for literature and Finch for analysis, ranks with an LLM judge over pairwise
+comparisons aggregated by Bradley--Terry--Luce, and runs \emph{eight independent} Finch
+trajectories on the same data because the analysis ``can vary between runs, even when given
+identical prompts and data''.
+
+We follow that, with two deliberate departures and one addition.
+
+\begin{center}\small
+\begin{tabular}{@{}p{2.4cm}p{1.9cm}p{9.6cm}@{}}
+\toprule
+\textbf{Agent} & \textbf{LLM?} & \textbf{Why} \\
+\midrule
+Proposer     & \textbf{yes} & Chooses which mechanism edit is worth a GPU-hour and commits to a
+prediction. An enumerator cannot do this: if the prediction follows mechanically from the edit's
+sign, the surprise rate measures nothing. \\
+Reflection   & \textbf{yes} & Peer-reviews the batch before it costs cluster time. A type-correct
+proposal can still be a bad experiment. \\
+Analyst $\times N$ & \textbf{yes} & $N$ independent readings of one run, reconciled by consensus;
+disagreement is recorded as a calibration signal. \\
+Watcher      & \textbf{yes} (VLM) & Reads the movie and \emph{vetoes} promotion when the picture
+contradicts the claim. \\
+Interpreter  & \textbf{yes} & Writes the causal account --- this spec, this phenomenon, by this
+route. \\
+Evolution    & \textbf{yes} & Refines the winner (simplify / synthesise / ground). \\
+Meta-review  & \textbf{yes} & Distils recurring patterns into the Proposer's instructions. \\
+Judge        & \textbf{yes} & A \emph{second opinion} on ranking, from the pictures. \\
+\midrule
+Supervisor   & no & Arithmetic on statistics. An LLM here is drift, not judgement. \\
+Critic       & no & The type and precondition guard. It is the thing that stops a language model
+proposing something ill-typed; it cannot itself be one. \\
+Referee      & no & Ranks by \emph{measuring}. \\
+Proximity    & no & Structural distance --- exact, not approximate. \\
+Metrologist  & no & Certifies the instrument. An LLM here could talk itself into admitting its
+own evidence. \\
+Engineer     & human & The substrate boundary. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Departure 1: ranking is measured \emph{and} judged.}
+Both papers rank by argument because a wet-lab assay is scarce. Ours is a simulation scored by
+code, so an opinion about available ground truth is a step backwards --- \emph{except} that the
+instrument gate has now measured a metric scoring $9.30$ on a small bud. So the metric bank ranks
+first, an LLM judge ranks independently from the rendered movie, and \textbf{their disagreement
+is the signal}: it is the eye/number divergence detector. Neither paper needs this, because
+their measurement is external to their system; ours is code we wrote.
+
+\paragraph{Departure 2: pre-registration.}
+Neither system records what was \emph{believed before} the evidence arrived, so a prediction
+cannot be distinguished from a post-hoc rationalisation. Ours refuses to run a candidate whose
+prediction is not already recorded (\S\ref{sec:protocol}).
+
+\paragraph{Addition: the type system is not an agent.}
+Illegal edits, unmet preconditions and dangling slots never reach the Proposer at all --- it
+chooses from a menu the type system has already filtered. The language decides what is
+\emph{possible}; the agent decides what is \emph{worth doing}. Neither can do the other's job.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Running for weeks: where this breaks}
+\label{sec:weeks}
+
+The campaign is meant to run unattended for weeks. That is a different engineering problem from
+running one round, and the arithmetic should be done before the fact rather than discovered.
+
+One run is roughly $250\,$s of engine, $60\,$s of rendering, $60\,$s of captioning and a
+mechanics pass: call it \textbf{7 minutes}. Eight-way on the partition gives $\sim$68 runs per
+hour. A round is a batch of eight plus a proposer call, so $\sim$20 minutes, or $\sim$70 rounds
+per day. Two weeks is then of order $10^3$ rounds and $10^4$ runs.
+
+\begin{center}\small
+\begin{tabular}{@{}p{0.4cm}p{4.0cm}p{9.4cm}@{}}
+\toprule
+ & \textbf{Bottleneck} & \textbf{Consequence, and what it forces} \\
+\midrule
+1 & \textbf{The composition space is too small.} & Twelve operators, $\sim$19 legal edits from
+the seed. Distinct \emph{clusters} number in the tens. At eight runs a round the search
+\textbf{exhausts itself and freezes every cluster within days}. A multi-week campaign is
+therefore \emph{not} mechanism search --- it is dominated by parameter fitting and by
+\textbf{operator requests}. Escalation is the main path, not an edge case, and it is the least
+built part of the system. \\
+2 & VLM cost & A $23\,$GB model loaded once per job. Caption per \emph{wave} instead: one load,
+eight captions. Still always-caption, never deferred to an end pass. \\
+3 & Storage & $30$--$50\,$MB per trajectory $\times\,10^4$ runs $\approx 400\,$GB. Retention
+policy: full trajectories for kept and promoted runs, per-frame metric tables (kilobytes) for
+everything else --- so the archive stays re-scorable exactly where re-scoring matters. \\
+4 & The proposer call blocks & Eight GPUs idle for minutes every round. Propose round $N{+}1$
+while $N$ runs. \\
+5 & \textbf{Knowledge growth is unmeasured} & The point of the campaign is that knowledge
+accumulates, and there was no quantity tracking it. See below. \\
+6 & The videos do not accumulate & Each run has its own movie; nothing assembles them into
+something you can watch. See below. \\
+7 & Prompt growth & Meta-review appends forever. The distilled section is capped and rewritten
+in place, so old patterns are dropped rather than accreted. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Knowledge growth, as a measured quantity}
+
+If the campaign's product is knowledge, then its rate is the thing to watch, and it should be
+plotted rather than asserted. Per round we record: distinct clusters discovered and frozen;
+counts moving between Established / Refuted / Structural / Open; the \textbf{surprise rate}
+(\S\ref{sec:protocol}); operator requests filed; and the fraction of runs admitted as evidence
+at all. A campaign whose surprise rate collapses toward zero has stopped learning even while it
+is still burning GPU-hours --- and that, not a wall-clock limit, is the honest signal to
+escalate or stop.
+
+\subsection{The video battery}
+
+Every run already produces a movie, a strip, a caption and a mechanics panel. What was missing
+is that they never assembled. Three artefacts accumulate across the campaign:
+
+\begin{itemize}\itemsep2pt
+\item a \textbf{round montage} --- the batch's final frames side by side, so a round is legible
+at a glance;
+\item a \textbf{progress reel} --- the best run of every round, concatenated in order, so the
+campaign can be \emph{watched} learning;
+\item a \textbf{phase-diagram panel} --- the four Okuda cells (\S\ref{sec:question}) as they
+currently stand, which is simultaneously the scientific target and the talk figure.
+\end{itemize}
+
+The reel is not decoration. The single most expensive failure in this project's history was a
+number disagreeing with a picture, and the cheapest defence has repeatedly been to look.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{What the campaign produces}
 \label{sec:out}
