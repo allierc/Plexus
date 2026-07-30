@@ -41,7 +41,10 @@ from composition_space import (DIVIDE_CALL_PERIOD_BEFORE_D1, OPERATORS,
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TYSSUE = os.path.abspath(os.path.join(HERE, "..", "prototype", "Tyssue"))
-CKPT = os.path.join(TYSSUE, "archive", "smoke_hom", "ckpt.npz")
+# REPO-RELATIVE. The devcontainer mounts the NFS export at /workspace and the cluster mounts the
+# SAME export at /groups/saalfeld/home/allierc/Graph, so an absolute path baked into a TRACKED
+# config is portable to exactly one of the two. run_one.py resolves this against its own location.
+CKPT = os.path.join("prototype", "Tyssue", "archive", "smoke_hom", "ckpt.npz")
 
 VBUF, CBUF = 30000, 16000
 DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never composition-dependent
