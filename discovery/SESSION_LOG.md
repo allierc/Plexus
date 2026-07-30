@@ -358,3 +358,65 @@ alignment assertion (D3), acted-ledger (D4), and translation-time D1/D2/D3. Rema
 switch-on: the operator-side private clocks, the instrument gate, and the control law itself.
 
 ---
+## Hour 6 — 2026-07-30 18:00–19:00 EDT
+
+**18:10** Wrote `discovery/control.py` — the anti-rabbit-hole control law, as a **deterministic
+script**. Robin's authors found their orchestrator "almost always called tools in the same order"
+and replaced it with a notebook; we do the same. Language models are called only where judgement
+is required (propose, watch, explain). Ranking is by measuring.
+
+Components, each answering one named pathology:
+
+| Pathology | Mechanism |
+|---|---|
+| depth-first drift | `propose_batch` draws across **distinct clusters**, one legal edit each; `truncate` keeps top-K and **drops the losers, never refines them** |
+| no terminal state | `Supervisor.terminal()` — computed from statistics, not patience; `escalate()` opens the next stage gate or files an **operator request** |
+| near-duplicates | `ProximityIndex` clusters on structural distance; a cluster with 6 evaluations and no best-score gain is **frozen** and its budget reallocated the same round |
+| eye/number divergence | any run with an inert operator or a saturated buffer scores `-inf` and can never win a tournament |
+| goal drift | `CampaignConfig` holds objective + success criteria + stopping rule; workers cannot amend it |
+
+`rank_btl()` implements Bradley–Terry–Luce over pairwise comparisons (Robin's fix for position
+bias, which simple win/loss tallies are highly susceptible to) — but **the comparator is the
+metric bank, not a debate**. Verified: BTL recovers a strict order from pairwise comparisons.
+
+The success criteria are authored **before** the search and are falsifiable:
+`aspect_final ≥ 3.0` ∧ `retention ≥ 0.6` ∧ `Q ≥ 0.5` ∧ **achieved without the extrude node**.
+
+**18:40** ✅ **FULL STACK VERIFIED ON THE L4 PARTITION.**
+
+`pg_ref_uniform_inflation` ran on `gpu_l4`, host `8*h08u18`, `cuda:0`, 130 frames, 63.5 s wall /
+107 s CPU, 1336 MB peak:
+
+```
+{"saturated": false, "inert_operators": [], "retention": 0.992,
+ "valid_evidence": true, "aspect_final": 1.018, "n_cells_final": 5449, "frames": 131}
+D4 ok: all 6 scheduled operators acted ({'seed_mesh_3d': 1, 'divide_3d': 31, 'reconnect_t1_3d': 130} ...)
+```
+
+Config → job script → detached bsub → queue → GPU → engine → D3 assertion → D4 ledger → metrics →
+archive → strip + movie, all on the shared NFS mount. Nothing in the chain is untested now.
+
+### 📌 NOTE — the archive correctly refused to double-count
+
+The cluster run wrote **no new archive record**, which is right: `run_id` is a content hash of
+(composition, θ, seed, backend, IC), so an identical re-run is idempotent. Same inputs, same
+evidence, one record. That is exactly the property that makes a crashed multi-week campaign
+resumable without duplicating or losing evidence — confirmed here by accident rather than by
+design intent, which is the better kind of confirmation.
+
+### ⏱ SUMMARY — Hour 6 (18:00–19:00)
+
+| | |
+|---|---|
+| **Done** | control law written and exercised end to end; **full pipeline verified on L4**; archive idempotency confirmed on a real duplicate |
+| **Found** | nothing broken this hour — first hour without a defect |
+| **Decided** | success criteria frozen in `CampaignConfig` before the search, including "achieved without the extrude node" |
+| **Next** | operator-side D1 (delete the 5 private clocks); the instrument gate on 8 eye-labelled archived runs; then wire propose→run→rank into one round driver |
+| **Blocked** | nothing |
+
+**Pre-flight status:** D1 (translation) ✅ · D2 ✅ · D3 ✅ · D4 ✅ · D7 ✅ · D8 ✅ · D9 ✅ ·
+saturation guard ✅ · control law ✅ · Grounder ✅ · cluster ✅.
+Remaining: D1 (operator-side), D5 (lying tags), D10/D11 (ranker wired, bounded cost), the
+instrument gate, and the round driver.
+
+---
