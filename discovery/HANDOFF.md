@@ -16,6 +16,7 @@ Claude session with no prior context. Cedric is moving to a local ws1 session.
 | M0 code work | **Barely started, then stopped.** Only `prototype/Tyssue/tests/test_baseline.py` + `tests/_baseline/{vesicle3d,rd}.json` exist. Nothing else was written. |
 | **RD promotion** | **NOT DONE — Cedric flagged this gap. See §5. It is a real unresolved language decision, not an oversight.** |
 | Git | ⚠️ **`main` has diverged: 51 local commits ahead, 21 behind origin.** See §7. All local work backed up to branch `m0-discovery-foundation`. |
+| Full plan | **§9** — M0 verify-the-instrument → M1 composition space → M2 loop harness → M3 the long run → M4 differentiable fit → M5 talk. Dates assume an M0 start that has not happened. |
 
 ---
 
@@ -248,12 +249,122 @@ Both must survive → **merge, do not rebase**. I did **not** merge; it needs Ce
 7. **Contract attributes + tag fixes + `--prototype` audit flag.**
 8. **`config/tyssue/` specs** (12-18) — register `tyssue` as a pre-folder type in
    `src/plexus/paths.py`; port **known-good parameters** from `archive/`, do not invent physics.
-9. **`validate_promotion.py`** — the L0-L6 ladder (§9).
+9. **`validate_promotion.py`** — the L0-L7 ladder (§10).
 10. Run on cuda:0 + cuda:1 with **VLM captioning on** (never `--no-describe`).
+
+**After M0 → §9 has the full milestone plan through the talk (M1 composition space, M2 loop
+harness, M3 the long run, M4 differentiable fit, M5 talk assembly).**
 
 ---
 
-## 9. "How do we check it works?" — the validation ladder
+## 9. The plan through November (M0–M5)
+
+> **Drift to reconcile before following this literally** (it was drafted 2026-07-30, before two
+> later decisions):
+> - **M5's slide budget still gives 3 min to the gland and 4 min to Okuda.** Decision #4 in §1 was
+>   *"focus the talk on Okuda"*. Re-balance — probably gland shrinks to ~1 min as "the method's
+>   first proof" and Okuda takes ~6.
+> - **"The 25 ops"** — the real count is **27 registered contracts / 30 implementations**
+>   (16 of them on the 3D vesicle path the loop actually searches).
+> - **All dates assume M0 started 2026-07-30. M0 did not start** (see §6), so every milestone
+>   below shifts by however long the §3/§5 decisions take.
+
+### M0 — Verify the instrument (week 1)
+
+Before any search runs. Take ~8 already-archived runs spanning known outcomes (`round_06` clean
+tri-lobe, `round_28` tube, a cauliflower, a flat one, a ballooned one, `vh_K4_cv15_d4` uniform
+shell) and check the metric vector reproduces **the human eyeball ranking**.
+
+This is the gland Loop III admissibility test applied retroactively: agrees-with-ground-truth ∧
+separates-distinct-outcomes ∧ nuisance-invariant. It targets the documented failure *"a passed
+metric ≠ qualitative fidelity"* and *"`red_frac` caught what `hollow`/`protr` didn't."*
+
+**Gate:** metrics rank 8 archived runs consistently with the human, or fix metrics before spending
+a single L4-hour. A search optimizing an untrusted metric is a rabbit hole with extra steps.
+
+*(M0 now also carries the four correctness bugs of §4 — those were discovered after this plan was
+drafted and are prerequisites to trusting any metric.)*
+
+### M1 — Composition space + backend adapter (weeks 2–3)
+
+`okuda_composition_space.py`, modeled directly on the SMG one. The ops as typed graph nodes,
+stage-gated:
+
+- **Stage 1 substrate:** `seed_mesh_3d` / `load_mesh_3d`, `shape_energy_3d` (impl: `default` |
+  `monolayer`), `reconnect_t1_3d`
+- **Stage 2 growth coupling:** `vesicle_growth`, `morphogen_growth_3d`, `divide_3d`
+  (`orient_iface` on/off), `face_growth`
+- **Stage 3 patterning + feedback:** `cell_rd_seed` (modes), `cell_react`
+  (`gray_scott` | `gierer_meinhardt` | `brusselator` — already three interchangeable impls, which
+  is exactly the plexus2 contract paying off), `cell_diffuse`, `rd_interface_tension`,
+  `cell_differentiate`
+
+One legal edit per step (add / remove / connect / disconnect). **`comp_hash` excludes θ — so a
+parameter tweak provably cannot register as a new hypothesis.** That single line is the structural
+fix for what happened over rounds 01–30.
+
+**Gate (gland Stage II):** replay 4 known configs as compositions and reproduce their archived
+metrics to tolerance. Proves the harness didn't change the physics.
+
+### M2 — Loop harness (week 4)
+
+Port `run_record.py` / `knowledge.py` / `overnight.py`. Add the four upgrades:
+
+1. **LLM critic pre-screen** — tool-free triage, kills obviously-flawed compositions before compute
+2. **Two-tier evaluation** — local smoke (150 cells / 80 frames, seconds) gates the full L4 run
+3. **Proximity clustering** on composition encoding — near-duplicates compete *within cluster*, so
+   a whole cluster starves together
+4. **Meta-review** — recurring patterns distilled from prior records, appended to the proposer's prompt
+
+**Gate:** 24 h unattended, ledger updating, restartable from checkpoint, zero manual intervention.
+
+### M3 — The long run (weeks 5–12)
+
+Continuous on L4. The weekly job is **read the ledger, not the runs.** Each week yields: a ledger
+delta (Established / Refuted / Structural / Open), a montage of the week's best, and an **operator
+backlog** — compositions the proposer wanted but couldn't express. That backlog *is* the atlas
+growth, and each entry is a talk bullet.
+
+Three rules that make this not-a-rabbit-hole, **enforced in code**:
+
+- A cluster with >K evaluations and no best-metric improvement is **frozen**; budget reallocates
+  automatically.
+- **Structural limitations are first-class results** ("mesh + isotropic `v_eq` growth cannot
+  produce a tube") — recorded, reusable, never retried.
+- **No manual parameter tweaking outside the loop.** This is the discipline that broke last time;
+  if a config needs hand-tuning, that's a missing operator, not a missing afternoon.
+
+### M4 — Differentiable local tuning (parallel, Oct)
+
+Loop II on whatever composition the ledger promotes. The recipe exists in
+`prototype/inverse_slime/`. Deliverable: one figure — residual descent + identifiable vs.
+degenerate parameters. Gland's Stage V is the template (it hit ~10⁻² → 10⁻⁹ on a synthetic
+recoverable case and surfaced a genuine degeneracy).
+
+### M5 — Talk assembly (weeks 13–15, Nov 1–14)
+
+15 min ≈ 12 slides:
+
+| min | content |
+|---|---|
+| 1 | Bridge: "I proposed unifying three graph frameworks; building it produced a typed operator algebra" |
+| 2 | Plexus in one slide + gallery reel (existing minisite movies — zero new work) |
+| 2 | The problem: which model, which parameters, which metric — three questions, one loop conflates them |
+| 3 | Gland: five stages on real data; the measurement-changed-the-conclusion moment |
+| 4 | Okuda: same loop, new system, new backend — what it found, incl. impossibility results |
+| 2 | Differentiable fit; the atlas grew by N operators |
+| 1 | Close |
+
+### Load-bearing risk
+
+M1+M2 is ~3 weeks of engineering before any science. **If it slips past mid-September the long run
+gets too short.** Mitigation: M0 and M1 are independently useful (a verified metric bank and a
+composition space are talk material regardless), and the gland half of the talk is already written
+and figured — so the talk floor is high even if Okuda produces only structural limitations.
+
+---
+
+## 10. "How do we check it works?" — the validation ladder
 
 One command, each level independently PASS/FAIL, non-zero exit on any failure.
 
@@ -279,7 +390,7 @@ this** — it is the direct antidote to "a passed metric ≠ qualitative fidelit
 
 ---
 
-## 10. Hard-won lessons (do not rediscover these)
+## 11. Hard-won lessons (do not rediscover these)
 
 - **A numeric invariant ≠ the geometric one.** Bow-tie faces have *positive* shoelace area, so
   `area>0` passed them; the mesh was tangled and a rearrangement result was wrong. Caught by
@@ -298,7 +409,7 @@ this** — it is the direct antidote to "a passed metric ≠ qualitative fidelit
 
 ---
 
-## 11. Key file map
+## 12. Key file map
 
 ```
 paper/plexus2.tex                       # the spec — SOURCE OF TRUTH
@@ -330,7 +441,7 @@ papers/multiagent.pdf, coscientist.pdf  # Robin + Co-Scientist (Nature, Jul 2026
 
 ---
 
-## 12. What to steal from the two Nature papers
+## 13. What to steal from the two Nature papers
 
 - **Robin** — batch-and-truncate, never depth-first: 30 candidates → tournament → top 5; losers
   dropped, not refined. Also: they *de-agentified* their orchestrator ("almost always called tools
