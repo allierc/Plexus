@@ -237,3 +237,69 @@ evidence arrived. Validated / Refuted / Open sections, surprises flagged.
 | **Blocked** | nothing. Re-tuning θ after the D1 re-anchoring is now a required campaign step, not optional. |
 
 ---
+## Hour 4 — 2026-07-30 16:00–17:00 EDT
+
+**16:05** Wrote `discovery/instrument.py` — the **D4 acted-ledger**, implemented generically.
+Rather than editing every operator to self-report (and trusting each edit), it wraps every
+registered operator class and takes a cheap fingerprint of the hierarchy before and after each
+call. If the state moved, or a non-empty delta was returned, the operator acted. 66 operator
+classes instrumented, idempotent.
+
+### 🔴 FINDING 9 — the D4 detector itself needed verifying before it could be trusted
+
+First test on `ref_uniform_inflation` reported **two** inert operators. Only one was real:
+
+- `divide_3d` — **true positive.** `after_frame = 100` but the smoke ran 25 frames, so division
+  genuinely never fired.
+- `vesicle_growth` — **false positive.** It writes the per-cell mechanical *targets* inside the
+  mesh dict (`A0`, `P0`, `V0f`), which my fingerprint did not cover. A growth operator would have
+  been reported inert on every run, invalidating perfectly good evidence.
+
+Fixed by folding every numeric array in the mesh dict into the fingerprint. Re-verified in both
+directions: at 25 frames `divide_3d` is correctly flagged; at 131 frames **all 6 operators act**
+(`divide_3d` 31×, `vesicle_growth` 131×) and the run is marked `valid_evidence: true`.
+
+*This is the discipline the whole document is about, applied to the guard itself: verify the
+instrument before trusting the measurement.* A detector that cries wolf is worse than none,
+because the campaign would learn to ignore it.
+
+### 🔴 FINDING 10 — R41 reproduced quantitatively, under the corrected instrument
+
+Both runs are the **same composition** (`C5e315998af4`) — `relax_iters` is θ, so this is a
+parameter-sensitivity result within one mechanism, exactly as the identity rule predicted.
+
+| | relax = 30 | relax = 60 |
+|---|---|---|
+| aspect **peak** | 3.22 | **4.58** |
+| aspect **final** | 2.42 | **1.36** |
+| **retention** (final/peak) | **0.75** | **0.30** |
+| cells | 3335 | 4801 |
+
+More relaxation grows a *larger transient* tube which then collapses *more completely*. The
+forced protrusion cannot be held against the shape energy. This is round 41's finding — *"pushing
+toward quasi-static destroys the tube"* — as a **number with a trajectory behind it**, rather than
+an eyeball judgement on a movie.
+
+Added **retention** as a first-class metric. It is a cheap proxy for the full Q test and,
+crucially, is computable for every archived run *from the stored per-frame table without
+re-simulating* — the direct payoff of fixing D7 first.
+
+### ⏱ SUMMARY — Hour 4 (16:00–17:00)
+
+| | |
+|---|---|
+| **Done** | D4 acted-ledger implemented + self-verified; `retention` metric added; replay + relaxation control both completed at 900 frames with artefacts |
+| **Found** | the D4 detector's own false positive (fixed); **R41 reproduced quantitatively** — retention 0.75 → 0.30 under more relaxation |
+| **Decided** | inert operators and buffer saturation both set `valid_evidence: false`; such runs can never enter the ledger |
+| **Next** | Grounder agent; metric bank + full Q; L4 8-way driver; operator-side D1 (delete the private clocks) |
+| **Blocked** | nothing |
+
+**Note on outputs (answering Cedric's question):** configs land in `config/okuda/` (10, tracked),
+job artefacts in `log/okuda/<name>/{strip.png, movie.mp4, diag.json, spec_run.yaml}`, evidence in
+`discovery/_archive/{records,analyses}.jsonl` + `traj/*.npz` (29–48 MB for the 900-frame runs —
+full trajectories, gitignored). **`graphs_data/` is deliberately untouched**: `run_one.py` drives
+`plexus.engine.run` directly rather than `Plexus_Main.py -o generate`, because the 3D-AVM needs
+its own half-edge/cross-section renderer and the campaign needs the RunRecord evidence contract,
+which the `graphs_data` convention does not provide.
+
+---
