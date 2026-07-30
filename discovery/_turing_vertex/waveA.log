@@ -1,0 +1,13 @@
+[study] sweeping a_sw over [50.0, 0.6, 0.45, 0.3, 0.15], 400 frames, 5 parallel
+  [wave] started waveA_0_50
+  [wave] started waveA_1_0p6
+  [wave] started waveA_2_0p45
+  [wave] started waveA_3_0p3
+  [wave] started waveA_4_0p15
+  [wave] waveA_0_50             ok cells=1778   protr=1.051 corr=n/a  134.8s
+  [wave] waveA_1_0p6            ok cells=1778   protr=1.046 corr=n/a  135.6s
+  [wave] waveA_2_0p45           ok cells=1778   protr=1.040 corr=n/a  135.7s
+  [wave] waveA_3_0p3            ok cells=1778   protr=1.041 corr=n/a  135.4s
+  [wave] waveA_4_0p15           ok cells=1778   protr=1.051 corr=n/a  139.5s
+
+[study] wrote /workspace/Plexus/discovery/_turing_vertex/wave_waveA.json

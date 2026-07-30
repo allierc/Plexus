@@ -1,0 +1,13 @@
+[study] sweeping rho over [1.0, 0.5, 0.2, 0.05, 0.0], holding {'a_sw': 0.3}, 400 frames, 5 parallel
+  [wave] started waveB_0_1
+  [wave] started waveB_1_0p5
+  [wave] started waveB_2_0p2
+  [wave] started waveB_3_0p05
+  [wave] started waveB_4_0
+  [wave] waveB_0_1              ok cells=1778   protr=1.041 corr=n/a  133.1s
+  [wave] waveB_1_0p5            ok cells=1778   protr=1.048 corr=n/a  131.7s
+  [wave] waveB_2_0p2            ok cells=1778   protr=1.064 corr=n/a  133.7s
+  [wave] waveB_3_0p05           ok cells=1778   protr=1.084 corr=n/a  131.0s
+  [wave] waveB_4_0              ok cells=1778   protr=1.034 corr=n/a  133.1s
+
+[study] wrote /workspace/Plexus/discovery/_turing_vertex/wave_waveB.json

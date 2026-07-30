@@ -1,0 +1,5 @@
+[engine] 400 sim frames -> recording 401 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === tv_waveD_1_0p6 ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=400
+[engine] sets:      cell(1800)  vertex(3552)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
