@@ -59,28 +59,31 @@ LOG = os.path.join(ROOT, "log", "okuda")
 # These are the ground truth of this gate and must not be edited to make a metric pass.
 # ---------------------------------------------------------------------------------------------
 LABELLED = [
-    dict(config="round_40_mc8",      eye="tube",   rank=4,
-         note="archived strip: long thin tube, activator at the tip. The fresh clock-fixed "
-              "replay renders a SMALL BUD -- so this entry deliberately carries a KNOWN "
-              "disagreement between the archived and current substrate, and the gate must "
-              "score the run it actually ran, not the archive."),
-    dict(config="round_41_hertwig",  eye="bud",    rank=2,
-         note="long-axis division without bud-axis orientation -- report: 'makes no tube'"),
-    dict(config="round_41_relax60",  eye="bud",    rank=2,
-         note="more relaxation collapses the protrusion (R41)"),
+    # ⚠ RE-LABELLED 2026-07-30 FROM THE RENDERED FRAMES OF THESE RUNS.
+    # The first version took labels from the REPORT -- which describes the ARCHIVED runs -- while
+    # scoring FRESH ones. round_40_mc8 is a long thin tube in the archive and a BUD here, so it
+    # was ranked 4 while rendering a 2. That is the gate's own failure mode (judging by
+    # provenance instead of by looking) committed one level up, and it made the gate reject
+    # every metric. Ground truth for this gate is ONLY what these runs render.
+    dict(config="ref_uniform_inflation", eye="exploded", rank=0,
+         note="at 900 frames uniform inflation EXPLODES into spikes (the 130-frame smoke was a "
+              "clean sphere). Kept as rank 0: it is not a tube, so a metric that scores it high "
+              "is fooled -- this is the 'lumpy blob scores well' control."),
+    dict(config="round_44_base",     eye="sphere", rank=1,
+         note="large smooth sphere with a tiny nub"),
+    dict(config="round_41_hertwig",  eye="bud",    rank=2, note="sphere + small bud"),
+    dict(config="round_41_relax60",  eye="bud",    rank=2, note="sphere + small bud"),
+    dict(config="round_40_mc8",      eye="bud",    rank=2,
+         note="sphere + small bud. The ARCHIVE for this preset is a long thin tube; the "
+              "clock-fixed substrate renders a bud (Metrologist D1d). We score what ran."),
     dict(config="round_42_k05",      eye="spike",  rank=3,
-         note="monolayer, growth-driven: report says thin SPIKES, not a clean tube"),
-    dict(config="round_42_k05_ex4",  eye="spike",  rank=3,
-         note="monolayer + gentle extrusion assist"),
-    dict(config="round_44_base",     eye="flood",  rank=1,
-         note="emergent GM coupled to the wall machinery: floods, over-proliferates, NO tube"),
-    dict(config="round_21_gs",       eye="bud",    rank=2,
-         note="Gray-Scott stable-spot regime"),
-    dict(config="ref_uniform_inflation", eye="sphere", rank=0,
-         note="uniform inflation, no patterning: a sphere. The negative control."),
+         note="monolayer, growth-driven: clearly elongated"),
+    dict(config="round_42_k05_ex4",  eye="spike",  rank=4,
+         note="monolayer + extrusion: the MOST elongated -- a long thin spike"),
+    dict(config="round_21_gs",       eye="bud",    rank=2, note="Gray-Scott stable-spot regime"),
 ]
 
-CLASS_ORDER = ["sphere", "flood", "bud", "spike", "tube"]
+CLASS_ORDER = ["exploded", "sphere", "bud", "spike"]
 
 # metrics the gate judges. `tube_like` metrics should increase with rank.
 JUDGED = ["ta_aspect_len_over_diam", "ta_tube_len_final", "ta_n_tubes_final",
