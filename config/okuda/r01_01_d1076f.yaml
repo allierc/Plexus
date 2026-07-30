@@ -1,9 +1,9 @@
 general:
-  name: ref_okuda_route
+  name: r01_01_d1076f
   seed: 0
-  n_frames: 350
+  n_frames: 900
   dt: 0.02
-  record_cap: 352
+  record_cap: 902
   record_every: 1
   boundary: free
   dim: 3
