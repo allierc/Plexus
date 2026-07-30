@@ -49,12 +49,30 @@ class CampaignConfig:
     its own drift; every course correction in the hand-run record came from outside the loop.
     """
     name: str = "okuda_growth_driven"
-    objective: str = ("find a composition that produces a sustained tube as a GROWTH-DRIVEN "
-                      "quasi-static equilibrium -- surviving relaxation, sharing load between "
-                      "tube and body, requiring no explicit extrusion force -- or establish "
-                      "that no composition in the searched space can, and say which capability "
-                      "is missing")
+    objective: str = (
+        "BUILD THE CAUSAL LEVER-MAP of the Okuda mechanism space: for every operator, every "
+        "implementation and every routing, what does it do ALONE, and what does it do IN "
+        "COMBINATION -- since mixtures rarely surrender their causal structure to inspection. "
+        "The product is a map, not a winner. Specific questions -- which composition makes a "
+        "sustained tube, which reproduces Okuda's (chi,gamma) phase diagram, which mechanism is "
+        "necessary for branching -- are QUERIES AGAINST that map, and each is answered as a "
+        "by-product of covering it.")
+    # Why a map and not a target: with a single objective the search converges, freezes every
+    # cluster within days, and stops. With coverage as the objective the campaign runs until
+    # every lever is characterised alone AND in interaction -- which is a weeks-scale programme
+    # and is what plexus2 Loop I actually asks for. It also makes every run informative: a
+    # composition that fails to make a tube still fills a cell of the map.
     # success criteria, authored BEFORE the search (falsifiable, not an impression)
+    # QUERIES against the map. None of these is "the" objective; each is a question the map
+    # answers once the relevant cells are covered. They are recorded so the campaign can report
+    # progress on them, not so it can stop at one.
+    queries: dict = field(default_factory=lambda: {
+        "sustained_tube": "a tube that survives relaxation, WITHOUT the extrude forcing node",
+        "phase_diagram": "Okuda's four (chi,gamma) morphologies from ONE composition: "
+                         "thin tube / thick tube / undulation / branching",
+        "necessity": "for each observed phenotype, which operators are necessary",
+        "impossibility": "which composition families provably CANNOT reach a phenotype",
+    })
     success: dict = field(default_factory=lambda: {
         # Authored before the search, and REVISED once by the instrument gate (M4): the first
         # version used `retention` and a RATIO-valued Q, both of which the gate showed reward
