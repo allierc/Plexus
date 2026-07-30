@@ -91,30 +91,70 @@ apart. This is the general statement of why parameter search cannot find a mecha
 stronger than the usual one: \emph{the search optimises resemblance, and resemblance is the
 quantity blind to the distinction that matters.}
 
-\subsection{The campaign objective, stated falsifiably}
+\subsection{The campaign objective: a causal lever-map, not a target}
+
+An earlier draft of this note stated the objective as one question --- \emph{produce a sustained
+tube as a growth-driven quasi-static equilibrium}. That framing is wrong, and the throughput
+arithmetic of \S\ref{sec:weeks} is what exposed it: with a single target the search
+\emph{converges}, freezes every cluster within days, and stops, having established one fact.
+It also wastes most of its own evidence, because a composition that does not make a tube teaches
+nothing about tubes.
+
+The objective is the one plexus2's Loop~I already names:
 
 \begin{quote}\itshape
-Find a composition of Plexus operators that produces a sustained tube as a \textbf{growth-driven
-quasi-static equilibrium} --- one that survives relaxation, shares load between tube and body,
-and requires no explicit extrusion force --- or establish that no composition in the searched
-space can, and say precisely which capability is missing.
+Build the CAUSAL LEVER-MAP of the mechanism space: for every operator, every implementation and
+every routing, what does it do \emph{alone}, and what does it do \emph{in combination} --- since
+mixtures rarely surrender their causal structure to inspection.
 \end{quote}
 
-Two subordinate questions inherit from the record and must be re-tested rather than assumed:
+The product is a map, not a winner. Specific questions become \textbf{queries against it}:
 
-\begin{enumerate}\itemsep2pt
-\item \textbf{Can patterning be emergent?} A late round concluded that the activator--inhibitor
-system floods the growing domain and cannot maintain a tip-riding peak, so the driven tip signal
-is necessary. That is an impossibility claim, and it was made \emph{before} the precondition
-checks of \S\ref{sec:defects} existed. It is exactly the class of claim a silently inert operator
-manufactures. It re-enters the campaign as \textbf{Open}.
-\item \textbf{Does per-cell three-dimensional volume change the answer?} The mid-surface model
-gives a cell a wedge volume measured from the shell centre; the monolayer implementation gives it
-a true volume $A\!\cdot\!h$ with apical and basal surfaces, and with it a bending rigidity that is
-emergent rather than imposed. The first attempt to wire it in produced spikes, and the diagnosis
-on record is that division still triggers on the wedge volume, so activated cells inflate instead
-of dividing. This is a concrete, testable entry point, not a mystery.
-\end{enumerate}
+\begin{center}\small
+\begin{tabular}{@{}p{3.2cm}p{10.8cm}@{}}
+\toprule
+\textbf{query} & \textbf{answered once the relevant cells are covered} \\
+\midrule
+sustained tube & a tube that survives relaxation, \emph{without} the extrusion forcing node \\
+phase diagram & Okuda's four $(\chi,\gamma)$ morphologies --- thin tube, thick tube, undulation,
+branching --- from \emph{one} composition \\
+necessity & for each observed phenotype, which operators are load-bearing \\
+impossibility & which composition families provably cannot reach a phenotype \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The cells of the map, and coverage as progress}
+
+\begin{center}\small
+\begin{tabular}{@{}p{2.2cm}p{11.8cm}@{}}
+\toprule
+\textbf{Solo} & for each operator and each structural implementation, its effect alone \\
+\textbf{Pair} & for each pair, is the joint effect what the two solo effects predict
+(\emph{additive}), or not? \textbf{Interactions are the expensive knowledge} --- they are
+precisely what cannot be read off the code \\
+\textbf{Routing} & morphogen $\to$ growth.\code{gate} vs $\to$ divide.\code{axis} vs $\to$
+extrude.\code{site}: same operators, different mechanism \\
+\textbf{Necessity} & for each observed phenotype, which ablations destroy it \\
+\textbf{Phenotype} & which regions produce which morphology --- labels \emph{discovered} by the
+analysts, never declared in advance \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Progress is then \textbf{coverage}: the fraction of cells carrying enough evidence to state a
+verdict. Every run fills a cell, so no run is wasted, and the campaign has a natural extent ---
+it runs until the levers are characterised. That is a weeks-scale programme rather than a
+days-scale search, and it is what makes the multi-week campaign coherent rather than merely
+long.
+
+Two subordinate questions inherit from the record and enter the map as ordinary open cells
+rather than as blockers: whether patterning can be \emph{emergent} (a late round concluded the
+activator--inhibitor system floods the growing domain and cannot maintain a tip-riding peak ---
+an impossibility claim made \emph{before} the precondition checks existed, so it re-enters as
+\textbf{Open}), and whether per-cell three-dimensional volume changes the answer (the monolayer
+implementation, whose first wiring spiked because division still triggered on the wedge volume
+rather than $A\!\cdot\!h$).
 
 \subsection{The metric that makes the objective measurable}
 
