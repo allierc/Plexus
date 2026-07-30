@@ -3,6 +3,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{ifthen}
 \usepackage{xcolor}
 \usepackage{graphicx}
 \usepackage{parskip}
@@ -551,84 +552,126 @@ adjudication, and add one agent neither has.
   ic/.style={draw=cgray, line width=0.55pt},
   fillc/.style={fill=cset!12},
   lbl/.style={font=\scriptsize\bfseries, text=black},
-  rol/.style={font=\tiny, text=cgray, align=center, text width=3.0cm},
-  cell/.style={minimum width=3.2cm, minimum height=2.05cm}]
+  rol/.style={font=\tiny, text=cgray, align=center, text width=2.75cm},
+  cell/.style={minimum width=3.0cm, minimum height=2.0cm}]
 
-\def\cw{3.35}   \def\ch{2.15}
+\def\cw{3.05}   \def\ch{2.16}
 
-% ---------- icon macros: each draws a small glyph centred on (0,0) ----------
-\newcommand{\icTarget}{\draw[ic,fillc](0,0)circle(3.6mm);\draw[ic](0,0)circle(2mm);\fill[cop](0,0)circle(.75mm);}
-\newcommand{\icBook}{\draw[ic,fillc](-3.4mm,-2.6mm)rectangle(3.4mm,2.6mm);\draw[ic](0,-2.6mm)--(0,2.6mm);
-  \draw[cgray,line width=.4pt](-2.6mm,1.2mm)--(-.8mm,1.2mm);\draw[cgray,line width=.4pt](-2.6mm,0)--(-.8mm,0);
-  \draw[cgray,line width=.4pt](.8mm,1.2mm)--(2.6mm,1.2mm);\draw[cgray,line width=.4pt](.8mm,0)--(2.6mm,0);}
-\newcommand{\icBulb}{\draw[ic,fill=cwarn!25](0,.8mm)circle(2.6mm);\draw[ic,fill=cgray!25](-1.3mm,-2.1mm)rectangle(1.3mm,-1.4mm);
-  \draw[ic](-1.1mm,-2.9mm)--(1.1mm,-2.9mm);\draw[cwarn,line width=.4pt](0,3.9mm)--(0,4.9mm);
-  \draw[cwarn,line width=.4pt](2.9mm,2.6mm)--(3.7mm,3.4mm);\draw[cwarn,line width=.4pt](-2.9mm,2.6mm)--(-3.7mm,3.4mm);}
-\newcommand{\icFunnel}{\draw[ic,fillc](-3.2mm,2.6mm)--(3.2mm,2.6mm)--(.7mm,-.4mm)--(.7mm,-3mm)--(-.7mm,-3mm)--(-.7mm,-.4mm)--cycle;
-  \fill[cop](-2.2mm,3.4mm)circle(.5mm);\fill[cop](0,3.9mm)circle(.5mm);\fill[cop](2.2mm,3.4mm)circle(.5mm);}
-\newcommand{\icScale}{\draw[ic,line width=.7pt](0,-3.2mm)--(0,2.8mm);
-  \draw[ic,line width=.7pt](-3.4mm,2.8mm)--(3.4mm,2.8mm);
-  \draw[cgray,line width=.35pt](-3.4mm,2.8mm)--(-3.4mm,1.4mm);
-  \draw[cgray,line width=.35pt](3.4mm,2.8mm)--(3.4mm,1.4mm);
-  \draw[ic,fillc](-4.5mm,1.4mm)--(-2.3mm,1.4mm)--(-3.4mm,-.3mm)--cycle;
-  \draw[ic,fillc](2.3mm,1.4mm)--(4.5mm,1.4mm)--(3.4mm,-.3mm)--cycle;
-  \draw[ic,line width=.7pt](-1.8mm,-3.2mm)--(1.8mm,-3.2mm);}
-\newcommand{\icCluster}{\fill[cset](-2.2mm,1.4mm)circle(.85mm);\fill[cset](-.6mm,2.4mm)circle(.85mm);
-  \fill[cset](-1.6mm,-.2mm)circle(.85mm);\draw[densely dashed,cgray,line width=.4pt](-1.5mm,1.2mm)circle(2.9mm);
-  \fill[cfield](2.6mm,-1.6mm)circle(.85mm);\fill[cfield](3.4mm,.2mm)circle(.85mm);
-  \draw[densely dashed,cgray,line width=.4pt](3mm,-.7mm)circle(2.2mm);}
-\newcommand{\icChart}{\draw[ic,fillc](-3.4mm,-2.8mm)rectangle(3.4mm,2.8mm);
-  \draw[cset,line width=.7pt](-2.4mm,-1.4mm)--(-.8mm,.8mm)--(.8mm,-.6mm)--(2.4mm,1.8mm);
-  \draw[cop,line width=.5pt,densely dotted](-2.4mm,-.4mm)--(-.8mm,1.4mm)--(.8mm,.2mm)--(2.4mm,1.2mm);}
-\newcommand{\icEye}{\draw[ic,fillc](-3.8mm,0)..controls(-1.6mm,2.9mm)and(1.6mm,2.9mm)..(3.8mm,0)
-  ..controls(1.6mm,-2.9mm)and(-1.6mm,-2.9mm)..(-3.8mm,0);\draw[ic,fill=cset!35](0,0)circle(1.5mm);\fill[black](0,0)circle(.6mm);
-  \draw[cgray,line width=.35pt](-4.6mm,3mm)--(-3.4mm,2.2mm);\draw[cgray,line width=.35pt](4.6mm,3mm)--(3.4mm,2.2mm);}
-\newcommand{\icSpeech}{\draw[ic,fillc](-3.4mm,-1.4mm)rectangle(3.4mm,2.8mm);
-  \draw[ic,fillc](-1.8mm,-1.4mm)--(-1.1mm,-3.2mm)--(-.3mm,-1.4mm);
-  \draw[cgray,line width=.4pt](-2.4mm,1.8mm)--(2.4mm,1.8mm);\draw[cgray,line width=.4pt](-2.4mm,.6mm)--(1.2mm,.6mm);
-  \draw[white,line width=.9pt](-1.75mm,-1.4mm)--(-.35mm,-1.4mm);}
-\newcommand{\icLoop}{\draw[ic,-{Stealth[length=1.5mm]}](0,0)+(30:3.2mm) arc (30:320:3.2mm);
-  \draw[cset,line width=.5pt](-1.4mm,0)--(1.4mm,0);\draw[cset,line width=.5pt](-1.4mm,1.2mm)--(.6mm,1.2mm);
-  \draw[cset,line width=.5pt](-1.4mm,-1.2mm)--(.9mm,-1.2mm);}
-\newcommand{\icCaliper}{\draw[ic,fillc](-4mm,.9mm)rectangle(4mm,2.1mm);
-  \foreach \x in {-3.2,-2.4,-1.6,-.8,0,.8,1.6,2.4,3.2}{\draw[cgray,line width=.35pt](\x mm,.9mm)--(\x mm,1.5mm);}
-  \draw[ic,fill=cop!25](-3.4mm,-2.6mm)rectangle(-2.2mm,.9mm);\draw[ic,fill=cop!25](1.4mm,-2.6mm)rectangle(2.6mm,.9mm);}
-\newcommand{\icWrench}{\draw[ic,fill=cgray!18,rotate=-38](-.75mm,-3.4mm)rectangle(.75mm,2.2mm);
-  \draw[ic,fill=cgray!18,rotate=-38](0,3.3mm)circle(1.9mm);\draw[white,line width=.9pt,rotate=-38](0,4.3mm)--(0,2.5mm);}
+\newcommand{\icTarget}{\draw[ic,fillc](0,0)circle(3.4mm);\draw[ic](0,0)circle(1.9mm);\fill[cop](0,0)circle(.7mm);}
+\newcommand{\icBook}{\draw[ic,fillc](-3.2mm,-2.4mm)rectangle(3.2mm,2.4mm);\draw[ic](0,-2.4mm)--(0,2.4mm);
+  \draw[cgray,line width=.35pt](-2.4mm,1.1mm)--(-.7mm,1.1mm);\draw[cgray,line width=.35pt](-2.4mm,0)--(-.7mm,0);
+  \draw[cgray,line width=.35pt](.7mm,1.1mm)--(2.4mm,1.1mm);\draw[cgray,line width=.35pt](.7mm,0)--(2.4mm,0);}
+\newcommand{\icBulb}{\draw[ic,fill=cwarn!25](0,.7mm)circle(2.4mm);\draw[ic,fill=cgray!25](-1.2mm,-2mm)rectangle(1.2mm,-1.3mm);
+  \draw[ic](-1mm,-2.7mm)--(1mm,-2.7mm);\draw[cwarn,line width=.35pt](0,3.6mm)--(0,4.5mm);
+  \draw[cwarn,line width=.35pt](2.7mm,2.4mm)--(3.4mm,3.1mm);\draw[cwarn,line width=.35pt](-2.7mm,2.4mm)--(-3.4mm,3.1mm);}
+\newcommand{\icFunnel}{\draw[ic,fillc](-3mm,2.4mm)--(3mm,2.4mm)--(.6mm,-.4mm)--(.6mm,-2.8mm)--(-.6mm,-2.8mm)--(-.6mm,-.4mm)--cycle;
+  \fill[cop](-2mm,3.2mm)circle(.45mm);\fill[cop](0,3.6mm)circle(.45mm);\fill[cop](2mm,3.2mm)circle(.45mm);}
+\newcommand{\icScale}{\draw[ic,line width=.6pt](0,-3mm)--(0,2.6mm);\draw[ic,line width=.6pt](-3.2mm,2.6mm)--(3.2mm,2.6mm);
+  \draw[cgray,line width=.3pt](-3.2mm,2.6mm)--(-3.2mm,1.3mm);\draw[cgray,line width=.3pt](3.2mm,2.6mm)--(3.2mm,1.3mm);
+  \draw[ic,fillc](-4.2mm,1.3mm)--(-2.2mm,1.3mm)--(-3.2mm,-.3mm)--cycle;
+  \draw[ic,fillc](2.2mm,1.3mm)--(4.2mm,1.3mm)--(3.2mm,-.3mm)--cycle;\draw[ic,line width=.6pt](-1.7mm,-3mm)--(1.7mm,-3mm);}
+\newcommand{\icCluster}{\fill[cset](-2mm,1.3mm)circle(.8mm);\fill[cset](-.5mm,2.2mm)circle(.8mm);
+  \fill[cset](-1.5mm,-.2mm)circle(.8mm);\draw[densely dashed,cgray,line width=.35pt](-1.4mm,1.1mm)circle(2.7mm);
+  \fill[cfield](2.4mm,-1.5mm)circle(.8mm);\fill[cfield](3.2mm,.2mm)circle(.8mm);
+  \draw[densely dashed,cgray,line width=.35pt](2.8mm,-.6mm)circle(2mm);}
+\newcommand{\icChart}{\draw[ic,fillc](-3.2mm,-2.6mm)rectangle(3.2mm,2.6mm);
+  \draw[cset,line width=.6pt](-2.2mm,-1.3mm)--(-.7mm,.7mm)--(.7mm,-.5mm)--(2.2mm,1.7mm);
+  \draw[cop,line width=.45pt,densely dotted](-2.2mm,-.3mm)--(-.7mm,1.3mm)--(.7mm,.2mm)--(2.2mm,1.1mm);}
+\newcommand{\icEye}{\draw[ic,fillc](-3.6mm,0)..controls(-1.5mm,2.7mm)and(1.5mm,2.7mm)..(3.6mm,0)
+  ..controls(1.5mm,-2.7mm)and(-1.5mm,-2.7mm)..(-3.6mm,0);\draw[ic,fill=cset!35](0,0)circle(1.4mm);\fill[black](0,0)circle(.55mm);}
+\newcommand{\icSpeech}{\draw[ic,fillc](-3.2mm,-1.3mm)rectangle(3.2mm,2.6mm);
+  \draw[ic,fillc](-1.7mm,-1.3mm)--(-1mm,-3mm)--(-.3mm,-1.3mm);
+  \draw[cgray,line width=.35pt](-2.2mm,1.6mm)--(2.2mm,1.6mm);\draw[cgray,line width=.35pt](-2.2mm,.5mm)--(1.1mm,.5mm);
+  \draw[white,line width=.8pt](-1.65mm,-1.3mm)--(-.35mm,-1.3mm);}
+\newcommand{\icLoop}{\draw[ic,-{Stealth[length=1.4mm]}](0,0)+(30:3mm) arc (30:320:3mm);
+  \draw[cset,line width=.45pt](-1.3mm,0)--(1.3mm,0);\draw[cset,line width=.45pt](-1.3mm,1.1mm)--(.5mm,1.1mm);
+  \draw[cset,line width=.45pt](-1.3mm,-1.1mm)--(.8mm,-1.1mm);}
+\newcommand{\icCaliper}{\draw[ic,fillc](-3.8mm,.8mm)rectangle(3.8mm,2mm);
+  \foreach \x in {-3,-2.2,-1.4,-.6,.2,1,1.8,2.6}{\draw[cgray,line width=.3pt](\x mm,.8mm)--(\x mm,1.4mm);}
+  \draw[ic,fill=cop!25](-3.2mm,-2.4mm)rectangle(-2mm,.8mm);\draw[ic,fill=cop!25](1.3mm,-2.4mm)rectangle(2.5mm,.8mm);}
+\newcommand{\icWrench}{\draw[ic,fill=cgray!18,rotate=-38](-.7mm,-3.2mm)rectangle(.7mm,2mm);
+  \draw[ic,fill=cgray!18,rotate=-38](0,3.1mm)circle(1.8mm);\draw[white,line width=.85pt,rotate=-38](0,4mm)--(0,2.3mm);}
+\newcommand{\icReview}{\draw[ic,fillc](-2.6mm,-3mm)rectangle(2.2mm,2.6mm);
+  \draw[cgray,line width=.35pt](-1.8mm,1.6mm)--(1.4mm,1.6mm);\draw[cgray,line width=.35pt](-1.8mm,.5mm)--(1.4mm,.5mm);
+  \draw[cgray,line width=.35pt](-1.8mm,-.6mm)--(.4mm,-.6mm);
+  \draw[cfield,line width=.9pt](-.6mm,-1.9mm)--(.3mm,-2.8mm)--(2.6mm,-.3mm);}
+\newcommand{\icEvolve}{\draw[ic,-{Stealth[length=1.5mm]}](-3mm,-2.6mm)..controls(-1mm,-2.6mm)and(-.6mm,.4mm)..(.6mm,1.6mm);
+  \draw[ic,-{Stealth[length=1.5mm]}](-1.4mm,-1.2mm)..controls(.4mm,-1.4mm)and(1.6mm,-1.4mm)..(3mm,-2.4mm);
+  \fill[cfield](.9mm,1.9mm)circle(.8mm);\fill[cop](3.3mm,-2.7mm)circle(.8mm);}
+\newcommand{\icGavel}{\draw[ic,fill=cgray!20,rotate=-40](-2.4mm,-.9mm)rectangle(2.4mm,.9mm);
+  \draw[ic,fill=cgray!18,rotate=-40](2.4mm,-1.9mm)rectangle(3.6mm,1.9mm);
+  \draw[ic,line width=.6pt](-3.4mm,-3mm)--(1mm,-3mm);}
 
-% ---------- layout ----------
-\foreach \i/\name/\role/\icon in {%
-  0/Supervisor/{objective, budget, terminal state}/\icTarget,
-  1/Grounder/{plexus2 $\cdot$ okuda $\cdot$ the corpus}/\icBook,
-  2/Proposer/{one legal edit, across clusters}/\icBulb,
-  3/Critic/{free triage: types, preconditions}/\icFunnel,
-  4/Referee/{ranks by measuring, not debate}/\icScale,
-  5/Proximity/{near-duplicates starve together}/\icCluster,
-  6/{Analyst $\times N$}/{independent reads, consensus}/\icChart,
-  7/Watcher/{reads the movie; gates promotion}/\icEye,
-  8/Interpreter/{this spec $\to$ this phenomenon}/\icSpeech,
-  9/Meta-review/{patterns $\to$ the next prompt}/\icLoop,
-  10/Metrologist/{certifies the instrument; retracts}/\icCaliper,
-  11/Engineer/{patches substrate, outside the loop}/\icWrench}
+\foreach \i/\name/\role/\icon/\kind in {%
+  0/Supervisor/{objective, budget, terminal state}/\icTarget/det,
+  1/Grounder/{plexus2 $\cdot$ okuda $\cdot$ corpus}/\icBook/hyb,
+  2/Proposer/{chooses the edit, predicts}/\icBulb/llm,
+  3/Reflection/{peer review before it runs}/\icReview/llm,
+  4/Critic/{types, preconditions}/\icFunnel/det,
+  5/Referee/{ranks by measuring}/\icScale/det,
+  6/Judge/{2nd opinion, from pictures}/\icGavel/llm,
+  7/Proximity/{near-duplicates starve}/\icCluster/det,
+  8/{Analyst $\times N$}/{independent reads, consensus}/\icChart/llm,
+  9/Watcher/{reads movie; VETOES}/\icEye/llm,
+  10/Interpreter/{this spec $\to$ this phenomenon}/\icSpeech/llm,
+  11/Evolution/{refines the winner}/\icEvolve/llm,
+  12/Meta-review/{patterns $\to$ next prompt}/\icLoop/llm,
+  13/Metrologist/{certifies instrument; retracts}/\icCaliper/det,
+  14/Engineer/{patches substrate, outside}/\icWrench/hum}
 {
-  \pgfmathsetmacro{\col}{mod(\i,4)}
-  \pgfmathsetmacro{\row}{-floor(\i/4)}
+  \pgfmathsetmacro{\col}{mod(\i,5)}
+  \pgfmathsetmacro{\row}{-floor(\i/5)}
   \begin{scope}[shift={(\col*\cw, \row*\ch)}]
-    \draw[rounded corners=2pt, draw=cgray!45, line width=.5pt] (-1.5,-0.82) rectangle (1.5,0.93);
-    \begin{scope}[shift={(0,0.42)}] \icon \end{scope}
-    \node[lbl] at (0,-0.16) {\name};
-    \node[rol] at (0,-0.55) {\role};
+    \ifthenelse{\equal{\kind}{llm}}{\def\bd{cop}\def\bw{1.0pt}}{%
+      \ifthenelse{\equal{\kind}{hum}}{\def\bd{cfield}\def\bw{1.0pt}}{\def\bd{cgray!45}\def\bw{.5pt}}}
+    \draw[rounded corners=2pt, draw=\bd, line width=\bw] (-1.4,-0.83) rectangle (1.4,0.94);
+    \begin{scope}[shift={(0,0.44)}] \icon \end{scope}
+    \node[lbl] at (0,-0.18) {\name};
+    \node[rol] at (0,-0.56) {\role};
   \end{scope}
 }
 \end{tikzpicture}
-\caption{The agent roster. The first ten produce or judge \emph{evidence}. The last two do not:
-the \textbf{Metrologist} certifies the instrument that evidence is measured with --- and may act
-backwards, retracting claims whose foundation is later found defective --- while the
-\textbf{Engineer} patches the substrate from \emph{outside} the loop and cannot admit its own fix.
-That separation exists because an agent able to rewrite the simulator can make any hypothesis
-true.}
+\caption{The fifteen agents. \textcolor{cop}{\textbf{Red border}} $=$ a genuine language-model
+call (eight: Proposer, Reflection, Judge, Analyst, Watcher, Interpreter, Evolution, Meta-review).
+Grey $=$ deliberately deterministic, following Robin's de-agentification --- the Critic is the
+type guard and so cannot itself be a model, the Referee ranks by measuring, and an LLM
+Metrologist could talk itself into admitting its own evidence.
+\textcolor{cfield}{\textbf{Green}} $=$ the human: the Engineer patches the substrate from
+outside the loop, because an agent able to rewrite the simulator can make any hypothesis true.}
 \label{fig:agents}
 \end{figure}
+
+\begin{table}[t]\centering\small
+\begin{tabular}{@{}rlcp{5.0cm}p{4.0cm}@{}}
+\toprule
+\# & \textbf{Agent} & \textbf{LLM} & \textbf{What it does} & \textbf{Where it lands} \\
+\midrule
+1 & Supervisor & --- & holds objective, budget, terminal state; escalates & \code{control.py::Supervisor} \\
+2 & Grounder & part & plexus2 $+$ okuda $+$ corpus; \code{ground} / \code{gate} / \code{understand} / \code{figure\_target} & \code{agents/grounder.py} \\
+3 & Proposer & \textbf{yes} & chooses the edit from a type-filtered menu; commits to a prediction & \code{agents/proposer.py} \\
+4 & Reflection & \textbf{yes} & peer-reviews the batch \emph{before} it costs cluster time & \code{agents/llm\_agents.py::reflect} \\
+5 & Critic & --- & types, preconditions, duplicates --- free rejection & \code{composition\_space.py}, \code{propose\_batch} \\
+6 & Referee & --- & ranks by \emph{measuring}, gate-admissible metrics only & \code{control.py::score\_run}, \code{rank\_btl} \\
+7 & Judge & \textbf{yes} & second opinion from the pictures; disagreement is the signal & \code{llm\_agents.py::judge\_pair} \\
+8 & Proximity & --- & structural distance; near-duplicates starve together & \code{control.py::ProximityIndex} \\
+9 & Analyst $\times N$ & \textbf{yes} & $N$ independent readings $\to$ consensus; disagreement recorded & \code{llm\_agents.py::analyse} \\
+10 & Watcher & \textbf{yes} & captions the movie (VLM) and \textbf{vetoes} promotion & \code{run\_one.py::describe}, \code{llm\_agents.py::watch} \\
+11 & Interpreter & \textbf{yes} & this spec $\to$ this phenomenon, by this route & \code{llm\_agents.py::interpret} \\
+12 & Evolution & \textbf{yes} & refines the winner: simplify / synthesise / ground & \code{llm\_agents.py::evolve} \\
+13 & Meta-review & \textbf{yes} & distils patterns into the Proposer's prompt (capped) & \code{llm\_agents.py::meta\_review} \\
+14 & Metrologist & --- & certifies the instrument; issues \textbf{retractions} & \code{agents/metrologist.py} \\
+15 & Engineer & human & patches the substrate, from outside the loop & --- \\
+\bottomrule
+\end{tabular}
+\caption{The roster in full. Eight genuine language-model calls; five deliberately deterministic;
+one part-deterministic (the Grounder's retrieval is reproducible by construction, so a citation
+can be re-derived); one human. The shared substrate --- the CLI wrapper, the file-based working
+memory (\code{instruction} / \code{memory} / append-only \code{analysis} / \code{user\_input}),
+the wall-clock budget, forced seeds and the causality rule with its control slot --- is
+\code{agents/llm.py}, ported from an earlier exploration loop that had already solved these.}
+\label{tab:agents}
+\end{table}
+
 
 \begin{center}\small
 \begin{tabular}{@{}p{2.2cm}p{6.5cm}p{5.6cm}@{}}
