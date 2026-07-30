@@ -157,3 +157,83 @@ available locally; the L4 partition is untouched so far.
 archived phenotypes* — that is the run in flight.
 
 ---
+## Hour 3 — 2026-07-30 15:00–16:00 EDT
+
+**15:05** Added **V9 PARAMETER FIDELITY** to the battery. V3 proved *same operators*; that is not
+*same model*. V9 compares the actual numbers against `run_tyssue_round.make()`, excluding only the
+keys we deliberately changed (`dt`, `every` — the D1/D2 fixes).
+
+### 🔴 FINDING 7 — V9 caught a silent semantic bug plus 7 fidelity gaps
+
+The one that matters: **`cell_rd_seed.mode='cone'` vs the engine's `'cones'`.** My emitter used the
+singular; the engine matches on the plural, so the seeding mode was falling through to a different
+branch entirely. **Identical operator set, different mechanism** — precisely the class of defect
+V9 exists to catch, and invisible to V3.
+
+Also fixed: `n_spots` hardcoded 3 (hand 1); `after_frame` hardcoded 100 (hand 20/50/80); extrude
+`a_sw` 1.2 (hand 0.5, derived from `iface_asw`); `cycle_cv` 0.15 (hand 0.4); `min_cycle` 8
+(hand 4); Gray–Scott `F`/`kk` hardcoded; monolayer `gamma`; `orient_asw`.
+
+Vocabulary defaults are now the hand-tuned working point (`p0=3.90`, `Gamma=0.05`, `Lambda=0.20`,
+`h0=0.40`), so a default-parameter composition starts where our evidence is. **52/52.**
+
+**15:20** Committed `e033726`, pushed.
+
+### 🔴 FINDING 8 — the D1 fix re-anchors the baseline, and the tube gets shorter
+
+Replayed `round_40_mc8` at its own 900 frames from the real homogenised checkpoint (1431 cells).
+
+| | archived (hand) | replay (D1/D2/D3 fixed) |
+|---|---|---|
+| aspect | ~7.5 | **3.22 peak / 2.42 final** |
+| cells | ~2700 | **3335** |
+
+The archived run had `divide_3d every=2` **and** a private `self._k` counter — effective period 4.
+The corrected config fires division **4× more often**. More cells, shorter tube. This is exactly
+the re-anchoring the handoff predicted (*"expect division counts to roughly double"*), and it is
+larger than predicted.
+
+**Consequence:** the archived "best tube, aspect 7.5" was obtained at a division rate four times
+lower than its own config advertised. **The old θ is not the new θ** — the working point must be
+re-tuned after the fix, and every one of the 316 archived runs is at a different effective
+division rate than it claims. This is a campaign-level fact, not a nuisance: it means the archive
+can be re-scored for *shape* but not compared on *rate* without correction.
+
+**15:35** Wrote `discovery/hypothesis.py` — the scientific protocol, in response to Cedric's
+clarification. See the decision below.
+
+**15:50** Added two sections to `plexus2_discovery.tex` (now **16 pp**): the Grounder's precise
+role and call sites, and **§5 The scientific protocol: hypothesis first**.
+
+### ⚠ DECISION — where hypothesis-first and the 70/30 balance live in the loop
+
+Answering Cedric's question directly. **It lands in the batch composition, with pre-registered
+predictions.** A candidate cannot be run until its prediction is recorded (`Hypothesis.__post_init__`
+refuses one without). Each batch is allocated confirmatory vs adversarial, so every outcome falls
+into a 2×2, and the informative quadrants are the *prediction errors*:
+
+|  | confirmed | refuted |
+|---|---|---|
+| **confirmatory** | consolidates (low info) | 🔥 surprise |
+| **adversarial** | 🔥 surprise | breaks as expected (low info) |
+
+So **70/30 is a setpoint, not a quota**: the Supervisor closes a loop on the observed *surprise
+rate*. `< 0.10` → drifted to 100/0, confirming what we already believe → push adversarial.
+`> 0.50` → drifted to 0/100, nothing consolidates → push confirmatory. Target ≈ 0.30.
+Implemented in `HypothesisRegister.advise_mix()`.
+
+`knowledge.md` is append-only and written in the order the science happened — hypothesis and
+grounding, then prediction, then outcome — so a reader can audit what was believed *before* the
+evidence arrived. Validated / Refuted / Open sections, surprises flagged.
+
+### ⏱ SUMMARY — Hour 3 (15:00–16:00)
+
+| | |
+|---|---|
+| **Done** | V9 parameter-fidelity gate (52/52); replay of `round_40_mc8` at full length; `hypothesis.py` protocol; spec grown to 16 pp with the Grounder and hypothesis-first sections |
+| **Found** | the `'cone'`/`'cones'` silent mode bug; **the D1 fix re-anchors the tube from aspect 7.5 → 3.2** |
+| **Decided** | 70/30 implemented as a closed loop on surprise rate, not a quota; prediction is mandatory before a run |
+| **Next** | `round_41_relax60` control (same comp_hash, more relaxation → should collapse further, giving the first real Q reading); then the metric bank + L4 driver |
+| **Blocked** | nothing. Re-tuning θ after the D1 re-anchoring is now a required campaign step, not optional. |
+
+---
