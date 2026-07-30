@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.join(HERE, "agents"))
 
 import cluster                                                            # noqa: E402
 import critic as C                                                        # noqa: E402
+import escalation as ESC                                                  # noqa: E402
 import predict as PR                                                      # noqa: E402
 import translate as T                                                     # noqa: E402
 from composition_space import reference_recipes, seed                     # noqa: E402
@@ -217,7 +218,8 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         cands = build_composition_batch(sup, cfg, batch, ledger)
     if not cands:
         print("[round] no candidates -- escalating")
-        print(json.dumps(sup.escalate(), indent=1))
+        print(json.dumps(run_escalation(cfg, sup, lm, rid, "the batch builder produced no "
+                                        "runnable candidate"), indent=1))
         return 1
 
     # ------------------------------------------------ hypotheses FIRST, then configs
@@ -334,6 +336,14 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     A.meta_review(rid)
     save_frontier([g for _, g, _, _, _, _ in kept] or load_frontier())
 
+    # ------------------------------------------------ escalate if the space is spent
+    # `terminal()` has always been able to return "ESCALATE: ...", and nothing ever read it. So
+    # the escalation branch could only be reached by the batch builder returning nothing -- i.e.
+    # by a crash-like condition, never by the ordinary course of a campaign exhausting its
+    # reachable space, which over weeks is the NORMAL way a mechanism search ends.
+    if str(rep.get("reason", "")).startswith("ESCALATE"):
+        print(json.dumps(run_escalation(cfg, sup, lm, rid, rep["reason"]), indent=1))
+
     cov = lm.coverage()["overall"]
     print(f"\n[supervisor] {json.dumps({k: v for k, v in rep.items() if k != 'mix_why'})}")
     print(f"  mix: {rep['mix_why']}")
@@ -341,6 +351,66 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
           f"{cov['n_runs']} runs)")
     print(f"[llm] {ledger.summary()}")
     return 0
+
+
+# --------------------------------------------------------------------------- escalation
+def run_escalation(cfg, sup, lm, rid, why):
+    """Execute the escalation decision. The branch a human took by hand last time.
+
+    Three actions, cheapest first (see escalation.py): open a stage gate, file an operator
+    request, or declare the region exhausted. Only the middle one costs an LLM call, and only
+    when the stage gates are already spent -- so this cannot become a per-round expense.
+    """
+    backlog = ESC.Backlog(os.path.join(CAMP, "operator_requests.jsonl"))
+    frontier = load_frontier()
+    n_edits = sum(len(g.legal_edits(cfg.stage_gate)) for g in frontier)
+    action, detail = ESC.decide(cfg, sup, backlog, n_edits)
+    print(f"[escalate] {action}: {detail}")
+
+    if action == "open_stage_gate":
+        rec = sup.escalate()                       # advances cfg.stage_gate and checkpoints it
+    elif action == "request_operator":
+        req = A.request_operator(
+            _ledger_summary(sup, lm), _map_summary(lm),
+            "\n".join(f"  {comp_hash(g)}  {g.name_region()}" for g in frontier[:8]),
+            f"{why}\n{detail}", rid)
+        if not req or not req.get("why_inexpressible"):
+            print("[escalate] the agent produced no usable request -- recording the fact rather "
+                  "than inventing one")
+            rec = sup.escalate()
+        else:
+            dup = backlog.duplicate_of(req["mechanism"])
+            if dup:
+                print(f"[escalate] already filed as {dup.rid} -- not duplicating")
+                rec = {"action": "operator_request_duplicate", "rid": dup.rid}
+            else:
+                r = backlog.file(ESC.OperatorRequest(
+                    rid=backlog.next_rid(), round_id=rid,
+                    mechanism=req["mechanism"], why_inexpressible=req["why_inexpressible"],
+                    wanted_for=req.get("wanted_for", ""),
+                    proposed_contract=req.get("proposed_contract", {}),
+                    acceptance_test=req.get("acceptance_test", ""),
+                    evidence=[comp_hash(g) for g in frontier[:4]]))
+                print(f"[escalate] filed {r.rid}: {r.mechanism}")
+                print(f"           limit: {r.why_inexpressible[:150]}")
+                rec = sup.escalate(operator_request=r.to_dict())
+    else:
+        rec = {"action": "exhausted", "detail": detail,
+               "open_requests": [r.rid for r in backlog.open_requests()]}
+        sup._log(rec)
+
+    backlog.render(os.path.join(CAMP, "operator_backlog.md"))
+    return rec
+
+
+def _map_summary(lm):
+    cov = lm.coverage()["overall"]
+    solo = lm.solo()
+    lines = [f"coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
+             f"{cov['n_runs']} runs)", "solo effects:"]
+    for op, v in sorted(solo.items(), key=lambda kv: -(kv[1].get('delta') or -99))[:12]:
+        lines.append(f"  {op:24} {v.get('delta','—')}  {v['verdict']}")
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------- helpers

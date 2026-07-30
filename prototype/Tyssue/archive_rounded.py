@@ -124,20 +124,28 @@ def compare_to_archive(nm, rec):
     if not os.path.exists(ref_p):
         print(f"[{nm}] no archived diag.json to compare against"); return None, {}
     ref = json.load(open(ref_p))
-    TOL = {"cells_end": 0.02, "vol_cv": 0.10, "hollow_frac": 0.05}   # relative, then absolute
+    # (relative tolerance, ABSOLUTE floor). The floor is not decoration: hollow_frac's reference
+    # is 0.004, so a run that improves it to 0.000 is a 100% relative change and was reported as a
+    # reproduction MISMATCH -- a failure of the comparison, not of the simulation. A relative
+    # tolerance on a near-zero reference measures nothing. Same class of error as the metrics the
+    # instrument gate threw out; it belongs in the checker too.
+    TOL = {"cells_end": (0.02, 0.5), "vol_cv": (0.10, 0.01), "hollow_frac": (0.05, 0.01)}
     ok, deltas = True, {}
-    for k, tol in TOL.items():
+    for k, (rtol, atol) in TOL.items():
         if k not in ref or k not in rec:
             continue
         a, b = float(ref[k]), float(rec[k])
-        d = abs(b - a) / max(abs(a), 1e-9)
-        deltas[k] = {"archived": a, "now": b, "rel_delta": round(d, 4)}
-        if d > tol:
+        ad = abs(b - a)
+        rd = ad / max(abs(a), 1e-9)
+        hit = (ad > atol) and (rd > rtol)          # must fail BOTH to count as a mismatch
+        deltas[k] = {"archived": a, "now": b, "abs_delta": round(ad, 6),
+                     "rel_delta": round(rd, 4), "ok": not hit}
+        if hit:
             ok = False
     print(f"[{nm}] REPRODUCTION {'MATCH' if ok else 'MISMATCH'}")
     for k, v in deltas.items():
-        print(f"    {k:12} archived {v['archived']:<10} now {v['now']:<10} "
-              f"rel {v['rel_delta']:+.1%}")
+        print(f"    {'ok ' if v['ok'] else 'BAD'} {k:12} archived {v['archived']:<10} "
+              f"now {v['now']:<10} abs {v['abs_delta']:<9} rel {v['rel_delta']:+.1%}")
     return ok, deltas
 
 

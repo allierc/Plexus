@@ -281,7 +281,20 @@ class MorphogenGrowth3D(Structural):
     self-organised budding/coral. A cross-set coupling (reads cell.chem, writes the vertex mesh targets
     A0/P0/v_eq); the per-cell volume elasticity then inflates the activated cells by force balance.
     Uniform vesicle_growth is the a_sw->0 limit."""
-    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
+    # MAY_MUTATE_INTEGRATED_STATE was declared False and the operator mutates it anyway: the
+    # `conserve_amount` branch rescales cell.chem in place (c_j <- c_j * (v_old/v_new)) when the
+    # cell's target volume grows. The engine's integration invariant caught it and refused to run
+    # -- which is why the Turing x vertex (coral) movie on the site's front page could not be
+    # regenerated at all, while the plain grow+divide movie could. Plain has no RD, so the
+    # activator is identically zero and the branch is never reached; the tag only lies once
+    # chemistry is present, i.e. exactly in the composition the campaign is about.
+    #
+    # The DECLARATION is what was wrong, not the behaviour. The rescale is a change of variable
+    # forced by a volume change, not a dynamics delta -- the operator is registered
+    # kind="structural", which is precisely the category the invariant exempts -- and the comment
+    # at the branch records it as load-bearing (Okuda's intra-domain gradients come from it).
+    # Returning it as an integrated delta would change the physics; declaring it honestly does not.
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["growth", "morphogen_driven", "budding", "cross_scale"]
     REFERENCE = "Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis of the tissue. Sci. Rep. 8:2386."
 

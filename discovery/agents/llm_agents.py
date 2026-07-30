@@ -322,3 +322,60 @@ def _first_json(text):
 def _majority(vals):
     vals = [v for v in vals if v]
     return max(set(vals), key=vals.count) if vals else "unclear"
+
+
+# ============================================================================ ESCALATION (new)
+def request_operator(ledger_summary, map_summary, frontier_desc, exhausted_why, round_id,
+                     timeout_min=8):
+    """Ask what mechanism the language cannot express. The escalation path's only LLM call.
+
+    This is invoked when the search has run out of moves that could teach it anything: every
+    stage gate open, every proximity cluster frozen, or literally no legal edit left. At that
+    point more compute cannot help -- the OPERATOR SET is the binding constraint, and the only
+    useful output is a precise statement of what is missing.
+
+    The load-bearing field is `why_inexpressible`. "I want a better growth operator" is a wish and
+    is refused by `escalation.OperatorRequest`; "no operator EMITs a per-edge tension, and the
+    cell set carries no edge-indexed state block to route into one" is a request -- it names the
+    limit, so it can be acted on and it is evidence about the LANGUAGE, which is the thesis.
+    """
+    prompt = f"""OPERATOR REQUEST. The mechanism search has run out of moves.
+
+{budget_note(timeout_min, "1) the JSON request")}
+WHY WE ARE STUCK
+{exhausted_why}
+
+THE CAUSAL MAP SO FAR
+{map_summary}
+
+EVIDENCE LEDGER
+{ledger_summary}
+
+THE COMPOSITIONS ON THE FRONTIER
+{frontier_desc}
+
+You are NOT being asked for another composition -- there are none left worth running. You are
+being asked what the OPERATOR LANGUAGE cannot say. Name ONE mechanism you would test next if the
+type system allowed it, and be specific about the limit that blocks it.
+
+A request is only useful if it names the LIMIT. Compare:
+  WISH    "a better growth operator that makes tubes"
+  REQUEST "no operator EMITs a per-EDGE tension; shape_energy_3d reads one scalar Lambda for the
+           whole mesh and the cell set has no edge-indexed state block to route into it"
+
+Reply with ONLY:
+{{"mechanism": "<the biology, one sentence>",
+  "why_inexpressible": "<WHICH type-system limit blocks it: a missing EMIT kind, a missing state
+                        block, a set/kind mismatch, an absent contract, a routing slot that does
+                        not exist. Name the operators and attributes involved.>",
+  "wanted_for": "<the question it would answer / which cell of the map it would fill>",
+  "proposed_contract": {{"contract": "<name>", "set": "vertex|cell|edge|field",
+                        "kind": "structural|lateral|aggregate|rewire|field",
+                        "family": "growth|mechanics|fields|topology|hierarchy",
+                        "EMIT": "velocity|force|none",
+                        "params": {{"<param>": "<role>"}}}},
+  "acceptance_test": "<a concrete test on a SIMPLE geometry that would show the new operator
+                       works, with a number in it>",
+  "confidence": "high|medium|low"}}"""
+    ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=["Read"], quiet=True)
+    return _first_json(out)
