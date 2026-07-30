@@ -303,3 +303,58 @@ its own half-edge/cross-section renderer and the campaign needs the RunRecord ev
 which the `graphs_data` convention does not provide.
 
 ---
+## Hour 5 — 2026-07-30 17:00–18:00 EDT
+
+**17:05** Wrote `discovery/agents/grounder.py` — the agent Cedric asked about, implemented.
+
+It holds `paper/plexus2.tex` (the language contract), `papers/okuda.pdf` (the reference model),
+and `papers/okuda_corpus.md` + the 23-source vendored corpus, and exposes exactly the three call
+sites: `ground()` for the Proposer, `gate()` for the Supervisor, `name_mechanism()` for an
+operator request. Retrieval is **local, deterministic and citable** — term-overlap, no embedding
+model, no network — so any citation recorded in `knowledge.md` can be re-derived and audited back
+to the page it came from.
+
+`gate()` carries five **reference claims** the paper settles (quasi-static regime; Gierer–Meinhardt
+not Brusselator/Gray–Scott; no explicit bending; growth-driven not forced; χ sets the diameter).
+A hypothesis that contradicts one is not blocked — but the Supervisor must *see* the contradiction
+before cluster time is spent. Verified: the campaign's central hypothesis ("the tube survives
+removal of the extrusion force") returns `grounded` against the `growth_driven` claim, citing
+`okuda.pdf (p.4)`.
+
+### 🔴 FINDING 11 — the corpus contains a duplicate that would have doubled its own evidence
+
+`okuda.pdf` and `Turing_Vertex.pdf` are byte-identical (both 3,331,840 B). Every retrieval
+returned both, so every citation of the reference model appeared **twice** — silently doubling
+the apparent weight of evidence for whatever that one paper says. Fixed by de-duplicating the
+corpus on content hash. After the fix the same query returns `okuda.pdf` plus
+`LedesmaDuran_2023_turing_growing_domain.pdf` (Turing on a growing domain — the dilution paper,
+directly relevant to the flood problem) instead of the same paper twice.
+
+**17:30** Wrote `discovery/cluster.py` — the L4 driver.
+
+Built around the rule the Tyssue notes paid for: *an action's reported outcome is a hint; the
+world's state is the fact.* Submissions are fired **detached** (the ssh returns in <1 s), and the
+only ground truth is `bjobs`. `status()` returns `None` — not `{}` — when the queue is
+unreachable, so `wait()` can never mistake a dead link for "all jobs finished". Waves of 8
+(`gpu_l4` gives 8 slots per GPU); `-gpu num=1` always, since the queue rejects jobs without it.
+
+**17:45** **End-to-end cluster verification.** Submitted `ref_uniform_inflation` (130 frames) →
+`bjobs` shows `RUN pg_ref_uniform_inflation`. The full remote path works: config → job script →
+detached bsub → queue → execution, with artefacts landing on the shared NFS mount at
+`log/okuda/`.
+
+### ⏱ SUMMARY — Hour 5 (17:00–18:00)
+
+| | |
+|---|---|
+| **Done** | Grounder written and verified on all three call sites; L4 cluster driver written; **one real job submitted and running on the partition** |
+| **Found** | the corpus duplicate (`okuda.pdf` == `Turing_Vertex.pdf`) that would have double-counted the reference model in every citation |
+| **Decided** | queue-unreachable returns `None`, never `{}` — a dead link must never read as "done" |
+| **Next** | the control law (batch → triage → rank → truncate → starve → freeze → terminate); then the operator-side D1 fix; then the instrument gate on 8 eye-labelled runs |
+| **Blocked** | nothing |
+
+**Campaign readiness:** 4 of the 5 pre-flight items are now in place — evidence contract (D7),
+alignment assertion (D3), acted-ledger (D4), and translation-time D1/D2/D3. Remaining before
+switch-on: the operator-side private clocks, the instrument gate, and the control law itself.
+
+---
