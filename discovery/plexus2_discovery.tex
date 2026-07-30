@@ -1210,4 +1210,111 @@ separate from its interpretation, a search that drops its losers instead of lovi
 them, a supervisor that holds the goal nobody else can be trusted to hold --- and the willingness
 to keep looking at the pictures.
 
+\section{First live results (2026-07-30, overnight)}
+\label{sec:live}
+
+Three things were exercised for the first time: the LLM Proposer, the composition mode end to end,
+and the loop pointed at a \emph{second} system (the Turing\,$\times$\,vertex recipe behind the
+site's front-page movies). Each produced defects that only running could find.
+
+\subsection{The composition mode could never have completed a round}
+
+\texttt{proposer.propose()} \emph{rejects} any proposal whose slot 0 is not
+\texttt{intent: "control"}; \texttt{hypothesis.INTENTS} did not contain \texttt{"control"}, so
+\texttt{Hypothesis.\_\_post\_init\_\_} raised on it. Two halves of the same protocol disagreed
+about whether a control exists and both enforced their view with a hard error. A control is now a
+first-class intent, excluded from the surprise rate and the mix --- it asserts nothing about an
+edit --- but a control that \emph{fails} its own prediction raises \textsc{baseline drift}, which
+is louder than a surprise: every other slot is measured as a difference from it.
+
+\subsection{The surprise rate was computed by a regex that could only bias it downwards}
+
+The campaign's one control signal was a first-match regular expression with three defects: an
+\emph{unparseable} prediction returned true and was recorded \texttt{confirmed}; the parser was
+metric-blind, applying the first comparison it found to \texttt{protr\_peak} whatever the clause
+named; and \texttt{REFUTED if \ldots} was read as the assertion. All three push the rate toward
+``nothing was learned''.
+
+The measured cost: the \texttt{vcap} round's five points were posed before the parameter-hypothesis
+fix with the placeholder \texttt{"unknown -- sensitivity sweep"}, which parsed to nothing and so
+resolved \texttt{confirmed}. The persisted surprise rate for the campaign's most informative round
+was \textbf{0.00}. The 0.40 everyone quoted had been computed by hand in a narrative and never
+reached the ledger. \texttt{predict.py} now parses every clause with its metric and returns
+\texttt{inconclusive} rather than guessing; an append-only \texttt{amend()} backfilled the record,
+and the ledger computes 0.40 itself. The same guard later refused to score 32 runs of the
+Turing\,$\times$\,vertex study because \texttt{protr} was not a known metric --- declining 32 times
+instead of inventing 32 confirmations.
+
+\subsection{The supervisor did not survive a restart}
+
+\texttt{round}, \texttt{spent}, \texttt{dry}, \texttt{best}, \texttt{prox} and \texttt{stage\_gate}
+were re-initialised every process; \texttt{supervisor.jsonl} was append-only \emph{output}, never
+read back. For a campaign specified to run for weeks across restarts this disabled every stateful
+control at once: every round is ``round 1'' (five duplicate hypothesis ids were already in the
+ledger), the budget can never be spent so \texttt{terminal()} never fires, dry rounds never
+accumulate so \textbf{escalation was dead at the trigger}, and no proximity cluster is ever frozen.
+State is now checkpointed atomically, and a corrupt checkpoint refuses to start rather than
+silently resetting the counter.
+
+\subsection{The escalation path, and its first entry}
+
+\texttt{terminal()} has always been able to return \texttt{ESCALATE:} and nothing ever read it, so
+escalation could only be reached by a crash-like condition --- never by a campaign exhausting its
+reachable space, which over weeks is the normal ending. The path is now three actions tried in
+order (open a stage gate; file an operator request; declare the region exhausted) and it has
+produced \textbf{OR001}: quasi-static force-balance relaxation to a \emph{residual} rather than a
+fixed step count, plus 3D IH/HI reconnection, with an acceptance test that today's best setting
+fails by roughly $4\times$ on both integrity metrics.
+
+\subsection{Turing $\times$ vertex: a structural limitation, measured}
+
+The two front-page movies are the \emph{same simulation}: their archived diagnostics are identical
+because \texttt{a\_sw = 50} leaves the Hill switch unfired, so the reaction--diffusion is pure
+colouring. Running the loop on the settings found something sharper --- with \texttt{rho = 1.0}
+every cell grows every tick, and the \texttt{conserve\_amount} dilution then drives the activator
+to $2\times10^{-22}$ by frame 400. The coral pattern on the site's front page is a colour map
+stretched over an extinct field.
+
+With the field alive, 32 runs across five knobs give a clean boundary:
+
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+$\rho$ & 1.0 & 0.5 & 0.2 & 0.05 & 0.0\\
+\midrule
+corr(act,\,radius) & $+0.29$ & $+0.26$ & $+0.28$ & $\mathbf{+0.63}$ & $+0.53$\\
+protr              & 1.03    & 1.05    & 1.06    & 1.17             & 32.7\\
+hollow\_frac       & 0.000   & 0.006   & 0.008   & 0.197            & 0.839\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Eighteen runs keep an intact mesh (\texttt{hollow\_frac} $<0.05$) and reach at most
+\texttt{protr} 1.064; all nine runs with \texttt{corr} $>0.4$ have \texttt{hollow\_frac}
+$\geq 0.197$; \textbf{none achieves both}. On this backend activator-driven shaping and monolayer
+integrity are mutually exclusive. That is a structural limitation, it is first-class, and it
+reaches by measurement the conclusion the previous campaign reached independently on a different
+backend: the gap is representational, not parametric.
+
+\subsection{What the defences caught, and what they cost me}
+
+On the first composition round the Watcher vetoed the two \emph{highest}-scoring runs ---
+\texttt{protr\_peak} 4.03 and 3.20, one of them the control that three Analysts had called a tube
+--- because the captions show no tube. The Critic separately refused a third slot as not-evidence
+(reservoir saturated at 15\,002 cells). Two of six slots produced no evidence and both said so
+loudly.
+
+Twice in one night I proposed a mechanism and the measurement refuted it. I argued that the
+per-cell volume cap explained the flat shape; the first test refuted it, but that test ran against
+the extinct field, so its refutation was worthless --- \emph{a refutation obtained under a broken
+instrument is not evidence, and I nearly filed it as one}. I then argued the extinction reached the
+main campaign, submitted the comparison, and measured \texttt{act\_max\_final} $=0.995$ with the
+dilution on: refuted within the hour. The dilution tracks the volume growth ratio, so it only bites
+while cells grow; at $\rho=0$ growth saturates and the dilution stops. I had the sign of the
+feedback backwards.
+
+Both are recorded as retractions rather than quietly edited. The protocol's value is not that it
+prevents wrong ideas --- it is that a wrong idea costs two cluster runs and an hour instead of a
+month.
+
 \end{document}

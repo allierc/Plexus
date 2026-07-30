@@ -36,18 +36,28 @@ If any of those fail, fix that before anything else — they are the gates.
 
 ## 2. THE NEXT THING TO DO
 
-**Run one attended composition round.** The LLM Proposer has been written, parses, and is wired
-into `round.py` — but **it has never actually been called**. Every prompt-level failure mode
-(bad JSON, the agent ignoring the control slot, Reflection rejecting everything) is still
-unobserved.
+**Done 2026-07-30 (hours 12–14): the attended composition round ran.** It found eight defects,
+starting with the fact that `--mode composition` could never have completed a round. Round 2 is
+in the ledger. See SESSION_LOG hours 12–14 and `_turing_vertex/FINDINGS.md`.
+
+**Next: round 3 will trigger ESCALATION on its own.** The Supervisor now resumes at round 2 with
+`dry 1` and its single proximity cluster **frozen** (0 active), so `terminal()` returns
+`ESCALATE: all clusters frozen` — and `round.py` now *reads* that verdict, which it never did
+before. Expect it to open stage gate 3 and admit the stage-3 operators.
 
 ```bash
-$PY round.py --mode composition --batch 6 --dry     # inspect the proposal FIRST
-$PY round.py --mode composition --batch 6           # then for real, and watch it
+$PY round.py --mode composition --batch 6           # watch the escalation branch fire
 ```
 
-Read `campaign/proposal.json`, `campaign/analysis.md`, `campaign/knowledge.md` afterwards.
-Expect it to break. That is the point of doing it attended.
+Two open scientific threads, both from round 2, both needing a WITHIN-RUN time series rather
+than a cross-run comparison (I made that mistake twice last night — see the retractions):
+
+1. **What is `protr_peak = 4.03` on the control?** Three Analysts called it a tube; the Watcher
+   vetoed it; the montage shows a small body with a short stub. Both knockouts collapse it
+   (→1.39, →1.03), so both operators are necessary for *whatever it is*.
+2. **Is the activator being carried off the tip?** `ta_tip_act_final` is 0.27 with growth on and
+   0.80 with growth removed — but the second has no protrusion, so "tip" is not the same place.
+   Confounded. Needs `ta_tip_act` over time in one run.
 
 ---
 
@@ -66,15 +76,22 @@ Expect it to break. That is the point of doing it attended.
 
 ## 4. What is NOT done — do not assume otherwise
 
-1. **The LLM Proposer has never run.** (See §2.)
-2. **The escalation path is unbuilt.** `Supervisor.escalate()` opens a stage gate or files an
-   operator request, but nothing consumes an operator request. The lever-map reframing made this
-   the *main* path for a multi-week campaign, not an edge case. **This is the biggest gap.**
-3. **No progress reel.** Per-run movie/strip/caption/mechanics exist; nothing assembles the round
-   montage, the progress reel, or the (χ,γ) phase-diagram panel that Cedric asked for.
-4. **The Proposer call blocks the round** — 8 GPUs idle for minutes. Should overlap N+1 with N.
-5. Analyst/Interpreter/Meta-review/Evolution/Judge are written and parse but have **never been
-   invoked** either.
+1. ~~The LLM Proposer has never run.~~ **Ran.** Works; wrote a real 6-slot proposal, took prompt
+   corrections on the second call.
+2. ~~The escalation path is unbuilt.~~ **Built** (`escalation.py`, self-tested): three-action
+   decision table, `agents/llm_agents.request_operator`, wired into `round.py`, and it has one
+   real entry — **OR001** in `campaign/operator_backlog.md`. Not yet fired *automatically*; round
+   3 should do that.
+3. ~~No progress reel.~~ **`reel.py`** builds round montages and study reels with burned-in
+   labels. ⚠ Tiles are **not on a common spatial scale** (each movie used its own camera box) —
+   the label says so; read shape, never relative size. A common-`Lbox` re-render is still to do,
+   and so is the (χ,γ) phase-diagram panel.
+4. **The Proposer call still blocks the round** — 6 GPUs idle for ~7 minutes. Should overlap N+1
+   with N. **Still the main remaining inefficiency.**
+5. Analyst / Watcher / Judge / Interpreter / Meta-review **have now all been invoked** on round 2.
+   Evolution still has not.
+6. **Analyst calls bypass the budget ledger.** `A.analyse` is called without the `ledger`, so the
+   25 min per-round LLM ceiling is not enforced on the 15 analyst calls. Not yet fixed.
 
 ---
 
