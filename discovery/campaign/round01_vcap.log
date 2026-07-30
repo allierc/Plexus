@@ -1,0 +1,22 @@
+================================================================================================
+ROUND 1   mode=theta   campaign=okuda_growth_driven
+================================================================================================
+  [theta] 5 points of `divide_3d0.vcap` on round_40_mc8 (comp C5e315998af4, constant)
+  r01_00_5e3159_0  theta divide_3d0.vcap=0.0                    confirmatory  predict unknown -- this is a sensitivity sweep
+  r01_01_5e3159_1  theta divide_3d0.vcap=0.75                   confirmatory  predict unknown -- this is a sensitivity sweep
+  r01_02_5e3159_2  theta divide_3d0.vcap=1.5                    confirmatory  predict unknown -- this is a sensitivity sweep
+  r01_03_5e3159_3  theta divide_3d0.vcap=2.25                   confirmatory  predict unknown -- this is a sensitivity sweep
+  r01_04_5e3159_4  theta divide_3d0.vcap=3.0                    confirmatory  predict unknown -- this is a sensitivity sweep
+[cluster] fired 5 bsub(s) DETACHED on allierc@login1: pg_r01_00_5e3159_0, pg_r01_01_5e3159_1, pg_r01_02_5e3159_2, pg_r01_03_5e3159_3, pg_r01_04_5e3159_4
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+  [16:21] run/pend=5 done=0 exit=0 of 5
+  [16:22] run/pend=5 done=0 exit=0 of 5
+  [16:23] run/pend=5 done=0 exit=0 of 5
+  [16:24] run/pend=5 done=0 exit=0 of 5
+  [16:25] run/pend=4 done=1 exit=0 of 5
+  [16:26] run/pend=4 done=1 exit=0 of 5
+  [16:27] run/pend=3 done=2 exit=0 of 5
+  [16:28] run/pend=1 done=4 exit=0 of 5
+  [16:29] run/pend=1 done=4 exit=0 of 5
+  [16:30] run/pend=1 done=4 exit=0 of 5

@@ -684,3 +684,75 @@ post-relaxation elongation with a floor, not a ratio.
 conclusion from, and the discriminator the whole campaign was specified around.
 
 ---
+## Hour 10 — 2026-07-30 22:00–23:00 EDT
+
+### The loop is wired, and the first question exposed a structural limit before it ran
+
+Cedric proposed testing the loop on the open `vcap`/`D1d` question. Choosing it surfaced a limit
+that no amount of round-running would have shown:
+
+> **`vcap` is a parameter, not a composition edit.** `comp_hash` excludes θ by design — that is
+> the rule that stops a retune posing as a new hypothesis. So the loop as built **structurally
+> could not ask the D1d question**: every vcap value is the same hypothesis.
+
+I had built only **Loop I** (mechanism search). D1d is a **Loop II** (parameter) question. A loop
+with only Loop I would have answered it by accident or not at all — and this is exactly what the
+multi-week analysis predicted, that Loop II dominates once the composition space exhausts.
+
+`round.py` now has two modes. In `--mode theta` the composition hash is **asserted constant**
+across the sweep; the constancy is the point, not a defect, and verdicts land in the map as
+parameter-sensitivity rather than as new mechanisms.
+
+### The full agent chain is connected
+
+`Grounder → Proposer(LLM) → Critic → Reflection(LLM) → hypotheses → L4 → Analyst×3(LLM) →
+Watcher veto(LLM) → Referee + Judge(LLM) → truncate → Interpreter(LLM) → LeverMap → Supervisor →
+Meta-review(LLM)`
+
+Two deliberate refusals: if the Proposer yields nothing usable the round **fails rather than
+falling back to random** (a round with no reasoned proposal is a failed round, not a random one);
+and if Reflection reports *serious* issues the batch is **not run as proposed**.
+
+### 🔴 FINDING 17 — the Critic caught a live bug in my own reference recipe
+
+Consolidating the type guard into 12 enumerable rules (`critic.py`) immediately rejected
+`okuda_route`:
+
+```
+R4_SLOT_NOT_ON_IMPL: divide_3d:hertwig has no `axis`
+```
+
+The recipe connected morphogen → `divide_3d.axis` while the implementation was `hertwig`, which
+splits on the cell's *own* long axis and exposes no such slot. `is_runnable()` checked only for
+**unrouted** slots, never for a connection into a slot the implementation does not have — so the
+edge compiled and was **silently ignored**, through 59/59 validation and a real cluster run.
+Third silent no-op found by making a guard enumerable rather than trusting it.
+
+### 🔴 FINDING 18 — stale configs collide by name
+
+`r01_01_4af688.yaml` from an earlier dry-run shadowed a theta slot. Over weeks a job could pick
+up a stale config with a matching name. Removed by hand; the real fix (namespacing configs by
+round *and* mode, or purging per round) is **not yet done**.
+
+And a smaller one worth recording because it is the same failure in miniature: my verification
+glob matched the stale files rather than the theta ones, and I only caught it by listing the
+actual files. Trusting the label over the artefact, again.
+
+### Budgets
+
+Per-agent LLM limits (`agents/llm.py`): minutes + `max_turns` + tools, sized per job, in one
+auditable table, with a **25 min per-round ceiling** that hard-stops. `max_turns` is the real
+lever — it bounds tool-use loops — and the two agents that only map text→JSON (Watcher, Judge)
+get **no tools at all**, so they cannot loop. Verified: a worst-case round blocks the 6th call
+rather than overrunning.
+
+### ⏱ SUMMARY — Hour 10
+
+| | |
+|---|---|
+| **Done** | `round.py` wired to the real agents; θ-sweep mode added; `critic.py` consolidated (12 rules); per-agent budgets; Figure 1 → 15 agents + Table 1; objective reframed as the causal lever-map |
+| **Found** | the loop could not ask a parameter question at all (F: Loop II missing); the `hertwig`/`axis` silent edge; stale config name collisions |
+| **Running** | **vcap sweep, 5 points, on L4** — the first real round |
+| **Next** | read the sweep; namespace configs per round; escalation path; caption-per-wave; progress reel |
+
+---
