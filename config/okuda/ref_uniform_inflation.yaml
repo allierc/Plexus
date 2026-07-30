@@ -29,8 +29,14 @@ operators:
 - op: seed_mesh_3d
   at: vertex
   cell_set: cell
+  before_frame: 1
   n_cells: 500
   vseed_cv: 0.15
+- op: vesicle_growth
+  at: vertex
+  cell_set: cell
+  rate: 0.006
+  dt: 0.02
 - op: shape_energy_3d
   at: vertex
   p0: 3.7
@@ -72,18 +78,13 @@ operators:
 - op: topo_snapshot_3d
   at: vertex
   every: 1
-- op: vesicle_growth
-  at: vertex
-  cell_set: cell
-  rate: 0.006
-  dt: 0.02
 schedule:
 - seed_mesh_3d
+- vesicle_growth
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d
 - topo_snapshot_3d
-- vesicle_growth
 _discovery:
   comp_hash: C6a07112cc06
   structure:

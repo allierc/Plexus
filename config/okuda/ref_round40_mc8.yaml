@@ -29,6 +29,7 @@ operators:
 - op: seed_mesh_3d
   at: vertex
   cell_set: cell
+  before_frame: 1
   n_cells: 500
   vseed_cv: 0.15
 - op: cell_geometry_3d
