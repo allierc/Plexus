@@ -1,0 +1,17 @@
+# Operator backlog
+
+_Mechanisms the search wanted and the language could not express._ Each entry is
+one unit of atlas growth: it survives parameter changes, and it is actionable
+without re-running anything.
+
+_1 open of 1 filed._
+
+## OR001 — quasi-static force-balance relaxation with 3D reconnection (IH/HI), so a growing monolayer can RELIEVE the strain differential growth imposes instead of accumulating it as folded faces
+- **status**: open   ·   filed round 2
+- **why the language cannot express it**: No registered operator solves the mechanics to a RESIDUAL. `shape_energy_3d` takes a fixed `relax_iters` count of bounded-Euler gradient steps per frame -- a step count, not a convergence criterion -- so the mesh is never at force balance when the next tick applies growth again. And `reconnect_t1_3d` is an edge-only, 2D-style T1: there is no IH/HI operator for 3D cell-cell reconnection, so cells cannot exchange neighbours in the direction a bulge requires. Both gaps are in the CONTRACT, not the parameters: no value of relax_iters, eta or cap_frac turns a step count into a residual, and no parameter creates a topological move the operator set does not have.
+- **what it would answer**: The only unfilled cell of the Turing x vertex map: activator-driven shaping WITH an intact monolayer. Across 32 runs spanning 5 knobs (conserve_amount, a_sw, rho, chi, rate) the two are mutually exclusive -- the 18 runs with hollow_frac < 0.05 reach at most protr 1.064 and corr +0.292, while all 9 runs with corr > 0.4 have hollow_frac >= 0.197. No parameter reaches this cell; it needs a mechanism.
+- **proposed contract**: `contract=relax_to_balance  set=vertex  kind=lateral  family=mechanics  EMIT=velocity`
+  - params: `{"residual_tol": "convergence_criterion", "max_iters": "safety_bound", "reconnect": "IH/HI 3D topological move cadence"}`
+- **acceptance test**: On the wave-E rho=0.05 setting, 400 frames: reach corr_act_rad >= 0.5 with hollow_frac <= 0.05 and vol_cv <= 0.35. That setting today gives corr +0.627 with hollow_frac 0.197 and vol_cv 0.958 -- failed by ~4x on both integrity metrics, so it cannot pass by accident.
+- **motivated by**: _turing_vertex/FINDINGS.md, waveE_3_0p05, waveE_4_0, waveF_3_3, archive/vh_K4_cv15_d4_rd_coral
+- _Filed by the operator from measured evidence (32 runs), NOT written by the request agent -- provenance recorded so it is not mistaken for an LLM-generated wish. Independently corroborates the prior Turing_vertex campaign report that the gap is REPRESENTATIONAL, not parametric._

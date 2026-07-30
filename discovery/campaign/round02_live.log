@@ -78,3 +78,23 @@ Files updated: `proposal.json`, `analysis.md` (appended), `memory.md` (revised).
   [17:47] run/pend=1 done=5 exit=0 of 6
   [17:48] run/pend=1 done=5 exit=0 of 6
   [17:49] run/pend=1 done=5 exit=0 of 6
+  [17:50] run/pend=1 done=5 exit=0 of 6
+  [17:51] run/pend=1 done=5 exit=0 of 6
+  [17:52] run/pend=1 done=5 exit=0 of 6
+  [17:53] run/pend=1 done=5 exit=0 of 6
+  [17:54] run/pend=1 done=5 exit=0 of 6
+  [17:55] run/pend=1 done=5 exit=0 of 6
+  [17:56] run/pend=1 done=5 exit=0 of 6
+  [17:57] run/pend=1 done=5 exit=0 of 6
+  [17:58] run/pend=1 done=5 exit=0 of 6
+  [17:59] run/pend=0 done=5 exit=1 of 6
+[cluster] ⚠ 1 job(s) EXITed: ['153234537']
+[caption] loading the VLM ONCE for 5 run(s) on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:37, 17.88it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:07, 82.44it/s]Loading weights:   7%|▋         | 48/677 [00:00<00:04, 138.55it/s]Loading weights:  11%|█         | 76/677 [00:00<00:03, 179.06it/s]Loading weights:  14%|█▍        | 96/677 [00:00<00:03, 183.64it/s]Loading weights:  17%|█▋        | 118/677 [00:00<00:03, 179.08it/s]Loading weights:  22%|██▏       | 146/677 [00:00<00:02, 192.84it/s]Loading weights:  25%|██▌       | 172/677 [00:00<00:02, 210.01it/s]Loading weights:  29%|██▊       | 194/677 [00:01<00:02, 211.23it/s]Loading weights:  32%|███▏      | 216/677 [00:01<00:02, 204.41it/s]Loading weights:  36%|███▌      | 243/677 [00:01<00:02, 215.26it/s]Loading weights:  40%|███▉      | 269/677 [00:01<00:01, 221.13it/s]Loading weights:  43%|████▎     | 292/677 [00:01<00:01, 221.63it/s]Loading weights:  47%|████▋     | 315/677 [00:01<00:01, 213.10it/s]Loading weights:  50%|████▉     | 338/677 [00:01<00:01, 217.75it/s]Loading weights:  53%|█████▎    | 360/677 [00:01<00:01, 213.44it/s]Loading weights:  56%|█████▋    | 382/677 [00:01<00:01, 203.35it/s]Loading weights:  60%|██████    | 409/677 [00:02<00:01, 214.34it/s]Loading weights:  64%|██████▍   | 432/677 [00:02<00:01, 218.16it/s]Loading weights:  67%|██████▋   | 454/677 [00:02<00:01, 211.43it/s]Loading weights:  71%|███████   | 478/677 [00:02<00:00, 201.90it/s]Loading weights:  74%|███████▍  | 502/677 [00:02<00:00, 201.76it/s]Loading weights:  78%|███████▊  | 526/677 [00:02<00:00, 211.77it/s]Loading weights:  81%|████████  | 548/677 [00:02<00:00, 200.96it/s]Loading weights:  85%|████████▍ | 575/677 [00:02<00:00, 212.74it/s]Loading weights:  88%|████████▊ | 597/677 [00:02<00:00, 213.01it/s]Loading weights:  91%|█████████▏| 619/677 [00:03<00:00, 202.52it/s]Loading weights:  95%|█████████▌| 644/677 [00:03<00:00, 197.39it/s]Loading weights:  99%|█████████▉| 670/677 [00:03<00:00, 212.93it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 201.57it/s]
+  [1/5] r002c_00_5e3159: DESCRIPTION: A small red region on a large white sphere gradually shrinks and disappears...
+  [2/5] r002c_01_cba5fe: DESCRIPTION: The simulation shows a large spherical object with a Voronoi-like surface m...
+  [3/5] r002c_02_9fdce9: DESCRIPTION: A large spherical structure composed of a white Voronoi-like mesh remains s...
+  [4/5] r002c_04_a413e0: DESCRIPTION: A small, dark red object begins on the surface of a large, white spherical ...
+  [5/5] r002c_05_2399b2: DESCRIPTION: A spherical cluster of particles begins as a smooth, uniform surface with a...
+[caption] 5 run(s) in 135s (one model load, not 5)
+  [watcher] r002c_00_5e3159 VETOED -- The description shows a red region vanishing and a ring deforming into a teardrop on a static sphere — no tube
