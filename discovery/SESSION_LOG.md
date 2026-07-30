@@ -558,3 +558,50 @@ itself corrected is exactly why the ledger is append-only.
 | **Blocked** | nothing — the open inconsistency from Hour 7 is closed |
 
 ---
+### 🔴🔴 RETRACTION — Hour 8's conclusion was wrong. The Watcher caught it.
+
+I rendered the final frame and looked at it, which I should have done before writing "successful".
+
+| | archived `round_40_mc8` | clock-fixed replay |
+|---|---|---|
+| **what the eye sees** | a genuine long thin **tube**, activator at the tip | a **small bud** |
+| tube_len / tube_diam | — | 14.69 / 1.58 |
+| scored "aspect" | ~7.5 | **9.30** |
+| cells | ~2700 | 2927 |
+
+**Two separate confirmed problems, not one.**
+
+**`M3` — the metric lies.** `tube_len_final = 14.69` was scored on a bud, giving an "aspect" of
+9.30 that is *higher* than the archived tube's 7.5. This is the documented failure mode verbatim
+— *a passed metric is not qualitative fidelity* — and it means the **instrument gate is mandatory
+before any campaign scoring**, not a nicety. Retraction `RET001` withdraws the
+clock-re-anchoring-successful claim.
+
+**`D1d` — the re-anchoring does not restore the tube.** Cell count *is* restored (2927 vs ~2700),
+so the proliferation **rate** is correctly re-anchored — but the **phenotype** is not. Something
+governing tip dynamics remains uncorrected.
+
+**The suspect is now evidence-backed rather than guessed: `vcap`.** It force-divides oversized
+cells *bypassing the throttle*. Checked 4× more often, tip cells are split the moment they cross
+the cap instead of ramping while queued — and the Tyssue report attributes the tube tip
+specifically to that backlog behaviour (*"tube-tip cells grew far too big because oversized cells
+backlog behind the per-call division throttle and keep ramping while queued"*). Its clock
+equivalent is probably **not** a simple scaling. A `vcap` sweep under the fixed clock is the next
+experiment.
+
+**Three self-corrections today, all of them comparisons rather than computations.** The pattern is
+worth naming: every error I made was in deciding *what counts as the same quantity* — my `aspect`
+vs their `aspect`, `ta_protr` vs our `protr`, and now a scored tube-length vs a tube. The
+simulation was not once at fault.
+
+### ⏱ SUMMARY — Hour 8 revised
+
+| | |
+|---|---|
+| **Done** | engine gating verified; metric-bank reconciliation; **and then the visual check that overturned it** |
+| **Found** | `M3` the metric reports a tube on a bud; `D1d` the clock fix restores cell count but not phenotype |
+| **Decided** | the instrument gate now blocks everything downstream; `vcap` is the evidence-backed suspect |
+| **Next** | **instrument gate first** — the metric bank must separate eye-labelled archived runs before any score is trusted. Then the vcap sweep. |
+| **Blocked** | campaign scoring, correctly — the Metrologist refuses admission and `M3` is invalidating |
+
+---

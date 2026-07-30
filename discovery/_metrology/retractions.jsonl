@@ -1,1 +1,2 @@
 {"rid": "RET000", "defect_id": "D1c", "affected_claims": ["vcap-not-rate-coupled"], "affected_runs": [], "reason": "the assertion was reasoned, not measured, and the re-anchored replay contradicts it", "reanalysable": false, "t": 1785437910.2791805}
+{"rid": "RET001", "defect_id": "M3", "affected_claims": ["clock-re-anchoring-successful"], "affected_runs": ["round_40_mc8@metric_reconcile"], "reason": "the claim rested on tube_len/tube_diam, which the rendered frames contradict", "reanalysable": true, "t": 1785438848.5886881}
