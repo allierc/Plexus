@@ -756,3 +756,37 @@ rather than overrunning.
 | **Next** | read the sweep; namespace configs per round; escalation path; caption-per-wave; progress reel |
 
 ---
+### 🔴 FINDING 19 — a parameter CAN carry a hypothesis; I had conflated two rules
+
+Cedric: *"we can draw hypotheses with parameters: I expect XXX if I increase vcap to XXX."*
+Correct. I had inferred from "composition identity excludes θ" (so a retune cannot be a new
+MECHANISM — right, and it stays) that a parameter cannot carry a HYPOTHESIS (wrong).
+
+Consequence, and it is not small: θ points were stamped `predicted: "unknown — sensitivity
+sweep"` and **excluded from the surprise rate**. Had that stood, all five vcap points would have
+been uncounted and the round that taught the most would have reported **surprise 0.00 — "nothing
+learned"**. Fixed: parameter hypotheses carry real predictions and count like any other.
+
+### ✅ FIRST REAL RESULT — the vcap sweep, and it refuted me
+
+| vcap | predicted | protr_peak | final | cells | p_ratio | |
+|---|---|---|---|---|---|---|
+| 0.0 | `< 1.5` | **2.19** | 2.12 | 2152 | **42.9** | 🔥 refuted |
+| 0.75 | `< 2.0` | **4.03** | 1.70 | 5881 | 1.84 | 🔥 refuted |
+| **1.5** | `< 2.0` | **1.73** | 1.33 | 2927 | 2.51 | confirmed |
+| 2.25 | `≥ 2.0` | 2.24 | 1.61 | 2523 | 5.79 | confirmed |
+| 3.0 | `≥ 2.0` | **3.22** | **2.81** | 2448 | 4.70 | confirmed |
+
+**Surprise rate 0.40** — in the productive band (target ~0.30), on the very first round.
+
+1. **`vcap = 1.5`, the archived working point, is the WORST value swept.** It sits at the minimum
+   of elongation. That is a large part of D1d: the clock re-anchoring left θ stranded at a local
+   minimum, which is why the tube was lost.
+2. **The response is NON-MONOTONIC** (2.19 → 4.03 → 1.73 → 2.24 → 3.22). My mechanism story —
+   *a lower cap splits tip cells sooner so the tube shortens* — predicted a monotone trend and is
+   simply wrong.
+3. `vcap = 3.0` gives the best sustained protrusion (peak 3.22, final 2.81 — much the highest
+   retention). `vcap = 0.0` shows `p_ratio = 42.9`: massively forced, with no relief valve.
+
+D1d moves from Open toward a partial answer, by measurement rather than by my reasoning — which
+is the whole point of building the loop.

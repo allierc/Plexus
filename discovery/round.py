@@ -134,11 +134,19 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
 
 
 # --------------------------------------------------------------------------- LOOP II batch
-def build_theta_batch(base_name, param, values, n_slots):
+def build_theta_batch(base_name, param, values, n_slots, predictions=None):
     """A parameter sweep of ONE composition. The hash is constant BY CONSTRUCTION.
 
-    This is what makes the vcap/D1d question askable at all. It is recorded as
-    parameter-sensitivity of a single mechanism, never as a set of new mechanisms.
+    CORRECTION (Cedric): I had conflated two different things. Composition IDENTITY excludes
+    theta, so a retune cannot count as a new MECHANISM -- that rule is right and stays. But I
+    wrongly inferred that a parameter cannot carry a HYPOTHESIS. It obviously can:
+
+        "if I raise vcap to 3.0, tip cells divide sooner, so the tube shortens"
+
+    is falsifiable, predictive, and exactly the kind of claim one can be wrong about. Stamping
+    these points `unknown -- sensitivity sweep` and excluding them from the surprise rate threw
+    away the most informative part of the round. A parameter hypothesis now carries a real
+    prediction and COUNTS toward surprise, like any other.
     """
     presets = T.load_presets()
     if base_name in presets:
@@ -146,15 +154,24 @@ def build_theta_batch(base_name, param, values, n_slots):
     else:
         base = reference_recipes().get(base_name) or seed("substrate")
     h0 = comp_hash(base)
+    preds = predictions or {}
     out = []
+    base_v = base.params.get(param)
     for v in values[:n_slots]:
         g = base.with_params({**base.params, param: v})
         assert comp_hash(g) == h0, "theta must not change composition identity"
+        # a real, falsifiable prediction per point -- supplied, or derived from the mechanism
+        pred = preds.get(str(v))
+        if pred is None:
+            pred = _theta_prediction(param, v, base_v)
+        intent = "confirmatory" if (base_v is None or abs(v - base_v) <= 1e-9
+                                    or pred.startswith("protr_peak >=")) else "adversarial"
         out.append((g, f"theta {param}={v}",
-                    {"intent": "confirmatory", "metric": "protr_peak",
-                     "predicted": "unknown -- this is a sensitivity sweep",
-                     "claim": f"{param}={v} on {base_name}",
-                     "why": "Loop II: parameter sensitivity of ONE fixed composition"}))
+                    {"intent": intent, "metric": "protr_peak", "predicted": pred,
+                     "claim": f"{param}={v} on {base_name}: {pred}",
+                     "why": "Loop II: a parameter hypothesis. Composition identity is unchanged "
+                            "by construction, so this cannot pose as a new mechanism -- but it "
+                            "is a prediction that can be wrong, and it counts as one."}))
     print(f"  [theta] {len(out)} points of `{param}` on {base_name} (comp {h0}, constant)")
     return out
 
@@ -294,11 +311,29 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
 
 
 # --------------------------------------------------------------------------- helpers
+def _theta_prediction(param, v, base_v):
+    """A default falsifiable prediction when none was supplied.
+
+    For vcap specifically the mechanism is on record: vcap force-divides oversized cells while
+    BYPASSING the throttle, and the Tyssue notes attribute the tube tip to cells BACKLOGGING
+    behind that throttle and continuing to ramp. So a LOWER cap should split tip cells sooner,
+    remove the backlog, and SHORTEN the tube; a higher cap should restore it. That is the claim
+    under test, and it is one we can be wrong about.
+    """
+    if param.endswith("vcap"):
+        if v <= 0.5:
+            return "protr_peak < 1.5"      # no cap == no forced split of oversized tip cells
+        if base_v is not None and v > base_v:
+            return "protr_peak >= 2.0"     # a higher cap restores the backlog -> longer tube
+        return "protr_peak < 2.0"
+    return "protr_peak >= 2.0"
+
+
 def _pred_holds(pred, got):
     import re
     m = re.search(r"(>=|<=|>|<)\s*([0-9.]+)", str(pred))
     if not m:
-        return True                     # unstated / sweep: never counted as a surprise
+        return True                     # only a genuinely UNSTATED prediction is uncounted
     op, v = m.group(1), float(m.group(2))
     return {">=": got >= v, "<=": got <= v, ">": got > v, "<": got < v}[op]
 
