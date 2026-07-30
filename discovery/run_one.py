@@ -62,6 +62,8 @@ def _lazy_engine():
     import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa: F401
     import plexus.schema as S
     from plexus.engine import run as engine_run
+    import instrument
+    instrument.install()                       # D4: every operator now reports whether it acted
     return S, engine_run
 
 
@@ -144,10 +146,9 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
 
     # D4: the acted-ledger. The engine does not yet report this (that fix lands in the operators);
     # until it does we record what we CAN observe and flag the rest as unknown.
-    acted = {}
-    for op in cfg["schedule"]:
-        acted[op] = int(getattr(Hf, "_acted", {}).get(op, -1))         # -1 == not instrumented
-    n_unknown = sum(1 for v in acted.values() if v < 0)
+    import instrument
+    acted, inert = instrument.report(Hf, cfg["schedule"])
+    n_unknown = 0
 
     # --------------------------------------------------------------- Q: the quasi-static test
     q = None
@@ -175,7 +176,15 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         print(f"[{name}] 🔴 SATURATED: {int(fm['n_cells'][-1])} cells vs buffer {cbuf}. "
               f"This run is NOT evidence -- raise the buffer or bound proliferation.", flush=True)
 
-    summary = {"saturated": bool(saturated),
+    # retention = final/peak aspect. A FORCED protrusion peaks then collapses (low retention);
+    # an EQUILIBRIUM one holds (high). Computable from the archived per-frame table for every
+    # run without re-simulating -- the D7 payoff -- and a cheap proxy for the full Q test.
+    _pk = max(fm["aspect"]) if fm["aspect"] else 0.0
+    retention = (fm["aspect"][-1] / _pk) if _pk > 1e-9 else 0.0
+
+    summary = {"saturated": bool(saturated), "inert_operators": inert,
+               "retention": round(retention, 3),
+               "valid_evidence": bool(not inert and not saturated),
                "aspect_final": round(fm["aspect"][-1], 3),
                "aspect_peak": round(max(fm["aspect"]), 3),
                "n_cells_final": int(fm["n_cells"][-1]),
@@ -188,9 +197,14 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     arch.add(rec)
 
     print(f"[{name}] {json.dumps(summary)}", flush=True)
-    if n_unknown:
-        print(f"[{name}] ⚠ acted-ledger not instrumented for {n_unknown}/{len(acted)} operators "
-              f"(D4 fix lands in the operators; runs are provisional until then)", flush=True)
+    if inert:
+        print(f"[{name}] 🔴 INERT OPERATORS {inert} -- this run is NOT evidence. A scheduled "
+              f"operator that never acted would be recorded as 'this mechanism cannot work' "
+              f"when the mechanism never ran (D4).", flush=True)
+    else:
+        print(f"[{name}] D4 ok: all {len(acted)} scheduled operators acted "
+              f"({ {k: v for k, v in sorted(acted.items(), key=lambda kv: kv[1])[:3]} } ...)",
+              flush=True)
 
     # --------------------------------------------------------------- artefacts
     if movie:
