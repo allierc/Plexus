@@ -1081,3 +1081,80 @@ it could never accumulate. Verified: an opened stage gate now survives a restart
 | **Running** | round 2 slot `r002c_03_560039` (−cell_geometry_3d) — 35+ min vs 5–20 for its siblings, degrading exactly as the Reflection agent warned |
 | **Next** | round 2 readout; progress reel; overlap the Proposer with cluster runs |
 | **Blocked** | nothing |
+
+---
+## Hour 14 — 2026-07-30 18:00–18:40 EDT
+
+### 🔴 FINDING 30 — the extinction defect reaches the MAIN campaign, not just the minisite
+
+Round 2's Watcher **vetoed the control**:
+
+> _"The description shows a red region vanishing and a ring deforming into a teardrop on a static
+> sphere — no tube"_
+
+and the VLM caption of that run begins *"A small red region on a large white sphere gradually
+shrinks and disappears"*. That is the F29 signature. Checked `config/okuda/round_40_mc8.yaml`:
+
+```yaml
+- op: morphogen_growth_3d
+  rate: 0.01
+  rho: 0.0
+  conserve_amount: true      # <-- the same dilution
+```
+
+The flagship okuda recipe carries it too, and with `rho: 0.0` it is **worse in kind**: growth only
+occurs where the activator is high, so the dilution applies *only to activated cells*. That is a
+self-extinguishing activator — a negative feedback whose fixed point is no pattern. It is a
+plausible mechanism for three things the campaign has recorded and not explained:
+
+- R44's *"emergent RD cannot sustain a tube"* impossibility claim (already re-opened in RESUME §5);
+- the campaign never finding a **grown** rather than **forced** tube;
+- the recurring "body shrinks as a thin filament extends" artefact.
+
+**Testing it rather than asserting it.** `conserve_amount` is an *implementation* choice
+(`hill_conserve_amount` vs `hill_no_conserve`), so this is a legal Loop-I composition edit, not a
+retune — the hashes differ (`Cd13473bf1c3` → `C8acc4aa1fcc`). Submitted both on L4 as
+`d1x_cons_d13473` / `d1x_nocons_8acc4a`, 900 frames.
+
+**If this lands, the campaign has been searching mechanism space with its morphogen switched off** —
+and every impossibility claim about RD-driven tubes predates the discovery.
+
+### 🔴 FINDING 31 — a degenerate slot could hold a round for 24 hours
+
+Round 2's `-cell_geometry_3d` knockout ran **45+ minutes against 5–20 for its five siblings**, with
+empty stdout: degenerate, not crashed — precisely what the Reflection agent had flagged
+(*"may not degrade gracefully ... could go degenerate/uninterpretable"*). A composition search
+generates combinations no preset ever ran, so this is the normal case, not a rare one.
+
+The only guard was `timeout_h=24`, and `round.py` **discarded the return value**, so "all six
+finished" and "we waited a day and gave up" were indistinguishable. Fixed: once a majority has
+landed, a job still running past `max(25 min, 4 × median)` is `bkill`ed and reported;
+`wait_for_ids` returns a dict; both call sites check it. Note `not {...}` is always `False`, so
+the internal caller would otherwise have silently stopped stopping.
+
+Applied the policy by hand to the live round (the process was running the old code): killed the
+straggler, and round 2 proceeded to caption and score the five that landed.
+
+### ✅ Caption-per-wave confirmed in production
+
+F20's fix worked on its first real composition round: **5 runs captioned in 135 s on one model
+load**, on the devcontainer, before the Analysts and the Watcher — and the Watcher then used a
+caption to veto the control. The eye/number defence is live again on cluster runs.
+
+### ✅ Escalation path produced its first real entry
+
+**OR001** in `campaign/operator_backlog.md`: quasi-static force-balance relaxation (a *residual*,
+not a step count) plus 3D IH/HI reconnection, with a proposed contract and an acceptance test that
+today's best setting fails by ~4× on both integrity metrics. Provenance is recorded in the entry:
+filed by me from 32 runs of measured evidence, **not** written by the request agent — so it cannot
+later be mistaken for an LLM-generated wish.
+
+### ⏱ SUMMARY — Hour 14
+
+| | |
+|---|---|
+| **Done** | straggler kill + dict contract; OR001 filed; FINDINGS.md with the 32-run structural limitation; caption-per-wave verified in production |
+| **Found** | the extinction defect is in the MAIN campaign's flagship recipe, and `rho=0` makes it self-reinforcing; a degenerate slot could stall a round for a day |
+| **Running** | round 2 analysts (20 LLM calls) · `d1x` conserve/no-conserve decisive test on L4 |
+| **Next** | read d1x; read round 2; progress reel |
+| **Blocked** | nothing |
