@@ -1231,3 +1231,51 @@ the protrusion were *forced*; it did not. Recorded as the round's one **surprise
 control is itself Watcher-vetoed, so the 4.03 baseline those ratios are measured against is
 suspect — the honest reading is *"both operators are necessary for whatever 4.03 is"*, and what
 4.03 is remains open.
+
+---
+## Hour 15 — 2026-07-30 18:10–18:20 EDT — deliverables and handover state
+
+### Progress reel built (`reel.py`)
+
+Round montages, per-wave study reels, and a progress reel, with labels burned in. Two things
+worth recording about *how* it had to be built:
+
+- The bundled `imageio-ffmpeg` binary has **no `drawtext` filter** (built without libfreetype) and
+  there is no system ffmpeg here. Labels are rendered with matplotlib and composited via
+  `overlay`, which the binary does have.
+- ⚠ **Tiles are not on a common spatial scale.** Each per-run movie was rendered with its own
+  camera box (`Lbox = 1.06·Rmax`), so a run with a long spike gets a wide box and its body is
+  drawn small. In the round-2 montage the control looks like a tiny body beside two large spheres
+  — **that difference is the camera, not the biology**. Every tile is now labelled `(own scale)`
+  and the module says so at the top. Recorded rather than silently shipped: an unlabelled montage
+  is itself an instrument that lies.
+
+The montage did earn its keep immediately: it shows the control's `protr_peak = 4.03` is a **small
+body with a short stub**, not a tube — which is exactly what the Watcher said and the three
+Analysts did not.
+
+### `plexus2_discovery.pdf` updated — 21 → 23 pages
+
+New §"First live results", covering: the control-intent deadlock, the three scoring defects and
+the 0.00-vs-0.40 ledger, the supervisor's missing persistence, the escalation path and OR001, the
+Turing×vertex structural limitation, and both of my retracted mechanism claims. Compiles clean.
+
+### Standing state for the next session
+
+- **Nothing running** locally or on the cluster.
+- Supervisor resumes at **round 2 → next round 3**, `spent 9`, `dry 1`, **1 cluster, 0 active**.
+  So `terminal()` returns `ESCALATE: all clusters frozen` and `round.py` now *reads* that verdict
+  — round 3 should open stage gate 3 by itself. That is the escalation path's first automatic
+  firing and it should be watched.
+- All gates pass: validate_space 59/59, critic, predict, hypothesis, control, escalation,
+  preflight, admission.
+- Findings run F1–F31, with **F30 retracted by measurement**.
+
+### ⏱ SUMMARY — Hour 15
+
+| | |
+|---|---|
+| **Done** | `reel.py` (3 montages incl. a 32-tile study reel); PDF 21→23 pp; RESUME.md rewritten for the next session |
+| **Found** | no `drawtext` in the bundled ffmpeg; montage tiles are not spatially comparable and would have invited a false reading |
+| **Next** | round 3 (watch escalation fire); overlap the Proposer with cluster runs; analyst calls bypass the LLM budget ledger; common-`Lbox` re-render for a truthful montage |
+| **Blocked** | nothing |
