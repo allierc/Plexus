@@ -46,6 +46,18 @@ POSED = {
     "waveE_2_0p2": ("confirmatory", "protr 1.0-1.30"),
     "waveE_3_0p05": ("confirmatory", "protr >= 1.2"),
     "waveE_4_0":   ("confirmatory", "protr >= 1.3"),
+    # wave F -- chi (domain size), at the only setting with coupling
+    "waveF_0_0p3": ("confirmatory", "protr >= 1.10"),
+    "waveF_1_0p65": ("confirmatory", "protr >= 1.10"),
+    "waveF_2_1p3": ("control",      "protr 1.10-1.30"),
+    "waveF_3_3":   ("confirmatory", "protr 1.0-1.30"),
+    "waveF_4_8":   ("adversarial",  "protr 1.0-1.15"),
+    # wave G -- rate (gamma)
+    "waveG_0_0p1": ("confirmatory", "protr >= 1.10"),
+    "waveG_1_0p3": ("confirmatory", "protr >= 1.10"),
+    "waveG_2_1":   ("control",      "protr 1.10-1.30"),
+    "waveG_3_3":   ("confirmatory", "protr 1.0-1.25"),
+    "waveG_4_10":  ("adversarial",  "protr 1.0-1.15"),
 }
 
 
@@ -139,14 +151,52 @@ def main():
     for r in rows:
         L.append(f"| `{r['name']}` | {r['intent']} | `{r['predicted']}` | {r['protr']:.3f} | "
                  f"{r['outcome']} | {'🔥 **surprise**' if r['surprise'] else ''} |")
-    L += ["", "### What I got wrong", "",
+    # ---- the claim that survives every wave ----
+    intact = [r for r in rows if r["hollow"] < 0.05]
+    coupled = [r for r in rows if (r["corr"] or 0) > 0.4]
+    both = [r for r in rows if r["hollow"] < 0.05 and (r["corr"] or 0) > 0.4]
+    L += ["", "## The structural limitation (the result)", "",
+          f"Across **{len(rows)} runs spanning 5 knobs** (`conserve_amount`, `a_sw`, `rho`, "
+          f"`chi`, `rate`):", "",
+          f"- **{len(intact)} runs keep an intact mesh** (`hollow_frac < 0.05`). The best any of "
+          f"them achieves is `protr` **{max(r['protr'] for r in intact):.3f}** and `corr` "
+          f"**{max((r['corr'] or 0) for r in intact):+.3f}** — no shaping.",
+          f"- **{len(coupled)} runs reach real coupling** (`corr > 0.4`). The *least* damaged of "
+          f"them has `hollow_frac` **{min(r['hollow'] for r in coupled):.3f}** — a fifth of all "
+          f"faces folded.",
+          f"- **{len(both)} runs achieve both.**", "",
+          "> On this backend, **activator-driven shaping and monolayer integrity are mutually",
+          "> exclusive.** Every setting that lets the Turing pattern shape the shell also breaks",
+          "> the shell. This is a structural limitation, not a tuning failure — and it is a",
+          "> first-class result.", "",
+          "It is also not a new opinion: the previous Turing_vertex campaign concluded "
+          "independently, on a *different* backend (spherical SPV), that *the gap is "
+          "REPRESENTATIONAL not parametric*. This is the same conclusion reached by measurement "
+          "on the vertex-mesh backend, with the boundary located at `hollow_frac ~ 0.197`.", "",
+          "Filed as **OR001** in `campaign/operator_backlog.md`: quasi-static force-balance "
+          "relaxation (a residual, not a step count) plus 3D IH/HI reconnection. With an "
+          "acceptance test that today's best setting fails by ~4x on both integrity metrics.", "",
+          "### Caveat carried, not buried", "",
+          "Waves F and G (the Okuda `chi`/`gamma` axes) were run at `rho = 0.05`, the only regime "
+          "with coupling — where `hollow_frac` is already 0.197. **Every point in those two waves "
+          "has `hollow_frac >= 0.197` and most exceed 0.46.** So their morphology numbers are "
+          "measured on a failing mesh and must not be read as a phase diagram. The apparent best "
+          "point (`chi = 3.0`: `protr` 1.430, `corr` +0.776) has **40% of faces folded**; it is "
+          "not an operating point. Reproducing Okuda's (chi, gamma) diagram needs OR001 first.", "",
+          "### What I got wrong", "",
           "- I predicted the **cap** was what held the shape flat, and that `rho = 0` would bulge.",
           "  Wave B refuted it (`protr` 1.034, the lowest of its sweep) — but wave B ran against",
           "  the dead field, so its refutation was uninformative. Wave E, with a live field,",
           "  **confirmed** the cap reading. A refutation obtained under a broken instrument is not",
           "  evidence, and I nearly recorded it as one.",
           "- I predicted `protr >= 1.2` at `rho = 0.05` and got 1.173 — refuted by 0.027.",
-          "  Recorded as refuted rather than rounded into a pass.", ""]
+          "  Recorded as refuted rather than rounded into a pass.",
+          "- **Wave G refuted my timescale story.** I claimed `corr` would FALL as `rate` rose,",
+          "  because a pattern reorganising faster than the shell relaxes should decouple from it.",
+          "  Observed `corr`: 0.167 / 0.062 / 0.627 / 0.675 / 0.476 at `rate` 0.1 / 0.3 / 1 / 3 /",
+          "  10 — it RISES then falls, peaking near `rate ~ 3`. The low end is not decoupling at",
+          "  all: `act_max` there is 0.002 and 0.000, i.e. **the pattern had not formed yet in 400",
+          "  frames**. A run-length artefact I read as a mechanism until I checked `act_max`.", ""]
     p = os.path.join(OUT, "FINDINGS.md")
     open(p, "w").write("\n".join(L))
     print(f"wrote {p}")

@@ -258,7 +258,14 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     if not ids:
         print("[round] submission did not land -- aborting rather than scoring nothing")
         return 1
-    cluster.wait_for_ids(ids, poll=60)
+    # The return value used to be discarded, so "all six finished" and "we waited 24 h and gave
+    # up" were indistinguishable. A killed straggler is recorded and its hypothesis is resolved
+    # `inconclusive` below (no diag.json), which keeps a degenerate slot out of the surprise rate
+    # instead of scoring it as evidence.
+    wait = cluster.wait_for_ids(ids, poll=60)
+    if not wait["ok"]:
+        print(f"[round] batch did not complete cleanly: exit={wait['exit']} "
+              f"killed={wait['killed']} timed_out={wait['timed_out']} -- scoring what landed")
 
     # ------------------------------------------------ caption the wave (one model load)
     # Must happen BEFORE the Analysts and the Watcher: both read description.txt, and a blind

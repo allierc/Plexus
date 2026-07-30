@@ -91,3 +91,42 @@ refutation was uninformative — my error, recorded).
 | 0.0 | confirmatory | `protr >= 1.3` — cap branch gone, activator-only bulge |
 
 **Discriminating point is again rho = 0.0**, but now with a live activator behind it.
+
+---
+
+## Waves F/G — Okuda's (chi, gamma) axes, at the only setting where shaping happens
+
+Run at `conserve_amount=0, rho=0.05, a_sw=0.30` — the one regime with real coupling (corr +0.63).
+Caveat recorded up front: `hollow_frac` is already 0.197 there, so morphology read from these
+waves is measured on a straining mesh and must be reported with the integrity number.
+
+Okuda's targets: thin tube (chi .01, gamma 100) · thick tube (.1, 1) · undulation (.1, 100) ·
+branching (.01, .01). Here chi = `cell_diffuse.chi`, gamma = `cell_react.rate`.
+
+### Wave F — `chi` (domain size). Okuda: tube diameter ∝ chi^(1/4)
+
+| chi | intent | prediction |
+|---|---|---|
+| 0.3 | confirmatory | `protr >= 1.10` — small domains, many fine lobes |
+| 0.65 | confirmatory | `protr >= 1.10` |
+| 1.3 (base) | control | `protr 1.10-1.30` |
+| 3.0 | confirmatory | `protr 1.0-1.30` — larger, broader domains |
+| 8.0 | adversarial | `protr 1.0-1.15` — domains approach the whole vesicle; nothing localised left to push |
+
+### Wave G — `rate` (gamma; chemistry speed vs mechanics)
+
+**Mechanism claim:** `corr_act_rad` should FALL as `rate` rises. The shell relaxes on a mechanical
+timescale; if the pattern reorganises faster than the shell can follow, the bulges lag the bands
+and the correlation decays. Low `rate` = quasi-static pattern = shell tracks it.
+
+| rate | intent | prediction |
+|---|---|---|
+| 0.1 | confirmatory | `protr >= 1.10` |
+| 0.3 | confirmatory | `protr >= 1.10` |
+| 1.0 (base) | control | `protr 1.10-1.30` |
+| 3.0 | confirmatory | `protr 1.0-1.25` |
+| 10.0 | adversarial | `protr 1.0-1.15` — chemistry outruns mechanics |
+
+Scored on `protr`; the `corr` trend is the mechanism claim and is reported alongside.
+**Refuted if** corr is flat or rising across `rate` — that would mean the timescale separation
+does not matter here, and the Okuda gamma axis is not doing what the paper says it does.

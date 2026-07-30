@@ -1,0 +1,13 @@
+[study] sweeping rate over [0.1, 0.3, 1.0, 3.0, 10.0], holding {'conserve_amount': 0.0, 'rho': 0.05, 'a_sw': 0.3}, 400 frames, 5 parallel
+  [wave] started waveG_0_0p1
+  [wave] started waveG_1_0p3
+  [wave] started waveG_2_1
+  [wave] started waveG_3_3
+  [wave] started waveG_4_10
+  [wave] waveG_1_0p3            ok cells=1778   protr=1.085 corr=+0.062  136.7s
+  [wave] waveG_3_3              ok cells=1778   protr=1.270 corr=+0.675  137.2s
+  [wave] waveG_4_10             ok cells=1778   protr=1.168 corr=+0.476  136.1s
+  [wave] waveG_0_0p1            ok cells=1778   protr=1.096 corr=+0.167  141.8s
+  [wave] waveG_2_1              ok cells=1778   protr=1.173 corr=+0.627  143.5s
+
+[study] wrote /workspace/Plexus/discovery/_turing_vertex/wave_waveG.json

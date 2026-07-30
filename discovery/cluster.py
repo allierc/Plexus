@@ -248,13 +248,36 @@ def status(verbose=True, include_done=True):
     return jobs
 
 
-def wait_for_ids(ids, poll=60, timeout_h=24):
-    """Block until every submitted JOB ID reaches a terminal state. IDs, not names."""
+def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler_min=25):
+    """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
+
+    STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
+    ---------------------------------------------------------------------------------------
+    A composition search deliberately generates combinations no preset ever ran, so some of them
+    are degenerate. A degenerate one does not usually crash; it gets SLOW. Round 2's
+    `-cell_geometry_3d` knockout ran 45+ minutes against 5-20 for its five siblings, with empty
+    stdout -- exactly what the Reflection agent had warned ("may not degrade gracefully ... could
+    go degenerate/uninterpretable").
+
+    With only the 24 h timeout, one such job holds the whole round for a DAY -- a night of the
+    campaign lost to a single slot, while its GPU stays occupied. And the old call site ignored
+    the return value, so a timeout was indistinguishable from success.
+
+    So: once most of the batch has finished, a job still running after
+    `max(min_straggler_min, straggler_factor x median_completion)` is KILLED and recorded as a
+    straggler. A killed slot is not a null result -- it is reported, and `round.py` resolves its
+    hypothesis `inconclusive`, which keeps it out of the surprise rate.
+
+    Returns {"ok", "done", "exit", "killed", "timed_out"} -- a dict, because "did everything
+    finish" and "did everything finish WELL" are different questions and the caller needs both.
+    """
     ids = set(map(str, ids))
     if not ids:
         print("[cluster] no job ids to wait on -- submission did not land")
-        return False
+        return {"ok": False, "done": [], "exit": [], "killed": [], "timed_out": False}
     t0 = time.time()
+    finished_at = {}
+    killed = set()
     while time.time() - t0 < timeout_h * 3600:
         out = _ssh_retry('bjobs -a -o "JOBID STAT" -noheader 2>/dev/null || true')
         if out is None:
@@ -268,14 +291,38 @@ def wait_for_ids(ids, poll=60, timeout_h=24):
             active = [i for i in ids if st.get(i) in ("RUN", "PEND")]
             done = [i for i in ids if st.get(i) == "DONE"]
             bad = [i for i in ids if st.get(i) == "EXIT"]
+            now = time.time()
+            for i in done + bad:
+                finished_at.setdefault(i, now)
             print(f"  [{time.strftime('%H:%M')}] run/pend={len(active)} done={len(done)} "
-                  f"exit={len(bad)} of {len(ids)}", flush=True)
+                  f"exit={len(bad)} of {len(ids)}"
+                  + (f" killed={len(killed)}" if killed else ""), flush=True)
             if not active:
                 if bad:
                     print(f"[cluster] ⚠ {len(bad)} job(s) EXITed: {sorted(bad)}")
-                return not bad
+                return {"ok": not bad and not killed, "done": sorted(done), "exit": sorted(bad),
+                        "killed": sorted(killed), "timed_out": False}
+
+            # straggler check -- only once a majority has landed, so a uniformly slow batch is
+            # never mistaken for a stuck one
+            settled = [finished_at[i] - t0 for i in finished_at]
+            if len(settled) >= max(2, int(0.6 * len(ids))):
+                med = sorted(settled)[len(settled) // 2]
+                limit = max(min_straggler_min * 60.0, straggler_factor * med)
+                if now - t0 > limit:
+                    for i in active:
+                        if i in killed:
+                            continue
+                        print(f"[cluster] ⏱ STRAGGLER {i}: {(now - t0) / 60:.0f} min vs median "
+                              f"{med / 60:.0f} min for the batch -- killing it. A degenerate "
+                              f"composition must not hold the round.", flush=True)
+                        _ssh_retry(f"bkill {i} 2>&1 || true")
+                        killed.add(i)
+                    return {"ok": False, "done": sorted(done), "exit": sorted(bad),
+                            "killed": sorted(killed), "timed_out": False}
         time.sleep(poll)
-    return False
+    print(f"[cluster] ⚠ wait timed out after {timeout_h} h")
+    return {"ok": False, "done": [], "exit": [], "killed": [], "timed_out": True}
 
 
 def wait_for(expected, poll=60, timeout_h=24):
@@ -347,9 +394,13 @@ def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None
     for i, wave in enumerate(waves, 1):
         print(f"\n=== wave {i}/{len(waves)}: {', '.join(wave)}")
         ids = submit(wave, frames=frames, do_q=do_q, campaign=campaign)
-        if not wait_for_ids(ids, poll=poll):
-            print(f"[cluster] wave {i} did not complete cleanly -- stopping rather than "
-                  f"continuing on partial evidence")
+        # `wait_for_ids` returns a DICT now: `not {...}` is always False, so testing the bare
+        # return would silently never stop. Check the field.
+        st = wait_for_ids(ids, poll=poll)
+        if not st["ok"]:
+            print(f"[cluster] wave {i} did not complete cleanly "
+                  f"(exit={st['exit']} killed={st['killed']} timed_out={st['timed_out']}) -- "
+                  f"stopping rather than continuing on partial evidence")
             return False
     print("\n[cluster] batch complete")
     return True
