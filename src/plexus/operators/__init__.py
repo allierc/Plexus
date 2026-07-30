@@ -13,6 +13,7 @@ from . import aggregate             # noqa: F401  children -> parent reduction (
 from . import broadcast             # noqa: F401  parent -> children lift (containment)
 from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
 from . import squared_law                # noqa: F401  registers squared_law (lateral, 2nd-derivative: Coulomb electrostatics OR Newtonian gravity)
+from . import stillinger_weber       # noqa: F401  SW two+three-body tetrahedral potential (mW water/Si/Ge; 1st many-body force)
 from . import attractor_flow         # noqa: F401  registers attractor_flow (lateral, 1st-derivative: strange-attractor ODE flow dx/dt = f(x))
 from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
 from . import velocity_align       # noqa: F401  Vicsek velocity alignment (nominal); boids = special case (was alignment)
