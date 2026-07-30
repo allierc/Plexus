@@ -252,7 +252,10 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     if movie:
         try:
             render(name, fr, out_dir)
-            describe(name, out_dir)          # VLM caption -- never deferred, never skipped
+            # Captioning is NOT done here. The cluster environment has no `transformers`, so an
+            # in-job caption fails on exactly the runs a long campaign produces -- leaving the
+            # Watcher blind where it matters most. caption_wave.py does it on the devcontainer
+            # side with ONE model load per wave, as part of closing the round.
         except Exception as e:
             print(f"[{name}] render failed: {type(e).__name__}: {e}", flush=True)
             traceback.print_exc()

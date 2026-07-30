@@ -1,0 +1,1 @@
+{"round": 1, "spent": 5, "best": 3.279, "new_clusters": 1, "frozen": [], "active_clusters": 1, "dry": 0, "surprise": 0.0, "next_confirmatory_frac": 0.5, "mix_why": "surprise 0.00 < 0.1: the batch is confirming what we already believe (drifting to 100/0, near-zero information). Push ADVERSARIAL.", "stop": false, "reason": "continue"}
