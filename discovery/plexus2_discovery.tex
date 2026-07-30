@@ -502,6 +502,94 @@ cheap.} A wet-lab assay costs weeks, so ranking by argument is rational. Our sim
 seconds and is measured by code. We therefore take their orchestration, diverge on their
 adjudication, and add one agent neither has.
 
+
+\begin{figure}[t]
+\centering
+\hyphenpenalty=10000 \exhyphenpenalty=10000 \tolerance=9999
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize},
+  ic/.style={draw=cgray, line width=0.55pt},
+  fillc/.style={fill=cset!12},
+  lbl/.style={font=\scriptsize\bfseries, text=black},
+  rol/.style={font=\tiny, text=cgray, align=center, text width=3.0cm},
+  cell/.style={minimum width=3.2cm, minimum height=2.05cm}]
+
+\def\cw{3.35}   \def\ch{2.15}
+
+% ---------- icon macros: each draws a small glyph centred on (0,0) ----------
+\newcommand{\icTarget}{\draw[ic,fillc](0,0)circle(3.6mm);\draw[ic](0,0)circle(2mm);\fill[cop](0,0)circle(.75mm);}
+\newcommand{\icBook}{\draw[ic,fillc](-3.4mm,-2.6mm)rectangle(3.4mm,2.6mm);\draw[ic](0,-2.6mm)--(0,2.6mm);
+  \draw[cgray,line width=.4pt](-2.6mm,1.2mm)--(-.8mm,1.2mm);\draw[cgray,line width=.4pt](-2.6mm,0)--(-.8mm,0);
+  \draw[cgray,line width=.4pt](.8mm,1.2mm)--(2.6mm,1.2mm);\draw[cgray,line width=.4pt](.8mm,0)--(2.6mm,0);}
+\newcommand{\icBulb}{\draw[ic,fill=cwarn!25](0,.8mm)circle(2.6mm);\draw[ic,fill=cgray!25](-1.3mm,-2.1mm)rectangle(1.3mm,-1.4mm);
+  \draw[ic](-1.1mm,-2.9mm)--(1.1mm,-2.9mm);\draw[cwarn,line width=.4pt](0,3.9mm)--(0,4.9mm);
+  \draw[cwarn,line width=.4pt](2.9mm,2.6mm)--(3.7mm,3.4mm);\draw[cwarn,line width=.4pt](-2.9mm,2.6mm)--(-3.7mm,3.4mm);}
+\newcommand{\icFunnel}{\draw[ic,fillc](-3.2mm,2.6mm)--(3.2mm,2.6mm)--(.7mm,-.4mm)--(.7mm,-3mm)--(-.7mm,-3mm)--(-.7mm,-.4mm)--cycle;
+  \fill[cop](-2.2mm,3.4mm)circle(.5mm);\fill[cop](0,3.9mm)circle(.5mm);\fill[cop](2.2mm,3.4mm)circle(.5mm);}
+\newcommand{\icScale}{\draw[ic,line width=.7pt](0,-3.2mm)--(0,2.8mm);
+  \draw[ic,line width=.7pt](-3.4mm,2.8mm)--(3.4mm,2.8mm);
+  \draw[cgray,line width=.35pt](-3.4mm,2.8mm)--(-3.4mm,1.4mm);
+  \draw[cgray,line width=.35pt](3.4mm,2.8mm)--(3.4mm,1.4mm);
+  \draw[ic,fillc](-4.5mm,1.4mm)--(-2.3mm,1.4mm)--(-3.4mm,-.3mm)--cycle;
+  \draw[ic,fillc](2.3mm,1.4mm)--(4.5mm,1.4mm)--(3.4mm,-.3mm)--cycle;
+  \draw[ic,line width=.7pt](-1.8mm,-3.2mm)--(1.8mm,-3.2mm);}
+\newcommand{\icCluster}{\fill[cset](-2.2mm,1.4mm)circle(.85mm);\fill[cset](-.6mm,2.4mm)circle(.85mm);
+  \fill[cset](-1.6mm,-.2mm)circle(.85mm);\draw[densely dashed,cgray,line width=.4pt](-1.5mm,1.2mm)circle(2.9mm);
+  \fill[cfield](2.6mm,-1.6mm)circle(.85mm);\fill[cfield](3.4mm,.2mm)circle(.85mm);
+  \draw[densely dashed,cgray,line width=.4pt](3mm,-.7mm)circle(2.2mm);}
+\newcommand{\icChart}{\draw[ic,fillc](-3.4mm,-2.8mm)rectangle(3.4mm,2.8mm);
+  \draw[cset,line width=.7pt](-2.4mm,-1.4mm)--(-.8mm,.8mm)--(.8mm,-.6mm)--(2.4mm,1.8mm);
+  \draw[cop,line width=.5pt,densely dotted](-2.4mm,-.4mm)--(-.8mm,1.4mm)--(.8mm,.2mm)--(2.4mm,1.2mm);}
+\newcommand{\icEye}{\draw[ic,fillc](-3.8mm,0)..controls(-1.6mm,2.9mm)and(1.6mm,2.9mm)..(3.8mm,0)
+  ..controls(1.6mm,-2.9mm)and(-1.6mm,-2.9mm)..(-3.8mm,0);\draw[ic,fill=cset!35](0,0)circle(1.5mm);\fill[black](0,0)circle(.6mm);
+  \draw[cgray,line width=.35pt](-4.6mm,3mm)--(-3.4mm,2.2mm);\draw[cgray,line width=.35pt](4.6mm,3mm)--(3.4mm,2.2mm);}
+\newcommand{\icSpeech}{\draw[ic,fillc](-3.4mm,-1.4mm)rectangle(3.4mm,2.8mm);
+  \draw[ic,fillc](-1.8mm,-1.4mm)--(-1.1mm,-3.2mm)--(-.3mm,-1.4mm);
+  \draw[cgray,line width=.4pt](-2.4mm,1.8mm)--(2.4mm,1.8mm);\draw[cgray,line width=.4pt](-2.4mm,.6mm)--(1.2mm,.6mm);
+  \draw[white,line width=.9pt](-1.75mm,-1.4mm)--(-.35mm,-1.4mm);}
+\newcommand{\icLoop}{\draw[ic,-{Stealth[length=1.5mm]}](0,0)+(30:3.2mm) arc (30:320:3.2mm);
+  \draw[cset,line width=.5pt](-1.4mm,0)--(1.4mm,0);\draw[cset,line width=.5pt](-1.4mm,1.2mm)--(.6mm,1.2mm);
+  \draw[cset,line width=.5pt](-1.4mm,-1.2mm)--(.9mm,-1.2mm);}
+\newcommand{\icCaliper}{\draw[ic,fillc](-4mm,.9mm)rectangle(4mm,2.1mm);
+  \foreach \x in {-3.2,-2.4,-1.6,-.8,0,.8,1.6,2.4,3.2}{\draw[cgray,line width=.35pt](\x mm,.9mm)--(\x mm,1.5mm);}
+  \draw[ic,fill=cop!25](-3.4mm,-2.6mm)rectangle(-2.2mm,.9mm);\draw[ic,fill=cop!25](1.4mm,-2.6mm)rectangle(2.6mm,.9mm);}
+\newcommand{\icWrench}{\draw[ic,fill=cgray!18,rotate=-38](-.75mm,-3.4mm)rectangle(.75mm,2.2mm);
+  \draw[ic,fill=cgray!18,rotate=-38](0,3.3mm)circle(1.9mm);\draw[white,line width=.9pt,rotate=-38](0,4.3mm)--(0,2.5mm);}
+
+% ---------- layout ----------
+\foreach \i/\name/\role/\icon in {%
+  0/Supervisor/{objective, budget, terminal state}/\icTarget,
+  1/Grounder/{plexus2 $\cdot$ okuda $\cdot$ the corpus}/\icBook,
+  2/Proposer/{one legal edit, across clusters}/\icBulb,
+  3/Critic/{free triage: types, preconditions}/\icFunnel,
+  4/Referee/{ranks by measuring, not debate}/\icScale,
+  5/Proximity/{near-duplicates starve together}/\icCluster,
+  6/{Analyst $\times N$}/{independent reads, consensus}/\icChart,
+  7/Watcher/{reads the movie; gates promotion}/\icEye,
+  8/Interpreter/{this spec $\to$ this phenomenon}/\icSpeech,
+  9/Meta-review/{patterns $\to$ the next prompt}/\icLoop,
+  10/Metrologist/{certifies the instrument; retracts}/\icCaliper,
+  11/Engineer/{patches substrate, outside the loop}/\icWrench}
+{
+  \pgfmathsetmacro{\col}{mod(\i,4)}
+  \pgfmathsetmacro{\row}{-floor(\i/4)}
+  \begin{scope}[shift={(\col*\cw, \row*\ch)}]
+    \draw[rounded corners=2pt, draw=cgray!45, line width=.5pt] (-1.5,-0.82) rectangle (1.5,0.93);
+    \begin{scope}[shift={(0,0.42)}] \icon \end{scope}
+    \node[lbl] at (0,-0.16) {\name};
+    \node[rol] at (0,-0.55) {\role};
+  \end{scope}
+}
+\end{tikzpicture}
+\caption{The agent roster. The first ten produce or judge \emph{evidence}. The last two do not:
+the \textbf{Metrologist} certifies the instrument that evidence is measured with --- and may act
+backwards, retracting claims whose foundation is later found defective --- while the
+\textbf{Engineer} patches the substrate from \emph{outside} the loop and cannot admit its own fix.
+That separation exists because an agent able to rewrite the simulator can make any hypothesis
+true.}
+\label{fig:agents}
+\end{figure}
+
 \begin{center}\small
 \begin{tabular}{@{}p{2.2cm}p{6.5cm}p{5.6cm}@{}}
 \toprule
