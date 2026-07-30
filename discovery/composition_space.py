@@ -69,8 +69,8 @@ OPERATORS = {
         stage=1, role="mechanics", outputs=["geometry"], slots=[], needs=[],
         impls=["default", "monolayer"], impl_structural=True,       # mid-surface vs true 3D volume
         params={"K_V": (1.0, 8.0, 6.0), "kappa_s": (0.05, 0.6, 0.2),
-                "Gamma": (0.0, 0.4, 0.12), "Lambda": (0.0, 0.3, 0.08),
-                "p0": (3.4, 4.2, 3.7), "h0": (0.05, 0.4, 0.15),
+                "Gamma": (0.0, 0.4, 0.05), "Lambda": (0.0, 0.3, 0.20),
+                "p0": (3.4, 4.2, 3.90), "h0": (0.05, 0.4, 0.40), "mono_gamma": (0.0, 0.3, 0.06),
                 "relax_iters": (10, 90, 30)}),
     "reconnect_t1_3d": dict(
         stage=1, role="topology", outputs=[], slots=[], needs=[],
@@ -95,13 +95,13 @@ OPERATORS = {
         stage=2, role="topology", outputs=[], slots=[], impl_slots={"orient_iface": ["axis"]},
         needs=[],
         impls=["hertwig", "orient_iface"], impl_structural=True,   # long-axis vs bud-axis septum
-        params={"cycle_cv": (0.05, 0.5, 0.15), "min_cycle": (2, 14, 8),
-                "max_cycle": (6, 24, 12), "vcap": (1.2, 3.0, 1.8),
-                "max_div": (2, 60, 20)}),
+        params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 14, 4),
+                "max_cycle": (6, 10**9, 10**9), "vcap": (0.0, 3.0, 1.5),
+                "max_div_frac": (0.005, 0.20, 0.03), "orient_asw": (0.2, 6.0, 1.0)}),
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
         impls=["radial_push"], impl_structural=False,
-        params={"K_extrude": (0.0, 8.0, 4.0)}),
+        params={"K_extrude": (0.0, 14.0, 4.0), "a_sw": (0.2, 6.0, 0.5)}),
 
     # ---------------------------------------------------------------- Stage 3: patterning
     "cell_geometry_3d": dict(
@@ -118,13 +118,14 @@ OPERATORS = {
     "cell_react": dict(
         stage=3, role="patterning", outputs=["morphogen"], slots=[], needs=["adjacency"],
         impls=["gierer_meinhardt", "gray_scott", "brusselator"], impl_structural=True,
-        params={"gamma": (0.1, 100.0, 1.0), "a0": (0.0, 0.05, 0.0),
-                "rd_rate": (0.2, 3.0, 1.0)}),
+        params={"gamma": (0.1, 100.0, 0.3), "a0": (0.0, 0.05, 0.01),
+                "rd_rate": (0.2, 3.0, 1.0), "F": (0.02, 0.06, 0.055), "kk": (0.05, 0.07, 0.062),
+                "mu_h": (0.2, 2.0, 1.0)}),
     "cell_rd_seed": dict(                                     # the prescribed activation driver
         stage=3, role="driver", outputs=["morphogen"], slots=[], needs=[],
         impls=["tip", "cone", "spot"], impl_structural=True,
-        params={"tip_radius": (0.6, 3.0, 1.5), "cone_deg": (4.0, 30.0, 8.0),
-                "amp": (0.5, 5.0, 2.0), "grow_after": (0, 250, 100)}),
+        params={"tip_radius": (0.6, 3.0, 2.0), "cone_deg": (4.0, 30.0, 8.0),
+                "amp": (0.5, 5.0, 2.0), "n_spots": (1, 8, 1)}),
     # NOTE: there is deliberately no separate `rd_interface_tension` node. In the engine that op
     # carries BOTH K_purse and K_extrude; the mechanism we need to ablate is the outward forcing,
     # so it is exposed once, as `extrude`. A second node would be the same engine operator under

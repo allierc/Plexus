@@ -126,6 +126,40 @@ def main():
     else:
         print("  (skipped -- make() unavailable in this environment)")
 
+    # ---------------------------------------------------------------- V9 parameter fidelity
+    # V3 proves "same operators". That is not "same model": a vocabulary default silently
+    # overriding a preset value gives an identical operator set and different physics. This
+    # check compares the actual numbers, excluding the keys we DELIBERATELY changed.
+    print("\nV9 PARAMETER FIDELITY -- same numbers, not just same operators?")
+    DELIBERATE = {"dt", "every", "max_cycle", "max_div", "record_every"}   # D1/D2 fixes + caps
+    if have_make:
+        for name in TRUSTED:
+            if name not in specs or name not in presets:
+                continue
+            try:
+                _, hand = rtr.make(presets[name])
+                hand_by = {o["op"]: o for o in hand["operators"]}
+                diffs = []
+                for o in specs[name]["operators"]:
+                    h = hand_by.get(o["op"])
+                    if h is None:
+                        continue
+                    for k, v in h.items():
+                        if k in DELIBERATE or k not in o:
+                            continue
+                        if isinstance(v, (int, float)) and not isinstance(v, bool):
+                            if abs(float(o[k]) - float(v)) > 1e-6 * max(1.0, abs(float(v))):
+                                diffs.append(f"{o['op']}.{k}={o[k]} (hand {v})")
+                        elif o[k] != v:
+                            diffs.append(f"{o['op']}.{k}={o[k]!r} (hand {v!r})")
+                check(f"V9 {name}", not diffs,
+                      "; ".join(diffs[:5]) + (f" +{len(diffs)-5} more" if len(diffs) > 5 else "")
+                      if diffs else "all mechanism parameters match")
+            except Exception as e:
+                check(f"V9 {name}", False, f"{type(e).__name__}: {str(e)[:70]}")
+    else:
+        print("  (skipped -- make() unavailable)")
+
     # ---------------------------------------------------------------- V4 defect fixes
     print("\nV4 DEFECT FIXES -- are D1/D2/D3 in every emitted config?")
     for name, cfg in specs.items():

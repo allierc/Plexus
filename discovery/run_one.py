@@ -165,7 +165,18 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                                      "region": disc.get("region"), "n_frames": T})
     rec.set_trajectory_ref(ref)
     rec.set_acted(acted)
-    summary = {"aspect_final": round(fm["aspect"][-1], 3),
+    # --------------------------------------------------------------- saturation guard
+    # "every high-division run pinned at exactly 890 cells -- a buffer ceiling, not physics."
+    # A run that hits its cell buffer is not evidence about a mechanism; it is evidence about a
+    # buffer. Flag it loudly so the ledger can never read it as a phenotype.
+    cbuf = cfg["sets"]["cell"]["n"]
+    saturated = fm["n_cells"][-1] >= 0.9 * cbuf
+    if saturated:
+        print(f"[{name}] 🔴 SATURATED: {int(fm['n_cells'][-1])} cells vs buffer {cbuf}. "
+              f"This run is NOT evidence -- raise the buffer or bound proliferation.", flush=True)
+
+    summary = {"saturated": bool(saturated),
+               "aspect_final": round(fm["aspect"][-1], 3),
                "aspect_peak": round(max(fm["aspect"]), 3),
                "n_cells_final": int(fm["n_cells"][-1]),
                "red_frac_final": round(fm["red_frac"][-1], 3),
