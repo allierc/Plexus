@@ -113,11 +113,28 @@ WRITE {PROPOSAL_FILE} as JSON:
 }}
 
 RULES
- - Slot 0 MUST be the control (edit: null).
- - Aim for ~70% confirmatory / ~30% adversarial across the remaining slots.
+ - Slot 0 MUST be the control (edit: null), with intent "control".
+ - Aim for ~70% confirmatory / ~30% adversarial across the remaining slots. The control is not
+   part of that ratio -- it is a fixed cost of the design, not one of your choices.
  - A prediction you are certain of is nearly worthless. Prefer edits you genuinely cannot call.
- - Do NOT propose a parameter change. Composition identity excludes parameters; a retune is
-   Loop II's job and CANNOT count as a new hypothesis here.
+ - Do NOT propose a parameter change IN THIS BATCH. That is a division of labour, NOT a
+   judgement about validity: this is Loop I, which searches over mechanism STRUCTURE, and
+   composition identity excludes parameters, so a retune could not be recorded as a distinct
+   mechanism here even if it were the right experiment. Parameter sweeps are Loop II's job and
+   they run in `--mode theta`.
+   * A Loop II sweep in the evidence above is FULLY LEGITIMATE EVIDENCE. Use it. A parameter
+     CAN carry a hypothesis ("if vcap rises to 3.0 then the tube shortens") and those
+     predictions count toward the surprise rate exactly like yours.
+   * Do NOT describe a past parameter round as forbidden, invalid, a violation or a mistake,
+     and do not write that into memory. Doing so discards real measurements -- the vcap sweep
+     is where the non-monotone response and the "forced, not grown" reading came from.
+ - Write your PREDICTIONS so they can be checked mechanically. Each must contain at least one
+   clause of the form `<metric> <op> <value>` (e.g. `protr_peak >= 2.0`) or a range
+   (`protr_peak 2.0-3.5`), naming a metric from the admitted list. State the metric explicitly
+   in every clause -- `p_ratio drops toward ~1` is NOT checkable, `mech_p_ratio <= 1.5` is.
+   A prediction with no checkable clause is scored `inconclusive`: it buys a GPU-hour and
+   contributes nothing to the map. You may add a `REFUTED if ...` sentence; it is recorded but
+   the assertion before it is what gets checked.
  - Then append one dated entry to {paths['analysis']} and revise {paths['memory']}.
 """
     ok, out = run_claude(prompt, timeout_min=timeout_min)

@@ -1,0 +1,44 @@
+================================================================================================
+ROUND 1   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+  [configs] purged 2 stale config(s) for round 1
+All three files written. Round 1 proposal complete.
+
+## Summary
+
+This is the **Okuda 3D-morphogenesis campaign** (not the completed embryo campaign in auto-memory — that "HARD STOP" does not apply here). **User input:** no Pending instructions as of 2026-07-30.
+
+**Situation:** Round 0 was a forbidden `vcap` parameter sweep — surprise 0.00, every run FORCED (`mech_p_ratio` 1.8–42.9, body drainage), zero growth-driven tubes, and the solo lever-map is still completely empty (all 8 operators "insufficient"). Map coverage 0%.
+
+**Proposed batch (6 slots, `explore`, 3 confirmatory / 2 adversarial = 60/40)** — every non-control slot changes exactly ONE operator on the round-33 recipe; **no parameters touched**:
+
+| Slot | Edit | Intent | Prediction (falsifiable) |
+|---|---|---|---|
+| 0 | control | — | protr_peak 2.0–3.5, p_ratio ~3 |
+| 1 | −extrude | conf | protr_peak < 1.5, p_ratio → ~1 |
+| 2 | −morphogen_growth_3d | **adv** | protr_peak ≥ 2.0 (unchanged); refuted if < 1.5 |
+| 3 | −cell_geometry_3d | **adv** | protr_peak < 1.5/degenerate; refuted if ≥ 2.0 |
+| 4 | +divide_3d:hertwig | conf | protr_peak ≥ 3.0 |
+| 5 | +vesicle_growth:uniform_ramp | conf | p_ratio → ~1, protr_peak ≥ 2.0 |
+
+**Logic:** buy causal-map coverage via knockouts (three clean lever readings) plus two additions aimed at Okuda's *grown* morphology rather than forced-drainage spikes. The **−extrude / −morphogen_growth_3d pair is the central dissociation test** of R0's "forced not grown" verdict. The mix leans adversarial per the supervisor's standing steer (R0 drifted to 92/8).
+
+Files written: `proposal.json`, `analysis.md` (dated entry), `memory.md` (revised, R0 relabeled + R1 model added).
+
+Note: the claude.ai MCP connectors (Gmail/Calendar/Drive) need authorization via claude.ai connector settings before their tools are usable — not relevant to this task.
+  [reflection] batch_ok=True :: Worth running as proposed: it has a real control, real mechanisms, mostly crisp falsifiable predictions, and — its strongest feature — an elegant dissociation (slot 1 extrude-KO predicts collapse, slo
+     slot 4: [minor] Prediction is disjunctive ('protr_peak >= 3.0 AND/OR ta_n_tubes increases') so either outcome confirms it — weakest falsifiability in the batch. It also stays silent on p_ratio direction, so even if it fires it won't tell you whether oriented division gives a GROWN vs FORCED regime, which is the actual campaign question. Tighten to a single conjoined claim (e.g. protr_peak >= 3.0 AND p_ratio not rising).
+     slot 3: [minor] cell_geometry_3d knockout may not degrade gracefully — if it's truly foundational the run could go degenerate/uninterpretable rather than yield a clean protr_peak reading, so the slot risks producing a non-value rather than a lever entry. The prediction already hedges for this, but treat a collapse as 'load-bearing, unquantified' not a measured lever.
+     slot 2: [minor] All six slots are n=1. Given this campaign's own DURABLE law that single-seed clean points routinely regress on replication, any SURPRISING knockout here (especially a slot-2 confirm of 'forced not grown', which then closes the interpretation) must be seed-replicated before the lever is called — don't let a one-seed knockout settle R0's causal story.
+     slot 5: [minor] Composition note (not a defect): non-control slots are 3 confirmatory / 2 adversarial ≈ 60/40, heavier on adversarial than the 70/30 target. Acceptable — arguably desirable for a first lever-map — but flag it so the ratio is a deliberate choice, not drift.
+Traceback (most recent call last):
+  File "/workspace/Plexus/discovery/round.py", line 410, in <module>
+    sys.exit(run_round(mode=a.mode, frames=a.frames, batch=a.batch, base=a.base,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Plexus/discovery/round.py", line 217, in run_round
+    h = Hypothesis(hid=f"R{rid}.{i}.{comp_hash(g)[1:7]}", comp_hash=comp_hash(g),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 19, in __init__
+  File "/workspace/Plexus/discovery/hypothesis.py", line 91, in __post_init__
+    raise ValueError(f"intent {self.intent!r} not in {INTENTS}")
+ValueError: intent 'control' not in ('confirmatory', 'adversarial')

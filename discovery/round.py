@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.join(HERE, "agents"))
 
 import cluster                                                            # noqa: E402
 import critic as C                                                        # noqa: E402
+import predict as PR                                                      # noqa: E402
 import translate as T                                                     # noqa: E402
 from composition_space import reference_recipes, seed                     # noqa: E402
 from control import CampaignConfig, Supervisor, score_run, truncate       # noqa: E402
@@ -134,7 +135,7 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
 
 
 # --------------------------------------------------------------------------- LOOP II batch
-def build_theta_batch(base_name, param, values, n_slots, predictions=None):
+def build_theta_batch(base_name, param, values, n_slots, predictions=None, intents=None):
     """A parameter sweep of ONE composition. The hash is constant BY CONSTRUCTION.
 
     CORRECTION (Cedric): I had conflated two different things. Composition IDENTITY excludes
@@ -164,8 +165,20 @@ def build_theta_batch(base_name, param, values, n_slots, predictions=None):
         pred = preds.get(str(v))
         if pred is None:
             pred = _theta_prediction(param, v, base_v)
-        intent = "confirmatory" if (base_v is None or abs(v - base_v) <= 1e-9
-                                    or pred.startswith("protr_peak >=")) else "adversarial"
+        # INTENT MUST NOT BE READ OFF THE SHAPE OF THE PREDICTION STRING.
+        # This line used to be:
+        #     intent = "confirmatory" if (... or pred.startswith("protr_peak >=")) else "adversarial"
+        # i.e. "predicts an increase" => confirmatory, "predicts a decrease" => adversarial. That
+        # is the SAME vacuity proposer.py was written to remove from Loop I (`intent = adversarial
+        # if lbl.startswith("-")`), reintroduced in Loop II. Under it the surprise rate stops
+        # measuring belief and starts measuring the SIGN OF THE EFFECT: a predicted decrease can
+        # only ever be "adversarial", so it can never be a surprise when it fails.
+        #
+        # A theta point is CONFIRMATORY when it is the standing mechanism story's own forecast,
+        # and ADVERSARIAL only when it is chosen to break that story. `_theta_prediction` derives
+        # every point from the recorded vcap mechanism, so these are its forecasts: confirmatory
+        # unless the caller says otherwise.
+        intent = (intents or {}).get(str(v), "confirmatory")
         out.append((g, f"theta {param}={v}",
                     {"intent": intent, "metric": "protr_peak", "predicted": pred,
                      "claim": f"{param}={v} on {base_name}: {pred}",
@@ -197,7 +210,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     print(f"ROUND {rid}   mode={mode}   campaign={cfg.name}")
     print("=" * 96)
 
-    _purge_round_configs(rid)          # F18: stale configs must not shadow this round's
+    _purge_round_configs(rid, mode)    # F18: stale configs must not shadow this round's
     if mode == "theta":
         cands = build_theta_batch(base, param, values, batch)
     else:
@@ -272,9 +285,13 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         if wa.get("watcher_blocks"):
             print(f"  [watcher] {nm} VETOED -- {wa.get('watcher_why','')[:110]}")
         sc = score_run(summ, cfg) if not wa.get("watcher_blocks") else -np.inf
-        got = float(summ.get("protr_peak", 0.0))
-        outcome = "confirmed" if _pred_holds(h.predicted, got) else "refuted"
-        sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm])
+        # `predict.score` refuses to guess: a prediction it cannot check resolves `inconclusive`
+        # and drops out of the surprise denominator, rather than being recorded as `confirmed`
+        # (which is what the old first-match regex did -- see predict.py P1/P2/P3).
+        outcome, why = PR.score(h.predicted, summ, primary_metric=h.metric)
+        if outcome == "inconclusive":
+            print(f"  [predict] {nm} NOT CHECKABLE -- {why[:150]}")
+        sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm], note=why)
         lm.add(comp_hash(g), g, an["analyst_consensus"], sc if np.isfinite(sc) else -1.0, summ, nm)
         rows.append((nm, g, summ, sc, outcome, h))
 
@@ -327,19 +344,26 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
 
 
 # --------------------------------------------------------------------------- helpers
-def _purge_round_configs(rid):
-    """Remove any config already carrying THIS round's prefix.
+def _purge_round_configs(rid, mode):
+    """Remove any config already carrying THIS round's AND THIS MODE's prefix.
 
     A stale config from an aborted run of the same round number would otherwise shadow a fresh
     one, and a cluster job would silently execute the wrong experiment. Found when a dry-run
     leftover (r01_01_4af688.yaml) shadowed a theta slot.
+
+    THE GLOB MUST CARRY THE MODE LETTER. Configs are namespaced `r{rid:03d}{mode[0]}_...` -- that
+    was F18's fix -- but the purge globbed `r{rid:03d}*`, which matches BOTH modes. So running a
+    composition round deleted the theta round's configs of the same number, and vice versa. On
+    the first attended composition run this really did delete two committed `r001t_*` files
+    (recovered with `git restore`). The purge is meant to protect this round from its own
+    leftovers, never to reach into the other loop's evidence.
     """
     import glob
     n = 0
-    for f in glob.glob(os.path.join(ROOT, "config", "okuda", f"r{rid:03d}*.yaml")):
+    for f in glob.glob(os.path.join(ROOT, "config", "okuda", f"r{rid:03d}{mode[0]}_*.yaml")):
         os.remove(f); n += 1
     if n:
-        print(f"  [configs] purged {n} stale config(s) for round {rid}")
+        print(f"  [configs] purged {n} stale {mode} config(s) for round {rid}")
 
 
 
@@ -361,13 +385,11 @@ def _theta_prediction(param, v, base_v):
     return "protr_peak >= 2.0"
 
 
-def _pred_holds(pred, got):
-    import re
-    m = re.search(r"(>=|<=|>|<)\s*([0-9.]+)", str(pred))
-    if not m:
-        return True                     # only a genuinely UNSTATED prediction is uncounted
-    op, v = m.group(1), float(m.group(2))
-    return {">=": got >= v, "<=": got <= v, ">": got > v, "<": got < v}[op]
+# `_pred_holds` lived here. It was a first-match regex that scored an UNPARSEABLE prediction as
+# `confirmed`, applied whatever threshold it found first to `protr_peak` regardless of the metric
+# named, and read `REFUTED if ...` as the assertion. All three biased the surprise rate DOWNWARD,
+# toward "nothing was learned". Replaced by `predict.score()`, which parses every clause with its
+# metric and returns `inconclusive` rather than guessing. See predict.py for the three defects.
 
 
 def _cap(nm):
