@@ -1,0 +1,159 @@
+general:
+  name: r002c_05_2399b2
+  seed: 0
+  n_frames: 900
+  dt: 0.02
+  record_cap: 902
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+sets:
+  vertex:
+    n: 30000
+  cell:
+    n: 16000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: load_mesh_3d
+  at: vertex
+  cell_set: cell
+  ckpt: prototype/Tyssue/archive/smoke_hom/ckpt.npz
+  before_frame: 1
+- op: cell_geometry_3d
+  at: cell
+- op: cell_rd_seed
+  at: cell
+  mode: tip
+  n_spots: 1
+  amp: 2.0
+  tip_radius: 1.2
+- op: vesicle_growth
+  at: vertex
+  cell_set: cell
+  rate: 0.006
+  dt: 0.02
+- op: morphogen_growth_3d
+  at: vertex
+  cell_set: cell
+  rate: 0.01
+  a_sw: 0.5
+  hill: 4.0
+  rho: 0.0
+  vth_frac: 1.5
+  after_frame: 20
+  dt: 0.02
+  conserve_amount: true
+- op: shape_energy_3d
+  at: vertex
+  p0: 3.9
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.05
+  Lambda: 0.2
+  K_V: 6.0
+  K_R: 0.02
+  K_bend: 0.0
+  antiinv: 0.0
+  mu: 1.0
+  dt: 0.02
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: rd_interface_tension
+  at: vertex
+  cell_set: cell
+  K_purse: 0.0
+  K_extrude: 12.0
+  a_sw: 0.5
+  eta: 0.05
+  iters: 4
+  after_frame: 20
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: divide_3d
+  at: vertex
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.4
+  p0: 3.9
+  every: 1
+  max_div: 30
+  max_div_frac: 0.0075
+  vcap: 0.75
+  cell_set: cell
+  min_cycle: 32
+  max_cycle: 1000000000
+  after_frame: 20
+  orient_iface: true
+  orient_asw: 0.5
+  g1_ramp: false
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- load_mesh_3d
+- cell_geometry_3d
+- cell_rd_seed
+- vesicle_growth
+- morphogen_growth_3d
+- shape_energy_3d
+- rd_interface_tension
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
+_discovery:
+  comp_hash: C2399b2d4a00
+  structure:
+    operators:
+    - id: cell_geometry_3d0
+      op: cell_geometry_3d
+    - id: cell_rd_seed0
+      op: cell_rd_seed
+      impl: tip
+    - id: divide_3d0
+      op: divide_3d
+      impl: orient_iface
+    - id: extrude0
+      op: extrude
+    - id: morphogen_growth_3d0
+      op: morphogen_growth_3d
+      impl: hill_conserve_amount
+    - id: reconnect_t1_3d0
+      op: reconnect_t1_3d
+    - id: seed_mesh_3d0
+      op: seed_mesh_3d
+    - id: shape_energy_3d0
+      op: shape_energy_3d
+      impl: default
+    - id: vesicle_growth0
+      op: vesicle_growth
+    connections:
+    - src_op: cell_rd_seed
+      dst_op: divide_3d
+      slot: axis
+    - src_op: cell_rd_seed
+      dst_op: extrude
+      slot: site
+    - src_op: cell_rd_seed
+      dst_op: morphogen_growth_3d
+      slot: gate
+  region: driven + forced (round-33 recipe)
+  defect_fixes:
+  - D1 engine owns the clock (every=1)
+  - D2 one global dt=0.02
+  - D3 topo_snapshot every=1 == position stride

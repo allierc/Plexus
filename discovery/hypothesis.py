@@ -55,7 +55,22 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 
-INTENTS = ("confirmatory", "adversarial")
+# `control` is an intent, but NOT a mechanism hypothesis.
+#
+# The causality rule makes slot 0 the unchanged parent, and `proposer.propose()` REJECTS any
+# proposal whose slot 0 is not `intent: "control"`. But `control` was missing from this tuple, so
+# `Hypothesis.__post_init__` raised on it -- meaning `--mode composition` crashed at the moment it
+# posed its first hypothesis and could never have completed a single round. Two halves of the same
+# protocol disagreed about whether a control exists, and both enforced their view with a hard
+# error. Found by running the mode attended, which is the only way it could have been found.
+#
+# A control is kept OUT of MECHANISM_INTENTS because it is not a claim about an edit: it changes
+# nothing, so it cannot confirm or refute a mechanism, and folding it into the surprise rate would
+# dilute the campaign's only control signal (with a 6-slot batch, by a sixth). What a control CAN
+# do is fail -- and that is `is_baseline_drift`, a louder signal than a surprise, because it means
+# the baseline moved under us and the round's other five comparisons are all suspect.
+INTENTS = ("confirmatory", "adversarial", "control")
+MECHANISM_INTENTS = ("confirmatory", "adversarial")
 OUTCOMES = ("confirmed", "refuted", "inconclusive")
 
 # Supervisor control band on the surprise rate (see module docstring).
@@ -107,11 +122,26 @@ class Hypothesis:
 
     @property
     def is_surprise(self) -> bool:
-        """A prediction error: the informative quadrant of the 2x2."""
+        """A prediction error: the informative quadrant of the 2x2.
+
+        A control is never a surprise -- it asserts nothing about any mechanism. See
+        `is_baseline_drift` for the thing a control can tell you.
+        """
         if self.outcome is None or self.outcome == "inconclusive":
             return False
         return ((self.intent == "confirmatory" and self.outcome == "refuted") or
                 (self.intent == "adversarial" and self.outcome == "confirmed"))
+
+    @property
+    def is_baseline_drift(self) -> bool:
+        """The control's prediction failed -- the baseline moved.
+
+        This is not a surprise, it is an ALARM: every other slot in the round is measured as a
+        difference from this control, so if the control is not where it was believed to be, the
+        round's whole causal reading is suspect. It must be reported separately and loudly rather
+        than averaged into a rate.
+        """
+        return self.intent == "control" and self.outcome == "refuted"
 
     def to_dict(self):
         return asdict(self)
@@ -125,11 +155,20 @@ class HypothesisRegister:
         self.path = path
         os.makedirs(os.path.dirname(path), exist_ok=True)
         self._items = {}
+        self.amendments = []
         if os.path.exists(path):
+            fields = set(Hypothesis.__dataclass_fields__)
             for line in open(path):
-                if line.strip():
-                    d = json.loads(line)
-                    self._items[d["hid"]] = Hypothesis(**d)
+                if not line.strip():
+                    continue
+                d = json.loads(line)
+                if d.get("amended"):
+                    # audit metadata rides alongside the record; keep it, but the dataclass
+                    # itself only takes its own fields
+                    self.amendments.append({k: d[k] for k in
+                                            ("hid", "amend_reason", "amended_from", "t_amended")
+                                            if k in d})
+                self._items[d["hid"]] = Hypothesis(**{k: v for k, v in d.items() if k in fields})
 
     def pose(self, h: Hypothesis):
         """Record a hypothesis BEFORE its run. Refuses to overwrite."""
@@ -144,6 +183,43 @@ class HypothesisRegister:
         self._append(h)                       # append the resolution; the posing line stays
         return h
 
+    def amend(self, hid, reason, predicted=None, outcome=None, note=None):
+        """Correct a RECORD that misstates what was done. Appends; never deletes.
+
+        `resolve` refuses to touch a resolved hypothesis, and that rule is right: a claim's
+        history must not be rewritten to suit a later belief. But it cannot cover the case where
+        the record itself is wrong about what was PREDICTED -- and that case is real.
+
+        The vcap round is the instance. Its five points were posed before F19 with the placeholder
+        `predicted: "unknown -- this is a sensitivity sweep"`, and the old scorer returned True on
+        any string it could not parse, so all five resolved `confirmed`. The persisted surprise
+        rate for the campaign's most informative round was therefore 0.00 -- "nothing learned" --
+        while the actual predictions (recorded in the session log and in the round's own output)
+        were `< 1.5`, `< 2.0`, `< 2.0`, `>= 2.0`, `>= 2.0`, of which two were refuted.
+
+        An amendment must say WHY, is written as a new line carrying `amended_from`, and leaves
+        every prior line in place. The file remains a complete audit trail: `grep amended` shows
+        every correction ever made.
+        """
+        if not reason:
+            raise ValueError("an amendment without a stated reason is a rewrite; give a reason")
+        h = self._items[hid]
+        prior = {"predicted": h.predicted, "outcome": h.outcome, "note": h.note}
+        if predicted is not None:
+            h.predicted = predicted
+        if outcome is not None:
+            if outcome not in OUTCOMES:
+                raise ValueError(f"outcome {outcome!r} not in {OUTCOMES}")
+            h.outcome = outcome
+        if note is not None:
+            h.note = note
+        d = h.to_dict()
+        d.update({"amended": True, "amend_reason": reason, "amended_from": prior,
+                  "t_amended": time.time()})
+        with open(self.path, "a") as f:
+            f.write(json.dumps(d) + "\n")
+        return h
+
     def _append(self, h):
         with open(self.path, "a") as f:
             f.write(json.dumps(h.to_dict()) + "\n")
@@ -156,17 +232,42 @@ class HypothesisRegister:
 
     # ----------------------------------------------------------------- the control signal
     def surprise_rate(self, round_id=None):
-        """Fraction of resolved hypotheses whose outcome contradicted its prediction."""
+        """Fraction of resolved MECHANISM hypotheses whose outcome contradicted its prediction.
+
+        Controls are excluded: they assert nothing about an edit, so counting them would dilute
+        the rate by one slot per round. `inconclusive` is excluded too -- an unresolved or
+        uncheckable prediction is not evidence either way, which is precisely why
+        `predict.score()` returns it instead of guessing `confirmed` (see predict.py P1).
+        """
         hs = [h for h in (self.by_round(round_id) if round_id is not None else self.all())
-              if h.outcome in ("confirmed", "refuted")]
+              if h.outcome in ("confirmed", "refuted") and h.intent in MECHANISM_INTENTS]
         if not hs:
             return None
         return sum(1 for h in hs if h.is_surprise) / len(hs)
 
+    def baseline_drift(self, round_id=None):
+        """The controls that failed their prediction. Non-empty means read the round with care."""
+        return [h for h in (self.by_round(round_id) if round_id is not None else self.all())
+                if h.is_baseline_drift]
+
     def mix(self, round_id=None):
-        hs = self.by_round(round_id) if round_id is not None else self.all()
+        """Confirmatory/adversarial split among MECHANISM slots that produced evidence.
+
+        The 70/30 setpoint is about how the batch spends its *edits*; the control is a fixed
+        overhead of the design, not a choice, so including it would report 6 slots as 50/33 when
+        the agent in fact chose 60/40.
+
+        `inconclusive` is excluded so that this and `surprise_rate` describe the SAME population.
+        They are printed side by side and read as one statement about the round; computing them
+        over different sets makes that statement false. Concretely: eight hypotheses posed by
+        aborted runs sat unresolved under round 1 (a consequence of the round counter restarting
+        every process) and dragged the reported mix to 92/8 -- which is the steer the Supervisor
+        gave the Proposer, and the Proposer duly obeyed it.
+        """
+        hs = [h for h in (self.by_round(round_id) if round_id is not None else self.all())
+              if h.intent in MECHANISM_INTENTS and h.outcome in ("confirmed", "refuted")]
         n = len(hs) or 1
-        return {i: sum(1 for h in hs if h.intent == i) / n for i in INTENTS}
+        return {i: sum(1 for h in hs if h.intent == i) / n for i in MECHANISM_INTENTS}
 
     def advise_mix(self, round_id=None):
         """The Supervisor's rule. Returns (confirmatory_fraction, why).
@@ -193,11 +294,23 @@ class HypothesisRegister:
                     key=lambda h: h.t_posed)
         s = self.surprise_rate(round_id)
         mix = self.mix(round_id)
+        n_ctl = sum(1 for h in hs if h.intent == "control")
+        drift = [h for h in hs if h.is_baseline_drift]
         lines = [f"\n## Round {round_id} — {time.strftime('%Y-%m-%d %H:%M')}", "",
-                 f"- batch: {len(hs)} hypotheses "
-                 f"({mix['confirmatory']:.0%} confirmatory / {mix['adversarial']:.0%} adversarial)",
+                 f"- batch: {len(hs) - n_ctl} mechanism hypotheses "
+                 f"({mix['confirmatory']:.0%} confirmatory / {mix['adversarial']:.0%} adversarial)"
+                 + (f" + {n_ctl} control" if n_ctl else ""),
                  f"- **surprise rate: {s:.2f}**" if s is not None else "- surprise rate: n/a",
                  f"- supervisor: {self.advise_mix(round_id)[1]}", ""]
+        if drift:
+            lines += [f"> ⚠️ **BASELINE DRIFT — {len(drift)} control(s) failed their prediction.** "
+                      f"Every other slot this round is measured as a difference from a control "
+                      f"that is not where it was believed to be, so read the causal claims below "
+                      f"with care.", ""]
+            for h in drift:
+                lines.append(f"> - `{h.comp_hash}` predicted `{h.predicted}` → "
+                             f"observed `{json.dumps(h.observed)}`")
+            lines.append("")
 
         for label, pred in (("### Validated", "confirmed"), ("### Refuted", "refuted"),
                             ("### Open / inconclusive", "inconclusive")):
@@ -263,6 +376,22 @@ if __name__ == "__main__":
         reg.resolve("R1.h1", {"aspect_final": 1.02}, "refuted",
                     note="the forcing is necessary in THIS composition; consistent with R41")
         reg.resolve("R1.h2", {"aspect_final": 1.1}, "confirmed")
+
+        # THE CONTROL -- this construction used to raise, which is why --mode composition could
+        # never complete a round. It must be posable, must not enter the surprise rate, and must
+        # raise a BASELINE DRIFT alarm when its own prediction fails.
+        hc = reg.pose(Hypothesis(
+            hid="R1.h0", comp_hash="C5e315998af4", parent_hash=None,
+            edit="control (parent unchanged)", intent="control",
+            claim="the parent, unchanged -- the control every knockout is read against",
+            metric="protr_peak", predicted="protr_peak 2.0-3.5", round_id=1))
+        assert reg.surprise_rate(1) == 0.0, "the control must not enter the surprise rate"
+        assert abs(reg.mix(1)["confirmatory"] - 0.5) < 1e-9, "the control must not enter the mix"
+        reg.resolve("R1.h0", {"protr_peak": 9.1}, "refuted", note="baseline moved")
+        assert hc.is_baseline_drift and not hc.is_surprise, "a failed control is drift, not surprise"
+        assert reg.surprise_rate(1) == 0.0, "a failed control still must not enter the rate"
+        assert len(reg.baseline_drift(1)) == 1
+        print("control: posable, excluded from surprise/mix, raises baseline drift -- OK")
 
         print(f"\nsurprise rate round 1: {reg.surprise_rate(1):.2f}")
         print("mix:", {k: f'{v:.0%}' for k, v in reg.mix(1).items()})

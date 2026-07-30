@@ -156,6 +156,24 @@ class ProximityIndex:
         return {cid: {k: (list(v) if isinstance(v, set) else v) for k, v in c.items()}
                 for cid, c in self.clusters.items()}
 
+    # ----------------------------------------------------------------- persistence
+    def to_dict(self):
+        return {"radius": self.radius,
+                "centroids": [[e.tolist(), cid] for e, cid in self.centroids],
+                "clusters": {cid: {**{k: v for k, v in c.items() if k != "members"},
+                                   "members": sorted(c["members"]),
+                                   "best": (None if c["best"] == -np.inf else c["best"])}
+                             for cid, c in self.clusters.items()}}
+
+    @classmethod
+    def from_dict(cls, d):
+        p = cls(radius=d.get("radius", 2.0))
+        p.centroids = [(np.asarray(e, dtype=float), cid) for e, cid in d.get("centroids", [])]
+        for cid, c in d.get("clusters", {}).items():
+            p.clusters[cid] = {**c, "members": set(c.get("members", [])),
+                               "best": -np.inf if c.get("best") is None else float(c["best"])}
+        return p
+
 
 # ============================================================================ ranking
 def rank_btl(items, compare, n_pairs=None, iters=200):
@@ -228,7 +246,34 @@ def meets_success(summary, cfg: CampaignConfig, has_extrude: bool):
 
 # ============================================================================ supervisor
 class Supervisor:
-    """Holds the objective, the budget and the terminal-state decision. Never does the work."""
+    """Holds the objective, the budget and the terminal-state decision. Never does the work.
+
+    THE SUPERVISOR MUST SURVIVE A RESTART.
+    ---------------------------------------------------------------------------------------
+    Every field below used to be initialised fresh in `__init__` and never read back from disk.
+    `supervisor.jsonl` was append-only OUTPUT. In one long-lived process that is invisible; the
+    campaign is specified to run for WEEKS, across crashes, cluster maintenance and session
+    boundaries, and each restart silently reset every control mechanism that keeps the loop from
+    becoming the very rabbit hole it was built to escape:
+
+      self.round -> 0   every round is "round 1": config namespaces collide, the per-round purge
+                        deletes the previous round's configs, and hypothesis ids collide. This
+                        had ALREADY happened -- `hypotheses.jsonl` contained five duplicated
+                        hids (R1.0.5e3159 twice, ...) before anyone looked.
+      self.spent -> 0   `terminal()` compares spent against budget_runs, so THE CAMPAIGN COULD
+                        NEVER TERMINATE ON BUDGET.
+      self.dry   -> 0   dry rounds never accumulate, so `dry_rounds_to_escalate` NEVER FIRES --
+                        the escalation path was dead at the trigger, not merely unbuilt at the
+                        consumer.
+      self.prox  -> {}  proximity clustering starts blank, so no cluster is ever frozen and
+                        budget is never reallocated. That is the Co-Scientist mechanism which is
+                        the entire antidote to "thirty rounds, four ideas".
+      self.best  -> -inf no best-score history, so "no improvement" cannot be detected.
+
+    So: state is checkpointed to `state.json` after every round and every escalation, and loaded
+    here. `supervisor.jsonl` stays as the append-only audit trail -- the two have different jobs
+    and neither replaces the other.
+    """
 
     def __init__(self, cfg: CampaignConfig, root):
         self.cfg = cfg
@@ -242,9 +287,47 @@ class Supervisor:
         self.dry = 0
         self.best = -math.inf
         self.log_path = os.path.join(root, "supervisor.jsonl")
+        self.state_path = os.path.join(root, "state.json")
+        self._load()
         cfgp = os.path.join(root, "campaign.json")
         if not os.path.exists(cfgp):
             json.dump(cfg.to_dict(), open(cfgp, "w"), indent=1)
+
+    # ----------------------------------------------------------------- checkpoint
+    def _load(self):
+        if not os.path.exists(self.state_path):
+            return
+        try:
+            s = json.load(open(self.state_path))
+        except Exception as e:
+            # Never silently start a weeks-long campaign from a blank slate because a checkpoint
+            # would not parse. Losing the round counter corrupts the config namespace.
+            raise RuntimeError(
+                f"{self.state_path} exists but could not be read ({type(e).__name__}: {e}). "
+                f"Refusing to start from a blank state -- that would restart the round counter "
+                f"and overwrite this campaign's configs and hypothesis ids. Repair or move it.")
+        self.round = int(s.get("round", 0))
+        self.spent = int(s.get("spent", 0))
+        self.dry = int(s.get("dry", 0))
+        b = s.get("best")
+        self.best = -math.inf if b is None else float(b)
+        if s.get("prox"):
+            self.prox = ProximityIndex.from_dict(s["prox"])
+        # stage_gate is advanced by escalate(); it is campaign state, not a launch option
+        if s.get("stage_gate") is not None:
+            self.cfg.stage_gate = int(s["stage_gate"])
+        print(f"[supervisor] resumed: round {self.round}, {self.spent} runs spent, "
+              f"{len(self.prox.clusters)} clusters ({len(self.prox.active())} active), "
+              f"dry {self.dry}, stage_gate {self.cfg.stage_gate}")
+
+    def _save(self):
+        tmp = self.state_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"round": self.round, "spent": self.spent, "dry": self.dry,
+                       "best": None if self.best == -math.inf else self.best,
+                       "stage_gate": self.cfg.stage_gate,
+                       "prox": self.prox.to_dict(), "t": time.time()}, f, indent=1)
+        os.replace(tmp, self.state_path)        # atomic: a killed write must not truncate state
 
     # ---------------------------------------------------------------- terminal state
     def terminal(self):
@@ -278,6 +361,7 @@ class Supervisor:
             rec["action"] = "exhausted: no further stage, no operator request filed"
         self.dry = 0
         self._log(rec)
+        self._save()             # an opened stage gate must survive the restart that follows it
         return rec
 
     def _log(self, obj):
@@ -313,6 +397,7 @@ class Supervisor:
                "next_confirmatory_frac": mix_frac, "mix_why": mix_why,
                "stop": stop, "reason": reason}
         self._log(rep)
+        self._save()             # the round counter, the budget and the clusters must persist
         return rep
 
 
@@ -422,4 +507,39 @@ if __name__ == "__main__":
         order = [vals[i] for i in sorted(st, key=lambda k: -st[k])]
         assert order == sorted(vals, reverse=True), order
         print(f"\n[BTL] recovered strict order {order} from pairwise comparisons")
+
+        # ---------------------------------------------------------------- PERSISTENCE
+        # The defect this guards: every field below was reset to zero on each process start, so a
+        # weeks-long restartable campaign silently re-ran "round 1" forever, never spent its
+        # budget, never accumulated a dry round, and never froze a cluster.
+        want = (sup.round, sup.spent, round(sup.best, 6), sup.dry,
+                len(sup.prox.clusters), sorted(sup.prox.clusters))
+        sup.cfg.stage_gate = 2                    # pretend an escalation opened a gate
+        sup._save()
+
+        sup2 = Supervisor(CampaignConfig(), d)    # a FRESH process would build exactly this
+        got = (sup2.round, sup2.spent, round(sup2.best, 6), sup2.dry,
+               len(sup2.prox.clusters), sorted(sup2.prox.clusters))
+        assert got == want, f"state did not survive a restart:\n  want {want}\n  got  {got}"
+        assert sup2.cfg.stage_gate == 2, "an opened stage gate must survive a restart"
+        for cid, c in sup2.prox.clusters.items():
+            assert c["members"] == sup.prox.clusters[cid]["members"], f"{cid} members lost"
+            assert c["evals"] == sup.prox.clusters[cid]["evals"], f"{cid} evals lost"
+        print(f"[persist] round/spent/best/dry/clusters/stage_gate survive a restart: {got}")
+
+        # a round after the restart must ADVANCE the counter, not repeat it
+        rep2 = sup2.observe(results)
+        assert rep2["round"] == sup.round + 1, (rep2["round"], sup.round)
+        assert rep2["spent"] == sup.spent + len(results)
+        print(f"[persist] next round after restart is {rep2['round']} "
+              f"(was repeating {sup.round} forever), spent {rep2['spent']}")
+
+        # a corrupt checkpoint must REFUSE to start, not silently reset the counter
+        open(os.path.join(d, "state.json"), "w").write("{not json")
+        try:
+            Supervisor(CampaignConfig(), d)
+            raise AssertionError("a corrupt state.json must not start from a blank slate")
+        except RuntimeError as e:
+            print(f"[persist] corrupt checkpoint refused: {str(e)[:88]}...")
+
         print("\ncontrol law OK")
