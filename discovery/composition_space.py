@@ -319,6 +319,11 @@ class CompositionGraph:
             return False, f"unmet precondition: {self.unmet_preconditions()}"
         if self.unrouted_slots():
             return False, f"dangling slot: {self.unrouted_slots()}"
+        for c in self.conns:                       # over-routed: a slot the impl does not expose
+            dn = self._node(c["dst"])
+            if dn is not None and c["slot"] not in slots_of(dn["op"], self.impl_of(dn)):
+                return False, (f"connection into a slot the implementation does not expose: "
+                               f"{dn['op']}:{self.impl_of(dn)} has no `{c['slot']}`")
         return True, "ok"
 
     # ---------------------------------------------------------------- one-edit API
@@ -509,7 +514,9 @@ def reference_recipes():
     rsrc = next(o["id"] for o in h.ops if o["op"] == "cell_react")
     h, _ = h.apply(("connect", rsrc, next(o["id"] for o in h.ops
                                           if o["op"] == "morphogen_growth_3d"), "gate"))
-    h, _ = h.apply(("connect", rsrc, next(o["id"] for o in h.ops if o["op"] == "divide_3d"), "axis"))
+    # NO morphogen -> divide_3d.axis here: `hertwig` splits on the cell's OWN longest axis and
+    # exposes no `axis` slot. The earlier version made that connection anyway; it compiled and
+    # was SILENTLY IGNORED. Caught by the consolidated Critic rule R4_SLOT_NOT_ON_IMPL.
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.

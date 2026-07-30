@@ -44,6 +44,79 @@ USER_INPUT = os.path.join(CAMPAIGN, "user_input.md")
 
 DEFAULT_TIMEOUT_MIN = 12
 
+# ---------------------------------------------------------------------------------------------
+# PER-AGENT BUDGETS.  (minutes, max_turns, tools)
+#
+# Eight LLM calls per round, ~70 rounds a day, for weeks: unbounded by default. Each agent gets
+# the budget its job actually needs and no more, and the limits are here rather than scattered
+# across call sites so the campaign's LLM cost is one auditable table.
+#
+# `max_turns` is the real lever: it bounds tool-use loops, which is where a call runs away.
+# Agents that only read text and emit JSON get NO tools at all, so they cannot loop.
+AGENT_BUDGETS = {
+    #                 min  turns  tools
+    "proposer":      (10,   40,  ["Read", "Edit", "Write"]),   # reads evidence, writes proposal + log
+    "reflection":    ( 5,   10,  ["Read"]),                    # reads a batch, emits one review
+    "analyst":       ( 4,    8,  ["Read"]),                    # one run, one verdict  (x N)
+    "watcher":       ( 3,    4,  []),                          # text -> JSON, no tools
+    "judge":         ( 2,    4,  []),                          # pairwise, no tools
+    "interpreter":   ( 6,   20,  ["Read", "Edit", "Write"]),   # appends the causal description
+    "evolution":     ( 5,   12,  ["Read"]),
+    "meta_review":   ( 8,   30,  ["Read", "Edit", "Write"]),   # rewrites the distilled section
+    "grounder":      ( 4,    8,  ["Read"]),
+}
+
+# Whole-round ceiling. A round is ~20 min of GPU; its LLM overhead must not exceed it, or the
+# partition idles waiting for text. Exceeding this is a hard stop, not a warning.
+ROUND_LLM_BUDGET_MIN = 25.0
+
+
+class BudgetLedger:
+    """Tracks LLM wall-clock so a multi-week campaign cannot silently burn unbounded time."""
+
+    def __init__(self, path=None):
+        self.path = path
+        self.round_spent = 0.0
+        self.total_spent = 0.0
+        self.calls = 0
+
+    def may_call(self, agent):
+        want = AGENT_BUDGETS.get(agent, (DEFAULT_TIMEOUT_MIN, 40, None))[0]
+        if self.round_spent + want > ROUND_LLM_BUDGET_MIN:
+            return False, (f"round LLM budget exhausted "
+                           f"({self.round_spent:.1f}+{want} > {ROUND_LLM_BUDGET_MIN} min)")
+        return True, ""
+
+    def record(self, agent, minutes):
+        self.round_spent += minutes
+        self.total_spent += minutes
+        self.calls += 1
+
+    def new_round(self):
+        self.round_spent = 0.0
+
+    def summary(self):
+        return {"calls": self.calls, "round_min": round(self.round_spent, 1),
+                "total_min": round(self.total_spent, 1)}
+
+
+def run_agent(agent, prompt, ledger=None, **over):
+    """Run one agent under its budget. The single place LLM cost is decided."""
+    tmin, turns, tools = AGENT_BUDGETS.get(agent, (DEFAULT_TIMEOUT_MIN, 40, None))
+    tmin = over.pop("timeout_min", tmin)
+    turns = over.pop("max_turns", turns)
+    tools = over.pop("allowed_tools", tools)
+    if ledger is not None:
+        ok, why = ledger.may_call(agent)
+        if not ok:
+            return False, f"[budget] {agent} SKIPPED -- {why}"
+    t0 = time.time()
+    ok, out = run_claude(prompt, timeout_min=tmin, allowed_tools=tools,
+                         max_turns=turns, **over)
+    if ledger is not None:
+        ledger.record(agent, (time.time() - t0) / 60.0)
+    return ok, out
+
 
 # --------------------------------------------------------------------------- the CLI
 def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=None,
