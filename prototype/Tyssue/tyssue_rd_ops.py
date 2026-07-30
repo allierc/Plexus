@@ -290,7 +290,8 @@ class MorphogenGrowth3D(Structural):
         self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
-        self.every = int(params.get("every", 1)); self._k = 0
+        from tyssue_ops3d import _engine_owns_clock
+        self.every = _engine_owns_clock(params); self._k = 0
         # OKUDA uniform-cell mode: growth rate lambda = rate*(rho + Hill(a)); rho = baseline so ALL cells
         # cycle (the activator sets the RATE, not the size), and v_eq is capped at vth_frac*v_ref so every
         # cell oscillates in [~2/3, vth_frac]*v_ref -> uniform. rho=0 (default) = legacy activator-only bulge.
@@ -304,9 +305,7 @@ class MorphogenGrowth3D(Structural):
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
         if m is None:
             return {}
-        self._k += 1
-        if self._k % self.every != 0:
-            return {}
+        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         clvl = H.level(self.cat)
         if "chem" not in clvl.state_schema:
             return {}

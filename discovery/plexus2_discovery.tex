@@ -534,6 +534,13 @@ Interpreter & Writes the causal description (\S\ref{sec:out}) as a versioned ana
 Co-Scientist's overview synthesis, specialised to mechanism. \\
 Meta-review & Distils recurring patterns and appends them to proposer and critic prompts. &
 Co-Scientist, which calls this feedback propagation without back-propagation --- no fine-tuning. \\
+\textbf{Metrologist} & Owns the validation ladder, the instrument gate and \emph{substrate
+semantics} (units, clocks, per-call vs per-frame). Certifies that evidence may be admitted --- and
+\textbf{retracts knowledge already recorded} when a foundation defect is found. & \textbf{Neither
+system has this.} Their measurement is an external wet-lab assay; ours is code we wrote. \\
+\textbf{Engineer} & Proposes a patch to the substrate when the Metrologist quarantines it. Writes
+to a \emph{different artefact} than the campaign's evidence, and cannot admit its own fix. &
+Deliberately outside the loop (see the boundary below). \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -567,6 +574,92 @@ judgement is genuinely required --- proposing, watching, explaining.
 \paragraph{One thing neither paper needs.} Their measurement is an external assay. Ours is code
 written by the same system being judged, so ``the metric lied'' is a failure mode unique to us,
 and we have suffered it twice. Hence the instrument gate of \S\ref{sec:defects}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Knowledge certification, and who may touch the substrate}
+\label{sec:certify}
+
+\begin{quote}
+\emph{If the foundations are wrong, so is the knowledge.}
+\end{quote}
+
+Every other agent in \S\ref{sec:agents} produces or judges \emph{evidence}. None of them is
+responsible for the thing evidence is measured \emph{with}. That gap is not hypothetical: it is
+how the defect below was found --- by a person reading code, not by any designed role.
+
+\subsection{A worked example of why the role must exist}
+
+\code{divide\_3d} counts \code{min\_cycle} and \code{max\_cycle} in \emph{division-calls}, and
+\code{max\_div} / \code{max\_div\_frac} are \emph{per-call} throttles. The archived configurations
+passed \code{every: 2}, which the engine gated \emph{and} the operator's own private counter gated
+--- so the operator body executed once every \textbf{four} frames. Correcting the clock therefore
+multiplied the wall-clock meaning of every per-call quantity by four, and the same recipe that had
+produced a tube of aspect $7.5$ produced one of aspect $3.2$.
+
+Two further consequences, each of which a casual fix would have missed:
+
+\begin{itemize}\itemsep2pt
+\item The hand-tuned values had been adopted as \emph{vocabulary defaults}, on the reasoning that
+``a default composition should start where our evidence is''. After the clock fix that reasoning
+inverted: those defaults now encode a $\theta$ tuned for the wrong clock, so \emph{every}
+composition the loop generates would have started biased --- silently.
+\item Rescaling the obvious knob was not enough. Since
+$\text{cap} = \max(\code{max\_div},\, \code{max\_div\_frac}\cdot n_F)$, the absolute floor
+\emph{dominates} at realistic cell counts, so rescaling only \code{max\_div\_frac} was
+\textbf{entirely masked}. Both had to move.
+\end{itemize}
+
+Because the factor is exact, the correction is analytic rather than a re-tuning sweep: rescale the
+per-call quantities and the fix becomes \emph{behaviour-preserving by construction}, verified
+identical to the archived budget at every cell count. Any later change in phenotype is then
+attributable to the change that caused it, rather than to the clock.
+
+\subsection{The Metrologist}
+
+The Metrologist certifies that evidence may be admitted at all. It owns the validation ladder, the
+instrument gate, and --- the part no other role covers --- \emph{substrate semantics}: units,
+clocks, and the distinction between per-call and per-frame quantities. Its distinguishing power is
+that it may act \emph{backwards}:
+
+\begin{quote}
+When a foundation defect is found, the Metrologist issues a \textbf{retraction}: every claim whose
+evidence depends on the defective semantics is moved back to \emph{Open}, with the defect and its
+scope recorded.
+\end{quote}
+
+In an append-only ledger a retraction is a new record, never an edit. The history must show what
+was believed, on what evidence, and why that evidence was later withdrawn --- otherwise a reader
+cannot distinguish a claim that survived scrutiny from one that was quietly repaired.
+
+\subsection{The boundary: who may modify the substrate}
+
+\begin{quote}
+\textbf{No campaign agent may modify the substrate.} An agent that can rewrite the simulator can
+make any hypothesis true.
+\end{quote}
+
+The separation is therefore structural, not procedural:
+
+\begin{center}\small
+\begin{tabular}{@{}p{2.6cm}p{11.6cm}@{}}
+\toprule
+\textbf{Metrologist} & \emph{detects and quarantines.} Halts admission of evidence, marks affected
+claims Open-pending-recheck, and states the scope of the defect. It does not write code. \\
+\textbf{Engineer} & \emph{proposes a patch}, into the substrate --- a \emph{different artefact}
+from the campaign's evidence. It cannot admit its own fix. \\
+\textbf{Supervisor} & \emph{gates resumption.} Evidence admission restarts only after the full
+ladder passes on the patched substrate, and the re-anchoring is recorded explicitly rather than
+absorbed. \\
+\textbf{Human} & approves substrate changes. The campaign runs unattended; the thing it measures
+with does not change unattended. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The underlying principle is the one an experimentalist would recognise: \emph{the instrument must
+not be adjustable by the experiment it is measuring.} Our situation is sharper than either
+published system's, because their measurement is an external wet-lab assay and ours is code
+written by the same project that is being judged.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{What the campaign produces}

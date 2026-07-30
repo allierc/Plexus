@@ -90,11 +90,11 @@ operators:
   cycle_cv: 0.4
   p0: 3.9
   every: 1
-  max_div: 120
-  max_div_frac: 0.03
+  max_div: 30
+  max_div_frac: 0.0075
   vcap: 1.5
   cell_set: cell
-  min_cycle: 4
+  min_cycle: 16
   max_cycle: 1000000000
   after_frame: 100
   orient_iface: true

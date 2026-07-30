@@ -243,15 +243,14 @@ class ReconnectT1_3D(Rewire):
         self.l_th = float(params.get("l_th", 0.0))           # absolute; <=0 -> l_th_frac x mean edge
         self.l_th_frac = float(params.get("l_th_frac", 0.15))
         self.max_flips = int(params.get("max_flips", 20))
-        self.every = int(params.get("every", 1)); self._k = 0
+        from tyssue_ops3d import _engine_owns_clock
+        self.every = _engine_owns_clock(params); self._k = 0
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
-        self._k += 1
-        if self._k % self.every != 0:
-            return {}
+        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         dev = lvl.state.device; dt = lvl.state.dtype
         Nv = int(m["Nv"])
         pos_np = lvl.get("pos")[:Nv].detach().cpu().numpy().astype(np.float64)

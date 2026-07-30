@@ -36,7 +36,8 @@ import os
 
 import yaml
 
-from composition_space import OPERATORS, CompositionGraph, seed
+from composition_space import (DIVIDE_CALL_PERIOD_BEFORE_D1, OPERATORS,
+                               CompositionGraph, seed)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TYSSUE = os.path.abspath(os.path.join(HERE, "..", "prototype", "Tyssue"))
@@ -157,7 +158,12 @@ def _emit_divide(g, n, ga):
     return {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12,
             "cycle_cv": float(_p(g, i, "cycle_cv")), "p0": 3.90,
             "every": 1,                                        # D1: the ENGINE owns the clock
-            "max_div": 120, "max_div_frac": float(_p(g, i, "max_div_frac")),
+            # max_div is ALSO per-call, and cap_div = max(max_div, max_div_frac*nF) makes it a
+            # FLOOR that DOMINATES at realistic cell counts (at nF=1431: max(120, 42) = 120), so
+            # rescaling max_div_frac alone was ENTIRELY MASKED. 120/4 = 30 restores the archived
+            # per-frame budget exactly at every scale.
+            "max_div": int(_p(g, i, "max_div")),
+            "max_div_frac": float(_p(g, i, "max_div_frac")),
             "vcap": float(_p(g, i, "vcap")), "cell_set": "cell",
             "min_cycle": int(_p(g, i, "min_cycle")), "max_cycle": int(_p(g, i, "max_cycle")),
             "after_frame": ga, "orient_iface": g.impl_of(n) == "orient_iface",
@@ -322,9 +328,19 @@ def from_preset(p: dict) -> CompositionGraph:
         ("shape_energy_3d", "kappa_s", p.get("kappa_s")), ("shape_energy_3d", "h0", p.get("h0")),
         ("morphogen_growth_3d", "rate", p.get("rate")), ("morphogen_growth_3d", "a_sw", p.get("a_sw")),
         ("morphogen_growth_3d", "alpha", p.get("hill")), ("morphogen_growth_3d", "rho", p.get("rho")),
-        ("divide_3d", "cycle_cv", p.get("cycle_cv")), ("divide_3d", "min_cycle", p.get("min_cycle")),
-        ("divide_3d", "max_cycle", p.get("max_cycle")), ("divide_3d", "vcap", p.get("vcap")),
-        ("divide_3d", "max_div_frac", p.get("mdf")),
+        ("divide_3d", "cycle_cv", p.get("cycle_cv")),
+        # CLOCK RE-ANCHORING: these are per-CALL in the operator and the archived configs ran
+        # divide_3d once every 4 frames. Rescale so the replay preserves the archived
+        # wall-clock behaviour under the corrected clock (see composition_space header).
+        ("divide_3d", "min_cycle",
+         (p["min_cycle"] * DIVIDE_CALL_PERIOD_BEFORE_D1) if p.get("min_cycle") else None),
+        ("divide_3d", "max_cycle",
+         (p["max_cycle"] * DIVIDE_CALL_PERIOD_BEFORE_D1)
+         if (p.get("max_cycle") and p["max_cycle"] < 10**8) else None),
+        ("divide_3d", "max_div_frac",
+         (p["mdf"] / DIVIDE_CALL_PERIOD_BEFORE_D1) if p.get("mdf") else None),
+        ("divide_3d", "max_div", 120 // DIVIDE_CALL_PERIOD_BEFORE_D1),   # make() hardcodes 120
+        ("divide_3d", "vcap", p.get("vcap")),
         ("shape_energy_3d", "Gamma", p.get("Gamma")), ("shape_energy_3d", "Lambda", p.get("Lambda")),
         ("shape_energy_3d", "p0", p.get("p0")),
         ("extrude", "K_extrude", p.get("K_extrude")),
