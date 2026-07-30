@@ -420,6 +420,23 @@ confined to a small, transient region, and the loss should be placed exactly the
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Agentic mechanistic discovery}
 
+\begin{quote}
+\emph{``What I cannot create, I do not understand.''} \\
+\emph{``Know how to solve every problem that has been solved.''}
+
+\hfill --- Richard P.\ Feynman\footnote{Found written on Feynman's blackboard at
+Caltech at his death in February 1988. Never published in a paper or lecture, it
+survives as a bare aphorism; the second line stood directly beneath the first on the
+same board. Photographs of the blackboard are widely reproduced.}
+\end{quote}
+
+Feynman's two lines frame this section. A biological mechanism is understood only when
+an agent can \emph{create} it --- assemble it from operators until it reproduces the
+observations --- and new discovery begins only once the agent can already re-derive
+every model that has been solved. The three loops below make this operational, moving
+from reconstructing what is already known toward constructing the mechanisms that
+existing models cannot yet express.
+
 The explicit representation of biological mechanisms transforms scientific
 discovery from a parameter optimization problem into a language exploration
 problem. Because mechanisms are represented as explicit operators rather than
@@ -431,11 +448,25 @@ progressively moving from existing models toward new biological knowledge.
 
 \paragraph{Loop I: Understanding.}
 
-The first loop analyses an existing simulation model. Rather than treating the
-simulator as opaque code, the agent decomposes it into Plexus operators,
-identifies the biological mechanisms it implements, and reconstructs an
-explicit mechanistic description. Existing simulation frameworks therefore
-become repositories of reusable biological operators.
+The first loop takes an existing model --- a paper and its repository --- and decomposes it
+into Plexus operators, sets, states and fields, so the biological mechanisms it implements
+become explicit. That decomposition is necessary, but it is only the \emph{entry}: it makes
+the model's \emph{levers} explicit without yet explaining them. Understanding is earned
+afterwards, by \emph{interrogating} the decomposition as a causal system --- learning what
+each operator and parameter does on its own and, the harder part, what it does in
+combination, since mixtures rarely surrender their causal structure to inspection. The
+driving force is therefore not translation but a \emph{hypothesis $\to$ validate/falsify}
+cycle run on the decomposed model: each step states a falsifiable claim about a lever, tests
+it against a dedicated metric, and accumulates the causal map that results. A useful
+operating point is a rough \textbf{70/30 balance of validation to falsification}: pure
+validation only ever confirms hypotheses one already believes (trivial, near-zero
+information), while pure falsification only ever probes the improbable (which mostly breaks as
+expected and never consolidates a working map) --- so most tests should confirm plausible
+levers while a deliberate minority attacks the current understanding, where a surprise is
+most informative. The loop's product is a causal lever-map of the model --- what each
+mechanism buys, and how mechanisms combine --- which is what makes the operators genuinely
+\emph{reusable} rather than merely catalogued, and what later tells Loop~III which lever the
+model \emph{lacks}.
 
 \paragraph{Loop II: Fitting.}
 
@@ -448,11 +479,12 @@ parameters and biological mechanisms.
 \paragraph{Loop III: Discovery.}
 
 The third loop analyses the residual remaining after optimization. Persistent
-discrepancies are interpreted as evidence that the current operator
-composition is incomplete rather than simply poorly parameterized. The agent
-therefore proposes alternative operators, compares competing mechanistic
-hypotheses, and extends the operator algebra whenever existing mechanisms fail
-to explain the observations.
+discrepancies are interpreted as evidence that the current operator composition is
+incomplete rather than simply poorly parameterized. Turning Loop~I's hypothesis-driven
+validate/falsify cycle outward --- from the levers the model \emph{has} to the ones it
+\emph{lacks} --- the agent proposes candidate operators, compares competing mechanistic
+hypotheses, and extends the operator algebra whenever existing mechanisms fail to explain
+the observations.
 
 Together, these three loops transform simulation, inverse modelling and
 hypothesis generation into successive stages of a single scientific workflow.
@@ -461,46 +493,68 @@ is represented by extending the operator algebra rather than merely adjusting
 parameter values.
 
 \paragraph{Orchestration: loop agents and a master controller.}
-The three loops are naturally realized as autonomous agents coordinated by a
-\emph{master} controller. Each loop agent performs one kind of work --- decomposing
-a model (Understanding), fitting parameters and fields (Fitting), or proposing new
-operators against the residual (Discovery) --- and communicates only through typed
-artifacts on a shared blackboard: a mechanistic model, a set of success metrics with
-current values, the residual, and a queue of falsifiable hypotheses. The master never
-performs the loops' work; it is a state machine whose transition guards are the metrics,
-advancing a stage when its metric is met, invoking Discovery when a residual persists,
-and re-invoking Fitting once a new operator is admitted. Three responsibilities make the
-master more than a scheduler, and each proved decisive in practice. First, it authors and
-extends the \emph{success metrics} themselves during exploration --- morphological or
-data-driven criteria that make ``goal achieved'' a falsifiable test rather than a visual
-impression. Second, it \emph{grounds hypotheses in the literature and reference code}:
-before Discovery proposes an operator, the master consults the source model to seed or
-unstick the hypothesis, so the search over model structures is guided rather than blind.
-Third, it enforces two gates on every proposal --- \emph{compliance}, that a proposed
-operator is a well-typed Plexus contract rather than a simulator-specific patch, and
-\emph{consistency}, an active search for contradictions against expected invariants
-(determinism, conservation laws, monotonic trends, agreement between overlapping runs)
-rather than passive trust in the metric. A violated invariant --- for instance, a longer
-run diverging from a shorter one over the frames they must share --- signals that a
-persistent residual may indict the \emph{diagnostic} rather than the model, so that a
-mis-measuring metric is corrected before the operator algebra is extended. This gate
-distinguishes ``the model is incomplete'' from ``the measurement is wrong,'' a distinction
-without which an agent elaborates operators to explain an artifact. A fourth responsibility keeps the
-process honest once the metrics are met: \emph{perfecting}. A satisfied threshold is not the same as
-qualitative fidelity to the reference, and the master must notice discrepancies that \emph{no current
-metric captures} --- cells that are triangular where the reference's are round, a boundary that is ragged
-where it should be smooth --- and treat each as a prompt to author a \emph{new} metric and refine toward
-it. This closes the loop between qualitative observation and quantitative objective: the eye (or the
-reference figure) flags a gap, the master turns the gap into a measurable target, and the loops close it.
-Perfecting is therefore not obsessive polishing but the mechanism by which the goal itself is progressively
-sharpened as the model approaches the reference. It is also a deliberate counterweight to the characteristic
-failure mode of a fast operator, human or agent: advancing to the next stage before the current one is
-genuinely settled. The master holds each stage open until its metric is met and refuses the tempting
-shortcut of ``good enough to move on''; the discipline it supplies --- finish the step, verify it, only
-then proceed --- is precisely the one a hurried operator most often skips. The master thus keeps a multi-round,
-partially-automated discovery on its goals: it holds the objective, proceeds in small
-hypothesis-validated steps on a cheap-to-expensive evaluation ladder, and preserves the
-provenance of what was tried, validated, or falsified.
+The three loops are realized as autonomous agents coordinated by a \emph{master}: each
+performs one kind of work --- Understanding, Fitting, or Discovery --- and communicates only
+through typed artifacts on a shared blackboard (the mechanistic model, the success metrics
+with current values, the residual, and a queue of falsifiable hypotheses). The master never
+performs the loops' work; it is a state machine whose guards are the metrics --- advancing a
+stage when its metric is met, invoking Discovery when a residual persists, re-invoking Fitting
+once a new operator is admitted. Beyond scheduling it carries a few responsibilities: it
+\emph{authors} the success metrics, so ``goal achieved'' is a falsifiable test rather than a
+visual impression; it \emph{grounds} hypotheses in the reference literature and code before
+Discovery proposes; it gates every proposal on \emph{compliance} (a well-typed Plexus
+contract, not a simulator-specific patch) and \emph{consistency} (an active search for
+violated invariants --- determinism, conservation, agreement between overlapping runs ---
+that separates ``the model is incomplete'' from ``the measurement is wrong''); and it holds
+each stage open until settled, refusing the ``good enough to move on'' shortcut.
+
+\paragraph{The master reproduces a modeller's discipline.}
+These responsibilities are not invented for the machine; they formalise how a careful
+modeller works, distilled from a prototype that deciphers the \texttt{tyssue} epithelial
+vertex model into Plexus operators.\footnote{Reported separately as a living document of
+dated field notes: it reconstructs the model as mechanism-named contracts and works each
+morphogenesis stage by the method below.} Four disciplines recur.
+\begin{itemize}
+\item \textbf{Verify the instrument before trusting the measurement} --- the sharpest,
+most-repeated lesson: a ``$97\%$ hollow'' shell that was a recording-stride \emph{misalignment}
+(vertex positions paired with another frame's connectivity, caught by a determinism
+contradiction --- a long run diverging from its own shorter prefix), and a false
+``$0$ invalid faces'' that passed self-intersecting bow-tie polygons because the guard checked
+area $> 0$, not a simple embedded tiling. An agent that skips this gate elaborates operators
+to explain an artefact.
+\item \textbf{Small, falsifiable, metric-gated steps --- one factor at a time, cheap-first.}
+Loop~I's validate/falsify cadence, enforced across every stage: isolating proliferation rate,
+division timing and volume stiffness is what homogenised the tissue; a blind sweep would not
+attribute the win.
+\item \textbf{Perfecting.} A satisfied metric is not qualitative fidelity: the
+triangular-versus-round-cells gap became a newly authored metric (shape index, sliver
+fraction) and a target to close.
+\item \textbf{A persistent, revisable master memory} --- a log of hypotheses validated and
+overturned, grounding reads from the reference literature, and the operator atlas --- so the
+search accumulates knowledge instead of re-deriving it each round.
+\end{itemize}
+
+\paragraph{What the loop cannot yet supply --- and the agents that must.}
+A prototype run with a human in the loop makes the division of labour precise, and honest
+about its frontier: the worker agents are strong at execution, breadth and bookkeeping, but
+four contributions came reliably from the human and name what the scheme must still
+internalise.
+\begin{itemize}
+\item \textbf{Goal custody} --- the single most valuable intervention. A worker elaborates
+whatever it is touching and cannot catch its own drift (``I thought we were starting tubing
+from 2000 cells''); the master's objective must be held \emph{separately} from the workers'.
+\item \textbf{Temporal perception} --- a genuinely structural gap: an agent reads a static
+strip but cannot \emph{watch a movie}, yet the decisive evidence was in the time course
+(a pattern that forms only at 12\,s; a spot that decays then reforms; tip cells that balloon
+at 2\,s). A dynamics-watching critic is a required agent, not a convenience.
+\item \textbf{Domain priors and taste} --- reading the activator gradient off Okuda's figure;
+naming amplification feedback before finding it is Gierer--Meinhardt.
+\item \textbf{Literature grounding} --- ``which reaction--diffusion regime does Okuda use?''
+$\to$ the GM unlock.
+\end{itemize}
+A faithful multi-agent scheme is therefore not one master and identical workers but a small
+division of labour --- a goal-custody supervisor, a dynamics-watching critic, and a
+literature-grounding reader --- around the disciplined loops above.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1093,7 +1147,7 @@ Appendix~\ref{app:atlas}. The objective is to recover the reusable biological
 mechanisms implemented by each project and register them as operators within
 the Plexus language.
 
-The reference corpus is organized into six broad categories.
+The reference corpus is organized into several thematic categories.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1126,6 +1180,66 @@ Typical operators extracted from these models include
 \item neighbour rewiring,
 \item particle--cell aggregation,
 \item optimal transport.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Vertex models and 3D morphogenesis}
+
+Feynman's second blackboard line urges not just creation but the understanding of
+\emph{everything that has already been built}. Reproducing a \emph{known} result --- Okuda
+\emph{et al.}'s autonomous 3D tubulation and branching, a Turing reaction--diffusion coupled to
+a 3D vertex model --- inside Plexus therefore begins by surveying, as exhaustively as we can,
+the vertex-model and morphogenesis literature it descends from and the code that ships with it.
+This focused sub-corpus is that survey.
+
+\paragraph{The Okuda lineage (the reproduction target).}
+\begin{itemize}
+\item \href{https://doi.org/10.1038/s41598-018-20678-6}{Combining Turing and 3D vertex models reproduces autonomous multicellular morphogenesis with undulation, tubulation, and branching} --- Okuda et al.\ (2018), the target.
+\item \href{https://doi.org/10.2142/biophysico.12.0_13}{Three-dimensional vertex model for simulating multicellular morphogenesis} --- Okuda et al.\ (2015), the base 3D vertex model (volume/surface energy, reversible network reconnection).
+\item \href{https://doi.org/10.1007/s10237-012-0430-7}{Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis} --- Okuda et al.\ (2013), the RNR / T1 topology operator.
+\end{itemize}
+
+\paragraph{Vertex-model frameworks that ship code.}
+\begin{itemize}
+\item \href{https://github.com/DamCB/tyssue}{tyssue} --- the true-vertex (AVM) Python framework; the mechanical substrate of our prototype.
+\item \href{https://arxiv.org/abs/2204.07081}{tvm} (Zhang \& Schwarz, 2022; \href{https://github.com/ZhangTao-SJTU/tvm}{code}) --- a maintained 3D space-filling vertex model, a numerical-validation target.
+\item \href{https://arxiv.org/abs/2309.04818}{Graph vertex model} (Sarkar \& Krajnc, 2024; code \href{https://gitlab.com/ijskrajncgroup1/neovm}{neoVM}) --- topology as a graph; 3D reconnection decomposed into elementary T1 moves.
+\item \href{https://github.com/alihashmiii/3D-Vertex-Model}{3D-Vertex-Model} --- a Mathematica port of Okuda's 2012/2013 reconnection model.
+\item \href{https://doi.org/10.1038/s41598-023-45127-x}{Tissue Forge} (2023) --- a general C++/Python vertex-modelling substrate.
+\end{itemize}
+
+\paragraph{Differentiable vertex / morphogenesis models} (nearest to the Plexus architecture).
+\begin{itemize}
+\item \href{https://arxiv.org/abs/2604.06896}{VertAX} (Pasqui et al., 2026; \href{https://github.com/VirtualEmbryo/VertAX}{code}) --- a differentiable JAX vertex model; benchmarks implicit differentiation through equilibrium against an unrolled relaxation loop.
+\item \href{https://arxiv.org/abs/2407.06295}{jax-morph} (Deshpande et al., 2025; \href{https://github.com/fmottes/jax-morph}{code}) --- composable differentiable growth / division / diffusion modules, the closest existing analogue of an operator registry.
+\item \href{https://doi.org/10.64898/2026.07.02.736195}{Differentiable Design for Morphogenesis} (Beker \& Dumitrascu, 2026) --- a differentiable forward tissue model with a GNN-based inverse.
+\item \href{https://arxiv.org/abs/2308.12892}{Mean-field elastic moduli of a 3D cell-based vertex model} (Kim, Zhang \& Schwarz, 2024) --- closed-form moduli to validate a 3D implementation against.
+\end{itemize}
+
+\paragraph{Reaction--diffusion on growing domains} (the dilution term the patterning must carry).
+\begin{itemize}
+\item \href{https://arxiv.org/abs/2308.12196}{Turing patterns on a two-component isotropic growing system, Part~1} (Ledesma-Dur\'an, 2023) --- growth adds a dilution term that makes the homogeneous base state time-dependent.
+\item \href{https://doi.org/10.3934/mbe.2026005}{Base state of growing reaction-dilution systems} (Ledesma-Dur\'an, 2026) --- how patterning conditions change once reaction rates must balance local volume change.
+\end{itemize}
+
+\paragraph{Tube, lumen and sheet morphogenesis} (the target morphology).
+\begin{itemize}
+\item \href{https://doi.org/10.1007/s10409-023-23297-x}{Three-dimensional morphogenesis of epithelial tubes} (Yu \& Li, 2024).
+\item \href{https://doi.org/10.1126/sciadv.adn0172}{Mechanochemical dynamics in multicellular lumens} (Yu et al., 2024).
+\item \href{https://doi.org/10.3389/fcell.2022.932814}{A virtual spherical-shell multicellular platform} (Fujiwara et al., 2022) --- the same shell geometry we build on.
+\item \href{https://arxiv.org/abs/2407.13187}{Growth and shrinkage of tissue sheets on substrates: buds, buckles, and pores} (Noguchi \& Elgeti, 2024).
+\item \href{https://hal.science/hal-03835943}{Computational approaches for simulating luminogenesis} (Fuji et al., 2022).
+\item \href{https://arxiv.org/abs/2209.06753}{Modeling polarity-driven laminar patterns in bilayer tissues} (Moore, Dale \& Woolley, 2023).
+\end{itemize}
+
+\paragraph{Surveys and further corpus.}
+\begin{itemize}
+\item \href{https://doi.org/10.3390/biophysica4040039}{No country for old frameworks? Vertex models and their ongoing reinvention} (Bri\~nas-Pascual et al., 2024).
+\item \href{https://doi.org/10.3390/cells15020177}{Cell-based computational models of organoids: a systematic review} (Neagu et al., 2026).
+\item \href{https://arxiv.org/abs/2604.13827}{Beads, springs and fields in cell biophysics} (Sorichetti et al., 2026).
+\item \href{https://doi.org/10.1007/s11538-021-00968-3}{Modelling cellular interactions and dynamics during kidney morphogenesis} (Cook et al., 2022).
+\item \href{https://doi.org/10.1371/journal.pcbi.1009952}{Avalanches during epithelial tissue growth: a Drosophila eye-disc model} (Courcoubetis et al., 2022).
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

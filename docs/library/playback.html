@@ -327,46 +327,59 @@ window.Quarto = {
 
 </main> <!-- /main -->
 <style>
-/* gallery videos (those without native controls) become click-to-enlarge */
+/* gallery videos (those without native controls) are click-to-fullscreen */
 .sim-card video, .okuda-card video, .op-vid video, .sim-gallery video, .okuda-gallery video { cursor: zoom-in; }
-#vbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 10000;
+#vbox-overlay { position: fixed; inset: 0; background: #000; z-index: 10000;
   display: none; align-items: center; justify-content: center; cursor: zoom-out; }
 #vbox-overlay.open { display: flex; }
-#vbox-overlay video { max-width: 92vw; max-height: 92vh; width: auto; height: auto;
-  object-fit: contain; border-radius: 8px; background: #000;
-  box-shadow: 0 10px 50px rgba(0,0,0,.6); cursor: default; }
+#vbox-overlay video { width: 100%; height: 100%; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; background: #000; cursor: default; }
 #vbox-close { position: fixed; top: 12px; right: 22px; color: #fff; font-size: 36px; line-height: 1;
-  font-family: sans-serif; cursor: pointer; opacity: .8; z-index: 10001; user-select: none; }
+  font-family: sans-serif; cursor: pointer; opacity: .75; z-index: 10001; user-select: none; }
 #vbox-close:hover { opacity: 1; }
 </style>
-<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">×</span><video id="vbox-video" controls="" loop="" muted="" playsinline=""></video></div>
+<div id="vbox-overlay"><span id="vbox-close" title="close (Esc)">&times;</span><video id="vbox-video" controls loop muted playsinline></video></div>
 <script>
 (function () {
   var ov = document.getElementById('vbox-overlay'),
       vv = document.getElementById('vbox-video'),
       cl = document.getElementById('vbox-close');
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function requestFS() {
+    try {
+      if (ov.requestFullscreen) return ov.requestFullscreen();
+      if (ov.webkitRequestFullscreen) return ov.webkitRequestFullscreen();
+      if (vv.webkitEnterFullscreen) return vv.webkitEnterFullscreen();   // iOS Safari: video only
+    } catch (e) {}
+  }
+  function exitFS() {
+    try { if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document); }
+    catch (e) {}
+  }
   function open(src) {
     vv.src = src; ov.classList.add('open'); document.body.style.overflow = 'hidden';
     var p = vv.play(); if (p && p.catch) p.catch(function () {});
+    var r = requestFS(); if (r && r.catch) r.catch(function () {});   // expand to full screen on the click gesture
   }
   function close() {
+    exitFS();
     ov.classList.remove('open'); vv.pause(); vv.removeAttribute('src'); vv.load();
     document.body.style.overflow = '';
   }
   document.addEventListener('click', function (e) {
     var v = (e.target && e.target.closest) ? e.target.closest('video') : null;
     if (v && v.id !== 'vbox-video' && !v.controls) {
-      var s = v.currentSrc
-            || (v.querySelector('source') && v.querySelector('source').src)
-            || v.getAttribute('src');
+      var s = v.currentSrc || (v.querySelector('source') && v.querySelector('source').src) || v.getAttribute('src');
       if (s) { e.preventDefault(); open(s); }
     }
   });
   ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
   cl.addEventListener('click', close);
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && ov.classList.contains('open')) close();
-  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) close(); });
+  function onFsChange() { if (!fsElement() && ov.classList.contains('open')) close(); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  vv.addEventListener('webkitendfullscreen', function () { if (ov.classList.contains('open')) close(); }); // iOS exit
 })();
 </script>
 <script id="quarto-html-after-body" type="application/javascript">

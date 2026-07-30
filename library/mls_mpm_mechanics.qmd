@@ -371,6 +371,7 @@ class MLSMPMMechanics(Exchange):
         "surface_tension": "interface_cohesion",
         "vmax": "speed_cap",
     }
+    REFERENCE = "Hu, Y. et al. (2018). A moving least squares material point method with displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150; Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

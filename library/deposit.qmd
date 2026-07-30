@@ -112,6 +112,7 @@ class Deposit(Exchange):
     REQUIRES_PARAMS = ["to"]
     MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]
     PARAM_ROLES = {"amount": "deposit_rate"}
+    REFERENCE = "Grasse, P.-P. (1959). La reconstruction du nid et les coordinations interindividuelles (stigmergy). Insectes Sociaux 6:41-80."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)

@@ -129,6 +129,7 @@ class PolarityAlign(Exchange):                   # (alias `heading_align`, one m
     REQUIRES_PARAMS = []                        # no required params — gain/noise optional (defaults in __init__)
     MECHANISM_TAGS = ["vicsek", "polar_alignment", "collective_motion", "flocking"]
     PARAM_ROLES = {"gain": "alignment_rate", "noise": "orientation_noise"}
+    REFERENCE = "Vicsek, T. et al. (1995). Phys. Rev. Lett. 75:1226-1229."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
