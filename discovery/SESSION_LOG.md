@@ -970,3 +970,114 @@ The clock migration is `every: 2 → 4`, not `2 → 2`: the old true period was 
 | **Running** | round 2 (6 knockout jobs on L4, first real composition round) · full 500-frame reproduction of both minisite videos |
 | **Next** | read round 2; escalation path; progress reel |
 | **Blocked** | nothing |
+
+---
+## Hour 13 — 2026-07-30 17:20–18:00 EDT  (overnight, unattended)
+
+Cedric clarified the ask: **run the agentic loop on the Turing + vertex settings to get knowledge
+about that class of simulation** — not merely replay the movie. The replay became the baseline.
+
+### Both minisite videos reproduce again — and that validates the clock migration
+
+`archive_rounded.py --repro` (new mode: writes `*.repro.*`, compares, never touches the archive):
+
+| | cells_end | vol_cv | hollow_frac | verdict |
+|---|---|---|---|---|
+| `vh_K4_cv15_d4` archived | 1778 | 0.226 | 0.004 | |
+| reproduced | **1778** | 0.215 | 0.000 | **MATCH** |
+| `vh_K4_cv15_d4_rd_coral` reproduced | **1778** | 0.215 | 0.000 | **MATCH** |
+
+`cells_end` matching *exactly* is the load-bearing check: it says the division schedule is
+identical, which is what confirms the D1 migration is `every: 2 → 4` (old true period = 2 engine ×
+2 operator) and not `2 → 2`.
+
+### 🔴 FINDING 28 — a second lying tag, and it only lies when chemistry is present
+
+The coral video needed one more fix. `morphogen_growth_3d` declares
+`MAY_MUTATE_INTEGRATED_STATE = False` and mutates it anyway (`conserve_amount` rescales
+`cell.chem` in place). The engine's integration invariant refused to run it. This is one of the
+four tags HANDOFF §4 flagged; now confirmed by execution rather than inference.
+
+Note *when* it lies: the plain recipe has no RD, so the activator is identically zero and the
+branch is never reached. **It fails only in the composition the campaign is actually about.**
+The declaration was wrong, not the behaviour — a `kind=structural` operator rescaling a variable
+after a volume change is precisely the exempt category.
+
+### 🔴 FINDING 29 (the big one) — the Turing activator is diluted to extinction
+
+Running the loop on the settings, with predictions recorded first:
+
+| conserve_amount | act_max @f200 | act_max @f400 | act_frac_high | corr(act,radius) |
+|---|---|---|---|---|
+| **1** (the default) | 6.5e-8 | **3.0e-19** | 0.000 | undefined |
+| 0 | 0.421 | **0.431** | 0.340 | **+0.292** |
+
+`conserve_amount` divides `cell.chem` by the volume growth ratio **every tick**. Over 400 frames
+that is a geometric decay of ~0.88/frame: `3.3e-2 → 4.6e-11 → 2.0e-22` at frames 60/200/400. The
+Gray-Scott field is numerically dead long before the movie ends. Consequences, all measured:
+
+- **The coral pattern on the site's front page is a colour map stretched over a field of magnitude
+  1e-22.** The renderer normalises to the field's own 5th/99th percentile, so an extinct field
+  still renders as vivid coral.
+- It explains why both archived movies have identical diagnostics: with no chemistry, the coral
+  run *is* the plain run.
+- **Waves A and B were null by construction** — ten runs sweeping `a_sw` (50→0.15) and `rho`
+  (1.0→0) against a dead field, every one `cells_end = 1778`, `protr` 1.03–1.08. Both knobs
+  multiply an activator that was already 1e-19.
+
+### ✅ The lever map, against a live field
+
+| rho | protr | corr(act,radius) | hollow_frac | mesh |
+|---|---|---|---|---|
+| 1.0 | 1.033 | +0.292 | 0.000 | intact |
+| 0.5 | 1.049 | +0.263 | 0.006 | intact |
+| 0.2 | 1.060 | +0.283 | 0.008 | intact |
+| **0.05** | **1.173** | **+0.627** | 0.197 | straining |
+| 0.0 | 32.727 | +0.530 | 0.839 | **destroyed** |
+
+And `a_sw`, swept 50 → 0.1 at `rho = 1.0`: `protr` 1.036–1.051, `hollow` 0.000 throughout.
+
+**`rho` (the growth cap) is the shaping lever; `a_sw` is not.** The strip at `rho = 0.05` shows
+the shell clefting *along the activator bands* — corr **+0.63**, the best coupling seen anywhere
+in this project (the previous campaign's best was 0.42 on the SPV backend).
+
+**But there is no clean window.** Coupling only appears once the mesh starts to fail: 20% of faces
+folded at `rho = 0.05`, 84% at `rho = 0`, where `protr = 32.7` is a needle, not a tube. Recorded
+as a **structural limitation**, which is first-class — and it independently agrees with the prior
+campaign's conclusion that the gap is representational (missing force-balance iteration and 3D
+reconnection), not parametric.
+
+Figure: `_turing_vertex/turing_vertex_lever.png`. Report: `_turing_vertex/FINDINGS.md`.
+**Surprise rate 0.235** over 17 mechanism hypotheses — in the productive band.
+
+### Two errors of my own, recorded
+
+- I predicted the cap explained the flat shape and that `rho = 0` would bulge. Wave B **refuted**
+  it — but wave B ran against the dead field, so that refutation was worthless. Wave E, with a
+  live field, **confirmed** the reading. *A refutation obtained under a broken instrument is not
+  evidence, and I nearly filed it as one.*
+- Sweeping `rho` while `a_sw` sat at its default 50 would have measured "growth rate → 0", not
+  activator-driven bulging — two levers moving with one named. Caught before it ran; added
+  `--fix` so the held knobs are explicit.
+
+And one thing that worked: `predict.score` **refused to score all 22 runs** because `protr` was
+not in its known-metric list, returning `inconclusive` 22 times rather than inventing 22
+confirmations. That is P1 doing its job on me.
+
+### Escalation path built
+
+`escalation.py` (self-tested): the operator-request backlog + a three-action decision table
+(open stage gate → file request → declare exhausted), `agents/llm_agents.request_operator`, and
+wiring in `round.py`. The trigger was dead in two ways: `terminal()` has always been able to
+return `ESCALATE:` and **nothing ever read it**, and `Supervisor.dry` reset to 0 every process so
+it could never accumulate. Verified: an opened stage gate now survives a restart.
+
+### ⏱ SUMMARY — Hour 13
+
+| | |
+|---|---|
+| **Done** | both minisite videos reproduce (MATCH); F28 second lying tag; F29 activator extinction; the rho/a_sw lever map + figure + FINDINGS.md; escalation path built and tested |
+| **Found** | the front-page "coral" is an extinct field rendered through a percentile stretch; `rho` not `a_sw` is the shaping lever; coupling and mesh integrity fail together — no clean window |
+| **Running** | round 2 slot `r002c_03_560039` (−cell_geometry_3d) — 35+ min vs 5–20 for its siblings, degrading exactly as the Reflection agent warned |
+| **Next** | round 2 readout; progress reel; overlap the Proposer with cluster runs |
+| **Blocked** | nothing |

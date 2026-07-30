@@ -49,6 +49,11 @@ KNOWN_METRICS = (
     "protr_peak", "protr_final", "ta_n_tubes_final",       # ADMITTED (instrument gate)
     "mech_p_ratio", "n_cells_final", "Q_drop",             # informative, not scored
     "ta_aspect_len_over_diam", "ta_tube_len_final", "retention",   # REJECTED -- see below
+    # Turing x vertex study (turing_vertex_study.py). Added after the parser correctly REFUSED to
+    # score 22 runs whose predictions were written against `protr` -- it returned `inconclusive`
+    # 22 times rather than inventing 22 confirmations, which is the whole point of P1. An unknown
+    # metric is a missing entry here, not a licence to guess.
+    "protr", "protr_p99", "corr_act_rad", "hollow_frac", "vol_cv", "act_max", "r_cv", "cells_end",
 )
 
 # Measured to lie by the instrument gate (F15/F16). A prediction resting on one of these is not

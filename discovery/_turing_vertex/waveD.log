@@ -4,3 +4,10 @@
   [wave] started waveD_2_0p4
   [wave] started waveD_3_0p25
   [wave] started waveD_4_0p1
+  [wave] waveD_0_50             ok cells=1778   protr=1.051 corr=+0.109  137.2s
+  [wave] waveD_1_0p6            ok cells=1778   protr=1.042 corr=+0.188  138.1s
+  [wave] waveD_2_0p4            ok cells=1778   protr=1.044 corr=+0.197  137.1s
+  [wave] waveD_3_0p25           ok cells=1778   protr=1.036 corr=+0.043  136.5s
+  [wave] waveD_4_0p1            ok cells=1778   protr=1.041 corr=+0.097  138.1s
+
+[study] wrote /workspace/Plexus/discovery/_turing_vertex/wave_waveD.json

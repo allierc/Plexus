@@ -4,3 +4,10 @@
   [wave] started waveE_2_0p2
   [wave] started waveE_3_0p05
   [wave] started waveE_4_0
+  [wave] waveE_0_1              ok cells=1778   protr=1.033 corr=+0.292  136.6s
+  [wave] waveE_1_0p5            ok cells=1778   protr=1.049 corr=+0.263  136.9s
+  [wave] waveE_2_0p2            ok cells=1778   protr=1.060 corr=+0.283  138.6s
+  [wave] waveE_3_0p05           ok cells=1778   protr=1.173 corr=+0.627  141.7s
+  [wave] waveE_4_0              ok cells=1778   protr=32.727 corr=+0.530  290.5s
+
+[study] wrote /workspace/Plexus/discovery/_turing_vertex/wave_waveE.json
