@@ -26,3 +26,45 @@ excluded from scoring:
              (perfectly anti-correlated with elongation), n_cells_final
 Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body pressure;
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
+
+<!-- LEARNED PATTERNS -->
+## Learned patterns
+_Distilled across rounds. Seeded R1 (2026-07-30). Drop entries once they stop earning space._
+
+**Edits that keep failing — do not repropose:**
+- **Parameter sweeps disguised as hypotheses.** R1 burned 4/5 slots on ONE composition
+  (C5e315998af4) at five `divide_3d0.vcap` values → surprise 0.00, supervisor flagged drift
+  to 92/8 confirmatory. A change of NUMBERS is not a hypothesis. Each slot must change
+  composition identity or routing.
+- **"unknown -- sensitivity sweep" predictions.** Every R1 slot shipped a non-prediction;
+  "unknown" earns zero information and cannot be falsified. Commit to a callable direction
+  or don't spend the slot.
+
+**Predictions that were wrong (map is miscalibrated here):**
+- **vcap is NOT a monotone protrusion knob.** protr_peak across vcap {0,0.75,1.5,2.25,3.0} =
+  {2.19, 4.03, 1.73, 2.24, 3.22} — non-monotone, peaks at 0.75, dips at 1.5. The proposer's
+  own vcap prediction was refuted. Do not assume raising vcap moves protrusion monotonically.
+- **High protr_peak ≠ stable tube.** vcap=0.75 had the batch-max peak (4.03) yet Q_drop 0.69 —
+  it collapsed after relax. Peak height and persistence are decoupled; always read Q_drop.
+
+**Metrics/artefacts that keep misleading:**
+- **"Body shrinks / mass sucked into the protrusion"** — flagged by analysts in ALL 5 R1 slots.
+  A thin filament off a visibly shrinking sphere is a forced-drainage / render-rescale artefact,
+  NOT growth-driven tubulogenesis. Distrust any single thin tube from this base.
+- **ta_aspect_len_over_diam, ta_tube_len_final, retention** stay REJECTED — R1 reconfirmed they
+  read 9–35 (huge elongation) on buds/spikes the admitted protr_peak scored 1.7–3.2.
+- **mech_p_ratio flags forcing:** ~1 growth-equilibrium, ~3 forced, ≥40 degenerate drainage
+  (vcap=0.0 hit 42.9). Every R1 run was "forced", none "grown".
+- **analyst_consensus="tube" is not proof of a tube.** R1's ledger kept the two "tube"-consensus
+  slots (vcap 0.0, 3.0) — the very ones with extreme p_ratio + shrinking body. Cross-check
+  p_ratio + Q_drop + body-shrink before building on a "tube".
+- **watcher gate is inert** — watcher_verdict="no_caption" in every R1 slot (no VLM caption
+  produced). Do not rely on the watcher to block artefacts.
+
+**Composition families looking exhausted:**
+- **divide_3d0 vcap sweep on C5e315998af4 / round_40_mc8** → forced spikes/tubes with body
+  drainage across all of vcap ∈ [0,3]; no growth-driven (p_ratio~1) regime anywhere. More vcap
+  points add nothing — switch to a DIFFERENT operator or routing to find a grown tube.
+
+**Standing steer:** supervisor wants MORE adversarial edits (target ~70/30; R1 ran 92/8).
+Prefer edits whose outcome you genuinely cannot call over consolidating what's already believed.

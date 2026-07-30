@@ -232,6 +232,13 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
 
     # ------------------------------------------------ run
     names = [n for n, _, _ in posed]
+    # THE SPLIT: local = intelligence, cluster = jobs. Certify the job env BEFORE committing a
+    # round to it -- an import that exists only locally would degrade every cluster run silently
+    # while the campaign still reported completed jobs (this is exactly how the Watcher went
+    # blind for a whole wave).
+    if cluster.preflight(verbose=True) is False:
+        print("[round] preflight FAILED -- not submitting. Fix the job environment first.")
+        return 1
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
         print("[round] submission did not land -- aborting rather than scoring nothing")
