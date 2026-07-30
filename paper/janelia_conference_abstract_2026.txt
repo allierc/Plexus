@@ -1,0 +1,8 @@
+Cell Communication Across Time Scales — Janelia Conference, Nov 15-18, 2026
+Submitted abstract
+
+Living tissues emerge from the interplay of biochemical signaling, cellular interactions, mechanical forces, and collective dynamics operating across multiple spatial and temporal scales. While forward models can simulate these processes under prescribed assumptions, recovering the underlying interaction rules, latent heterogeneity, and governing mechanisms directly from experimental observations remains a fundamental challenge.
+
+We present a unified differentiable framework for solving inverse problems in complex biological systems. Our approach integrates three complementary computational frameworks developed for cellular, neural, and continuum dynamics: CellGraph for collective cellular interactions and dynamical rule discovery, NeuralGraph for signaling networks, and MPMGraph for tissue mechanics and deformable materials. Although originally developed independently, these frameworks share a common graph-based representation in which entities are modeled as nodes with learnable embeddings and interactions are encoded through differentiable message passing.
+
+By combining inference, simulation, and optimization within a single differentiable framework, differentiable tissue computing provides a general approach for uncovering hidden dynamics and learning governing principles directly from data. This framework offers new opportunities for studying multicellular organization, tissue morphogenesis, developmental processes, and other complex living systems.
