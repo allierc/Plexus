@@ -53,3 +53,7 @@ graphs_data
 
 # GUI node-editor layout sidecars (per-spec canvas positions, not source)
 *.gui.json
+
+# simulation data + transient cluster job logs (see 0d75783 for the .npz precedent)
+*.npy
+cluster_logs/

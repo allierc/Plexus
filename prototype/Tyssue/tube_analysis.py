@@ -52,6 +52,27 @@ def tube_diameter(pt, mt, prot_frac=1.3):
                 n_tubes=len(diams), tube_len=round(float(np.median(lens)), 3) if lens else 0.0)
 
 
+def cell_census(pt, mt, act):
+    """Classify cells by STRUCTURE (tip / branch / body, from radial position along a protrusion) and by
+    STATE (red = activated vs white), so we can watch the composition over frames. A clean TUBE keeps the
+    activator CONFINED to a small tip (red_frac ~ tip_frac, red_at_tip ~ 1, body-dominant); a RUNAWAY /
+    cauliflower spreads red far beyond the tips (red_frac >> tip_frac) and grows the tip count each frame."""
+    _, rad = _cell_centroids(pt, mt); ok = rad > 1e-9
+    r = rad[ok]; n = max(len(r), 1)
+    body_r = float(np.median(r)); max_r = float(np.percentile(r, 97)); span = max(max_r - body_r, 1e-6)
+    tip = r > body_r + 0.70 * span                              # top of the protrusion
+    body = r < body_r + 0.15 * span                             # the base vesicle
+    branch = (~tip) & (~body)                                   # along the tube/branch
+    if act is not None and len(act) == len(rad) and float(act[ok].max()) > float(act[ok].min()):
+        a = np.asarray(act, float)[ok]; thr = a.min() + 0.5 * (a.max() - a.min()); red = a > thr
+    else:
+        red = np.zeros(len(r), bool)
+    red_at_tip = float((red & tip).sum()) / max(int(red.sum()), 1)   # fraction of activated cells that ARE tips
+    return dict(tip_frac=round(float(tip.mean()), 3), branch_frac=round(float(branch.mean()), 3),
+                body_frac=round(float(body.mean()), 3), red_frac2=round(float(red.mean()), 3),
+                red_at_tip=round(red_at_tip, 3), n_tip=int(tip.sum()), n_red=int(red.sum()))
+
+
 def frame_metrics(pt, mt, act=None):
     """All per-frame tube-quality metrics in one dict. `act` (per-cell activator) adds red_frac -- the
     fraction of ACTIVATED cells (top half of the activator range): LOW == localised spots (distinct
@@ -73,6 +94,7 @@ def frame_metrics(pt, mt, act=None):
         if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
             m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
     m.update(tube_diameter(pt, mt))
+    m.update(cell_census(pt, mt, act))                          # tip/branch/body + red composition
     return m
 
 
@@ -91,13 +113,22 @@ def analyze(frames, OUT):
                 tube_diam_final=series[-1]["tube_diam"], n_tubes_final=series[-1]["n_tubes"],
                 tube_len_final=series[-1]["tube_len"], protr_final=series[-1]["protr"],
                 red_frac_final=series[-1].get("red_frac", 0.0),
-                tip_act_final=series[-1].get("tip_act", 0.0))
+                tip_act_final=series[-1].get("tip_act", 0.0),
+                # census: clean tube -> red_at_tip ~1 (activator confined to tip) + red_frac ~ tip_frac;
+                # runaway/cauliflower -> red_frac >> tip_frac and red_at_tip < 1
+                red_at_tip_final=series[-1].get("red_at_tip", 0.0),
+                tip_frac_final=series[-1].get("tip_frac", 0.0), body_frac_final=series[-1].get("body_frac", 0.0),
+                red_over_tip_final=round(series[-1].get("red_frac2", 0.0) / max(series[-1].get("tip_frac", 1e-6), 1e-6), 2))
     json.dump({"summary": summ, "series": series}, open(os.path.join(OUT, "metrics.json"), "w"), indent=1)
-    fig, ax = plt.subplots(1, 3, figsize=(13.5, 3.4)); fig.patch.set_facecolor("white")
+    fig, ax = plt.subplots(1, 4, figsize=(18.0, 3.4)); fig.patch.set_facecolor("white")
     ax[0].plot(fr, col("hollow_n"), "-", color="crimson"); ax[0].set_title("hollow cell count"); ax[0].set_xlabel("frame")
     ax[1].plot(fr, col("area_cv"), "-", color="C0", label="area"); ax[1].plot(fr, col("vol_cv"), "-", color="C2", label="vol")
     ax[1].set_title("cell-size CV"); ax[1].set_xlabel("frame"); ax[1].legend(fontsize=8)
     ax[2].plot(fr, col("tube_diam"), "-", color="darkorange"); ax[2].set_title("avg tube diameter"); ax[2].set_xlabel("frame")
+    bo, br, ti = col("body_frac"), col("branch_frac"), col("tip_frac")   # stacked structure census + red overlay
+    ax[3].stackplot(fr, bo, br, ti, labels=["body", "branch", "tip"], colors=["#dddddd", "#f0a080", "#c02020"])
+    ax[3].plot(fr, col("red_frac2"), "--", color="black", lw=1.4, label="red (activated)")
+    ax[3].set_title("cell census (red confined to tip = clean tube)"); ax[3].set_xlabel("frame"); ax[3].set_ylim(0, 1); ax[3].legend(fontsize=7, loc="upper left")
     for a_ in ax:
         a_.grid(alpha=0.3)
     fig.tight_layout(); fig.savefig(os.path.join(OUT, "metrics.png"), dpi=110); plt.close(fig)
