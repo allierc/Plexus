@@ -14,26 +14,31 @@ _Revisable. The agent's current model of the problem: what is established, what 
 > The numbering below is also off by one: the sweep was **round 1**; this batch is **round 2**.
 > (The Supervisor had no persistence, so its counter restarted every process — now fixed.)
 
-## Round 2 proposal issued — 2026-07-30
+## Round 2 proposal ISSUED — 2026-07-30
 
-**Batch (proposed, awaiting results):** 6 slots on the round-33 recipe control, mode=explore,
-3 conf / 2 adv. No parameters changed — this is Loop I, so the edits are structural.
-Slots: s0 control · s1 −extrude ·
-s2 −morphogen_growth_3d · s3 −cell_geometry_3d · s4 +divide_3d:hertwig ·
-s5 +vesicle_growth:uniform_ramp.
+**Batch (issued, awaiting results):** 6 slots on the round-33 recipe control, mode=explore,
+3 conf / 2 adv (60/40, leaning adversarial per supervisor steer). One single-operator edit per
+non-control slot; NO parameters changed (Loop I = structure only). Slots: s0 control ·
+s1 −extrude (conf) · s2 −morphogen_growth_3d (conf) · s3 −cell_geometry_3d (adv) ·
+s4 +divide_3d:hertwig (conf) · s5 +vesicle_growth:uniform_ramp (adv).
 
-**Strategy:** the solo lever-map is EMPTY (all 8 ops "insufficient") and R0 was a zero-surprise
-vcap sweep, so R1 buys map coverage by KNOCKOUT (three single-op removals = clean lever readings)
-plus two additions aimed at a GROWN (p_ratio~1) morphology instead of R0's forced-drainage spikes.
+**Predictions (ADMITTED metrics only, all mechanically checkable):** s0 protr_peak 1.7–4.0 ·
+s1 protr_peak <=1.5 · s2 protr_peak >=2.0 · s3 protr_peak >=2.0 · s4 ta_n_tubes_final >=1 ·
+s5 protr_peak >=2.0. p_ratio is DIAGNOSTIC commentary, never the checkable clause (it is not
+in the admitted scoring set).
 
-**Central test (falsifiable, recorded before running):** is the protrusion FORCED (extrude) or
-GROWN (morphogen)? Dissociation: −extrude should COLLAPSE protr_peak (predict <1.5, p_ratio→1);
-−morphogen_growth_3d should leave it ~unchanged (predict >=2.0) IF R0's "forced" verdict holds.
+**Numbering/framing fixed this round:** vcap sweep = round 1 (a legitimate Loop-II measurement,
+NOT "forbidden"); this knockout batch = round 2. Purged the "R0 forbidden sweep" language from
+proposal.json — do not reintroduce it.
 
-**Watch when results land:** read p_ratio + Q_drop + body-shrink to reject forced-drainage
-"tubes" (R0 lesson: high protr_peak ≠ stable tube; watcher gate inert; aspect/tube_len/retention
+**Central test (recorded before running):** FORCED (extrude) vs GROWN (morphogen). Dissociation:
+−extrude should COLLAPSE protr_peak (<=1.5); −morphogen_growth_3d should leave it ~unchanged
+(>=2.0) IF round 1's "forced" verdict holds. s2 is refuted if it drops <=1.5.
+
+**Watch when results land:** cross-check p_ratio + Q_drop + body-shrink to reject forced-drainage
+"tubes" (R1 lessons: high protr_peak ≠ stable tube; watcher gate inert; aspect/tube_len/retention
 LIE). If −extrude or +vesicle_growth yields p_ratio~1 with a persistent bulge → first GROWN
-regime, the campaign's real prize. Then robustness-test that composition across seeds.
+regime, the campaign's real prize → robustness-test that composition across seeds next round.
 
 ---
 

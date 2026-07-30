@@ -1,14 +1,14 @@
 {
-  "reasoning": "Round 0 was a forbidden vcap parameter sweep on one base (C5e315998af4): surprise 0.00, every slot FORCED (mech_p_ratio 1.8-42.9, visible body drainage), never a growth-driven (p_ratio~1) tube -- and the solo lever-map is still empty (all eight operators read 'insufficient'). So Round 1 spends its budget BUILDING the causal lever-map by knockout rather than tuning: three single-operator removals (-extrude, -morphogen_growth_3d, -cell_geometry_3d) measure what each op contributes, and two mechanistically-motivated additions (Hertwig long-axis division for oriented elongation; uniform vesicle_growth for a grown regime) hunt for the p_ratio~1 morphology Okuda's phase diagram actually targets. The sharpest pair is the dissociation between -extrude and -morphogen_growth_3d: if the protrusion is FORCED (extrude) rather than GROWN (morphogen), knocking out growth should leave protr_peak roughly unchanged while knocking out extrude should collapse it. Mix is 3 confirmatory / 2 adversarial (60/40), leaning adversarial as the supervisor's standing steer requests after R0's 92/8 drift. No parameter is changed; every non-control slot changes exactly one operator from the control.",
+  "reasoning": "Round 1 was a legitimate Loop-II vcap sweep whose real result was that divide_3d makes FORCED extrusions on this base (mech_p_ratio 1.8-42.9, visible body drainage in all 5 slots), non-monotone in vcap, with no growth-driven (p_ratio~1) regime anywhere -- and the solo lever-map is still empty (all 8 operators read 'insufficient'). Round 2 therefore spends its budget BUILDING the causal lever-map by knockout on the round-33 recipe rather than tuning: three single-operator removals (-extrude, -morphogen_growth_3d, -cell_geometry_3d) each give one clean lever reading, and two additions (Hertwig long-axis division; uniform vesicle_growth) hunt for the p_ratio~1 grown morphology Okuda's phase diagram actually targets. The sharpest pair is the dissociation between -extrude and -morphogen_growth_3d: if the protrusion is FORCED rather than GROWN, knocking out growth should leave protr_peak roughly unchanged while knocking out extrude should collapse it. Mix is 3 confirmatory / 2 adversarial, leaning adversarial per the supervisor's standing steer after R1's 92/8 drift; no parameter is changed and every non-control slot changes exactly one operator.",
   "mode": "explore",
   "slots": [
     {
       "parent_index": 0,
       "edit": null,
       "intent": "control",
-      "claim": "the round-33 recipe, unchanged -- the control that all knockouts are read against",
+      "claim": "the round-33 recipe, unchanged -- the causal baseline every knockout is read against",
       "metric": "protr_peak",
-      "predicted": "protr_peak 2.0-3.5, mech_p_ratio ~3 (forced), analyst phenotype tube/spike",
+      "predicted": "protr_peak 1.7-4.0",
       "why": "control"
     },
     {
@@ -19,10 +19,10 @@
         "yields": "growth-driven mid-surface"
       },
       "intent": "confirmatory",
-      "claim": "extrude is the forcing operator; removing it collapses the forced protrusion and any residual bulge becomes growth-driven (p_ratio toward ~1)",
+      "claim": "extrude supplies the protrusion force; removing it collapses the forced protrusion",
       "metric": "protr_peak",
-      "predicted": "protr_peak < 1.5 AND mech_p_ratio drops from ~3 toward ~1",
-      "why": "R0 showed every protrusion was FORCED (p_ratio 1.8-42.9, body drainage); extrude is the prime suspect for that forcing. This single knockout is the highest-value lever-map entry and the campaign's best shot at revealing the GROWN mid-surface tube Okuda's targets require rather than a forced-drainage spike."
+      "predicted": "protr_peak <= 1.5",
+      "why": "R1 read every protrusion as FORCED (p_ratio 1.8-42.9, body drainage) and extrude is the prime suspect. This is the highest-value lever-map entry: if it collapses, extrude is the forcing op and any residual bulge is the campaign's first candidate GROWN mid-surface. REFUTED if protr_peak >= 2.0 -- then the force lives in divide_3d/morphogen, not extrude."
     },
     {
       "parent_index": 0,
@@ -31,11 +31,11 @@
         "label": "-morphogen_growth_3d",
         "yields": "mechanics-only (no growth)"
       },
-      "intent": "adversarial",
-      "claim": "the protrusion is FORCED by extrude, not grown, so removing morphogen_growth_3d leaves protr_peak essentially unchanged",
+      "intent": "confirmatory",
+      "claim": "growth is not what drives the round-33 protrusion; mechanics-only leaves peak height essentially intact",
       "metric": "protr_peak",
-      "predicted": "protr_peak >= 2.0 (within ~0.5 of control); REFUTED if it drops below 1.5",
-      "why": "Directly tests R0's 'forced not grown' verdict and dissociates from the extrude knockout (slot 1). If growth were driving the protrusion, this knockout would collapse it; R0's evidence (forced, high p_ratio, drainage) predicts it will NOT. A prediction I could genuinely be wrong about."
+      "predicted": "protr_peak >= 2.0",
+      "why": "The mirror of the -extrude knockout and the direct test of R1's 'forced, never grown' verdict: if height is set by mechanics, removing the morphogen growth field should not collapse it. REFUTED if protr_peak <= 1.5 -- growth was load-bearing after all and the forced reading is wrong."
     },
     {
       "parent_index": 0,
@@ -45,10 +45,10 @@
         "yields": "driven + forced (round-33 recipe)"
       },
       "intent": "adversarial",
-      "claim": "cell_geometry_3d is load-bearing -- it supplies the geometry shape_energy_3d reads -- so removing it degrades the mechanics and the tube fails to form",
+      "claim": "cell_geometry_3d is inert per-frame bookkeeping, not a driver; its removal does not change protrusion height",
       "metric": "protr_peak",
-      "predicted": "protr_peak < 1.5 or degenerate/collapsed morphology; REFUTED if protr_peak stays >= 2.0 (op was inert bookkeeping)",
-      "why": "Genuinely uncalled: cell_geometry_3d may be an inert per-frame bookkeeping op or the geometric substrate every mechanical op depends on. With all solo effects 'insufficient', this knockout is a foundational lever-map entry that resolves which."
+      "predicted": "protr_peak >= 2.0",
+      "why": "Genuinely uncalled: cell_geometry_3d either is passive shape bookkeeping (my bet) or is the geometric substrate every mechanical op reads, in which case its knockout silently destroys the tube. With all solo effects 'insufficient' this is a foundational lever-map entry. REFUTED if protr_peak <= 1.5 or ta_n_tubes_final == 0."
     },
     {
       "parent_index": 0,
@@ -58,10 +58,10 @@
         "yields": "driven + forced (round-33 recipe)"
       },
       "intent": "confirmatory",
-      "claim": "adding Hertwig-rule (long-axis) oriented division elongates the tissue, raising protrusion above control",
-      "metric": "protr_peak",
-      "predicted": "protr_peak >= 3.0 (>= control) and/or ta_n_tubes_final increases",
-      "why": "Oriented division along the cell long axis is a canonical tube-elongation mechanism and a plausible route to GROWN elongation distinct from extrude's forcing. Confirmatory in direction, but the magnitude and whether it lowers p_ratio are uncertain."
+      "claim": "adding Hertwig-rule (long-axis) oriented division feeds cells into the elongating protrusion and sustains at least one tube",
+      "metric": "ta_n_tubes_final",
+      "predicted": "ta_n_tubes_final >= 1",
+      "why": "Division along the cell long axis is a canonical tube-elongation mechanism; cells born in an elongating protrusion should extend it rather than widen the body. REFUTED if ta_n_tubes_final == 0 or protr_final < control protr_final."
     },
     {
       "parent_index": 0,
@@ -70,11 +70,11 @@
         "label": "+vesicle_growth:uniform_ramp",
         "yields": "driven + forced (round-33 recipe)"
       },
-      "intent": "confirmatory",
-      "claim": "adding uniform vesicle growth feeds volume into the structure and produces a growth-driven regime (p_ratio toward ~1) rather than forced drainage",
+      "intent": "adversarial",
+      "claim": "a uniform volume ramp channels into a grown bulge that still registers elevated protr_peak, rather than merely inflating the sphere",
       "metric": "protr_peak",
-      "predicted": "mech_p_ratio drops toward ~1 with protr_peak >= 2.0; REFUTED if the body merely inflates (protr_peak < 1.5, no tube)",
-      "why": "R0 found NO grown regime anywhere on this substrate. Uniform growth is the most direct way to add mass without a forcing extrusion; whether it channels into a tube or just inflates the sphere is exactly the uncalled question the map needs to answer."
+      "predicted": "protr_peak >= 2.0",
+      "why": "R1 found NO grown (p_ratio~1) regime anywhere on this substrate; uniform growth is the most direct way to add mass without a forcing extrusion. Whether it forms a tube or just swells the body is exactly the uncalled question the map needs. REFUTED if protr_peak < 1.5 -- uniform growth only inflates and the grown-tube regime is still unfound."
     }
   ]
 }
