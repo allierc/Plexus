@@ -50,7 +50,7 @@ DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never
 SCHEDULE_ORDER = [
     "load_mesh_3d", "seed_mesh_3d", "cell_geometry_3d",
     "cell_rd_seed", "cell_adjacency", "cell_diffuse", "cell_react",
-    "morphogen_growth_3d", "shape_energy_3d", "rd_interface_tension",
+    "vesicle_growth", "morphogen_growth_3d", "shape_energy_3d", "rd_interface_tension",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
 
@@ -88,7 +88,10 @@ def _emit_seed(g, n, ga):
     if impl == "checkpoint":
         return {"op": "load_mesh_3d", "at": "vertex", "cell_set": "cell",
                 "ckpt": CKPT, "before_frame": 1}
-    return {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell",
+    # `before_frame: 1` is MANDATORY: without it seed_mesh_3d rebuilds the sphere every tick,
+    # wiping `_mesh` -- and `hist` lives inside `_mesh`, so the topology history is destroyed and
+    # the D3 alignment assertion fires. (Found by that assertion on the first real run.)
+    return {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
             "n_cells": int(_p(g, n["id"], "n_cells")),
             "vseed_cv": float(_p(g, n["id"], "vseed_cv"))}
 
@@ -211,6 +214,11 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
     # downstream. This is the fix for the phantom "97% hollow" result.
     ops.append({"op": "topo_snapshot_3d", "at": "vertex", "every": record_every})
 
+    unordered = sorted({o["op"] for o in ops} - set(SCHEDULE_ORDER))
+    if unordered:
+        raise ValueError(
+            f"operators missing from SCHEDULE_ORDER: {unordered}. They would sort to the END of "
+            f"the schedule -- e.g. a growth operator running AFTER the recorder. Add them.")
     order = {n: i for i, n in enumerate(SCHEDULE_ORDER)}
     ops.sort(key=lambda o: order.get(o["op"], 999))
     sched = [o["op"] for o in ops]
