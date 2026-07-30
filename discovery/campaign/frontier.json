@@ -27,11 +27,6 @@
     "impl": "default"
    },
    {
-    "id": "extrude0",
-    "op": "extrude",
-    "impl": "radial_push"
-   },
-   {
     "id": "reconnect_t1_3d0",
     "op": "reconnect_t1_3d",
     "impl": "length_threshold"
@@ -52,11 +47,6 @@
     "src": "cell_rd_seed0",
     "dst": "divide_3d0",
     "slot": "axis"
-   },
-   {
-    "src": "cell_rd_seed0",
-    "dst": "extrude0",
-    "slot": "site"
    }
   ],
   "params": {
@@ -78,8 +68,6 @@
    "shape_energy_3d0.h0": 0.4,
    "shape_energy_3d0.mono_gamma": 0.06,
    "shape_energy_3d0.relax_iters": 30,
-   "extrude0.K_extrude": 12.0,
-   "extrude0.a_sw": 0.5,
    "reconnect_t1_3d0.l_th": 0.04,
    "divide_3d0.cycle_cv": 0.4,
    "divide_3d0.min_cycle": 32,
@@ -110,11 +98,6 @@
     "impl": "tip"
    },
    {
-    "id": "morphogen_growth_3d0",
-    "op": "morphogen_growth_3d",
-    "impl": "hill_conserve_amount"
-   },
-   {
     "id": "shape_energy_3d0",
     "op": "shape_energy_3d",
     "impl": "default"
@@ -138,11 +121,6 @@
   "conns": [
    {
     "src": "cell_rd_seed0",
-    "dst": "morphogen_growth_3d0",
-    "slot": "gate"
-   },
-   {
-    "src": "cell_rd_seed0",
     "dst": "divide_3d0",
     "slot": "axis"
    },
@@ -159,10 +137,6 @@
    "cell_rd_seed0.cone_deg": 8.0,
    "cell_rd_seed0.amp": 2.0,
    "cell_rd_seed0.n_spots": 1,
-   "morphogen_growth_3d0.rate": 0.01,
-   "morphogen_growth_3d0.a_sw": 0.5,
-   "morphogen_growth_3d0.alpha": 4.0,
-   "morphogen_growth_3d0.rho": 0.0,
    "shape_energy_3d0.K_V": 6.0,
    "shape_energy_3d0.kappa_s": 0.2,
    "shape_energy_3d0.Gamma": 0.05,
@@ -177,7 +151,7 @@
    "divide_3d0.cycle_cv": 0.4,
    "divide_3d0.min_cycle": 32,
    "divide_3d0.max_cycle": 1000000000,
-   "divide_3d0.vcap": 3.0,
+   "divide_3d0.vcap": 0.75,
    "divide_3d0.max_div_frac": 0.0075,
    "divide_3d0.max_div": 30,
    "divide_3d0.orient_asw": 0.5,

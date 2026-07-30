@@ -1,7 +1,7 @@
 {
- "round": 1,
- "spent": 5,
- "dry": 0,
+ "round": 2,
+ "spent": 9,
+ "dry": 1,
  "best": 3.279,
  "stage_gate": 2,
  "prox": {
@@ -38,16 +38,19 @@
   ],
   "clusters": {
    "K000": {
-    "evals": 5,
+    "evals": 9,
     "best": 3.279,
-    "frozen": false,
-    "why": "",
-    "stale": 3,
+    "frozen": true,
+    "why": "9 evaluations, no best-score gain in the last 7 -- budget reallocated",
+    "stale": 7,
     "members": [
-     "C5e315998af4"
+     "C5e315998af4",
+     "C9fdce94643e",
+     "Ca413e0819f9",
+     "Ccba5fe3d10f"
     ]
    }
   }
  },
- "t": 1785445469.851926
+ "t": 1785449347.3152025
 }

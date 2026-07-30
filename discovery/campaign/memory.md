@@ -2,6 +2,27 @@
 
 _Revisable. The agent's current model of the problem: what is established, what is open, what to try next._
 
+## META-REVIEW after Round 2 — 2026-07-30
+
+**Recurring patterns a proposer must carry forward (full detail in instruction.md LEARNED PATTERNS):**
+- **Central verdict FLIPPED in R2:** the "forced not grown" story is dead. `−morphogen_growth_3d`
+  collapsed protr_peak 4.03→1.026 (sphere) and `−extrude` →1.385 (sphere) — BOTH core drivers are
+  jointly necessary. The protrusion is a GROWTH-FED forced extrusion. This was the R2 surprise
+  (rate 0.33). Solo knockouts of each driver are now DONE; next map their routing/differential.
+- **Three edit families burned slots to invalid/degenerate runs — never repropose blind:**
+  (a) growth-magnifying additions (vesicle_growth uniform_ramp) → n_cells 15002 → BUFFER_SATURATED
+  → NOT EVIDENCE; (b) removing bookkeeping ops (cell_geometry_3d) → no diag.json / crash;
+  (c) big division additions (divide_3d hertwig) → late force/tension blowup, body fragments.
+- **CONTROL failed its own prediction (protr_peak 4.03 vs predicted 1.7–4.0) = baseline drift.**
+  protr_peak is noisy at the top; single-run diffs vs a drifting control are shaky. Leave headroom.
+- **watcher is now UNRELIABLE, not inert** — R2 it flipped to false-CONTRADICTS on real growing
+  structures (blocked the control tube AND the hertwig growth). Don't let it overturn metric evidence.
+- Reconfirmed liars: ta_aspect_len_over_diam / ta_tube_len / retention; "body shrinks" drainage
+  artefact; analyst "tube" consensus on the extreme-p_ratio slots; mech_p_ratio is diagnostic-only.
+- Instruction.md LEARNED PATTERNS section rewritten in place (under 4000 chars), R1-only detail
+  compressed to make room for the R2 reversals.
+
+
 > **CORRECTION (operator, 2026-07-30 17:0x).** The entries below call the round-1 `vcap` sweep
 > "forbidden" and "R0's cardinal sin". **That is wrong and must not be carried forward.** The
 > prompt's "do not propose a parameter change" is a DIVISION OF LABOUR — this batch is Loop I,

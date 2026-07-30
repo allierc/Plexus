@@ -1158,3 +1158,76 @@ later be mistaken for an LLM-generated wish.
 | **Running** | round 2 analysts (20 LLM calls) · `d1x` conserve/no-conserve decisive test on L4 |
 | **Next** | read d1x; read round 2; progress reel |
 | **Blocked** | nothing |
+
+### ⛔ FINDING 30 RETRACTED — measured within the hour, and it was wrong
+
+The `d1x` test landed. **There is no activator extinction in the okuda campaign.**
+
+| | `conserve_amount: true` | `false` |
+|---|---|---|
+| `act_max_final` | **0.995** | 1.000 |
+| `protr_peak` | 1.876 | 1.945 (+3.7%) |
+| `ta_tip_act_final` | 0.676 | 0.661 |
+| `n_cells_final` | 569 | 571 |
+
+And on the recipe that actually prompted the hypothesis (round 2's control, comp `5e3159`):
+`act_max_final = 0.972`. The morphogen is alive at full amplitude. Turning the dilution off
+changes almost nothing.
+
+**Why the Turing x vertex recipe dies and this one does not.** The dilution is driven by the
+volume growth ratio, so it only bites while cells are growing:
+
+- Tyssue coral recipe: `rho = 1.0` — *every* cell grows *every* tick, so the dilution is
+  continuous and global → amplitude collapses to 1e-22.
+- okuda recipe: `rho = 0.0` — only activated cells grow, and the `else` branch clamps the scale
+  at `cap`; once a cell saturates, growth stops and **so does its dilution**. The activator
+  survives.
+
+I had the sign of the feedback backwards: I argued `rho = 0` would make the dilution
+*self-reinforcing*; it is *self-limiting*.
+
+**What the caption actually meant.** *"A small red region … gradually shrinks and disappears"* was
+right about the DOMAIN and I read it as amplitude. `red_frac_final = 0.005` — the activated region
+has collapsed to 0.5% of cells while its peak stays at 0.97. And the tip tells the real story:
+
+| run | `ta_tip_act_final` | `protr_peak` |
+|---|---|---|
+| control | **0.27** | 4.03 |
+| −morphogen_growth_3d | **0.80** | 1.03 |
+
+With growth on, the activator is *not at the tip*. That is a local effect — growth carries the
+activated region away from the protrusion it is supposed to drive — not a global decay, and
+`conserve_amount` is not its cause.
+
+Recorded as a retraction rather than a quiet edit: the hypothesis was stated in this log an hour
+ago, it was testable, it was tested, and it failed. The test cost two cluster runs because
+`conserve_amount` is an *implementation* (`hill_conserve_amount` / `hill_no_conserve`), so the
+comparison was a legal one-edit composition change with distinct hashes — not a retune.
+
+### ✅ Round 2 completed — the first composition round, and the Watcher earned its place
+
+```
+[KEEP] r002c_01_cba5fe  score 1.71  protr_peak 1.39  phen=sphere      watcher=supports     [confirmed]
+[KEEP] r002c_02_9fdce9  score 1.53  protr_peak 1.03  phen=sphere      watcher=supports     [refuted] SURPRISE
+[drop] r002c_00_5e3159  score -inf  protr_peak 4.03  phen=tube        watcher=CONTRADICTS  [refuted]
+[drop] r002c_04_a413e0  score -inf  protr_peak 3.20  phen=degenerate  watcher=CONTRADICTS  [confirmed]
+       r002c_03_560039  straggler, killed
+       r002c_05_2399b2  NOT EVIDENCE — P2_BUFFER_SATURATED: n_cells=15002
+```
+
+**The Watcher vetoed the two highest-scoring runs.** `protr_peak` 4.03 and 3.20 — the numerical
+winners, one of them the control that three Analysts called a *tube* — both scored −∞ and dropped,
+because the captions do not show a tube. That is the eye/number divergence defence firing on a
+composition round for the first time, and it is the difference between this round reporting "the
+control makes a tube (4.03)" and reporting the truth.
+
+The Critic separately refused `+vesicle_growth:uniform_ramp` as **not evidence** — the reservoir
+saturated at 15002 cells. Two of six slots produced no evidence, and both said so loudly rather
+than returning a plausible number.
+
+**The dissociation result:** both knockouts collapse the protrusion (4.03 → 1.39 for −extrude,
+→ 1.03 for −morphogen_growth_3d). The Proposer predicted −morphogen would leave it unchanged if
+the protrusion were *forced*; it did not. Recorded as the round's one **surprise**. But the
+control is itself Watcher-vetoed, so the 4.03 baseline those ratios are measured against is
+suspect — the honest reading is *"both operators are necessary for whatever 4.03 is"*, and what
+4.03 is remains open.
