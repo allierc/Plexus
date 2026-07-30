@@ -57,3 +57,7 @@ graphs_data
 # simulation data + transient cluster job logs (see 0d75783 for the .npz precedent)
 *.npy
 cluster_logs/
+
+# discovery campaign: archives are large + regenerable; ledgers/configs ARE tracked
+discovery/_archive*/
+discovery/**/traj/
