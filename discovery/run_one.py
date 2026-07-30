@@ -84,21 +84,27 @@ def check_alignment(posf, hist, name=""):
 def frame_metrics(frames):
     """A cheap per-frame table computed on every run, so any temporal observable can be
     re-derived later without re-simulating (D7). `frames` = [(pos, mesh, act), ...]."""
-    out = {"n_cells": [], "aspect": [], "r95": [], "rmed": [], "act_max": [], "red_frac": []}
+    # NOTE the name. `protr` = percentile(r,95)/median(r) is EXACTLY tube_analysis.py:89's
+    # definition. It is NOT the report's "aspect ~7.5" for round_40_mc8, which is
+    # tube_len/tube_diam -- a different quantity. Calling this one "aspect" led me to compare
+    # 1.73 against 7.5 and invent a discrepancy that does not exist. Measure the geometric thing
+    # you mean, and NAME it the thing you measured.
+    out = {"n_cells": [], "protr": [], "r95": [], "rmed": [], "act_max": [], "red_frac": []}
     for pos, mt, act in frames:
         r = np.linalg.norm(pos - pos.mean(0), axis=1)
         r95, rmed = float(np.percentile(r, 95)), float(np.median(r) + 1e-9)
         out["n_cells"].append(float(mt["nF"]))
         out["r95"].append(r95)
         out["rmed"].append(rmed)
-        out["aspect"].append(r95 / rmed)
+        out["protr"].append(r95 / rmed)
         a = np.asarray(act, float)
         out["act_max"].append(float(a.max()) if a.size else 0.0)
         out["red_frac"].append(float((a > 0.5 * a.max()).mean()) if a.size and a.max() > 0 else 0.0)
     return out
 
 
-def aspect_of(pos):
+def protr_of(pos):
+    """percentile(r,95)/median(r) -- tube_analysis.py:89. NOT tube_len/tube_diam."""
     r = np.linalg.norm(pos - pos.mean(0), axis=1)
     return float(np.percentile(r, 95) / (np.median(r) + 1e-9))
 
@@ -153,7 +159,31 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # --------------------------------------------------------------- Q: the quasi-static test
     q = None
     if do_q:
-        q = quasi_static_Q(cfg, cfg_path, device, aspect_before=fm["aspect"][-1], out_dir=out_dir)
+        q = quasi_static_Q(cfg, cfg_path, device, protr_before=fm["protr"][-1], out_dir=out_dir)
+
+    # --------------------------------------------------------------- the REAL tube metrics
+    # tube_analysis is the archive's own metric bank. Comparing against archived numbers requires
+    # ITS definitions, not look-alikes of our own.
+    tube = {}
+    try:
+        from tube_analysis import analyze
+        samp = np.unique(np.linspace(0, T - 1, min(40, T)).astype(int))
+        tube = analyze([(int(t), fr[t][0], fr[t][1], fr[t][2]) for t in samp], out_dir) or {}
+        keep = ("tube_len_final", "tube_diam_final", "n_tubes_final", "protr_final",
+                "hollow_n_peak", "hollow_n_final", "area_cv_final", "vol_cv_final",
+                "red_frac_final", "tip_act_final")
+        raw = {k: v for k, v in tube.items() if k in keep}
+        if raw.get("tube_diam_final", 0) > 1e-9:
+            raw["aspect_len_over_diam"] = round(
+                float(raw["tube_len_final"]) / float(raw["tube_diam_final"]), 3)
+        # NAMESPACE THEM. tube_analysis computes on 40 SAMPLED frames with its own body-median
+        # definition; our frame_metrics computes on all 901. Merging them unprefixed produced
+        # `protr_final 3.124 > protr_peak 1.732`, which is impossible -- two different quantities
+        # under one name. That is the SAME defect I had just diagnosed, committed again one
+        # function later. Prefix `ta_` so provenance is visible in the summary itself.
+        tube = {f"ta_{k}": v for k, v in raw.items()}
+    except Exception as e:
+        print(f"[{name}] tube_analysis unavailable: {type(e).__name__}: {str(e)[:80]}", flush=True)
 
     # --------------------------------------------------------------- persist
     arch = RunArchive(ARCHIVE)
@@ -179,18 +209,19 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # retention = final/peak aspect. A FORCED protrusion peaks then collapses (low retention);
     # an EQUILIBRIUM one holds (high). Computable from the archived per-frame table for every
     # run without re-simulating -- the D7 payoff -- and a cheap proxy for the full Q test.
-    _pk = max(fm["aspect"]) if fm["aspect"] else 0.0
-    retention = (fm["aspect"][-1] / _pk) if _pk > 1e-9 else 0.0
+    _pk = max(fm["protr"]) if fm["protr"] else 0.0
+    retention = (fm["protr"][-1] / _pk) if _pk > 1e-9 else 0.0
 
     summary = {"saturated": bool(saturated), "inert_operators": inert,
                "retention": round(retention, 3),
                "valid_evidence": bool(not inert and not saturated),
-               "aspect_final": round(fm["aspect"][-1], 3),
-               "aspect_peak": round(max(fm["aspect"]), 3),
+               "protr_final": round(fm["protr"][-1], 3),
+               "protr_peak": round(max(fm["protr"]), 3),
                "n_cells_final": int(fm["n_cells"][-1]),
                "red_frac_final": round(fm["red_frac"][-1], 3),
                "act_max_final": round(fm["act_max"][-1], 3),
                "frames": T, "wall_s": round(wall, 1)}
+    summary.update(tube)                       # the archive's own definitions, for comparison
     if q is not None:
         summary["Q"] = round(q, 3)
     rec.add_analysis("metric_v1", summary)
@@ -222,7 +253,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
 
 
 # --------------------------------------------------------------------------- Q
-def quasi_static_Q(cfg, cfg_path, device, aspect_before, out_dir, relax_frames=60):
+def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, relax_frames=60):
     """Continue from the end state with growth + driver OFF: mechanics and reconnection only.
 
     A FORCED protrusion collapses (Q -> 0). A GROWN one persists (Q -> 1). This is round 41's
@@ -250,8 +281,8 @@ def quasi_static_Q(cfg, cfg_path, device, aspect_before, out_dir, relax_frames=6
         m = getattr(Hq.level("vertex"), "_mesh", {}) or {}
         hq = m.get("hist", [])
         nv = hq[-1]["Nv"] if hq else pos.shape[1]
-        a_after = aspect_of(pos[-1][:nv].astype(np.float64))
-        return a_after / max(aspect_before, 1e-9)
+        a_after = protr_of(pos[-1][:nv].astype(np.float64))
+        return a_after / max(protr_before, 1e-9)
     except Exception as e:
         print(f"  [Q] failed: {type(e).__name__}: {str(e)[:90]}", flush=True)
         return None

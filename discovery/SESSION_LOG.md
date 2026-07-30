@@ -498,3 +498,63 @@ producing or judging evidence, the last two (Metrologist, Engineer) deliberately
 | **Blocked** | the Metrologist correctly refuses evidence admission until D1/D1b/D3/D4 are marked resolved and the instrument gate passes |
 
 ---
+## Hour 8 — 2026-07-30 20:00–21:00 EDT
+
+### ✅ RESOLVED — the "aspect discrepancy" was my own metric misnaming
+
+First I verified the assumption underneath the whole re-anchoring: **does the engine actually gate
+on `every`?** Yes — `engine.py:694`, `max(1, int(o.params.get("every", 1)))`, *"run only when
+tick % every == 0"*. So the double-gating is real and the factor of 4 is correct.
+
+Then the actual resolution. `tube_analysis.py:89` defines
+`protr = percentile(r,95)/median(r)` — **exactly the formula I had been computing and calling
+`aspect`.** But the report's "aspect ~7.5" for `round_40_mc8` is `tube_len/tube_diam`, a different
+quantity. I had been comparing **1.73 against 7.5 as if they were the same number.**
+
+Measured with the archive's *own* metric bank:
+
+| | replay (clock-fixed) | archived (report) |
+|---|---|---|
+| **aspect** = tube_len/tube_diam | **9.30** | ~7.5 |
+| tube_len / tube_diam | 14.69 / 1.58 | — |
+| n_tubes | 1 | — |
+| cells | **2927** | ~2700 |
+| area CV | 0.72 | 0.63 |
+| hollow_n_peak | 367 | 176 (tube-aware defn) |
+
+**The clock re-anchoring is successful.** The tube is reproduced, at or above the archived
+aspect, with a matching cell count. There was never a physics discrepancy.
+
+### 🔴 FINDING 14 — and I committed the identical error again, one function later
+
+Wiring `tube_analysis` in, I merged its output into our summary **unprefixed**, producing
+`protr_final 3.124 > protr_peak 1.732` — impossible, because `tube_analysis` computes on 40
+sampled frames with its own body-median while ours computes on all 901. Two different quantities
+under one name, *again*, minutes after diagnosing exactly that. Caught only because the ordering
+was impossible.
+
+Fixed by namespacing every metric-bank key as `ta_*`, so provenance is visible **in the summary
+itself** rather than inferred. Recorded as `M1` (the original) and `M2` (the repeat).
+
+The document's own lesson — *a numerical invariant is not the geometric one you meant* — turns out
+to apply to the analysis at least as often as to the simulation. Both of my errors today were
+comparisons, not computations.
+
+### 🔁 vcap retraction corrected
+
+The vcap retraction (`D1c`/`RET000`) was reasoned **from the false discrepancy**. Its conclusion
+survives — vcap's rate-coupling is untested, neither proven nor disproven — but for a different
+reason than recorded, and the note in `composition_space.py` now says so. A retraction that is
+itself corrected is exactly why the ledger is append-only.
+
+### ⏱ SUMMARY — Hour 8 (20:00–21:00)
+
+| | |
+|---|---|
+| **Done** | verified the engine really gates on `every`; reconciled against the archive's own metric bank; **clock re-anchoring confirmed successful** (aspect 9.30 vs ~7.5, cells 2927 vs ~2700); metrics namespaced |
+| **Found** | the aspect "discrepancy" was a naming error of mine — **and I repeated it one function later** |
+| **Decided** | every borrowed metric is namespaced by provenance (`ta_*`); our r95/median is named `protr`, matching the codebase |
+| **Next** | mark D1/D1b/D3/D4 resolved in the Metrologist; instrument gate on eye-labelled runs; round driver |
+| **Blocked** | nothing — the open inconsistency from Hour 7 is closed |
+
+---
