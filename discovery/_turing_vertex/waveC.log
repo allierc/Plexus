@@ -1,0 +1,7 @@
+[study] sweeping conserve_amount over [1.0, 0.0], holding {'a_sw': 0.3}, 400 frames, 2 parallel
+  [wave] started waveC_0_1
+  [wave] started waveC_1_0
+  [wave] waveC_0_1              ok cells=1778   protr=1.041 corr=n/a  127.3s
+  [wave] waveC_1_0              ok cells=1778   protr=1.033 corr=+0.292  127.3s
+
+[study] wrote /workspace/Plexus/discovery/_turing_vertex/wave_waveC.json

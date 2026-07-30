@@ -1,0 +1,6 @@
+[study] sweeping a_sw over [50.0, 0.6, 0.4, 0.25, 0.1], holding {'conserve_amount': 0.0}, 400 frames, 5 parallel
+  [wave] started waveD_0_50
+  [wave] started waveD_1_0p6
+  [wave] started waveD_2_0p4
+  [wave] started waveD_3_0p25
+  [wave] started waveD_4_0p1
