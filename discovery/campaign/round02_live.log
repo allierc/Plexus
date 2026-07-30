@@ -107,3 +107,8 @@ Files updated: `proposal.json`, `analysis.md` (appended), `memory.md` (revised).
   [KEEP] r002c_02_9fdce9  score   1.53  protr_peak  1.03 phen=sphere    watcher=supports   [refuted]  SURPRISE
   [drop] r002c_00_5e3159  score   -inf  protr_peak  4.03 phen=tube      watcher=CONTRADICTS [refuted]
   [drop] r002c_04_a413e0  score   -inf  protr_peak  3.20 phen=degenerate watcher=CONTRADICTS [confirmed]
+
+[supervisor] {"round": 2, "spent": 9, "best": 3.279, "new_clusters": 0, "frozen": ["K000"], "active_clusters": 0, "dry": 1, "surprise": 0.3333333333333333, "next_confirmatory_frac": 0.7, "stop": false, "reason": "ESCALATE: all clusters frozen"}
+  mix: surprise 0.33 in the productive band -- hold 70/30
+[map] coverage 27% (3/11 cells, 9 runs)
+[llm] {'calls': 0, 'round_min': 0.0, 'total_min': 0.0}
