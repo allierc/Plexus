@@ -406,6 +406,87 @@ which silently converts a campaign of many cheap experiments into a few enormous
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The scientific protocol: hypothesis first}
+\label{sec:protocol}
+
+The control law of \S\ref{sec:control} says how budget is allocated. This section says what makes
+an allocation an \emph{experiment} rather than a sample. One rule, enforced in code:
+
+\begin{quote}
+\textbf{A candidate is not run until its prediction has been recorded.}
+\end{quote}
+
+Every candidate carries, before it reaches the cluster: a falsifiable \emph{claim}, the single
+\emph{metric} that decides it, an explicit \emph{prediction} on that metric, a \emph{rationale},
+and the Grounder's \emph{citations}. A hypothesis without a prediction is refused at construction.
+
+\subsection{Two intents, and why the mixture matters}
+
+Each batch is allocated between two kinds of edit:
+
+\begin{center}\small
+\begin{tabular}{@{}p{2.6cm}p{11.6cm}@{}}
+\toprule
+\textbf{Confirmatory} & an edit the current causal map predicts \emph{will} work. Consolidates
+the map. Individually low-information; collectively what makes the map usable. \\
+\textbf{Adversarial} & an edit predicted to \emph{break} the current best explanation.
+High-variance; this is where surprise lives. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Because the prediction precedes the run, every outcome falls into a $2\times2$:
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{confirmed} & \textbf{refuted} \\
+\midrule
+\textbf{confirmatory} & consolidates (low information) & \textbf{surprise} (high information) \\
+\textbf{adversarial}  & \textbf{surprise} (high information) & breaks as expected (low information) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A batch of pure confirmation ($100/0$) only ever confirms what we already believe: near-zero
+information. A batch of pure falsification ($0/100$) only ever probes the improbable, which mostly
+breaks as expected and never consolidates a working map. The productive operating point is a
+deliberate minority of attacks on the current understanding --- roughly $70/30$, and at times
+$50/50$ when the map is young.
+
+\subsection{The 70/30 balance is a setpoint, not a quota}
+
+This is the part that makes the discipline machine-enforceable. Define the \emph{surprise rate}
+of a round as the fraction of resolved hypotheses whose outcome contradicted its prediction. Then
+the Supervisor closes a loop on it:
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{surprise} & \textbf{diagnosis} & \textbf{correction} \\
+\midrule
+$< 0.10$ & drifted to $100/0$: confirming what we already believe & push \textbf{adversarial} \\
+$\approx 0.30$ & the productive band & hold $70/30$ \\
+$> 0.50$ & drifted to $0/100$: everything breaks, no map accumulates & push \textbf{confirmatory} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A quota cannot notice that its questions have become trivial; a setpoint on the prediction-error
+rate can. This is the mechanism by which the loop avoids both failure modes the hand-run campaign
+fell into --- a long stretch of confirmatory tuning where nothing surprised us, followed by a
+stretch of wild attempts that mostly broke as expected.
+
+\subsection{The knowledge document}
+
+\code{knowledge.md} is append-only and written in the order the science happened: the hypothesis
+and its grounding, then its prediction, then what occurred. A reader can audit what was believed
+\emph{before} the evidence arrived --- which is the only way to tell a prediction from a
+post-hoc rationalisation. Verdicts move between the four classes of \S\ref{sec:out}; a claim's
+history is extended, never rewritten. Surprises are flagged, because they are the entries a
+returning human should read first.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{The agents}
 \label{sec:agents}
 
@@ -429,9 +510,10 @@ adjudication, and add one agent neither has.
 Supervisor & Holds objective, criteria, stopping rule, budget. Computes round statistics; decides
 allocation, freezing, escalation, termination. Never does the work. & Co-Scientist's Supervisor,
 whose statistics likewise determine whether a terminal state is reached. \\
-Grounder & Answers mechanism questions from the local reference corpus; attaches citations to
-proposals. & Robin's literature agents. Co-Scientist's ablation showed that giving the reviewer
-search suppressed plausible-but-false hypotheses. \\
+Grounder & Holds \code{plexus2.tex} (the language contract), \code{okuda.pdf} (the reference
+model) and \code{okuda\_corpus.md} $+$ \code{papers/} (the literature). Answers mechanism
+questions and attaches citations. & Robin's literature agents. Co-Scientist's ablation showed
+that giving the reviewer search suppressed plausible-but-false hypotheses. \\
 Proposer & Generates a batch of one-edit candidates across distinct clusters. & Co-Scientist's
 generator. \emph{Divergence:} our space is typed and executable, so illegal proposals are
 impossible by construction rather than rejected on review. \\
@@ -455,6 +537,25 @@ Co-Scientist, which calls this feedback propagation without back-propagation ---
 \bottomrule
 \end{tabular}
 \end{center}
+
+\paragraph{The Grounder, specifically.} It is worth being precise about this agent because it
+is the one whose absence was most expensive last time. The Grounder holds three bodies of text ---
+\code{paper/plexus2.tex} (what the language permits), \code{papers/okuda.pdf} (what the reference
+model actually does), and \code{papers/okuda\_corpus.md} together with the vendored
+\code{papers/} corpus (what the field has already established) --- and it is called at exactly
+three points:
+
+\begin{enumerate}\itemsep2pt
+\item when the \textbf{Proposer} needs a mechanism grounded before proposing it;
+\item when the \textbf{Supervisor} gates a hypothesis, before Discovery is allowed to propose;
+\item when an \textbf{operator request} is filed --- does the literature already name this
+mechanism, and under what conditions does it hold?
+\end{enumerate}
+
+This is the agent that produced the Gierer--Meinhardt unlock by hand last time. The decisive
+question --- \emph{which reaction--diffusion regime does Okuda actually use?} --- was answered by
+reading the paper, not by sweeping parameters, and it redirected the entire campaign. Making that
+a scheduled call rather than a lucky afternoon is the point.
 
 \paragraph{Two further borrowings worth naming.} Whatever proposes must not be what judges ---
 Robin used different models for generation and adjudication, and the separation is free. And
