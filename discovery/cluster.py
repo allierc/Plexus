@@ -49,6 +49,66 @@ PARALLEL = int(os.environ.get("PG_PARALLEL", "8"))
 PREFIX = "pg_"                                   # job-name prefix; all queue ops filter on it
 
 
+# =============================================================================================
+# THE SPLIT.  LOCAL = intelligence.  CLUSTER = jobs.
+#
+#   LOCAL (devcontainer)   every LLM agent (Claude CLI), the VLM captioner, the Grounder's PDF
+#                          reading, all orchestration, ranking, ledgers and artefacts.
+#   CLUSTER (gpu_l4)       ONLY the simulation jobs: engine + render + mechanics.
+#
+# This is not a preference, it is what the environments actually support. Audited:
+#
+#   torch numpy yaml matplotlib imageio_ffmpeg scipy skimage  -> present on the cluster
+#   transformers  fitz                                        -> MISSING on the cluster
+#
+# and those two missing ones are precisely the intelligence side. Violating the split fails
+# QUIETLY AND LATE: captioning ran inside the cluster job for a while and recorded
+# "UNAVAILABLE" on every run, leaving the Watcher blind on the entire population a long
+# campaign produces. `preflight()` below exists so the next such violation fails immediately.
+JOB_REQUIREMENTS = ["torch", "numpy", "yaml", "matplotlib", "imageio_ffmpeg", "scipy", "skimage"]
+LOCAL_ONLY = ["transformers", "fitz"]          # the intelligence side -- never used in a job
+
+
+def preflight(verbose=True):
+    """Verify the cluster can run a job, BEFORE a campaign commits weeks to it.
+
+    Checks two things: that every library a job needs is importable there, and that nothing
+    LOCAL_ONLY has crept into the job path. The second is the one that matters -- adding an
+    import to run_one.py that only exists locally would fail on every cluster run, at scale,
+    with the campaign still reporting completed jobs.
+    """
+    mods = JOB_REQUIREMENTS
+    code = ("import importlib;"
+            "print(' '.join(m+':'+('OK' if _try(m) else 'MISSING') for m in %r))" % mods)
+    helper = ("def _try(m):\n import importlib\n"
+              " try:\n  importlib.import_module(m); return True\n"
+              " except Exception:\n  return False\n")
+    out = _ssh_retry(f"conda run -n {ENV} python -c \"{helper}{code}\"")
+    if out is None:
+        if verbose:
+            print("[preflight] cluster UNREACHABLE -- cannot certify")
+        return None
+    txt = (out.stdout or "")
+    missing = [t.split(":")[0] for t in txt.split() if t.endswith(":MISSING")]
+    # and: does the job entrypoint import anything local-only?
+    leaked = []
+    try:
+        src = open(os.path.join(HERE, "run_one.py"), errors="ignore").read()
+        for m in LOCAL_ONLY:
+            if f"import {m}" in src and "caption" not in src.split(f"import {m}")[0][-400:]:
+                leaked.append(m)
+    except Exception:
+        pass
+    ok = not missing and not leaked
+    if verbose:
+        print(f"[preflight] cluster job env: {'OK' if not missing else 'MISSING ' + str(missing)}")
+        if leaked:
+            print(f"[preflight] ⚠ run_one.py imports LOCAL-ONLY module(s) {leaked} -- these do "
+                  f"NOT exist on the partition and every job would degrade silently")
+        print(f"[preflight] {'PASS' if ok else 'FAIL'}")
+    return ok
+
+
 def cpath(p):
     ap = os.path.abspath(p)
     return MAP[1] + ap[len(MAP[0]):] if ap.startswith(MAP[0]) else ap
