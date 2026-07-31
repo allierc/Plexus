@@ -23,10 +23,29 @@ OUT = os.path.join(HERE, "_turing_vertex")
 FS = 11
 
 
-def _strip_row(ax, png, label):
-    """Draw the 3D (top) half of a saved strip.png as one row."""
+def _strip_row(ax, png, label, rows=None):
+    """Draw the FIRST row of a saved strip.png (the side-on 3D view).
+
+    Do not assume the strip has two rows. It had two (3D + cross-section) when this was written;
+    the renderer now emits three (side / top-down / cross-section), so a hard-coded `//2` takes
+    one and a half rows and silently produces a wrong figure -- no exception, just a clipped
+    near-polar row colliding with the next label.
+
+    A verifier raised this before the renderer changed, I checked it, and it was a FALSE ALARM at
+    the time -- the study strips really were still two rows. It became true when the renderer was
+    fixed hours later. The lesson is not "the verifier was right"; it is that a layout constant
+    copied from a file you do not own is a time bomb with someone else's finger on it. So the row
+    count is now DERIVED from the image's aspect ratio rather than assumed, and stated in the
+    docstring rather than a trailing comment.
+    """
     im = plt.imread(png)
-    ax.imshow(im[: im.shape[0] // 2])                # top half == the 3D views
+    h, w = im.shape[0], im.shape[1]
+    if rows is None:
+        # panels are ~square and laid out n_cols wide; rows = round(h / (w / n_cols)) is not
+        # knowable without n_cols, so use the recorded aspect: 2-row strips are ~1.96:1 wide,
+        # 3-row ~1.30:1. Bucket on that rather than guess.
+        rows = 2 if (w / max(h, 1)) > 1.6 else 3
+    ax.imshow(im[: h // rows])                       # the FIRST row, whatever the layout
     ax.set_xticks([]); ax.set_yticks([])
     for s in ax.spines.values():
         s.set_visible(False)

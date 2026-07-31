@@ -38,6 +38,7 @@ worth doing.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from composition_space import OPERATORS, REQUIRED_ROLES, slots_of
@@ -160,7 +161,47 @@ def check_posthoc(summary):
         out.append(Rejection("P2_BUFFER_SATURATED",
                              "the run hit its cell buffer -- evidence about a buffer, not a "
                              "mechanism", f"n_cells={summary.get('n_cells_final')}"))
+
+    # P3 -- THE CHEMISTRY DIVERGED. This is where the reaction ceiling went.
+    #
+    # The parameter boxes used to reject an absurd reaction rate for free, before any compute.
+    # That guard was removed on purpose: the bound was an arbitrary hand-written number, and the
+    # rule now is that a bound is either PHYSICAL AND DERIVED or absent. The diffusion limit is
+    # derivable and is still enforced up front; the reaction one is not (measured -- see
+    # composition_space.reaction_stiffness, "NOT a stability criterion").
+    #
+    # But "no arbitrary cap" must not become "no protection". We cannot say in advance which rate
+    # diverges; we can say with certainty that a run whose chemistry went non-finite is not
+    # evidence about a mechanism. So the guard moves from a guess before the run to a measurement
+    # after it. Gierer-Meinhardt at rate 100 reaches ~4e13 within 300 steps, so this fires.
+    for key in ("act_max_final", "act_max_peak", "protr_peak", "protr_final"):
+        v = summary.get(key)
+        if v is None:
+            continue
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(f):
+            out.append(Rejection("P3_CHEMISTRY_DIVERGED",
+                                 "a recorded quantity is not finite -- the integration blew up, "
+                                 "so this run is evidence about numerics, not biology",
+                                 f"{key}={v}"))
+        elif key.startswith("act_max") and f > ACT_DIVERGED:
+            out.append(Rejection("P3_CHEMISTRY_DIVERGED",
+                                 "the activator exceeded every physical scale -- the reaction "
+                                 "integration is diverging", f"{key}={f:.3g} > {ACT_DIVERGED:g}"))
+    if summary.get("act_nan"):
+        out.append(Rejection("P3_CHEMISTRY_DIVERGED",
+                             "the activator field contains NaN", "act_nan=True"))
     return out
+
+
+# The activator is a concentration of order 1 in every kinetics we run (Gray-Scott saturates
+# near 1, Gierer-Meinhardt's steady state is O(1)). Three orders of magnitude above that is not a
+# strong pattern, it is a diverging integration. Deliberately loose: this is a divergence
+# detector, not a quality bar.
+ACT_DIVERGED = 1e3
 
 
 # ============================================================================ the gate + menu
