@@ -114,6 +114,7 @@ WRITE {PROPOSAL_FILE} as JSON:
      "why": "control"}},
    {{"parent_index": <int>, "edit": <one entry copied EXACTLY from legal_edits>,
      "intent": "confirmatory" | "adversarial",
+     "territory": "in_paper" | "excursion",
      "claim": "<falsifiable, one sentence>",
      "metric": "protr_peak",
      "predicted": "<e.g. 'protr_peak >= 3.0' -- a claim you could be WRONG about>",
@@ -126,6 +127,24 @@ RULES
  - Slot 0 MUST be the control (edit: null), with intent "control".
  - Aim for ~70% confirmatory / ~30% adversarial across the remaining slots. The control is not
    part of that ratio -- it is a fixed cost of the design, not one of your choices.
+ - SEPARATELY, aim for ~70% `in_paper` / ~30% `excursion`. This is a DIFFERENT axis from
+   confirmatory/adversarial and the two are independent -- an excursion can be confirmatory
+   ("at extreme diffusion I expect a flat sheet") and an in-paper slot can be adversarial.
+   * `in_paper`  -- at or near a setting Okuda reports, aimed at reproducing one of his
+     morphologies (undulation / thin tube / thick tube / branching).
+   * `excursion` -- deliberately OUTSIDE his published space: an extremum, a regime he never
+     shows, or a combination he had no reason to try. Say in `why` what perspective you expect
+     it to give that a published point cannot.
+   Extrema often reveal what a lever DOES more plainly than the operating point does, and running
+   only his settings teaches us to reproduce his figures rather than to understand the system --
+   the objective is a MAP, not a target. This is also where a phenotype nobody has named is most
+   likely to appear, and there is now machinery to catch one: an unlisted phenotype gets its own
+   scoreboard row, its topology is checked (a ring cannot be legally produced, so an apparent one
+   is a mesh bug until proven otherwise), and if no admitted metric can measure it, one is written
+   and must pass known shapes before it counts.
+   An excursion is NOT licence to be arbitrary: it still carries a falsifiable prediction, and a
+   run that diverges numerically is refused as evidence, so wild settings cost compute and buy
+   nothing.
  - A prediction you are certain of is nearly worthless. Prefer edits you genuinely cannot call.
  - Do NOT propose a parameter change IN THIS BATCH. That is a division of labour, NOT a
    judgement about validity: this is Loop I, which searches over mechanism STRUCTURE, and

@@ -71,6 +71,36 @@ from dataclasses import asdict, dataclass, field
 # the baseline moved under us and the round's other five comparisons are all suspect.
 INTENTS = ("confirmatory", "adversarial", "control")
 MECHANISM_INTENTS = ("confirmatory", "adversarial")
+
+# ---------------------------------------------------------------------------------------------
+# THE SECOND 70/30 -- WHERE the experiment sits, not what we believe about it.
+#
+# The intent mix asks "do you expect this to work?". It says nothing about WHERE in the space you
+# are looking, and for months every proposal sat on or near Okuda's four published points. Cedric:
+# "during the Okuda understanding it can be nice to deviate a bit to look at other objects or
+# EXTREMUM objects different from those depicted in Okuda, to bring another perspective -- in a
+# ratio 70 (in paper distribution) / 30 (out of paper distribution)."
+#
+# The two axes are orthogonal and both are informative:
+#
+#                    | in_paper                        | excursion
+#     ---------------+---------------------------------+---------------------------------
+#     confirmatory   | reproduce Fig 5a                 | "at extreme chi I expect a flat sheet"
+#     adversarial    | break the Fig 5a mechanism       | "I doubt anything coherent forms here"
+#
+# Three reasons the excursions earn their 30%:
+#   * extrema often say what a lever DOES more plainly than the operating point does;
+#   * running only the published settings teaches you to reproduce his figures, not to understand
+#     the system -- and the stated objective is a MAP, not a target;
+#   * a phenotype nobody has named is far likelier at an extremum than at a published point, so
+#     this IS the serendipity budget -- and it now has machinery behind it (an open scoreboard row,
+#     the genus test, metric authoring).
+#
+# It is affordable only now. Before the pre-flight, an excursion that blew up entered the record as
+# a phenotype; today it is refused as not-evidence and costs compute alone.
+TERRITORIES = ("in_paper", "excursion")
+TERRITORY_TARGET = 0.70          # fraction of MECHANISM slots that should sit in Okuda's space
+TERRITORY_LOW, TERRITORY_HIGH = 0.55, 0.85
 OUTCOMES = ("confirmed", "refuted", "inconclusive")
 
 # Supervisor control band on the surprise rate (see module docstring).
@@ -91,6 +121,7 @@ class Hypothesis:
     metric: str                    # THE metric that decides it
     predicted: str                 # e.g. "Q > 0.5"  -- recorded before the run
     rationale: str = ""
+    territory: str = "in_paper"    # in_paper | excursion -- see TERRITORIES
     grounding: list = field(default_factory=list)   # citations from the Grounder
     round_id: int = 0
     t_posed: float = field(default_factory=time.time)
@@ -104,6 +135,8 @@ class Hypothesis:
     def __post_init__(self):
         if self.intent not in INTENTS:
             raise ValueError(f"intent {self.intent!r} not in {INTENTS}")
+        if self.territory not in TERRITORIES:
+            raise ValueError(f"territory {self.territory!r} not in {TERRITORIES}")
         if not self.predicted:
             raise ValueError("a hypothesis without a recorded prediction is not a hypothesis; "
                              "the prediction MUST exist before the run")
@@ -268,6 +301,45 @@ class HypothesisRegister:
               if h.intent in MECHANISM_INTENTS and h.outcome in ("confirmed", "refuted")]
         n = len(hs) or 1
         return {i: sum(1 for h in hs if h.intent == i) / n for i in MECHANISM_INTENTS}
+
+    def territory_mix(self, round_id=None):
+        """Fraction of resolved mechanism slots that sat inside Okuda's space."""
+        hs = [h for h in (self.by_round(round_id) if round_id is not None else self.all())
+              if h.intent in MECHANISM_INTENTS and h.outcome in ("confirmed", "refuted")]
+        n = len(hs) or 1
+        return {t: sum(1 for h in hs if h.territory == t) / n for t in TERRITORIES}
+
+    def novelty_yield(self, round_id=None, novel_phenotypes=()):
+        """Of the excursions that produced evidence, what fraction found something new?
+
+        The counterpart to the surprise rate, and the control signal for the territory mix. An
+        excursion "found something" if its phenotype is one nobody had listed. If excursions stop
+        yielding, spend the budget back inside the paper; if they keep yielding, widen.
+        """
+        ex = [h for h in (self.by_round(round_id) if round_id is not None else self.all())
+              if h.territory == "excursion" and h.outcome in ("confirmed", "refuted")]
+        if not ex:
+            return None
+        novel = {str(p).strip().lower() for p in novel_phenotypes}
+        hit = sum(1 for h in ex
+                  if str((h.observed or {}).get("analyst_consensus", "")).strip().lower() in novel)
+        return hit / len(ex)
+
+    def advise_territory(self, round_id=None, novel_phenotypes=()):
+        """(in_paper_fraction, why). Steered by novelty yield, as the intent mix is by surprise."""
+        y = self.novelty_yield(round_id, novel_phenotypes)
+        cur = self.territory_mix(round_id)["in_paper"]
+        if y is None:
+            return TERRITORY_TARGET, ("no excursion has produced evidence yet -- hold the 70/30 "
+                                      "default")
+        if y <= 0.0:
+            return TERRITORY_HIGH, (f"novelty yield {y:.2f}: the excursions are finding nothing "
+                                    f"new. Spend the budget inside the paper (currently "
+                                    f"{cur:.0%} in-paper).")
+        if y >= 0.5:
+            return TERRITORY_LOW, (f"novelty yield {y:.2f}: excursions keep finding phenotypes "
+                                   f"nobody listed. Widen -- the map is bigger than the paper.")
+        return TERRITORY_TARGET, f"novelty yield {y:.2f} -- hold 70/30"
 
     def advise_mix(self, round_id=None):
         """The Supervisor's rule. Returns (confirmatory_fraction, why).
