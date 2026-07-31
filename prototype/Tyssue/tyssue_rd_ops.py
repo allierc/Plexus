@@ -177,11 +177,22 @@ class CellRDSeed(Structural):
         return {}
 
 
-@register_operator("cell_diffuse", set="cell", kind="lateral", family="fields")
+@register_operator("cell_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian")
 class CellDiffuse(Lateral):
-    """Graph-Laplacian diffusion of the two morphogens between neighbouring cells (forked from
-    Turing_vertex `graph_diffuse`). `norm=True` uses the degree-normalised Laplacian (eigenvalues in
-    [-2,0]) so an explicit step is stable at any cell degree. First-order -> EMIT=velocity into chem."""
+    """`graph_laplacian` implementation of cell_diffuse: PURELY COMBINATORIAL diffusion of the two
+    morphogens between neighbouring cells (forked from Turing_vertex `graph_diffuse`). `norm=True` uses
+    the degree-normalised Laplacian (eigenvalues in [-2,0]) so an explicit step is stable at any cell
+    degree. First-order -> EMIT=velocity into chem.
+
+    CAVEAT (why the `interface_weighted` sibling exists): this forward reads ONLY `chem` and
+    `edge_index` -- no geometry at all. Two cells sharing a thin sliver exchange exactly as much as two
+    sharing a broad face, and a cell stretched to twice its volume dilutes as if it had not stretched,
+    so mesh DEFORMATION IS INVISIBLE to the chemistry (the pattern rides on the tissue like a decal).
+    That is the right numerics for a pure Turing-on-a-graph study and it is what every calibrated
+    round_* preset was tuned against, so it stays the contract DEFAULT; select
+    `implementation: interface_weighted` for the Okuda shape<->chemistry two-way coupling.
+    The name is not new: discovery/composition_space.py has always listed this impl as
+    "graph_laplacian" -- it was registered as the anonymous "default", so the two disagreed."""
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
     REQUIRES_PARAMS = ["d_a", "d_h", "chi"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = ["edge_index"]
@@ -206,6 +217,134 @@ class CellDiffuse(Lateral):
         deg = torch.zeros(N, device=chem.device, dtype=chem.dtype).index_add_(0, i, torch.ones_like(i, dtype=chem.dtype))
         lap = (agg / deg.clamp(min=1)[:, None] - chem) if self.norm else (agg - deg[:, None] * chem)
         coef = torch.tensor([self.d_a, self.d_h], device=chem.device, dtype=chem.dtype) * self.chi
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: (coef[None, :] * lap) * occ}
+
+
+@register_operator("cell_diffuse", set="cell", kind="lateral", family="fields", implementation="interface_weighted")
+class CellDiffuseInterfaceWeighted(Lateral):
+    """`interface_weighted` implementation of cell_diffuse -- the OKUDA finite-volume form, and the
+    MISSING HALF of the chemistry<->shape coupling. Same contract as `graph_laplacian` (set=cell,
+    kind=lateral, family=fields, EMIT=velocity into chem); only the numerics differ.
+
+        dc_i/dt = D * kappa * ( sum_j A_ij (c_j - c_i) ) / v_i
+
+    i.e. the flux from cell j into cell i is weighted by the wall they SHARE (A_ij) and diluted by the
+    RECEIVING cell's volume (v_i). Deformation therefore feeds back into the chemistry: a sliver wall
+    passes proportionally less morphogen than a broad one, and a cell inflated to twice its volume
+    dilutes what arrives twice as much. `graph_laplacian` has neither term (it is a plain unweighted
+    neighbour average), which is the defect this implementation exists to remove.
+
+    WHICH GEOMETRIC QUANTITIES ARE USED, AND WHY (read this before trusting the numbers)
+      * A_ij -- NOT a true 3D interface area, because the mesh does not carry one. This substrate is an
+        APICAL-SURFACE representation: a cell IS a face of a closed shell, so two neighbouring cells
+        meet along a shared mesh EDGE (a 1-D segment), not along a stored 2-D lateral wall -- there is
+        no basal sheet and no thickness field anywhere in `_mesh`. We therefore use the sanctioned
+        proxy A_ij = l_ij * h, the shared-edge length times a notional epithelial thickness h. h is a
+        single global constant and CANCELS EXACTLY against the kappa normalisation below, so it is not
+        exposed as a parameter: the operator is driven by shared-edge LENGTH. Two cells that share
+        several edges get all of them summed, which is the correct total interface.
+      * v_i -- the per-cell WEDGE volume v_f = (1/3)(cen_f . N_f) from face_geometry_3d, the pyramid
+        from the shell centre out to the cell. This is the model's own definition of cell volume (it is
+        exactly what seed_mesh_3d stores as the target V0f and what shape_energy_3d's K_V term
+        controls), so the chemistry dilutes by the same volume the mechanics conserves. It is
+        origin-referenced, so it is only meaningful while the shell stays star-shaped about the origin
+        -- true for the vesicle/bud/tube runs this campaign is about.
+      * kappa = 1 / mean_i(S_i / v_i), with S_i = sum_j A_ij the cell's total shared interface. A
+        mesh-wide scalar that non-dimensionalises the finite-volume operator. It is what makes this a
+        DROP-IN for `graph_laplacian`: on a mesh whose walls are all equal and whose volumes are all
+        equal, kappa*S_i/v_i = 1 and the expression collapses ALGEBRAICALLY to mean_j(c_j) - c_i, the
+        degree-normalised graph Laplacian -- so d_a/d_h/chi keep the meaning every round_* preset
+        calibrated them with, and only the DEVIATION from uniformity acts. (It also means a uniform
+        inflation of the whole vesicle is normalised away; global dilution under growth is already
+        handled structurally by morphogen_growth_3d's conserve_amount, so applying it here too would
+        double-count it.)
+
+    STABILITY / STENCIL GAIN (derived, then measured -- do not re-guess it). The operator is -L for a
+    weighted graph Laplacian whose row sums are row_i = kappa*S_i/v_i, mean 1 by construction but
+    UNBOUNDED ABOVE: a cell squashed thin (small v_i, perimeter unchanged) acquires a large row weight
+    and blows up an explicit Euler step that was safe for graph_laplacian's [-2,0] spectrum. `w_cap`
+    clamps row_i, so by Gershgorin the spectrum lies in [-2*max_i(row_i), 0] subset [-2*w_cap, 0], i.e.
+
+        stencil_gain(interface_weighted) = w_cap * stencil_gain(graph_laplacian)   -- worst case
+
+    and the CFL bound dt*chi*max(d_a,d_h)*gain <= 1 tightens by that factor. MEASURED on an 80-cell
+    vesicle (eigenvalues of the assembled matrix): pristine gain 1.25, budded 1.33, and only a violent
+    40%-vertex-jitter mesh reaches 2.82 -- the w_cap=4 default is slack on every realistic mesh (it
+    binds on 0/80 cells pristine/budded/15%-jitter, 1/80 at 40% jitter) yet still caps the tail: on
+    that violent mesh the spectrum is -1.40 / -2.23 / -4.14 / -5.34 for w_cap = 1 / 2 / 4 / uncapped.
+    `vol_floor` guards the other end -- a wedge volume that has collapsed or INVERTED (v_i <= 0 after a
+    bad T1 / cap inversion) would divide by ~0 or flip the sign of the Laplacian, turning diffusion
+    into anti-diffusion; the floor keeps it a diffusion."""
+    SUPPORTED_DIMS = [3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["d_a", "d_h", "chi"]
+    INPUTS = ["cell", "vertex"]; OUTPUTS = ["cell"]; READS = ["chem", "pos"]; WRITES = ["chem"]
+    MAPS = ["E_srce", "E_trgt", "E_face"]
+    MECHANISM_TAGS = ["diffusion", "finite_volume", "interface_weighted", "turing", "cross_scale"]
+    REFERENCE = ("Okuda, S. et al. (2018). Combining Turing and 3D vertex models reproduces autonomous "
+                 "multicellular morphogenesis of the tissue. Sci. Rep. 8:2386 (Appendix A: inter-cellular "
+                 "flux ~ shared area / cell volume); Eymard, R., Gallouet, T. & Herbin, R. (2000). "
+                 "Finite volume methods. Handb. Numer. Anal. 7:713-1018.")
+    PARAM_ROLES = {"d_a": "activator_diffusivity", "d_h": "substrate_diffusivity", "chi": "spatial_scale",
+                   "vol_floor": "collapsed_cell_volume_floor", "w_cap": "max_row_weight_vs_mesh_mean"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
+        self.d_a = float(params["d_a"]); self.d_h = float(params["d_h"]); self.chi = float(params["chi"])
+        self.norm = bool(params.get("norm", True))
+        # floor on v_i as a fraction of the median LIVE positive wedge volume -- see STABILITY above
+        self.vol_floor = float(params.get("vol_floor", 0.05))
+        # cap on a cell's row weight relative to the mesh mean (1.0) -- see STABILITY above
+        self.w_cap = float(params.get("w_cap", 4.0))
+
+    def forward(self, H, mask=None):
+        from tyssue_ops3d import face_geometry_3d, ShapeEnergy3D
+        lvl = H.level(self.at); vlvl = H.level(self.vat)
+        chem = lvl.get("chem")
+        m = getattr(vlvl, "_mesh", None)
+        if m is None:
+            # NOT a silent geometry fallback: the mesh simply does not exist yet (seed_mesh_3d has not
+            # run). Matching graph_laplacian's no-adjacency path -- emit nothing rather than guess.
+            return {self.at: torch.zeros_like(chem)}
+        nF = int(m["nF"]); Nv = int(m["Nv"]); dev = chem.device; dt = chem.dtype
+        es = torch.as_tensor(m["E_srce"], device=dev, dtype=torch.long)   # robust to numpy after division
+        et = torch.as_tensor(m["E_trgt"], device=dev, dtype=torch.long)
+        ef = torch.as_tensor(m["E_face"], device=dev, dtype=torch.long)
+        if nF == 0 or es.numel() == 0:
+            return {self.at: torch.zeros_like(chem)}
+        pos = vlvl.get("pos")[:Nv].to(dtype=dt)
+        twin = ShapeEnergy3D._twin_faces(es, et, ef, Nv)      # cell on the far side of each shared edge
+        shared = (twin != ef).to(dt)                          # 0 on an unpaired (boundary) half-edge
+        w = (pos[et] - pos[es]).norm(dim=-1) * shared         # A_ij / h : the SHARED-WALL weight
+
+        _, _, _, vf = face_geometry_3d(pos, es, et, ef, nF)   # per-cell wedge volume = the model's own v_i
+        alive = m["alive"][:nF].to(device=dev, dtype=dt) if "alive" in m else torch.ones(nF, device=dev, dtype=dt)
+        live_pos = vf[(vf > 0) & (alive > 0)]
+        med = live_pos.median() if live_pos.numel() else vf.new_tensor(1.0)
+        v = vf.clamp(min=float(self.vol_floor * med.clamp(min=1e-12)))   # collapsed/inverted-cell guard
+
+        c = chem[:nF]
+        agg = torch.zeros(nF, c.shape[1], device=dev, dtype=dt).index_add_(0, ef, w[:, None] * c[twin])
+        S = torch.zeros(nF, device=dev, dtype=dt).index_add_(0, ef, w)   # total shared interface of cell i
+        r = S / v                                              # per-cell conductance/volume [1/length]
+        live = alive > 0
+        rbar = r[live].mean() if int(live.sum()) else r.mean()
+        row = r / rbar.clamp(min=1e-12)                        # RELATIVE row weight, mean 1 by construction
+        kappa = 1.0 / rbar.clamp(min=1e-12)                    # h and the mesh length scale cancel here
+        if not self.norm:                                      # parity with graph_laplacian's norm=False
+            z = torch.zeros(nF, device=dev, dtype=dt).index_add_(0, ef, shared)   # shared-edge degree
+            kappa = kappa * (z[live].mean() if int(live.sum()) else z.mean())
+        lap_c = kappa * (agg - S[:, None] * c) / v[:, None]
+        # The cap is measured on `row` (the mean-1 RELATIVE weight), never on kappa*r. Folding the
+        # norm=False degree factor into the capped quantity made the clamp bind at w_cap/zbar on EVERY
+        # cell of a perfectly uniform mesh -- a silent global 0.8x on the dodecahedron -- so norm=False
+        # no longer reproduced graph_laplacian. Keeping the cap relative makes it deformation-triggered
+        # only, and makes `norm` a pure change of overall scale exactly as it is in graph_laplacian.
+        lap_c = lap_c * torch.clamp(self.w_cap / row.clamp(min=1e-12), max=1.0)[:, None] * alive[:, None]
+
+        lap = torch.zeros_like(chem); lap[:nF] = lap_c
+        coef = torch.tensor([self.d_a, self.d_h], device=dev, dtype=dt) * self.chi
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: (coef[None, :] * lap) * occ}
 

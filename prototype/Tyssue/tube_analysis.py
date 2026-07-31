@@ -1,9 +1,18 @@
 #!/usr/bin/env python
 """Shared tube-quality analysis: per-FRAME metrics (single end-frame numbers hid a transient hollowing the
-movie clearly showed). For each frame: hollow-cell COUNT + fraction, cell-size CV (area & volume), and the
-average TUBE DIAMETER. Tubes are found by clustering protruding cells (radius > 1.3x body median) by
-direction; a tube's diameter = 2x median perpendicular distance of its cells to the cluster axis
-(Okuda: diameter is the control target, ~chi^1/4). Emits metrics.json (series) + metrics.png (vs frame)."""
+movie clearly showed). For each frame: the THREE mesh-failure modes separately (broken / folded / sliver),
+cell-size CV (area & volume), and the average TUBE DIAMETER. Tubes are found by clustering protruding cells
+(radius > 1.3x body median) by direction; a tube's diameter = 2x median perpendicular distance of its cells
+to the cluster axis (Okuda: diameter is the control target, ~chi^1/4). Emits metrics.json (series) +
+metrics.npz (columns) + metrics.png (vs frame).
+
+MESH FAULTS: BROKEN is the one that matters. `broken_frac` counts faces that are no longer faces
+(under-connected, or the vertex ring is not a valid polygon -- the 3D port of the `ring_valid` test the 2D
+runners have always used and the 3D path never had). `folded_frac` is geometry warping and `sliver_frac` is
+usually a cell that just divided; both are recoverable. `hollow_frac` is the legacy OR of folded|sliver|
+under-connected: kept bit-identical so archived runs stay comparable, DERIVED, and not to be ranked on. A
+measured 60-frame run moved from hollow_frac 0.032 (100% slivers) to 0.207 (14:1 folded) with broken == 0 at
+every frame -- one axis, two unrelated states, no invalid physics anywhere in it."""
 from __future__ import annotations
 import os, json
 import numpy as np
@@ -112,7 +121,17 @@ def frame_metrics(pt, mt, act=None):
     area, vf = area.numpy(), vf.numpy()
     a = area[area > 1e-9]; v = np.abs(vf[np.abs(vf) > 1e-9])
     hollow, _, hst = hollow_flags(pt, mt)
-    m = dict(cells=int(nF), hollow_n=int(hst["n"]), hollow_frac=round(float(hst["frac"]), 4),
+    # THE THREE MESH-FAILURE MODES, SEPARATELY (see tyssue_diag.mesh_faults). They used to be ORed
+    # into `hollow_frac` alone, which cannot distinguish a fifth of the cells being slightly bent
+    # from a fifth being destroyed -- and the archive has runs at hollow_frac 0.97. Only `broken`
+    # (under-connected, or the ring is not a valid polygon) invalidates the physics; a sliver is
+    # usually just a cell that divided last frame.
+    m = dict(cells=int(nF),
+             broken_n=int(hst["n_broken"]), broken_frac=round(float(hst["frac_broken"]), 4),
+             folded_n=int(hst["n_folded"]), folded_frac=round(float(hst["frac_folded"]), 4),
+             sliver_n=int(hst["n_sliver"]), sliver_frac=round(float(hst["frac_sliver"]), 4),
+             # DERIVED, back-compat only: the frozen legacy blend folded|sliver|under-connected.
+             hollow_n=int(hst["n"]), hollow_frac=round(float(hst["frac"]), 4),
              area_cv=round(float(a.std() / (a.mean() + 1e-9)), 3) if a.size else 0.0,
              vol_cv=round(float(v.std() / (v.mean() + 1e-9)), 3) if v.size else 0.0)
     _, radl, livem = _cell_centroids(pt, mt); rad = radl[livem]
@@ -137,7 +156,15 @@ def analyze(frames, OUT):
         r = frame_metrics(pt, mt, act); r["frame"] = int(t); series.append(r)
     def col(k): return np.array([s[k] for s in series], float)
     fr = col("frame")
-    summ = dict(hollow_n_peak=int(col("hollow_n").max()), hollow_frac_peak=round(float(col("hollow_frac").max()), 4),
+    summ = dict(  # BROKEN first: it is the only one of the three that invalidates the physics
+                broken_n_peak=int(col("broken_n").max()), broken_frac_peak=round(float(col("broken_frac").max()), 4),
+                broken_n_final=int(series[-1]["broken_n"]),
+                folded_frac_peak=round(float(col("folded_frac").max()), 4),
+                folded_frac_final=series[-1]["folded_frac"],
+                sliver_frac_peak=round(float(col("sliver_frac").max()), 4),
+                sliver_frac_final=series[-1]["sliver_frac"],
+                # DERIVED blend, kept only so archived runs stay comparable -- do not rank on it
+                hollow_n_peak=int(col("hollow_n").max()), hollow_frac_peak=round(float(col("hollow_frac").max()), 4),
                 hollow_n_final=int(series[-1]["hollow_n"]), area_cv_peak=round(float(col("area_cv").max()), 3),
                 area_cv_final=series[-1]["area_cv"], vol_cv_final=series[-1]["vol_cv"],
                 tube_diam_final=series[-1]["tube_diam"], n_tubes_final=series[-1]["n_tubes"],
@@ -165,7 +192,13 @@ def analyze(frames, OUT):
              for k in (series[0].keys() if series else ())}
     np.savez(os.path.join(OUT, "metrics.npz"), **_cols)
     fig, ax = plt.subplots(1, 4, figsize=(18.0, 3.4)); fig.patch.set_facecolor("white")
-    ax[0].plot(fr, col("hollow_n"), "-", color="crimson"); ax[0].set_title("hollow cell count"); ax[0].set_xlabel("frame")
+    # the three modes on their own curves; the legacy blend is the faint dashed line behind them,
+    # plotted only so an old metrics.png can be compared to a new one.
+    ax[0].plot(fr, col("broken_frac"), "-", color="crimson", lw=2.0, label="broken (invalid)")
+    ax[0].plot(fr, col("folded_frac"), "-", color="darkorange", label="folded")
+    ax[0].plot(fr, col("sliver_frac"), "-", color="steelblue", label="sliver")
+    ax[0].plot(fr, col("hollow_frac"), "--", color="0.6", lw=1.0, label="hollow (derived blend)")
+    ax[0].set_title("mesh faults by mode"); ax[0].set_xlabel("frame"); ax[0].legend(fontsize=7)
     ax[1].plot(fr, col("area_cv"), "-", color="C0", label="area"); ax[1].plot(fr, col("vol_cv"), "-", color="C2", label="vol")
     ax[1].set_title("cell-size CV"); ax[1].set_xlabel("frame"); ax[1].legend(fontsize=8)
     ax[2].plot(fr, col("tube_diam"), "-", color="darkorange"); ax[2].set_title("avg tube diameter"); ax[2].set_xlabel("frame")

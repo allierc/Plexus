@@ -193,8 +193,15 @@ EMIT = {
         "every": 1, "max_flips": 300},                          # D1
     "cell_geometry_3d": lambda g, n, ga: {"op": "cell_geometry_3d", "at": "cell"},
     "cell_adjacency": lambda g, n, ga: {"op": "cell_adjacency", "at": "cell"},
+    # `implementation` MUST be emitted. Without it the spec silently runs the default
+    # (graph_laplacian) while the composition hash records `interface_weighted` -- so the search
+    # would log a DISTINCT hypothesis that is byte-identical to its control. That is exactly the
+    # "silent no-op recorded as evidence" failure this campaign exists to eliminate, and it would
+    # have made the shape-to-chemistry ABLATION -- the whole reason the operator was written --
+    # report "no effect" while never once running the new code.
     "cell_diffuse": lambda g, n, ga: {
-        "op": "cell_diffuse", "at": "cell", "d_a": float(_p(g, n["id"], "d_a")),
+        "op": "cell_diffuse", "at": "cell", "implementation": g.impl_of(n),
+        "d_a": float(_p(g, n["id"], "d_a")),
         "d_h": float(_p(g, n["id"], "d_h")), "chi": float(_p(g, n["id"], "chi"))},
     "vesicle_growth": lambda g, n, ga: {
         "op": "vesicle_growth", "at": "vertex", "cell_set": "cell",

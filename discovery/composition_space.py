@@ -151,8 +151,7 @@ HILL_EPS = 1e-12          # the additive regulariser in MorphogenGrowth3D.forwar
 GM_MU_A = 1.0             # hard-wired by translate._emit_react (gm_rho=1.0, mu_a=1.0)
 BRUSSELATOR_B = 3.0       # hard-wired by translate._emit_react (A=1.0, B=3.0)
 
-DIFFUSION_CFL_LIMIT = 1.0     # see diffusion_cfl
-REACTION_EULER_LIMIT = 2.0    # |1 - dt*k| <= 1 for a linear decay k
+DIFFUSION_CFL_LIMIT = 1.0     # see diffusion_cfl. The ONLY validated limit in this module.
 
 
 def check_dt_agreement():
@@ -213,10 +212,37 @@ def chi_ceiling(d, dt=None, stencil_gain=1.0):
 
 
 # ---------------------------------------------------------------- explicit reaction (cell_react)
-# Same integrator, same argument, applied to the stiffest LINEAR term of each kinetics (read off
-# tyssue_rd_ops): |1 - dt*k| <= 1  =>  dt*k <= 2.
+# THERE IS NO REACTION BOUND HERE, AND THAT IS A MEASURED RESULT, NOT AN OVERSIGHT.
+#
+# The obvious move is to reuse the diffusion argument on the stiffest LINEAR term of each
+# kinetics (|1 - dt*k| <= 1  =>  dt*k <= 2, with k = rate*max(mu_a,mu_h) for Gierer-Meinhardt and
+# rate*(F+kk) for Gray-Scott). It was written, and then it was RUN against the real operator
+# classes, and it does not hold:
+#
+#   Gierer-Meinhardt, rate=50  -> dt*k = 1.0, well inside the bound, and |chem| reaches 1.9e12.
+#     Re-integrating the SAME reaction time at 1/50 the step (rate=1, 15000 steps) stays at 0.68,
+#     so it is not a step-size failure at all: unsaturated GM (sat=0, the a^2/h autocatalysis) has
+#     finite-time blow-up in the ODE, and `rate` merely buys more reaction time per frame.
+#   Gray-Scott -> bounded at dt*k = 0.94, NaN by dt*k = 1.87, i.e. it diverges INSIDE the bound;
+#     (F+kk) is not the largest Jacobian eigenvalue once the u*a^2 term is included.
+#
+# So dt*k <= 2 predicts neither, and shipping it would have put a confident, wrong, BLOCKING
+# number in the search's way -- a hand-written cap wearing a derivation. Per the rule (a bound is
+# PHYSICAL AND DERIVED, or ABSENT) the reaction boxes are therefore open above: rd_rate and gamma
+# have a physical lower bound of 0 (a rate cannot be negative) and NO upper bound.
+#
+# What this costs: rd_rate = 100 with Gierer-Meinhardt does diverge, and nothing here stops it.
+# That is deliberate. The guard for a run that diverged belongs where the divergence is OBSERVED
+# (critic.check_posthoc, alongside P1_INERT_OPERATOR / P2_BUFFER_SATURATED -- "not evidence"),
+# not in an invisible box that also removes four decades of Okuda's published span from view.
+#
+# `reaction_stiffness` is kept because it is the correct linear-decay rate and is useful for
+# reporting; it is deliberately NOT wired to a blocking condition.
 def reaction_stiffness(impl, rd_rate=1.0, mu_h=1.0, F=0.055, kk=0.062, gamma=0.3):
-    """Stiffest linear decay rate of a kinetics implementation, in engine time units."""
+    """Stiffest LINEAR decay rate of a kinetics implementation, in engine time units.
+
+    NOT a stability criterion -- see the measurements above. Reporting only.
+    """
     if impl == "gierer_meinhardt":       # da = ... - mu_a*a ;  dh = ... - mu_h*h ; scaled by rate
         return float(rd_rate) * max(GM_MU_A, float(mu_h))
     if impl == "gray_scott":             # da = ... - (F+kk)*a ; scaled by rate
@@ -226,31 +252,31 @@ def reaction_stiffness(impl, rd_rate=1.0, mu_h=1.0, F=0.055, kk=0.062, gamma=0.3
     return 0.0
 
 
-def rd_rate_ceiling(impl, mu_h=1.0, F=0.055, kk=0.062, dt=None):
-    """Largest rd_rate an explicit step can carry for this kinetics. `brusselator` ignores
-    rd_rate entirely (it is driven by `gamma`), so it imposes no ceiling on it."""
-    dt = ENGINE_DT if dt is None else dt
-    k = reaction_stiffness(impl, rd_rate=1.0, mu_h=mu_h, F=F, kk=kk)
-    return float("inf") if k <= 0 else REACTION_EULER_LIMIT / (float(dt) * k)
-
-
 # ---------------------------------------------------------------- the growth switch (Hill)
 # MorphogenGrowth3D.forward:  hillv = a**alpha / (a_sw**alpha + a**alpha + HILL_EPS)
-# `a_sw**alpha` must stay REPRESENTABLE and must stay DISTINGUISHABLE from the regulariser:
-#   a_sw > 1 : alpha*ln(a_sw) <  ln(FLOAT32_MAX)  else it overflows -> hillv == 0, growth silently
-#              dies with no error
-#   a_sw < 1 : alpha*ln(a_sw) >  ln(HILL_EPS)     else the threshold sinks below HILL_EPS and
-#              hillv == 1 everywhere -> the switch silently becomes ALWAYS-ON, i.e. the operator
-#              stops being morphogen-gated at all while still appearing to run
-# Both failures are silent and both would be recorded as evidence about the mechanism.
+#
+# ONE branch of this is statically derivable and it is the a_sw > 1 branch: `a_sw**alpha` depends
+# only on PARAMETERS, and once it overflows float32 the denominator is inf, hillv is identically
+# 0, and growth silently stops with no error. Confirmed: a_sw=6, alpha=49.5 -> 3.3e38 (finite,
+# hillv fine); alpha=50 -> inf, hillv == 0 at every activator value.
+#
+# The a_sw < 1 branch is NOT statically derivable and no bound is asserted for it. The failure
+# there is `a**alpha` sinking below the HILL_EPS regulariser, which suppresses cells that should
+# activate (measured: a=0.5, a_sw=0.2, alpha=40 -> hillv=0.48 where it should be ~1; alpha=60 ->
+# 8.7e-07). That depends on the ACTIVATOR MAGNITUDE, which is state, not theta. An earlier version
+# of this function asserted a ceiling of ln(HILL_EPS)/ln(a_sw) = 17.2 for a_sw=0.2 and described
+# it as "the switch becomes always-on"; running it showed hillv = 9.4e-15 there, i.e. the switch
+# was working fine and the stated mechanism was wrong. The bound is therefore absent.
 def hill_alpha_ceiling(a_sw):
-    """Largest Hill exponent at which the switch is still a switch, at this a_sw."""
+    """Largest Hill exponent at which a_sw**alpha is still representable in float32.
+
+    Returns inf for a_sw <= 1: no STATIC bound exists there (the failure mode is activator-
+    dependent -- see above). Absent, rather than guessed.
+    """
     a_sw = float(a_sw)
-    if a_sw == 1.0:
+    if a_sw <= 1.0:
         return float("inf")
-    if a_sw > 1.0:
-        return np.log(FLOAT32_MAX) / np.log(a_sw)
-    return np.log(HILL_EPS) / np.log(a_sw)
+    return np.log(FLOAT32_MAX) / np.log(a_sw)
 
 
 # ---------------------------------------------------------------- the boxes, computed
@@ -265,14 +291,12 @@ A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.2, 6.0, 1.5
 
 D_CEIL = diffusivity_ceiling(CHI_DEFAULT)          # 12.5   -- reaches Okuda's d_h = 10
 CHI_CEIL = chi_ceiling(D_H_DEFAULT)                # 71.4
-RD_RATE_CEIL = min(rd_rate_ceiling("gierer_meinhardt", mu_h=MU_H_DEFAULT),
-                   rd_rate_ceiling("gray_scott", F=F_DEFAULT, kk=KK_DEFAULT))   # 100 (GM binds)
-GAMMA_CEIL = REACTION_EULER_LIMIT / (ENGINE_DT * (BRUSSELATOR_B + 1.0))         # 25
-# alpha is the ONE place the default-companion rule is deliberately not used. The overflow term is
-# `a**alpha` in the ACTIVATOR, whose magnitude is state-dependent and cannot be bounded statically
-# at all; so the static box takes the conservative branch instead -- the largest alpha that is
-# safe for EVERY admissible a_sw. That is 17.2, which still reaches Okuda's alpha = 10.
-ALPHA_CEIL = min(hill_alpha_ceiling(A_SW_MIN), hill_alpha_ceiling(A_SW_MAX))    # 17.2
+RD_RATE_CEIL = float("inf")     # ABSENT: no reaction bound survived measurement (see above)
+GAMMA_CEIL = float("inf")       # ABSENT: same
+# alpha is the one place the default-companion rule is deliberately not used: the ceiling FALLS as
+# a_sw rises, so the box takes the tightest value over the admissible a_sw range rather than the
+# value at a_sw's default. 49.5, which reaches Okuda's alpha = 10 with room to spare.
+ALPHA_CEIL = hill_alpha_ceiling(A_SW_MAX)          # 49.5
 
 # ============================================================================ vocabulary
 # stage           -- the gate; the search opens stages in order
@@ -312,8 +336,8 @@ OPERATORS = {
         stage=2, role="growth", outputs=[], slots=["gate"], needs=["morphogen"],
         impls=["hill_conserve_amount", "hill_no_conserve"], impl_structural=True,
         # alpha: was (1.0, 8.0) -- a hand-written cap that put OKUDA'S OWN alpha = 10 outside the
-        # searchable space. Now ALPHA_CEIL, derived from the Hill function's float32/HILL_EPS
-        # degeneracy (see hill_alpha_ceiling). lo = 1.0 stays: below 1 the Hill switch has
+        # searchable space. Now ALPHA_CEIL, derived from the float32 overflow of a_sw**alpha in
+        # the Hill function (see hill_alpha_ceiling). lo = 1.0 stays: below 1 the Hill switch has
         # infinite slope at the origin and stops being a switch.
         params={"rate": (0.002, 0.03, 0.010), "a_sw": (A_SW_MIN, A_SW_MAX, A_SW_DEFAULT),
                 "alpha": (1.0, ALPHA_CEIL, 4.0), "rho": (0.0, 1.0, 0.0)}),
@@ -361,12 +385,10 @@ OPERATORS = {
         stage=3, role="patterning", outputs=["morphogen"], slots=[], needs=["adjacency"],
         impls=["gierer_meinhardt", "gray_scott", "brusselator"], impl_structural=True,
         # rd_rate: was (0.2, 3.0) -- a factor of 15, where Okuda spans FOUR DECADES. lo = 0.0 is
-        # the physical bound (a rate cannot be negative); hi = RD_RATE_CEIL = 100 is the derived
-        # explicit-Euler ceiling of the stiffest kinetics at its defaults. 0.01 .. 100 is now
-        # inside the box, so all four decades are reachable.
-        # gamma (brusselator): was (0.1, 100.0). Not a cap at all -- 100 is four times the
-        # integrator's own limit, i.e. the box positively invited a guaranteed divergence. Now the
-        # derived GAMMA_CEIL. This is the same defect with the sign flipped: an undrived bound.
+        # the physical bound (a rate cannot be negative); the upper bound is ABSENT because the
+        # candidate derivation was measured and did not hold (see "explicit reaction" above).
+        # An absent bound is the honest state; 3.0 was a hand-written one that hid three decades.
+        # gamma (brusselator): was (0.1, 100.0), equally hand-written. Also open above.
         params={"gamma": (0.0, GAMMA_CEIL, 0.3), "a0": (0.0, 0.05, 0.01),
                 "rd_rate": (0.0, RD_RATE_CEIL, 1.0),
                 "F": (0.02, 0.06, F_DEFAULT), "kk": (0.05, 0.07, KK_DEFAULT),
@@ -403,9 +425,9 @@ PARAM_BASIN = {
     ("cell_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)
     ("cell_diffuse", "chi"): 10.0 - 1.0,                # old box (1.0, 10.0)
     ("cell_react", "rd_rate"): 3.0 - 0.2,               # old box (0.2, 3.0)
-    ("cell_react", "gamma"): GAMMA_CEIL,                # box NARROWED to the derived limit; the
-    #   old width (99.9) sampled gamma far past the integrator's ceiling, so preserving it would
-    #   preserve a basin most of which cannot be integrated.
+    ("cell_react", "gamma"): 100.0 - 0.1,               # old box (0.1, 100.0). Inherited, not
+    #   endorsed -- the box above it is now open, so a basin MUST be stated explicitly, and
+    #   restating the old one is the only choice that changes nothing else.
     ("divide_3d", "max_cycle"): 0.0,                    # 1e9 is a SENTINEL for "no maximum", not a
     #   tunable. The old rule gave it sigma = 1.5e8 and the clip then pinned half the draws back
     #   onto 1e9 -- noise that looked like sampling. Fixed = never perturbed.
@@ -417,7 +439,14 @@ def basin_sigma(op, pname, scale=0.15):
     if (op, pname) in PARAM_BASIN:
         return float(PARAM_BASIN[(op, pname)]) * float(scale)
     lo, hi, _ = OPERATORS[op]["params"][pname]
-    return float(scale) * (float(hi) - float(lo))
+    w = float(hi) - float(lo)
+    if not np.isfinite(w):
+        # An OPEN box (a bound we could not derive, so did not invent) carries no implied basin.
+        # Falling back to scale*(hi-lo) would silently hand the sampler sigma=inf.
+        raise ValueError(
+            f"{op}.{pname} has an open box ({lo}, {hi}) and no PARAM_BASIN entry. The admissible "
+            f"region and the sampling basin are separate; state the basin explicitly.")
+    return float(scale) * w
 
 
 # ============================================================================ theta conditions
@@ -434,7 +463,10 @@ def basin_sigma(op, pname, scale=0.15):
 #   blocking=False visible but not a wall. Used for (a) leaving the declared box, which is a
 #                  prior and not a physical fact, and (b) any limit we have NOT derived. We never
 #                  block on a number we did not derive -- that is how the original cap happened.
-THETA_RULES = ["T1_DIFFUSION_UNSTABLE", "T2_REACTION_UNSTABLE", "T3_HILL_SWITCH_DEGENERATE",
+# T2 is deliberately absent: the reaction-stability rule that would have gone here was written,
+# measured against the real operators, refuted, and removed rather than shipped. The gap in the
+# numbering is the record of that.
+THETA_RULES = ["T1_DIFFUSION_UNSTABLE", "T3_HILL_SWITCH_DEGENERATE",
                "T4_OUTSIDE_DECLARED_BOX", "T5_STENCIL_GAIN_UNDERIVED"]
 
 
@@ -635,32 +667,19 @@ class CompositionGraph:
                         f"(max diffusivity here is {diffusivity_ceiling(chi, stencil_gain=gain):.4g})",
                         derived))
 
-            elif op == "cell_react":
-                k = reaction_stiffness(impl, rd_rate=self.theta(nid, "rd_rate"),
-                                       mu_h=self.theta(nid, "mu_h"), F=self.theta(nid, "F"),
-                                       kk=self.theta(nid, "kk"), gamma=self.theta(nid, "gamma"))
-                if ENGINE_DT * k > REACTION_EULER_LIMIT:
-                    out.append(ThetaCondition(
-                        "T2_REACTION_UNSTABLE",
-                        "explicit reaction past its Euler limit -- chem diverges, so the run is "
-                        "evidence about an integrator, not a mechanism",
-                        f"{impl}: dt*k = {ENGINE_DT}*{k:g} = {ENGINE_DT * k:.4g} > "
-                        f"{REACTION_EULER_LIMIT}", True))
+            # cell_react has NO stability condition on purpose: the candidate bound was measured
+            # against the real operators and refuted. See "explicit reaction" above.
 
             elif op == "morphogen_growth_3d":
                 a_sw, alpha = self.theta(nid, "a_sw"), self.theta(nid, "alpha")
                 ceil = hill_alpha_ceiling(a_sw)
                 if alpha > ceil:
-                    why = ("overflows float32 -> hillv == 0, growth silently stops"
-                           if a_sw > 1.0 else
-                           f"sinks below the operator's own {HILL_EPS:g} regulariser -> hillv == 1 "
-                           f"everywhere, the switch silently becomes ALWAYS-ON and the operator "
-                           f"stops being morphogen-gated while still appearing to run")
                     out.append(ThetaCondition(
                         "T3_HILL_SWITCH_DEGENERATE",
                         "the growth switch stops being a switch, silently",
-                        f"a_sw**alpha = {a_sw:g}**{alpha:g} {why}; alpha ceiling here is "
-                        f"{ceil:.4g}", True))
+                        f"a_sw**alpha = {a_sw:g}**{alpha:g} overflows float32 -> the Hill "
+                        f"denominator is inf, hillv == 0 at every activator value, and growth "
+                        f"stops with no error; alpha ceiling at this a_sw is {ceil:.4g}", True))
         return out
 
     def blocking_theta_conditions(self):
