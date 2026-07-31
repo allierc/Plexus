@@ -105,6 +105,14 @@ Work independently. Do not try to agree with anyone.
 HOW EACH MEASUREMENT BEHAVED OVER TIME -- classified automatically, not by anyone's judgement:
 {shapes or "  (no trajectory recorded)"}
 
+ALSO LOOK AT THE CELLS THEMSELVES, not only the tissue's outline. The cross-section row of the
+strip shows individual cells; say whether they look uniform or whether some are visibly stretched,
+thin, compressed or otherwise distorted, and WHERE (in the protrusion? at its base? scattered?).
+`shape_idx_*` in the numbers is the measurement: the cells' preferred value here is about 3.5, and
+above 3.81 a tissue stops behaving like a solid and starts to flow. A tissue that is flowing can
+be pushed into a tube but cannot hold one, so this bears directly on forced-versus-grown.
+Nobody looked at cell shape for months because no number recorded it; do not let that continue.
+
 Read those shapes BEFORE the final numbers, and say in your verdict when the two disagree:
   peaked   the best moment was mid-run; the final value reports the DECAY, not the phenomenon
   rising   still climbing when the run stopped -- the run was cut short, not finished

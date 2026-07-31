@@ -204,6 +204,14 @@ def unmeasured(description, admitted_metrics):
         "branch": ("branch", "bifurcat", "fork", "split into"),
         "invagination": ("invaginat", "dimple", "indent", "pit", "crater"),
         "multiple_lobes": ("lobe", "cauliflower", "cluster of bumps"),
+        # CELL-LEVEL, not tissue-level. The first version of this vocabulary was entirely about
+        # the shape of the whole tissue, so when Cedric looked at a cross-section and said the
+        # tube cells were "very distorted, very thin", nothing here would have fired -- the
+        # trigger built to catch what no metric measures had a tissue-shaped blind spot.
+        "cell_distortion": ("stretch", "distort", "elongated cell", "thin cell", "squash",
+                            "compress", "sliver", "flattened cell", "deformed cell"),
+        "cell_heterogeneity": ("some cells", "uneven", "irregular size", "heterogen",
+                               "mixture of", "two populations", "patchy"),
     }
     d = (description or "").lower()
     hits = [k for k, words in vocab.items() if any(w in d for w in words)]
