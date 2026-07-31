@@ -138,6 +138,59 @@ None of these tells us anything about tubes. They tell us the experiment we thou
 is not the experiment that ran.
 
 %======================================================================
+\section{What ``success'' means --- corrected}\label{sec:success}
+
+Cedric, 31 July: \emph{``maybe we are all wrong with the threshold to define success \ldots\ it
+is about knowledge and being able to reproduce qualitatively the figures of the paper --- and we
+forget branching and budding.''} He is right, and the contradiction was sitting in a single
+dataclass the whole time. Three fields apart:
+
+\begin{quote}\small
+\textbf{objective:} ``\ldots The product is a MAP, NOT A WINNER. Specific questions --- which
+composition makes a sustained tube, which reproduces Okuda's phase diagram, which mechanism is
+necessary for branching --- are \textbf{queries against that map}.''
+
+\textbf{\code{meets\_success}:} four \emph{tube} metrics, and-ed together.
+\end{quote}
+
+The stated objective is coverage; the coded criterion is a tube detector. Okuda's paper is titled
+for three behaviours --- undulation, tubulation and branching --- and the tubulation figure has two
+regimes. A criterion measuring how far one protrusion sticks out can score \emph{at most one} of
+the four. Worse, it scores \textbf{undulation --- a successful reproduction of Figure 7 --- as the
+least successful thing the campaign can do}, because undulation is by definition many shallow
+bumps rather than one deep protrusion. Branching and budding had no cell at all.
+
+I made this worse rather than catching it: I spent a morning deriving that threshold to three
+significant figures, sharpening a criterion that contradicts the objective printed above it.
+
+\subsection*{Two questions instead of one number}
+
+\begin{center}\small
+\begin{tabular}{@{}l p{10.4cm}@{}}
+\toprule
+\textbf{1. What can we reproduce?} & Each of the paper's morphologies is a row, scored
+qualitatively: not attempted / attempted and failed / partial / reproduced. Today
+\textbf{0 of 4}. Budding is tracked too --- our substrate produces it and no criterion mentioned
+it.\\
+\textbf{2. What do we know?} & Already measured and previously subordinate to the tube gate:
+map coverage \textbf{27\%} (3 of 11 cells can state a verdict) --- and \emph{all} of it is
+routing; \textbf{solo operator effects are 0 of 8}. Nine claims resolved, ten open, surprise
+rate 0.375.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The derived tube threshold is not discarded. It is demoted to what it always was: the test for
+whether a shape is a tube --- the criterion for two rows of the board, not the definition of the
+campaign.
+
+\textbf{This also dissolves a question I had been about to put to Cedric.} The 33 archived records
+carrying the broken survival measurement were a dilemma: quarantine them and a fallback silently
+promotes them to ``success''; leave them and the ledger is poisoned. Under a board neither
+happens --- success is not a boolean a single run can trip, so those runs are evidence whose
+forced-versus-grown status is simply \textbf{unknown}. An honest cell, neither pass nor fail.
+
+%======================================================================
 \section{The four broken rulers}\label{sec:rulers}
 
 All four are \emph{measurement} faults. The physics may be fine; we simply could not see it.
