@@ -28,3 +28,31 @@ behaviour -- purely a source read. I also did not trace whether any assembled mo
 examples/guides actually *includes* `Death` in a pipeline, so its intended composition partners
 beyond the documented Division pairing are unverified. Verdict/contract left for the normalizer.
 
+## Death -- normalized
+
+**Verdict: `new`.** Contract `apoptose` (kind `structural`, family `growth`, set `cell`; reads
+`death_rate`, writes `alive`+`death`). The frozen baseline has no operator that removes a set
+member: `cell_divide` and `cell_grow` are the only structural/growth/cell contracts, and both ADD
+matter (a daughter, or volume). `apoptose` is `cell_divide`'s biological inverse -- it retires a
+live slot rather than waking a dormant one -- so no existing contract covers it and widening
+`cell_divide` to also destroy cells would conflate mitosis with apoptosis (the paper itself lists
+division as a capability and never death). I gave it `cell_divide`'s exact typing on purpose: same
+kind/family/set, so the record shows a birth/death PAIR of structural growth operators, not a lone
+outlier.
+
+**Strongest argument AGAINST `new` (the alternative I had to defeat).** Death and Division are so
+tightly coupled at the implementation level -- identical hazard `p = 1 - exp(-rate*dt)`, identical
+`>=0` clip, identical straight-through discrete draw, identical `{action}_eligible` masking, the
+same DISCRETE phase, and a *mandatory* divide-then-die ordering -- that one could argue they are two
+IMPLEMENTATIONS (or two directions) of a single abstract contract: a Bernoulli-hazard toggle of cell
+occupancy, `occ 0->1` for division and `1->0` for death. Under that reading Death is an alias of
+`cell_divide` (or the pair is one operator with a sign), and calling it `new` inflates the atlas's
+yield by counting a sign flip as a new contract -- exactly the failure `record.py`'s R5 exists to
+catch. I rejected it because Plexus fixes contract identity by what an operator DOES to the state
+(its writes and biology), not by the noise law it borrows: division writes position/radius/lineage
+and conserves volume across a new inherited slot, while death writes only `alive`+`death` and frees
+nothing that step; sharing a random-timing law makes them no more one contract than `diffuse` and
+`decay` are for both scaling by `dt`. But the coupling is real, and if Plexus ever adds a
+`population_turnover`/occupancy-toggle abstraction, `apoptose` and `cell_divide` would be its first
+two implementations -- worth revisiting then.
+

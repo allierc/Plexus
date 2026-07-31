@@ -3,66 +3,86 @@ order: 9
 raw_name: SaturatingCellGrowth
 raw_kind: step (SimulationStep)
 code_path: papers/jax-morph/jax_morph/physics/growth.py:L23
-paper_section: 'p. 9 Methods "Cell Growth" eq. Ri(t+dt)=min(Ri(t)+dR, Rmax); restated p. 14'
-summary: >-
-  Dynamic step. For each cell it grows the per-cell radius toward the module target
-  max_radius by the exact closed-form flow of a saturating (von Bertalanffy) law
-  dr/dt = k*(1 - r/R), where the rate k is read per cell from the growth_rate state
-  field. It returns a sparse, dt-scaled delta on radius only; growth is fastest at small
-  r and relaxes to zero as r approaches max_radius.
-equations: |
-  Code (authoritative) -- the exact flow of the linear ODE dr/dt = k*(1 - r/R):
-    decay = exp(-growth_rate * dt / max_radius)
-    dr    = (max_radius - radius) * (1 - decay)
-  returned as state.deltas(radius=dr). Symbols: r = per-cell radius (state field radius);
-  k = per-cell growth_rate (state field, default 0); R = max_radius (module param);
-  dt = macro-step duration. As dt grows the increment saturates at (R - r), so r
-  approaches but never overshoots R for k >= 0, and no min/clamp is used.
-  Paper (Methods, stated twice): Ri(t+dt) = min(Ri(t) + dR, Rmax) -- a CONSTANT
-  increment dR per step (linear growth) with a hard min clamp at Rmax. The code does
-  NOT implement that constant-rate-plus-min law; it implements the saturating
-  exponential relaxation above. Per the loop rule the code wins; the disagreement is
-  recorded under surprises.
+paper_section: p. 9 Methods "Cell Growth" eq. Ri(t+dt)=min(Ri(t)+dR, Rmax); restated p. 14
+summary: Dynamic step. For each cell it grows the per-cell radius toward the module target max_radius
+  by the exact closed-form flow of a saturating (von Bertalanffy) law dr/dt = k*(1 - r/R), where the rate
+  k is read per cell from the growth_rate state field. It returns a sparse, dt-scaled delta on radius
+  only; growth is fastest at small r and relaxes to zero as r approaches max_radius.
+equations: "Code (authoritative) -- the exact flow of the linear ODE dr/dt = k*(1 - r/R):\n  decay = exp(-growth_rate\
+  \ * dt / max_radius)\n  dr    = (max_radius - radius) * (1 - decay)\nreturned as state.deltas(radius=dr).\
+  \ Symbols: r = per-cell radius (state field radius);\nk = per-cell growth_rate (state field, default\
+  \ 0); R = max_radius (module param);\ndt = macro-step duration. As dt grows the increment saturates\
+  \ at (R - r), so r\napproaches but never overshoots R for k >= 0, and no min/clamp is used.\nPaper (Methods,\
+  \ stated twice): Ri(t+dt) = min(Ri(t) + dR, Rmax) -- a CONSTANT\nincrement dR per step (linear growth)\
+  \ with a hard min clamp at Rmax. The code does\nNOT implement that constant-rate-plus-min law; it implements\
+  \ the saturating\nexponential relaxation above. Per the loop rule the code wins; the disagreement is\n\
+  recorded under surprises.\n"
 params:
   max_radius: asymptotic_target_size
 state_io:
   reads:
-    - radius
-    - growth_rate
+  - radius
+  - growth_rate
   writes:
-    - radius
+  - radius
 surprises:
-  - |
-    Paper/code contradiction (the most important thing here). The paper specifies
-    CONSTANT-rate linear growth with a hard min clamp -- Ri(t+dt)=min(Ri+dR,Rmax),
-    Methods "Cell Growth" twice, plus the intro "cells grow at a fixed rate until
-    reaching a maximum radius". The code implements a SATURATING von Bertalanffy law
-    dr/dt=k(1-r/R) with NO clamp (saturation is intrinsic). Different trajectories: the
-    paper radius grows at constant speed then stops abruptly at Rmax; the code radius
-    decelerates smoothly toward R and asymptotes. A reimplementer following the paper
-    would produce the wrong dynamics.
-  - |
-    The growth rate is NOT a constructor parameter. growth_rate is a per-cell STATE
-    FIELD (module-level spec GROWTH_RATE, heritable=True, default 0.0), designed to be
-    rewritten each macro-step by an upstream controller (gene network / MLP) so
-    gradients flow through it from a morphology objective. Default 0 means no growth
-    unless a rate is supplied. The sole constructor param is max_radius (default 1.0; a
-    jax.Array makes it a traced, optimizable target).
-  - |
-    The increment is the EXACT flow of the linear law, not forward Euler. A naive Euler
-    reimplementation dr = k*(1 - r/R)*dt would differ numerically and can overshoot for
-    large dt; the closed form dr=(R-r)*(1-exp(-k*dt/R)) is unconditionally stable and
-    monotone for any dt and any k >= 0.
-  - |
-    dt-scaling is baked into the returned delta (the exponential already contains dt).
-    This is a DYNAMIC step: the model sums its delta with any other radius writers and
-    does NOT re-scale by dt afterward. The exact-flow property holds only while this is
-    the sole dynamic writer of radius; with a co-writer it degrades to a stable
-    operator-split contribution (still additive).
-  - |
-    GROWTH_RATE is exported from the module so a separate control step can declare the
-    SAME spec and remain merge-compatible; heritable=True means a daughter inherits the
-    mother's growth propensity on division unless a controller overwrites it.
+- 'Paper/code contradiction (the most important thing here). The paper specifies
+
+  CONSTANT-rate linear growth with a hard min clamp -- Ri(t+dt)=min(Ri+dR,Rmax),
+
+  Methods "Cell Growth" twice, plus the intro "cells grow at a fixed rate until
+
+  reaching a maximum radius". The code implements a SATURATING von Bertalanffy law
+
+  dr/dt=k(1-r/R) with NO clamp (saturation is intrinsic). Different trajectories: the
+
+  paper radius grows at constant speed then stops abruptly at Rmax; the code radius
+
+  decelerates smoothly toward R and asymptotes. A reimplementer following the paper
+
+  would produce the wrong dynamics.
+
+  '
+- 'The growth rate is NOT a constructor parameter. growth_rate is a per-cell STATE
+
+  FIELD (module-level spec GROWTH_RATE, heritable=True, default 0.0), designed to be
+
+  rewritten each macro-step by an upstream controller (gene network / MLP) so
+
+  gradients flow through it from a morphology objective. Default 0 means no growth
+
+  unless a rate is supplied. The sole constructor param is max_radius (default 1.0; a
+
+  jax.Array makes it a traced, optimizable target).
+
+  '
+- 'The increment is the EXACT flow of the linear law, not forward Euler. A naive Euler
+
+  reimplementation dr = k*(1 - r/R)*dt would differ numerically and can overshoot for
+
+  large dt; the closed form dr=(R-r)*(1-exp(-k*dt/R)) is unconditionally stable and
+
+  monotone for any dt and any k >= 0.
+
+  '
+- 'dt-scaling is baked into the returned delta (the exponential already contains dt).
+
+  This is a DYNAMIC step: the model sums its delta with any other radius writers and
+
+  does NOT re-scale by dt afterward. The exact-flow property holds only while this is
+
+  the sole dynamic writer of radius; with a co-writer it degrades to a stable
+
+  operator-split contribution (still additive).
+
+  '
+- 'GROWTH_RATE is exported from the module so a separate control step can declare the
+
+  SAME spec and remain merge-compatible; heritable=True means a daughter inherits the
+
+  mother''s growth propensity on division unless a controller overwrites it.
+
+  '
 verdict: null
 of: null
 why: null

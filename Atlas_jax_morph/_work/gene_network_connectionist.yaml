@@ -77,11 +77,75 @@ surprises:
 - _rescaled_sigmoid deliberately clips x to the dtype's finite range and rescales x*x to avoid float32
   overflow/NaN at large |drive|; a naive x/sqrt(1+x^2) can overflow before the ODE solver would otherwise
   diverge.
-verdict: null
+verdict: new
 of: null
-why: null
-contract: null
-status: inspected
+implementation_of: regulate
+why: 'No registered contract expresses a per-cell INTERNAL regulatory dynamical system: a heritable
+
+  gene-state vector whose autonomous per-cell ODE (dense recurrent gene->gene coupling through a
+
+  saturating nonlinearity + linear decay + a learnable drive from SENSED external fields) is
+
+  integrated over the macro-step to emit the action-setting outputs that division / secretion /
+
+  adhesion steps read. The closest registered contract is `signal` -- a first-order recurrent
+
+  network ODE (its own MECHANISM_TAGS include "recurrent"), with the same -decay + bias +
+
+  saturated-weighted-drive skeleton. But `signal` is LATERAL: its recurrence runs BETWEEN nodes
+
+  across a fixed connectome EDGE-SET, and its typed signature is load-bearing on that topology --
+
+  INPUTS ["neuron","synapse"], MAPS ["pre","post"], REQUIRES_PARAMS ["edge_set"], activation on
+
+  the PRESYNAPTIC input. The gene circuit has NO edge set and NO cross-cell coupling: W_gene is a
+
+  dense WITHIN-cell gene->gene matrix applied independently per cell (vmap), the sigmoid wraps the
+
+  WHOLE production drive, and the environmental drive enters via W_in on sensed FIELDS -- a term
+
+  `signal` has no place for. Widening `signal` to admit it would force MAPS / edge_set to become
+
+  optional and add a field-input coupling, i.e. delete the "connectome signalling across a
+
+  connectome" that IS the contract for its only user (a neuron network), converting a lateral
+
+  graph operator into a per-cell field->state controller. That is a different contract, not a
+
+  widening. Near-misses that also fail: `sense` / `chemotax` (exchange/fields) read a field into
+
+  cell state but carry no internal heritable state and no recurrent dynamics; `pacemaker` is a
+
+  per-cell internal temporal SOURCE but a fixed-form oscillator with no input coupling and no
+
+  learnable regulatory matrix. So: `new`. This class is the CONNECTIONIST (linear-drive)
+
+  implementation of the contract; GeneNetworkMWC (thermodynamic log-occupancy drive) and NeuralODE
+
+  (black-box MLP vector field) are sibling implementations of the SAME `regulate` contract, so the
+
+  three ODEController subclasses collapse to ONE new contract, not three -- the convergence result
+
+  the ledger is meant to record.
+
+  '
+contract:
+  name: regulate
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  - sensed_input_fields
+  outputs:
+  - cell
+  reads:
+  - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
+  - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)
+  writes:
+  - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

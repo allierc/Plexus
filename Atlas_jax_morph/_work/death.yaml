@@ -78,23 +78,39 @@ surprises:
   Use exactly one estimator per run, never both.'
 verdict: new
 of: null
-why: |
-  No registered contract removes cells or models cell death. The frozen baseline has proliferation
+why: 'No registered contract removes cells or models cell death. The frozen baseline has proliferation
+
   (cell_divide) and size change (cell_grow) in the growth family, but nothing that RETIRES a set
+
   member. The closest contract is cell_divide, and the resemblance is real -- Death shares its exact
+
   Bernoulli hazard p = 1 - exp(-death_rate*dt), its >=0 rate clip, its straight-through discrete
+
   draw, its {action}_eligible trace convention, and its structural/growth/cell typing. But it is
-  cell_divide's biological INVERSE: division wakes a dormant slot (occ 0->1), shrinks the mother
-  by 2^(-1/d), scatters a volume-conserving daughter that inherits the mother's heritable state,
+
+  cell_divide''s biological INVERSE: division wakes a dormant slot (occ 0->1), shrinks the mother
+
+  by 2^(-1/d), scatters a volume-conserving daughter that inherits the mother''s heritable state,
+
   and records born/mother lineage; Death flips `alive` True->False (a live slot 1->0), frees no slot
+
   within the macro-step, and writes a per-step float `death` lineage record. Widening cell_divide to
+
   also destroy set members would force ONE contract to both create and remove cells -- violence to
+
   its biology (mitosis is not apoptosis; the paper itself lists division as a cell capability and
+
   never mentions death, see surprises). The shared Bernoulli-hazard timing is an interchangeable
+
   IMPLEMENTATION detail -- death could equally be threshold- or stress-triggered -- not contract
+
   identity, which Plexus fixes by what the operator does to the state (its outputs/writes and
+
   semantics), not by the noise model it borrows. Hence `new`: a distinct structural/growth operator
+
   `apoptose` on the cell set, not an alias or refinement of cell_divide.
+
+  '
 contract:
   name: apoptose
   kind: structural

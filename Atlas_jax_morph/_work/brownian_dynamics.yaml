@@ -3,60 +3,93 @@ order: 11
 raw_name: BrownianDynamics
 raw_kind: step (StochasticStep)
 code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L36
-paper_section: "p. 14 (Materials and Methods, 'Mechanical Interactions': relaxation = gradient-descent energy minimization of the Morse potential); high-temperature 'Brownian relaxation steps' p. 19 (SI, 'Chemical Regulation of Cellular Adhesion')"
-summary: >-
-  One Euler-Maruyama step of overdamped Langevin (Brownian) dynamics. It moves cell
-  positions by a dt-scaled displacement = deterministic drift down the potential's
-  force field plus Gaussian thermal noise, and records that displacement so the same
-  step can be replayed pathwise or scored. It is a DYNAMIC step: it returns a sparse
-  position *delta* (dt-scaled increment) that the model accumulates, not an absolute
-  position. With kT=0 the noise vanishes and it degenerates to a single gradient-descent
-  relaxation step (learning rate dt/gamma); with potential=None the drift vanishes and
-  it is a free Brownian gas (pure noise).
-equations: >-
-  Update (code): dx = mean + std * xi, applied as a delta to position, with
-    mean = dt * F(state) / gamma,  where F = potential.forces(state) = -grad U  (forces already carry the minus sign),
-    std  = sqrt(2 * kT * dt / gamma),
-    xi ~ N(0, I) standard normal, shape (capacity, n_space_dim).
-  i.e. dx = -(grad U / gamma) * dt + sqrt(2 kT dt / gamma) * xi  (the docstring's Euler-Maruyama form).
-  NOTE the split dt-scaling: drift ~ dt (linear), noise ~ sqrt(dt) (Wiener increment).
-  Score (logp): sum over ALIVE cells and dims of gaussian_logp(dx; mean, std), where
-    gaussian_logp(x, mean, std) = -0.5*((x-mean)/std)^2 - log(std) - 0.5*log(2*pi)
-    (a fully-normalized Gaussian log-density). It scores the recorded realized dx, not xi.
-    If std == 0 (kT == 0, deterministic) the contribution is masked to 0 (degenerate delta,
-    no finite density) instead of dividing by zero.
-  Symbols: U = interaction potential energy (Morse etc.); F = per-cell force -grad U;
-    gamma = translational drag; kT = thermal energy (temperature); dt = macro-step size;
-    xi = exogenous standard-normal noise; N = number of live cells; capacity = padded array size.
-  PAPER FORM (contrast): the paper writes no Langevin/Euler-Maruyama equation; its relaxation is
-    deterministic 'gradient descent energy minimization of the Morse potential for a fixed number
-    of steps' (p. 14) = the kT=0 special case of the above.
+paper_section: 'p. 14 (Materials and Methods, ''Mechanical Interactions'': relaxation = gradient-descent
+  energy minimization of the Morse potential); high-temperature ''Brownian relaxation steps'' p. 19 (SI,
+  ''Chemical Regulation of Cellular Adhesion'')'
+summary: 'One Euler-Maruyama step of overdamped Langevin (Brownian) dynamics. It moves cell positions
+  by a dt-scaled displacement = deterministic drift down the potential''s force field plus Gaussian thermal
+  noise, and records that displacement so the same step can be replayed pathwise or scored. It is a DYNAMIC
+  step: it returns a sparse position *delta* (dt-scaled increment) that the model accumulates, not an
+  absolute position. With kT=0 the noise vanishes and it degenerates to a single gradient-descent relaxation
+  step (learning rate dt/gamma); with potential=None the drift vanishes and it is a free Brownian gas
+  (pure noise).'
+equations: "Update (code): dx = mean + std * xi, applied as a delta to position, with\n  mean = dt * F(state)\
+  \ / gamma,  where F = potential.forces(state) = -grad U  (forces already carry the minus sign),\n  std\
+  \  = sqrt(2 * kT * dt / gamma),\n  xi ~ N(0, I) standard normal, shape (capacity, n_space_dim).\ni.e.\
+  \ dx = -(grad U / gamma) * dt + sqrt(2 kT dt / gamma) * xi  (the docstring's Euler-Maruyama form). NOTE\
+  \ the split dt-scaling: drift ~ dt (linear), noise ~ sqrt(dt) (Wiener increment). Score (logp): sum\
+  \ over ALIVE cells and dims of gaussian_logp(dx; mean, std), where\n  gaussian_logp(x, mean, std) =\
+  \ -0.5*((x-mean)/std)^2 - log(std) - 0.5*log(2*pi)\n  (a fully-normalized Gaussian log-density). It\
+  \ scores the recorded realized dx, not xi.\n  If std == 0 (kT == 0, deterministic) the contribution\
+  \ is masked to 0 (degenerate delta,\n  no finite density) instead of dividing by zero.\nSymbols: U =\
+  \ interaction potential energy (Morse etc.); F = per-cell force -grad U;\n  gamma = translational drag;\
+  \ kT = thermal energy (temperature); dt = macro-step size;\n  xi = exogenous standard-normal noise;\
+  \ N = number of live cells; capacity = padded array size.\nPAPER FORM (contrast): the paper writes no\
+  \ Langevin/Euler-Maruyama equation; its relaxation is\n  deterministic 'gradient descent energy minimization\
+  \ of the Morse potential for a fixed number\n  of steps' (p. 14) = the kT=0 special case of the above."
 params:
-  potential: "interaction_potential -- source of the mechanical drift; its forces(state) = -grad U give the deterministic drift. Pass None -> NoForce (a free Brownian gas: pure noise, no drift)."
-  n_space_dim: "spatial_dimension (static) -- sizes the trailing dim of the recorded xi/dx trace arrays at model-build time (before any state exists); _check_dim raises at trace time if it differs from the state's actual position dim."
-  gamma: "translational_drag_coefficient (friction). Sets mobility 1/gamma converting force to drift velocity, and appears under the noise sqrt. Plain field (float -> static, jax.Array -> traced/optimizable). Default 1.0."
-  kT: "thermal_energy (temperature). Controls translational noise amplitude via std = sqrt(2 kT dt / gamma); kT=0 -> deterministic gradient-descent relaxation. Plain field (optimizable). Default 0.1."
-  tag: "trace_namespace (static string) -- prefixes the trace fields {tag}_xi and {tag}_dx so several BrownianDynamics instances coexist in one model. Default 'brownian'."
-  score_by_default: "scoring_inclusion_flag (static) -- whether default trajectory scoring includes this step's logp. Defaults to False here (overriding the StochasticStep base default True): the displacement is reparameterized, so its gradient flows pathwise through replay regardless; the score-function term is off by default to avoid double-counting."
+  potential: 'interaction_potential -- source of the mechanical drift; its forces(state) = -grad U give
+    the deterministic drift. Pass None -> NoForce (a free Brownian gas: pure noise, no drift).'
+  n_space_dim: spatial_dimension (static) -- sizes the trailing dim of the recorded xi/dx trace arrays
+    at model-build time (before any state exists); _check_dim raises at trace time if it differs from
+    the state's actual position dim.
+  gamma: translational_drag_coefficient (friction). Sets mobility 1/gamma converting force to drift velocity,
+    and appears under the noise sqrt. Plain field (float -> static, jax.Array -> traced/optimizable).
+    Default 1.0.
+  kT: thermal_energy (temperature). Controls translational noise amplitude via std = sqrt(2 kT dt / gamma);
+    kT=0 -> deterministic gradient-descent relaxation. Plain field (optimizable). Default 0.1.
+  tag: trace_namespace (static string) -- prefixes the trace fields {tag}_xi and {tag}_dx so several BrownianDynamics
+    instances coexist in one model. Default 'brownian'.
+  score_by_default: 'scoring_inclusion_flag (static) -- whether default trajectory scoring includes this
+    step''s logp. Defaults to False here (overriding the StochasticStep base default True): the displacement
+    is reparameterized, so its gradient flows pathwise through replay regardless; the score-function term
+    is off by default to avoid double-counting.'
 state_io:
   reads:
-    - "position (POSITION) -- the drift is evaluated at current positions."
-    - "potential.state_reads() -- any per-cell field the potential sources couplings from (e.g. radius via sigma = r_i + r_j; a per-cell epsilon StateFieldSpec when adhesion is field-driven). Empty for NoForce."
+  - position (POSITION) -- the drift is evaluated at current positions.
+  - potential.state_reads() -- any per-cell field the potential sources couplings from (e.g. radius via
+    sigma = r_i + r_j; a per-cell epsilon StateFieldSpec when adhesion is field-driven). Empty for NoForce.
   writes:
-    - "position (POSITION) -- a DYNAMIC dt-scaled displacement delta, summed across dynamic writers by the model (not an absolute position)."
+  - position (POSITION) -- a DYNAMIC dt-scaled displacement delta, summed across dynamic writers by the
+    model (not an absolute position).
   trace_writes:
-    - "{tag}_xi -- exogenous standard-normal noise, shape (n_space_dim,), heritable=False, default 0 (ephemeral, reset each macro-step)."
-    - "{tag}_dx -- realized displacement dx, shape (n_space_dim,), heritable=False, default 0. logp scores this field."
+  - '{tag}_xi -- exogenous standard-normal noise, shape (n_space_dim,), heritable=False, default 0 (ephemeral,
+    reset each macro-step).'
+  - '{tag}_dx -- realized displacement dx, shape (n_space_dim,), heritable=False, default 0. logp scores
+    this field.'
 surprises:
-  - "PAPER vs SOURCE (the key contradiction): the paper's Methods (p. 14) defines mechanical relaxation as DETERMINISTIC 'gradient descent energy minimization of the Morse potential for a fixed number of steps' -- no thermal noise, and neither gamma nor kT is written down. Thermal 'Brownian relaxation steps ... temperature is high' appear only in the SI differential-adhesion experiment (p. 19), again with no equation. The SOURCE implements a full overdamped Langevin step with explicit gamma and kT and a sqrt(2 kT dt / gamma) noise term. SOURCE WINS: the code unifies both regimes under one parameterized step -- kT=0 reduces exactly to one gradient-descent step (dx = -(grad U/gamma)*dt, learning rate dt/gamma), kT>0 is the noisy high-temperature relaxation."
-  - "Split dt-scaling: drift ~ dt but noise ~ sqrt(dt) (Wiener). A reimplementer who scales the noise by dt (not sqrt(dt)) gets the diffusion constant wrong. This is the Euler-Maruyama discretization, not simple explicit Euler."
-  - "forces() already returns -grad U (F = -grad energy), so mean = dt * forces / gamma is the drift down the potential; do NOT add another minus sign."
-  - "Dynamic-delta contract: replay returns state.deltas(position=dx, ...) -- a sparse increment with every untouched field None -- NOT a full updated state. The model sums these across dynamic writers and alive-masks them once."
-  - "kT=0 guard: logp routes through _gaussian_logp_or_zero, which replaces std with 1.0 before gaussian_logp then masks the result to 0, so a deterministic (std=0) component contributes 0 log-density and never NaNs under jax_debug_nans. A naive gaussian_logp would divide by zero."
-  - "score_by_default defaults to False here, overriding the StochasticStep base default (True). Because the Gaussian displacement is reparameterizable, its gradient is carried pathwise through replay; adding the logp (score-function) term by default would double-count. Flipping this adds a spurious REINFORCE-style term to a reparameterized draw."
-  - "sample_trace returns ONLY the noise xi (shape (capacity, n_space_dim)); it does not sample dx. replay derives dx = mean + std*xi and records BOTH xi and dx, so the recorded dx is by construction the value replay computed (no sampler/replay disagreement). logp then scores the recorded dx, not xi."
-  - "Trace fields are heritable=False and reset to 0 at the start of every macro-step (ephemeral); a daughter cell created by a division step does not inherit {tag}_xi / {tag}_dx. n_space_dim is a static int that sizes these arrays before any state exists; a mismatch with the state's real dim raises in _check_dim at trace time, not as an obscure broadcast error."
-  - "gamma and kT are plain 'object' fields, not eqx static: a Python float is static, a jax.Array is traced -- so both are differentiable/optimizable. Only n_space_dim and tag are eqx static."
+- 'PAPER vs SOURCE (the key contradiction): the paper''s Methods (p. 14) defines mechanical relaxation
+  as DETERMINISTIC ''gradient descent energy minimization of the Morse potential for a fixed number of
+  steps'' -- no thermal noise, and neither gamma nor kT is written down. Thermal ''Brownian relaxation
+  steps ... temperature is high'' appear only in the SI differential-adhesion experiment (p. 19), again
+  with no equation. The SOURCE implements a full overdamped Langevin step with explicit gamma and kT and
+  a sqrt(2 kT dt / gamma) noise term. SOURCE WINS: the code unifies both regimes under one parameterized
+  step -- kT=0 reduces exactly to one gradient-descent step (dx = -(grad U/gamma)*dt, learning rate dt/gamma),
+  kT>0 is the noisy high-temperature relaxation.'
+- 'Split dt-scaling: drift ~ dt but noise ~ sqrt(dt) (Wiener). A reimplementer who scales the noise by
+  dt (not sqrt(dt)) gets the diffusion constant wrong. This is the Euler-Maruyama discretization, not
+  simple explicit Euler.'
+- forces() already returns -grad U (F = -grad energy), so mean = dt * forces / gamma is the drift down
+  the potential; do NOT add another minus sign.
+- 'Dynamic-delta contract: replay returns state.deltas(position=dx, ...) -- a sparse increment with every
+  untouched field None -- NOT a full updated state. The model sums these across dynamic writers and alive-masks
+  them once.'
+- 'kT=0 guard: logp routes through _gaussian_logp_or_zero, which replaces std with 1.0 before gaussian_logp
+  then masks the result to 0, so a deterministic (std=0) component contributes 0 log-density and never
+  NaNs under jax_debug_nans. A naive gaussian_logp would divide by zero.'
+- score_by_default defaults to False here, overriding the StochasticStep base default (True). Because
+  the Gaussian displacement is reparameterizable, its gradient is carried pathwise through replay; adding
+  the logp (score-function) term by default would double-count. Flipping this adds a spurious REINFORCE-style
+  term to a reparameterized draw.
+- sample_trace returns ONLY the noise xi (shape (capacity, n_space_dim)); it does not sample dx. replay
+  derives dx = mean + std*xi and records BOTH xi and dx, so the recorded dx is by construction the value
+  replay computed (no sampler/replay disagreement). logp then scores the recorded dx, not xi.
+- Trace fields are heritable=False and reset to 0 at the start of every macro-step (ephemeral); a daughter
+  cell created by a division step does not inherit {tag}_xi / {tag}_dx. n_space_dim is a static int that
+  sizes these arrays before any state exists; a mismatch with the state's real dim raises in _check_dim
+  at trace time, not as an obscure broadcast error.
+- 'gamma and kT are plain ''object'' fields, not eqx static: a Python float is static, a jax.Array is
+  traced -- so both are differentiable/optimizable. Only n_space_dim and tag are eqx static.'
 verdict: null
 of: null
 why: null

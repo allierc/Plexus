@@ -95,11 +95,82 @@ surprises:
   ln(1+g_i/K_gene_ii). n_gene = hidden_size + out_size, and output genes are ordered so the last output
   is the readout consumed downstream (paper: last output gene = division propensity, last Nc = secretion
   rates) -- ordering of output_specs is semantically load-bearing, not documented in this class.'
-verdict: null
+verdict: new
 of: null
-why: null
-contract: null
-status: inspected
+implementation_of: regulate
+why: 'No registered contract expresses a per-cell INTERNAL regulatory dynamical system: a heritable
+
+  gene-state vector whose autonomous per-cell ODE is integrated over one macro-step -- reading the
+
+  cell''s own gene concentrations plus a fixed snapshot of SENSED external fields, and emitting the
+
+  sparse gene-expression deltas that division / secretion / adhesion steps read. This class is the
+
+  THERMODYNAMIC (MWC / statistical-mechanics log-occupancy) implementation of that contract: its
+
+  vector field is dg/dt = rho*sigmoid(F0 + sum H*ln(1+g/K)) - g/tau. Its two siblings in the same
+
+  file -- GeneNetworkConnectionist (linear W*g drive) and NeuralODE (black-box MLP vector field) --
+
+  share the SAME integration and I/O contract and differ ONLY in the vector field f. This is the
+
+  Morse/SoftSphere/Hertzian pattern: the three ODEController subclasses collapse to ONE contract
+
+  `regulate` with three implementations, NOT three contracts -- so `implementation_of: regulate`,
+
+  and the phase yields one new contract, not an inflated three. The verdict is `new` (not
+
+  alias/refinement) only because `regulate` is absent from the frozen 42 and therefore cannot be an
+
+  `of:` target until it is promoted; R4 rejects a non-registered `of:`. The closest REGISTERED
+
+  contracts all lose their biology if widened to admit this. `signal` (lateral/interaction) is a
+
+  recurrent nonlinear first-order ODE network -- the same -decay + bias + saturated-drive skeleton
+
+  -- but its recurrence runs BETWEEN nodes across a fixed connectome EDGE-SET (INPUTS neuron/synapse,
+
+  MAPS pre/post, REQUIRES edge_set); the gene circuit has NO edge set and no cross-cell coupling:
+
+  H_gene is a dense WITHIN-cell gene->gene matrix applied independently per cell (vmap), and the
+
+  environmental drive enters via H_in*ln(1+u/K_in) on sensed FIELDS, a term `signal` has no slot
+
+  for. Widening `signal` to fit would make MAPS/edge_set optional and bolt on field sensing -- i.e.
+
+  delete the connectome signalling that IS the contract for its only user. Other near-misses fail
+
+  too: `sense` / `chemotax` (exchange/fields) read a field into cell state but carry no heritable
+
+  internal state and no recurrent dynamics; `decay` is a bare first-order relaxation with no
+
+  production and no coupling; `pacemaker` is a fixed-form autonomous clock with no sensed drive and
+
+  no learnable regulatory matrix. Per rule 5 the SOURCE sets scope: this MWC log-occupancy drive is
+
+  NOT in the paper (which states only the linear connectionist eq. 4), so it is a code-only
+
+  thermodynamic variant recorded as the third implementation of the same biological role.
+
+  '
+contract:
+  name: regulate
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  - sensed_input_fields
+  outputs:
+  - cell
+  reads:
+  - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
+  - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics, held fixed over
+    dt)
+  writes:
+  - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

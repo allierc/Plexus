@@ -78,11 +78,78 @@ surprises:
   reparameterizable pathwise branch (replay(pathwise=True)) and an oriented placement -- a second, lower-variance
   gradient path the paper never mentions. The two estimators must not be summed in one run (division.py
   L1-8); the source is authoritative here.'
-verdict: null
+verdict: out_of_scope
 of: null
-why: null
-contract: null
-status: inspected
+why: 'StochasticStep is an ABSTRACT differentiability mixin, not a forward-dynamics operator. Its own
+
+  state_writes() and trace_writes() both default to (): it writes no physical state of its own and
+
+  adds exactly one non-physical constructor knob (score_by_default, a scoring-inclusion flag). Its
+
+  entire content is the gradient-estimator machinery -- sample parameter-free exogenous noise,
+
+  replay it to produce the effect, and score each selected step''s logp -- i.e. the REINFORCE /
+
+  score-function estimator (paper p. 10) for discrete events plus a reparameterized pathwise branch
+
+  the model selects via `pathwise = not scored`. That is autodiff / optimization plumbing. In
+
+  Plexus, differentiability is an ENGINE concern (torch autograd over the forward operators), not an
+
+  operator in the forward algebra, so there is nothing here for the vocabulary to gain.
+
+
+  The biology lives entirely in the concrete subclasses, each already its own atlas entry and each
+
+  carrying its own real contract: a Bernoulli division IS `cell_divide` (order 26 `division`), death
+
+  IS apoptosis (order 6 `death`), a Brownian displacement IS motion. The mixin adds nothing to those
+
+  forward effects; it adds only the gradient PATH (which estimator, how the trace round-trips into
+
+  scoring). Hence not `alias`/`refinement`: no registered contract models gradient estimation, and
+
+  widening one to admit trace/replay/score would graft an optimization concern onto a
+
+  forward-dynamics signature. And not `new`: counting a differentiability contract as a new operator
+
+  would inflate the yield with framework machinery, exactly the failure out_of_scope exists to
+
+  prevent. The strongest counter -- "an operator whose effect is a scored random draw" is a genuine
+
+  gap -- is rejected because that forward effect already has a biological home in the subclass''s own
+
+  contract; only the AD path is left over, and that is not a forward operation on state.
+
+
+  SOURCE-vs-PAPER (recorded in surprises): the paper describes ONLY the discrete score-function
+
+  estimator and a uniformly-random division plane; the code additionally supports a reparameterized
+
+  pathwise branch and oriented placement -- a lower-variance path the paper never mentions. The two
+
+  estimators must not be summed in one run (division.py L1-8); the source is authoritative.
+
+
+  OVERLAP: the sibling entry `stochastic_trace___replay___score` (order 24) is the SAME
+
+  core/step.py:148 class and should receive the same out_of_scope verdict.
+
+  '
+contract:
+  name: sample_score
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads: []
+  writes:
+  - trace
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:
