@@ -2591,9 +2591,9 @@ mechanisms:
       contact); a radial pair force integrated overdamped or minimised by the wrapping motion step. This
       is the adhesion-OFF shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive
       tail)
-  status: normalized
-  module: null
-  test: null
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_soft_sphere.py
+  test: tests/test_jax_morph_soft_sphere.py
   evidence:
     oracle_run: null
     diff_metric: null
