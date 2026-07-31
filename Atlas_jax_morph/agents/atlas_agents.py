@@ -24,14 +24,14 @@ THE SIX ROLES
 WHAT EVERY ROLE IS TOLD, AND WHY
 
   * The record is the product, not the chat. An agent that explains a brilliant normalization in
-    prose and does not write it into `Atlas_jax_morph/atlas_record.yaml` has produced nothing.
+    prose and does not write it into its entry has produced nothing.
   * A verdict is an obligation (see record.py). `new` must survive all three baseline tiers;
     `alias`/`refinement` must name a registered contract and say what differs.
   * The baseline is the PROMOTED language only. A name that exists in `prototype/` or in the
     `candidates/` anti-chamber does not make a mechanism un-new -- but do read that code before
     writing a fresh implementation of it.
-  * Never edit another mechanism's entry. One mechanism per call keeps attribution possible --
-    the same rule as the discovery loop's one-edit-per-slot.
+  * One mechanism per call keeps attribution possible -- the same rule as the discovery loop's
+    one-edit-per-slot. The working copy makes it structural rather than a request.
   * If the source contradicts the paper, the SOURCE WINS and the contradiction is recorded. It is
     the most valuable thing a reproduction can find, and the reason we chose a target with code.
 """
@@ -68,6 +68,14 @@ ATLAS_BUDGETS = {
 }
 
 RECORD = os.path.join(ATLAS, "atlas_record.yaml")
+WORK = os.path.join(ATLAS, "_work")          # one file per mechanism, the agent's whole world
+NOTES = os.path.join(CAMPAIGN, "notes")      # one note per mechanism; merged into analysis.md
+
+# The discovery loop's per-round LLM ceiling is 25 minutes, sized for a round that is ~20 minutes
+# of GPU. An atlas phase is 24 sequential reading calls and nothing else, so that ceiling would
+# fire on call three and print an overrun for every call after it -- noise that trains you to
+# ignore the one message that must never be ignored. The atlas sets its own.
+_llm.ROUND_LLM_BUDGET_MIN = 24 * 15.0
 
 
 # ------------------------------------------------------------------------------------------- #
@@ -106,8 +114,8 @@ library's own guides are under `papers/jax-morph/jax_morph/guides/`. It RUNS: `A
 isolated venv, and `Atlas_jax_morph/_oracle/runs/smoke/` already holds a deterministic reference trajectory.
 
 THE RULES OF THIS LOOP.
-1. The product is `Atlas_jax_morph/atlas_record.yaml`. Prose that is not written into the record does not exist.
-2. Edit ONLY the one mechanism entry you are given. Never touch another entry, never reorder.
+1. The product is the record entry. Prose that is not written into it does not exist.
+2. You are given a working copy holding ONE entry. Edit that file; the driver merges it back.
 3. A verdict is an obligation, not a label. `record.py` enforces twelve rules and the driver
    runs it after you; if it fails, your edit is reverted and you are shown the violations.
 4. `new` means the PROMOTED language does not have it: not among the registered contracts in
@@ -120,13 +128,41 @@ THE RULES OF THIS LOOP.
 """
 
 
-def _mech_json(mech_id) -> str:
+def entry(mech_id) -> dict:
     import record
-    doc = record.load(RECORD)
-    for m in doc["mechanisms"]:
+    for m in record.load(RECORD)["mechanisms"]:
         if m["id"] == mech_id:
-            return json.dumps(m, indent=2, default=str)
+            return m
     raise SystemExit(f"no mechanism {mech_id!r} in the record")
+
+
+def work_file(mech_id) -> str:
+    """The agent's working copy: ONE mechanism entry, alone in a file.
+
+    Isolation by construction rather than by instruction. The blast-radius rule ("never edit a
+    neighbouring entry") was a request an agent could violate by accident; a file that contains
+    only its own entry cannot be violated at all -- and it is what lets several agents run at
+    once without racing on one YAML.
+    """
+    import yaml
+    os.makedirs(WORK, exist_ok=True)
+    path = os.path.join(WORK, f"{mech_id}.yaml")
+    with open(path, "w") as f:
+        yaml.safe_dump(entry(mech_id), f, sort_keys=False, width=100, allow_unicode=True)
+    return path
+
+
+def _mech_json(mech_id) -> str:
+    return json.dumps(entry(mech_id), indent=2, default=str)
+
+
+def _where(mech_id) -> str:
+    return (f"YOUR WORKING COPY: `Atlas_jax_morph/_work/{mech_id}.yaml` -- this file holds this "
+            f"ONE mechanism entry and nothing else. EDIT THAT FILE. Do not open or edit "
+            f"`Atlas_jax_morph/atlas_record.yaml`: the driver merges your entry back into it "
+            f"after validating it, and an edit there is reverted.\n"
+            f"YOUR NOTE: `Atlas_jax_morph/campaign/notes/{mech_id}.md` -- create or append; the "
+            f"driver merges the notes into `campaign/analysis.md` at the end of the phase.")
 
 
 # ------------------------------------------------------------------------------------------- #
@@ -137,7 +173,9 @@ def excavate_prompt(mech_id):
 
 ROLE: EXCAVATOR. One mechanism, read at source.
 
-THE ENTRY (in `Atlas_jax_morph/atlas_record.yaml`):
+{_where(mech_id)}
+
+THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
 DO THIS
@@ -162,8 +200,8 @@ DO THIS
    and a reader who has just spent an hour in a file is the worst-placed person to judge whether
    it is novel.
 
-Then append 5-15 lines to `Atlas_jax_morph/campaign/analysis.md` under a heading with the mechanism id: what you
-read, what surprised you, what you could not determine. Be concrete about what you did NOT
+Then write 5-15 lines into your note file: what you read, what surprised you, what you could not
+determine. Be concrete about what you did NOT
 establish -- an unstated uncertainty becomes someone else's false belief.
 """
 
@@ -173,7 +211,9 @@ def normalize_prompt(mech_id):
 
 ROLE: NORMALIZER. Translate one inspected mechanism into the Plexus operator algebra.
 
-THE ENTRY:
+{_where(mech_id)}
+
+THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
 THE FROZEN BASELINE:
@@ -202,8 +242,7 @@ DO THIS
    and finding a lot of it is a GOOD result, not a disappointing one.
 4. Set `status: normalized`.
 
-One paragraph in `Atlas_jax_morph/campaign/analysis.md` under the mechanism id: the verdict and the single
-strongest argument AGAINST it. If you cannot construct an argument against your own verdict,
+One paragraph in your note file: the verdict and the single strongest argument AGAINST it. If you cannot construct an argument against your own verdict,
 you have not understood the alternative.
 """
 
@@ -213,7 +252,9 @@ def skeptic_prompt(mech_id):
 
 ROLE: SKEPTIC. Try to refute a verdict. You have NO edit tools -- you argue, the driver decides.
 
-THE ENTRY:
+{_where(mech_id)}
+
+THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
 THE FROZEN BASELINE:
@@ -247,7 +288,9 @@ def implement_prompt(mech_id):
 
 ROLE: IMPLEMENTER. Write the Plexus operator for one normalized mechanism.
 
-THE ENTRY:
+{_where(mech_id)}
+
+THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
 DO THIS
@@ -279,7 +322,9 @@ def differ_prompt(mech_id):
 
 ROLE: DIFFER. Decide whether our operator actually reproduces the reference's behaviour.
 
-THE ENTRY:
+{_where(mech_id)}
+
+THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
 THE ORDER OF OPERATIONS IS THE WHOLE TEST. Do it in exactly this order:
@@ -304,7 +349,7 @@ THE ORDER OF OPERATIONS IS THE WHOLE TEST. Do it in exactly this order:
    would test it. A failed differential test is the most informative outcome available here --
    it is the reproduction telling us the contract is wrong.
 
-Append the numbers, both runs' paths, and the verdict to `Atlas_jax_morph/campaign/analysis.md`.
+Append the numbers, both runs' paths, and the verdict to your note file.
 """
 
 
@@ -313,7 +358,9 @@ def curate_prompt(mech_id):
 
 ROLE: CURATOR. Promote a validated operator out of the anti-chamber, or refuse to.
 
-THE ENTRY:
+{_where(mech_id)}
+
+THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
 Promotion is a claim that this contract is part of the Plexus language. Refuse it if:

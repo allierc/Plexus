@@ -1,0 +1,110 @@
+id: neural_ode
+order: 2
+raw_name: NeuralODE
+raw_kind: step (ODEController)
+code_path: papers/jax-morph/jax_morph/control/ode.py:L281
+paper_section: eq. (4), p. 16 (Gene Networks) - describes the ODE-controller FAMILY, not this
+  generic-MLP member; see surprises
+summary: >-
+  A DYNAMIC controller step. Over one macro-step of duration dt it integrates a per-cell ODE whose
+  right-hand side is a single shared MLP: it packs the cell's fixed sensed driver inputs u and its
+  evolving state y (optional latent hidden block concatenated with the observed output fields) into
+  one vector, sets dy/dt = MLP([u, y]) (u frozen for the whole step), integrates with an adaptive
+  Dopri5 solver from t=0 to t=dt, and writes the CHANGE y(dt)-y(0) back as sparse dt-deltas on the
+  hidden field and each output field. It is the generic, uninterpretable sibling of the paper's
+  gene-regulatory ODE: the same ODEController integration machinery with the structured
+  sigmoid-linear vector field replaced by a free-form neural network.
+equations: >-
+  Code (NeuralODE.vector_field + ODEController.__call__):
+    y  = concat(hidden, outputs)        # evolving state, width = hidden_size + out_size
+    u  = concat(input_specs fields)      # fixed drivers, width = in_size, held constant over dt
+    dy/dt = MLP( concat(u, y) )          # one shared MLP, applied per cell via vmap; autonomous (t unused)
+    y(dt) = diffrax.diffeqsolve(Dopri5, t0=0, t1=dt, dt0=dt,
+                                PIDController(rtol=1e-4, atol=1e-6), SaveAt(t1=True))
+    delta = y(dt) - y(0)                 # returned as sparse per-field increments, NOT the new value
+  MLP shape contract: in_size + hidden_size + out_size  ->  hidden_size + out_size.
+  Paper eq. (4) (the ODEController family this generalizes; implemented literally by
+  GeneNetworkConnectionist, not here):
+    dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i
+  where g_i = expression of gene i, W_ij = regulatory coupling of gene j on i, b_i = basal
+  transcription bias, I_i = sensed input forcing, k_i = degradation rate, phi = saturating sigmoid.
+  NeuralODE keeps the "phi(...) + I - k g" scaffolding NOWHERE - it replaces the entire RHS with
+  MLP([u, y]), so there is no explicit W, b, k, degradation, or additive input forcing; those are
+  whatever the network learns.
+params:
+  input_specs:
+    role: >-
+      input_field_binding - static tuple of StateFieldSpec naming the sensed driver fields u
+      (chemicals, stress, ...) read each step and held FIXED during integration; sets in_size.
+  output_specs:
+    role: >-
+      output_field_binding - static tuple of StateFieldSpec naming the observed evolving fields the
+      ODE integrates and writes back as dt-deltas (e.g. gene readouts / division propensity /
+      secretion); sets out_size.
+  hidden_size:
+    role: >-
+      latent_state_width - width of the unobserved hidden block prepended to the evolving state;
+      0 means a pure-output ODE and NO hidden field is allocated or written. Must be >= 0.
+  mlp:
+    role: >-
+      vector_field_network - the learnable per-cell derivative map (an eqx.nn.MLP); THIS is where
+      all trainable/optimizable parameters live. Must already be sized in_size+hidden_size+out_size
+      -> hidden_size+out_size; build it with the make_mlp classmethod (defaults width=64, depth=2).
+  tag:
+    role: >-
+      field_namespace - string prefix for the latent field name f'{tag}_hidden' (default 'ode');
+      lets several controllers coexist without colliding on the hidden-state field. Purely a naming
+      key, not a physical quantity.
+state_io:
+  reads:
+    - "every field in input_specs (the fixed drivers u), by declared spec name"
+    - "every field in output_specs (current observed evolving state), by declared spec name"
+    - "f'{tag}_hidden' (latent state) - ONLY when hidden_size > 0"
+  writes:
+    - "f'{tag}_hidden' with shape (hidden_size,) - ONLY when hidden_size > 0 (heritable latent state)"
+    - "every field in output_specs - as a per-dt increment (delta), scalar chunk squeezed when spec.shape == ()"
+surprises:
+  - >-
+    NOT IN THE PAPER. The paper's only ODE controller is the structured gene-regulatory network
+    eq. (4) (sigmoid of a linear regulatory drive + additive input forcing - linear degradation),
+    implemented by GeneNetworkConnectionist. NeuralODE - a free-form MLP vector field - has NO paper
+    counterpart; it is a library generalization of the ODEController contract. A reimplementer who
+    "implements the paper" would build the gene network, not this.
+  - >-
+    Returns a DELTA, not the integrated state. __call__ returns y(dt) - y(0) as sparse deltas
+    because DYNAMIC steps contribute dt-scaled increments that the engine ACCUMULATES across writers
+    (see core/step.py). Returning solution.ys[-1] directly (the new value) would double-add the old
+    state. dt-scaling is already baked in via the integration window [0, dt].
+  - >-
+    The driver inputs u are FROZEN for the whole macro-step - the ODETerm closes over the packed
+    inputs once, so mid-step feedback from u is impossible by construction; only the evolving block y
+    changes during integration. The vector field is autonomous (t is deleted/unused).
+  - >-
+    dt0=dt sets the FIRST solver step to the entire macro-step, then Dopri5 + PIDController
+    (rtol=1e-4, atol=1e-6) adapt sub-steps; the tolerances are hard-coded, not exposed as params, so
+    accuracy is fixed and independent of dt magnitude.
+  - >-
+    Constructor does NO random init and NO parameter allocation of its own: it only stores a
+    pre-built mlp and validates its in/out sizes (raises if the MLP shape != in+hidden+out ->
+    hidden+out). make_mlp defaults (width=64, depth=2, key required) are the only place randomness
+    enters, and they live on the classmethod, not the constructor.
+  - >-
+    When hidden_size == 0 no hidden field is read or written and y0 is just the packed outputs; the
+    hidden delta dict is omitted entirely. _pack returns a (n_cells, 0) zero array for an empty spec
+    tuple, so an all-empty output_specs would still run but write nothing meaningful.
+  - >-
+    UNKNOWN I could not establish empirically: whether any oracle script / smoke trajectory actually
+    instantiates NeuralODE (vs the gene-network controllers). Its parameter count and typical field
+    bindings in a real run are undetermined here - I read the class statically only.
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null
