@@ -16,16 +16,46 @@ from tyssue_topology_ops3d import rings_from_flat_3d
 _COS = np.cos(np.deg2rad(24.0))   # tubes merge cells within 24 deg of the cluster axis
 
 
+def protrusion_ratio(rad):
+    """THE protrusion definition, in one place: percentile(r,95) / median(r).
+
+    `run_one.protr_of` (vertex positions) and `frame_metrics` (cell centroids) apply it to
+    different point sets, which is fine -- what is not fine is the two computing DIFFERENT
+    quantities under the same name, which is what happened when one measured radius from the
+    tissue centroid and the other from the world origin. Both now call this.
+    """
+    rad = np.asarray(rad, float)
+    return float(np.percentile(rad, 95) / (np.median(rad) + 1e-9)) if rad.size else 1.0
+
+
 def _cell_centroids(pt, mt):
+    """Per-cell centroids and their radius FROM THE TISSUE CENTROID, plus the live-cell mask.
+
+    Radius used to be `norm(cen)` -- distance from the WORLD ORIGIN. `run_one.protr_of` measures
+    `norm(pos - pos.mean(0))` -- distance from the TISSUE centroid. Both were called `protr`, and
+    the difference is the whole `protr` vs `ta_protr` divergence: nothing pins the vesicle to the
+    origin, so asymmetric growth and extrusion translate it and the origin-referenced version
+    reads that DRIFT as elongation. The tube-clustering directions (`cen/rad`) pointed at the
+    origin rather than along the tube for the same reason. Both are now centroid-referenced.
+
+    `live` must be returned explicitly: the old code used `rad > 1e-9` as a liveness test, which
+    only worked because a dead ring produced the origin. Once the origin is no longer the
+    reference, a dead cell has a NON-zero radius and a live cell may sit exactly at the centroid.
+    """
     rings = rings_from_flat_3d(np.asarray(mt["E_srce"]), np.asarray(mt["E_trgt"]), np.asarray(mt["E_face"]), mt["nF"])
+    live = np.array([r is not None and len(r) > 0 for r in rings], dtype=bool)
     cen = np.array([pt[r].mean(0) if (r is not None and len(r)) else [0.0, 0.0, 0.0] for r in rings])
-    return cen, np.linalg.norm(cen, axis=1)
+    origin = cen[live].mean(0) if live.any() else np.zeros(3)
+    cen = cen - origin                                       # centroid-referenced, like protr_of
+    rad = np.linalg.norm(cen, axis=1)
+    rad[~live] = 0.0                                         # dead cells stay at radius 0 by fiat
+    return cen, rad, live
 
 
 def tube_diameter(pt, mt, prot_frac=1.3):
     """Average tube diameter + tube count. Cluster protruding cells (r>1.3x body median) by direction,
     diameter = 2x median perpendicular distance to the tube axis; also return protrusion + tube length."""
-    cen, rad = _cell_centroids(pt, mt); good = rad > 1e-9
+    cen, rad, good = _cell_centroids(pt, mt)
     if good.sum() < 8:
         return dict(tube_diam=0.0, n_tubes=0, tube_len=0.0)
     rbody = float(np.median(rad[good]))
@@ -34,7 +64,7 @@ def tube_diameter(pt, mt, prot_frac=1.3):
         return dict(tube_diam=0.0, n_tubes=0, tube_len=0.0)
     clusters = []                                            # greedy angular clustering into tubes
     for i in prot:
-        di = cen[i] / rad[i]
+        di = cen[i] / max(rad[i], 1e-12)
         for c in clusters:
             if float(di @ c["dir"]) > _COS:
                 c["idx"].append(i); m = cen[c["idx"]].mean(0); c["dir"] = m / (np.linalg.norm(m) + 1e-12); break
@@ -57,7 +87,7 @@ def cell_census(pt, mt, act):
     STATE (red = activated vs white), so we can watch the composition over frames. A clean TUBE keeps the
     activator CONFINED to a small tip (red_frac ~ tip_frac, red_at_tip ~ 1, body-dominant); a RUNAWAY /
     cauliflower spreads red far beyond the tips (red_frac >> tip_frac) and grows the tip count each frame."""
-    _, rad = _cell_centroids(pt, mt); ok = rad > 1e-9
+    _, rad, ok = _cell_centroids(pt, mt)
     r = rad[ok]; n = max(len(r), 1)
     body_r = float(np.median(r)); max_r = float(np.percentile(r, 97)); span = max(max_r - body_r, 1e-6)
     tip = r > body_r + 0.70 * span                              # top of the protrusion
@@ -85,12 +115,12 @@ def frame_metrics(pt, mt, act=None):
     m = dict(cells=int(nF), hollow_n=int(hst["n"]), hollow_frac=round(float(hst["frac"]), 4),
              area_cv=round(float(a.std() / (a.mean() + 1e-9)), 3) if a.size else 0.0,
              vol_cv=round(float(v.std() / (v.mean() + 1e-9)), 3) if v.size else 0.0)
-    _, rad = _cell_centroids(pt, mt); rad = rad[rad > 1e-9]
-    m["protr"] = round(float(np.percentile(rad, 95) / (np.median(rad) + 1e-9)), 3) if rad.size else 1.0
+    _, radl, livem = _cell_centroids(pt, mt); rad = radl[livem]
+    m["protr"] = round(protrusion_ratio(rad), 3)
     if act is not None and len(act):
         act = np.asarray(act, float); thr = act.min() + 0.5 * (act.max() - act.min())
         m["red_frac"] = round(float((act > thr).mean()), 3)
-        _, radc = _cell_centroids(pt, mt); ok = radc > 1e-9    # tip_act: corr(activator, radius). +1 = activator
+        radc, ok = radl, livem                                 # tip_act: corr(activator, radius). +1 = activator
         if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
             m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
     m.update(tube_diameter(pt, mt))
@@ -120,6 +150,20 @@ def analyze(frames, OUT):
                 tip_frac_final=series[-1].get("tip_frac", 0.0), body_frac_final=series[-1].get("body_frac", 0.0),
                 red_over_tip_final=round(series[-1].get("red_frac2", 0.0) / max(series[-1].get("tip_frac", 1e-6), 1e-6), 2))
     json.dump({"summary": summ, "series": series}, open(os.path.join(OUT, "metrics.json"), "w"), indent=1)
+    # ALSO as .npz, column-oriented, to match mechanics.npz.
+    #
+    # The two time series of the same run were stored in two different formats -- mechanics as
+    # named arrays, these as a list of per-frame dicts -- so nothing could load both the same way
+    # and, in practice, nothing loaded these at all. `metrics.png` is drawn from them and is
+    # referenced ZERO times anywhere in the codebase: plotted every run since the beginning, read
+    # by nobody. One format is the precondition for anything (the Analyst, the Metrologist, the
+    # evidence horizon) actually consuming the trajectories instead of the endpoints.
+    #
+    # `metrics.json` is kept as well: it carries the summary, and the archive already contains
+    # runs that only have it.
+    _cols = {k: np.asarray([r.get(k, np.nan) for r in series], dtype=float)
+             for k in (series[0].keys() if series else ())}
+    np.savez(os.path.join(OUT, "metrics.npz"), **_cols)
     fig, ax = plt.subplots(1, 4, figsize=(18.0, 3.4)); fig.patch.set_facecolor("white")
     ax[0].plot(fr, col("hollow_n"), "-", color="crimson"); ax[0].set_title("hollow cell count"); ax[0].set_xlabel("frame")
     ax[1].plot(fr, col("area_cv"), "-", color="C0", label="area"); ax[1].plot(fr, col("vol_cv"), "-", color="C2", label="vol")
