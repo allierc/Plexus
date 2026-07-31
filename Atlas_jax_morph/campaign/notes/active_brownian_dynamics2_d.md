@@ -71,3 +71,36 @@ deterministic) lives entirely in the `D_r` rotational diffusion glide dropped. S
 record a coverage the language does not actually have. The counter-inflation guard is that I scope
 `new` to the reorientation leg *only* (2 of 3 legs are explicitly logged as aliases), so the marginal
 yield is one contract, not a whole "active dynamics" operator.
+
+---
+
+**IMPLEMENTER -- `reorient` written, imports/registers, 6 property tests pass.**
+Module `src/plexus/operators/candidates/jax_morph_active_brownian_dynamics2_d.py`; test
+`tests/test_jax_morph_active_brownian_dynamics2_d.py`. Implemented ONLY the uncovered
+rotational-diffusion leg (the other two legs stay aliases of a pair potential and of `glide`).
+
+**Key translation decision -- scalar angle -> unit-vector rotation.** The source carries
+`active_heading` as a *scalar angle* and adds `dtheta` to it. In Plexus `heading` is a unit VECTOR
+`[N,D]` (read by glide/bounce/sense), so I translated "add `dtheta` to the angle" into "**rotate the
+heading vector by `dtheta`**", `h <- R(dtheta) h`. Exactly equivalent, and it buys two properties:
+(1) **norm-preserving by construction** -- a planar rotation keeps `|heading|=1`, so I deliberately
+do NOT renormalize (that keeps the norm-conservation test meaningful: it separates this correct
+rotation from a naive additive `h += noise`); (2) **additive composition survives the change of
+representation** -- planar rotations compose additively, `R(a)R(b)=R(a+b)`, so `reorient` in place
+followed by another rotational heading writer equals summing the angle increments, reproducing the
+source's dynamic-additive-delta accumulation under Plexus's in-place heading-steer idiom.
+
+**Routing.** `EMIT=None`, mutates `heading` in place, returns `{}` -- the sibling of
+`polarity_align`/`polarity_flow_align` (the polarity family owns every heading write; the engine
+does not integrate heading). `SUPPORTED_DIMS=[2]` (scalar rotation angle -> planar rotation; a 3-D
+version needs a rotation axis, and the source itself raises for `n_space_dim != 2`).
+
+**No fitted constants.** `std_r = sqrt(2 * rot_diffusion * dt)` is the source's own scale (NO gamma
+-- do not reuse the translational `std_t`); zero-drift (mean-0 increment); `rot_diffusion=0` is a
+non-crashing identity limit; noise drawn at full padded capacity then gated by `occ`/`mask` (dead &
+masked slots get `dtheta=0`), matching the source's `n_cells`-sized sampling; seeded RNG.
+
+**Tests (all statable without the oracle):** zero-diffusion no-op; norm conservation (unit stays
+unit); heading actually rotates; **zero-drift mean + variance = `2 D_r dt`** over 40k cells; variance
+**linear in dt** (Brownian scaling); dead/masked slots unchanged. `evidence.oracle_run` stays null --
+the differential test vs the oracle is the verifier's job.

@@ -139,9 +139,9 @@ contract:
   writes:
   - heading
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_active_brownian_dynamics2_d.py
+test: tests/test_jax_morph_active_brownian_dynamics2_d.py
 evidence:
   oracle_run: null
   diff_metric: null

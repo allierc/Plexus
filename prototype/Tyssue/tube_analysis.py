@@ -296,6 +296,17 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
         radc, ok = radl, livem                                 # tip_act: corr(activator, radius). +1 = activator
         if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
             m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
+    # PATTERN SCALE, in cell diameters -- how many spots and how far apart. This is what Okuda
+    # reports ("about five spots on a 2000-cell ball"), and it is the only pattern length we have
+    # that can be compared with a paper: `chi` is a solver rate, not a scale (finding F009).
+    if act is not None and len(act) == nF:
+        try:
+            from pattern_scale import pattern_metrics as _pm
+            _, _, _cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
+                                             torch.as_tensor(et), torch.as_tensor(ef), nF)
+            m.update(_pm(np.asarray(act, float), es, et, ef, nF, cen=_cen.numpy()))
+        except Exception:
+            pass
     m.update(tube_diameter(pt, mt))
     m.update(cell_census(pt, mt, act, a_sw=a_sw))                          # tip/branch/body + red composition
     return m

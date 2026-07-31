@@ -80,3 +80,57 @@ engine-integration to self-solve -- it breaks exactly that identity. So the mism
 operator and `new` stands. (`signal` and `regulate` are two contracts of the same recurrent-network
 FAMILY, not two implementations of one contract -- their typed signatures differ in kind, set, maps
 and integration mode.)
+
+## Implementation (implementer)
+
+Wrote `regulate` at `src/plexus/operators/candidates/jax_morph_odecontroller.py` (the anti-chamber;
+promotion is the curator's call after the differential test). Registered
+`@register_operator("regulate", family="fields", set="cell", kind="exchange",
+implementation="connectionist")` -- the `connectionist` reaction law is the shipped implementation;
+`mwc` (log-occupancy) and `neural_ode` (MLP field) are sibling implementations of the SAME contract
+(same signature, same self-solve, only the vector field differs), exactly the diffuse
+finite_difference/spectral shape. Test: `tests/test_jax_morph_odecontroller.py`, 5 passing.
+
+Three engine-mapping decisions, each faithful to the source but forced by Plexus's integration model:
+
+1. **The evolving state is ONE first-order block `gene`** = the source's `y = concat(hidden, outputs)`
+   (surprise #8: they are integrated as one coupled system). Plexus routes a delta by LEVEL, with a
+   single `INTEGRAND` block per operator, so the two persisted fields the source slices apart cannot
+   be two separate Plexus blocks written by one op; the coupled vector is their honest joint form.
+   `hidden_size` is kept as a documented latent/output split but does not change the integration (the
+   whole block is solved). This is the FIRST registered operator to use the non-coordinate
+   `_delta_blocks` path (grep confirms no other operator sets `INTEGRAND`); the machinery existed
+   unused. Class `INTEGRAND="gene"` (so `_resolve_emit` sees a non-`pos` integrand and never
+   constrains the cell's coordinate order); instance `self.INTEGRAND` routes to the configured block.
+
+2. **inc/dt EMIT scaling.** The source is a DYNAMIC step: it self-solves and returns the exact
+   increment `g(dt)-g0`, which the Model ADDS (surprises #1/#2). Plexus integrates a first-order block
+   as `g += dt*delta`, so the operator returns the effective mean rate `delta=(g(dt)-g0)/dt` and the
+   engine's `dt*` recovers the exact endpoint -- the dt cancels; it is NOT a second integration. This
+   preserves "exact integrated increment, not rate*dt" while obeying `EMIT=velocity`.
+
+3. **SOURCE WINS on the forcing input.** Implemented the code's `sigma(W_gene@g + W_in@u + b) -
+   gamma*g` (drive INSIDE the sigmoid), not the paper's additive-outside `+ I_i`, because the
+   differential test compares us to the running source. Sigmoid is the ALGEBRAIC
+   `0.5+0.5 x/sqrt(1+x^2)` (source's `_rescaled_sigmoid`), computed via `hypot(1,x)` for stability.
+   Drive `u` read from a frozen `inputs` block (integration=none), closed over for the whole solve.
+
+Translated `diffrax.Dopri5() + PIDController(rtol=1e-4, atol=1e-6), dt0=dt` as a genuine batched
+adaptive Dormand-Prince 5(4): DP tableau, embedded 4th-order error, RMS error norm over all elements
+(diffrax's default -> one shared step sequence over the stacked per-cell state), I-controller
+`h *= clamp(0.9*err^-0.2, 0.2, 5)`, first step = dt. NOT hard-coded to the oracle. Sanity-checked
+the endpoint against a 20000-step fixed RK4 on a nonlinear coupled 2-gene+drive case: max abs diff
+7.2e-5 (< rtol), so the tableau and control are correct. Dead cells (occ=0) get a zero delta
+(gene state frozen) -- the same net effect as the source's post-hoc alive-mask (surprise #9).
+
+Test properties (all reference-free -- exact solutions of the drive-frozen scalar ODE, since W_gene=0
+makes the drive constant in g): (a) linear-decay increment exact -- `dg/dt=0.5-g` from g0=0 lands on
+`0.5(1-e^{-dt})` to 1e-4; (b) same through the engine `_integrate` from g0=0.3; (c) fixed point
+g*=0.5/gamma is stationary (delta~0); (d) frozen drive forces g*=sigma(k*u) (input path) and the
+`drive` block is unchanged after the step; (e) dormant cells hold their gene state.
+
+Could NOT do (left for the validator/curator): the differential run against the oracle -- I did not
+run jax (deliberately absent from the Plexus env) and did not build the paired ODE scenario. The
+oracle uses adaptive Dopri5 at the same rtol; both should converge to the true solution to ~1e-4, so
+tolerance-level agreement is expected, but that is evidence for the validator to produce, not me.
+`evidence`/`status: validated` stay untouched (status advanced only to `implemented`).

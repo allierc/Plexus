@@ -145,9 +145,9 @@ contract:
   writes:
   - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_gene_network_connectionist.py
+test: tests/test_jax_morph_gene_network_connectionist.py
 evidence:
   oracle_run: null
   diff_metric: null

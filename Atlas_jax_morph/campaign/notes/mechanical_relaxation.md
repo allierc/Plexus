@@ -59,3 +59,47 @@ empty composition); `relax` also performs a real forward transformation (positio
 a zero no-op) and is potential-agnostic (the operation, not the force) -- but a verifier could still
 land this at `out_of_scope` if they judge a convergence-gated solver to carry no biology of its own,
 so this is the live fault line for the entry.
+
+---
+
+**Implementation (IMPLEMENTER role).** Wrote `src/plexus/operators/candidates/jax_morph_mechanical_relaxation.py`
+(the anti-chamber) and `tests/test_jax_morph_mechanical_relaxation.py`; `status: implemented`.
+Torch, not JAX. Registered `@register_operator("relax", family="mechanics", set="cell", kind="lateral")`,
+`EMIT="velocity"`, `DIFFERENTIABLE=False`. Imports + registers + 7 property tests pass.
+
+Design decisions (and the impedance mismatches they resolve):
+- **Quasistatic overwrite through the delta contract.** The reference step OVERWRITES position with
+  the equilibrium `x*` (`state.set('position', x*)`). Plexus has no quasistatic phase and the
+  integration invariant forbids an operator writing `pos` directly, so I express the overwrite as a
+  velocity: the engine integrates `pos += dt*v`, so emitting `v = (x* - x0)/dt` lands `pos` exactly
+  on `x*` in ONE macro-step, for ANY `dt`. That `1/dt` factor is the SIGNATURE of a quasistatic
+  step -- the exact dual of `agitate`'s `1/sqrt(dt)` Wiener emit. A test drives three `dt` values and
+  confirms the landed configuration is identical (dt-independence).
+- **Potential-agnostic solver.** `relax` is the SOLVER, not the force law: a `potential:` param
+  selects the energy family it relaxes (`soft_sphere` default / `hertzian` / `harmonic` / `morse` /
+  `lennard_jones` / `none`=NoForce no-op). I ported the source's `_compact_repulsion` / `_smooth_cutoff`
+  / `safe_divide` / `safe_norm` and the five sigma-relative (`sigma = r_i + r_j`) pair energies, and
+  take the force by autodiff of the energy -- so `relax` composes with any of them, orthogonal to
+  which interaction. Smoke-ran all five: the adhesive ones (morse/LJ/harmonic) settle to exactly the
+  well minimum at contact (sep 1.000), the repulsive ones to at least contact.
+- **FIRE, faithfully.** `_fire_to_tol` reproduces the Bitzek-2006 schedule verbatim (carried velocity
+  mixed toward the force direction; global power/norm reductions; dt grows after `n_min` downhill
+  steps, resets with the velocity on an uphill step); stops at `|grad U|_inf <= f_tol`, `max_steps` a
+  fallback. Forward-only: `_force` evaluates `-grad U` on a fresh detached leaf under a local
+  `enable_grad` (the engine generates under `no_grad`), so the solver path is never in any outer graph
+  -- the source's `custom_vjp` stance ("the answer depends only on `x*`, not how FIRE got there").
+
+What I did NOT reproduce (honest gaps, deliberately):
+- **The implicit-diff backward.** `DIFFERENTIABLE=False`. The source's distinctive gradient -- the IFT
+  sensitivity `dx*/dp = -H^{-1} d(grad U)/dp`, CG-solved on the physical subspace with the rigid-body
+  gauge modes projected out -- is NOT implemented. Reproducing it as a `torch.autograd.Function` with a
+  projected-Hessian CG solve is the promotion follow-up. The FORWARD equilibration (what the engine
+  runs, what the differ compares) is faithful; the flag correctly steers an inverse loop past this
+  implementation.
+- **No oracle diff.** `evidence.*` still null -- comparing our relaxation trajectory to `oracle.py` is
+  the CURATOR's differential test. I did not run it. My tests assert only contract properties statable
+  WITHOUT the reference (force balance `|grad U| <= f_tol`; energy non-increase `U(x*) <= U(x0)`;
+  overlap resolved APART to >= contact with centre-of-mass conserved; NoForce no-op limit; translation
+  symmetry in free space; dt-independent one-step landing; dead cells held fixed). No fitted constants.
+- **Per-cell `alpha` field** (morse well-width as a `StateFieldSpec`) is not supported -- only per-cell
+  `epsilon_field`. The source allows either; I judged scope. Note for a reuser.

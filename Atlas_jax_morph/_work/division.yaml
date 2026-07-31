@@ -171,9 +171,9 @@ contract:
     or a zero division_axis falls back to isotropic placement
   - lineage = a born flag plus the mother parent-slot index recorded on the woken slot (sentinel -1 elsewhere),
     reconstructing clonal ancestry that the registered birth flag alone cannot
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_division.py
+test: tests/test_jax_morph_division.py
 evidence:
   oracle_run: null
   diff_metric: null

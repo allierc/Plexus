@@ -143,9 +143,9 @@ contract:
   - output_specs fields as per-dt gene-expression increments (delta)
   - tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_neural_ode.py
+test: tests/test_jax_morph_neural_ode.py
 evidence:
   oracle_run: null
   diff_metric: null

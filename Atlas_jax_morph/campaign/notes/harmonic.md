@@ -82,3 +82,53 @@ plus three siblings landing alias is real evidence that reading is defensible. I
 per-pair contact tracking each cell's growing radius is a biologically load-bearing feature (size-aware cell
 mechanics vs a fixed-width swarming law are distinct model classes), not an alternate length source — but
 this is the genuine tension, and the family record stays split until the alias entries are revisited.
+
+---
+
+## Implementation (IMPLEMENTER pass)
+
+**Module.** `src/plexus/operators/candidates/jax_morph_harmonic.py` — registered
+`@register_operator("adhere", family="interaction", set="cell", kind="lateral",
+implementation="harmonic")`, so it is the **first** implementation of the `new` contract `adhere`
+(none was registered before; the sibling SoftSphere entry named it but no operator yet carries it).
+A later SoftSphere/Morse/Hertzian/LJ candidate joins the same contract via a different
+`implementation=` key, exactly as `diffuse` holds `finite_difference` + `spectral`. `AdhereHarmonic`
+subclasses `Lateral`, `EMIT="velocity"`, `SUPPORTED_DIMS=[2,3]` (reads `D=pos.shape[-1]`).
+
+**How the reference's shape survives the port to torch.**
+- `sigma = r_i + r_j` read off the per-cell `radius` buffer (block-or-buffer `_read_scalar`, the
+  grow_radius recipe); `r_c = r_cutoff_frac*sigma`; the C0 hard `torch.where(r<r_c, ., 0)` is kept
+  verbatim (no smoothing — the force jumps at `r_c`, the faithful surprise).
+- `k` is a shared scalar OR a per-cell field (`k_field`), symmetrised by the **arithmetic-mean** mix
+  `0.5*(k_i+k_j)` (no sqrt), matching the base `mix`.
+- The down-shift `-(r_c-sigma)^2` is preserved, so the well is adhesive (negative at contact).
+
+**The one real design decision: force = -grad(energy) vs analytic force, and `velocity` vs the
+reference's raw force.** The reference `PairwisePotential.forces` returns `-jax.grad(total_energy)`,
+a FORCE, and the *wrapping* overdamped step turns it into motion by `1/gamma`. Plexus has no separate
+"potential returns force, step divides by gamma" seam — an operator emits an integrable delta. Two
+faithful choices existed: (a) emit an `acceleration` (inertial) or (b) emit the overdamped drift
+`velocity = mobility*F`. I chose (b) because the whole jax-morph mechanics is overdamped (Brownian /
+active-Brownian / gradient-descent relaxation, never inertial), and because the campaign's `agitate`
+(the Brownian bath) already documents the split: it emits the thermal velocity and expects the drift
+potential to emit `F/gamma`. So `adhere` emits `v = mobility*F`, `mobility=1/gamma` default 1.0 (the
+reference's gamma=1); scheduled with `agitate` the two velocities sum into one Euler-Maruyama step.
+For the force itself I return the **analytic** radial law `F(r)=k*(sigma-r)` (which IS `-dU/dr`)
+rather than autodiff-in-forward: it is exactly the reference's force inside the cutoff, is
+differentiable w.r.t. pos and k by plain torch, and avoids a `requires_grad` leaf in the hot path.
+This is NOT fitting the oracle — it is the closed-form gradient of the same energy, and the test
+below proves the two agree.
+
+**Test** (`tests/test_jax_morph_harmonic.py`, 8 pass). Every assertion is stated without the
+reference: (1) **energy-defined force** — the emitted velocity equals `-torch.autograd.grad(
+op.total_energy, pos)` to `1e-4` on a heterogeneous cluster with per-cell radii and per-cell `k`
+(this is the load-bearing check that the analytic force is genuinely `-grad U`, and that the mix /
+down-shift / cutoff are all self-consistent); (2) **zero at contact** (`r=sigma`); (3) **three
+regimes + hard cutoff** — repel at `r<sigma`, adhere at `sigma<r<r_c`, exactly zero at `r>=r_c`,
+with equal-and-opposite pair forces; (4) **momentum conservation** — `sum_i v_i ≈ 0` (Newton's
+third law, any positions/radii/k); (5) **dead/masked** — a dead cell neither moves nor pushes, while
+an alive-but-`at:`-masked cell is not driven yet still SOURCES a force (masking gates the actor, not
+the field); (6) **pos not mutated** by forward; (7) `r_cutoff_frac<=1` raises (the construction
+check); (8) **3-D generic**. Entry updated: `status: implemented`, `module`, `test` set. Evidence
+(`oracle_run`/`diff_metric`) left null — the differential comparison against the jax oracle is the
+CURATOR's pass; I did not run it and did not hard-code any reference number.

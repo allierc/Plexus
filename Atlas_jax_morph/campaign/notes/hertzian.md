@@ -64,3 +64,60 @@ registered operator's `reads` genuinely lacks `radius` (aliasing asserts coverag
 not have) and because splitting the near-identical twins SoftSphere/Hertzian is indefensible; but the
 right resolution is family-wide (pull parent + Morse + Harmonic toward `adhere`), and that
 reconciliation is flagged for the analysis phase.
+
+---
+
+## Implementation (candidate `adhere:hertzian`)
+
+Wrote `src/plexus/operators/candidates/jax_morph_hertzian.py` — the `hertzian` implementation of
+the `adhere` contract, registered `@register_operator("adhere", family="interaction", set="cell",
+kind="lateral", implementation="hertzian")`. Imports/registers clean; the contract reports
+`kind=lateral family=interaction set=cell`, `implementations=['hertzian']`. (SoftSphere, the twin,
+is not yet coded, so this registration MINTS the `adhere` contract with `hertzian` as its default
+implementation; a later `adhere:soft_sphere` will add the second implementation to the same
+contract — the normalized `implementation_of: adhere` in the entry is what makes that legal.)
+
+**Faithful to the SOURCE, not the analytic shortcut.** The operator does not hand-write the radial
+force. It builds the total conservative pair energy `E = 0.5 * sum_{live i!=j} (2/5) eps (1 -
+r/sigma)^(5/2)` and takes `force = -autograd.grad(E, pos)`, exactly mirroring the source's
+`forces = -jax.grad(total_energy)` (potentials.py:L84/:L228). This is deliberate: it REALIZES the
+2/5 = 1/exponent trick (autodiff of the energy with the 2/5 in place yields the intended unit force
+coefficient `f = (eps/sigma)(1-r/sigma)^(3/2)`) rather than smuggling a fitted constant into a
+hand-written force — which is the trap the loop warns against. Ported both source guards verbatim:
+`_safe_divide` / `_safe_norm` (double-`where`, finite grad at the sigma=0 padded pair and the r=0
+self-diagonal) and the `_compact_repulsion` double-`where` (the fractional power only ever sees a
+strictly-positive base). Dead/self masking is EXTERNAL (an alive-mask `where` on the energy, the
+`neighbor_sum` seam), not inside the per-pair law — matching the surprise the entry records.
+
+**Routing decisions.** `EMIT="velocity"` (mobility * F): the paper's mechanics is overdamped
+(gradient-descent `MechanicalRelaxation` / overdamped `BrownianDynamics`), so the force is a
+velocity the engine integrates and sums with any other velocity a cell carries — same routing as
+the registered near-miss `attraction_repulsion`. `sigma = r_i + r_j` (ADDITIVE) read from the
+per-cell `radius` buffer; per-cell `epsilon` (via optional `epsilon_field`) mixed by the ARITHMETIC
+MEAN `0.5*(eps_i+eps_j)`, else a shared scalar — the two-different-combining-rules surprise is
+implemented and tested. `mobility` (default 1.0) is the sole added knob (the overdamped 1/gamma),
+NOT a fitted constant. DENSE N×N half-summed (the source is dense `neighbor_sum`, not a graph);
+fine at atlas cell counts, O(N^2) noted in the docstring. Dimension-generic (`SUPPORTED_DIMS=[2,3]`,
+reads D from pos). Made `create_graph` follow `pos.requires_grad and grad_enabled` so a plain
+rollout under `no_grad` is cheap/detached while a differentiable inverse loop keeps the force
+connected to the state graph.
+
+**Test** `tests/test_jax_morph_hertzian.py` — 8 properties, all stated from the calculus of the
+energy, none from the oracle: (1) overlap is repulsive with the EXACT analytic magnitude
+`f=(eps/sigma)(1-r/sigma)^(3/2)` and correct direction; (2) compact support — zero force AT and
+beyond contact (no tail, no cutoff param); (3) C2 softness — |force| falls monotonically to ~0 as
+overlap → 0; (4) Newton's third law — total force over a 12-cell cluster sums to 0 (momentum
+conservation of a conservative pair energy); (5) size-consistency — additive sigma, same overlap
+fraction → same force fraction, and unequal radii with equal sigma give equal force; (6) dead-cell
+masking is external (a dead cell coincident with a live one perturbs nothing); (7) per-cell epsilon
+mixes by arithmetic mean (eps=(2,4) acts like shared 3); (8) the force is a real autodiff (grads
+flow to positions, finite — no NaN from the fractional power). `8 passed`. Also hand-checked
+no_grad rollout (detached forces, 0.5^1.5=0.35355), single-cell no-pair (zero), and 3D.
+
+**Did NOT do / left open (unchanged from normalization):** no oracle run — jax is deliberately
+absent from this env AND no oracle script instantiates Hertzian (it would need a new script), so the
+`evidence` block stays null and the energy/force shape is confirmed only against hand-derived
+calculus, not measured against jax-morph. The differential test against the oracle is the curator's
+next step; a passing property test is NOT that. The family-wide reconciliation (pull the abstract
+parent + Morse + Harmonic toward `adhere`, and reconsider whether `adhere` is the right name for a
+purely-repulsive member) remains flagged for the analysis phase — not settled here.

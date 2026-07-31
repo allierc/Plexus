@@ -74,3 +74,66 @@ p. 19), temperature-parameterized, FDT-calibrated, Wiener-scaled. The closest co
 `drag`, and widening dissipative inertial friction (acc = -k*v, an acceleration, the energy-SINK half
 of fluctuation-dissipation) into an overdamped temperature-scaled fluctuation *source* inverts both
 its regime (2nd- to 1st-order) and its sign convention -- violence to its biology, not a widening.
+
+---
+
+## Implementation (implementer)
+
+Wrote `agitate` at `src/plexus/operators/candidates/jax_morph_brownian_dynamics.py` (anti-chamber;
+promotion is the curator's call after the differential test). `@register_operator("agitate",
+family="motion", set="cell", kind="lateral")`, base `Lateral`, `EMIT="velocity"`, `SUPPORTED_DIMS=[2,3]`.
+Imports and registers clean; 8 property tests pass (`tests/test_jax_morph_brownian_dynamics.py`).
+
+**The one decision that matters: how the split dt-scaling survives the engine's integrator.** The
+Plexus engine integrates an `EMIT="velocity"` delta as `pos += dt*v` -- it multiplies whatever we
+return by `dt`. But the thermal DISPLACEMENT is a Wiener increment `dx = sqrt(2 kT dt/gamma)*xi`,
+which scales as `sqrt(dt)`, not `dt`. To land a `sqrt(dt)` displacement THROUGH a `dt`-multiplying
+integrator, `agitate` emits a velocity that scales as `1/sqrt(dt)`:
+
+    v = sqrt(2 kT / (gamma*dt)) * xi     ->     dt*v = sqrt(2 kT dt/gamma) * xi   (correct)
+
+This is the faithful torch translation of the source's `std = sqrt(2 kT dt/gamma)` applied as a
+position delta. It also makes the composite reproduce Euler-Maruyama exactly: a drift operator
+emits velocity `F/gamma`, the engine sums it with this thermal velocity, and one `pos += dt*v`
+integration gives `dt*(F/gamma) + sqrt(2 kT dt/gamma)*xi`. Getting this wrong (a `dt`-independent
+noise velocity, or scaling the noise by `dt` like the drift) makes the displacement variance scale
+as `dt^2` instead of `dt` -- the wrong diffusion constant. This is the headline test.
+
+**Decomposition honored: `agitate` owns ONLY the thermal leg.** Per the normalized contract, the
+deterministic drift `F/gamma` is a SEPARATE pluggable pair-potential operator (soft_sphere /
+hertzian / the Morse family / attraction_repulsion -- all already `velocity`-emitting, gamma folded
+into their coefficients, confirmed in `attraction_repulsion.py:30`). `agitate` reads no potential
+and adds no drift; it is the free Brownian gas (the source's `potential=None`) and composes with a
+drift operator in the schedule. The whole StochasticStep trace/replay/logp machinery is engine
+plumbing and is out of scope here. This is the sibling shape of `reorient`
+(`jax_morph_active_brownian_dynamics2_d.py`), which likewise kept only the one leg
+(ActiveBrownianDynamics2D's rotational diffusion) the frozen language lacked.
+
+**Tests -- all reference-free (a limit, a scaling law, a symmetry; no oracle numbers):**
+- `kT=0` limit -> emitted velocity exactly zero (the deterministic gradient-descent regime);
+- Wiener `sqrt(dt)` scaling (headline) -- same-seed noise, quartering `dt` halves the displacement
+  (velocity doubles), exact to 1e-6;
+- FDT amplitude -- same-seed, displacement scales as `sqrt(kT)` and `1/sqrt(gamma)`, exact;
+- Einstein diffusion + isotropy -- 40k cells, per-dim displacement variance = `2 kT dt/gamma`
+  within 5%, zero mean, equal across dims (2-D and a separate 3-D case);
+- alive/mask masking -- dead (`occ=0`) or masked-out cells draw a zero kick;
+- pos-invariance -- forward returns a delta and never mutates `pos` (the integration guard);
+- `n_space_dim` mismatch raises (the source's `_check_dim` surprise, kept as an optional assert).
+
+**Faithful extras.** `kT` (default 0.1) and `gamma` (default 1.0) match the source; `kT<0` /
+`gamma<=0` raise; `dt<=0` returns a zero kick. Noise uses `H.rng` (seeded generator) sized to the
+full padded capacity and masked by `occ` -- the reference's alive-masking.
+
+**NOT established (for the verifier / curator):**
+- Oracle NOT run. `evidence.*` untouched -- no numerical check that a Plexus `agitate` (+ a Morse
+  drift operator) trajectory matches `oracle.py` on a Brownian/relaxation script. The differential
+  test is the curator's next step; the tests above fix the operator's contract, not oracle
+  agreement, by design (a fitted constant would pass the differ and teach us nothing).
+- RNG stream differs from the source (torch generator vs jax PRNG key), so a pathwise trajectory
+  will NOT match sample-by-sample; the differ must compare distributional/statistical quantities
+  (MSD growth, diffusion constant), or the `kT=0` deterministic case where only the drift moves
+  cells (that one CAN match a jax-md gradient-descent relaxation numerically).
+- The `sqrt(dt)`-velocity convention assumes the engine multiplies a `velocity` emit by `dt` once.
+  Verified against the documented integration contract (base.py:524) and the sibling velocity
+  operators (glide/sediment/attraction_repulsion), but not exercised end-to-end through
+  `engine.run` here.

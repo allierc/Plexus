@@ -56,3 +56,42 @@ nothing that step; sharing a random-timing law makes them no more one contract t
 `population_turnover`/occupancy-toggle abstraction, `apoptose` and `cell_divide` would be its first
 two implementations -- worth revisiting then.
 
+
+## Death -- implemented
+
+Operator `apoptose` at `src/plexus/operators/candidates/jax_morph_death.py`; test at
+`tests/test_jax_morph_death.py` (6 properties, all pass). Written as `cell_divide`'s literal
+inverse and modelled on it line-for-line: same `Structural` base, `EMIT=None`, the same
+`getattr(lvl, "<rate>", None)`-else-scalar-`rate` fallback (`death_rate` buffer here, `div_rate`
+there), the same `getattr(H, "rng", None)` draw. The whole effect is `lvl.occ[die] = 0.0` -- occ
+IS the Plexus analog of the source's `alive` mask, and retiring it (rather than parking/zeroing
+mass) is the faithful minimal translation, because jax-morph cells are single particles with no
+MPM child to retire. Reuse of the freed slot is deferred to a LATER macro-step exactly as the
+source intends: `cell_divide` (which allocates `occ==0` slots) runs earlier in the pipeline under
+divide-then-die, so a slot freed this step survives for lineage reconstruction.
+
+Deliberate translations of the source's subtleties:
+- Hazard `p = -expm1(-clip(rate,0)*dt)` copied verbatim (the `-expm1` form, and the `clamp(min=0)`
+  guard so a negative controller output gives p=0, not a NaN score).
+- `die` is re-AND'd with the LIVE mask via the eligibility set (`elig = live & at-mask`), so an
+  already-dormant slot can never be marked "newly dead" -- the source's `(died>0.5) & alive` guard.
+- `death` is a lazily-registered per-node FLOAT buffer, zeroed then set each step (OVERWRITTEN, not
+  accumulated), dtype float so it is summable/differentiable while occ stays the boolean liveness.
+- The `at:` mask gates eligibility (the source's `die_eligible`); a test confirms masked-out live
+  cells survive.
+
+NOT modelled (and why): the trace/`logp` score-function (REINFORCE) layer. Plexus's engine runs the
+forward EFFECT only (the source's `replay`), so `died`/`die_eligible` traces and `Death.logp` have
+no engine counterpart -- same scope as `cell_divide`, which realises the forward proliferation event
+without its scoring term. If a scoring/inverse-design driver lands, that layer is the follow-up.
+
+Tests are reference-free by construction (limits, sign, conservation): rate-0 no-op; negative-rate
+clip -> no death; huge-rate -> certain death of every live cell (seed-independent, tests the hazard
+form + the retire); dormant slots never die/revive and live-count is monotone non-increasing
+(apoptose is strictly a remover); the float `death` record equals the exact occ 1->0 flip mask; and
+the eligibility mask restricts who may die. No oracle run -- the paper ships no death config and jax
+is absent from this env by design -- so `evidence.oracle_run` stays null for the differ/curator.
+
+Name note: `apoptose`, not `death`, so no clash with the pre-existing efflux-boundary `death`
+operator (candidates/death.py, kind `lateral`) -- a geometric exit-line sink, an unrelated
+mechanism. Candidates are not auto-imported, so nothing registers until the differ/tests import it.

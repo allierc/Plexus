@@ -54,3 +54,22 @@ already an energy-defined interaction registered in the same lateral/interaction
 autodiffing an energy mints no contract), and the virial stress is the separate VirialStress
 operator's output (it writes a `stress` field), not part of the interaction contract -- no field of
 attraction_repulsion's signature is forced to change.
+
+---
+
+**Dispute resolved (normalizer, status -> normalized).** A skeptic challenged `alias` -> claimed
+`refinement`, on the grounds that registered `attraction_repulsion` carries a GLOBAL scalar interaction
+length (`attraction_repulsion.py:43 self.sigma=float(params["sigma"])`) and reads no per-cell `radius`,
+so hosting Morse's per-pair `sigma = r_i + r_j` forces a `+radius` read + per-pair contact distance =
+costed widening. Both of the skeptic's RECORD facts are wrong, and the substantive point was already
+adjudicated. (1) The parent `pairwise_potential` (order 13) is NOT `verdict: null` -- it is
+`verdict: alias -> attraction_repulsion` (atlas_record.yaml:2057; the cited "1964" is the wrong line),
+and its own `why:` already ruled "the additive contact rule sigma = r_i + r_j read from radius ...
+default-compatible and break no existing user, so they are not a costed widening." (2) The very
+"division bar" the skeptic invokes (record L1246-1256) is what DEFEATS refinement here: Division tipped
+to `refinement` because it reads a `division_axis` field NO promoted operator has AND writes a `radius`
+that flips the growth invariant every caller relies on. Morse only adds a `radius` READ -- a field read
+across the language (cell_grow, cell_divide, radius_graph), additive, breaking no caller and minting no
+novel dependency -- so it clears neither prong of that bar. Consistent with the whole normalized sibling
+family (SoftSphere, Hertzian, Harmonic, LennardJones all `alias -> attraction_repulsion`), Morse stays
+`alias`.

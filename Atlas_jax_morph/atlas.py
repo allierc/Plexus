@@ -37,12 +37,14 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fcntl
 import json
 import os
 import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -95,41 +97,52 @@ def _validate_target(doc, mech_id, baseline):
     return [v for v in record.validate(doc, baseline) if v[1] in (mech_id, "-")]
 
 
-_RECORD_LOCK = threading.Lock()
-_MIRROR = None          # the master record exactly as THIS driver last wrote it
+_RECORD_LOCK = threading.Lock()          # threads inside one driver
+LOCKFILE = os.path.join(STATE, ".record.lock")
 
 
-def _master_locked():
-    """Read the master under the lock, and restore it if anything but the driver wrote it.
+@contextmanager
+def record_lock():
+    """Mutual exclusion over the record for THREADS AND PROCESSES.
 
-    With several agents in flight the naive check -- "did the file change during my call?" --
-    accuses an innocent agent every time a sibling commits. The mirror distinguishes the two: the
-    driver is the only writer, so any difference from the mirror is somebody else's edit, whoever
-    made it, and it is undone before it can be merged into.
+    The first version kept an in-memory mirror of the record and treated any deviation as an
+    agent tampering with it. That works for one driver and fails badly for two: running a
+    stragglers pass beside a phase pass, each with its own mirror, made every commit look like
+    tampering to the other -- and one of them dutifully "restored" its stale snapshot, erasing a
+    normalization that had been done correctly. The check was destroying exactly the work it
+    existed to protect.
+
+    A record shared by several processes needs a lock in the filesystem, not a copy in one
+    process's memory. Tampering is now judged per entry (below), which is both cross-process
+    correct and closer to what we actually care about.
     """
-    global _MIRROR
-    disk = yaml.safe_load(open(RECORD).read())
-    if _MIRROR is None:
-        _MIRROR = copy.deepcopy(disk)
-        return disk, False
-    if disk != _MIRROR:
-        record.save(_MIRROR, RECORD)
-        return copy.deepcopy(_MIRROR), True
-    return disk, False
+    os.makedirs(STATE, exist_ok=True)
+    with _RECORD_LOCK:
+        with open(LOCKFILE, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
 
 
-def _merge(mech_id, new_entry, role, baseline):
+def _merge(mech_id, new_entry, role, baseline, entry_at_start=None):
     """Splice one edited entry back into the master record, under the lock.
 
     Returns (problems, tampered). The master is only written if the merged document passes the
-    rung check and the twelve rules -- so several agents can be in flight at once and the record
-    still never holds an edit nobody checked.
+    rung check and the twelve rules -- so several agents, and several drivers, can be in flight
+    at once and the record still never holds an edit nobody checked.
+
+    `tampered` means THIS mechanism's entry changed in the master while its agent was working,
+    which is the only change that can have come from the agent: the working copy is the agent's
+    whole world, and a sibling call can only ever commit a different entry.
     """
-    global _MIRROR
-    with _RECORD_LOCK:
-        before, tampered = _master_locked()
-        if _entry(before, mech_id) is None:
-            return [f"the target entry {mech_id!r} is not in the record"], tampered
+    with record_lock():
+        before = yaml.safe_load(open(RECORD).read())
+        current = _entry(before, mech_id)
+        if current is None:
+            return [f"the target entry {mech_id!r} is not in the record"], False
+        tampered = entry_at_start is not None and current != entry_at_start
         if new_entry.get("id") != mech_id:
             return ([f"the working copy's id is {new_entry.get('id')!r}, not {mech_id!r}"],
                     tampered)
@@ -146,15 +159,13 @@ def _merge(mech_id, new_entry, role, baseline):
         if problems:
             return problems, tampered
         record.save(merged, RECORD)
-        _MIRROR = copy.deepcopy(merged)
         return [], tampered
 
 
 def guarded(role, mech_id, ledger=None, retry=True, extra=""):
     """Run one role on one mechanism inside the transaction. Returns (committed, report)."""
     baseline = registry_view.load()
-    with _RECORD_LOCK:
-        _master_locked()                        # sync the mirror before anything runs
+    entry_at_start = copy.deepcopy(A.entry(mech_id))     # to tell an agent's edit from a sibling's
     # The note file is CREATED HERE, not by the agent: the reading roles are given Read/Edit and
     # deliberately no Write, so a note they were told to "create" could never exist. Found by the
     # first parallel batch, which produced four good entries and zero notes.
@@ -189,7 +200,7 @@ def guarded(role, mech_id, ledger=None, retry=True, extra=""):
             problems.append("the agent changed nothing -- the record is the product, and a call "
                             "that produces no record change produced nothing")
         else:
-            problems, tampered = _merge(mech_id, new_entry, role, baseline)
+            problems, tampered = _merge(mech_id, new_entry, role, baseline, entry_at_start)
             if tampered:
                 # The master is off limits: the driver is its only writer. Whatever was written
                 # there has been undone, and the call fails even if the entry itself was fine.
@@ -266,14 +277,12 @@ def _skeptic_verdict(mech_id, ok, out, mins):
 def demote(mech_id, verdict):
     """Send a refuted mechanism back a rung, UNDER THE LOCK and through the mirror.
 
-    The first version wrote the record directly. With several agents in flight that write looks
-    exactly like tampering to `_master_locked()`, which dutifully restored the mirror and erased
-    the demotion -- so the loop's one adversarial check was silently undone by its own integrity
-    check. The driver is the only writer; the skeptic goes through it like everyone else.
+    The first version wrote the record without the lock, so a concurrent commit could erase the
+    demotion -- the loop's one adversarial check, silently undone. Everything that writes the
+    record goes through the same lock.
     """
-    global _MIRROR
-    with _RECORD_LOCK:
-        doc, _ = _master_locked()
+    with record_lock():
+        doc = yaml.safe_load(open(RECORD).read())
         m = _entry(doc, mech_id)
         if m is None:
             return
@@ -283,7 +292,6 @@ def demote(mech_id, verdict):
                          "evidence": verdict.get("evidence"),
                          "what_would_settle_it": verdict.get("what_would_settle_it")}
         record.save(doc, RECORD)
-        _MIRROR = copy.deepcopy(doc)
 
 
 # ------------------------------------------------------------------------------------------- #
