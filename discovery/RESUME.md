@@ -1,5 +1,49 @@
 # RESUME — start here in a fresh session
 
+**Rewritten 2026-07-31, 11:00.** Supersedes everything below the line.
+
+## Read this first, in this order
+
+1. `plexus2_discovery.pdf` — **the document.** Plain English, partitioned per phase. This is what
+   Cedric reads and what you report into. 13 pp.
+2. `plexus2_technical.pdf` — the old 23-page build spec, preserved. Reference only.
+3. `SESSION_LOG.md` — my technical log. Hourly while working.
+
+## The working agreement (agreed with Cedric 2026-07-31)
+
+- Two tracks: **A** build the search method, **B** reproduce Okuda as the proof it works.
+- **Report into `plexus2_discovery.pdf` at every phase boundary, then STOP and wait.** Do not roll
+  on. This is the thing that makes it not vibe-coding.
+- Plain English in that document. No jargon. Four defined terms, no more.
+- Hourly `SESSION_LOG.md` while actively working.
+
+## State on 2026-07-31 11:00
+
+- **THE BELIEF REGISTER IS EMPTY.** Every measurement to date came through a broken ruler. The
+  overnight "shaping and integrity are mutually exclusive" claim is **withdrawn** — all 32 runs
+  ended at exactly 1778 cells because that is the vertex buffer ceiling, not biology.
+- **THE COMPUTE CLUSTER IS OFF.** Cedric will say when it is back. Only `cluster.py` and
+  `round.py` need it. Phase 0 and Phase 1 are entirely local (2x RTX A6000, 64 cores).
+- **Phase 0 is in progress**, six items: 2 done (centroid, frame-pairing guard), 4 committed but
+  **UNVERIFIED** at `a22975a` (Q, camera, cell counts, stopwatch), and 3 more not started
+  (remove the silent parameter caps; the geometry-weighted diffusion implementation; separate the
+  three mesh-failure modes).
+- **Anything in `a22975a` is unverified.** Re-derive each defect before trusting it.
+- Done and verified today: `curve_shape.py` (trajectory classification + evidence horizon,
+  self-tested), `metrics.npz` written alongside `mechanics.npz` with 24 runs backfilled.
+
+## The next thing
+
+Finish Phase 0. Then Phase 1 — re-run the 32-run study at a 10x reservoir, locally. That decides
+whether the withdrawn claim survives. Test whether the engine runs on `cuda` first: 10x reservoir
+means ~18,000 cells and the study currently hardcodes `device="cpu"`.
+
+---
+
+<details><summary>Superseded — the 2026-07-30 resume, kept for reference</summary>
+
+# RESUME — start here in a fresh session
+
 **Written 2026-07-30, end of session.** Read this file first, then `SESSION_LOG.md` (newest hour
 at the bottom). Everything is committed and pushed; nothing is running.
 
@@ -146,3 +190,5 @@ git          push may need --no-verify (git-lfs absent in the devcontainer)
 Commit and push regularly; update `plexus2_discovery.pdf` when the design changes; append to
 `SESSION_LOG.md` **every hour** with a `### ⏱ SUMMARY` block (done / found / decided / next /
 blocked). Findings are numbered continuously — the last was **F20**.
+
+</details>
