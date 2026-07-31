@@ -822,6 +822,33 @@ measure, record whether the prediction held.
 \item \textbf{Phase} --- one of the eight stages above. Our agreed stopping points.
 \end{itemize}
 
+\subsection*{The four measurements, renamed}
+
+Agreed 31 July. The old names misled in three separate ways and are being retired: \code{protr}
+reads as a length but is a \emph{ratio}; \code{final} became ambiguous the moment we introduced
+the evidence horizon; and \code{Q} said nothing at all. The rename happens as one mechanical pass
+once the current work lands, with old records aliased on read --- the archive is never rewritten.
+
+\begin{center}\small
+\begin{tabular}{@{}l l p{7.9cm}@{}}
+\toprule
+\textbf{was} & \textbf{is} & \textbf{means}\\
+\midrule
+\code{protr} & \code{elongation}
+& the 95th-percentile cell radius divided by the median. \textbf{1.0 is a sphere.} A ratio, not a
+length --- reading 1.62 as an amount of protrusion is the mistake the old name invited.\\
+\code{protr\_peak} & \code{elongation\_peak}
+& the most elongated it ever got, over \emph{valid} frames only.\\
+\code{protr\_final} & \code{elongation\_at\_end}
+& at the last \emph{valid} frame --- not simply the last frame.\\
+\code{Q} & \code{elongation\_unforced}
+& what remains after growth and pushing are switched off and the tissue relaxes.
+\textbf{This is the forced-versus-grown test}, and it is the whole reason the campaign exists: we
+can already make a tube by pushing; the question is whether the tissue will hold one by itself.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \vspace{6pt}
 \hrule
 \vspace{6pt}
