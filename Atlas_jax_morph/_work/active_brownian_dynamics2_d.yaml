@@ -1,0 +1,128 @@
+id: active_brownian_dynamics2_d
+order: 10
+raw_name: ActiveBrownianDynamics2D
+raw_kind: step (StochasticStep)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L199
+paper_section: p. 14 (SI I, 'Mechanical Interactions'); active variant ABSENT -- see surprises
+summary: >-
+  One Euler-Maruyama macro-step of overdamped active Brownian (self-propelled) dynamics in 2-D. On
+  top of the passive Langevin drift (potential force / gamma) and translational noise, each cell
+  self-propels at its per-cell speed active_speed along a persistent heading angle active_heading,
+  and that heading rotationally diffuses. It writes a position displacement delta and a heading
+  increment delta, recording both exogenous noises so the step is pathwise-differentiable and
+  scorable (a Gaussian kernel on the displacement and on the heading increment).
+equations: |-
+  Per alive cell i, over a macro-step dt (F_i = potential forces = -grad_i U; theta_i =
+  active_heading; v0_i = active_speed; D_r = rot_diffusion):
+
+    e_i      = (cos theta_i, sin theta_i)                      # heading unit vector (2-D)
+    drift_i  = F_i / gamma + v0_i * e_i                        # NOTE: v0 term is NOT divided by gamma
+    mean_t_i = dt * drift_i
+    std_t    = sqrt(2 * kT * dt / gamma)                       # translational noise scale (shared)
+    dx_i     = mean_t_i + std_t * xi_t_i,   xi_t_i ~ N(0, I_2) # position displacement
+    std_r    = sqrt(2 * D_r * dt)                              # heading noise scale (NO gamma)
+    dtheta_i = std_r * xi_r_i,              xi_r_i ~ N(0, 1)   # heading increment; drift is ZERO
+
+  Applied as dynamic (additive) deltas:  position_i += dx_i ;  active_heading_i += dtheta_i.
+
+  Score (logp), summed over alive cells, deterministic component contributes 0:
+    logp = sum_i [ log N(dx_i | mean_t_i, std_t^2) + log N(dtheta_i | 0, std_r^2) ]
+
+  Passive limit v0 = 0 recovers BrownianDynamics (dynamics.py:L36). Paper's mechanics (p. 14) is a
+  DIFFERENT operation entirely: deterministic gradient-descent energy minimization of the Morse
+  potential Vij(r) = eps[(1 - exp(-alpha(r - sigma)))^2 - 1]; no noise, no self-propulsion.
+params:
+  potential: >-
+    interaction_potential -- a Potential whose autodiff forces (-grad U) give the mechanical drift
+    term; None resolves to NoForce (a free active gas: self-propulsion + heading noise only).
+  n_space_dim: >-
+    spatial_dimension -- static int, must be 2 (heading is a scalar angle); sizes the (N, 2)
+    translational trace fields and is re-checked against the live state's actual dimension at trace
+    time. Constructor raises ValueError if != 2.
+  gamma: >-
+    translational_drag_coefficient -- divides the potential force in the drift AND sets the
+    translational noise scale std_t = sqrt(2 kT dt / gamma). Does NOT scale the self-propulsion
+    term. Default 1.0.
+  kT: >-
+    translational_noise_temperature -- thermal energy setting the translational Gaussian noise
+    std_t; kT = 0 makes translation deterministic (contributes 0 to logp). Default 0.1.
+  rot_diffusion: >-
+    heading_rotational_diffusion_rate (D_r) -- sets the heading noise std_r = sqrt(2 D_r dt) (the
+    Vicsek 'noise'); D_r = 0 fixes the heading (contributes 0 to logp). Default 1.0.
+  tag: >-
+    trace_namespace -- static string prefixing the four trace fields ({tag}_xi_t, {tag}_dx,
+    {tag}_xi_r, {tag}_dtheta) so several instances coexist in one model. Default 'active'.
+  score_by_default: >-
+    score_inclusion_flag -- static bool; whether a scoring driver called with score=None includes
+    this step's logp. Constructor default here is False (the StochasticStep base default is True).
+state_io:
+  reads:
+    - position (drift is applied to it)
+    - active_speed (per-cell self-propulsion speed v0; heritable; READ-only here, set externally)
+    - active_heading (per-cell heading angle theta; heritable; read then incremented)
+    - "*potential.state_reads() (e.g. per-cell coupling fields the potential sources params from)"
+  writes:
+    - position (dynamic displacement delta dx)
+    - active_heading (dynamic heading-increment delta dtheta; persistent, heritable, shared)
+  trace_writes:
+    - "{tag}_xi_t  shape (2,)  -- exogenous translational noise (heritable=False, default 0)"
+    - "{tag}_dx    shape (2,)  -- realized displacement (default 0)"
+    - "{tag}_xi_r  scalar      -- exogenous rotational noise (default 0)"
+    - "{tag}_dtheta scalar     -- realized heading increment (default 0)"
+surprises:
+  - >-
+    THE ENTIRE STEP IS ABSENT FROM THE PAPER. The paper's mechanics (SI I 'Mechanical Interactions',
+    p. 14) is passive and even noise-free: deterministic gradient-descent energy minimization of a
+    Morse potential, described in the main text (p. 3, Fig. 1d; p. 19) as high-temperature 'Brownian
+    motion / relaxation' for rearrangement. No self-propulsion, active heading, or rotational
+    diffusion appears anywhere in the paper. ActiveBrownianDynamics2D is a library-side active-matter
+    generalization -- its docstring calls it 'the natural base for a Vicsek-type model', and
+    examples/04_physics_examples.ipynb pairs it with a VicsekAlignment step to build a flocker. SOURCE
+    WINS; the recorded disagreement is that the paper is silent on active/self-propelled dynamics.
+  - >-
+    The self-propulsion term v0 * e is NOT divided by gamma, whereas the force term IS (F / gamma).
+    So active_speed is a genuine velocity while the force enters as force/drag. A reimplementer who
+    divides v0 by gamma (by analogy to the force) is wrong.
+  - >-
+    The heading has ZERO drift: dtheta = std_r * xi_r only, and logp scores dtheta against mean 0
+    (not a state-dependent, recomputed mean). Only the translational channel carries a
+    state-conditioned mean.
+  - >-
+    The two channels use different noise scalings: std_t = sqrt(2 kT dt / gamma) (has gamma) but
+    std_r = sqrt(2 D_r dt) (NO gamma -- the heading has its own rate D_r). Do not reuse one for the
+    other.
+  - >-
+    kT = 0 and/or rot_diffusion = 0 must not crash (kT = 0 is in fact the textbook ABP: pure
+    self-propulsion + heading noise). _gaussian_logp_or_zero substitutes std = 1 before gaussian_logp
+    then masks that component's density to 0, avoiding 1/0 and log(0) NaNs under the always-on
+    jax_debug_nans. A naive log N(...) would NaN.
+  - >-
+    active_heading is a persistent, heritable state_write emitted as a DYNAMIC (additive) delta -- the
+    step returns the increment dtheta, not the absolute angle, so a second dynamic writer (e.g. an
+    alignment torque) accumulates into the same field. Writing the absolute angle would break both
+    composition and the dt-scaling contract.
+  - >-
+    logp is a scalar SUM over alive cells (masked by state.alive), not a per-cell array; dead/padded
+    slots contribute 0, and the model's dynamic accumulator separately zeroes dead-slot deltas.
+  - >-
+    In pathwise replay dx and dtheta are RECOMPUTED from the frozen noise (xi_t, xi_r) with live
+    params; the recorded {tag}_dx / {tag}_dtheta are used only for non-pathwise (scored) replay.
+    sample_trace deliberately records only the noise (not dx/dtheta) -- replay co-emits the realized
+    increments (the check_stochastic_step round-trip guards exactly this).
+  - >-
+    2-D ONLY: the heading is a scalar angle, so the constructor raises for n_space_dim != 2. A 3-D
+    active version would need a heading vector/quaternion, not this class. Minor idiom trap: this
+    class sizes noise with state.n_cells (= full padded capacity), while the sibling BrownianDynamics
+    uses state.position.shape; n_cells here is capacity, NOT the alive count.
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

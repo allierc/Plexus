@@ -145,6 +145,18 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
           f"frames={cfg['general']['n_frames']} dt={cfg['general']['dt']} device={device}",
           flush=True)
 
+    # PREMISES, STATIC TIER -- before the GPU is touched. These read only the spec, so a
+    # composition that cannot possibly work is rejected in milliseconds instead of after ten
+    # minutes of simulation followed by a plausible-looking null result. This is a HARD gate: a
+    # growth ceiling below the division trigger, or chemistry on the mechanics clock, makes every
+    # downstream number a statement about the configuration rather than about the tissue.
+    # A deliberate violation is legal -- declare it in the spec under _premises.waive.
+    import premise_check as _pc
+    _static = _pc.check(cfg)
+    if _pc.report(_static, f"{name} (static, pre-run)"):
+        raise SystemExit(f"[{name}] refusing to run: a premise is broken before the simulation "
+                         f"starts. Fix it, or declare it under _premises.waive with a reason.")
+
     t0 = time.time()
     sim = S.load(cfg_path)
     Hf, out = engine_run(sim, device=device)
@@ -331,8 +343,29 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
             print(f"[{name}] render failed: {type(e).__name__}: {e}", flush=True)
             traceback.print_exc()
 
+    # PREMISES, PASSIVE TIER -- on the run's own recorded series. Unlike the static gate this
+    # cannot abort anything (the simulation already happened), so it goes LOUDLY into the record:
+    # an Analyst that reads a summary without knowing the chemistry was extinct, or that the cells
+    # are stretched 2:1, is interpreting a broken specimen as a result.
+    prem = []
+    try:
+        # read the series back off disk: analyze() has just written metrics.json, and its RETURN
+        # value is the summary, not the per-frame table. (First wiring passed `tube` and the
+        # passive tier silently reported nothing at all -- a check that quietly does not run is
+        # worse than no check, because the record then says the premises held.)
+        _ser = _pc._series(name)
+        if _ser is None:
+            print(f"[{name}] premise check: no series on disk, PASSIVE TIER DID NOT RUN", flush=True)
+        prem = _pc.check(cfg, _ser, mech=_pc._mech(name))
+        _pc.report(prem, f"{name} (post-run)")
+    except Exception as e:
+        print(f"[{name}] premise check unavailable: {type(e).__name__}: {e}", flush=True)
+
     json.dump({"config": name, "comp_hash": disc.get("comp_hash"),
                "region": disc.get("region"), "summary": summary, "acted": acted,
+               "premises": [p.as_dict() for p in prem],
+               "premises_broken": [p.pid for p in prem if p.status in ("fail", "error")],
+               "premises_ablated": [p.pid for p in prem if p.status == "ablation"],
                "run_id": rec.run_id},
               open(os.path.join(out_dir, "diag.json"), "w"), indent=1)
     return summary

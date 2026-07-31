@@ -1,0 +1,123 @@
+id: free_screened_diffusion
+order: 7
+raw_name: FreeScreenedDiffusion
+raw_kind: step (SimulationStep)
+code_path: papers/jax-morph/jax_morph/physics/diffusion.py:L92
+paper_section: 'p. 15 (Materials and Methods: Diffusion; steady state dc/dt = D grad^2 c - K c + S
+  = 0); main-text Fig. 1c, p. 3'
+summary: 'Quasistatic step that OVERWRITES the per-cell chemical field each macro-step with the
+  steady-state screened-diffusion (modified Helmholtz) concentration. It reads every live cell''s
+  per-species secretion rate and sets each cell''s concentration to the superposition of all live
+  sources'' finite-size, open-boundary (free-space) analytic Green''s functions evaluated at that
+  cell''s center. dt and key are unused (the field is an instantaneous constraint solve, not
+  integrated); the written field is non-heritable and recomputed from scratch every step.'
+equations: "Steady screened-diffusion (modified Helmholtz) PDE that BOTH the paper and the code\n\
+  solve, per species k. Symbols: c_k = concentration, D_k = diffusion (`diffusion`), K_k =\n\
+  degradation / uptake rate (`degradation`), S_k = per-cell secretion rate (`source_name` field):\n\
+  \n    dc_k/dt = D_k * grad^2 c_k - K_k * c_k + S_k = 0\n\n\
+  CODE (this class) -- analytic FREE-SPACE Green's-function superposition, NOT a lattice solve.\n\
+  Symbols: i = receiver cell (array slot), j = source cell; r_ij = ||pos_i - pos_j|| (safe_norm of\n\
+  the state space's pairwise displacement); a_j = radius of the SOURCE cell j (broadcast over the\n\
+  receiver rows i); alive_j in {0,1}; kappa_k = sqrt(K_k / D_k) = inverse screening length;\n\
+  r_eff = max(r_ij, a_j) = receiver distance clamped to the source surface (on-surface self/near\n\
+  value, so the i == j diagonal DOES contribute).\n\n\
+  Superposition (per species, a matrix-vector over live sources):\n\
+  \    c_i = sum_j  alive_j * G_dim(r_ij, a_j, kappa_k, D_k) * S_j        # c = (G .* alive) @ S\n\
+  \    c_i = c_i * alive_i                                                # dead receivers zeroed\n\n\
+  Dimension-selected finite-size Green's function G_dim (n_space_dim in {1,2,3} picks one):\n\
+  \    1-D segment:  G = exp(-kappa*(r_eff - a)) / (2*D*kappa)\n\
+  \    2-D disk:     G = K0(kappa*r_eff) / (2*pi*D*a*kappa*K1(kappa*a))   # K0,K1 modified Bessel\n\
+  \    3-D sphere:   G = exp(-kappa*(r_eff - a)) / (4*pi*D*r_eff*(1 + kappa*a))\n\
+  Guards: a <- max(a, 1e-12); 1-D/2-D also floor kappa <- max(kappa, 1e-12); the 3-D kernel is\n\
+  left exact (bounded at kappa=0, reducing to the unscreened 1/(4*pi*D*r_eff)). Species are vmapped\n\
+  so D,K may be scalars or shape (n_field_species,), each species with its own kappa.\n\n\
+  PAPER (Materials & Methods, p. 15) -- the SAME steady PDE but solved on the GRAPH LAPLACIAN of\n\
+  the cell-center lattice, NOT via free-space Green's functions:\n\
+  \    D_k * L * c_k - K_k * c_k + S_k = 0   ->   c_k = (K_k*I - D_k*L)^{-1} * S_k\n\
+  with L = deg(A) - A. Closed/reflecting system: A_ij = 1/||r_i - r_j||. Permeable variant:\n\
+  A_ij = 1 if dist(i,j) <= R_i + R_j else 0, plus a heuristic ghost SINK node wired to detected\n\
+  boundary cells to bleed chemical into the surrounding medium. The paper has no source radius a\n\
+  and no Bessel/exponential kernel. WHICH IS THE CODE: the free-space Green's-function form above;\n\
+  the graph-Laplacian solve is the paper only. See surprises for the full divergence.\n"
+params:
+  n_field_species: number_of_field_species -- static channel count; the source and field arrays
+    have shape (capacity, n_field_species). Shape-determining int (eqx static), not a physical
+    tunable.
+  n_space_dim: spatial_dimension_selector -- static int 1/2/3 that SELECTS the segment / disk /
+    sphere Green's-function kernel; must equal state.position.shape[1] or __call__ raises. Not a
+    physical scalar; it changes the functional form, not a coefficient.
+  diffusion: diffusion_coefficient (D_k) -- scalar or per-species (n_field_species,); sets the
+    kernel prefactor and the screening length kappa = sqrt(K/D). Stored as a plain eqx field, so a
+    Python float is static while a jax.Array is traced/optimizable. Defaults to 1.0.
+  degradation: degradation_rate / uptake_rate (K_k) -- first-order screened-decay (chemical
+    consumption) rate; the paper's uptake constant K. Scalar or per-species; sets kappa. Must be
+    > 0 in 1-D/2-D (unscreened low-dim field is unbounded); 3-D admits 0. Defaults to 1.0.
+  source_name: source_field_plumbing_name -- name of the per-cell secretion-rate state field READ
+    (the source term S). Data-flow wiring, not a physical value. Defaults to 'secretion_rate'.
+  field_name: output_field_plumbing_name -- name of the per-cell concentration field WRITTEN.
+    Data-flow wiring, not a physical value. Defaults to 'chemical'.
+state_io:
+  reads:
+  - secretion_rate
+  writes:
+  - chemical
+surprises:
+- 'PAPER CONTRADICTION (source wins; the most valuable item here): the paper and the code solve
+  the SAME steady PDE (D grad^2 c - K c + S = 0) by fundamentally DIFFERENT methods with different
+  boundaries. The paper (p. 15) discretizes on the graph Laplacian of the cell-center lattice,
+  L = deg(A) - A, and inverts a linear system c = (K*I - D*L)^{-1} S, with EXPLICITLY MODELED
+  boundary conditions: closed/reflecting (adjacency A_ij = 1/dist(i,j)) OR permeable via a
+  heuristic ghost SINK node connected to detected boundary cells. The CODE superposes ANALYTIC
+  free-space (open-boundary) screened-diffusion Green''s functions -- no adjacency matrix, no graph
+  Laplacian, no ghost node; open boundaries are automatic and pairing with a bounded/periodic space
+  is a modeling error the user owns (NOT enforced). A reader trusting the paper would build a
+  lattice/Laplacian solver and get different numbers, especially near the cluster boundary.'
+- 'The finite SOURCE RADIUS a has NO paper counterpart. The paper''s concentration is an N x 1
+  vector sampled at cell sites with no notion of source size; the code models each source as a
+  finite sphere/disk/segment of radius a = the emitting cell''s radius, giving the r_eff = max(r,a)
+  surface clamp and the 3-D (1 + kappa*a) correction. A reimplementer using a bare point-source
+  e^{-kappa r}/r would drop this finite-size normalization and get the wrong self/near magnitude.'
+- 'The kernel is DIMENSION-SPECIFIC and the choice is a STATIC constructor arg (n_space_dim), not
+  read from the state. 1-D, 2-D and 3-D use three different closed forms (2-D needs modified Bessel
+  K0/K1); n_space_dim must equal state.position.shape[1] or __call__ raises ValueError. Screening
+  is MANDATORY in 1-D/2-D (degradation > 0, enforced at construction for a static value) because
+  the unscreened low-dimension field diverges; only 3-D admits degradation = 0.'
+- 'Self / near field is INCLUDED, not excluded. r_eff = max(r_ij, a_j) clamps the receiver distance
+  to the source surface, so the i == j diagonal contributes the on-surface value -- a cell reads its
+  OWN secretion. This is unlike a typical neighbor sum that drops the self term; a reimplementer who
+  masks the diagonal would omit the self-field.'
+- 'Alive-masking is applied TWICE and asymmetrically: sources are masked so only live cells emit
+  (G .* alive over columns j), AND receivers are masked so dead cells hold zero field
+  (field * alive over rows i). Dropping either leaves dead slots emitting or carrying phantom
+  concentration.'
+- 'Three numerical GUARDS exist only to stay finite under jax_debug_nans and would be easy to omit:
+  (1) a <- max(a, 1e-12) so a dead cell''s zero radius does not make 1/r_eff or K1(0) singular
+  (those entries are zeroed by the alive mask anyway, but the floor prevents inf*0 -> NaN); (2) the
+  1-D and 2-D kernels floor kappa <- max(kappa, 1e-12) because they divide by kappa and evaluate
+  K1(kappa*a) -- a no-op for any real screened config, only guarding a transiently-traced kappa=0
+  during optimization; (3) the 3-D kernel is deliberately NOT floored (it is exact and bounded at
+  kappa=0).'
+- 'The source radius used is the EMITTER''s (a = state.radius[None, :], broadcast over receiver
+  rows i), not the receiver''s -- the finite-size correction is per-source. Confusing the two axes
+  transposes the kernel.'
+- 'Field-plumbing, not physics: source_name / field_name make the step species-agnostic (default
+  secretion_rate -> chemical), and diffusion/degradation may be per-species arrays vmapped with
+  in_axes=(0,0,1), out_axes=1. The write is non-heritable and recomputed every macro-step (a
+  quasistatic constraint), so reading a stale chemical field across a step is wrong; dt and key are
+  ignored.'
+- 'Undeclared geometry reads: state_reads() declares ONLY source_name (secretion_rate). The step
+  ALSO reads the base fields position, radius and alive plus the space''s displacement function,
+  none of which appear in state_reads(). Wiring dataflow from state_reads() alone would miss the
+  geometric inputs the field depends on.'
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

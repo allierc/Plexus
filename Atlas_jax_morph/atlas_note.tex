@@ -404,12 +404,45 @@ reproduction telling us the contract is wrong, which is the whole reason for cho
 with code.
 \end{phasebox}
 
-\begin{phasebox}{Phase 5 --- The figure \hfill \todo\ ($\sim$1 day)}
-One headline result of the paper, rebuilt in Plexus from the normalized operators. This is the
-evidence that the ledger describes something real rather than a filing system.
+\begin{phasebox}{Phase 5 --- The forward figure \hfill \todo\ ($\sim$1 day)}
+\textbf{Forward only, deliberately first.} A composition of the normalized operators --- growth,
+division, mechanics, secretion, diffusion --- run in the Plexus engine and set beside the same
+composition run in theirs. No optimisation, no gradients: this figure exists to show that the
+\emph{vocabulary} is faithful before anything is asked to learn through it.
+
+It is also the honest order of work. If the forward figure disagrees with the reference, no amount
+of gradient descent on top will fix it --- it will only hide the disagreement inside a fitted
+parameter.
 \end{phasebox}
 
-\begin{phasebox}{Phase 6 --- Promotion, and past the paper \hfill \todo}
+\begin{phasebox}{Phase 6 --- Figure 5, through differentiability \hfill \todo\ ($\sim$2--3 days)}
+\textbf{Their headline result, and an expected feature of Plexus 2 rather than a bonus.}
+Figure~5 of the paper is engineered morphogenesis: a small gene network is \emph{optimised} until
+a growing cluster self-organises into a specified structure. Reproducing it exercises the inverse
+half of Plexus --- gradients through the simulator itself.
+
+\textbf{We are not starting from zero here.}
+\begin{itemize}
+\item \code{prototype/inverse\_slime/} already does this shape of thing in Plexus: differentiable
+reimplementations of the field operators, validated against the engine to $\sim$10$^{-7}$, and a
+teacher-forced one-step Adam fit that recovers all four differentiable slime parameters
+(mean error 0.001 against 0.283 for the black-box search --- about 224$\times$ better). It also
+records precisely where the approach stops: the hard \code{torch.where} branches in \code{sense}
+and \code{bounce}, which need a smooth surrogate.
+\item \code{ParticleGraph/src/ParticleGraph/models/graph\_trainer.py} is the training loop that
+pattern came from.
+\end{itemize}
+
+\textbf{What is genuinely new here, and worth being careful about.} Slime recovers parameters from
+a trajectory; Figure~5 optimises parameters toward a \emph{shape}, through a rollout that changes
+the number of cells. Division and death are discrete, so a pathwise gradient does not exist
+through them --- which is exactly what the reference's stochastic trace contract solves, and
+exactly why that contract is one of the mechanisms the atlas is normalizing in Phase 2. The
+inverse half of Plexus may end up needing it as a language feature, not just as a jax-morph
+detail. That would be the strongest possible result from this exercise.
+\end{phasebox}
+
+\begin{phasebox}{Phase 7 --- Promotion, and past the paper \hfill \todo}
 Validated operators leave the anti-chamber with a library page and a spec that composes each one
 with an operator Plexus already had --- a vocabulary item that only works beside its own siblings
 has not joined the language. Then the part that is not reproduction at all: run compositions the
@@ -497,21 +530,25 @@ round-trips in Phase 2.
 \end{enumerate}
 
 %======================================================================
-\section{What I need from you}
+\section{Decided, and what is still open}
+
+\textbf{Decided (31 July).} Run Phases 1--3 straight through, and stop for a joint review before
+any figure work. Then the figure in two steps: \textbf{forward only in Phase 5}, and
+\textbf{Figure~5 proper in Phase 6, through differentiability} --- treated as an expected feature
+of Plexus 2 rather than an optional extra, building on \code{prototype/inverse\_slime/} and the
+\code{ParticleGraph} trainer.
+
+\textbf{Still open, and not blocking.}
 
 \begin{enumerate}[leftmargin=1.4em]
-\item \textbf{Phase 1 is cheap --- shall I just run it?} Twenty-three excavator calls, about two
-and a half hours, no cluster. It produces no verdicts, only readings, so there is little to get
-wrong; and Phase 2 cannot start without it.
-\item \textbf{Which figure for Phase 5?} The paper's headline is engineered morphogenesis ---
-optimising a gene network until a cluster self-organises into a specified shape. Reproducing
-\emph{that} exercises the inverse half of Plexus, not just the forward simulator, and is the
-stronger result. A forward-only figure --- proliferation plus chemical patterning --- is perhaps a
-day's work and proves considerably less.
 \item \textbf{After this repository, which one?} A saturation curve only becomes an argument at
 the second and third framework. Cellular Potts (CompuCell3D) is the biggest step away from
 everything we have --- cells as lattice domains rather than points --- and therefore the sharpest
 test of whether the language is really complete.
+\item \textbf{What happens to a refinement that breaks an existing user?} Widening a registered
+signature to admit a jax-morph mechanism can invalidate specs that already run. The record forces
+the cost to be stated; it does not say who pays it. I would rather agree that now than discover it
+during Phase 3.
 \end{enumerate}
 
 \vspace{6pt}

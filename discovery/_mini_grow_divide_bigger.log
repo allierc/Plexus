@@ -4,3 +4,6 @@
 [engine] sets:      vertex(30000)  cell(16000)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d
+[mini_grow_divide_bigger] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[mini_grow_divide_bigger] {"saturated": false, "inert_operators": [], "retention": 0.993, "valid_evidence": true, "protr_final": 1.143, "protr_peak": 1.152, "horizon_frame": 500, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.152, "protr_final_untruncated": 1.143, "n_cells_final": 7686, "red_frac_final": 0.0, "act_max_final": 0.0, "frames": 501, "wall_s": 132.6, "ta_hollow_n_peak": 300, "ta_hollow_n_final": 31, "ta_area_cv_final": 0.754, "ta_vol_cv_final": 0.36, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.145, "ta_red_frac_final": 0.0, "ta_tip_act_final": 0.0, "mech_force_mean": 22.8867, "mech_p_body": 14.8744, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 9.1611, "mech_migration": 0.81683}
+[mini_grow_divide_bigger] D4 ok: all 7 scheduled operators acted ({'seed_mesh_3d': 1, 'reconnect_t1_3d': 126, 'divide_3d': 126} ...)

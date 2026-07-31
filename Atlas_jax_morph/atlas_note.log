@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  31 JUL 2026 16:10
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  31 JUL 2026 16:50
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -712,22 +712,24 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 
 [8]
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 493.
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 526.
 
 
-[9] (./atlas_note.aux)
+[9]
+
+[10] (./atlas_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `atlas_note.out' has not changed.
-(rerunfilecheck)             Checksum: CA62B0B9FA86F7B92F370C3E4EE3C16E;2940.
+(rerunfilecheck)             Checksum: 8A01B8A3C35FCF7DBDE4BD247344875B;2998.
  ) 
 Here is how much of TeX's memory you used:
- 22558 strings out of 475102
- 433596 string characters out of 5764878
- 822056 words of memory out of 5000000
- 45172 multiletter control sequences out of 15000+600000
+ 22560 strings out of 475102
+ 433631 string characters out of 5764878
+ 822058 words of memory out of 5000000
+ 45174 multiletter control sequences out of 15000+600000
  575161 words of font info for 69 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,446b,608s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -750,10 +752,10 @@ re/texmf/fonts/type1/public/cm-super/sfti0900.pfb></usr/share/texmf/fonts/type1
 i1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/shar
 e/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type1/
 public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (9 pages, 578960 bytes).
+Output written on atlas_note.pdf (10 pages, 583796 bytes).
 PDF statistics:
- 268 PDF objects out of 1000 (max. 8388607)
- 205 compressed objects within 3 object streams
+ 271 PDF objects out of 1000 (max. 8388607)
+ 207 compressed objects within 3 object streams
  52 named destinations out of 1000 (max. 500000)
  122 words of extra memory for PDF output out of 10000 (max. 10000000)
 

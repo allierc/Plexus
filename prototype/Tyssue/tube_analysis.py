@@ -171,6 +171,18 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
     # This is the criterion that decides whether out-of-plane bumps are a mechanism or a defect,
     # and it is computed on the ENCLOSED volume of the shell (divergence theorem over the closed
     # surface), not on the sum of cell volumes, because it is the enclosure that is over-covered.
+    # TOPOLOGY, every frame. V - E + F = 2 - 2g. Premise #9 (a closed epithelium is a sphere with
+    # no holes) is the test that separates a discovery from a corrupted mesh -- no operator in this
+    # substrate can fuse two surfaces, so a handle cannot be created legally. It was computable all
+    # along and simply never recorded, which is why the buckling transition needed a bespoke script
+    # to check rather than a column in the table.
+    try:
+        from tyssue_diag import mesh_genus
+        _g = mesh_genus(mt)
+        m_size["euler"] = int(_g.get("euler", 0))
+        m_size["genus"] = int(_g.get("genus", -1))
+    except Exception:
+        pass
     # Fan each face from its own centroid: for half-edge (s,t) of face f the triangle is
     # (c_f, p_s, p_t). Needs no new vertex array and inherits the half-edges' orientation, so the
     # signed volume comes out consistently. Dead half-edges (ef >= nF) are dropped.
@@ -211,8 +223,13 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
     m_shape = (dict(shape_idx_mean=round(float(np.nanmean(_si[_ok])), 3),
                     shape_idx_med=round(float(np.nanmedian(_si[_ok])), 3),
                     shape_idx_p95=round(float(np.nanpercentile(_si[_ok], 95)), 3),
-                    shape_idx_max=round(float(np.nanmax(_si[_ok])), 3))
-               if _ok.any() else dict(shape_idx_mean=0.0, shape_idx_med=0.0,
+                    shape_idx_max=round(float(np.nanmax(_si[_ok])), 3),
+                    # THE FLOOR. perimeter/sqrt(area) cannot go below 2 sqrt(pi) = 3.5449 for ANY
+                    # shape -- that is a circle, and it is geometry, not biology. A measured value
+                    # below it is a BROKEN MEASUREMENT, never a finding. Nothing recorded the
+                    # minimum, so the one statistic that can prove the ruler is lying was missing.
+                    shape_idx_min=round(float(np.nanmin(_si[_ok])), 3))
+               if _ok.any() else dict(shape_idx_mean=0.0, shape_idx_med=0.0, shape_idx_min=0.0,
                                       shape_idx_p95=0.0, shape_idx_max=0.0))
     # THE THREE MESH-FAILURE MODES, SEPARATELY (see tyssue_diag.mesh_faults). They used to be ORed
     # into `hollow_frac` alone, which cannot distinguish a fifth of the cells being slightly bent

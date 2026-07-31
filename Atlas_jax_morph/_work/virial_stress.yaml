@@ -1,0 +1,104 @@
+id: virial_stress
+order: 20
+raw_name: VirialStress
+raw_kind: step (SimulationStep)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/stress.py:L15-L58
+paper_section: 'p. 16, Methods "Mechanical Stress" (the sigma_i equation); used in main text
+  "Mechanical Control of Cell Proliferation" p. 7-8 (d_i = g_i(stress, chemicals) * f(r)),
+  fig. 4, fig. S6'
+summary: >-
+  A quasistatic (pure-sensing) step that computes each live cell's Irving-Kirkwood virial
+  pressure from the attached pairwise potential and writes it into the transient per-cell
+  ``stress`` field (heritable=False), recomputed from the live configuration every macro-step.
+  It moves nothing and changes no dynamics; it only exposes local mechanical load so a downstream
+  gene-network / division-control step can sense it. Delegates the actual math to
+  ``PairwisePotential.virial_pressure(state)``.
+equations: |
+  CODE (VirialStress.__call__ -> PairwisePotential.virial_pressure) -- the per-cell
+  Irving-Kirkwood virial pressure:
+
+      p_i = -(1 / (2 d V_i)) * sum_{j != i, j alive} r_ij * (dU/dr)(r_ij)
+
+  r_ij = ||x_i - x_j||   (safe_norm of the space displacement; self-diagonal r=0 kept finite)
+  dU/dr                  = jax.grad of pair_energy w.r.t. separation, elementwise --
+                           INCLUDES the smooth-cutoff factor, not just the bare potential core
+  d                      = state.n_space_dim (spatial dimension)
+  V_i                    = the cell's OWN d-ball volume: 2 R_i (d=1), pi R_i^2 (d=2),
+                           4/3 pi R_i^3 (d=3)
+  1/2                    = Irving-Kirkwood bond split (each pair's virial shared by its two cells)
+  minus sign             = makes repulsion (dU/dr < 0, compression) read p_i > 0, tension < 0
+  masking                = neighbor_sum drops self-pairs and dead-cell sources; a final
+                           ``* alive`` zeroes dead i; safe_divide makes V_i=0 give 0, not inf.
+  state.set('stress', p) writes p of shape (capacity,).
+
+  PAPER (p. 16, "Mechanical Stress") -- a DIFFERENT scalar, defined only in 2D:
+
+      sigma_i = sum_j [ F_ij,x * (dx / |dx|) + F_ij,y * (dy / |dy|) ],   d = (dx, dy) = r_j - r_i
+
+  i.e. each force COMPONENT times the SIGN of that displacement component (a per-component /
+  taxicab weighting, NOT the Euclidean radial unit vector), summed over x and y. It has NO
+  volume normalization, NO 1/(2 d) factor, and NO 1/2 bond split. THE SHIPPED CODE IS THE
+  VIRIAL PRESSURE ABOVE, not this expression (see surprises: SOURCE WINS).
+params:
+  potential: >-
+    interaction_potential -- the ``PairwisePotential`` whose pairwise force law (dU/dr) and
+    per-pair couplings supply the virial; the sole constructor field. It is a structural
+    dependency (the interaction model), not a numeric tunable. Its own parameters (e.g. a traced
+    ``epsilon`` array) are exactly what the written ``stress`` remains differentiable/optimizable
+    through -- the step itself carries no scalar knob.
+state_io:
+  reads:
+    - position
+    - radius
+    - alive
+    - '<potential.state_reads(): any per-cell coupling field the potential sources params from,
+      e.g. a StateFieldSpec epsilon; empty for a plain scalar-parameter potential>'
+  writes:
+    - stress   # per-cell, heritable=False, transient sensing quantity, recomputed each macro-step
+surprises:
+  - 'SOURCE-vs-PAPER CONTRADICTION (the headline). The code computes the standard
+    Irving-Kirkwood virial pressure; the paper (p. 16) defines a non-standard scalar
+    ``sigma_i = sum_j F_ij,x*sgn(dx) + F_ij,y*sgn(dy)``. They differ three ways: (1) the paper
+    uses a per-component SIGN (taxicab) weighting, the code uses the true Euclidean radial
+    projection r_ij*(dU/dr); (2) the paper has NO volume/dimension normalization, the code
+    divides by 2 d V_i; (3) the paper has no 1/2 bond split. A reimplementer following the paper
+    would get an unnormalized, differently-weighted number, off by roughly a per-cell factor of
+    2 d V_i. Per the loop rule, SOURCE WINS: the shipped quantity is the virial pressure.'
+  - 'Minus-sign / compression convention. p_i = -(...): repulsion (dU/dr < 0) gives p_i > 0.
+    Drop the sign and compression reads negative -- which inverts the mechanosensing signal the
+    trained gene circuit relies on (in the paper stress INHIBITS division; a sign flip would
+    flip the learned rule).'
+  - 'The 1/2 is a bond split, not cosmetic. Each pair''s virial is shared between its two cells;
+    omitting it double-counts every cell''s pressure by 2x.'
+  - 'V_i is the cell''s OWN d-ball volume from its radius R_i (dimension-branched 2r / pi r^2 /
+    4/3 pi r^3), NOT a Voronoi area, NOT the pair contact distance sigma. Using sigma or a fixed
+    area gives wrong per-cell scaling and miscompares cells of different radius.'
+  - 'dU/dr is the autodiff derivative of the FULL pair_energy, INCLUDING the multiplicative
+    smooth cutoff. Pairs inside the transition window carry a switch-function term; differentiating
+    only the bare Morse/LJ core is wrong. Beyond r_cutoff both energy and derivative are exactly 0,
+    so far cells contribute 0.'
+  - 'Masking and NaN guards: neighbor_sum excludes the self-pair (r=0 diagonal) and dead-cell
+    sources; a trailing ``* alive`` zeroes dead i; safe_norm/safe_divide keep value AND gradient
+    finite at r=0 and at V_i=0 (dead cell, radius 0) under the always-on jax_debug_nans. A naive
+    implementation NaNs on the diagonal or on padded dead slots.'
+  - 'Pure sensing, quasistatic, transient. It writes only ``stress`` with heritable=False and is
+    recomputed every macro-step; it does not move cells, add force, or persist across division
+    (a daughter starts at the default, not the mother''s value). No step INSIDE the library reads
+    ``stress`` -- the consumer is a control/gene-network input in the examples. A reimplementer
+    might wrongly make it persistent/heritable or expect a mechanical feedback loop.'
+  - 'Not sure I could establish: whether this hardened reimplementation''s ``virial_pressure``
+    matches the ORIGINAL jax-morph numeric stress trajectory. The FORM clearly disagrees with the
+    paper text, but I did not run the oracle to compare against a reference stress signal -- that
+    is a validation-stage check, not settled here.'
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

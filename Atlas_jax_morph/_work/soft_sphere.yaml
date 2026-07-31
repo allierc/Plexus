@@ -1,0 +1,107 @@
+id: soft_sphere
+order: 15
+raw_name: SoftSphere
+raw_kind: potential (PairwisePotential)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L315
+paper_section: 'p. 9, Materials and Methods "Mechanical interactions" (also p. 14) -- but the
+  paper defines cell mechanics as the Morse potential, NOT this harmonic soft sphere; see surprises.'
+summary: >-
+  A pairwise interaction ENERGY (not a step): purely repulsive, compact harmonic excluded volume.
+  For a pair at separation r with contact distance sigma = r_i + r_j (sum of the two cells' radii),
+  it contributes overlap energy U(r) = (epsilon/2)(1 - r/sigma)^2 while the cells overlap (r < sigma)
+  and exactly zero at and beyond contact. It does not itself write state; a wrapping step
+  (MechanicalRelaxation / BrownianDynamics / ActiveBrownianDynamics2D / a stress step) turns its
+  autodiff-derived forces into a position update. Both energy and force vanish at r = sigma (C1),
+  so cells feel a soft push that fades smoothly as the overlap closes -- the canonical soft-disk /
+  active-matter excluded-volume model, with no adhesive tail and no cutoff to tune.
+params:
+  epsilon:
+    role: 'repulsion_strength (excluded-volume energy scale / contact stiffness). Shared scalar
+      (Python float or scalar jax.Array, default 1.0) OR a per-cell StateFieldSpec of shape () --
+      the per-cell form lets a regulatory network set per-cell repulsion, combined per pair by the
+      arithmetic-mean mix. Per-type / per-cell raw arrays are rejected at construction; only a
+      scalar or a per-cell scalar spec is accepted.'
+  # SoftSphere has exactly ONE constructor parameter (epsilon). The overlap exponent (2, harmonic)
+  # and the energy prefactor (0.5) are hard-coded literals in pair_energy, NOT tunables -- they are
+  # what distinguishes SoftSphere from its siblings (Hertzian passes 2.5); see equations/surprises.
+equations: >-
+  CODE (this class). pair_energy(r, sigma, eps) delegates to
+  _compact_repulsion(r, sigma, eps, exponent=2.0, prefactor=0.5), i.e.
+
+      U(r) = 0.5 * eps * (1 - r/sigma)^2   for r < sigma,   U(r) = 0   for r >= sigma,
+
+  with sigma = r_i + r_j (contact distance = SUM of radii, per pair) and eps the repulsion
+  strength (a shared scalar, or the arithmetic mean 0.5*(eps_i + eps_j) when epsilon is a per-cell
+  field). Radial force magnitude F = -dU/dr = eps*(1 - r/sigma)/sigma > 0 inside contact (repulsion);
+  at r -> sigma both U -> 0 and dU/dr -> 0 (C1; the second derivative jumps from eps/sigma^2 to 0).
+  Forces are obtained by autodiff of the total energy, never hand-coded:
+  total_energy = 0.5 * sum_i sum_{j != i, alive} U(r_ij)  (the leading 0.5 counts each pair once and
+  is DISTINCT from the per-pair 0.5 above; self- and dead-pairs are dropped by neighbor_sum).
+  Per-cell virial pressure (inherited from PairwisePotential):
+  p_i = -(1/(2 d V_i)) * sum_j r_ij (dU/dr)(r_ij), V_i the d-ball volume of radius r_i
+  (2 r, pi r^2, 4/3 pi r^3 for d = 1,2,3); the sign makes compression give p > 0.
+  ---
+  PAPER (p. 9 / p. 14). The paper's cell mechanics is NOT a harmonic soft sphere but the Morse
+  potential  V_ij(r) = eps_ij[(1 - exp(-alpha_ij (r_ij - sigma_ij)))^2 - 1],  sigma_ij = R_i + R_j,
+  which has BOTH a repulsive core and an attractive adhesion tail. The paper calls its cells
+  "adhesive soft spheres" as a descriptor of that Morse model; it never writes the harmonic
+  (epsilon/2)(1 - r/sigma)^2 that this SoftSphere class implements. The SOURCE (this class) wins:
+  SoftSphere is a purely-repulsive library alternative the paper does not use for its results.
+state_io:
+  reads:
+    - 'position (base POSITION): cell centres -> pairwise separations r_ij = safe_norm(pairwise_displacements(position, displacement)).'
+    - 'radius (base RADIUS): sets the per-pair contact distance sigma = r_i + r_j, and the d-ball volume V_i in virial_pressure.'
+    - 'alive (base ALIVE): masks self-pairs (j != i) and dead/padded cells in neighbor_sum; virial_pressure also zeroes dead cells.'
+    - 'displacement (structural space metric): the pairwise displacement operator (handles any boundary/topology).'
+    - 'n_space_dim (structural): dimension d, used only by virial_pressure to pick the d-ball volume.'
+    - 'epsilon field: ONLY when epsilon is a per-cell StateFieldSpec -- then state_reads() returns that one spec so build_state_from_model allocates it. With the default scalar epsilon, state_reads() == () (declares nothing).'
+  writes:
+    - 'none. SoftSphere is a Potential (an energy), not a Step: it exposes total_energy / forces / virial_pressure and declares no state_writes. The position (or stress) update is written by whatever step consumes these forces.'
+surprises:
+  - 'PAPER vs SOURCE (the headline): the paper''s "adhesive soft spheres" are realized by the MORSE
+    potential (repulsion + adhesion), not by this class. This SoftSphere is a purely-repulsive
+    harmonic with NO attractive tail, so it is a mechanism the paper describes in name only. A
+    reader who assumes "SoftSphere == the paper''s cell mechanics" is wrong; the paper''s force law
+    is Morse (a sibling class in this same file).'
+  - 'sigma = r_i + r_j is the SUM of the two radii, not their mean and not a single diameter.
+    Contact happens when centres are one full (R_i + R_j) apart. Using (R_i+R_j)/2 halves the
+    contact distance and quadruples the effective stiffness.'
+  - 'The energy carries a 1/2 prefactor: U = (epsilon/2)(1 - r/sigma)^2, not epsilon(1 - r/sigma)^2.
+    It is the literal prefactor=0.5 inside _compact_repulsion. Dropping it doubles the force.'
+  - 'TWO independent halves. The per-pair 0.5 (harmonic prefactor) and the leading 0.5 in
+    total_energy (each undirected pair counted once over the dense N x N sum) are different factors;
+    a reimplementer who folds them into one under-counts either the energy or the stiffness.'
+  - 'Gradient-safety double `where` (in the shared _compact_repulsion): base = 1 - safe_divide(r,
+    sigma); the power is evaluated on where(base>0, base, 1.0) and then masked by where(base>0, ...,
+    0). For SoftSphere''s integer exponent 2 this looks redundant, but it is what keeps the FRACTIONAL
+    exponents of the siblings (Hertzian 5/2) NaN-free at r >= sigma under the always-on
+    jax_debug_nans. Omit it and the sibling potentials'' gradients NaN.'
+  - 'safe_divide(r, sigma) guards dead-dead PADDED pairs where both radii (hence sigma) are 0:
+    plain r/sigma would be 0/0 -> NaN, and the alive-mask in neighbor_sum removes the pair''s VALUE
+    but not a NaN that has already poisoned the sum under debug_nans. The guard must sit at the
+    divide, not at the reduction.'
+  - 'Per-cell epsilon combines by the ARITHMETIC mean 0.5*(eps_i+eps_j) (PairwisePotential.mix),
+    deliberately NOT the geometric mean / Lorentz-Berthelot -- chosen because it has a finite
+    gradient at zeros (no sqrt). So within one pair epsilon mixes by MEAN while sigma mixes by SUM:
+    two different combination rules.'
+  - 'On the self-diagonal (i == j) r = 0, so base = 1 and pair_energy returns 0.5*eps (NONZERO), not
+    0. It is neighbor_sum''s j != i mask -- not the energy formula -- that removes the spurious
+    self-energy. A naive full-matrix sum without the self-mask adds a constant offset.'
+  - 'No cutoff parameter and none needed: the support is exactly [0, sigma), so U and F are already
+    compact and C1 at contact. Unlike Morse / LennardJones / Harmonic there is no r_onset_frac /
+    r_cutoff_frac; porting cutoff code from a sibling would be a bug.'
+  - 'Forces come from jax.grad of total_energy, not a hand-written -dU/dr. The pair_energy must
+    therefore be autodiff-clean everywhere it is evaluated (including the masked diagonal and dead
+    pairs) -- which is the whole reason for safe_norm / safe_divide / the double where.'
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

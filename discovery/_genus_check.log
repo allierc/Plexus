@@ -1,0 +1,13 @@
+[engine] 460 sim frames -> recording 461 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === mini_grow_divide_bigger ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=460
+[engine] sets:      cell(16000)  vertex(30000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d
+frame  cells   genus / euler
+  300   1766   {'V': 3528, 'E': 5292, 'F': 1766, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}
+  371   2908   {'V': 5812, 'E': 8718, 'F': 2908, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}
+  397   3574   {'V': 7144, 'E': 10716, 'F': 3574, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}
+  410   3904   {'V': 7804, 'E': 11706, 'F': 3904, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}
+  423   4265   {'V': 8526, 'E': 12789, 'F': 4265, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}
+  440   4940   {'V': 9876, 'E': 14814, 'F': 4940, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}
+  459   5558   {'V': 11112, 'E': 16668, 'F': 5558, 'euler': 2, 'genus': 0, 'closed_sphere': True, 'verdict': 'sphere (as built)'}

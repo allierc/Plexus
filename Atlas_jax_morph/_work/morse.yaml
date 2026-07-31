@@ -1,0 +1,111 @@
+id: morse
+order: 14
+raw_name: Morse
+raw_kind: potential (PairwisePotential)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L269
+paper_section: p. 9 (Methods, 'Mechanical interactions', eq. V_ij(r), lines 514-520); restated
+  p. 14 (SI, 'Mechanical Interactions'); fig. 1d (repulsive core = volume exclusion, attractive
+  tail = cell-cell adhesion)
+summary: An interaction ENERGY, not a state-writing step. It evaluates a Morse pair potential over
+  every live, non-self pair -- a repulsive core plus an adhesive tail with its minimum -epsilon at
+  the contact distance sigma = r_i + r_j -- and sums it into the scalar total interaction energy;
+  the base class turns that into per-cell forces (autodiff of the energy) and per-cell virial
+  pressure. Morse itself writes NOTHING to state; a wrapping step (MechanicalRelaxation,
+  BrownianDynamics, VirialStress) consumes total_energy / forces / virial_pressure and moves
+  positions or records stress. The code multiplies the well by a sigma-relative smooth cutoff on
+  [1.5*sigma, 2.5*sigma] that the paper's written formula does not have.
+equations: |
+  Indices: i, j range over state-array slots (0..capacity-1); r_ij = |displacement(pos_i, pos_j)|.
+
+  Per-pair parameters (Morse.pair_params):
+      sigma_ij = radius_i + radius_j          # contact distance = well minimum (ADDITIVE rule)
+      eps_ij   = coupling(epsilon)            # scalar -> broadcast (N,N); StateFieldSpec -> mix()
+      alpha_ij = coupling(alpha)              # scalar -> broadcast (N,N); StateFieldSpec -> mix()
+      mix(v)_ij = 0.5*(v_i + v_j)             # arithmetic mean for a per-cell coupling (NOT for sigma)
+
+  Elementwise Morse energy with cutoff (Morse.pair_energy):
+      e_ij    = 1 - exp(-alpha_ij * (r_ij - sigma_ij))
+      U_ij    = eps_ij * (e_ij^2 - 1)         # = eps*(1 - exp(-alpha(r-sigma)))^2 - eps
+      Ucut_ij = U_ij * S(r_ij; r_on = 1.5*sigma_ij, r_off = 2.5*sigma_ij)   # <-- cutoff NOT in paper
+      U(sigma) = -eps (well minimum);  U(r -> inf) -> 0 already (e -> 1), the cutoff truncates the tail.
+
+  jax-md multiplicative_isotropic_cutoff S (helper _smooth_cutoff, C1 in value and 1st derivative):
+      S(r) = 1                                                                for r <= r_on
+           = (r_off^2 - r^2)^2 (r_off^2 + 2 r^2 - 3 r_on^2) / (r_off^2 - r_on^2)^3   for r_on < r < r_off
+           = 0                                                                for r >= r_off
+
+  Reductions inherited from PairwisePotential:
+      E(positions, state) = 0.5 * sum_i sum_{j!=i, alive} Ucut_ij      # 0.5 counts each pair once
+      forces(state)       = -grad_positions E                          # autodiff, shape (N, dim)
+      p_i (virial)        = -(1/(2 d V_i)) * sum_{j!=i,alive} r_ij (dU/dr)(r_ij)   # V_i = d-ball volume(radius_i)
+
+  Paper form (p. 9 / p. 14), IDENTICAL to U_ij but with NO cutoff factor:
+      V_ij(r) = eps_ij [1 - exp(-alpha_ij (r_ij - sigma_ij))]^2 - eps_ij
+  The CODE is authoritative: it adds the [1.5*sigma, 2.5*sigma] smooth cutoff the paper omits.
+params:
+  epsilon: well depth (energy scale) -- how deep the adhesive well / how strong the interaction;
+    at contact V = -epsilon. Shared scalar (default 3.0) or a per-cell StateFieldSpec combined per
+    pair by the arithmetic-mean mix(). This is the knob the paper's adhesion example learns (epsilon_ij
+    set by regulated cadherin concentration).
+  alpha: well steepness / inverse interaction range -- larger alpha narrows the well (steeper,
+    shorter-range interaction), smaller alpha widens the attractive tail. Shared scalar (default 2.8)
+    or per-cell StateFieldSpec, mixed by arithmetic mean.
+  r_onset_frac: interaction-range onset, as a multiple of the contact distance sigma. Below
+    r_onset_frac*sigma the energy is untouched (S=1). Default 1.5. Pure numeric field (never per-cell).
+  r_cutoff_frac: interaction-range end, as a multiple of sigma. Beyond r_cutoff_frac*sigma the energy
+    is exactly 0 (S=0). Default 2.5. Construction requires r_onset_frac < r_cutoff_frac (_check_config).
+state_io:
+  reads: 'position (the (N,dim) positions the energy is evaluated at, passed by the wrapping step);
+    radius (sigma_ij = r_i + r_j, per pair, and the d-ball volume for virial); alive (self/dead-pair
+    mask via neighbor_sum); displacement (the space metric, i.e. free vs periodic, for pairwise
+    separations); n_space_dim (virial_pressure only, for the d-ball volume). Plus any per-cell field
+    named by an epsilon/alpha StateFieldSpec -- state_reads() returns exactly those specs (default:
+    none, since the defaults are scalars).'
+  writes: 'NONE. Morse is a Potential, not a SimulationStep: it returns an energy (scalar), a force
+    array, or a virial vector, never a state or a state delta. All persistent state changes are made
+    by the wrapping step that consumes these (relaxation/Brownian write position; VirialStress writes
+    a stress field).'
+surprises:
+- 'PAPER-vs-CODE gap (the point of this entry): the paper''s written Morse energy (p. 9 eq. and p. 14
+    SI, both V_ij(r) = eps[1-exp(-alpha(r-sigma))]^2 - eps) is UNTRUNCATED. The code multiplies it by
+    a jax-md-style smooth multiplicative cutoff on [1.5*sigma, 2.5*sigma]. A reimplementer following
+    only the paper''s formula gets a different force in the 1.5-2.5*sigma window and a non-compact
+    interaction. The SOURCE wins; the cutoff, its window fractions, and its C1 (not C-infinity) form
+    are code-only decisions.'
+- 'The bare Morse well ALREADY decays to 0 as r -> inf (e -> 1 so U -> eps*(1-1) = 0); the "-epsilon"
+    shift sets V(inf)=0 and V(sigma)=-epsilon. So the cutoff is NOT needed to bound or zero the energy
+    -- it only truncates the residual exponential tail exactly and keeps the force continuous. Easy to
+    assume the cutoff is load-bearing when the potential is already asymptotically zero.'
+- 'TWO different pair-combining rules live in one potential: sigma uses an ADDITIVE rule (r_i + r_j),
+    while a per-cell epsilon/alpha uses the arithmetic-MEAN mix() = 0.5*(v_i+v_j). A reimplementer who
+    averages radii too (or sums the couplings) is wrong. mix is arithmetic (no sqrt) on purpose so the
+    gradient stays finite at zeros / dead cells under jax_debug_nans -- a geometric (Lorentz-Berthelot)
+    mean would NaN.'
+- 'epsilon/alpha accept ONLY a shared scalar or a per-cell SCALAR StateFieldSpec -- __check_init__
+    rejects any N-vector or N x N array. The paper''s differential-adhesion example (Fig. S1) needs a
+    full per-PAIR, type-dependent well-depth matrix: homotypic vs heterotypic cadherin SUM, sigmoid-
+    scaled to [0.8, 3.8]. That per-pair, sum-based, type-aware rule is NOT expressible through this
+    class''s arithmetic-mean coupling API; the model must supply epsilon by another route or override
+    mix(). I could NOT determine from potentials.py alone how the pattern example wires this -- flagged
+    as an open uncertainty.'
+- 'Default magic constants epsilon=3.0, alpha=2.8, r_onset_frac=1.5, r_cutoff_frac=2.5 appear NOWHERE
+    in the paper (which gives no numeric alpha, epsilon, or cutoff). They cannot be recovered from the
+    paper and a reimplementer must copy them from the source.'
+- 'NaN guards are load-bearing under the suite''s always-on jax_debug_nans: dead-dead padded pairs have
+    sigma = 0 -> r_on = r_off = 0, so S''s denominator (r_off^2 - r_on^2)^3 is 0/0; safe_divide returns
+    0 there. safe_norm gives the r=0 self-diagonal a zero value AND zero gradient. Reimplement without
+    these and a masked pair NaNs the whole energy/force (test_morse_padded_dead_cells_do_not_nan).'
+- 'The 0.5 in total_energy (0.5 * sum(neighbor_sum(U, alive))) counts each pair once; neighbor_sum
+    already masks self (i!=j) and dead pairs. Dropping the 0.5 doubles the energy and every force.'
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

@@ -1,0 +1,147 @@
+id: mechanical_relaxation
+order: 19
+raw_name: MechanicalRelaxation
+raw_kind: step (SimulationStep)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/relaxation.py:L221
+paper_section: >-
+  p. 14 (Materials and Methods, 'Mechanical Interactions'): "Relaxation is performed by gradient
+  descent energy minimization of the Morse potential for a fixed number of steps (except in the case
+  where we learn cell adhesion)"; framework slot Fig. 1a ('mechanical relaxation').
+summary: >-
+  Quasistatic step: relaxes cell positions to a mechanical equilibrium of an interaction potential,
+  overwriting POSITION with the force-balanced configuration x* where grad_x U(x*) = 0. The forward
+  runs FIRE (a momentum-accelerated minimizer) to a genuine force tolerance f_tol -- a real
+  equilibrium, not a fixed step count -- and the backward differentiates that EQUILIBRIUM by the
+  implicit function theorem (jax.custom_vjp), restricted to the physical (deformation) subspace, so
+  the rigid-body gauge modes carry no gradient. potential=None -> NoForce makes it a no-op.
+equations: |-
+  FORWARD (code) -- relax to a mechanical equilibrium x* = argmin_x U(x; state), realized as the
+    ROOT of grad_x U(x*, params) = 0, by FIRE (Fast Inertial Relaxation Engine; Bitzek 2006), NOT
+    plain gradient descent. Per iteration with force f = -grad_x U(x):
+      P     = f . v                                    (power; step is "uphill" when P <= 0)
+      v     <- 0 if uphill else v ;   v <- v + dt * f  (zero the velocity on an uphill step)
+      v     <- (1 - alpha) v + alpha (f / |f|) |v|     (mix velocity toward the force direction)
+      x     <- x + dt * v                              (semi-implicit Euler position update)
+      dt,alpha adapted: after n_min(=5) consecutive downhill steps dt <- min(dt*f_inc, dt_max) and
+        alpha <- alpha*f_alpha; on an uphill step dt <- dt*f_dec and alpha <- alpha_start, v <- 0.
+    STOP when |grad_x U|_inf <= f_tol (a genuine force balance) OR the iteration count reaches
+    max_steps. Then position <- x*. (NoForce: grad U = 0 at step 0, the loop body never runs.)
+  BACKWARD (code) -- gradient of the EQUILIBRIUM by the implicit function theorem, not the solver
+    path. At x*, grad_x U(x*, p) = 0, so by IFT  dx*/dp = -H^{-1} d(grad_x U)/dp  with the Hessian
+    H = d^2 U / dx^2. For an output cotangent g = dL/dx*, solve the adjoint on the PHYSICAL subspace
+        (P H P + ridge) u = P g       by conjugate gradient (maxiter 500),
+    where P projects OUT the rigid-body null modes -- dead-cell DOFs, d global translations, and
+    d(d-1)/2 global rotations of the alive cells (all exact zero modes of a distance-only U). Then
+        dL/dp = -u^T d(grad_x U)/dp   (the vjp of grad_x U wrt p = (potential, state), applied to -u)
+    yielding gradients for BOTH the potential's parameters and the incoming state (radii -> sigma...).
+    Symbols: U = interaction energy; x* = relaxed positions; H = Hessian at x*; P = physical-subspace
+    projector; ridge = Tikhonov damping on residual soft modes; g/u = output/adjoint cotangents.
+  PAPER FORM (contrast, p. 14): "gradient descent energy minimization of the Morse potential for a
+    FIXED NUMBER OF STEPS (except in the case where we learn cell adhesion)" -- plain first-order
+    descent, no momentum, no force-tolerance stop, and (implied) backprop through the unrolled
+    descent. SOURCE WINS: FIRE-to-tolerance forward + implicit-diff equilibrium backward.
+params:
+  potential: >-
+    interaction_potential -- its total_energy(x, state) defines the energy landscape U whose force
+    balance grad_x U = 0 is the equilibrium this step relaxes to. Any Potential; its float leaves are
+    traced/optimizable. Pass None -> NoForce (relaxation becomes a no-op; positions pass through).
+  max_steps: >-
+    solver_iteration_cap (eqx.field static int) -- a FALLBACK bound on FIRE iterations, NOT the
+    convergence criterion (that is f_tol). Static so the jax.lax.while_loop is jittable. Reaching it
+    without hitting f_tol emits a runtime RuntimeWarning and returns the last (off-equilibrium)
+    iterate anyway. Default 500.
+  f_tol: >-
+    equilibrium_tolerance (force convergence threshold) -- FIRE stops when the force inf-norm
+    |grad_x U|_inf <= f_tol, i.e. a genuine mechanical equilibrium (the residual measured at the
+    returned configuration). Plain float field. Default 1e-3.
+  ridge: >-
+    adjoint_regularization (Tikhonov damping) -- added to the PROJECTED Hessian in the backward
+    implicit-diff solve (P H P + ridge) u = P g to condition residual near-zero soft modes.
+    BACKWARD-ONLY: it changes gradients, never the forward relaxation. Plain float field. Default 1e-6.
+state_io:
+  reads:
+    - "position (POSITION) -- explicitly declared; supplies the FIRE initial condition x0 = state.position."
+    - >-
+      potential.state_reads() -- any NON-base per-cell field the potential sources its couplings from
+      (e.g. a per-cell epsilon StateFieldSpec when adhesion is field-driven). Empty for NoForce and
+      for scalar-coupling potentials.
+  writes:
+    - >-
+      position (POSITION) -- QUASISTATIC absolute overwrite: returns state.set('position', x*), the
+      relaxed equilibrium positions (a full state, NOT a dynamic delta).
+surprises:
+  - >-
+    PAPER vs SOURCE (the key contradiction). The paper's Methods (p. 14) defines mechanical
+    relaxation as "gradient descent energy minimization of the Morse potential for a FIXED NUMBER OF
+    STEPS (except in the case where we learn cell adhesion)". The SOURCE differs on THREE axes: (1)
+    the minimizer is FIRE (momentum + adaptive timestep), not plain gradient descent; (2) it runs to
+    a force TOLERANCE f_tol (a real equilibrium), with max_steps only a fallback bound, not a fixed
+    step count; (3) the gradient is the implicit-function-theorem sensitivity of the EQUILIBRIUM, not
+    backprop through the descent iterates. The paper's own parenthetical "(except in the case where
+    we learn cell adhesion)" marks exactly the regime where fixed-step solver-path gradients break
+    down -- which is the problem the code's implicit-diff approach solves in general. SOURCE WINS.
+  - >-
+    The gradient is NOT taken through the solver path. jax.custom_vjp replaces the forward FIRE loop's
+    autodiff with the IFT adjoint, so _fire_to_tol is forward-only and its internal ops are never
+    differentiated. A reimplementer who autodiffs through the FIRE while_loop gets path-dependent (not
+    equilibrium) gradients plus O(max_steps) memory; the whole point is that the answer depends only
+    on the converged x*, not on how FIRE got there.
+  - >-
+    Rigid-body null modes carry ZERO gradient by design. The adjoint is solved only on the physical
+    (deformation) subspace: dead-cell DOFs, one global translation (d modes), and one global rotation
+    (d(d-1)/2 modes) are projected out of BOTH the operator and the RHS (P g). A shape objective is
+    unaffected; a translation-/rotation-sensitive objective simply gets NO gradient for that
+    sensitivity (rather than a spurious ridge-scaled one). To make absolute position/orientation
+    optimizable you must break the symmetry physically (pin a cell, add a field/substrate). A naive
+    H u = g solve without projection is singular / ill-conditioned at a free-space equilibrium.
+  - >-
+    max_steps is a FALLBACK bound, not the loop count (the opposite of the paper's fixed-step
+    relaxation). On non-convergence the step returns the last iterate anyway and warns via
+    jax.debug.callback -- a HOST-side warning that fires even from inside a jitted / vmapped /
+    differentiated call. Under vmap the guarding lax.cond runs both branches, so the callback
+    re-checks the tolerance host-side and only warns for lanes that genuinely missed f_tol.
+  - >-
+    The FIRE integrator constants are HARDCODED in _fire_to_tol, not constructor knobs:
+    dt_start=0.01, dt_max=0.1, n_min=5, f_inc=1.1, f_dec=0.5, alpha_start=0.1, f_alpha=0.99 (the
+    standard Bitzek-2006 FIRE schedule). Only max_steps / f_tol / ridge are exposed; a reimplementer
+    expecting to tune the timestep or velocity-mixing from the step API finds no such parameter.
+  - >-
+    ridge is BACKWARD-ONLY and applied on the PROJECTED subspace (+ ridge * vp), not on the full-space
+    Hessian. It perturbs gradients, never the relaxed positions. ridge=0 risks a singular adjoint on
+    residual soft modes; a large ridge biases the physical-mode sensitivities -- which is why the exact
+    rigid modes are PROJECTED out first rather than merely ridge-damped.
+  - >-
+    The adjoint differentiates wrt the incoming STATE too, not only the potential's parameters:
+    params = (potential, state) rides the custom_vjp as ONE differentiable pytree (its float leaves
+    traced, its bool/callable leaves -- the alive mask, callables -- getting float0), so gradients
+    flow back to cell radii (radius -> sigma) etc. State cannot be a nondiff_argnum because
+    nondiff_argnums must be hashable and a state carrying array leaves is not.
+  - >-
+    Declared state_reads OMITS radius / alive / displacement. total_energy actually consumes
+    state.radius (sigma = r_i + r_j), state.alive (pair masking), and state.displacement, but the
+    step declares only POSITION + potential.state_reads() -- those three are BASE fields assumed
+    present, not re-declared. A reimplementer building the dataflow graph off state_reads() alone
+    would miss that radius (and liveness) drive the equilibrium.
+  - >-
+    The force is carried through the while_loop carry, not recomputed in cond: body computes
+    f = -grad U at the new position for the next iteration and cond tests that CARRIED force, so the
+    O(N^2) energy gradient is evaluated exactly once per FIRE step. Recomputing grad inside cond
+    would double the force evaluations per step.
+  - >-
+    The NoForce no-op is realized through the GENERAL FIRE path, not a special case in the step:
+    grad U = 0 everywhere gives residual 0 <= f_tol at iteration 0, so the while_loop body never runs
+    and positions pass through unchanged. relax_equilibrium has an explicit `if potential is None`
+    short-circuit, but the step stores an actual NoForce() (potential is not None), so that branch is
+    never taken -- it relies on immediate convergence instead.
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

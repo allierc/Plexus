@@ -1,0 +1,106 @@
+id: hertzian
+order: 16
+raw_name: Hertzian
+raw_kind: potential (PairwisePotential)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L345
+paper_section: >-
+  absent from paper; nearest anchor is the Morse-only mechanics, p. 9 "Mechanical
+  interactions" / eq. V_ij on p. 14 / Fig. 1d
+summary: >-
+  A pair-interaction ENERGY (not a state-mutating step): a purely repulsive, compact
+  Hertzian elastic-contact potential. It contributes a per-pair energy
+  U(r) = (2/5) eps (1 - r/sigma)^(5/2) for cells overlapping within the contact
+  distance sigma = r_i + r_j, and exactly zero at/beyond contact. It writes nothing
+  itself; a wrapping dynamic step (MechanicalRelaxation / BrownianDynamics) autodiffs
+  its total energy into forces and moves the cells. Softer at contact than SoftSphere:
+  both the force AND its slope vanish at r = sigma (deformable elastic spheres).
+equations: >-
+  Pair energy (code, Hertzian.pair_energy -> _compact_repulsion(r, sigma, eps, 2.5, 0.4)):
+
+    U(r) = 0.4 * eps_ij * (1 - r/sigma_ij)^2.5   for r < sigma_ij,   else 0
+         = (2/5) eps_ij (1 - r_ij/sigma_ij)^(5/2)
+
+  with contact distance (additive rule, NOT the arithmetic mix used for eps):
+    sigma_ij = r_i + r_j            (sum of the two cell radii)
+  and coupling:
+    eps_ij   = 0.5*(eps_i + eps_j)  if epsilon is a per-cell StateFieldSpec (mix = arithmetic mean),
+             = eps                  if epsilon is a shared scalar.
+
+  Radial repulsive force magnitude (from f = -dU/dr, the 2/5 chosen so this has coeff 1):
+    f(r) = (eps_ij / sigma_ij) (1 - r/sigma_ij)^(3/2)   for r < sigma, else 0.
+
+  Total energy summed once per live non-self pair (base class):
+    E = 0.5 * sum_{i != j, both alive} U(r_ij);   forces = -grad_positions E (autodiff);
+  per-cell virial pressure p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr) is inherited (repulsion -> p>0).
+
+  Symbols: r = |x_i - x_j| pair separation; sigma = contact distance (sum of radii); eps = contact
+  stiffness; d = n_space_dim; V_i = d-ball volume of cell i.
+
+  PAPER (code disagrees): the paper defines ONLY the Morse potential for mechanics,
+    V_ij(r) = eps_ij [ (1 - exp(-alpha_ij (r_ij - sigma_ij)))^2 - 1 ]  (adhesive soft spheres).
+  Hertzian is a code-only addition to the potential library; it is not in the paper.
+params:
+  epsilon: >-
+    contact_stiffness (repulsion strength / elastic-modulus scale); default 1.0. The ONLY
+    constructor parameter. Accepts a shared scalar OR a per-cell StateFieldSpec combined per pair
+    by the arithmetic-mean mix() (per-type / per-cell raw arrays are rejected at construction).
+  _implicit_not_a_constructor_param: >-
+    interaction_length sigma = r_i + r_j is sourced from state.radius, NOT a tunable field on the
+    potential; the exponent 5/2 and prefactor 2/5 are hard-coded (no cutoff parameter -- the
+    interaction is self-truncating exactly at contact, unlike Morse/LJ/Harmonic).
+state_io:
+  reads:
+    - POSITION (state.position -> pair separations r_ij)
+    - RADIUS (state.radius -> contact distance sigma_ij = r_i + r_j; and d-ball volume for virial)
+    - ALIVE (state.alive -> neighbor_sum masks dead cells and self-pairs)
+    - 'space metric (state.displacement, state.n_space_dim -- static, sets minimum-image r and virial volume)'
+    - 'epsilon field (ONLY if epsilon is a per-cell StateFieldSpec; declared via state_reads())'
+  writes:
+    - >-
+      none -- a Potential mutates no state; it exposes total_energy/forces/virial that a wrapping
+      dynamic step consumes, and that step writes POSITION.
+surprises:
+  - >-
+    NOT IN THE PAPER. The paper models mechanics with a single Morse potential (adhesive soft
+    spheres, p. 9 / p. 14 / Fig. 1d). Hertzian is a code-only extension of the pair-potential
+    library, exercised only by tests (tests/physics/test_potentials.py) and the examples notebook
+    (examples/03_potentials.ipynb); no paper model, config, or oracle script instantiates it. It
+    is PURELY REPULSIVE with NO adhesive tail, so it cannot reproduce the paper cell-cell adhesion.
+  - >-
+    Magic constant 2/5 (prefactor 0.4) is NOT arbitrary: it equals 1/exponent, which normalizes
+    the force prefactor to exactly eps/sigma (f = (eps/sigma)(1 - r/sigma)^1.5). A reimplementer
+    who writes U = eps (1 - r/sigma)^2.5 gets a force 2.5x too strong. (SoftSphere uses the same
+    trick: 0.5 = 1/2 for exponent 2.)
+  - >-
+    Softer-than-harmonic onset: exponent 5/2 makes energy ~overlap^2.5, so force ~overlap^1.5 and
+    force-slope ~overlap^0.5 BOTH vanish at contact (C2 energy). SoftSphere (exponent 2) has a
+    nonzero force-slope at contact (only C1). This is the whole point of Hertzian vs SoftSphere.
+  - >-
+    Fractional-power gradient guard (double where in _compact_repulsion): the (possibly fractional)
+    power is evaluated on a base forced strictly positive (safe = where(base>0, base, 1.0)) before
+    the outer where zeros it. A naive single where(base>0, eps*base**2.5, 0) NaNs the gradient for
+    r >= sigma under the always-on jax_debug_nans, because base**2.5 is differentiated at base<=0.
+  - >-
+    Dead/padded-pair masking is EXTERNAL, not in the energy. For a dead-dead pair sigma=0,
+    safe_divide(r,0)=0 so base = 1 - 0 = 1 > 0 and _compact_repulsion returns a spurious 0.4*eps,
+    NOT zero. That nonzero per-pair energy is cancelled downstream by neighbor_sum(u, state.alive),
+    which masks self-pairs and dead cells. Reordering (masking inside the energy) or dropping the
+    alive mask would inject phantom repulsion between dead cells.
+  - >-
+    Contact distance sigma uses the ADDITIVE rule r_i + r_j, a different combining rule from the
+    epsilon coupling (arithmetic-mean mix). Do not mix sigma with mean().
+  - >-
+    epsilon as a StateFieldSpec is combined per PAIR by arithmetic mean (mix), chosen over a
+    geometric mean specifically because it has a finite gradient at zeros/dead cells (no sqrt).
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null
