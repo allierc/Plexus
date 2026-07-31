@@ -307,6 +307,22 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
             m.update(_pm(np.asarray(act, float), es, et, ef, nF, cen=_cen.numpy()))
         except Exception:
             pass
+    # WHICH OF OKUDA'S SHAPES IS THIS. sphere / undulation / tube / branched, or `invalid` when
+    # the surface passes through itself -- the campaign has already once reported a crumple as a
+    # morphology. This is the measurement Phase 4 exists for: without it "we reproduced the
+    # figure" can be asserted but not checked.
+    try:
+        from morphology import classify as _mclass
+        _cn, _rd, _lv = _cell_centroids(pt, mt)
+        _c = _mclass(_cn, _rd, _lv, m.get("protr", 1.0),
+                     ray_single_frac=m_size.get("ray_single_frac"))
+        m["morphology"] = _c["morphology"]
+        m["morph_why"] = _c["why"]
+        m["n_protrusions"] = _c.get("n_protrusions", 0)
+        m["protrusion_aspect_max"] = round(max(_c.get("aspect") or [0.0]), 3)
+        m["n_tips"] = _c.get("n_tips", 0)
+    except Exception:
+        pass
     m.update(tube_diameter(pt, mt))
     m.update(cell_census(pt, mt, act, a_sw=a_sw))                          # tip/branch/body + red composition
     return m

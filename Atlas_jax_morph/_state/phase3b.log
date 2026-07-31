@@ -1,3 +1,56 @@
 implementer: 1 mechanisms, 3 at a time -- soft_sphere
 
 Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Done. Summary of what I implemented for `soft_sphere`:
+
+## Operator
+`src/plexus/operators/candidates/jax_morph_soft_sphere.py` — the `adhere:soft_sphere` torch operator.
+
+- `@register_operator("adhere", family="interaction", set="cell", kind="lateral", implementation="soft_sphere")`, subclass of `Lateral`, `EMIT="velocity"` (overdamped, engine-integrated).
+- It's the literal twin of the already-landed `jax_morph_hertzian.py` — same `_safe_divide`/`_safe_norm`/`_compact_repulsion` helpers ported verbatim from `potentials.py:L30`, same **autodiff-of-the-energy** force path (`-torch.autograd.grad(total_energy)`, faithful to the source's `forces = -jax.grad(...)`), same external live-non-self mask, additive `sigma = r_i + r_j`, and arithmetic-mean per-cell epsilon mix. It differs **only** in the two constants the source separates the family by: `_compact_repulsion(..., exponent=2.0, prefactor=0.5)`.
+- SoftSphere is the member that **mints** `adhere` (matches the normalized verdict; the docstring records this and the source-wins Morse contradiction). No oracle constant is baked in — the differ runs against the oracle later.
+
+## Test
+`tests/test_jax_morph_soft_sphere.py` — 8 property tests, all pass, none checking oracle numbers. The headline one distinguishes SoftSphere from its Hertzian twin without the reference: the radial force is **exactly linear in r** inside contact (equal steps → equal force drops, reaching 0 at contact with a finite nonzero slope `-eps/sigma²`, i.e. **C1**), where Hertzian's 5/2 core is C2. The rest assert: analytic repulsive magnitude `(eps/sigma)(1-r/sigma)`, compact support (zero at/beyond contact), Newton's third law (conservative → cluster force sums to 0), size-consistent additive contact, external dead-cell masking, arithmetic-mean per-cell epsilon, and finite position gradients.
+
+## Entry + note
+- `_work/soft_sphere.yaml`: `status: implemented`, `module:` and `test:` set (verdict/contract untouched — validated as still-valid YAML).
+- `campaign/notes/soft_sphere.md`: appended an implementer section documenting the build and the verified property.
+
+Confirmed the `adhere` family (soft_sphere/hertzian/harmonic) co-registers without collision.
+  committed  implementer/soft_sphere  (4.8 min)
+
+implementer: 1/1 committed in 4.8 min wall clock
+merged 1 note(s) into campaign/analysis.md
+
+fmottes/jax-morph @ ace08b87   24 mechanisms
+
+    1  GeneNetworkConnectionist                     implemented new          regulate
+    2  NeuralODE                                    implemented new          regulate
+    3  GeneNetworkMWC                               implemented new          regulate
+    4  ODEController                                implemented new          regulate  disputed
+    5  StochasticStep                               normalized  out_of_scope sample_score
+    6  Death                                        implemented new          apoptose
+    7  FreeScreenedDiffusion                        implemented new          morphogen
+    8  Division                                     implemented refinement   cell_divide
+    9  SaturatingCellGrowth                         implemented refinement   cell_grow
+   10  ActiveBrownianDynamics2D                     implemented new          reorient
+   11  BrownianDynamics                             implemented new          agitate
+   12  NoForce                                      normalized  out_of_scope no_interaction
+   13  PairwisePotential                            normalized  alias        attraction_repulsion
+   14  Morse                                        normalized  alias        attraction_repulsion  disputed
+   15  SoftSphere                                   implemented new          adhere  disputed
+   16  Hertzian                                     implemented new          adhere  disputed
+   17  Harmonic                                     implemented new          adhere  disputed
+   18  LennardJones                                 implemented new          adhere
+   19  MechanicalRelaxation                         implemented new          relax
+   20  VirialStress                                 implemented new          mechanosense
+   21  Lie-Trotter macro-step split                 normalized  out_of_scope integrate
+   22  step type: quasistatic / dynamic / discrete  normalized  out_of_scope timescale
+   23  declared field dataflow validation           normalized  out_of_scope couple
+   24  stochastic trace / replay / score            normalized  out_of_scope sample_score
+
+  {'candidate': 0, 'inspected': 0, 'normalized': 8, 'implemented': 16, 'validated': 0, 'promoted': 0}
+  {'alias': 2, 'refinement': 2, 'new': 14, 'out_of_scope': 6}
+  0 validator violations · 0 blocked
+  due at differ: 16  (gene_network_connectionist, neural_ode, gene_network_mwc, odecontroller, death, free_screened_diffusion...)

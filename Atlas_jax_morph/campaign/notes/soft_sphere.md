@@ -181,3 +181,42 @@ SoftSphere<->Morse incoherence the prior pass feared is real, but its fix is to 
 `adhere` (its skeptic already disputes the alias toward refinement/new), a FAMILY-WIDE reconciliation
 flagged for the analysis phase -- not to mis-alias SoftSphere to a contract the source proves does not
 cover it.
+
+---
+
+## Implementation (IMPLEMENTER pass)
+
+**Built.** `src/plexus/operators/candidates/jax_morph_soft_sphere.py` -- the `adhere:soft_sphere`
+torch operator, `@register_operator("adhere", family="interaction", set="cell", kind="lateral",
+implementation="soft_sphere")`, subclass of `Lateral`, `EMIT="velocity"` (overdamped). It is the
+literal twin of the already-landed `jax_morph_hertzian.py`: same `_safe_divide` / `_safe_norm` /
+`_compact_repulsion` helpers ported verbatim from potentials.py:L30, same dense-N-x-N autodiff-of-
+the-energy force path, same external live-non-self mask, same additive `sigma = r_i + r_j` and
+arithmetic-mean per-cell epsilon mix. It differs ONLY in the two constants the source separates the
+family by: `_compact_repulsion(..., exponent=2.0, prefactor=0.5)` (Hertzian is 2.5 / 0.4). SoftSphere
+is the member that MINTS `adhere`; the docstring says so, and names Hertzian/Harmonic/Morse as the
+other implementations. Registers cleanly under PYTHONPATH=src.
+
+**Faithfulness, not fitting.** The force is taken by `torch.autograd.grad` of the total pair energy
+`0.5 * sum(mask * (eps/2)(1 - r/sigma)^2)`, never a hand-written `-dU/dr`. That is the source's
+`forces = -jax.grad(total_energy)` and it is what makes the 1/2 prefactor load-bearing: with the 1/2
+in place autodiff yields the intended unit-per-sigma coefficient `f = (eps/sigma)(1 - r/sigma)`; drop
+it and every force doubles. No oracle constant is baked in (jax is absent in this env; the differ
+runs against the oracle later).
+
+**Property verified WITHOUT the reference** (`tests/test_jax_morph_soft_sphere.py`, 8 tests, all
+pass). The headline property is the one that pins the harmonic law and separates it from its twin:
+the radial force is EXACTLY LINEAR in the separation r inside contact -- equal steps in r give equal
+drops in |f|, and it reaches 0 at contact with a FINITE nonzero slope `-eps/sigma^2` (C1). Hertzian's
+5/2 exponent instead sends the slope to 0 at contact too (C2). This is a statement about the calculus
+of `U = (eps/2)(1 - r/sigma)^2`, not about any oracle number. The other seven assert: purely-repulsive
+analytic magnitude `(eps/sigma)(1 - r/sigma)` with direction away from the neighbour; exactly-zero
+force at and beyond contact (compact, no tail, no cutoff); Newton's third law (cluster force sums to
+0, i.e. the energy really is conservative); size-consistent additive contact (unequal radii summing to
+the same sigma give the same force; same overlap fraction at a larger sigma scales by 1/sigma);
+external dead-cell masking (a dead overlapper on top of a live cell perturbs nothing); per-cell epsilon
+mixing by the arithmetic mean (eps=(2,4) acts like 3); and finite gradients w.r.t. positions under
+backward (the double-`where` guard holds).
+
+**Entry updated:** `status: implemented`, `module:` + `test:` set. Verdict/contract untouched
+(`new` -> `implementation_of: adhere`, as normalized).
