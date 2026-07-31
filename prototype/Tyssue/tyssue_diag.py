@@ -162,3 +162,41 @@ def hollow_flags(pos, mesh, dev_deg=50.0, tiny_frac=0.15):
                                n_sliver=int(sliver.sum()), frac_sliver=float(sliver.sum()) / nF,
                                n_broken=int(broken.sum()), frac_broken=float(broken.sum()) / nF,
                                n_under=int(f["under"].sum()), n_invalid_ring=int(f["invalid"].sum()))
+
+def mesh_genus(mesh):
+    """Euler characteristic and genus of the closed shell. THE DISCOVERY-OR-BUG TEST.
+
+    V - E + F = 2 - 2g.  A sphere has g=0 (chi=2); a torus has g=1 (chi=0).
+
+    WHY THIS EXISTS. Cedric asked what happens if the loop produces something Okuda never
+    described -- a torus, say. Tracing it: the elongation metric would read a torus as an
+    unremarkable bump (p95(r)/median(r) ~ (R+r)/R), the tube counter would report zero, and the
+    scoreboard had no row for it. Nothing anywhere computed the topology.
+
+    That matters more than a missing row, because NO OPERATOR IN THIS SUBSTRATE CAN FUSE TWO
+    SURFACES. Division, reconnection, apoptosis and growth all preserve genus. So a handle cannot
+    be created legally -- and therefore a torus-shaped result is far more likely to be a CORRUPTED
+    MESH than a discovery. Without this function, serendipity and corruption are indistinguishable,
+    and the exciting interpretation is the one a tired reader will pick.
+
+    So: measure it. If the genus changed, that is a bug report, not a phenotype -- unless and until
+    an operator exists that is allowed to change it. If the genus is unchanged, the odd shape is a
+    real deformation (a deep invagination that nearly closes looks like a torus and is still a
+    sphere) and IS worth chasing.
+    """
+    es = np.asarray(mesh["E_srce"]); et = np.asarray(mesh["E_trgt"]); ef = np.asarray(mesh["E_face"])
+    nF = int(mesh["nF"])
+    live = ef < nF
+    es, et = es[live], et[live]
+    V = len(np.unique(np.concatenate([es, et])))
+    undirected = {(min(int(a), int(b)), max(int(a), int(b))) for a, b in zip(es, et)}
+    E = len(undirected)
+    F = nF
+    chi = V - E + F
+    g2 = 2 - chi
+    return {"V": int(V), "E": int(E), "F": int(F), "euler": int(chi),
+            "genus": (g2 // 2 if g2 % 2 == 0 else None),
+            "closed_sphere": bool(chi == 2),
+            "verdict": ("sphere (as built)" if chi == 2 else
+                        f"NOT a sphere: chi={chi}. No operator here can change genus, so this is "
+                        f"a MESH BUG until proven otherwise -- not a new morphology.")}

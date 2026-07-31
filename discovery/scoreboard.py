@@ -93,11 +93,57 @@ class Scoreboard:
     def __init__(self, path):
         self.path = path
         self.rows = _blank()
+        self.novel = {}
         if os.path.exists(path):
-            saved = json.load(open(path)).get("morphologies", {})
-            for k, v in saved.items():
+            d = json.load(open(path))
+            for k, v in d.get("morphologies", {}).items():
                 if k in self.rows:
                     self.rows[k].update(v)
+            self.novel = d.get("novel", {})
+
+    def observe(self, phenotype, evidence=(), note="", genus=None):
+        """Record an observed phenotype -- INCLUDING one we never listed.
+
+        My first version of this class had a closed list and `set()` raised KeyError on anything
+        unknown, which meant a genuinely new structure -- Cedric's example was a torus -- would be
+        DISCARDED BY THE SCOREBOARD ITSELF. A board that can only record what you predicted cannot
+        report a discovery, and this campaign's stated product is knowledge.
+
+        Unknown phenotypes therefore land in their own section with a three-step protocol
+        attached, because a surprise is not yet a result:
+
+          0 AUTHENTICATE.  Is it real or is it a broken mesh? For anything with unexpected
+            TOPOLOGY this is decisive and cheap: no operator in this substrate can fuse surfaces,
+            so the genus cannot legally change. A torus is a bug until an operator exists that is
+            allowed to make one. `tyssue_diag.mesh_genus` settles it.
+          1 LOCALISE.     Vary the parameter and find where it appears and where it does not. A
+            phenotype seen once is an anecdote; a phenotype with a boundary is a phenomenon. This
+            is an ordinary Loop II sweep.
+          2 ADOPT.        If it survives 0 and 1, it becomes a row of its own and a regression
+            baseline -- something later changes must keep reproducing.
+
+        Steps 1 and 2 were Cedric's suggestions; step 0 is what stops the loop chasing its own
+        corruption, which without a genus check it cannot distinguish from a discovery.
+        """
+        key = str(phenotype).strip().lower().replace(" ", "_")
+        if key in self.rows:
+            return self.rows[key]
+        n = self.novel.setdefault(key, {"phenotype": key, "evidence": [], "note": "",
+                                        "status": "unauthenticated", "genus": None,
+                                        "protocol": ["0 authenticate (genus / mesh validity)",
+                                                     "1 localise (parameter sweep: where does it "
+                                                     "appear and where does it stop?)",
+                                                     "2 adopt (own row + regression baseline)"]})
+        n["evidence"] = sorted(set(n["evidence"] + list(evidence)))
+        n["note"] = note or n["note"]
+        if genus is not None:
+            n["genus"] = genus
+            if genus != 0:
+                n["status"] = "SUSPECT -- genus != 0 and no operator can change genus; treat as a "
+                n["status"] += "mesh bug until an operator legitimately produces it"
+            else:
+                n["status"] = "authenticated shape (genus 0) -- proceed to localise"
+        return n
 
     def set(self, morphology, state, evidence=(), note=""):
         if morphology not in self.rows:
@@ -136,7 +182,7 @@ class Scoreboard:
                 "score": f"{len(ok)}/{len(OKUDA_TARGETS)}"}
 
     def save(self, lever_map=None, register=None):
-        json.dump({"morphologies": self.rows,
+        json.dump({"morphologies": self.rows, "novel": self.novel,
                    "knowledge": self.knowledge(lever_map, register),
                    "reproduction": self.reproduction()},
                   open(self.path, "w"), indent=1, default=str)
@@ -157,6 +203,18 @@ class Scoreboard:
             r = self.rows[name]
             L.append(f"| **{name}** | {r['figure']} | {mark[r['state']]} | {r['criterion']} | "
                      f"{', '.join(r['evidence']) or '—'} |")
+        if self.novel:
+            L += ["", "## 1b. Seen, but not on anyone's list", "",
+                  "_Phenotypes the analysts named that match no target. A board that can only "
+                  "record what we predicted cannot report a discovery._", "",
+                  "| phenotype | status | evidence | next |", "|---|---|---|---|"]
+            # NB: not `k` -- that is the knowledge dict, and shadowing it here made render()
+            # crash with "'str' object has no attribute 'get'" two lines later.
+            for nm, n in sorted(self.novel.items()):
+                nxt = ("authenticate: check the genus" if n["genus"] is None else
+                       "localise: sweep to find its boundary" if n["genus"] == 0 else
+                       "**treat as a mesh bug** — no operator can change genus")
+                L.append(f"| **{nm}** | {n['status']} | {', '.join(n['evidence']) or '—'} | {nxt} |")
         L += ["", "## 2. What do we know?", ""]
         if not k:
             # Never render a silent blank. An empty section reads as "nothing is known", when the
