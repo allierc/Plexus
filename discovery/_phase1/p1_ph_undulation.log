@@ -1,35 +1,15 @@
-[p1_ph_undulation] comp=Ca3c659380f8 region='growth-driven monolayer (Okuda route)' frames=300 dt=0.02 device=cuda:0
-[engine] 300 sim frames -> recording 301 set frames (stride 1), fields every 2 steps (<= 256)
-[engine] === p1_ph_undulation ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=300
+[p1_ph_undulation] comp=Ca3c659380f8 region='growth-driven monolayer (Okuda route)' frames=500 dt=0.02 device=cuda:1
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_ph_undulation ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=500
 [engine] sets:      vertex(30000)  cell(16000)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
-[p1_ph_undulation] evidence horizon at frame 23: peak/final taken over the first 24 of 301 frames
-[p1_ph_undulation] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
-[p1_ph_undulation] {"saturated": false, "inert_operators": [], "retention": 1.0, "valid_evidence": true, "protr_final": 1.02, "protr_peak": 1.02, "horizon_frame": 23, "horizon_why": "last frame with broken_n < 1 was 23; damage from there never recovers (reaching 32). First damage anywhere: frame 30.", "first_damage_frame": 30, "valid_frac": 0.077, "protr_peak_untruncated": 1.146, "protr_final_untruncated": 1.14, "n_cells_final": 500, "red_frac_final": 0.118, "act_max_final": 0.497, "frames": 301, "wall_s": 94.9, "ta_hollow_n_peak": 109, "ta_hollow_n_final": 90, "ta_area_cv_final": 1.09, "ta_vol_cv_final": 1.132, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.135, "ta_red_frac_final": 0.118, "ta_tip_act_final": -0.024, "mech_force_mean": 7.4607, "mech_p_body": 18.5965, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": -6.0018, "mech_migration": 0.1725}
-[p1_ph_undulation] D4 ok: all 11 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 22, 'morphogen_growth_3d': 61} ...)
-[p1_ph_undulation] camera: FIXED Lbox=5.280 for all 301 frames and both views (per-frame autofit would have run 5.280 -> 1.016, x0.19: that rescaling is what hid growth)
+[p1_ph_undulation] tube_analysis unavailable: FileNotFoundError: [Errno 2] No such file or directory: '/workspace/Plexus/log/okuda/p1_ph_undulati
+[p1_ph_undulation] 🔴 SATURATED: 14896 cells vs buffer 16000. This run is NOT evidence -- raise the buffer or bound proliferation.
+[p1_ph_undulation] ⚠ no evidence horizon (no metrics.npz (tube_analysis did not run)) -- peak/final are taken over ALL 501 frames, which is the un-truncated behaviour
+[p1_ph_undulation] mechanics FAILED: FileNotFoundError: [Errno 2] No such file or directory: '/workspace/Plexus/log/okuda/p1_ph_undulation/mechanics.npz'
+[p1_ph_undulation] {"saturated": true, "inert_operators": [], "retention": 1.0, "valid_evidence": false, "protr_final": 1.281, "protr_peak": 1.281, "horizon_frame": null, "horizon_why": "no metrics.npz (tube_analysis did not run)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.281, "protr_final_untruncated": 1.281, "n_cells_final": 14896, "red_frac_final": 0.033, "act_max_final": 0.5, "frames": 501, "wall_s": 588.8}
+[p1_ph_undulation] D4 ok: all 11 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 391, 'morphogen_growth_3d': 401} ...)
+[p1_ph_undulation] camera: FIXED Lbox=11.826 for all 501 frames and both views (per-frame autofit would have run 5.605 -> 11.826, x2.11: that rescaling is what hid growth)
 [p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
 [p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_undulation] artefacts -> log/okuda/p1_ph_undulation/{strip.png,movie.mp4}

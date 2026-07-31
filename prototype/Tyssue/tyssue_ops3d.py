@@ -507,6 +507,13 @@ class Divide3D(Structural):
             djit = djit.detach().cpu().numpy().tolist()
         age = m.get("age")                                       # per-cell age in division-calls since birth
         age = ([0] * nF) if (age is None or age.shape[0] != nF) else (age.detach().cpu().numpy() + 1).tolist()
+        # HAS THIS CELL EVER DIVIDED? `age` alone cannot answer it: it starts at 0 for every SEEDED
+        # cell and is only RESET to 0 by a division, so in the opening frames a whole untouched
+        # tissue looks "just divided" -- the movie flashed entirely green in p1_ph_rd_only, a run in
+        # which division never fires at all. Counting divisions separates born-this-way from
+        # divided-just-now; the renderer needs both.
+        ndiv = m.get("ndiv")
+        ndiv = ([0] * nF) if (ndiv is None or ndiv.shape[0] != nF) else ndiv.detach().cpu().numpy().tolist()
         # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
@@ -564,12 +571,14 @@ class Divide3D(Structural):
                 a0d = A0[f] * 0.5; v0d = V0f[f] * 0.5             # legacy: half the mother's targets
             A0[f] = a0d; V0f[f] = v0d; Vbirth[f] = half           # daughter A (kept at index f)
             djit[f] = self._fresh_djit(rng); age[f] = 0           # fresh (desync'd) thresholds; reset cell-cycle age
+            ndiv[f] = ndiv[f] + 1
             A0.append(a0d); V0f.append(v0d); Vbirth.append(half); alive.append(1.0)   # daughter B
-            djit.append(self._fresh_djit(rng)); age.append(0)
+            djit.append(self._fresh_djit(rng)); age.append(0); ndiv.append(ndiv[f])
             daughter_mothers.append(f)
             ndone += 1
         if ndone == 0:
             m["age"] = torch.as_tensor(np.asarray(age), dtype=dt, device=dev)   # persist ageing even without division
+            m["ndiv"] = torch.as_tensor(np.asarray(ndiv), dtype=dt, device=dev)
             return {}
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         A0a = np.array([A0[i] for i in keep], np.float64)
@@ -577,6 +586,7 @@ class Divide3D(Structural):
         Vba = np.array([Vbirth[i] for i in keep], np.float64)
         dja = np.array([djit[i] for i in keep], np.float64)
         agea = np.array([age[i] for i in keep], np.float64)
+        ndva = np.array([ndiv[i] for i in keep], np.float64)
         alv = np.array([alive[i] for i in keep], np.float64)
         P0a = self.p0 * np.sqrt(np.maximum(A0a, 1e-9))
         Nv2 = len(pos)
@@ -594,6 +604,7 @@ class Divide3D(Structural):
         m["Vbirth"] = torch.as_tensor(Vba, dtype=dt, device=dev)
         m["divjit"] = torch.as_tensor(dja, dtype=dt, device=dev)
         m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
+        m["ndiv"] = torch.as_tensor(ndva, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
@@ -651,7 +662,7 @@ class TopoSnapshot3D(Structural):
             # fired: a division splits a cell into two roughly equal halves, so a normal daughter
             # is ~50-70% of its neighbours while the sliver test looks below 15%. It detects
             # DEGENERATE cells, not new ones. Age is the actual event, not a proxy for it.
-            age=cp("age")))
+            age=cp("age"), ndiv=cp("ndiv")))
         return {}
 
 

@@ -121,7 +121,10 @@ def specs():
             # spending a GPU-second. Recording it is the point; crashing on it throws it away.
             REQUIRED.append((op, reason))
             continue
-        out.append((f"p1_ko_{op}", gk, f"KNOCKOUT {op}: {why}"))
+        # NAMED "without", not "ko". `p1_ko_divide_3d` reads as "divide" at a glance -- Cedric
+        # browsed the folder and asked why the division run showed no green cells, in the one run
+        # where division is REMOVED. A directory name is an instrument too.
+        out.append((f"p1_without_{op}", gk, f"WITHOUT {op}: {why}"))
 
     # ---- B. phenomenon probes
     p = dict(g0.params)
@@ -152,6 +155,24 @@ def specs():
     gd = reference_recipes()["uniform_inflation"]
     out.append(("p1_ph_divide_only", gd,
                 "DIVISION: uniform inflation + division, no chemistry at all"))
+
+    # ---- C. the CORAL reference: reaction-diffusion on a FIXED ball.
+    # No growth, no division, nothing moving -- just the chemistry, on a shell held still. This is
+    # the minisite's front-page movie and it is the cleanest possible read on whether our Turing
+    # pattern is alive: any structure you see is the chemistry, because nothing else is running.
+    # It is also the control the whole battery was missing. Every other spec confounds pattern
+    # formation with mechanics; this one cannot. 2000 cells rather than 500 because the Turing
+    # wavelength is set in CELL widths -- four times the cells on the same sphere means four times
+    # as many pattern periods across it, which is what makes the coral legible instead of a
+    # handful of blobs.
+    gc = g0
+    for op in ("morphogen_growth_3d", "divide_3d"):
+        if op in nid:
+            gc, _ = gc.apply(("remove_op", nid[op]))
+    c = dict(gc.params)
+    c[f'{nid["seed_mesh_3d"]}.n_cells'] = 2000
+    out.append(("p1_ph_coral_fixed_ball", gc.with_params(c),
+                "CORAL: Turing chemistry alone on a rigid 2000-cell ball. Is the pattern alive?"))
     return out
 
 

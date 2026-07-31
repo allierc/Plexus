@@ -1,0 +1,563 @@
+repository: fmottes/jax-morph
+paper: '10.1038/s43588-025-00851-4  (Deshpande, Mottes et al., Engineering morphogenesis of cell clusters
+  with differentiable programming, Nat Comput Sci 2025);  local: papers/Deshpande_2025_jax_morph.pdf'
+model_family: off_lattice_particle_multicellular_differentiable
+commit: ace08b87a30015ca6c899467ac302e60ecf3b621
+license: Apache-2.0
+clone: papers/jax-morph
+scale:
+- cell
+- cluster
+sets:
+- cell
+fields:
+- chemical (per-cell concentration, screened free-space kernel)
+maps:
+- cell_cell_pairwise
+note: 'Seeded mechanically by inventory.py. Every entry is at status `candidate`: named and located, nothing
+  inspected, nothing believed.'
+mechanisms:
+- id: gene_network_connectionist
+  order: 1
+  raw_name: GeneNetworkConnectionist
+  raw_kind: step (ODEController)
+  code_path: papers/jax-morph/jax_morph/control/ode.py:L202
+  paper_section: null
+  summary: 'Connectionist gene circuit: sigmoid-saturated production from a linear regulatory drive.'
+  params:
+    input_specs: null
+    output_specs: null
+    hidden_size: null
+    W_gene: null
+    W_in: null
+    b: null
+    gamma: null
+    tag: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: neural_ode
+  order: 2
+  raw_name: NeuralODE
+  raw_kind: step (ODEController)
+  code_path: papers/jax-morph/jax_morph/control/ode.py:L281
+  paper_section: null
+  summary: Generic neural ODE controller with an MLP per-cell vector field.
+  params:
+    input_specs: null
+    output_specs: null
+    hidden_size: null
+    mlp: null
+    tag: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: gene_network_mwc
+  order: 3
+  raw_name: GeneNetworkMWC
+  raw_kind: step (ODEController)
+  code_path: papers/jax-morph/jax_morph/control/ode.py:L364
+  paper_section: null
+  summary: Thermodynamic gene circuit with a log-occupancy (MWC-style) regulatory drive.
+  params:
+    input_specs: null
+    output_specs: null
+    hidden_size: null
+    log_rho: null
+    log_tau: null
+    F0: null
+    H_gene: null
+    log_K_gene: null
+    H_in: null
+    log_K_in: null
+    tag: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: odecontroller
+  order: 4
+  raw_name: ODEController
+  raw_kind: step (SimulationStep)
+  code_path: papers/jax-morph/jax_morph/control/ode.py:L46
+  paper_section: null
+  summary: Abstract dynamic controller that integrates a per-cell ODE over one macro-step.
+  params:
+    input_specs: null
+    output_specs: null
+    hidden_size: null
+    tag: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: stochastic_step
+  order: 5
+  raw_name: StochasticStep
+  raw_kind: step (SimulationStep)
+  code_path: papers/jax-morph/jax_morph/core/step.py:L148
+  paper_section: null
+  summary: 'Mixin for a stochastic step: it records a trace, replays it, and scores it.'
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: death
+  order: 6
+  raw_name: Death
+  raw_kind: step (StochasticStep)
+  code_path: papers/jax-morph/jax_morph/physics/death.py:L26
+  paper_section: null
+  summary: 'Discrete stochastic removal: each alive cell dies as an independent Bernoulli event.'
+  params:
+    score_by_default: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: free_screened_diffusion
+  order: 7
+  raw_name: FreeScreenedDiffusion
+  raw_kind: step (SimulationStep)
+  code_path: papers/jax-morph/jax_morph/physics/diffusion.py:L92
+  paper_section: null
+  summary: 'Quasistatic free-space field: superpose each cell''s finite-size screened-diffusion Green''s
+    function.'
+  params:
+    n_field_species: null
+    n_space_dim: null
+    diffusion: null
+    degradation: null
+    source_name: null
+    field_name: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: division
+  order: 8
+  raw_name: Division
+  raw_kind: step (StochasticStep)
+  code_path: papers/jax-morph/jax_morph/physics/division.py:L38
+  paper_section: null
+  summary: 'Discrete stochastic step: each alive cell divides as an independent Bernoulli event.'
+  params:
+    n_space_dim: null
+    orientation_snr: null
+    score_by_default: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: saturating_cell_growth
+  order: 9
+  raw_name: SaturatingCellGrowth
+  raw_kind: step (SimulationStep)
+  code_path: papers/jax-morph/jax_morph/physics/growth.py:L23
+  paper_section: null
+  summary: 'Dynamic step: grow each cell radius toward ``max_radius`` by a saturating (von Bertalanffy)
+    law.'
+  params:
+    max_radius: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: active_brownian_dynamics2_d
+  order: 10
+  raw_name: ActiveBrownianDynamics2D
+  raw_kind: step (StochasticStep)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L199
+  paper_section: null
+  summary: Overdamped active Brownian (self-propelled) dynamics as a reparameterized dynamic step.
+  params:
+    potential: null
+    n_space_dim: null
+    gamma: null
+    kT: null
+    rot_diffusion: null
+    tag: null
+    score_by_default: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: brownian_dynamics
+  order: 11
+  raw_name: BrownianDynamics
+  raw_kind: step (StochasticStep)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L36
+  paper_section: null
+  summary: Overdamped Langevin (Brownian) dynamics as a reparameterized dynamic stochastic step.
+  params:
+    potential: null
+    n_space_dim: null
+    gamma: null
+    kT: null
+    tag: null
+    score_by_default: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: no_force
+  order: 12
+  raw_name: NoForce
+  raw_kind: potential (Potential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L108
+  paper_section: null
+  summary: 'The trivial potential: no interactions, so every cell feels zero energy and zero force.'
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: pairwise_potential
+  order: 13
+  raw_name: PairwisePotential
+  raw_kind: potential (Potential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L128
+  paper_section: null
+  summary: A pair potential defined by ``pair_energy(r, *params)`` and per-pair ``pair_params(state)``.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: morse
+  order: 14
+  raw_name: Morse
+  raw_kind: potential (PairwisePotential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L269
+  paper_section: null
+  summary: Morse pair potential with a sigma-relative smooth cutoff.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: soft_sphere
+  order: 15
+  raw_name: SoftSphere
+  raw_kind: potential (PairwisePotential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L315
+  paper_section: null
+  summary: 'Harmonic soft-sphere repulsion: a purely repulsive, compact excluded-volume interaction.'
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: hertzian
+  order: 16
+  raw_name: Hertzian
+  raw_kind: potential (PairwisePotential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L345
+  paper_section: null
+  summary: 'Hertzian elastic-contact repulsion: purely repulsive and compact, with a soft onset.'
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: harmonic
+  order: 17
+  raw_name: Harmonic
+  raw_kind: potential (PairwisePotential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L375
+  paper_section: null
+  summary: 'Finite-range harmonic spring: a shifted parabola with its minimum at contact.'
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: lennard_jones
+  order: 18
+  raw_name: LennardJones
+  raw_kind: potential (PairwisePotential)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L419
+  paper_section: null
+  summary: 'Lennard-Jones potential (r_min form): minimum ``-epsilon`` at contact, with a sigma-relative
+    cutoff.'
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: mechanical_relaxation
+  order: 19
+  raw_name: MechanicalRelaxation
+  raw_kind: step (SimulationStep)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/relaxation.py:L221
+  paper_section: null
+  summary: 'Quasistatic step: relax positions to mechanical equilibrium under ``potential`` each step.'
+  params:
+    potential: null
+    max_steps: null
+    f_tol: null
+    ridge: null
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: virial_stress
+  order: 20
+  raw_name: VirialStress
+  raw_kind: step (SimulationStep)
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/stress.py:L15
+  paper_section: null
+  summary: Quasistatic step writing each cell's virial pressure into a per-cell ``stress`` field.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: lie__trotter_macro_step_split
+  order: 21
+  raw_name: Lie-Trotter macro-step split
+  raw_kind: integration contract
+  code_path: papers/jax-morph/jax_morph/core/step.py:L1
+  paper_section: guides/concepts.md, 'A simulation integrates a hybrid dynamical system'
+  summary: One macro-step = discrete o dynamic o quasistatic, each advancing the shared state over dt;
+    first-order accurate operator splitting.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: step_type:_quasistatic___dynamic___discrete
+  order: 22
+  raw_name: 'step type: quasistatic / dynamic / discrete'
+  raw_kind: step taxonomy
+  code_path: papers/jax-morph/jax_morph/core/step.py:L1
+  paper_section: guides/concepts.md, 'Models are ordered step pipelines'
+  summary: A step is classified by its TIME-SCALE SEMANTICS (fast constraint / finite rate / instantaneous
+    event), orthogonal to what part of the state it touches.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: declared_field_dataflow_validation
+  order: 23
+  raw_name: declared field dataflow validation
+  raw_kind: composition contract
+  code_path: papers/jax-morph/jax_morph/core/state.py:L1
+  paper_section: guides/concepts.md, 'Physics and control compose through fields'
+  summary: Steps couple ONLY through named state fields; reads/writes are declared and cross-validated
+    when the model is built, so recomposition is add/remove/reorder.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: stochastic_trace___replay___score
+  order: 24
+  raw_name: stochastic trace / replay / score
+  raw_kind: stochasticity contract
+  code_path: papers/jax-morph/jax_morph/core/logp.py:L1
+  paper_section: guides/concepts.md, 'Differentiability -- score-based'
+  summary: A stochastic step samples parameter-free noise, records an ephemeral trace, replays the trace
+    to produce the effect, and scores the same trace in logp -- which is what makes a discrete event (division,
+    death) differentiable.
+  params: {}
+  verdict: null
+  of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
