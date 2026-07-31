@@ -75,16 +75,43 @@ def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None):
     diag = os.path.join(out_dir, "diag.json")
     desc = os.path.join(out_dir, "description.txt")
     mech = os.path.join(out_dir, "mechanics.png")
+    # THE TRAJECTORIES. Until now an Analyst was handed ENDPOINTS (diag.json, labelled "metrics")
+    # and never learned the per-frame curves existed -- `metrics.png` was referenced nowhere in the
+    # codebase, drawn for every run since the beginning and read by nobody. A scalar cannot tell a
+    # plateau at 2.7 from a spike to 2.7 at the moment the mesh tears, and the campaign ranks on
+    # exactly that number. The SHAPE of each curve is classified deterministically (arithmetic, not
+    # judgement) and handed over as text, so the reading starts from what actually happened over
+    # time rather than from where the run happened to stop.
+    shapes = ""
+    try:
+        import curve_shape as _CS
+        _rep = _CS.report(out_dir, write=True)
+        shapes = _CS.summarise(_rep) or ""
+    except Exception as e:
+        shapes = (f"(trajectory shapes unavailable: {type(e).__name__}: {str(e)[:70]} -- read "
+                  f"metrics.png yourself and say so in your verdict)")
     reads = []
     for i in range(n):
         prompt = f"""ANALYST {i + 1} of {n}. Read ONE simulation run and report what happened.
 
 Work independently. Do not try to agree with anyone.
 {budget_note(timeout_min, "1) your JSON verdict  2) nothing else")}
-  metrics    : {diag}
-  VLM caption: {desc}
-  mechanics  : {mech}   (force | pressure body-vs-protruding | tension | migration)
-  strip      : {os.path.join(out_dir, 'strip.png')}
+  final numbers : {diag}      (ENDPOINTS ONLY -- see the trajectories below before trusting them)
+  VLM caption   : {desc}
+  mechanics     : {mech}   (force | pressure body-vs-protruding | tension | migration)
+  strip         : {os.path.join(out_dir, 'strip.png')}
+  curves        : {os.path.join(out_dir, 'metrics.png')}   (every metric vs frame)
+
+HOW EACH MEASUREMENT BEHAVED OVER TIME -- classified automatically, not by anyone's judgement:
+{shapes or "  (no trajectory recorded)"}
+
+Read those shapes BEFORE the final numbers, and say in your verdict when the two disagree:
+  peaked   the best moment was mid-run; the final value reports the DECAY, not the phenomenon
+  rising   still climbing when the run stopped -- the run was cut short, not finished
+  pinned   held against a hard limit (a buffer), not converged. Not a result about biology
+  exploded a late blow-up -- suspect the mesh, not the tissue
+A run whose headline number came from an `exploded` or `pinned` curve is not the run its summary
+claims it is. Saying so is more useful than a phenotype label.
 
 Only these metrics are admissible (the others were MEASURED to lie and are excluded):
   ADMITTED  protr_peak, ta_n_tubes_final, protr_final
