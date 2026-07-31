@@ -395,8 +395,15 @@ OPERATORS = {
                 "mu_h": (0.2, 2.0, MU_H_DEFAULT)}),
     "cell_rd_seed": dict(                                     # the prescribed activation driver
         stage=3, role="driver", outputs=["morphogen"], slots=[], needs=[],
-        impls=["tip", "cone", "spot"], impl_structural=True,
+        # `scatter` added 2026-07-31: it is the ONLY Gray-Scott seeding validated on this
+        # substrate -- the minisite coral movie uses mode="scatter", seed_frac=0.06, and that is
+        # the configuration measured to give a live pattern (act_max 0.43). The search space
+        # exposed only cones and tip, so the one seeding known to work could not be expressed.
+        # Scattered seeds are also the physically natural initial condition for a Turing system:
+        # a pattern should emerge from noise, not from foci we placed by hand.
+        impls=["tip", "cone", "spot", "scatter"], impl_structural=True,
         params={"tip_radius": (0.6, 3.0, 2.0), "cone_deg": (4.0, 30.0, 8.0),
+                "seed_frac": (0.01, 0.30, 0.06),
                 "amp": (0.5, 5.0, 2.0), "n_spots": (1, 8, 1)}),
     # NOTE: there is deliberately no separate `rd_interface_tension` node. In the engine that op
     # carries BOTH K_purse and K_extrude; the mechanism we need to ablate is the outward forcing,

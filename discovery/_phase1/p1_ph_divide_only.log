@@ -1,0 +1,6 @@
+[p1_ph_divide_only] comp=C6a07112cc06 region='uniform inflation (no patterning)' frames=300 dt=0.02 device=cuda:1
+[engine] 300 sim frames -> recording 301 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_ph_divide_only ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=300
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, vesicle_growth, divide_3d, topo_snapshot_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d

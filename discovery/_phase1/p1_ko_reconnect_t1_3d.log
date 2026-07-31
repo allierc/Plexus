@@ -1,0 +1,34 @@
+[p1_ko_reconnect_t1_3d] comp=Cdf6723053e5 region='growth-driven monolayer (Okuda route)' frames=300 dt=0.02 device=cuda:1
+[engine] 300 sim frames -> recording 301 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_ko_reconnect_t1_3d ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=300
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
+[p1_ko_reconnect_t1_3d] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[p1_ko_reconnect_t1_3d] {"saturated": false, "inert_operators": [], "retention": 0.957, "valid_evidence": true, "protr_final": 1.097, "protr_peak": 1.147, "horizon_frame": 300, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.147, "protr_final_untruncated": 1.097, "n_cells_final": 500, "red_frac_final": 0.07, "act_max_final": 0.499, "frames": 301, "wall_s": 93.2, "ta_hollow_n_peak": 66, "ta_hollow_n_final": 10, "ta_area_cv_final": 0.741, "ta_vol_cv_final": 0.709, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.094, "ta_red_frac_final": 0.07, "ta_tip_act_final": 0.061, "mech_force_mean": 5.8696, "mech_p_body": 18.6207, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": -6.1322, "mech_migration": 0.179}
+[p1_ko_reconnect_t1_3d] D4 ok: all 10 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 1, 'morphogen_growth_3d': 61} ...)
+[p1_ko_reconnect_t1_3d] camera: FIXED Lbox=5.281 for all 301 frames and both views (per-frame autofit would have run 5.281 -> 0.789, x0.15: that rescaling is what hid growth)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ko_reconnect_t1_3d] artefacts -> log/okuda/p1_ko_reconnect_t1_3d/{strip.png,movie.mp4}
