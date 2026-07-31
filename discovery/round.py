@@ -86,6 +86,213 @@ def seen_hashes(sup):
                                                          for h in c["members"]] or [])
 
 
+# --------------------------------------------------------------------- stale-Q quarantine (D2)
+# THE DEFECT BEING PREVENTED. `run_one.quasi_static_Q` used to delete the growth/driver operators
+# and then `S.load()` the edited spec -- which rebuilds the simulation FROM THE SEED SPHERE. It
+# therefore relaxed a fresh seed sphere for 60 frames and reported ITS elongation, whatever the
+# run had actually done. Q came back 1.014 in 14 of the 16 runs that computed one, over real
+# `protr_final` spanning 1.02-2.81. That constant reaches the science in three places:
+#     control.score_run        LIVE. Q carries weight 1.0 in the campaign's scalar objective.
+#     control.meets_success    LIVE. Gates the success criterion at Q >= 2.0, hence unreachable.
+#     predict.score            LATENT. `Q_drop` (= protr_final - Q) is in predict.KNOWN_METRICS,
+#                              so a prediction naming it is MEANT to be checked -- but
+#                              `predict.parse` lowercases the captured metric name, and Q_drop is
+#                              the only KNOWN_METRIC carrying a capital, so every Q_drop clause
+#                              currently resolves `inconclusive` on "q_drop not measured".
+#                              MEASURED, not assumed:
+#                                PR.score("Q_drop >= 1.5", {"Q_drop": 1.792}) -> inconclusive
+#                                PR.score("Q_drop >= 1.5", {"q_drop": 1.792}) -> confirmed
+#                              That case-fold bug is in predict.py, not here; the day it is fixed
+#                              the path goes live, and the quarantine below already closes it.
+# The generator was fixed (run_one.quasi_static_Q now checkpoints the end state and guards frame
+# 0), but the RECORDS on disk still hold the old value.
+#
+# Those records are IMMUTABLE: discovery/_archive/analyses.jsonl and log/okuda/*/diag.json are
+# the research record and are never deleted, and never rewritten in place. The idiom is
+# hypothesis.HypothesisRegister.amend(): annotate, append, leave every prior line standing. So
+# the poison is intercepted AT READ TIME instead -- the value is moved aside under a `__STALE`
+# key where nothing scores it, the reason travels with it into the hypothesis record, and an
+# append-only quarantine ledger records each interception. The archive is opened read-only here.
+SEED_SPHERE_Q = 1.014          # protr of the relaxed SEED SPHERE -- what the broken test measured
+SEED_SPHERE_Q_TOL = 5e-4       # run_one rounds Q to 3 dp, so this is exact-match with slack
+Q_KEY = "Q_protr_after_relax"
+Q_DERIVED = ("Q_drop",)        # protr_final - Q: computed FROM the poison, so equally poisoned
+STALE_SUFFIX = "__STALE"
+Q_QUARANTINE = os.path.join(CAMP, "q_quarantine.jsonl")   # append-only; NOT in _archive/
+
+
+class StaleQ(ValueError):
+    """A poisoned Q was found where the caller demanded a trustworthy one."""
+
+
+def stale_q_reason(summary):
+    """Why this summary's Q must not be scored, or None if it may be.
+
+    The test is on the VALUE, not on provenance, because provenance is not recoverable: the
+    broken and the fixed `quasi_static_Q` both write `metric_version="metric_v1"`, so no record
+    can say which code produced it. A Q sitting on the seed-sphere constant is therefore
+    INDISTINGUISHABLE from the artefact -- and indistinguishable resolves to STALE, never to
+    trusted. Refusing a good value costs one re-measurement; accepting a poisoned one costs a
+    conclusion, which is a bill this campaign has already paid.
+
+    The corroborating evidence is reported with the reason so a human re-scoring the archive can
+    see how strong each case is: a run that ended at protr_final 2.805 and "relaxed" to 1.014 is
+    the seed sphere beyond argument, whereas one that ended at 1.024 is merely unprovable.
+    """
+    if not isinstance(summary, dict):
+        return None
+    q = summary.get(Q_KEY)
+    if q is None:
+        return None
+    try:
+        qf = float(q)
+    except (TypeError, ValueError):
+        return f"{Q_KEY}={q!r} is not numeric -- cannot be scored"
+    if abs(qf - SEED_SPHERE_Q) > SEED_SPHERE_Q_TOL:
+        return None
+    fin = summary.get("protr_final")
+    corr = ""
+    try:
+        if fin is not None and abs(float(fin) - qf) > 0.15:
+            corr = (f"; the run ended at protr_final={float(fin):.3f}, so the relaxation did not "
+                    f"start where the run finished")
+    except (TypeError, ValueError):
+        pass
+    return (f"STALE {Q_KEY}={qf:.3f}: this is the relaxed-seed-sphere constant produced by the "
+            f"pre-fix quasi_static_Q, which rebuilt the simulation from the seed instead of "
+            f"continuing from the end state{corr}. Quarantined -- recompute before scoring.")
+
+
+def _quarantine_log(entry, ledger_path=None):
+    """Append one line to the quarantine ledger. Never raises into the caller.
+
+    Append-only, and outside _archive/ and log/okuda/, because an interception is a NEW fact
+    about a record -- not a licence to edit the record.
+    """
+    p = ledger_path or Q_QUARANTINE
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(p)), exist_ok=True)
+        with open(p, "a") as f:
+            f.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), **entry}) + "\n")
+        return p
+    except Exception as e:                       # a failed audit line must not lose the scrub
+        print(f"  [Q-stale] could not append to the quarantine ledger {p}: "
+              f"{type(e).__name__}: {e}")
+        return None
+
+
+def scrub_stale_q(summary, source="", ledger_path=None, quiet=False):
+    """Return a COPY of `summary` with any poisoned Q moved OUT OF SCORING REACH.
+
+    The value is not destroyed -- it moves to `Q_protr_after_relax__STALE` (and `Q_drop__STALE`)
+    and the reason rides alongside as `Q_stale_reason`. Downstream this means:
+      * control.score_run     sees no Q and takes its documented `else fin` fallback, instead of
+                              adding the sphere constant with weight 1.0
+      * control.meets_success likewise falls back rather than testing 1.014 >= 2.0
+      * predict.score         reports `Q_drop not measured` -> inconclusive, rather than scoring
+                              a prediction against an artefact (that clause is already dead for
+                              an unrelated reason -- see the case-fold note above -- so this is
+                              the path being held shut, not one being reopened)
+    Never mutates the caller's dict; never writes to the file the summary came from.
+    """
+    reason = stale_q_reason(summary)
+    out = dict(summary or {})
+    if not reason:
+        return out
+    moved = {}
+    for k in (Q_KEY,) + Q_DERIVED:
+        if k in out:
+            moved[k] = out.pop(k)
+            out[k + STALE_SUFFIX] = moved[k]
+    out["Q_stale"] = True
+    out["Q_stale_reason"] = reason
+    if source:
+        out["Q_stale_source"] = source
+    if not quiet:
+        print(f"  [Q-stale] {source or 'summary'}: {reason}")
+    _quarantine_log({"source": source, "quarantined": moved, "reason": reason,
+                     "protr_final": summary.get("protr_final"),
+                     "protr_peak": summary.get("protr_peak")}, ledger_path)
+    return out
+
+
+def refuse_stale_q(summary, source=""):
+    """Hard refusal, for a re-scorer that must not proceed at all. Raises rather than scores."""
+    reason = stale_q_reason(summary)
+    if reason:
+        _quarantine_log({"source": source, "reason": reason, "action": "REFUSED"}, None)
+        raise StaleQ(f"{source or 'summary'}: {reason}")
+    return summary
+
+
+def read_diag_summary(path, source=None, quiet=False):
+    """Read a run's diag.json `summary` with the stale-Q quarantine already applied."""
+    d = json.load(open(path)).get("summary", {})
+    return scrub_stale_q(d, source or path, quiet=quiet)
+
+
+def read_archive_analyses(path=None, quiet=True):
+    """Yield (run_id, metric_version, scrubbed_result) from the IMMUTABLE analyses.jsonl.
+
+    THE ENTRY POINT FOR ANYTHING THAT RE-SCORES FROM THE ARCHIVE. Opened 'r' only -- this
+    function must never gain a write path.
+    """
+    p = path or os.path.join(HERE, "_archive", "analyses.jsonl")
+    if not os.path.exists(p):
+        return
+    for i, line in enumerate(open(p)):
+        if not line.strip():
+            continue
+        e = json.loads(line)
+        res = e.get("result")
+        if isinstance(res, dict):
+            res = scrub_stale_q(res, f"analyses.jsonl:{i + 1}:{e.get('run_id')}", quiet=quiet)
+        yield e.get("run_id"), e.get("metric_version"), res
+
+
+def quarantine_scan(archive=None, log_root=None, ledger_path=None, verbose=True):
+    """Sweep every Q on disk, report which are stale, and record the interceptions.
+
+    READS ONLY. It exists so the poison count is a measured number rather than a remembered one,
+    and so the append-only ledger names every record a re-scorer has to skip.
+    """
+    n_q = n_stale = 0
+    rows = []
+    for rid, _mv, res in read_archive_analyses(archive, quiet=True):
+        if not isinstance(res, dict):
+            continue
+        if res.get("Q_stale"):
+            n_q += 1
+            n_stale += 1
+            rows.append(("analyses.jsonl", rid, res.get(Q_KEY + STALE_SUFFIX), True))
+        elif res.get(Q_KEY) is not None:
+            n_q += 1
+            rows.append(("analyses.jsonl", rid, res.get(Q_KEY), False))
+    import glob
+    for d in sorted(glob.glob(os.path.join(log_root or LOG, "*", "diag.json"))):
+        try:
+            s = read_diag_summary(d, source=os.path.basename(os.path.dirname(d)), quiet=True)
+        except Exception as e:
+            print(f"  [Q-scan] unreadable {d}: {type(e).__name__}: {e}")
+            continue
+        if s.get("Q_stale"):
+            n_q += 1
+            n_stale += 1
+            rows.append(("diag.json", os.path.basename(os.path.dirname(d)),
+                         s.get(Q_KEY + STALE_SUFFIX), True))
+        elif s.get(Q_KEY) is not None:
+            n_q += 1
+            rows.append(("diag.json", os.path.basename(os.path.dirname(d)), s.get(Q_KEY), False))
+    if verbose:
+        print(f"[Q-scan] {n_stale} STALE of {n_q} recorded Q values "
+              f"(seed-sphere constant {SEED_SPHERE_Q} +- {SEED_SPHERE_Q_TOL})")
+        for where, who, val, bad in rows:
+            print(f"   {'STALE' if bad else '  ok ':>5}  {where:15} {str(who)[:26]:26} Q={val}")
+        print(f"[Q-scan] the records are UNCHANGED; interceptions appended to "
+              f"{ledger_path or Q_QUARANTINE}")
+    return {"n_q": n_q, "n_stale": n_stale, "rows": rows}
+
+
 # --------------------------------------------------------------------------- LOOP I batch
 def build_composition_batch(sup, cfg, n_slots, ledger):
     """Proposer(LLM) -> Critic -> Reflection(LLM). Returns [(graph, label, hyp_fields)]."""
@@ -200,6 +407,9 @@ def _finish(ledger, rid, mode, status, code):
 
     Reporting only on the happy path is how a round that died early, or one that blew the LLM
     ceiling, comes to look indistinguishable from a clean one in the log.
+
+    Call it through `_RoundBookkeeping.finish`, never directly: that is what puts the CRASH path
+    on the same footing as the seven `return`s.
     """
     print()
     print(ledger.report("round"))
@@ -216,17 +426,81 @@ def _finish(ledger, rid, mode, status, code):
     return code
 
 
+class _RoundBookkeeping:
+    """Guarantees the round's timing is written EXACTLY ONCE, on EVERY way out of the round.
+
+    THE DEFECT BEING PREVENTED. `run_round` had seven `return`s, all correctly routed through
+    `_finish`, and ZERO try blocks. Hand-routing covers only the exits somebody remembered. An
+    uncaught exception -- and this campaign has spent weeks finding defects MID-ROUND, so a crash
+    is the LIKELY exit, not the exotic one -- unwound straight past all seven and the round's LLM
+    cost vanished from llm_timing.jsonl entirely. A crashed round then looked, in the cost log,
+    exactly like a round that never ran.
+
+    `crash()` records and then the caller RE-RAISES. Nothing here swallows an exception: the
+    project's standing rule is never to swallow an exception around an artefact, and a crash must
+    stay loud. The bookkeeping is also not allowed to become the thing that hides the real
+    failure, so every path through `finish()` catches its own errors and prints them instead.
+    """
+
+    def __init__(self, ledger, mode):
+        self.ledger, self.mode = ledger, mode
+        # `_finish` takes rid but does not use it -- the round id that lands in llm_timing.jsonl
+        # comes from `ledger.round_id`, set by `ledger.new_round(rid)` in the body. So a crash
+        # BEFORE that call honestly records round=null, and one after it records the round. This
+        # is tracked here only so the crash path passes the same argument the seven returns do.
+        self.rid = None
+        self.done = False
+
+    def finish(self, rid=None, status="complete", code=0, warn=False):
+        if self.done:
+            return code
+        self.done = True
+        if rid is not None:
+            self.rid = rid
+        if warn:
+            print(f"\n[round] BOOKKEEPING FALLBACK: run_round returned without calling _finish "
+                  f"(status={status}). The timing is recorded anyway; the exit path that skipped "
+                  f"it is the bug to fix.")
+        try:
+            return _finish(self.ledger, self.rid, self.mode, status, code)
+        except Exception as e:
+            print(f"[round] TIMING BOOKKEEPING FAILED ({type(e).__name__}: {e}) -- round "
+                  f"{self.rid} status={status} is NOT in {LLM_TIMING}")
+            return code
+
+    def crash(self, exc):
+        print(f"\n[round] UNCAUGHT {type(exc).__name__} mid-round -- recording this round's "
+              f"timing BEFORE the exception propagates: {str(exc)[:160]}")
+        return self.finish(status=f"crashed:{type(exc).__name__}", code=3)
+
+
 def run_round(mode="composition", frames=900, batch=8, base=None, param=None, values=None,
               dry=False):
-    # The ledger is created FIRST and every `return` below goes through `_finish`, so even a
-    # round that aborts at the admission gate reports what it spent getting there.
+    """Thin wrapper: the round's body, with the timing bookkeeping made crash-proof."""
+    # The ledger is created FIRST and every `return` in the body goes through `bk.finish`, so
+    # even a round that aborts at the admission gate reports what it spent getting there.
     ledger = llm.BudgetLedger(path=LLM_TIMING)
+    bk = _RoundBookkeeping(ledger, mode)
+    try:
+        return _run_round(bk, ledger, mode, frames, batch, base, param, values, dry)
+    except BaseException as exc:
+        # BaseException, not Exception: a Ctrl-C or a SystemExit mid-round costs the same LLM
+        # minutes as a TypeError and must be accounted for the same way.
+        bk.crash(exc)
+        raise                      # NEVER swallowed -- the traceback is the point
+    finally:
+        # Belt and braces for an EIGHTH return path added later that forgets to route through
+        # `finish`. Hand-routing is the fragile part, so the guarantee lives here rather than in
+        # each individual `return`. No-op once `finish` has already run.
+        bk.finish(status="unfinished_no_exit_status", code=4, warn=True)
 
+
+def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     cert = Certification(os.path.join(HERE, "_metrology"))
     ok, why = cert.may_admit()
     if not ok:
         print(f"[round] ADMISSION GATE CLOSED -- refusing to run.\n  {why}")
-        return _finish(ledger, None, mode, "admission_gate_closed", 2)
+        return bk.finish(None, "admission_gate_closed", 2)
 
     cfg = CampaignConfig(batch=batch, keep_truncate=max(2, batch // 3))
     sup = Supervisor(cfg, CAMP)
@@ -248,7 +522,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         print("[round] no candidates -- escalating")
         print(json.dumps(run_escalation(cfg, sup, lm, rid, "the batch builder produced no "
                                         "runnable candidate", ledger=ledger), indent=1))
-        return _finish(ledger, rid, mode, "no_candidates", 1)
+        return bk.finish(rid, "no_candidates", 1)
 
     # ------------------------------------------------ hypotheses FIRST, then configs
     posed = []
@@ -271,7 +545,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
 
     if dry:
         print("\n[round] --dry: configs + hypotheses written, nothing submitted")
-        return _finish(ledger, rid, mode, "dry", 0)
+        return bk.finish(rid, "dry", 0)
 
     # ------------------------------------------------ run
     names = [n for n, _, _ in posed]
@@ -281,11 +555,11 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     # blind for a whole wave).
     if cluster.preflight(verbose=True) is False:
         print("[round] preflight FAILED -- not submitting. Fix the job environment first.")
-        return _finish(ledger, rid, mode, "preflight_failed", 1)
+        return bk.finish(rid, "preflight_failed", 1)
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
         print("[round] submission did not land -- aborting rather than scoring nothing")
-        return _finish(ledger, rid, mode, "submit_failed", 1)
+        return bk.finish(rid, "submit_failed", 1)
     # The return value used to be discarded, so "all six finished" and "we waited 24 h and gave
     # up" were indistinguishable. A killed straggler is recorded and its hypothesis is resolved
     # `inconclusive` below (no diag.json), which keeps a degenerate slot out of the surprise rate
@@ -308,7 +582,11 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         if not os.path.exists(d):
             sup.reg.resolve(h.hid, {}, "inconclusive", note="no diag.json")
             continue
-        summ = json.load(open(d)).get("summary", {})
+        # THE ONLY DOOR the poisoned Q can come through in a round: a run's own diag.json. A
+        # re-run of round N re-reads log/okuda/rNNNc_*/diag.json, and 14 of those on disk hold
+        # the seed-sphere constant. Scrub at the read, so score_run / meets_success /
+        # predict.score cannot reach it. The diag.json itself is untouched.
+        summ = read_diag_summary(d, source=nm)
         post = C.check_posthoc(summ)
         if post:
             sup.reg.resolve(h.hid, summ, "inconclusive", note=f"NOT EVIDENCE: {post}")
@@ -328,6 +606,11 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         outcome, why = PR.score(h.predicted, summ, primary_metric=h.metric)
         if outcome == "inconclusive":
             print(f"  [predict] {nm} NOT CHECKABLE -- {why[:150]}")
+        # A quarantined Q must be visible in the SCIENTIFIC record, not only in the terminal:
+        # `why` is what lands in hypotheses.jsonl, so anyone reading the resolution later sees
+        # that the survival number was withheld rather than measured.
+        if summ.get("Q_stale"):
+            why = f"{why} | {summ['Q_stale_reason']}"
         sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm], note=why)
         lm.add(comp_hash(g), g, an["analyst_consensus"], sc if np.isfinite(sc) else -1.0, summ, nm)
         rows.append((nm, g, summ, sc, outcome, h))
@@ -335,7 +618,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     if not rows:
         print("[round] no admissible evidence")
         print(json.dumps(sup.observe([]), indent=1))
-        return _finish(ledger, rid, mode, "no_evidence", 1)
+        return bk.finish(rid, "no_evidence", 1)
 
     # ------------------------------------------------ rank (measure) + judge (2nd opinion)
     rows.sort(key=lambda r: -r[3])
@@ -400,7 +683,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     print(f"  mix: {rep['mix_why']}")
     print(f"[map] coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
           f"{cov['n_runs']} runs)")
-    return _finish(ledger, rid, mode, "complete", 0)
+    return bk.finish(rid, "complete", 0)
 
 
 # --------------------------------------------------------------------------- escalation
@@ -547,7 +830,13 @@ if __name__ == "__main__":
     ap.add_argument("--param", default=None)
     ap.add_argument("--values", default=None)
     ap.add_argument("--dry", action="store_true")
+    # Read-only sweep of every recorded Q. Exits non-zero while poison remains, so a script that
+    # re-scores from the archive can gate on it.
+    ap.add_argument("--quarantine-scan", action="store_true",
+                    help="report every STALE Q in _archive/ and log/okuda/ (reads only)")
     a = ap.parse_args()
+    if a.quarantine_scan:
+        sys.exit(1 if quarantine_scan()["n_stale"] else 0)
     vals = [float(x) for x in a.values.split(",")] if a.values else None
     sys.exit(run_round(mode=a.mode, frames=a.frames, batch=a.batch, base=a.base,
                        param=a.param, values=vals, dry=a.dry))

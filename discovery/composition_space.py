@@ -109,6 +109,171 @@ PROVISIONAL_THETA = ("vcap",)   # NOT settled. Metrologist D1d: the clock re-anc
 #   4x more often splits tip cells the moment they cross instead of letting them ramp while
 #   queued -- and the report attributes the tube tip specifically to that backlog. Sweep required.
 
+# ============================================================================ derived limits
+#
+# ⚠ THE SILENT CAP (raised 2026-07-31)
+#
+# `params` used to hold hand-written (lo, hi, default) triples and `sample_params` did
+#
+#       p[k] = float(np.clip(d + rng.normal(0, scale*(hi-lo)), lo, hi))
+#
+# a SILENT hard clamp. Measured on `okuda_route` at the shipped scale=0.15: 904/6200 = 14.6% of
+# draws (over 200 seeds) left the box and were pushed back onto the bound WITHOUT a warning, a
+# flag, or a return value the caller could see. Four of the 31 values in the seed-0 draw sat
+# EXACTLY on a bound. Meanwhile `with_params` -- the path a HUMAN sweep takes (round.py:167) --
+# validated nothing at all. The box bound the agent, did not bind us, and informed neither.
+#
+# This is the buffer-ceiling defect again (critic P2_BUFFER_SATURATED: "evidence about a buffer,
+# not a mechanism"): an invisible limit that converts "we did not look there" into "there is
+# nothing there". For a campaign whose headline findings are IMPOSSIBILITY claims that is the
+# most dangerous bug available. Three of Okuda's own published values were outside the box:
+# alpha=10 (box 1..8), d_h=10 (box 0.1..2.0), and rd_rate over four decades (box 0.2..3.0).
+#
+# THE RULE ADOPTED HERE
+#   A bound is either PHYSICAL AND DERIVED, or it is absent.
+#   Two different things had been conflated into one pair of numbers, which is WHY the box was
+#   kept artificially tight -- widening it also widened the robustness basin:
+#       BOX   (lo, hi)      the ADMISSIBLE region. Derived below, never hand-written.
+#       BASIN PARAM_BASIN   the sampling width a robustness claim is made over. Explicit, and
+#                           deliberately UNCHANGED by the widening.
+#   Nothing is clipped. Leaving the admissible region is a named, visible condition (THETA_RULES).
+#
+# WHERE THE NUMBERS COME FROM -- all three limits were re-derived from the operator source and
+# then CONFIRMED by running the operator's own arithmetic (see the smoke test at the bottom).
+ENGINE_DT = 0.02
+# ^ MUST equal translate.DT_GLOBAL (D2: one dt for the whole campaign). It cannot be imported at
+#   module scope -- translate imports THIS module -- so it is duplicated and the duplication is
+#   converted into a CHECKED invariant by check_dt_agreement(), called from theta_conditions().
+#   A silent disagreement would make every derived bound below wrong by the ratio of the two dts.
+
+FLOAT32_MAX = 3.4028234663852886e38   # the state dtype the operators run in
+HILL_EPS = 1e-12          # the additive regulariser in MorphogenGrowth3D.forward's Hill function
+GM_MU_A = 1.0             # hard-wired by translate._emit_react (gm_rho=1.0, mu_a=1.0)
+BRUSSELATOR_B = 3.0       # hard-wired by translate._emit_react (A=1.0, B=3.0)
+
+DIFFUSION_CFL_LIMIT = 1.0     # see diffusion_cfl
+REACTION_EULER_LIMIT = 2.0    # |1 - dt*k| <= 1 for a linear decay k
+
+
+def check_dt_agreement():
+    """Fail LOUDLY if ENGINE_DT has drifted from the dt the campaign actually runs at.
+
+    Every limit in this section is a function of dt. If the two copies disagree, the bounds are
+    silently wrong -- the exact failure mode this whole section exists to remove.
+    """
+    from translate import DT_GLOBAL          # lazy: translate imports composition_space
+    if abs(float(DT_GLOBAL) - ENGINE_DT) > 1e-15:
+        raise RuntimeError(
+            f"ENGINE_DT={ENGINE_DT} disagrees with translate.DT_GLOBAL={DT_GLOBAL}. Every derived "
+            f"stability bound in composition_space is a function of dt and is now wrong.")
+    return True
+
+
+# ---------------------------------------------------------------- explicit diffusion (cell_diffuse)
+# tyssue_rd_ops.CellDiffuse.forward returns   coef * lap,  coef = [d_a, d_h] * chi
+#   norm=True (the default, and the only mode translate emits):  lap = mean(neighbours) - self
+# and the engine integrates it explicitly:  engine.py  `new = new + dt * d`.
+# The degree-normalised Laplacian has eigenvalues in [-2, 0] AT ANY CELL DEGREE, so the per-step
+# amplification is 1 + dt*chi*d*lambda and stability needs |1 + dt*chi*d*lambda| <= 1, i.e.
+#
+#       dt * chi * max(d_a, d_h) * stencil_gain  <=  1
+#
+# The same statement in physical terms: the fraction of its own content a cell hands to its
+# neighbours in one step cannot exceed what it holds. `stencil_gain` is the connectivity factor --
+# 1 for the DEGREE-NORMALISED stencil (the normalisation is exactly what removes the degree
+# dependence), max cell degree for a stencil that does not normalise.
+# CONFIRMED numerically on the operator's own arithmetic: dt*chi*d = 1.000 is stable over 400
+# steps, 1.010 diverges (K2 -> 1.4e3, 64-ring -> 5.6e1, odd 63-ring -> 7.3e14).
+DIFFUSION_STENCIL_GAIN = {
+    "graph_laplacian": 1.0,   # DERIVED from source: `agg / deg - chem` is degree-normalised.
+    "interface_weighted": None,   # NOT YET DERIVED -- that implementation is being written in
+    #   tyssue_rd_ops.py concurrently and its stencil has not been read. `None` means "we have not
+    #   derived this", which is NOT the same as 1.0 and must never be silently rounded to it. The
+    #   CFL is then evaluated at the most permissive gain (1.0) so we never BLOCK a composition on
+    #   a number we did not derive, and T5_STENCIL_GAIN_UNDERIVED says so out loud.
+}
+
+
+def diffusion_cfl(d_a, d_h, chi, dt=None, stencil_gain=1.0):
+    """The explicit-diffusion CFL number. Stable iff <= DIFFUSION_CFL_LIMIT (== 1)."""
+    dt = ENGINE_DT if dt is None else dt
+    return float(dt) * float(chi) * float(stencil_gain) * max(float(d_a), float(d_h))
+
+
+def diffusivity_ceiling(chi, dt=None, stencil_gain=1.0):
+    """Largest d_a/d_h an explicit step can carry at this chi. Computed, never hard-coded."""
+    dt = ENGINE_DT if dt is None else dt
+    return DIFFUSION_CFL_LIMIT / (float(dt) * float(chi) * float(stencil_gain))
+
+
+def chi_ceiling(d, dt=None, stencil_gain=1.0):
+    """Largest chi an explicit step can carry at this diffusivity."""
+    dt = ENGINE_DT if dt is None else dt
+    return DIFFUSION_CFL_LIMIT / (float(dt) * float(d) * float(stencil_gain))
+
+
+# ---------------------------------------------------------------- explicit reaction (cell_react)
+# Same integrator, same argument, applied to the stiffest LINEAR term of each kinetics (read off
+# tyssue_rd_ops): |1 - dt*k| <= 1  =>  dt*k <= 2.
+def reaction_stiffness(impl, rd_rate=1.0, mu_h=1.0, F=0.055, kk=0.062, gamma=0.3):
+    """Stiffest linear decay rate of a kinetics implementation, in engine time units."""
+    if impl == "gierer_meinhardt":       # da = ... - mu_a*a ;  dh = ... - mu_h*h ; scaled by rate
+        return float(rd_rate) * max(GM_MU_A, float(mu_h))
+    if impl == "gray_scott":             # da = ... - (F+kk)*a ; scaled by rate
+        return float(rd_rate) * (float(F) + float(kk))
+    if impl == "brusselator":            # da = gamma*(... - (B+1)*a ...); `rate` is NOT read
+        return float(gamma) * (BRUSSELATOR_B + 1.0)
+    return 0.0
+
+
+def rd_rate_ceiling(impl, mu_h=1.0, F=0.055, kk=0.062, dt=None):
+    """Largest rd_rate an explicit step can carry for this kinetics. `brusselator` ignores
+    rd_rate entirely (it is driven by `gamma`), so it imposes no ceiling on it."""
+    dt = ENGINE_DT if dt is None else dt
+    k = reaction_stiffness(impl, rd_rate=1.0, mu_h=mu_h, F=F, kk=kk)
+    return float("inf") if k <= 0 else REACTION_EULER_LIMIT / (float(dt) * k)
+
+
+# ---------------------------------------------------------------- the growth switch (Hill)
+# MorphogenGrowth3D.forward:  hillv = a**alpha / (a_sw**alpha + a**alpha + HILL_EPS)
+# `a_sw**alpha` must stay REPRESENTABLE and must stay DISTINGUISHABLE from the regulariser:
+#   a_sw > 1 : alpha*ln(a_sw) <  ln(FLOAT32_MAX)  else it overflows -> hillv == 0, growth silently
+#              dies with no error
+#   a_sw < 1 : alpha*ln(a_sw) >  ln(HILL_EPS)     else the threshold sinks below HILL_EPS and
+#              hillv == 1 everywhere -> the switch silently becomes ALWAYS-ON, i.e. the operator
+#              stops being morphogen-gated at all while still appearing to run
+# Both failures are silent and both would be recorded as evidence about the mechanism.
+def hill_alpha_ceiling(a_sw):
+    """Largest Hill exponent at which the switch is still a switch, at this a_sw."""
+    a_sw = float(a_sw)
+    if a_sw == 1.0:
+        return float("inf")
+    if a_sw > 1.0:
+        return np.log(FLOAT32_MAX) / np.log(a_sw)
+    return np.log(HILL_EPS) / np.log(a_sw)
+
+
+# ---------------------------------------------------------------- the boxes, computed
+# HOW A BOX CEILING IS SET: the derived limit evaluated with the parameter's COMPANIONS AT THEIR
+# DEFAULTS. The constraints are JOINT (chi x d, alpha x a_sw), so no per-parameter box can be
+# sufficient on its own -- a value inside the box can still be unstable in combination. That is
+# what the joint conditions in theta_conditions() are for. The box is the reachability envelope;
+# the joint condition is the wall.
+CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 4.0, 0.02, 0.7
+MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.055, 0.062
+A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.2, 6.0, 1.5
+
+D_CEIL = diffusivity_ceiling(CHI_DEFAULT)          # 12.5   -- reaches Okuda's d_h = 10
+CHI_CEIL = chi_ceiling(D_H_DEFAULT)                # 71.4
+RD_RATE_CEIL = min(rd_rate_ceiling("gierer_meinhardt", mu_h=MU_H_DEFAULT),
+                   rd_rate_ceiling("gray_scott", F=F_DEFAULT, kk=KK_DEFAULT))   # 100 (GM binds)
+GAMMA_CEIL = REACTION_EULER_LIMIT / (ENGINE_DT * (BRUSSELATOR_B + 1.0))         # 25
+# alpha is the ONE place the default-companion rule is deliberately not used. The overflow term is
+# `a**alpha` in the ACTIVATOR, whose magnitude is state-dependent and cannot be bounded statically
+# at all; so the static box takes the conservative branch instead -- the largest alpha that is
+# safe for EVERY admissible a_sw. That is 17.2, which still reaches Okuda's alpha = 10.
+ALPHA_CEIL = min(hill_alpha_ceiling(A_SW_MIN), hill_alpha_ceiling(A_SW_MAX))    # 17.2
+
 # ============================================================================ vocabulary
 # stage           -- the gate; the search opens stages in order
 # role            -- for post-hoc naming and proximity clustering
@@ -146,8 +311,12 @@ OPERATORS = {
     "morphogen_growth_3d": dict(                             # LOCAL growth, gated by the activator
         stage=2, role="growth", outputs=[], slots=["gate"], needs=["morphogen"],
         impls=["hill_conserve_amount", "hill_no_conserve"], impl_structural=True,
-        params={"rate": (0.002, 0.03, 0.010), "a_sw": (0.2, 6.0, 1.5),
-                "alpha": (1.0, 8.0, 4.0), "rho": (0.0, 1.0, 0.0)}),
+        # alpha: was (1.0, 8.0) -- a hand-written cap that put OKUDA'S OWN alpha = 10 outside the
+        # searchable space. Now ALPHA_CEIL, derived from the Hill function's float32/HILL_EPS
+        # degeneracy (see hill_alpha_ceiling). lo = 1.0 stays: below 1 the Hill switch has
+        # infinite slope at the origin and stops being a switch.
+        params={"rate": (0.002, 0.03, 0.010), "a_sw": (A_SW_MIN, A_SW_MAX, A_SW_DEFAULT),
+                "alpha": (1.0, ALPHA_CEIL, 4.0), "rho": (0.0, 1.0, 0.0)}),
     "divide_3d": dict(
         # `hertwig` splits normal to the cell's OWN longest axis -> needs no morphogen input.
         # `orient_iface` stacks daughters along the bud axis -> needs the activator routed in.
@@ -175,15 +344,33 @@ OPERATORS = {
         impls=["shared_edge"], impl_structural=False, params={}),
     "cell_diffuse": dict(
         stage=3, role="patterning", outputs=[], slots=[], needs=["adjacency"],
-        impls=["graph_laplacian"], impl_structural=False,
-        params={"d_a": (0.005, 0.2, 0.02), "d_h": (0.1, 2.0, 0.7),
-                "chi": (1.0, 10.0, 4.0)}),
+        # TWO implementations, and the choice is STRUCTURAL. `graph_laplacian` couples every
+        # neighbour equally; `interface_weighted` couples through the shared-interface area, so
+        # the coupling follows the geometry the mechanics is deforming. Those are two different
+        # claims about how the morphogen moves, not two numerics -- the same reason cell_react's
+        # kinetics are structural (module docstring). Registering both with impl_structural=True
+        # makes ABLATING THE COUPLING a legal ONE-EDIT move (`=cell_diffuse:interface_weighted`),
+        # so the loop can run that ablation itself instead of waiting for a human to hand-write it.
+        impls=["graph_laplacian", "interface_weighted"], impl_structural=True,
+        # d_a/d_h/chi: was (0.005,0.2)/(0.1,2.0)/(1.0,10.0) -- hand-written, and it put OKUDA'S
+        # OWN inhibitor spread d_h = 10 outside the space. The real limit is the explicit-diffusion
+        # CFL and it is JOINT in (chi, d): see diffusion_cfl / T1_DIFFUSION_UNSTABLE.
+        params={"d_a": (0.0, D_CEIL, D_A_DEFAULT), "d_h": (0.0, D_CEIL, D_H_DEFAULT),
+                "chi": (0.0, CHI_CEIL, CHI_DEFAULT)}),
     "cell_react": dict(
         stage=3, role="patterning", outputs=["morphogen"], slots=[], needs=["adjacency"],
         impls=["gierer_meinhardt", "gray_scott", "brusselator"], impl_structural=True,
-        params={"gamma": (0.1, 100.0, 0.3), "a0": (0.0, 0.05, 0.01),
-                "rd_rate": (0.2, 3.0, 1.0), "F": (0.02, 0.06, 0.055), "kk": (0.05, 0.07, 0.062),
-                "mu_h": (0.2, 2.0, 1.0)}),
+        # rd_rate: was (0.2, 3.0) -- a factor of 15, where Okuda spans FOUR DECADES. lo = 0.0 is
+        # the physical bound (a rate cannot be negative); hi = RD_RATE_CEIL = 100 is the derived
+        # explicit-Euler ceiling of the stiffest kinetics at its defaults. 0.01 .. 100 is now
+        # inside the box, so all four decades are reachable.
+        # gamma (brusselator): was (0.1, 100.0). Not a cap at all -- 100 is four times the
+        # integrator's own limit, i.e. the box positively invited a guaranteed divergence. Now the
+        # derived GAMMA_CEIL. This is the same defect with the sign flipped: an undrived bound.
+        params={"gamma": (0.0, GAMMA_CEIL, 0.3), "a0": (0.0, 0.05, 0.01),
+                "rd_rate": (0.0, RD_RATE_CEIL, 1.0),
+                "F": (0.02, 0.06, F_DEFAULT), "kk": (0.05, 0.07, KK_DEFAULT),
+                "mu_h": (0.2, 2.0, MU_H_DEFAULT)}),
     "cell_rd_seed": dict(                                     # the prescribed activation driver
         stage=3, role="driver", outputs=["morphogen"], slots=[], needs=[],
         impls=["tip", "cone", "spot"], impl_structural=True,
@@ -199,6 +386,71 @@ OPERATORS = {
 def slots_of(op: str, impl: str):
     spec = OPERATORS[op]
     return list(spec.get("impl_slots", {}).get(impl, spec["slots"]))
+
+
+# ============================================================================ the sampling basin
+# The BOX is the admissible region (derived above). The BASIN is how far `sample_params` wanders
+# around the default -- the width a ROBUSTNESS claim is made over. They were the same numbers,
+# which is why widening the box was expensive: it silently widened the basin too, so any claim
+# of the form "this result survives a 15% perturbation" would have changed meaning underneath us.
+#
+# Default rule (unlisted parameters): sigma = scale * (hi - lo), i.e. EXACTLY the old behaviour.
+# Listed here: sigma pinned to the width of the OLD, pre-widening box, so this change is
+# basin-preserving by construction and no existing robustness claim changes meaning.
+PARAM_BASIN = {
+    ("morphogen_growth_3d", "alpha"): 8.0 - 1.0,        # old box (1.0, 8.0)
+    ("cell_diffuse", "d_a"): 0.2 - 0.005,               # old box (0.005, 0.2)
+    ("cell_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)
+    ("cell_diffuse", "chi"): 10.0 - 1.0,                # old box (1.0, 10.0)
+    ("cell_react", "rd_rate"): 3.0 - 0.2,               # old box (0.2, 3.0)
+    ("cell_react", "gamma"): GAMMA_CEIL,                # box NARROWED to the derived limit; the
+    #   old width (99.9) sampled gamma far past the integrator's ceiling, so preserving it would
+    #   preserve a basin most of which cannot be integrated.
+    ("divide_3d", "max_cycle"): 0.0,                    # 1e9 is a SENTINEL for "no maximum", not a
+    #   tunable. The old rule gave it sigma = 1.5e8 and the clip then pinned half the draws back
+    #   onto 1e9 -- noise that looked like sampling. Fixed = never perturbed.
+}
+
+
+def basin_sigma(op, pname, scale=0.15):
+    """Sampling width for one parameter. Explicit if listed, else the old scale*(hi-lo) rule."""
+    if (op, pname) in PARAM_BASIN:
+        return float(PARAM_BASIN[(op, pname)]) * float(scale)
+    lo, hi, _ = OPERATORS[op]["params"][pname]
+    return float(scale) * (float(hi) - float(lo))
+
+
+# ============================================================================ theta conditions
+# NAMED, VISIBLE conditions on theta -- the replacement for the silent clip.
+#
+# Deliberately shaped like critic.Rejection (code / rule / detail) so the Critic can adopt them
+# with a one-line rule, and phrased in the same "this run is NOT evidence" idiom as
+# P2_BUFFER_SATURATED. A run whose chemistry diverged is evidence about an integrator, not a
+# mechanism, in exactly the way a saturated run is evidence about a buffer.
+#
+# BLOCKING vs not:
+#   blocking=True  we DERIVED the limit and it is breached -> is_runnable() is False and to_spec
+#                  refuses to compile. The composition cannot produce evidence.
+#   blocking=False visible but not a wall. Used for (a) leaving the declared box, which is a
+#                  prior and not a physical fact, and (b) any limit we have NOT derived. We never
+#                  block on a number we did not derive -- that is how the original cap happened.
+THETA_RULES = ["T1_DIFFUSION_UNSTABLE", "T2_REACTION_UNSTABLE", "T3_HILL_SWITCH_DEGENERATE",
+               "T4_OUTSIDE_DECLARED_BOX", "T5_STENCIL_GAIN_UNDERIVED"]
+
+
+class ThetaCondition:
+    __slots__ = ("code", "rule", "detail", "blocking")
+
+    def __init__(self, code, rule, detail, blocking):
+        self.code, self.rule, self.detail, self.blocking = code, rule, detail, blocking
+
+    def __repr__(self):
+        return f"<{'!' if self.blocking else '?'}{self.code}: {self.detail}>"
+
+    def line(self):
+        """One loud line, in run_one.py's idiom."""
+        mark = "\U0001f534" if self.blocking else "⚠"
+        return f"{mark} {self.code} -- {self.rule}: {self.detail}"
 
 STAGES = {s: [k for k, v in OPERATORS.items() if v["stage"] == s] for s in (1, 2, 3)}
 
@@ -271,19 +523,148 @@ class CompositionGraph:
                 p[f"{o['id']}.{pn}"] = d
         return p
 
-    def sample_params(self, rng, scale=0.15):
-        """Perturb around the defaults -- the PARAMETER BASIN a robustness claim is made over."""
+    def theta(self, node_id, pname):
+        """theta lookup with the vocabulary default as fallback (same rule as translate._p)."""
+        k = f"{node_id}.{pname}"
+        if k in self.params:
+            return self.params[k]
+        return OPERATORS[self._op_of(node_id)]["params"][pname][2]
+
+    def sample_params(self, rng, scale=0.15, verbose=True):
+        """Perturb around the defaults -- the PARAMETER BASIN a robustness claim is made over.
+
+        NEVER CLIPS. The previous implementation ended in `np.clip(..., lo, hi)`, which silently
+        moved 14.6% of draws onto a bound: the sampler reported a value it had not drawn, the
+        basin developed spikes of probability mass exactly at the edges, and nothing anywhere
+        said so. A draw that leaves the admissible region is now either re-drawn (a proper
+        truncated sample, no mass piled on the bound) or, if the basin cannot fit inside the box
+        at all, RETURNED AS DRAWN and reported as a named condition. Out-of-box is a fact about
+        the run; it is not something the sampler is allowed to quietly edit away.
+        """
+        p, cond = self.sample_params_report(rng, scale)
+        if verbose:
+            for c in cond:
+                print(c.line())
+        return p
+
+    def sample_params_report(self, rng, scale=0.15, max_tries=64):
+        """(params, [ThetaCondition]) -- the sampler with its excursions made explicit."""
         p = self.default_params()
+        cond = []
         for o in self.ops:
             for pn, (lo, hi, d) in OPERATORS[o["op"]]["params"].items():
                 k = f"{o['id']}.{pn}"
-                p[k] = float(np.clip(d + rng.normal(0, scale * (hi - lo)), lo, hi))
-        return p
+                sigma = basin_sigma(o["op"], pn, scale)
+                if sigma <= 0:
+                    p[k] = float(d)
+                    continue
+                v = float(d)
+                for _ in range(max_tries):        # truncated draw: RE-draw, never clamp
+                    v = float(d + rng.normal(0, sigma))
+                    if lo <= v <= hi:
+                        break
+                else:
+                    # the basin does not fit inside the box. Report the draw as it fell; the
+                    # alternative (clamping) is precisely the defect.
+                    cond.append(ThetaCondition(
+                        "T4_OUTSIDE_DECLARED_BOX",
+                        "a sampled value left the declared box and was NOT clipped",
+                        f"{k}={v:.6g} not in [{lo:.6g}, {hi:.6g}] after {max_tries} draws at "
+                        f"sigma={sigma:.6g} -- widen the box or narrow the basin", False))
+                p[k] = v
+        cond.extend(self.with_params(p, quiet=True).theta_conditions())
+        return p, cond
 
-    def with_params(self, params):
+    def with_params(self, params, quiet=False):
+        """Attach theta. VALIDATES -- and says so out loud.
+
+        This used to do no checking whatsoever, so the hand-written sweep path (round.py) was not
+        bound by the ranges that bound the agent, and neither side was told. The box binding one
+        of the two parties and informing neither is how a limit becomes invisible.
+        """
         g = self.copy()
         g.params = dict(params)
+        if not quiet:
+            for c in g.theta_conditions():
+                print(c.line())
         return g
+
+    # ---------------------------------------------------------------- derived theta limits
+    def theta_conditions(self):
+        """[ThetaCondition] -- every named condition this theta triggers. See THETA_RULES."""
+        check_dt_agreement()      # the bounds below are all functions of dt; refuse to guess
+        out = []
+
+        for k, v in self.params.items():
+            if k.startswith("_run.") or not isinstance(v, (int, float)) or isinstance(v, bool):
+                continue
+            nid, _, pname = k.partition(".")
+            node = self._node(nid)
+            if node is None:
+                continue
+            spec = OPERATORS[node["op"]]["params"].get(pname)
+            if spec and not (spec[0] <= v <= spec[1]):
+                out.append(ThetaCondition(
+                    "T4_OUTSIDE_DECLARED_BOX",
+                    "theta outside the declared box (a prior, not a physical wall)",
+                    f"{k}={v} not in [{spec[0]:.6g}, {spec[1]:.6g}]", False))
+
+        for o in self.ops:
+            nid, op, impl = o["id"], o["op"], self.impl_of(o)
+
+            if op == "cell_diffuse":
+                gain = DIFFUSION_STENCIL_GAIN.get(impl)
+                derived = gain is not None
+                if not derived:
+                    gain = 1.0        # most permissive; never block on an underived number
+                    out.append(ThetaCondition(
+                        "T5_STENCIL_GAIN_UNDERIVED",
+                        "the CFL for this diffusion implementation has not been derived from "
+                        "its source, so the stability bound below is provisional",
+                        f"{op}:{impl} -- evaluated at the most permissive stencil_gain=1.0", False))
+                d_a, d_h = self.theta(nid, "d_a"), self.theta(nid, "d_h")
+                chi = self.theta(nid, "chi")
+                cfl = diffusion_cfl(d_a, d_h, chi, stencil_gain=gain)
+                if cfl > DIFFUSION_CFL_LIMIT:
+                    out.append(ThetaCondition(
+                        "T1_DIFFUSION_UNSTABLE",
+                        "explicit diffusion past its CFL limit -- chem diverges, so the run is "
+                        "evidence about an integrator, not a mechanism",
+                        f"dt*chi*max(d_a,d_h)*gain = {ENGINE_DT}*{chi:g}*{max(d_a, d_h):g}"
+                        f"*{gain:g} = {cfl:.4g} > {DIFFUSION_CFL_LIMIT} "
+                        f"(max diffusivity here is {diffusivity_ceiling(chi, stencil_gain=gain):.4g})",
+                        derived))
+
+            elif op == "cell_react":
+                k = reaction_stiffness(impl, rd_rate=self.theta(nid, "rd_rate"),
+                                       mu_h=self.theta(nid, "mu_h"), F=self.theta(nid, "F"),
+                                       kk=self.theta(nid, "kk"), gamma=self.theta(nid, "gamma"))
+                if ENGINE_DT * k > REACTION_EULER_LIMIT:
+                    out.append(ThetaCondition(
+                        "T2_REACTION_UNSTABLE",
+                        "explicit reaction past its Euler limit -- chem diverges, so the run is "
+                        "evidence about an integrator, not a mechanism",
+                        f"{impl}: dt*k = {ENGINE_DT}*{k:g} = {ENGINE_DT * k:.4g} > "
+                        f"{REACTION_EULER_LIMIT}", True))
+
+            elif op == "morphogen_growth_3d":
+                a_sw, alpha = self.theta(nid, "a_sw"), self.theta(nid, "alpha")
+                ceil = hill_alpha_ceiling(a_sw)
+                if alpha > ceil:
+                    why = ("overflows float32 -> hillv == 0, growth silently stops"
+                           if a_sw > 1.0 else
+                           f"sinks below the operator's own {HILL_EPS:g} regulariser -> hillv == 1 "
+                           f"everywhere, the switch silently becomes ALWAYS-ON and the operator "
+                           f"stops being morphogen-gated while still appearing to run")
+                    out.append(ThetaCondition(
+                        "T3_HILL_SWITCH_DEGENERATE",
+                        "the growth switch stops being a switch, silently",
+                        f"a_sw**alpha = {a_sw:g}**{alpha:g} {why}; alpha ceiling here is "
+                        f"{ceil:.4g}", True))
+        return out
+
+    def blocking_theta_conditions(self):
+        return [c for c in self.theta_conditions() if c.blocking]
 
     # ---------------------------------------------------------------- D4 preconditions
     def unmet_preconditions(self):
@@ -311,8 +692,8 @@ class CompositionGraph:
         return out
 
     def is_runnable(self):
-        """(ok, reason). A graph must have a substrate + mechanics, no unmet precondition, and
-        no dangling slot."""
+        """(ok, reason). A graph must have a substrate + mechanics, no unmet precondition, no
+        dangling slot, and a theta the integrator can actually carry."""
         if not REQUIRED_ROLES.issubset(self.roles()):
             return False, f"missing required role(s): {sorted(REQUIRED_ROLES - self.roles())}"
         if self.unmet_preconditions():
@@ -324,6 +705,12 @@ class CompositionGraph:
             if dn is not None and c["slot"] not in slots_of(dn["op"], self.impl_of(dn)):
                 return False, (f"connection into a slot the implementation does not expose: "
                                f"{dn['op']}:{self.impl_of(dn)} has no `{c['slot']}`")
+        # A theta past a DERIVED integrator limit cannot produce evidence about the mechanism, so
+        # it must never reach the cluster -- the same standing as an unmet precondition (D4).
+        # to_spec() calls this and refuses to compile, which is where the condition becomes loud.
+        blocking = self.blocking_theta_conditions()
+        if blocking:
+            return False, "; ".join(c.line() for c in blocking)
         return True, "ok"
 
     # ---------------------------------------------------------------- one-edit API
@@ -577,4 +964,68 @@ if __name__ == "__main__":
 
     n_edits = len(g.legal_edits(3))
     print(f"\nlegal one-edit moves from the seed (stage<=3): {n_edits}")
-    print("composition_space OK")
+
+    # --- THE SILENT CAP: the sampler must not clip -------------------------------------------
+    print("\n" + "-" * 88)
+    print("SILENT CAP -- sample_params no longer clips")
+    print("-" * 88)
+    ok_ref = refs["okuda_route"]
+    r = np.random.default_rng(0)
+    p, cond = ok_ref.sample_params_report(r)
+    onbound = []
+    for k, v in p.items():
+        nid, _, pn = k.partition(".")
+        op = ok_ref._node(nid)["op"]
+        lo, hi, _d = OPERATORS[op]["params"][pn]
+        if basin_sigma(op, pn) <= 0:
+            continue          # held at its default on purpose (a sentinel), not clipped
+        if abs(v - lo) < 1e-12 or abs(v - hi) < 1e-12:
+            onbound.append(k)
+    print(f"  seed-0 draw: {len(onbound)} of {len(p)} perturbed values sit exactly on a bound "
+          f"(was 4/31 under the clip)  {onbound}")
+    assert not onbound, "a clipped draw is a value the sampler did not draw"
+    print(f"  excursions reported instead of hidden: {cond if cond else 'none'}")
+
+    # --- Okuda's three published values must be REACHABLE --------------------------------------
+    print("\n" + "-" * 88)
+    print("REACHABILITY -- Okuda's published values are inside the boxes")
+    print("-" * 88)
+    for op, pn, val, what in [("morphogen_growth_3d", "alpha", 10.0, "growth-switch sharpness"),
+                              ("cell_diffuse", "d_h", 10.0, "inhibitor spread"),
+                              ("cell_react", "rd_rate", 0.01, "chemistry speed, bottom decade"),
+                              ("cell_react", "rd_rate", 100.0, "chemistry speed, top decade")]:
+        lo, hi, d = OPERATORS[op]["params"][pn]
+        assert lo <= val <= hi, f"{op}.{pn}={val} still unreachable"
+        print(f"  {op}.{pn:8} = {val:<8g} in [{lo:g}, {hi:g}]  default still {d:g}   [{what}]")
+
+    # --- the bound that REMAINS is derived, and breaching it is loud ---------------------------
+    print("\n" + "-" * 88)
+    print("DERIVED BOUND -- explicit diffusion, computed not hard-coded")
+    print("-" * 88)
+    dif = next(o["id"] for o in ok_ref.ops if o["op"] == "cell_diffuse")
+    print(f"  at chi={CHI_DEFAULT:g}, dt={ENGINE_DT:g}: max diffusivity = "
+          f"{diffusivity_ceiling(CHI_DEFAULT):g}   (1 / (dt*chi))")
+    stable = ok_ref.with_params({**ok_ref.default_params(),
+                                 f"{dif}.d_h": 10.0, f"{dif}.chi": CHI_DEFAULT}, quiet=True)
+    print(f"  d_h=10 chi=4  -> CFL={diffusion_cfl(0.02, 10.0, 4.0):.3g}  runnable={stable.is_runnable()[0]}")
+    blown = ok_ref.with_params({**ok_ref.default_params(),
+                                f"{dif}.d_h": 10.0, f"{dif}.chi": 20.0}, quiet=True)
+    print(f"  d_h=10 chi=20 -> CFL={diffusion_cfl(0.02, 10.0, 20.0):.3g}")
+    for c in blown.theta_conditions():
+        print("   ", c.line())
+    assert not blown.is_runnable()[0], "an unintegrable theta must not reach the cluster"
+
+    # --- the coupling ablation is now a legal ONE-EDIT move ------------------------------------
+    print("\n" + "-" * 88)
+    print("ONE-EDIT SWAP -- the loop can ablate the coupling by itself")
+    print("-" * 88)
+    labels = [l for _, l in ok_ref.legal_edits(3)]
+    assert "=cell_diffuse:interface_weighted" in labels
+    swapped, _ = ok_ref.apply(("set_impl", dif, "interface_weighted"))
+    print(f"  '=cell_diffuse:interface_weighted' in legal_edits: True")
+    print(f"  hash {comp_hash(ok_ref)} -> {comp_hash(swapped)}  (the swap IS a new hypothesis)")
+    assert comp_hash(swapped) != comp_hash(ok_ref)
+    for c in swapped.theta_conditions():
+        print("   ", c.line())
+
+    print("\ncomposition_space OK")

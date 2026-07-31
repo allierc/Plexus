@@ -125,32 +125,78 @@ def classify_npz(path, keys=None):
     return out
 
 
-def evidence_horizon(shapes, series, t=None, hollow_key="hollow_frac", thresh=0.05):
-    """The first frame at which the mesh stops being trustworthy. PROVISIONAL.
+def evidence_horizon(shapes, series, t=None, n_bar=20, first_bar=1):
+    """The first frame at which the mesh stops being trustworthy, as an ABSOLUTE CELL COUNT.
 
     A run is not all-or-nothing: if the mesh fails at frame 380 of 400, the first 379 frames are
-    sound physics. So the record carries a HORIZON rather than a verdict, every measurement is
-    taken before it, and "final" means the last valid frame.
+    sound physics. So the record carries a HORIZON, every measurement is taken before it, and
+    "final" means the last valid frame.
 
-    PROVISIONAL, and the caveat is load-bearing: `hollow_frac` currently ORs together three
-    unrelated failures -- folded caps, harmless just-divided slivers, and cells with fewer than
-    three neighbours (genuinely broken topology). Only the third invalidates the physics. Until
-    those are separated this threshold is a stand-in, and it is deliberately conservative.
+    WHY A COUNT AND NOT A FRACTION (Cedric, 31 July -- the first version used hollow_frac > 0.05).
+    A broken cell is a LOCAL topology violation: the physics is wrong there, and having more
+    healthy cells elsewhere does not make it less wrong. Worse, a fractional bar gets MORE
+    PERMISSIVE AS THE TISSUE GROWS, because the denominator grows with it. Measured on
+    r01_03_5e3159_3, the 5% bar meant:
+
+        frame   0   1431 cells -> tolerated  72 broken cells
+        frame 461   1966 cells -> tolerated  98
+        frame 807   2389 cells -> tolerated 119
+
+    So the runs that grow the most -- the ones we care about -- were granted the most damage. An
+    absolute bar of ~20 puts this run's horizon at frame 461 instead of 692.
+
+    WHICH COUNT. Prefer `broken_n`: cells that are genuinely under-connected or whose ring is not
+    a valid polygon. Do NOT threshold the legacy blend if the split is available -- the blend also
+    counts folded caps and just-divided slivers, and a dividing tissue always has slivers, so a bar
+    of 20 on the blend would fire almost immediately and the rule would simply stop being applied.
+    An over-strict rule is its own failure mode.
+
+    THE BLEND IS NOT AN ACCEPTABLE FALLBACK, AND ASSUMING IT WAS COST ME A WRONG VERDICT.
+    I first reasoned: the blend counts more cells than `broken_n`, so a blend-based horizon fires
+    early -- pessimistic, therefore safe. That is wrong. The blend does not over-count damage; it
+    counts a DIFFERENT THING. Measured on r01_03_5e3159_3:
+
+        corr(hollow_n, n_tip) = +0.971
+
+    The blended "hollow" count tracks the number of TIP CELLS almost exactly. Over that run the
+    tube grows monotonically (length 2.96 -> 19.00) and narrows smoothly (diameter 2.67 -> 1.55)
+    with no discontinuity anywhere -- a healthy tube, confirmed by watching the movie -- while the
+    blend climbs from 4 to 162. It was counting the tube.
+
+    So the bias does not run toward caution, it runs AGAINST THE TARGET PHENOTYPE: the better the
+    tube, the more "damage" is reported. On that basis I condemned 13 of 24 archived runs as
+    "peaked after the mesh broke". That verdict is withdrawn.
+
+    Therefore: if only the blend is available, this returns NO HORIZON and says why. A number
+    computed from the wrong quantity is worse than no number, because it will be used.
+
+    `broken_n` is the right key precisely because it is TOPOLOGICAL -- under-connected cells and
+    rings that are not valid polygons. Curvature and cell size cannot manufacture it, so a tube
+    cannot look like damage to it.
     """
-    if hollow_key not in series:
-        return {"horizon": None, "why": f"{hollow_key} not recorded"}
-    y = np.asarray(series[hollow_key], dtype=float)
+    if "broken_n" not in series:
+        return {"horizon": None, "counted": None,
+                "why": ("no `broken_n` recorded. REFUSING to fall back to the legacy blended "
+                        "`hollow_n`: it correlates with the tip-cell count at r=+0.97, i.e. it "
+                        "counts the tube, not the damage. Re-run with the three failure modes "
+                        "separated. A horizon from the wrong quantity is worse than none.")}
+    key = "broken_n"
+    y = np.asarray(series[key], dtype=float)
     tt = np.arange(len(y)) if t is None else np.asarray(t)
-    bad = np.where(y > thresh)[0]
+    out = {"criterion": f"{key} >= {n_bar} cells", "counted": key}
+
+    dmg = np.where(y >= first_bar)[0]
+    out["first_damage"] = int(tt[dmg[0]]) if len(dmg) else None
+
+    bad = np.where(y >= n_bar)[0]
     if not len(bad):
-        return {"horizon": int(tt[-1]), "horizon_idx": len(y) - 1, "complete": True,
-                "why": f"{hollow_key} never exceeded {thresh}"}
+        return {**out, "horizon": int(tt[-1]), "horizon_idx": len(y) - 1, "complete": True,
+                "why": f"{key} never reached {n_bar} (max {int(np.nanmax(y))})"}
     i = int(bad[0])
-    return {"horizon": int(tt[i]), "horizon_idx": i, "complete": False,
+    return {**out, "horizon": int(tt[i]), "horizon_idx": i, "complete": False,
             "valid_frac": round(i / max(len(y) - 1, 1), 3),
-            "why": f"{hollow_key} first exceeded {thresh} at frame {int(tt[i])} "
-                   f"({i}/{len(y) - 1} of the recorded samples)",
-            "provisional": "hollow_frac blends folded caps, benign slivers and broken topology"}
+            "why": f"{key} first reached {n_bar} at frame {int(tt[i])} "
+                   f"(first damage at frame {out['first_damage']})"}
 
 
 def report(run_dir, write=True):
@@ -219,6 +265,8 @@ def summarise(rep, keys=("protr", "hollow_frac", "cells", "tube_diam", "force_me
                 extra = f" (late blow-up to {v['final']:.3g})  <-- suspect the mesh, not biology"
             lines.append(f"  {k:16} {v['shape']:10}{extra}")
     h = rep.get("horizon") or {}
+    if h.get("first_damage") is not None:
+        lines.append(f"  first damaged cell at frame {h['first_damage']}")
     if h.get("horizon") is not None and not h.get("complete", False):
         lines.append(f"  EVIDENCE HORIZON  frame {h['horizon']} "
                      f"({h.get('valid_frac', 0):.0%} of the run is trustworthy) -- {h['why']}")
