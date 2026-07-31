@@ -1,35 +1,6 @@
-[p1_ph_divide_only] comp=C6a07112cc06 region='uniform inflation (no patterning)' frames=300 dt=0.02 device=cuda:1
-[engine] 300 sim frames -> recording 301 set frames (stride 1), fields every 2 steps (<= 256)
-[engine] === p1_ph_divide_only ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=300
+[p1_ph_divide_only] comp=C6a07112cc06 region='uniform inflation (no patterning)' frames=500 dt=0.02 device=cuda:0
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_ph_divide_only ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=500
 [engine] sets:      vertex(30000)  cell(16000)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, vesicle_growth, divide_3d, topo_snapshot_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d
-[p1_ph_divide_only] 🔴 SATURATED: 15002 cells vs buffer 16000. This run is NOT evidence -- raise the buffer or bound proliferation.
-[p1_ph_divide_only] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
-[p1_ph_divide_only] {"saturated": true, "inert_operators": [], "retention": 0.994, "valid_evidence": false, "protr_final": 1.02, "protr_peak": 1.025, "horizon_frame": 300, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.025, "protr_final_untruncated": 1.02, "n_cells_final": 15002, "red_frac_final": 0.0, "act_max_final": 0.0, "frames": 301, "wall_s": 269.5, "ta_hollow_n_peak": 70, "ta_hollow_n_final": 70, "ta_area_cv_final": 0.245, "ta_vol_cv_final": 0.239, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.016, "ta_red_frac_final": 0.0, "ta_tip_act_final": 0.0, "mech_force_mean": 80.5019, "mech_p_body": 17.41, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 0.9072, "mech_migration": 1.02436}
-[p1_ph_divide_only] D4 ok: all 6 scheduled operators acted ({'seed_mesh_3d': 1, 'divide_3d': 201, 'reconnect_t1_3d': 290} ...)
-[p1_ph_divide_only] camera: FIXED Lbox=32.470 for all 301 frames and both views (per-frame autofit would have run 5.614 -> 32.470, x5.78: that rescaling is what hid growth)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_divide_only] artefacts -> log/okuda/p1_ph_divide_only/{strip.png,movie.mp4}

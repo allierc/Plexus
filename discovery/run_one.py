@@ -185,7 +185,13 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     try:
         from tube_analysis import analyze
         samp = np.unique(np.linspace(0, T - 1, min(40, T)).astype(int))
-        tube = analyze([(int(t), fr[t][0], fr[t][1], fr[t][2]) for t in samp], out_dir) or {}
+        # red_frac must be thresholded at the GROWTH OPERATOR'S OWN switch, not at the midpoint of
+        # the activator's current range. The relative version is scale-free and therefore blind --
+        # it read exactly 0.070 on every one of 40 frames while the pattern changed under it.
+        a_sw = next((float(o["a_sw"]) for o in cfg.get("operators", [])
+                     if o.get("op") == "morphogen_growth_3d" and "a_sw" in o), None)
+        tube = analyze([(int(t), fr[t][0], fr[t][1], fr[t][2]) for t in samp], out_dir,
+                       a_sw=a_sw) or {}
         keep = ("tube_len_final", "tube_diam_final", "n_tubes_final", "protr_final",
                 "hollow_n_peak", "hollow_n_final", "area_cv_final", "vol_cv_final",
                 "red_frac_final", "tip_act_final")
@@ -492,6 +498,13 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
                 div = None
             else:
                 div = np.asarray(age)[:mt["nF"]] <= DIVIDED_WINDOW
+                # ... AND the cell must actually have divided at least once. `age` starts at 0 for
+                # every seeded cell, so on its own it paints the whole untouched tissue green in the
+                # opening frames -- which is what p1_ph_rd_only's movie showed, in a run where
+                # division never fires. Spotted by Cedric watching the movie, not by any check.
+                nd = mt.get("ndiv")
+                if nd is not None:
+                    div = div & (np.asarray(nd)[:mt["nF"]] > 0)
             return div, f["broken"]
         except Exception as e:
             # Not swallowed silently: a missing overlay must announce itself, or a movie with no

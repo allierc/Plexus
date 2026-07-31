@@ -1,0 +1,6 @@
+[p1_without_divide_3d] comp=C3efe390b691 region='growth-driven monolayer (Okuda route)' frames=500 dt=0.02 device=cuda:1
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_without_divide_3d ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=500
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d

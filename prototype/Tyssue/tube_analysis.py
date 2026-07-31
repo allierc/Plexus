@@ -111,7 +111,7 @@ def cell_classes(pt, mt):
     return cls
 
 
-def cell_census(pt, mt, act):
+def cell_census(pt, mt, act, a_sw=None):
     """Classify cells by STRUCTURE (tip / branch / body, from radial position along a protrusion) and by
     STATE (red = activated vs white), so we can watch the composition over frames. A clean TUBE keeps the
     activator CONFINED to a small tip (red_frac ~ tip_frac, red_at_tip ~ 1, body-dominant); a RUNAWAY /
@@ -123,7 +123,12 @@ def cell_census(pt, mt, act):
     body = r < body_r + 0.15 * span                             # the base vesicle
     branch = (~tip) & (~body)                                   # along the tube/branch
     if act is not None and len(act) == len(rad) and float(act[ok].max()) > float(act[ok].min()):
-        a = np.asarray(act, float)[ok]; thr = a.min() + 0.5 * (a.max() - a.min()); red = a > thr
+        a = np.asarray(act, float)[ok]
+        # SAME DEFECT AS frame_metrics, second location. A midpoint-of-the-current-range threshold
+        # is recomputed every frame and so always returns about the top half: n_red sat at exactly
+        # 35 for all 40 frames of p1_ko_divide_3d. Threshold at the growth switch when we know it.
+        thr = float(a_sw) if a_sw is not None else (a.min() + 0.5 * (a.max() - a.min()))
+        red = a > thr
     else:
         red = np.zeros(len(r), bool)
     red_at_tip = float((red & tip).sum()) / max(int(red.sum()), 1)   # fraction of activated cells that ARE tips
@@ -132,10 +137,18 @@ def cell_census(pt, mt, act):
                 red_at_tip=round(red_at_tip, 3), n_tip=int(tip.sum()), n_red=int(red.sum()))
 
 
-def frame_metrics(pt, mt, act=None):
+def frame_metrics(pt, mt, act=None, a_sw=None):
     """All per-frame tube-quality metrics in one dict. `act` (per-cell activator) adds red_frac -- the
-    fraction of ACTIVATED cells (top half of the activator range): LOW == localised spots (distinct
-    tubes), HIGH == the activator has spread over the shell (one fat lumpy lobe, not tubes)."""
+    fraction of ACTIVATED cells: LOW == localised spots (distinct tubes), HIGH == the activator has
+    spread over the shell (one fat lumpy lobe, not tubes).
+
+    `a_sw` is the growth operator's OWN switch. Pass it. Without it the threshold falls back to the
+    midpoint of the activator's current range, which is RELATIVE and therefore blind: recomputed
+    every frame, it always selects roughly the top half of whatever is there, so it reports the same
+    number for a developing pattern, a frozen one and a dying one. Measured on p1_ko_divide_3d it sat
+    at exactly 0.070 with n_red exactly 35 for all 40 frames while the pattern visibly changed.
+    Thresholding at a_sw instead makes red_frac mean something mechanical -- the fraction of cells
+    the growth operator actually considers switched on -- and lets it move.""" 
     es, et, ef, nF = (np.asarray(mt["E_srce"]), np.asarray(mt["E_trgt"]), np.asarray(mt["E_face"]), mt["nF"])
     area, _, _, vf = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF)
     area, vf = area.numpy(), vf.numpy()
@@ -180,23 +193,30 @@ def frame_metrics(pt, mt, act=None):
     _, radl, livem = _cell_centroids(pt, mt); rad = radl[livem]
     m["protr"] = round(protrusion_ratio(rad), 3)
     if act is not None and len(act):
-        act = np.asarray(act, float); thr = act.min() + 0.5 * (act.max() - act.min())
-        m["red_frac"] = round(float((act > thr).mean()), 3)
+        act = np.asarray(act, float)
+        if a_sw is not None:
+            m["red_frac"] = round(float((act > float(a_sw)).mean()), 3)     # ABSOLUTE: the growth switch
+        else:
+            thr = act.min() + 0.5 * (act.max() - act.min())                 # relative fallback (blind; see above)
+            m["red_frac"] = round(float((act > thr).mean()), 3)
+        m["act_mean"] = round(float(act.mean()), 4)                         # unconditional, threshold-free
+        m["act_max"] = round(float(act.max()), 4)
+        m["act_p95"] = round(float(np.percentile(act, 95)), 4)
         radc, ok = radl, livem                                 # tip_act: corr(activator, radius). +1 = activator
         if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
             m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
     m.update(tube_diameter(pt, mt))
-    m.update(cell_census(pt, mt, act))                          # tip/branch/body + red composition
+    m.update(cell_census(pt, mt, act, a_sw=a_sw))                          # tip/branch/body + red composition
     return m
 
 
-def analyze(frames, OUT):
+def analyze(frames, OUT, a_sw=None):
     """frames = list of (frame_index, pt, mt); compute the series, save metrics.json + metrics.png, and
     return a summary with peak hollow / peak size-CV / final tube diameter."""
     series = []
     for fr in frames:
         (t, pt, mt), act = fr[:3], (fr[3] if len(fr) > 3 else None)
-        r = frame_metrics(pt, mt, act); r["frame"] = int(t); series.append(r)
+        r = frame_metrics(pt, mt, act, a_sw=a_sw); r["frame"] = int(t); series.append(r)
     def col(k): return np.array([s[k] for s in series], float)
     fr = col("frame")
     summ = dict(  # BROKEN first: it is the only one of the three that invalidates the physics
