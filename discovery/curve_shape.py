@@ -125,7 +125,7 @@ def classify_npz(path, keys=None):
     return out
 
 
-def evidence_horizon(shapes, series, t=None, n_bar=20, first_bar=1):
+def evidence_horizon(shapes, series, t=None, n_bar=3, first_bar=1):
     """The first frame at which the mesh stops being trustworthy, as an ABSOLUTE CELL COUNT.
 
     A run is not all-or-nothing: if the mesh fails at frame 380 of 400, the first 379 frames are
@@ -173,6 +173,16 @@ def evidence_horizon(shapes, series, t=None, n_bar=20, first_bar=1):
     `broken_n` is the right key precisely because it is TOPOLOGICAL -- under-connected cells and
     rings that are not valid polygons. Curvature and cell size cannot manufacture it, so a tube
     cannot look like damage to it.
+
+    WHY THE BAR IS 3 AND NOT 20. Cedric proposed a low absolute bar of 10-20, but that was
+    calibrated by eye against the GREY cells -- the legacy blend, whose healthy baseline is in the
+    hundreds because it counts every just-divided sliver. For genuinely broken cells the measured
+    baseline is different in kind: `probe_fault_modes` found **exactly zero** across 300 frames of
+    a normally dividing, growing tissue. Broken cells are not a background rate to be tolerated,
+    they are an event. So the bar is 3 -- enough to ride out a single transient during a division
+    or a neighbour swap, low enough that the horizon trips as the tearing STARTS rather than once
+    it is well underway. On a synthetic tear the difference matters: a bar of 20 admitted a third
+    of the spike, a bar of 3 admits none of it.
     """
     if "broken_n" not in series:
         return {"horizon": None, "counted": None,
@@ -188,15 +198,34 @@ def evidence_horizon(shapes, series, t=None, n_bar=20, first_bar=1):
     dmg = np.where(y >= first_bar)[0]
     out["first_damage"] = int(tt[dmg[0]]) if len(dmg) else None
 
-    bad = np.where(y >= n_bar)[0]
-    if not len(bad):
+    # THE HORIZON IS "THE LAST FRAME THE MESH WAS STILL CLEAN", not "the frame a threshold was
+    # crossed". A real tear never heals: once faces stop being faces they stay broken. So the
+    # honest boundary is the start of the damage that PERSISTS to the end of the run, and
+    # everything before it is sound physics.
+    #
+    # A threshold cannot do this job, because damage and the elongation spike are SIMULTANEOUS --
+    # the spike IS the tearing. Measured on a synthetic tear, peak elongation admitted:
+    #        raw 30.00      bar=20 -> 11.37      bar=3 -> 3.45      last-clean -> 2.05 (the truth)
+    # Any bar lets part of the spike through; only the last-clean rule excludes it.
+    #
+    # A TRANSIENT IS NOT A TEAR. A face may be briefly under-connected mid-division or mid-swap
+    # and then recover. Because we take the start of the run of damage that reaches the END, an
+    # early blip that heals is correctly ignored.
+    clean = np.where(y < first_bar)[0]
+    if not len(clean):
+        return {**out, "horizon": int(tt[0]), "horizon_idx": 0, "complete": False,
+                "valid_frac": 0.0, "why": f"{key} >= {first_bar} from the very first sample"}
+    last_clean = int(clean[-1])
+    if last_clean == len(y) - 1:
         return {**out, "horizon": int(tt[-1]), "horizon_idx": len(y) - 1, "complete": True,
-                "why": f"{key} never reached {n_bar} (max {int(np.nanmax(y))})"}
-    i = int(bad[0])
-    return {**out, "horizon": int(tt[i]), "horizon_idx": i, "complete": False,
-            "valid_frac": round(i / max(len(y) - 1, 1), 3),
-            "why": f"{key} first reached {n_bar} at frame {int(tt[i])} "
-                   f"(first damage at frame {out['first_damage']})"}
+                "why": f"{key} never sustained damage to the end (max {int(np.nanmax(y))})"}
+    sustained = np.nanmax(y[last_clean + 1:])
+    return {**out, "horizon": int(tt[last_clean]), "horizon_idx": last_clean, "complete": False,
+            "valid_frac": round(last_clean / max(len(y) - 1, 1), 3),
+            "sustained_peak": int(sustained),
+            "why": (f"last frame with {key} < {first_bar} was {int(tt[last_clean])}; damage from "
+                    f"there never recovers (reaching {int(sustained)}). First damage anywhere: "
+                    f"frame {out['first_damage']}.")}
 
 
 def report(run_dir, write=True):

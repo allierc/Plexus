@@ -223,17 +223,71 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         print(f"[{name}] 🔴 SATURATED: {int(fm['n_cells'][-1])} cells vs buffer {cbuf}. "
               f"This run is NOT evidence -- raise the buffer or bound proliferation.", flush=True)
 
+    # --------------------------------------------------------------- THE EVIDENCE HORIZON
+    # 0A-7. `protr_peak` used to be max() over EVERY recorded frame with no validity filter. When
+    # a mesh tears apart, cells fly outward and that number spikes -- and the spike BECAME THE
+    # SCORE (score_run weights protr_peak). So the search was not merely tolerating broken meshes,
+    # it was PAID to produce them: the most elongated run in the overnight study read 32.7 with
+    # 84% of its cells flagged. Run long enough, any search under that rule discovers that the
+    # cheapest way to score well is to blow the tissue apart, and reports it as the best mechanism
+    # found.
+    #
+    # The rule is NOT "a broken mesh is not evidence" -- that was too strong (Cedric): if the mesh
+    # fails at frame 380 of 400 the first 379 frames are sound physics. Instead every measurement
+    # is taken strictly BEFORE the first frame at which the mesh stops being valid, and the
+    # horizon is recorded so a reader can see how much of the run counted.
+    #
+    # It keys on `broken_n` ONLY -- under-connected cells and rings that are not polygons. NOT the
+    # legacy blend: that is dominated by just-divided slivers (r=+0.94 with the tip-cell count,
+    # while broken stayed at 0 for 300 frames), so thresholding it would penalise the tissue for
+    # dividing, i.e. for doing the thing we want.
+    horizon = {"horizon": None, "why": "not computed"}
+    hz_i = len(fm["protr"]) - 1
+    try:
+        import curve_shape as _CS
+        _mn = os.path.join(out_dir, "metrics.npz")
+        if os.path.exists(_mn):
+            _z = np.load(_mn)
+            if "broken_n" in _z.files:
+                horizon = _CS.evidence_horizon({}, {"broken_n": _z["broken_n"]},
+                                               _z["frame"] if "frame" in _z.files else None)
+                if horizon.get("horizon") is not None and not horizon.get("complete", True):
+                    hz_i = min(hz_i, max(0, int(horizon["horizon"])))
+            else:
+                horizon = {"horizon": None, "why": "metrics.npz carries no broken_n"}
+        else:
+            horizon = {"horizon": None, "why": "no metrics.npz (tube_analysis did not run)"}
+    except Exception as e:
+        # Loud, not silent: if the horizon cannot be computed we must not quietly fall back to
+        # scoring the whole run, because that is the behaviour being fixed.
+        horizon = {"horizon": None, "why": f"{type(e).__name__}: {str(e)[:90]}"}
+    if horizon.get("horizon") is None:
+        print(f"[{name}] ⚠ no evidence horizon ({horizon['why']}) -- peak/final are taken over "
+              f"ALL {len(fm['protr'])} frames, which is the un-truncated behaviour", flush=True)
+    elif hz_i < len(fm["protr"]) - 1:
+        print(f"[{name}] evidence horizon at frame {horizon['horizon']}: peak/final taken over "
+              f"the first {hz_i + 1} of {len(fm['protr'])} frames", flush=True)
+
+    _valid = fm["protr"][:hz_i + 1] or fm["protr"]
+
     # retention = final/peak aspect. A FORCED protrusion peaks then collapses (low retention);
     # an EQUILIBRIUM one holds (high). Computable from the archived per-frame table for every
     # run without re-simulating -- the D7 payoff -- and a cheap proxy for the full Q test.
-    _pk = max(fm["protr"]) if fm["protr"] else 0.0
-    retention = (fm["protr"][-1] / _pk) if _pk > 1e-9 else 0.0
+    _pk = max(_valid) if _valid else 0.0
+    retention = (_valid[-1] / _pk) if _pk > 1e-9 else 0.0
 
     summary = {"saturated": bool(saturated), "inert_operators": inert,
                "retention": round(retention, 3),
                "valid_evidence": bool(not inert and not saturated),
-               "protr_final": round(fm["protr"][-1], 3),
-               "protr_peak": round(max(fm["protr"]), 3),
+               "protr_final": round(_valid[-1], 3),          # last VALID frame, not last frame
+               "protr_peak": round(max(_valid), 3),           # over VALID frames only
+               "horizon_frame": horizon.get("horizon"),
+               "horizon_why": horizon.get("why"),
+               "first_damage_frame": horizon.get("first_damage"),
+               "valid_frac": horizon.get("valid_frac", 1.0),
+               # kept so the truncation is auditable and the change is visible in the record
+               "protr_peak_untruncated": round(max(fm["protr"]), 3),
+               "protr_final_untruncated": round(fm["protr"][-1], 3),
                "n_cells_final": int(fm["n_cells"][-1]),
                "red_frac_final": round(fm["red_frac"][-1], 3),
                "act_max_final": round(fm["act_max"][-1], 3),
