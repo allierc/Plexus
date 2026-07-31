@@ -261,6 +261,42 @@ def p4_chemistry_not_extinguished(cfg, s):
              f"loses.", dict(peak=peak, end=float(a[-1]), ratio=ratio))
 
 
+def p11_tissue_does_not_pass_through_itself(cfg, s):
+    """Two parts of the same epithelium cannot occupy the same space. A tissue is a physical body.
+
+    GENUS DOES NOT CATCH THIS, and assuming it did produced a wrong conclusion that had to be
+    retracted. Euler characteristic is COMBINATORIAL -- it reads connectivity, not coordinates --
+    so a shell folded seventeen layers through itself still reports genus 0, "sphere (as built)".
+    Measured on mini_grow_divide_bigger: genus 0 at every single frame, while rays cast from the
+    tissue centroid go from 100% single crossings at frame 384 to 0% (median 13) at frame 423. The
+    buckling transition was reported as physical on the strength of the genus check alone, and the
+    state it produces is not a tissue at all.
+
+    The likely cause in that run: the radial spring's target R0 is frozen at the seed radius while
+    the cells' target volumes grow sixteenfold, so the mechanics holds the shell at radius 5 while
+    the cells demand far more area than a sphere of that radius has. It has nowhere to go but
+    through itself.
+    """
+    fr = _col(s, "ray_single_frac")
+    if fr is None:
+        return R("P11", "passive", "tissue cannot pass through itself", "na",
+                 "ray_single_frac not recorded (run predates the self-intersection test)")
+    worst = float(np.nanmin(fr))
+    if worst >= 0.95:
+        return R("P11", "passive", "tissue cannot pass through itself", "pass",
+                 f"at every frame at least {worst:.1%} of rays cross the surface exactly once",
+                 dict(worst_single_frac=worst))
+    bad = int(np.argmin(fr))
+    f0 = int(s[bad].get("frame", bad))
+    med = s[bad].get("ray_cross_med")
+    return R("P11", "passive", "tissue cannot pass through itself", "fail",
+             f"the surface folds through itself: at frame {f0} only {worst:.1%} of rays cross it "
+             f"once, with a median of {med} crossings. A sheet {med} layers deep through its own "
+             f"centre is not a tissue, whatever the topology says -- genus is combinatorial and "
+             f"reports 'sphere' throughout. Every shape reading past this frame is meaningless.",
+             dict(worst_single_frac=worst, first_bad_frame=f0, median_crossings=med))
+
+
 def p5b_relaxation_keeps_up(cfg, s, mech=None):
     """#5 part B. The premise forbids UNRELAXED TRANSIENTS, not stress.
 
@@ -429,7 +465,8 @@ def p6_resting_vesicle_rests(cfg, device="cpu", frames=40, tol=0.03):
 # --------------------------------------------------------------------------- driver
 STATIC = [p2_gate_implies_baseline, p3_ceiling_above_trigger, p5_biology_advances_in_biological_time]
 PASSIVE = [p1_tissue_gains_material, p3b_mean_cell_volume_holds, p4_chemistry_not_extinguished,
-           p7_no_absorbing_area_by_stretching, p8_shape_index_floor, p9_closed_sphere]
+           p7_no_absorbing_area_by_stretching, p8_shape_index_floor, p9_closed_sphere,
+           p11_tissue_does_not_pass_through_itself]
 
 
 def _mech(run):

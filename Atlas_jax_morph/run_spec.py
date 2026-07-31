@@ -51,6 +51,17 @@ LOG_DIR = os.path.join(PLEXUS, "log", "atlas")
 # ------------------------------------------------------------------------------------------- #
 #  the acted ledger
 # ------------------------------------------------------------------------------------------- #
+def _edge_sig(lvl):
+    """A cheap fingerprint of a set's relation, so a rewire operator's work is visible."""
+    e = getattr(lvl, "edge_index", None)
+    if e is None:
+        return None
+    try:
+        return (int(e.shape[-1]), float(e.sum()))
+    except Exception:
+        return None
+
+
 def install_acted_ledger():
     """Wrap every operator the engine instantiates so we can tell doing from being scheduled.
 
@@ -71,18 +82,25 @@ def install_acted_ledger():
         class Watched(cls):                       # noqa: N801 -- a decorator would re-register
             def forward(self, H, mask=None):
                 rec = ledger.setdefault(name, {"calls": 0, "acted": 0, "moved": 0.0,
+                                               "kind": getattr(cls, "KIND", None),
                                                "structural": bool(
                                                    getattr(cls, "MAY_MUTATE_INTEGRATED_STATE",
                                                            False))})
-                before = {n: int(l.active.sum()) for n, l in H.levels.items()}
+                # THREE ways an operator can act, and only the first is a delta. The smoke run
+                # caught this on its first outing: `radius_graph` was reported INERT because a
+                # rewire operator moves nothing -- it rebuilds `edge_index`. A ledger that can
+                # only see deltas would have condemned every rewire in the library.
+                before_n = {n: int(l.active.sum()) for n, l in H.levels.items()}
+                before_e = {n: _edge_sig(l) for n, l in H.levels.items()}
                 out = super().forward(H, mask)
                 rec["calls"] += 1
                 moved = 0.0
                 for d in (out or {}).values():
                     if isinstance(d, torch.Tensor) and d.numel():
                         moved = max(moved, float(d.abs().max()))
-                after = {n: int(l.active.sum()) for n, l in H.levels.items()}
-                if moved > 0 or before != after:
+                after_n = {n: int(l.active.sum()) for n, l in H.levels.items()}
+                after_e = {n: _edge_sig(l) for n, l in H.levels.items()}
+                if moved > 0 or before_n != after_n or before_e != after_e:
                     rec["acted"] += 1
                     rec["moved"] = max(rec["moved"], moved)
                 return out

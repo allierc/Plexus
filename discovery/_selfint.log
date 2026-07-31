@@ -1,0 +1,12 @@
+[engine] 460 sim frames -> recording 461 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === mini_grow_divide_bigger ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=460
+[engine] sets:      cell(16000)  vertex(30000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d
+frame  cells   rays with 1 crossing   median crossings   max
+  300   1766        100.0%                1          1
+  384   3271        100.0%                1          1
+  410   3904         75.8%                1          5
+  423   4265          0.0%               13         17
+  440   4940          0.0%               17         19
+  459   5558          0.0%               17         21

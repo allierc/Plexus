@@ -3,59 +3,80 @@ order: 13
 raw_name: PairwisePotential
 raw_kind: potential (Potential)
 code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L128
-paper_section: "p. 9, 'Mechanical interactions', eq. V_ij(r) (also fig. 1d; SI p. 14 'Mechanical Interactions')"
-summary: >-
-  The abstract base for every soft-matter pair interaction. Given a subclass's elementwise
-  pair_energy(r, *params) and per-pair pair_params(state), it derives the cluster's total
-  interaction energy (dense N x N, half-summed over live non-self pairs so each unordered pair
-  counts once), the per-cell forces (-grad of that energy w.r.t. position, by autodiff -- no
-  jax-md), and the per-cell virial pressure. It touches NO state field of its own: it is a
-  read-only energy/force/pressure provider that a moving step (relaxation / Brownian) or a stress
-  step consumes. Couplings (epsilon, alpha, k, ...) resolve from a shared scalar or a per-cell
-  field, symmetrised per pair by mix (the arithmetic mean); the contact distance uses a separate
-  additive rule sigma = r_i + r_j so interactions stay size-consistent as cells grow.
-equations: |
-  Given a subclass's pair energy U(r; p_1..p_k) and pair_params(state) -> (p_1..p_k), each an
-  (N,N) matrix broadcastable with r:
-
-    separation:    r_ij = safe_norm( displacement(pos_i, pos_j) )         # (N,N); 0 on the i==i diagonal
-    total energy:  E    = 0.5 * sum_i sum_{j != i, alive_i & alive_j} U(r_ij; p_ij)
-                          # neighbor_sum masks self & dead pairs; the 0.5 dedups the symmetric double count
-    forces:        F_i  = -dE / d(pos_i)                                  # jax.grad, inherited from Potential; NO jax-md force law
-    virial press.: p_i  = -(1 / (2 d V_i)) * sum_{j != i, alive} r_ij * (dU/dr)(r_ij) * alive_i
-                          # Irving-Kirkwood one-half bond split; d = n_space_dim;
-                          # V_i = 2 r_i (d=1) | pi r_i^2 (d=2) | 4/3 pi r_i^3 (d=3); dead cell -> 0
-    coupling:      shared scalar c        -> broadcast_to (N,N)
-                   per-cell field spec f  -> mix( state.f )
-    mix (default): M_ij = 0.5 (v_i + v_j)                                 # arithmetic mean: no sqrt -> finite grad at 0/dead cells
-
-  Concrete Morse (paper eq., p.9) -- the one instance the paper actually describes:
-    U(r) = eps * [ (1 - exp(-alpha (r - sigma)))^2 - 1 ],   sigma = r_i + r_j
-  In code (Morse.pair_energy) this is additionally multiplied by a sigma-relative smooth cutoff
-  that the paper's V_ij does not mention.
+paper_section: p. 9, 'Mechanical interactions', eq. V_ij(r) (also fig. 1d; SI p. 14 'Mechanical Interactions')
+summary: 'The abstract base for every soft-matter pair interaction. Given a subclass''s elementwise pair_energy(r,
+  *params) and per-pair pair_params(state), it derives the cluster''s total interaction energy (dense
+  N x N, half-summed over live non-self pairs so each unordered pair counts once), the per-cell forces
+  (-grad of that energy w.r.t. position, by autodiff -- no jax-md), and the per-cell virial pressure.
+  It touches NO state field of its own: it is a read-only energy/force/pressure provider that a moving
+  step (relaxation / Brownian) or a stress step consumes. Couplings (epsilon, alpha, k, ...) resolve from
+  a shared scalar or a per-cell field, symmetrised per pair by mix (the arithmetic mean); the contact
+  distance uses a separate additive rule sigma = r_i + r_j so interactions stay size-consistent as cells
+  grow.'
+equations: "Given a subclass's pair energy U(r; p_1..p_k) and pair_params(state) -> (p_1..p_k), each an\n\
+  (N,N) matrix broadcastable with r:\n\n  separation:    r_ij = safe_norm( displacement(pos_i, pos_j)\
+  \ )         # (N,N); 0 on the i==i diagonal\n  total energy:  E    = 0.5 * sum_i sum_{j != i, alive_i\
+  \ & alive_j} U(r_ij; p_ij)\n                        # neighbor_sum masks self & dead pairs; the 0.5\
+  \ dedups the symmetric double count\n  forces:        F_i  = -dE / d(pos_i)                        \
+  \          # jax.grad, inherited from Potential; NO jax-md force law\n  virial press.: p_i  = -(1 /\
+  \ (2 d V_i)) * sum_{j != i, alive} r_ij * (dU/dr)(r_ij) * alive_i\n                        # Irving-Kirkwood\
+  \ one-half bond split; d = n_space_dim;\n                        # V_i = 2 r_i (d=1) | pi r_i^2 (d=2)\
+  \ | 4/3 pi r_i^3 (d=3); dead cell -> 0\n  coupling:      shared scalar c        -> broadcast_to (N,N)\n\
+  \                 per-cell field spec f  -> mix( state.f )\n  mix (default): M_ij = 0.5 (v_i + v_j)\
+  \                                 # arithmetic mean: no sqrt -> finite grad at 0/dead cells\n\nConcrete\
+  \ Morse (paper eq., p.9) -- the one instance the paper actually describes:\n  U(r) = eps * [ (1 - exp(-alpha\
+  \ (r - sigma)))^2 - 1 ],   sigma = r_i + r_j\nIn code (Morse.pair_energy) this is additionally multiplied\
+  \ by a sigma-relative smooth cutoff\nthat the paper's V_ij does not mention.\n"
 params:
-  "(base class has no constructor fields)": "PairwisePotential is abstract -- it declares no eqx fields; all tunables live on the concrete subclasses (Morse.epsilon/alpha, SoftSphere.epsilon, Harmonic.k, ...). The three entries below are the mechanism's actual tunable surface."
-  pair_energy: "extension_point (method): the elementwise interaction-energy law U(r, *params) -> (N,N); abstract here (raises NotImplementedError). Sets the potential shape (repulsive core / adhesive tail)."
-  pair_params: "extension_point (method): builds the per-pair (N,N) parameter matrices from state (e.g. sigma = r_i + r_j, epsilon, alpha); abstract here. Where a coupling becomes size-consistent."
-  mix: "pair_combination_rule: turns a per-cell coupling v (N,) into a symmetric per-pair coupling 0.5(v_i + v_j); default arithmetic mean, overridable (e.g. geometric mean / Lorentz-Berthelot)."
-  "coupling (epsilon/alpha/k/...)": "interaction_coupling: each subclass coupling is EITHER a shared scalar (broadcast to every pair) OR a per-cell StateFieldSpec of shape () read from state and mixed per pair; per-type or per-cell ARRAYS are rejected by __check_init__."
+  (base class has no constructor fields): PairwisePotential is abstract -- it declares no eqx fields;
+    all tunables live on the concrete subclasses (Morse.epsilon/alpha, SoftSphere.epsilon, Harmonic.k,
+    ...). The three entries below are the mechanism's actual tunable surface.
+  pair_energy: 'extension_point (method): the elementwise interaction-energy law U(r, *params) -> (N,N);
+    abstract here (raises NotImplementedError). Sets the potential shape (repulsive core / adhesive tail).'
+  pair_params: 'extension_point (method): builds the per-pair (N,N) parameter matrices from state (e.g.
+    sigma = r_i + r_j, epsilon, alpha); abstract here. Where a coupling becomes size-consistent.'
+  mix: 'pair_combination_rule: turns a per-cell coupling v (N,) into a symmetric per-pair coupling 0.5(v_i
+    + v_j); default arithmetic mean, overridable (e.g. geometric mean / Lorentz-Berthelot).'
+  coupling (epsilon/alpha/k/...): 'interaction_coupling: each subclass coupling is EITHER a shared scalar
+    (broadcast to every pair) OR a per-cell StateFieldSpec of shape () read from state and mixed per pair;
+    per-type or per-cell ARRAYS are rejected by __check_init__.'
 state_io:
   reads:
-    - position          # cell centres; E = E(position), F = -dE/d(position)
-    - alive             # neighbor_sum live/self masking -- dead cells and self-pairs contribute 0
-    - radius            # virial_pressure cell d-ball volume V_i; and (in subclass pair_params) the contact distance sigma = r_i + r_j
-    - displacement      # STATIC space metric (free / periodic), a function not a data array -> pairwise separations
-    - n_space_dim       # derived from position.shape[1]; selects the d-ball volume formula in virial_pressure
-    - "<coupling field>"  # only when a coupling is a StateFieldSpec (declared by state_reads()); e.g. a per-cell epsilon / cadherin field an upstream step sets
-  writes: []            # NONE. PairwisePotential writes no state; it returns energy / forces / pressure to a wrapping step (MechanicalRelaxation, BrownianDynamics, VirialStress) that does the writing.
+  - position
+  - alive
+  - radius
+  - displacement
+  - n_space_dim
+  - <coupling field>
+  writes: []
 surprises:
-  - "SOURCE vs PAPER: the paper (Methods, p. 9, line 498) says 'JAX-MD was used to perform molecular dynamics simulations for cell mechanics', but the source computes forces by autodiff of the energy with NO jax-md dependency (module docstring: 'forces come from autodiff of the energy, with no jax-md dependency'). SOURCE WINS -- a reimplementer trusting the paper would pull in jax-md and a hand-coded force law this code deliberately avoids."
-  - "The 0.5 in total_energy is a DOUBLE-COUNT dedup, not a bond split: neighbor_sum already sums every ordered (i,j) with j!=i, and U is symmetric, so each unordered pair appears twice; the 0.5 corrects it. Drop it and you double both energy AND force."
-  - "virial_pressure's factor of 2 is a DIFFERENT 1/2: it is the Irving-Kirkwood one-half bond split (each pair's virial shared between its two cells), NOT the total_energy double-count dedup (there neighbor_sum already gives cell i its full per-cell virial). Conflating the two halves is easy and wrong."
-  - "mix is the ARITHMETIC mean 0.5(v_i+v_j), not the geometric / Lorentz-Berthelot mean standard in MD. Chosen for a finite gradient everywhere (no sqrt at zero / dead cells under the always-on jax_debug_nans). The additive contact rule sigma = r_i + r_j is a SEPARATE convention the subclasses apply in pair_params, not routed through mix."
-  - "Couplings are restricted to a shared scalar OR a per-cell scalar StateFieldSpec; per-TYPE and per-cell ARRAYS are rejected at construction (__check_init__). So heterotypic adhesion (the paper's type x type 'cadherin' matrix, p. 20) cannot be an arbitrary type-type interaction matrix here -- it must be encoded as a per-cell scalar field, and every pair coupling is then forced to be the MEAN of two per-cell values. A real expressiveness limit vs the paper's differential-adhesion story."
-  - "pair_energy is evaluated on the i==i diagonal (r=0 via safe_norm) and on dead-dead padded pairs even though neighbor_sum masks them out of the SUM -- and jax.grad still flows through those masked entries. So every subclass MUST be value- AND gradient-safe at r=0 (LJ uses safe_divide(sigma, r); the compact repulsions use a double-where). A naive 1/r would NaN under debug_nans despite the mask."
-  - "forces() lives on the Potential base (line 84), so PairwisePotential inherits force = -jax.grad(total_energy). Any custom energy (not just pairwise) can subclass Potential directly and get forces for free; NoForce (line 108) overrides forces to zeros to skip the O(N^2) autodiff entirely."
+- 'SOURCE vs PAPER: the paper (Methods, p. 9, line 498) says ''JAX-MD was used to perform molecular dynamics
+  simulations for cell mechanics'', but the source computes forces by autodiff of the energy with NO jax-md
+  dependency (module docstring: ''forces come from autodiff of the energy, with no jax-md dependency'').
+  SOURCE WINS -- a reimplementer trusting the paper would pull in jax-md and a hand-coded force law this
+  code deliberately avoids.'
+- 'The 0.5 in total_energy is a DOUBLE-COUNT dedup, not a bond split: neighbor_sum already sums every
+  ordered (i,j) with j!=i, and U is symmetric, so each unordered pair appears twice; the 0.5 corrects
+  it. Drop it and you double both energy AND force.'
+- 'virial_pressure''s factor of 2 is a DIFFERENT 1/2: it is the Irving-Kirkwood one-half bond split (each
+  pair''s virial shared between its two cells), NOT the total_energy double-count dedup (there neighbor_sum
+  already gives cell i its full per-cell virial). Conflating the two halves is easy and wrong.'
+- mix is the ARITHMETIC mean 0.5(v_i+v_j), not the geometric / Lorentz-Berthelot mean standard in MD.
+  Chosen for a finite gradient everywhere (no sqrt at zero / dead cells under the always-on jax_debug_nans).
+  The additive contact rule sigma = r_i + r_j is a SEPARATE convention the subclasses apply in pair_params,
+  not routed through mix.
+- Couplings are restricted to a shared scalar OR a per-cell scalar StateFieldSpec; per-TYPE and per-cell
+  ARRAYS are rejected at construction (__check_init__). So heterotypic adhesion (the paper's type x type
+  'cadherin' matrix, p. 20) cannot be an arbitrary type-type interaction matrix here -- it must be encoded
+  as a per-cell scalar field, and every pair coupling is then forced to be the MEAN of two per-cell values.
+  A real expressiveness limit vs the paper's differential-adhesion story.
+- pair_energy is evaluated on the i==i diagonal (r=0 via safe_norm) and on dead-dead padded pairs even
+  though neighbor_sum masks them out of the SUM -- and jax.grad still flows through those masked entries.
+  So every subclass MUST be value- AND gradient-safe at r=0 (LJ uses safe_divide(sigma, r); the compact
+  repulsions use a double-where). A naive 1/r would NaN under debug_nans despite the mask.
+- forces() lives on the Potential base (line 84), so PairwisePotential inherits force = -jax.grad(total_energy).
+  Any custom energy (not just pairwise) can subclass Potential directly and get forces for free; NoForce
+  (line 108) overrides forces to zeros to skip the O(N^2) autodiff entirely.
 verdict: null
 of: null
 why: null

@@ -36,3 +36,38 @@ did not numerically execute them here. I did not exhaustively audit every notebo
 *paper-reproducing* example instantiates this step (I believe none does, consistent with its absence
 from the paper). I left `verdict`/`contract` null per the role split -- novelty vs. the promoted
 `src/plexus/operators/` is the normalizer's call.
+
+---
+
+**NORMALIZER -- verdict `new`, contract `reorient` (polarity/cell, exchange; reads/writes
+`heading`).** ABP2D is a composite step and decomposes into three legs, only one of which the
+promoted language lacks. The passive drift `F/gamma` is a registered pair potential under an
+overdamped mobility (alias). The self-propulsion `v0*e` + translational noise `std_t` is *exactly*
+`glide` with its `noise` param -- an exact param map (`active_speed`->`move_speed`,
+`active_heading`->`heading`, `std_t`->`glide.noise`), and glide even carries the `active_brownian`
+tag (alias). The one uncovered leg is the **rotational diffusion of the persistent heading**
+(`dtheta = sqrt(2 D_r dt) * xi_r`, zero-drift): a single-body, neighbour-independent Brownian
+rotation of the cell's own orientation that no registered operator performs. It is the
+orientational-decorrelation half of an ABP -- the thing that gives the walk a finite persistence
+length and its ballistic->diffusive crossover, and in the `kT=0` textbook limit the *only* source of
+wandering. Telling evidence it is a genuine gap and not an oversight: the prototype
+`candidates/motility.py` bundled propulsion **and** `cell.heading += rot*randn` in one class; the
+promotion to `glide` split off the propulsion and **dropped** the diffusion. Neither closest contract
+can widen without violence -- `glide` is deliberately propulsion-only (reads heading, never writes
+it; a heading write breaks its composition with the polarity family), and `polarity_align`/
+`polarity_flow_align` are *social, deterministic* steering that return `{}` for an isolated cell, the
+opposite of a targetless stochastic decorrelation.
+
+**Strongest argument AGAINST this verdict (and why I still hold it):** the honest challenge is that
+this should be a flat **alias of `glide`**, not `new`. glide's own docstring advertises "glide +
+noise = an active Brownian walker" and tags itself `active_brownian`; if the promoted operator
+already *claims* to be the ABP, then recording a `new` contract inflates the yield -- exactly the
+failure this loop exists to prevent -- and I am splitting hairs over an implementation detail of how
+the heading is maintained. I reject it because glide's claim over-reaches: glide never writes
+`heading`, so a glide walker has a **fixed** (or externally-steered) direction and is a persistent
+*ballistic* walker with translational jitter, which is not an ABP -- the defining ABP physics
+(persistence length `~v0/D_r`, the long-time crossover, and the `kT=0` case where translation is
+deterministic) lives entirely in the `D_r` rotational diffusion glide dropped. So the alias would
+record a coverage the language does not actually have. The counter-inflation guard is that I scope
+`new` to the reorientation leg *only* (2 of 3 legs are explicitly logged as aliases), so the marginal
+yield is one contract, not a whole "active dynamics" operator.

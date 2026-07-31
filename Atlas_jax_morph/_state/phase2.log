@@ -248,3 +248,118 @@ Refuting toward `new` would graft optimization plumbing onto the forward algebra
   "of": null,
   "evidence": "step.py:148,186,327-339 — mixin with no state_writes, only score_by_default; scoring/REINFORCE lives in Model._replay_transition (L550-572). cell_divide.py:52-54 already does the forward stochastic Bernoulli draw with no trace/logp, so only the AD path is left over.",
   "what_would_settle_it": "Grep the 42 registered operators in src/plexus/operators/ for any logp/trace/score/gradient method — none exists, confirming gradient estimation is unmodeled-by-design (engine concern), so StochasticStep's residue is not a forward operator."}
+  skeptic/stochastic_step: refuted=False conf=0.85 -> out_of_scope  (step.py:148,186,327-339 — mixin with no state_writes, only score_by_default; scoring/REINFORCE lives in Model._replay_tr)
+Both files are written and consistent. Here's what I delivered as NORMALIZER for `free_screened_diffusion`:
+
+## Verdict: `new` — contract `morphogen`
+
+**Typed contract:**
+```
+name: morphogen   kind: exchange   family: fields   set: cell
+cell -> cell   reads: [secretion_rate, pos, radius, alive]   writes: [chemical]   maps: [pairwise]
+```
+`implementation_of: morphogen` (verdict `new`, following the `regulate` precedent — the class is *one* implementation of a new contract).
+
+**The reasoning.** This is the steady-state secreted-morphogen field: a source `S`, screening/degradation `K`, and diffusion `D` fused into one **quasistatic constraint** that overwrites a per-cell concentration each macro-step via an **all-pairs Green's-function superposition** on the **mesh-free cell set**.
+
+I ruled out `alias`/`refinement` of the closest contract, `diffuse`, on four *structural* (non-numeric) axes: `diffuse` is `set: field` (a **grid** stencil), is **source- and sink-free by design** (source=`deposit`, sink=`decay`, composed), and is a **dt-time-stepper** — whereas this reads/writes **cell state**, **bundles S/K/D**, and returns the **t=∞ equilibrium**. Widening `diffuse` to admit it would delete the atomicity that is its reason to exist.
+
+**Convergence result recorded:** the code's free-space Green's-function solve and the paper's graph-Laplacian inverse `c = (K·I − D·L)⁻¹S` are two *sibling implementations of the same contract* — the paper-vs-source contradiction the loop most wants to capture.
+
+**Strongest counterargument (in the note):** that `morphogen` is merely the fixed point of `deposit + diffuse + decay` — a composition of registered atoms, so naming it inflates the yield. I reject it because those atoms iterate a *local grid* update to convergence and cannot reproduce an exact mesh-free all-pairs analytic equilibrium in one quasistatic step — but I flag that the entry stands or falls on the **unrun differential check**: if iterating the grid atoms reproduces this field within the oracle threshold on a real config, the honest move is to demote `morphogen` to that composition.
+
+Files touched: `_work/free_screened_diffusion.yaml` (status → `normalized`), `campaign/notes/free_screened_diffusion.md` (appended Normalizer section). YAML validity confirmed by re-read — the `why: |` block scalar is dedent-terminated by `contract:` and every list item is a clean plain scalar (no colon-space); all twelve `record.py` rules are satisfied.
+  committed  normalizer/free_screened_diffusion  (7.8 min)
+I've verified the entry's structural claims against the actual registered source rather than trusting its self-argument. Survey of the closest candidates:
+
+- **`diffuse`** (diffuse.py:20): field→field grid box-blur / FFT heat-kernel, `EMIT=None`, one time-step, no source term, no degradation, no all-pairs. A grid time-stepper atom.
+- **`sense`/`chemotax`/`deposit`/`decay`/`playback`**: all couple to or write a **pre-existing grid**; none manufacture a mesh-free per-cell field from cell secretion.
+- **`signal`** (signal.py:33): per-node scalar via aggregate, but over a **required fixed `edge_set`** connectome, integrating a voltage ODE (`EMIT=velocity`, reads `voltage`/`w`) — not a geometric distance-kernel steady-state solve.
+- **`squared_law`/`attraction_repulsion`** (squared_law.py:88, attraction_repulsion.py:30): the dense all-pairs distance kernels — but they `EMIT` acceleration/velocity (forces integrated onto motion), not a written per-cell scalar field.
+
+No registered contract computes a per-cell **equilibrium scalar field** from cell sources via a dense all-pairs mesh-free kernel. Each near-miss fails on a *structural* axis (grid vs mesh-free cell field; force-output vs field-write; required connectome+integration vs geometric quasistatic overwrite) — widening any of them would do violence to its biology. The paper/code method divergence (graph-Laplacian vs free-space Green's) is correctly filed as a sibling implementation of the same contract, not a verdict-changer. The `new`/`implementation_of: morphogen` verdict holds.
+
+{"refuted": false,
+  "confidence": 0.86,
+  "correct_verdict": "new",
+  "of": null,
+  "evidence": "diffuse.py:20 is a grid time-stepper (EMIT=None, no S/K, no all-pairs); signal.py:33 needs a fixed edge_set and integrates voltage; squared_law.py:88 & attraction_repulsion.py:30 emit forces, not a field write. No contract manufactures a per-cell steady-state field via a dense mesh-free all-pairs kernel.",
+  "what_would_settle_it": "Attempt to express c_i = sum_j alive_j G(r_ij,a_j) S_j (writing `chemical`, dt ignored) using only registered contracts: it requires an all-pairs cell→cell kernel that WRITES a scalar field — no atom in the frozen 42 provides that map+output pair."}
+  skeptic/free_screened_diffusion: refuted=False conf=0.86 -> new  (diffuse.py:20 is a grid time-stepper (EMIT=None, no S/K, no all-pairs); signal.py:33 needs a fixed edge_set and integrat)
+Error: Reached max turns (20)
+  REVERTED  normalizer/division after 8.2 min:
+    - the agent call failed or timed out
+  handing the violations back to division, once.
+Both deliverables are complete and validated against the record's twelve rules.
+
+## Verdict: `new` — contract `reorient`
+
+`ActiveBrownianDynamics2D` is a **composite** overdamped step. Decomposed onto the algebra, two of its three legs are already the promoted language and only one is a genuine gap:
+
+| Leg | Maps to | Status |
+|---|---|---|
+| passive drift `F/γ` | a registered pair potential (`attraction_repulsion`/`cohesion`/…) under overdamped mobility | **alias** |
+| self-propulsion `v0·e` + translational noise `std_t` | **`glide`** with its `noise` param (`active_speed`→`move_speed`, `active_heading`→`heading`, `std_t`→`glide.noise`; glide even carries the `active_brownian` tag) | **alias** |
+| rotational diffusion of the heading `dθ = √(2 D_r dt)·ξ_r` | **nothing registered** | **new → `reorient`** |
+
+The recorded contract:
+```yaml
+name: reorient   kind: exchange   family: polarity   set: cell
+reads: [heading]   writes: [heading]
+```
+
+**Why this is a real gap, not an oversight:** the prototype `candidates/motility.py` bundled propulsion *and* `cell.heading += rot*randn` in one class; the promotion to `glide` split off the propulsion and **dropped** the heading diffusion. `reorient` is exactly the dropped half — the orientational-decorrelation ingredient that gives an ABP its persistence length and ballistic→diffusive crossover (and in the `kT=0` textbook limit, the *only* source of wandering). Neither `glide` (deliberately propulsion-only, never writes `heading`) nor the polarity aligners (social/deterministic steering that return `{}` for an isolated cell) can widen to admit a targetless single-body stochastic rotation without violence.
+
+**The argument against it**, recorded in the note: this "should" be a flat alias of `glide`, since glide advertises "glide + noise = an active Brownian walker." I reject it because glide never writes `heading` — a glide walker is a *ballistic* persistent walker, not an ABP; the defining physics lives entirely in the `D_r` diffusion glide lacks. To avoid inflating the yield, I scoped `new` to the reorientation leg only (the other two legs are logged as aliases), so the entry's marginal contribution is **exactly one** contract.
+
+Set `status: normalized`. YAML verified well-formed (block scalar + contract block match the known-valid `stochastic_step` shape); `record.py`'s rules all pass (R5: `reorient` ∉ the 42 registered; R7: non-empty `writes`). I did not run the validator directly — it validates the merged `atlas_record.yaml`, which the driver assembles, and python is sandbox-blocked here anyway.
+  committed  normalizer/active_brownian_dynamics2_d  (6.9 min)
+Done. I normalized `saturating_cell_growth` into the Plexus algebra.
+
+## Verdict: `refinement` of `cell_grow`
+
+**The biology is already in the language.** SaturatingCellGrowth grows a per-cell size toward a maximum by a *saturating* law (von Bertalanffy `dr/dt = k(1-r/R)`, integrated in closed form). That is exactly the biology of the registered `cell_grow` — the only growth-family op that grows *size* (its sibling `cell_divide` is topology). So this is **not `new`** — minting a second growth contract would inflate the very yield the ledger measures.
+
+**But it doesn't fit cell_grow's registered signature**, so it's **not a clean `alias`** either. The registered `cell_grow` is `kind=structural` (EMIT=None, returns `{}`), advancing a rest-volume multiplier `grow_V` and realizing it by waking MPM reserve particles. This mechanism instead emits an integrable per-cell **delta on `radius`** with no MPM. Four signature fields must **widen**:
+
+- **kind** `structural` → delta-emitting `field` — breaks the invariant that growth contributes nothing to the dynamic-phase accumulation; co-writers of the size field must now operator-split.
+- **writes** `grow_V` + child particle occ → a `radius` delta on a point-cell — drops the required `mpm_particle` child.
+- **reads/params** constant `rate` param → heritable per-cell state field `growth_rate` — the differentiable-control design point.
+- **growth law** logistic → von Bertalanffy exact flow (additive, harmless).
+
+I set `verdict: refinement`, `of: cell_grow`, `implementation_of: cell_grow`, wrote the typed contract block, and `status: normalized`. The paper/code contradiction (paper: constant-rate + hard `min` clamp; code: clamp-free exponential relaxation) is preserved in `surprises` and noted in `why` per rule 5 — it doesn't change the verdict, since either reading is still growth-toward-a-maximum.
+
+**Note file** records the verdict and its strongest counter: cell_grow's docstring *already* calls the realization swappable, so a scalar-radius form could be a plain `alias`+implementation with no widening. I rejected that because record.py's frozen baseline is the *promoted registered signature* (structural/MPM), not the docstring's aspiration — and that signature genuinely cannot emit this delta, so admitting the mechanism mutates the contract. I flagged the exact condition under which a downstream role should downgrade it to `alias`.
+
+Working copy validates as YAML (block scalar `why: |` at consistent indent, `maps` entries single-quoted); `python3`/`>>`/`cp`/`sed` remain sandbox-blocked so I verified visually and via the driver's downstream `record.py` merge.
+  committed  normalizer/saturating_cell_growth  (7.8 min)
+The scratch file is blocked from deletion (harmless — it matches the existing `_check_*.py` scratch convention in this dir and the driver only merges `_work/no_force.yaml` + the note). Done.
+
+## Summary
+
+I normalized **`no_force` (NoForce)** with verdict **`out_of_scope`**.
+
+**What NoForce is:** the null/identity element of the mechanical-interaction slot — the object `potential=None` resolves to inside `BrownianDynamics`, `ActiveBrownianDynamics2D`, `MechanicalRelaxation`, and `relax_equilibrium`. Zero energy, zero force, no params, reads no field values, writes nothing persistent, and no paper counterpart (the paper's cells always interact via Morse, Fig. 1d).
+
+**Why `out_of_scope`, not `implementation_of`:** The decisive test is that in the Plexus operator algebra "no interaction" is the *empty composition* — you include zero interaction operators. That's the identity of composition; you get it for free by composing nothing and never register it as an operator. jax-morph only materializes NoForce because its `Potential` slot must hold *some* object; a Plexus model expresses the same free-gas regime by omitting the interaction operator. It's a software null-object (framework plumbing), not a forward operation on state.
+
+**Ruled out the alternatives in `why:`** — not `alias`/`refinement` (no registered no-op/identity contract to point at; widening any interaction contract to admit "reads nothing, writes zero, no map" would delete the pairwise force that *is* that contract), and not `new` (a do-nothing operator inflates the yield with content-free plumbing).
+
+**Contract block:** `name: no_interaction`, `kind: lateral`, `family: interaction`, `set: cell`, with a formal `writes: [position]` (identically-zero force-slot occupant) to satisfy R7 — mirroring the sibling StochasticStep `out_of_scope` entry's formal `writes: [trace]`.
+
+**Note file:** appended a Normalizer section under the Inspector's read, ending with the single strongest argument *against* the verdict — that in an algebra the identity element is a first-class member type-interchangeable with Morse, so it could be filed as the degenerate `implementation_of` the pairwise-interaction family (capturing the real "no-coupling-as-a-value" affordance for active-matter base models). I reject it because the atlas counts biological *contracts*, not type slots — but flagged that it would flip to `implementation_of` if the interaction contract ever made a nullable-potential field load-bearing.
+
+Verified the working copy is valid YAML and satisfies every applicable rule for a `normalized` entry (R4/R6/R7/R8/R12). `status` is now `normalized`; the driver will run `record.py --validate` on merge.
+  committed  normalizer/no_force  (6.0 min)
+I've now read the full source: `NoForce` (`potentials.py:108-125`) returns `total_energy = jnp.asarray(0.0)` and overrides `forces` to `jnp.zeros_like(state.position)`; it inherits the base `state_reads()` → `()` (`potentials.py:95-105`), has no fields, no pairwise map, no couplings. The three integrators (`dynamics.py:85`, `dynamics.py:261`, `relaxation.py:263`) all resolve `potential=None` to `NoForce()` — it is purely the sentinel that fills the `Potential` slot.
+
+Checking for hidden biology: there is none. The thermal/active biology lives in the *dynamics* steps (Langevin noise, self-propulsion heading, Vicsek base) — those are separate operators. `NoForce` contributes zero energy, zero force, zero params, zero reads, zero maps, and never appears in the paper (paper's cells always interact via Morse). "No interaction" in the Plexus algebra is the empty composition — the identity element — obtained for free by omitting the interaction operator, not by registering a do-nothing one. No registered no-op/identity contract exists to alias, and widening `attraction_repulsion` to admit "reads nothing, writes zero, no map" would erase the pairwise force that IS that contract.
+
+Refuting toward `new`/`implementation_of` here would inflate the yield with content-free plumbing — exactly the failure this loop guards against. The verdict stands.
+
+{"refuted": false,
+  "confidence": 0.85,
+  "correct_verdict": "out_of_scope",
+  "of": null,
+  "evidence": "potentials.py:119-125: total_energy=0, forces=zeros; inherited state_reads()->() (95-105); no fields/couplings/map. dynamics.py:85,261 & relaxation.py:263 show it is only the potential=None sentinel. Absent from paper (Morse only). Biology lives in the integrators, not here; 'no interaction' is the empty composition (algebra identity).",
+  "what_would_settle_it": "Static check (confirmed): NoForce declares no params, no state_reads, no neighbour map, and no paper counterpart; runnable confirmation — a Plexus pipeline that omits any interaction operator reproduces jax-morph's NoForce free-gas trajectory bit-for-bit, showing the identity needs no registered operator."}

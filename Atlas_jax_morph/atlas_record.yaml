@@ -1069,11 +1069,69 @@ mechanisms:
     reads the base fields position, radius and alive plus the space''s displacement function, none of
     which appear in state_reads(). Wiring dataflow from state_reads() alone would miss the geometric inputs
     the field depends on.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: morphogen
+  why: "No registered contract computes an EQUILIBRIUM CONCENTRATION FIELD from cell sources. This\noperator\
+    \ maps a per-cell secretion rate S to the steady-state concentration of a secreted,\ndiffusible, degradable\
+    \ signal, sampled at every cell -- the developmental MORPHOGEN gradient\n(source + diffusion + degradation,\
+    \ relaxed to steady state). It is quasistatic: dt and key\nare ignored; the field is OVERWRITTEN each\
+    \ macro-step with the t=infinity solution, computed\nas an all-pairs superposition of screened-diffusion\
+    \ Green's functions over the cell set.\n\nClosest registered contract: `diffuse` (field/fields). Widening\
+    \ `diffuse` to admit this\nwould do violence to its biology on four structural axes, none of them\
+    \ numeric:\n  (1) SET / state. `diffuse` is `set: field` -- it reads and writes a GRID field in place\n\
+    \      (a 3x3 box-blur, or an FFT heat-kernel step). This reads and writes CELL state\n      (secretion_rate\
+    \ -> chemical) with NO grid at all; the field is mesh-free, sampled at\n      cell centers. Different\
+    \ typed signature, not a discretization choice.\n  (2) ATOMICITY. `diffuse` is deliberately the ATOM\
+    \ of transport: source is `deposit`, sink\n      is `decay`, and reaction-diffusion is BUILT by composing\
+    \ deposit + diffuse + decay.\n      This operator BUNDLES all three -- it carries a source term S,\
+    \ a degradation / screening\n      rate K, and diffusion D fused into one contract. `diffuse` has\
+    \ no S or K slot; adding\n      them deletes the atomicity that is its whole reason to exist.\n  (3)\
+    \ DYNAMICS. Both `diffuse` implementations advance the field by dt (rate*dt lerp;\n      exp(-D k^2\
+    \ dt) kernel) -- they are time-steppers. This IGNORES dt and returns the\n      steady-state equilibrium\
+    \ (a CONSTRAINT solve, quasistatic), a different KIND of\n      operator, not a longer time step.\n\
+    \  (4) COUPLING. `diffuse` is a LOCAL stencil (a cell talks only to its grid neighbours).\n      This\
+    \ is a DENSE all-pairs cell -> cell kernel (each cell reads every live source's\n      Green's function).\
+    \ Different map.\n\nThe strongest argument AGAINST `new`: this is just deposit + diffuse + decay run\
+    \ to steady\nstate, i.e. a COMPOSITION of registered atoms, not a new contract. It is not. Those three\n\
+    atoms iterate a LOCAL update on a GRID and would have to be run to convergence, giving a\ndifferent\
+    \ discretization with grid-dependent boundaries; this computes the EXACT mesh-free\nequilibrium ANALYTICALLY\
+    \ in one shot on the cell set. You cannot wire the three grid atoms to\nreproduce the analytic all-pairs\
+    \ steady-state solve on the particle set -- that solve IS the\nnew mechanism.\n\nOther near-misses\
+    \ fail too. `signal` (lateral/interaction) also produces a per-node scalar\nfrom other nodes, but\
+    \ over a FIXED edge-set connectome (MAPS [pre, post], REQUIRES_PARAMS\nedge_set) as a first-order\
+    \ INTEGRATED voltage ODE (EMIT velocity); this has no edge set, is a\ndense GEOMETRIC distance kernel,\
+    \ and is a quasistatic OVERWRITE, not an integrated derivative.\n`sense` / `chemotax` / `deposit`\
+    \ (exchange/fields) COUPLE cells to a PRE-EXISTING grid field\n(read its gradient, sample it, or write\
+    \ onto it); this MANUFACTURES the field values from\nscratch -- it is the step that would produce\
+    \ the field they consume. `decay` supplies the\n-K c term alone, on a grid.\n\nSo: `new`, name `morphogen`.\
+    \ This class is the FREE-SPACE Green's-function implementation\n(open boundaries, finite source radius\
+    \ a, dimension-selected segment/disk/sphere kernel); the\npaper's graph-Laplacian inverse c = (K I\
+    \ - D L)^{-1} S (closed/permeable boundaries via an\nadjacency matrix and a ghost sink node, no source\
+    \ radius) is a SIBLING implementation of the\nSAME contract -- two very different numerical methods\
+    \ that collapse to ONE biological operator.\nThat collapse is exactly the convergence the ledger should\
+    \ record, hence\n`implementation_of: morphogen`.\n"
+  contract:
+    name: morphogen
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - secretion_rate (per-cell source rate S, the source_name field -- the only declared read)
+    - pos (cell centers; pairwise distances r_ij drive the kernel -- read but NOT declared in state_reads)
+    - radius (per-SOURCE finite size a, giving r_eff = max(r, a) and the 3-D (1 + kappa*a) term -- undeclared)
+    - alive (source AND receiver liveness mask, applied twice -- undeclared)
+    writes:
+    - chemical (per-cell steady-state screened-diffusion concentration, the field_name; non-heritable,
+      recomputed each step)
+    maps:
+    - pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij,
+      a_j) S_j)
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1265,11 +1323,66 @@ mechanisms:
     mother''s growth propensity on division unless a controller overwrites it.
 
     '
-  verdict: null
-  of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: refinement
+  of: cell_grow
+  implementation_of: cell_grow
+  why: "Refinement of `cell_grow`, the registered growth primitive. Same biology -- a cell grows\ntoward\
+    \ a maximum size by a SATURATING growth law -- so this is NOT `new`: promoting a second\ngrowth contract\
+    \ would inflate the yield the ledger exists to measure. But it does not fit\ncell_grow's REGISTERED\
+    \ signature, so it is not a clean `alias`/drop-in implementation either;\nthe signature must WIDEN,\
+    \ and a refinement nobody costed is a breaking change.\n\nWHAT WIDENS (the typed signature fields):\n\
+    \n- kind: structural -> field (delta-emitting). Registered cell_grow is `structural`\n  (EMIT=None,\
+    \ forward() returns {}): it advances a rest-VOLUME multiplier grow_V by a\n  logistic law and REALIZES\
+    \ it by waking dormant MPM reserve particles in place. This\n  mechanism is a DYNAMIC per-cell relaxation\
+    \ that emits an integrable delta on `radius`\n  (dr = (R-r)(1-exp(-k*dt/R))) and mutates no state\
+    \ directly. Admitting it flips the kind,\n  and that BREAKS the invariant every current cell_grow\
+    \ user relies on -- that growth is\n  structural and contributes NOTHING to the dynamic-phase delta\
+    \ accumulation. Any co-writer\n  of the size field must now operator-split with growth.\n\n- outputs\
+    \ / writes: {} + grow_V + child particle occ  ->  an additive delta on `radius`, a\n  geometric size\
+    \ scalar carried by a point/soft-sphere cell. The realization is a scalar\n  radius, not MPM reserve\
+    \ particles, so the contract can no longer REQUIRE an mpm_particle\n  `child` with a grow_reserve\
+    \ pool.\n\n- reads / params: the growth RATE moves from a constructor scalar `rate` to a per-cell\n\
+    \  HERITABLE STATE FIELD `growth_rate` (default 0), read each macro-step so an upstream\n  controller\
+    \ (gene network / MLP) can drive it and gradients flow back from a morphology\n  objective. That differentiable,\
+    \ per-cell, controllable rate is the whole design point.\n\n- maps (growth law): generalizes from\
+    \ logistic-only (dV/dt = rate*V*(1-V/target)) to a\n  family of saturating laws including the von\
+    \ Bertalanffy EXACT flow used here\n  (dr/dt = k(1-r/R), integrated in closed form -- unconditionally\
+    \ stable, monotone, no\n  min/clamp). This one is additive and breaks nothing.\n\nCLOSEST-CONTRACT\
+    \ check: cell_grow is unambiguously the closest registered contract (the only\nother growth-family\
+    \ op is cell_divide, which is TOPOLOGY, not size). Widening cell_grow does\nless violence than minting\
+    \ a new contract: cell_grow's own contract already declares the\ndiscretisation swappable and the\
+    \ growth LAW the invariant, and a scalar radius on a\npoint-cell is exactly 'another discretisation'\
+    \ of the same cell-growth biology -- so it\nbelongs to the SAME contract, refined, not a fresh one.\n\
+    \nSOURCE-vs-PAPER (recorded in surprises, rule 5): the paper's Methods state constant-rate\nlinear\
+    \ growth with a hard clamp, R(t+dt)=min(R+dR, Rmax); the CODE implements the saturating\nexponential\
+    \ relaxation above with no clamp. The code wins; the disagreement is a genuine\npaper/code contradiction,\
+    \ not a normalization choice, and it does not change the verdict --\neither reading is still cell\
+    \ growth toward a maximum size.\n"
+  contract:
+    name: cell_grow
+    kind: field
+    family: growth
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - radius
+    - growth_rate
+    writes:
+    - radius
+    maps:
+    - growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)),
+      the closed-form integral of dr/dt = k*(1 - r/R); saturating, monotone, unconditionally stable for
+      any dt, no min/clamp
+    - realization = per-cell scalar radius on a point / soft-sphere cell (NO MPM reserve particles); dt-scaling
+      is baked into the returned delta, which is summed with any other radius writers (stable operator-split
+      contribution)
+    - rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step
+      by an upstream controller so gradients flow through it; the sole constructor param is max_radius
+      (a traced, optimizable target)
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1368,11 +1481,60 @@ mechanisms:
     version would need a heading vector/quaternion, not this class. Minor idiom trap: this class sizes
     noise with state.n_cells (= full padded capacity), while the sibling BrownianDynamics uses state.position.shape;
     n_cells here is capacity, NOT the alive count.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: "ActiveBrownianDynamics2D is a COMPOSITE overdamped step; its three legs decompose cleanly onto\n\
+    the algebra and only ONE leg is uncovered -- that leg is the contract recorded here.\n\n(1) The passive\
+    \ drift F/gamma is a pair-potential force under an overdamped mobility: the force\nis any registered\
+    \ pair potential (attraction_repulsion / cohesion / stillinger_weber /\nsquared_law) and 1/gamma is\
+    \ the mobility, so this leg ALIASES an existing contract; it is not new.\n(2) The self-propulsion\
+    \ v0*e plus the translational noise std_t is EXACTLY `glide` (motion/cell):\nglide emits vel = move_speed\
+    \ * heading and adds an isotropic `noise` translational term; its\nMECHANISM_TAGS already read [\"\
+    self_propulsion\",\"motility\",\"active_brownian\"] and its docstring\nstates \"glide + noise = an\
+    \ active Brownian walker\". active_speed -> move_speed, active_heading ->\nheading, std_t -> glide.noise\
+    \ is an exact map, so this leg ALSO aliases an existing contract.\n(3) The ONLY uncovered leg is the\
+    \ rotational diffusion of the persistent heading\n(dtheta = sqrt(2 D_r dt) * xi_r): a single-body,\
+    \ neighbour-independent Brownian rotation of the\ncell's own orientation, ZERO-drift, scored against\
+    \ mean 0. NO registered operator performs it.\nThat is the recorded contract `reorient` (polarity/cell,\
+    \ writes heading) -- the orientational-\ndecorrelation half of an active Brownian particle, the ingredient\
+    \ that gives the walk its finite\npersistence length and its ballistic->diffusive crossover. With\
+    \ kT=0 (the textbook ABP, and an\nexplicitly-supported non-crashing limit here) it is the ONLY source\
+    \ of wandering.\n\nCLOSEST REGISTERED CONTRACTS, and why neither can widen to admit it:\n- `glide`\
+    \ (motion/cell) is closest by mechanism -- it IS the propulsion half of the very same\n  prototype.\
+    \ But glide is deliberately factored to own ONE concern, translational propulsion:\n  EMIT=velocity,\
+    \ it READS heading and never writes it. Widening glide to also WRITE heading (a\n  rot_diffusion channel)\
+    \ grafts heading dynamics onto a position operator and breaks its clean\n  composition with the polarity\
+    \ family, which owns every heading write. The factoring is not\n  incidental: the prototype `candidates/motility.py`\
+    \ bundled propulsion AND heading rotational\n  diffusion (cell.heading += rot*randn) in ONE class;\
+    \ the promotion to `glide` SPLIT OFF the\n  propulsion and DROPPED the diffusion. So the gap in the\
+    \ promoted language is a documented\n  promotion decision, and `reorient` is exactly the dropped half.\n\
+    - `polarity_align` / `polarity_flow_align` (polarity/cell) are the only registered heading-writers,\n\
+    \  so `reorient` is their sibling and shares their kind/family. But both are SOCIAL, DETERMINISTIC\n\
+    \  steering: they relax the heading toward a TARGET (neighbour-mean heading, or the tissue flow) and\n\
+    \  return {} for an isolated cell with no neighbours / no flow. reorient is the opposite -- a\n  single-body\
+    \ STOCHASTIC decorrelation with no target and no coupling; widening an alignment\n  operator to also\
+    \ inject free rotational noise when isolated would conflate \"align to a target\"\n  with \"spontaneously\
+    \ randomize\", two distinct biological concerns.\n\nRecording only the reorientation leg as `new`\
+    \ (not the whole step, and not a flat alias of glide)\nis the non-inflating call: 2 of 3 legs are\
+    \ already in the language, so the entry's true marginal\nyield is exactly one contract. SOURCE-vs-PAPER\
+    \ (see surprises): the paper's mechanics is passive\nMorse-potential energy minimization -- no self-propulsion,\
+    \ heading, or rotational diffusion appears\nanywhere in the paper; the whole active step, this contract\
+    \ included, is a library-side\ngeneralization. SOURCE WINS.\n"
+  contract:
+    name: reorient
+    kind: exchange
+    family: polarity
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - heading
+    writes:
+    - heading
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1508,11 +1670,99 @@ mechanisms:
   state_io:
     reads: []
     writes: []
-  verdict: null
+  verdict: out_of_scope
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'OUT_OF_SCOPE: NoForce carries no biological content. It is the null / identity element of the
+
+    mechanical-interaction slot -- the value ``potential=None`` resolves to inside BrownianDynamics,
+
+    ActiveBrownianDynamics2D, MechanicalRelaxation and relax_equilibrium (each does
+
+    ``potential if potential is not None else NoForce()``). Its energy is the constant 0 and its force
+
+    is identically zero; it has no parameters, reads no field values, contributes no leaves to the
+
+    model pytree, and has no counterpart in the paper (the paper''s cells ALWAYS interact via the Morse
+
+    pair potential, Fig. 1d). It is a software null-object -- framework plumbing so a position-integrator
+
+    step always has a ``Potential`` object to call -- not a forward operation on state.
+
+
+    DECISIVE TEST in the Plexus algebra: "no mechanical interaction" is the EMPTY COMPOSITION -- a
+
+    pipeline that includes zero interaction operators -- i.e. the identity of operator composition. An
+
+    algebra need not register its identity element as an operator; you get it for free by composing
+
+    nothing. jax-morph must materialize NoForce only because its ``Potential`` slot has to be filled by
+
+    SOME object; a Plexus model expresses the same free / non-interacting regime by omitting the
+
+    interaction operator entirely. Nothing in the promoted vocabulary is gained or missing here.
+
+
+    CLOSEST registered contract: the lateral/interaction pairwise-force slot -- ``attraction_repulsion``
+
+    (with ``cohesion`` / ``separation``), the home the paper''s Morse potential and its SoftSphere /
+
+    Hertzian / Harmonic / LennardJones siblings will normalize to. NoForce is NOT an implementation_of
+
+    that contract: it has no pairwise neighbour map, reads no separations, and emits zero -- it is the
+
+    ABSENCE of the interaction, not a member of it. It also cannot be `alias` or `refinement`: there is
+
+    no registered no-op / identity contract to alias, and widening any interaction contract to admit
+
+    "reads nothing, writes zero, no map" would erase the pairwise force that IS that contract. And not
+
+    `new`: registering a do-nothing operator would inflate the atlas yield with content-free plumbing
+    --
+
+    exactly what out_of_scope exists to prevent (R7 already flags a writes-nothing operator as an
+
+    undetectable no-op; the ``contract.writes: [position]`` below is only the formal force-slot the
+
+    potential drives, carrying an identically-zero increment, mirroring the StochasticStep out_of_scope
+
+    entry whose ``contract.writes: [trace]`` is likewise a formal, not a persistent, write).
+
+
+    STRONGEST COUNTERARGUMENT (and why it loses): in an operator ALGEBRA the identity element is a
+
+    first-class member, and NoForce is type-level interchangeable with Morse (same ``Potential``
+
+    protocol, consumed by the same integrator steps), so one could record it as the degenerate
+
+    implementation_of the pairwise-interaction contract rather than dismiss it as plumbing -- a view
+
+    that captures the real modeling affordance that jax-morph represents "no coupling" as a value of
+
+    the same type as "Morse coupling" (the base for active-matter / flocking models whose only coupling
+
+    lives in a separate alignment step). It loses because the biological measurement counts CONTRACTS,
+
+    not type slots: NoForce reads nothing, writes nothing real, carries no map or parameters, and is
+
+    never constructed in the paper -- it is the ``potential=None`` sentinel, which Plexus realizes by
+
+    omitting the operator, so there is no forward mechanism here to normalize.
+
+    '
+  contract:
+    name: no_interaction
+    kind: lateral
+    family: interaction
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads: []
+    writes:
+    - position
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:

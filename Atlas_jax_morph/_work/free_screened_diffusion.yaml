@@ -104,57 +104,44 @@ surprises:
 verdict: new
 of: null
 implementation_of: morphogen
-why: |
-  No registered contract computes an EQUILIBRIUM CONCENTRATION FIELD from cell sources. This
-  operator maps a per-cell secretion rate S to the steady-state concentration of a secreted,
-  diffusible, degradable signal, sampled at every cell -- the developmental MORPHOGEN gradient
-  (source + diffusion + degradation, relaxed to steady state). It is quasistatic: dt and key
-  are ignored; the field is OVERWRITTEN each macro-step with the t=infinity solution, computed
-  as an all-pairs superposition of screened-diffusion Green's functions over the cell set.
-
-  Closest registered contract: `diffuse` (field/fields). Widening `diffuse` to admit this
-  would do violence to its biology on four structural axes, none of them numeric:
-    (1) SET / state. `diffuse` is `set: field` -- it reads and writes a GRID field in place
-        (a 3x3 box-blur, or an FFT heat-kernel step). This reads and writes CELL state
-        (secretion_rate -> chemical) with NO grid at all; the field is mesh-free, sampled at
-        cell centers. Different typed signature, not a discretization choice.
-    (2) ATOMICITY. `diffuse` is deliberately the ATOM of transport: source is `deposit`, sink
-        is `decay`, and reaction-diffusion is BUILT by composing deposit + diffuse + decay.
-        This operator BUNDLES all three -- it carries a source term S, a degradation / screening
-        rate K, and diffusion D fused into one contract. `diffuse` has no S or K slot; adding
-        them deletes the atomicity that is its whole reason to exist.
-    (3) DYNAMICS. Both `diffuse` implementations advance the field by dt (rate*dt lerp;
-        exp(-D k^2 dt) kernel) -- they are time-steppers. This IGNORES dt and returns the
-        steady-state equilibrium (a CONSTRAINT solve, quasistatic), a different KIND of
-        operator, not a longer time step.
-    (4) COUPLING. `diffuse` is a LOCAL stencil (a cell talks only to its grid neighbours).
-        This is a DENSE all-pairs cell -> cell kernel (each cell reads every live source's
-        Green's function). Different map.
-
-  The strongest argument AGAINST `new`: this is just deposit + diffuse + decay run to steady
-  state, i.e. a COMPOSITION of registered atoms, not a new contract. It is not. Those three
-  atoms iterate a LOCAL update on a GRID and would have to be run to convergence, giving a
-  different discretization with grid-dependent boundaries; this computes the EXACT mesh-free
-  equilibrium ANALYTICALLY in one shot on the cell set. You cannot wire the three grid atoms to
-  reproduce the analytic all-pairs steady-state solve on the particle set -- that solve IS the
-  new mechanism.
-
-  Other near-misses fail too. `signal` (lateral/interaction) also produces a per-node scalar
-  from other nodes, but over a FIXED edge-set connectome (MAPS [pre, post], REQUIRES_PARAMS
-  edge_set) as a first-order INTEGRATED voltage ODE (EMIT velocity); this has no edge set, is a
-  dense GEOMETRIC distance kernel, and is a quasistatic OVERWRITE, not an integrated derivative.
-  `sense` / `chemotax` / `deposit` (exchange/fields) COUPLE cells to a PRE-EXISTING grid field
-  (read its gradient, sample it, or write onto it); this MANUFACTURES the field values from
-  scratch -- it is the step that would produce the field they consume. `decay` supplies the
-  -K c term alone, on a grid.
-
-  So: `new`, name `morphogen`. This class is the FREE-SPACE Green's-function implementation
-  (open boundaries, finite source radius a, dimension-selected segment/disk/sphere kernel); the
-  paper's graph-Laplacian inverse c = (K I - D L)^{-1} S (closed/permeable boundaries via an
-  adjacency matrix and a ghost sink node, no source radius) is a SIBLING implementation of the
-  SAME contract -- two very different numerical methods that collapse to ONE biological operator.
-  That collapse is exactly the convergence the ledger should record, hence
-  `implementation_of: morphogen`.
+why: "No registered contract computes an EQUILIBRIUM CONCENTRATION FIELD from cell sources. This\noperator\
+  \ maps a per-cell secretion rate S to the steady-state concentration of a secreted,\ndiffusible, degradable\
+  \ signal, sampled at every cell -- the developmental MORPHOGEN gradient\n(source + diffusion + degradation,\
+  \ relaxed to steady state). It is quasistatic: dt and key\nare ignored; the field is OVERWRITTEN each\
+  \ macro-step with the t=infinity solution, computed\nas an all-pairs superposition of screened-diffusion\
+  \ Green's functions over the cell set.\n\nClosest registered contract: `diffuse` (field/fields). Widening\
+  \ `diffuse` to admit this\nwould do violence to its biology on four structural axes, none of them numeric:\n\
+  \  (1) SET / state. `diffuse` is `set: field` -- it reads and writes a GRID field in place\n      (a\
+  \ 3x3 box-blur, or an FFT heat-kernel step). This reads and writes CELL state\n      (secretion_rate\
+  \ -> chemical) with NO grid at all; the field is mesh-free, sampled at\n      cell centers. Different\
+  \ typed signature, not a discretization choice.\n  (2) ATOMICITY. `diffuse` is deliberately the ATOM\
+  \ of transport: source is `deposit`, sink\n      is `decay`, and reaction-diffusion is BUILT by composing\
+  \ deposit + diffuse + decay.\n      This operator BUNDLES all three -- it carries a source term S, a\
+  \ degradation / screening\n      rate K, and diffusion D fused into one contract. `diffuse` has no S\
+  \ or K slot; adding\n      them deletes the atomicity that is its whole reason to exist.\n  (3) DYNAMICS.\
+  \ Both `diffuse` implementations advance the field by dt (rate*dt lerp;\n      exp(-D k^2 dt) kernel)\
+  \ -- they are time-steppers. This IGNORES dt and returns the\n      steady-state equilibrium (a CONSTRAINT\
+  \ solve, quasistatic), a different KIND of\n      operator, not a longer time step.\n  (4) COUPLING.\
+  \ `diffuse` is a LOCAL stencil (a cell talks only to its grid neighbours).\n      This is a DENSE all-pairs\
+  \ cell -> cell kernel (each cell reads every live source's\n      Green's function). Different map.\n\
+  \nThe strongest argument AGAINST `new`: this is just deposit + diffuse + decay run to steady\nstate,\
+  \ i.e. a COMPOSITION of registered atoms, not a new contract. It is not. Those three\natoms iterate\
+  \ a LOCAL update on a GRID and would have to be run to convergence, giving a\ndifferent discretization\
+  \ with grid-dependent boundaries; this computes the EXACT mesh-free\nequilibrium ANALYTICALLY in one\
+  \ shot on the cell set. You cannot wire the three grid atoms to\nreproduce the analytic all-pairs steady-state\
+  \ solve on the particle set -- that solve IS the\nnew mechanism.\n\nOther near-misses fail too. `signal`\
+  \ (lateral/interaction) also produces a per-node scalar\nfrom other nodes, but over a FIXED edge-set\
+  \ connectome (MAPS [pre, post], REQUIRES_PARAMS\nedge_set) as a first-order INTEGRATED voltage ODE (EMIT\
+  \ velocity); this has no edge set, is a\ndense GEOMETRIC distance kernel, and is a quasistatic OVERWRITE,\
+  \ not an integrated derivative.\n`sense` / `chemotax` / `deposit` (exchange/fields) COUPLE cells to\
+  \ a PRE-EXISTING grid field\n(read its gradient, sample it, or write onto it); this MANUFACTURES the\
+  \ field values from\nscratch -- it is the step that would produce the field they consume. `decay` supplies\
+  \ the\n-K c term alone, on a grid.\n\nSo: `new`, name `morphogen`. This class is the FREE-SPACE Green's-function\
+  \ implementation\n(open boundaries, finite source radius a, dimension-selected segment/disk/sphere kernel);\
+  \ the\npaper's graph-Laplacian inverse c = (K I - D L)^{-1} S (closed/permeable boundaries via an\n\
+  adjacency matrix and a ghost sink node, no source radius) is a SIBLING implementation of the\nSAME contract\
+  \ -- two very different numerical methods that collapse to ONE biological operator.\nThat collapse is\
+  \ exactly the convergence the ledger should record, hence\n`implementation_of: morphogen`.\n"
 contract:
   name: morphogen
   kind: exchange
@@ -170,9 +157,11 @@ contract:
   - radius (per-SOURCE finite size a, giving r_eff = max(r, a) and the 3-D (1 + kappa*a) term -- undeclared)
   - alive (source AND receiver liveness mask, applied twice -- undeclared)
   writes:
-  - chemical (per-cell steady-state screened-diffusion concentration, the field_name; non-heritable, recomputed each step)
+  - chemical (per-cell steady-state screened-diffusion concentration, the field_name; non-heritable, recomputed
+    each step)
   maps:
-  - pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij, a_j) S_j)
+  - pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij, a_j)
+    S_j)
 status: normalized
 module: null
 test: null
