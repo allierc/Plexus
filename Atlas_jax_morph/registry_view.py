@@ -8,18 +8,12 @@ BASELINE FIXED BEFORE THE READING. Otherwise the temptation is irresistible -- y
 `cell_division` in jax-morph, you notice Plexus has `cell_divide`, and you record an alias
 without ever asking whether the two contracts actually agree.
 
-So this module freezes the baseline and stamps it. Three tiers, deliberately separated:
-
-  registered   contracts in `plexus.operators` -- validated, importable, in the engine.
-  candidates   `plexus/operators/candidates/` -- prior art, NOT registered, name-collision-ridden.
-               Extracted by source regex because the folder is not importable by design.
-  prototype    `prototype/**/*.py` -- operators a study registers at import time and nobody
-               promoted. The 3D vertex layer the Okuda track runs on lives entirely here.
-  builtins     operator names the engine's own catalog defines.
-
-A mechanism that matches a *candidate* or a *prototype* operator is NOT new vocabulary -- it is
-a promotion we already owed. Counting it as new would inflate the atlas's yield with our own
-backlog, which is the most flattering and least honest error available to this measurement.
+THE BASELINE IS THE PROMOTED LANGUAGE, AND NOTHING ELSE. Only registered contracts in
+`plexus.operators` count: validated, importable, in the engine, with a typed signature the
+validator can read. Code sitting in `prototype/` or in the `candidates/` anti-chamber is not part
+of the language -- it is unreviewed, name-collision-ridden, and in several cases three different
+implementations under one name. Measuring the atlas against it would be measuring against
+something nobody has checked.
 
     python registry_view.py                 # human summary
     python registry_view.py --json          # write _state/registry_baseline.json
@@ -30,14 +24,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
 SRC = os.path.join(PLEXUS, "src")
-CANDIDATES = os.path.join(SRC, "plexus", "operators", "candidates")
-PROTOTYPE = os.path.join(PLEXUS, "prototype")
+
 STATE = os.path.join(HERE, "_state")
 BASELINE = os.path.join(STATE, "registry_baseline.json")
 
@@ -74,40 +66,6 @@ def registered() -> dict:
     return out
 
 
-_DECOR = re.compile(r'@register_operator\(\s*((?:"[^"]*"|\'[^\']*\'|\s|,)+)')
-_NAME = re.compile(r'["\']([^"\']+)["\']')
-
-
-def _scan(root: str, label: str) -> dict:
-    """`{operator_name: [source paths]}` by source regex over a tree. Regex, not import:
-    `candidates/__init__.py` is inert on purpose (colliding names, prototype-local imports),
-    and importing an arbitrary prototype module runs its top-level code."""
-    out = {}
-    if not os.path.isdir(root):
-        return out
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git", "_archive")]
-        for fn in sorted(filenames):
-            if not fn.endswith(".py") or fn == "__init__.py":
-                continue
-            path = os.path.join(dirpath, fn)
-            with open(path, errors="replace") as f:
-                src = f.read()
-            rel = os.path.relpath(path, PLEXUS)
-            for m in _DECOR.finditer(src):
-                for name in _NAME.findall(m.group(1)):
-                    out.setdefault(name, []).append(rel)
-    return out
-
-
-def candidates() -> dict:
-    return _scan(CANDIDATES, "candidates")
-
-
-def prototypes() -> dict:
-    return _scan(PROTOTYPE, "prototype")
-
-
 def builtins_() -> list:
     """Names the engine's catalog defines directly (not through the operator decorator)."""
     try:
@@ -124,23 +82,14 @@ def builtins_() -> list:
 
 def build() -> dict:
     reg = registered()
-    cand = candidates()
-    proto = prototypes()
     canonical = {n for n, v in reg.items() if v["alias_of"] is None}
-    unpromoted = sorted({n for n in list(cand) + list(proto) if n not in reg})
     return {
         "registered": reg,
-        "candidates": cand,
-        "prototypes": proto,
-        "unpromoted": unpromoted,
         "builtins": builtins_(),
         "counts": {
             "contracts": len(reg),
             "canonical": len(canonical),
             "aliases": len(reg) - len(canonical),
-            "candidate_names": len(cand),
-            "prototype_names": len(proto),
-            "unpromoted": len(unpromoted),
         },
         "families": sorted({v["family"] for v in reg.values() if v["family"]}),
         "kinds": sorted({v["kind"] for v in reg.values() if v["kind"]}),
@@ -167,17 +116,14 @@ def main():
     if a.show:
         entry = b["registered"].get(a.show)
         if entry is None:
-            raise SystemExit(f"{a.show!r} is not registered. candidates: "
-                             f"{b['candidates'].get(a.show, 'no')}")
+            raise SystemExit(f"{a.show!r} is not a registered contract")
         print(json.dumps(entry, indent=2))
         return
 
     c = b["counts"]
     print(f"registered contracts   {c['contracts']:>4}  "
           f"({c['canonical']} canonical + {c['aliases']} aliases)")
-    print(f"candidate names        {c['candidate_names']:>4}  (anti-chamber, not registered)")
-    print(f"prototype names        {c['prototype_names']:>4}  (registered only by a study)")
-    print(f"UNPROMOTED vocabulary  {c['unpromoted']:>4}  <- a match here is our backlog, not a find")
+    print(f"engine builtins        {len(b['builtins']):>4}")
     print(f"\nfamilies  {', '.join(b['families'])}")
     print(f"kinds     {', '.join(b['kinds'])}")
     print(f"sets      {', '.join(b['sets'])}")

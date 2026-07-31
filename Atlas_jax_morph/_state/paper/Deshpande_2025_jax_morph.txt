@@ -1,0 +1,1443 @@
+
+
+===== PAGE 1 =====
+
+Engineering morphogenesis of cell clusters with differentiable programming
+Ramya Deshpande,1, ∗Francesco Mottes,1, 2, ∗Ariana-Dalia Vlad,3 Michael P. Brenner,1 and Alma dal Co2
+1School of Engineering and Applied Sciences, Harvard University, Cambridge MA 02138
+2Department of Computational Biology, University of Lausanne, Lausanne, Switzerland
+3Harvard College, Cambridge, MA 02138
+(Dated: March 3, 2025)
+Understanding the rules underlying organismal development is a major unsolved problem in bi-
+ology. Each cell in a developing organism responds to signals in its local environment by dividing,
+excreting, consuming, or reorganizing, yet how these individual actions coordinate over a macro-
+scopic number of cells to grow complex structures with exquisite functionality is unknown. Here
+we use recent advances in automatic differentiation to discover local interaction rules and genetic
+networks that yield emergent, systems-level characteristics in a model of development. We consider
+a growing tissue with cellular interactions mediated by morphogen diffusion, cell adhesion and me-
+chanical stress. Each cell has an internal genetic network that is used to make decisions based on the
+cell’s local environment. We show that one can learn the parameters governing cell interactions in
+the form of interpretable genetic networks for complex developmental scenarios, including directed
+axial elongation, cell type homeostasis via chemical signaling and homogenization of growth via
+mechanical stress. When combined with recent experimental advances measuring spatio-temporal
+dynamics and gene expression of cells in a growing tissue, the methodology outlined here offers a
+promising path to unraveling the cellular bases of development.
+Morphogenesis, the emergence of distinct anatomical forms from dividing cellular assemblies, hinges on the delicate
+coordination of diverse cellular and molecular processes across multiple spatial and temporal scales. Programming
+cells to achieve desired morphogenetic outcomes is extremely challenging.
+Unlike systems guided by centralized
+control signals [1], most developmental complexity arises from the interplay of local communications, sensing, and
+information processing within individual cells, with minimal external influence [2]. The emergent nature of collective
+cell phenomena, coupled with the complexity of modeling them in adequate detail, imposes severe limits to the
+effectiveness of computational approaches to inverse design.
+Recent experimental advances offer unprecedented opportunities for morphogenetic engineering [3, 4], enabling the
+engineering of tailored cellular interactions, with applications ranging from population control [5] to programming
+multicellular assembly patterns [6]. Leveraging the intrinsic self-organizing tendencies of cell clusters has also facili-
+tated the production of diverse organoids that mimic multiple aspects of real tissues and organs [7–9]. The ability to
+quantitatively guide existing self-organizing developmental programs or engineer novel ones holds significant impli-
+cations for both fundamental scientific understanding and biotechnology [10, 11]. Many of these successes, however,
+heavily rely on manually crafted and qualitative cellular interaction rules and protocols. Heuristic experimental rules
+often exhibit drawbacks, including system specificity, limited robustness, and insufficient reproducibility [12]. De-
+veloping more versatile and efficient tools for biological design has the potential to extend the reach and impact of
+experimental techniques.
+Inverse design tasks are usually translated into optimization problems, wherein the objective is to minimize the
+discrepancy between a property of the simulated system state and its desired value. Pioneering research showcased
+the potential of using evolutionary algorithms to design genetic networks with specified functions [13]and and gaining
+insights into collective developmental cellular behaviors like segmentation [14]. While sophisticated computational
+physical models of cell behavior do exist [15, 16], their applicability to reverse engineering remains limited, particularly
+in high-dimensional parameter spaces where parameter sweeps and evolutionary searches become inefficient. Auto-
+matic differentiation (AD) algorithms, on the other hand, enable efficient calculation of sensitivities of observables
+with respect to input parameters. While originally developed for training large neural networks [17, 18], the same
+technical infrastructure can be used to differentiate through simulations of physical processes, offering gradient-based
+optimization as a viable alternative to tackle hard inverse problems of various scientific interest. Successful exam-
+ples include the design of self-assembling materials [19], the establishment of data-driven discretizations for partial
+differential equations [20], nonequilibrium statistical mechanics [21] and the design of quantum devices [22]. Neural
+Cellular Automata [23] represented an initial demonstration of how these methods could be used to engineer collective
+behaviors inspired by biology in lattice models. Hiscock, instead, showed that AD could be used to successfully learn
+meaningful couplings in ODE models of genetic networks [24].
+∗These authors contributed equally to this work.
+arXiv:2407.06295v3  [q-bio.CB]  27 Feb 2025
+
+
+===== PAGE 2 =====
+
+2
+Model Overview
+a
+Gene Networks
+Cellular Inputs
+stress
+c1
+c2
+division rate
+secretion rate of c1
+secretion rate of c2
+hidden state genes
+Wij
+gi
+gj
+Ii
+Diffusion
+Mechanics
+e
+Inverse Design
+Rewards
+Parameters
+Simulation
+Initial State
+Final State
+Total Reward
+Parameters
+Policy 
+Gradient
+Updated
+Parameters
+b
+c
+d
+FIG. 1. Modeling and Optimization Framework. (a) Model overview. Decision-making circuits in cells sense local chemical
+and mechanical inputs to regulate secretion, division probability, and adhesion. The environment responds to cellular outputs
+by handling chemical diffusion, cell division, and mechanical relaxation. (b) Input signals and internal state are integrated and
+elaborated in each cell by internal gene regulatory networks. Green gene nodes sense inputs, blue genes are intermediates and
+red genes can modify cellular actions. (c) Released chemical factors diffuse in the environment following steady-state diffusion.
+(d) Mechanical interactions between cells are modeled with a pairwise Morse potential.
+The repulsive region accounts for
+volume exclusion forces and the attractive region models cell adhesion. (e) Gradient calculation and optimization. Following
+the REINFORCE approach, the log probability gradient of each time step is weighted by action rewards to estimate the average
+gradient. Parameters are updated through gradient ascent to maximize the expected reward.
+In this study, we consider a tissue model composed of cells capable of division, growth, mechanical stress sensing,
+and morphogen excretion and detection. Cellular decisions are driven by responses to the local environment through
+an internal genetic network (Fig. 1a). We demonstrate that, starting from random or uninformative initializations,
+we can optimize the parameters governing genetic interactions to achieve non-trivial developmental scenarios in cell
+clusters. Our examples draw inspiration from various biological processes: axial elongation during limb bud outgrowth,
+maintenance of cell type homeostasis through chemical signaling in macrophage-fibroblast co-cultures, and growth
+homogenization via chemical signaling and mechanical stress response in the Drosophila wing disc. Our framework
+enables the probing of the complex relationship between individual capabilities of proliferating cells and emergent
+properties of the resulting tissues.
+MODEL AND OPTIMIZATION FRAMEWORK
+Forward Model
+We model proliferating cells in a tissue with adhesive soft spheres, demonstrating examples of both two- and three-
+dimensional systems. While we present specific examples in this paper, our methods are potentially applicable to
+various physical models of cell growth and interaction. In our model, cells grow at a fixed rate until reaching a
+maximum radius, leading to continuous mechanical reorganization. Cells secrete morphogens, measure local concen-
+trations of these chemicals, and sense mechanical stress. This locally sensed information guides decisions on chemical
+secretion modulation and division probability (Fig. 1a). Cell division events are stochastic and produce two daugh-
+ter cells, each with half the volume of a fully grown mother cell; the division plane is chosen uniformly at random.
+
+
+===== PAGE 3 =====
+
+3
+Decision-making circuits are modeled as regulatory networks comprising interacting genes with trainable excitatory or
+inhibitory couplings (Fig. 1b). The regulatory network processes the information sensed by individual cells to output
+division propensity, rates of chemical secretion, etc. In most examples, the regulatory network weights are shared
+by all cells, though we also explore one scenario where two cell types have separate regulatory networks. Secreted
+chemical factors allow information sharing by diffusing in the environment (Fig. 1c). Cells mechanically interact
+through a Morse potential (Fig. 1d), with a repulsive part for excluded volume interactions and an attractive part for
+cell-cell adhesion [25]. Simulations are conducted for a specific number of cell divisions, so the final state cannot in
+general be considered a steady state. Further mathematical detail can be found in the Materials and Methods section
+and in the Supplementary Information.
+Inverse Design
+Our objective is to discover local growth rules that enable cells to develop into a final configuration with desired
+properties. To effectively navigate the high-dimensional, non-convex parameter space of local interaction rules, we
+employ gradient descent schemes, widely used in modern machine learning for such optimizations. Our entire simula-
+tion is written to be automatically differentiable, leveraging recent advances from the deep learning and reinforcement
+learning communities. We utilize the JAX library [26] for efficient numerical and automatic differentiation algorithms,
+and other JAX-based libraries such as Equinox [27] and JAX-MD [28] for molecular dynamics.
+We employ score-based methods such as REINFORCE [29] to address the intrinsic stochasticity of proliferation
+dynamics, which implies that the loss function is not directly differentiable (Fig. 1e). In the REINFORCE update,
+rewards and penalties are assigned to each action taken (i.e. each cell division) to provide the weighting signal for the
+gradient of the trajectory probability. This weighted gradient is then used to nudge the weights of the gene network
+in the right direction. In practice, the system gradually learns which division events are the most favorable and
+increases their probability for the next simulation. To guide the reader possibly unfamiliar with these concepts, we
+also include a set of in-depth tutorial notebooks in the GitHub repository [30] and a longer theoretical explanation in
+the Supplementary Information. Since the dynamics of the environment, including chemical secretion and diffusion,
+depend partly on the same parameters (the gene network couplings) that cells use to decide whether to divide or
+not (their “policy”), it is essential to evaluate the gradient of the environment dynamics with respect to the gene
+network parameters. This necessity makes automatic differentiation particularly crucial in this context. Once the
+necessary gradients are calculated, optimization is performed using well-established gradient descent schemes, such
+as Adam [31]. The learned networks are then further simplified by removing all edges with weights smaller than an
+experiment-dependent threshold, such that the functional backbone of pruned network be highlighted while preserving
+the system properties we optimized for.
+SPATIAL CONTROL OF TISSUE GROWTH
+Understanding how to program the growth of complex shapes can aid in our comprehension of developmental body
+plans driven by chemical patterning. Rationally designed synthetic gene circuits have been shown to be able to drive
+the formation of target multicellular structures found in morphogenesis [6, 32]. We investigate here how to use our
+framework to discover decision-making circuits that utilize local chemical interactions to grow target shapes. As an
+example, we focus in this section on symmetry-breaking axial elongation. This process is the first geometric-defining
+process to happen in many developmental programs and is vital for establishing, for instance, the antero-posterior axis
+in animals [33]. We learn a gene circuit that enables cells to chemically interact with a non-proliferating population of
+”source cells” to elongate along a given axis. Similar problems have recently been explored by engineering, for example,
+contact-based cell communication instead of chemical communication [34, 35]. We consider a three-dimensional model
+of dividing cells, that we optimize to minimize the squared sum of the x-coordinates of cells, thus requiring the cluster
+to elongate horizontally (Fig. 2a). The system is composed of two different cell types. One secretes a diffusible factor
+(source cells, in red in Fig. 2a), but cannot proliferate. The other cell type (in gray in Fig. 2a) can only sense the
+factor concentration and modulate its division propensity accordingly. Local chemical concentration is the input to
+the proliferating cells’ gene network, allowing them to infer positional information through local physical cues.
+The learned mechanism (Fig. 2b) drives a dynamic process reminiscent of limb bud outgrowth in animal develop-
+ment. Secretion of the chemical factor by source cells results in a steady-state chemical gradient along the cell cluster
+(Fig. 2c). Due to the network’s input-to-output strong inhibitory link, regions of higher chemical concentration,
+proximal to the source cells, experience a decrease in the division propensity of proliferating cells. Conversely, areas
+with lower chemical concentration experience less inhibition, leading to a sustained higher division propensity located
+in the distal region. In the initial spherical cluster, source cells are localized on the left and proliferating cells on
+
+
+===== PAGE 4 =====
+
+4
+activation
+inhibition
+Initial
+Trained
+Untrained
+X
+X
+c
+d
+b
+a
+Source Cells (No division)
+Dividing Cells (No secretion)
+FIG. 2. Elongation. Maximization of the squared sum of the x-coordinates of cells, resulting in horizontal elongation in the
+optimized cluster. (a) On the left, the final configuration of a simulation with randomly initialized parameters; on the right,
+the final simulation state after learning. Source cells (in red) secrete the growth factor and cannot divide. Proliferating cells
+(in gray) sense the growth factor and divide in response to it. (b) The learned gene network. The receptor gene is activated
+only by the presence of the external chemical factor, which results in repression of the division propensity. Edge boldness is
+correlated to connection strength. (c) Chemical gradient created by source cells along the cluster x-coordinate. In the inset, the
+same gradient visualized in physical space. (d) Division propensity distribution at the end of the simulation along the x-axis,
+highlighting the concentration of dividing cells at the tip.
+the right, the latter cells possessing a non-zero initial division propensity. Proliferating cells closer to the source will
+experience a diminishing division propensity over time due to the presence of the chemical factor. As these cells
+divide, they preferentially expand the cluster in directions of lower chemical concentration, effectively moving away
+from the source and further reducing the chemical concentration at the extending tip. This creates a self-reinforcing
+loop: cell division events are concentrated at the distal tip where the chemical signal is weakest, ensuring directional
+growth and elongation away from the source of the secreted factor (Fig. 2d). Crucially, the weak inhibitory feedback
+from division propensity back to chemical input acts as a contrast enhancer, sharpening the division response to
+the chemical gradient and producing a ”winner-takes-all“ kind of behavior. In areas of high chemical concentration,
+the strong inhibitory forward connection suppresses division, thus diminishing the input suppression by the weaker
+feedback connection and leading to even stronger division suppression. Conversely, in regions of low chemical con-
+centration where direct inhibition is less prominent, division propensity increases and the weak feedback becomes
+functionally significant, further reducing the perceived chemical input. This effect amplifies the division propensity
+output specifically in these low-concentration regions. The positive self-loop on division propensity further stabilizes
+and amplify this directional growth by sustaining high division rates in the low-concentration tip regions, and working
+in synergy with the contrast-enhancing feedback to create a robust and spatially well-defined elongation.
+While significantly simplified compared to biochemical networks governing directional growth, the learned architec-
+ture functionally recapitulates the core logic of some developmental processes. Like limb bud outgrowth, it achieves
+directional elongation through localized growth at the tip [36]. Unlike the growth-promoting signaling factors (like
+FGF) secreted by the Apical Ectodermal Ridge, though, it employs an inhibitory regulatory signal originating from
+the base to restrict proximal proliferation and promote growth at the distal end. This regulation is learned consis-
+tently in all our optimization runs. The lack of alternative mechanisms (e.g. maintaining a proliferating zone close
+to the source cells) might be due to different reasons, like the particular mechanical properties chosen to simulate the
+
+
+===== PAGE 5 =====
+
+5
+activation
+inhibition
+Type 2
+Type 1
+S(c2)
+S(c1)
+R(c2)
+R(c1)
+R(c1)
+R(c2)
+Chem. 1
+Initial
+Trained
+Untrained
+a
+b
+c
+d
+e
+Cell Type 1
+Cell Type 2
+Chem. 2
+Division
+Secr. Chem. 1
+Chem. 1
+Chem. 2
+Division
+Secr. Chem. 2
+INPUTS
+OUTPUTS
+Network Variants:
+2/15 Optimizations
+7/15 Optimizations
+6/15 Optimizations
+FIG. 3. Chemical Regulation of Homeostasis. (a) Two cell types each exclusively secrete a chemical factor that can
+be sensed by both cell types.
+(b) Visualization of the learned gene networks.
+Interactions in black are present in every
+learned network.
+Colored interactions are single variants that are present only in a subset of learned solutions, with the
+reported frequency. This gives three type 1 network variants and two type 2 variants, totaling to 6 possible overall regulatory
+combinations. Edge boldness is correlated to connection strength. (c) An initially imbalanced state (in the middle) grows into
+an equally unbalanced final state with untrained network parameters (left) and into a balanced state with learned parameters
+(right) (d) Average over 100 realizations of final proportion of red cells at the end of simulations of increasing lengths. (e)
+Average over 100 realizations of final proportion of red cells at the end of simulations with increasing proportions of red cells
+in the starting state. In both plots the shaded area corresponds to average plus or minus one standard deviation.
+system, the absence of external geometric constraints or the specific reward function chosen.
+CHEMICAL REGULATION OF TISSUE HOMEOSTASIS
+Maintaining stable ratios of different cell populations is crucial for tissue function, and disruptions of this balance
+can lead to disease [37]. To maintain these stable proportions, cellular circuits must prevent uncontrolled growth of
+any single cell type. Cell communication mediated by diffusible factors constitutes a key mechanism for achieving
+tissue homeostasis and regulating tissue composition.
+One prominent example is the interplay between osteoblasts and osteoclasts in bone homeostasis [38].
+Bone-
+forming osteoblasts primarily secrete RANKL, which promotes osteoclast differentiation and activation. Conversely,
+osteoclasts secrete their own factors (like S1P) and release bone matrix factors (e.g. TGF-β) during bone resorption,
+influencing osteoblast abundance. This reciprocal signaling establishes a feedback loop that maintains the balance
+between bone formation and resorption. Similar phenomena are also observed in vitro. For instance, co-cultures of
+macrophages and fibroblasts can spontaneously reach stable ratios, even from highly imbalanced starting conditions
+[39]. Both cell types secrete growth factors that selectively stimulate the growth of the other: macrophages primarily
+produce PDGF and fibroblasts secrete Csf1, while other diffusible factors contribute to self-regulation of growth.
+Cell-to-cell chemical communication via diffusible factors has also been shown to be crucial for regulating homeostasis
+during cell differentiation [40, 41].
+Inspired by the macrophage-fibroblast system in particular, we investigated chemical mechanisms capable of main-
+taining a balanced 50/50 ratio between two cell types in a growing cluster. In this 2D model, two cell types interact
+chemically, each secreting a distinct chemical factor (Fig. 3a). Cell behavior is governed by cell-type-specific genetic
+networks, learned through optimization, which regulate division propensity and secretion of diffusible factors (Fig.
+
+
+===== PAGE 6 =====
+
+6
+3b). As shown in Fig 3c (center), simulations begin with an imbalanced initial state, comprising nr = 4 red cells (cell
+type 1) and nb = 16 blue cells (cell type 2). The untrained network is initialized to yield uniform division propensities:
+after 100 cell divisions, the initial imbalance is found again in the final state (Fig 3c, left). The learned mechanisms,
+instead, successfully yield balanced cell type populations at the end of the simulation. Gene couplings are optimized
+to minimize the number difference between the two cell types during growth (Fig 3c, right).
+Lt = |nr(t) −nb(t)|
+is the loss at time t, where nr and nb are the number of red and blue cells respectively, and nr + nb = N is the total
+cell number.
+The learned networks for each cell type are shown in Fig. 3b. Both cell types sense both chemicals, but each
+modulates the secretion of its own factor only. We focus first on the connections in black in the figure, representing
+the core ”backbone” network consistently learned across optimization runs and sufficient for homeostasis. As expected,
+the strongest effects (bold in Figure 3b) link input chemicals to proliferation regulation, in a mirrored manner across
+cell types. In both cell types, chemical secreted by the same type inhibits division, while chemical secreted from the
+other type promotes it. Secretion control in both cell types is governed solely by chemical factor 1, associated with
+the initially less abundant red cell type. In cell type 1, chemical 1 simply enhances its own production. In cell type 2,
+secretion regulation is less straightforward: chemical 1 inhibits secretion of chemical 2, and high secretion of chemical
+2 contribute to proliferation suppression.
+Consider a region where type 2 cells are surrounded by their own type, levels of chemical 1 are low and chemical 2
+is secreted at a basal rate. In this case, the lack of chemical 1 removes suppression of chemical 2 secretion, resulting
+in higher chemical 2 levels.
+High levels of chemical 2 and strong secretion activate division inhibitory pathways
+for type 2, halting proliferation.
+Conversely, when sensed levels of chemical 1 rise due to increased division of
+cell type 1, the inhibition of chemical 2 secretion is lifted, eliminating in turn the secondary inhibitory feedback on
+proliferation. Simultaneously, the strong positive regulatory connection between chemical 1 and division promotes type
+2 proliferation. Increased type 2 division and secretion of chemical 2 again activates the inhibitory division pathways,
+and the cycle repeats. Notably, spatial structure plays a key role: cell divisions place daughter cells near parent cells,
+altering neighborhood cell type composition. This increases the local concentration of the self-secreted chemical and,
+at the same time, decreases the concentration of the other chemical as cells move away from surrounding sources.
+Despite model differences, the learned solutions share key features with the macrophage-fibroblast homeostasis circuit
+reported in [39]. Both systems feature mutual proliferation promotion between the two cell types and negative growth
+self-regulation. Furthermore, also in this case one of the two factors negatively regulate the other.
+Beyond the most common networks, optimization also identifies two alternatives for cell type 1 and one for cell type
+2. These variants differ from the most frequent architecture by single additional edges (colored differently in Figure
+3b). Network variants are not correlated between cell types and can appear in any of the six possible combinations.
+The weaker additional links enhance existing dynamical behaviors without fundamentally altering network function.
+Their presence may reflect optimization convergence to local minima or variations in convergence speed, rather than
+specific functional advantages.
+Remarkably, the learned gene regulations exhibit robustness and generalization beyond the explicit optimization
+goals. If one fixes the initial imbalance to the one used during training (nr/N = 0.2), the learned regulation maintains
+homeostasis even in extended simulations far beyond the training duration of 100 divisions, showing no degradation
+(Fig. 3d). Furthermore, maintaining 100 cell divisions but varying the initial proportions of cell types, homeostasis
+is reasonably maintained up to nearly twice the initial imbalance (Fig. 3e). Beyond this point, the regulatory circuit
+starts to overcompensate and loses its advantage over random cell divisions. This behavior aligns with the regulatory
+asymmetry observed in the discovered networks, reflecting the fact that all initial simulation states during optimization
+are imbalanced in the same direction (i.e. with more blue cells than red ones). We suppose that the initial tissue state
+results from an upstream cell differentiation process which does not produce completely random cell type proportions,
+so having no initial variability seems like a reasonable approximating assumption.
+MECHANICAL CONTROL OF CELL PROLIFERATION
+Mechanical signaling plays a crucial role in morphogenesis, influencing both individual cells and tissue-level pro-
+cesses. At the cellular level, mechanosensation affects gene expression through various biochemical pathways that
+transduce forces [42]. On a broader scale, mechanical signals convey local instructions to shape global structures
+[42–45]. In tissues, mechanical interactions can operate over larger distances than biochemical signals due to tension
+propagation through connected cells [45]. Furthermore, the accumulation of local mechanical stress can impact the
+global growth of developing structures. For instance, mechanical feedback has been proposed as a mechanism for
+
+
+===== PAGE 7 =====
+
+7
+training field
+new field
+Final CV
+Density
+Model Input Ablations
+a
+b
+c
+d
+e
+R
+Division Field
+field
+two peak exp off center
+trained
+untrained
+power law
+Chem. 1
+Secr. Chem. 1
+Division
+Chem. 2
+Mechanical
+Stress
+Secr. Chem. 2
+FIG. 4. Mechano-chemical Regulation of Homogeneous Growth. (a) Scheme of the problem setup, inspired by wing
+disc growth in Drosophila. The extrinsic division scaling mirrors the experimentally observed tendency of cells to divide in the
+center of the cluster. (b) The learned gene network. Division is controlled both by the external division field (left implicit
+in the diagram) and by the other cell inputs. Edge boldness is correlated to connection strength. (c) Proliferation regulation
+learned in a power-law division field yield lower coefficient of variation of division propensities also in systems with different
+proliferation biases. Left to right: the power-law field used in training, a field with two peaks instead of one, an exponential
+field, and a field with an off-center peak. Distributions are calculated over 100 simulations. (d) Ablation studies assess the
+importance of both mechanical and chemical regulation. Separately removing chemical or mechanical feedback leads to more
+proliferation heterogeneity with respect to the presence of both.(e) Division rate divided by the extrinsic division field is plotted
+for each kind of simulation in panel (c). This shows that cells regulate division probabilities by adapting to the shape of the
+extrinsic division field.
+growth arrest in the Drosophila wing imaginal disc [46, 47]. In this study, we explore these concepts by optimizing a
+model inspired by the Drosophila wing disc development to uncover mechanisms that couple mechanics to growth.
+Our model incorporates a constant radial growth factor gradient that modulates division propensity, with cells closer
+to the cluster center having a higher probability of division (Fig. 4a). This aligns with experimental observations of
+transiently faster growth rates in central cells during early wing disc development [48]. This extrinsic division scaling,
+fixed throughout the simulation, follows a power-law decay. The total division propensity of cell i is given by:
+di = gi(stress, chemicals) ∗f(r)
+where gi(stress, chemicals) is the division output of the internal gene network and f(r) ∝1/r2 is the radial scaling
+due to the external factor.
+As the cell cluster expands, each cell modulates its division propensity through their internal gene circuit, receiving
+sensed chemicals and stress as inputs. We aim to identify local growth rules that achieve homogeneous proliferation
+throughout the cluster despite the nonuniform effect of the external factor gradient. This optimization for uniform
+growth rates is inspired by experimental evidence, showing similar growth rates across different regions of the wing
+disc during most of its development, despite small-scale local variations [48].
+We optimize couplings between genes in the circuit to minimize the coefficient of variation of division propensities:
+L = CV[d(T)] = σ[d(T)]
+µ[d(T)]
+
+
+===== PAGE 8 =====
+
+8
+where d(T) are the division propensities at final time T.
+The optimized gene circuit utilizes both chemical and mechanical information to modulate division propensity (Fig.
+4b). This regulation leads to a significantly lower CV of cells’ division rates (Fig. 4c). Remarkably, the gene circuit
+optimized on the power law gradient successfully reduces growth variations also when exposed to external division
+scaling fields unseen during training. To assess the robustness of the mechanism, we expose the trained gene circuit to
+different external gradients: an exponentially decaying gradient, a gradient with two symmetric peaks, and a gradient
+with a single asymmetric peak.(Fig. 4c, left panel).
+While simplified, our model parallels several phenomena observed in experimental studies of wing disc growth
+regulation and captures the essence of mechanical feedback in growth regulation. In the learned network, mechanical
+stress directly inhibits cell division, mirroring the role of the Hippo pathway in the wing disc.
+Experimentally,
+mechanical stress has been shown to activate the Hippo pathway [48], leading to Warts-mediated phosphorylation and
+inactivation of the growth-promoting transcription co-activator Yorkie (Yki), ultimately suppressing cell proliferation.
+Conversely, reduced mechanical stress allows Yki to remain unphosphorylated, enter the nucleus, and drive cell
+proliferation necessary for proper tissue growth and development. Our model represents a coarse-grained version of
+this mechanism through the inhibition of division propensity by the stress-sensing gene.
+Although the secreted factors in our model lack direct biological counterparts, they serve as a simplified abstraction
+of the complex chemical signaling networks coordinating growth control in the Drosophila wing imaginal disc. The
+incorporation of secreted factors for feedback regulation conceptually represents the broader principle of growth control
+via morphogen gradients in the wing disc. For instance, the Decapentaplegic (Dpp) and Wingless (Wg) proteins
+form concentration gradients across the anterior-posterior and dorsal-ventral axes respectively, regulating growth and
+patterning [48]. While not direct analogues of these specific morphogens, our model’s diffusible factors capture the
+essence of spatially distributed chemical signals that influence growth patterns. The importance of these factors is
+further demonstrated in Fig. 4d, where we compare the performance of circuits with ablated inputs. Removing
+the chemical factors significantly impairs the cluster’s self-regulation capabilities, confirming that both chemical and
+mechanical regulation are essential in this context. Moreover, the gene network outputs appear to track both the
+shape of the fields and patterns of stress accumulation (Fig. 4e, Supp Fig. S6c), consistent with a mechanical feedback
+mechanism.
+ADDITIONAL EXPERIMENTS
+We report in the Supplementary Information a set of additional experimental setups that we omitted from the
+main text to focus on the most biologically relevant findings. We provide here a brief summary of such examples,
+to further stress the flexibility of our method and possibly inspire further applications. When cells have access to
+estimates of chemical gradients constructed by communicating with nearest neighbors, they can learn to elongate in
+one direction (Fig. S2) and grow in a branched shape (Fig. S3) by only including a single cell type. In these cases they
+learn to create emergent chemical gradients without the need for external asymmetric sources and show remarkable
+robustness to cell removal. We also show that, besides chemical secretion and division propensity, we can endow cells
+with control over their adhesion strength. By regulating a set of homotypic and heterotypic “cadherins”, cells can
+learn basic assembly programs for checkerboard, lobed and core-shell structures (Fig S1).
+DISCUSSION
+Our results demonstrate the power of gradient-based optimization methods in discovering mechanisms within the
+space of physical models for collective cell behavior. By taking gradients through a physical model of interacting cells
+written using automatically differentiable code, we were able to learn decision-making programs within individual
+cells to orchestrate growth into target shapes or with other target properties. We were able to overcome challenges
+associated with differentiating through the discrete nature of cell division events and non-differentiable loss functions
+with an approach based on classic reinforcement learning. The mechanisms that were learned took the form of gene
+regulatory networks, which readily offer a physical and biological interpretation. The learned mechanisms were local
+in nature: cells did not have access to global information (e.g. their absolute position) and had to infer it instead by
+sensing chemicals and mechanics and communicating with nearby cells through these physical channels.
+The gene networks optimized here could be substituted with more detailed biophysical models or constrained to
+incorporate prior biological knowledge. Furthermore, the soft sphere model we have presented here is simply one of
+the possible choices. The physical details can be modified to optimize over an alternative bespoke forward model
+with the same methods we demonstrated in this work. Questions about minimal mechanisms, robustness to variation
+and perturbations, number of unique solutions or growth principles could also be framed and investigated within the
+
+
+===== PAGE 9 =====
+
+9
+same setting.
+Our results are a promising first step towards inferring mechanisms in existing multicellular systems or learning how
+to program them for desired behaviors. In particular, morphogenetic mechanisms frequently utilize local feedback
+to coordinate intricate forms, often through chemical or mechanical signals. Examples include a myriad of devel-
+opmental systems, from the development of the wing imaginal disc in Drosophila to the periodic segmentation of
+blocks in somitogenesis.
+The development of robust and useful organoid systems also requires an understanding
+of spatiotemporal chemical and physical cues needed to guide the growth of stem cells. Physical models could be
+optimized to reproduce experimental data from time-lapse imaging of such developmental systems to gain insights
+into individual decision making functions that recapitulate complex behaviors. Gene expression datasets could be
+incorporated to bridge the gap between known and unknown information in biological systems. Maximization or
+minimization principles could be explored beyond simplified models. Our work opens up a multitude of avenues for
+further explorations of the landscape of growth programs for desired emergent behaviors in living systems.
+MATERIALS AND METHODS
+Fully differentiable, hardware-accelerated simulations were coded using the JAX python library [26] and other
+libraries in the JAX ecosystem. In particular, JAX-MD [28] was used to perform molecular dynamics simulations for
+cell mechanics and Equinox [27] as the simulation backbone.
+We proceed to give a very succinct overview of the main components of our model. A full mathematical account of
+simulation and optimization details is given in the Supplementary Information.
+Cell division and growth
+Each cell i is endowed with a division propensity di calculated by the internal gene network. One cell divides at
+each time step, with probability:
+P(i divides) =
+di
+P
+i di
+The division substitutes one mature cell with two newborn cells with half the volume. The angular orientation of the
+division plan is chosen uniformly at random.
+Cells’ radii Ri grow linearly in time up to a maximum radius Rmax:
+Ri(t + ∆t) = min(Ri(t) + ∆R, Rmax)
+Mechanical interactions
+Cells are modeled as adhesive soft spheres. Interactions are defined by the Morse energy potential:
+Vij(r) = ϵij
+h
+1 −e−αij(rij−σij)i2
+−ϵij
+where ϵij is the well depth for the potential between particle i and j, αij is the range of interaction, σij is the sum of
+radii of particles i and j, and rij is the distance between the two particles.
+Diffusion
+We assume that chemicals diffuse freely in the environment and are taken up by cells at a constant rate. It is also
+assumed that diffusion is much faster than all other processes and can be therefore be considered at steady state. For
+any one chemical k:
+
+
+===== PAGE 10 =====
+
+10
+∂ck
+∂t = Dk∇2ck −Kkck + Sk = 0
+The equation is discretized and solved on the lattice formed by the cells’ centers with the graph Laplacian technique.
+Genetic regulatory interactions
+We model internal cell decision functions with a simple ODE model of gene regulation inspired by Hiscock [24]:
+dgi
+dt = ϕ(ΣjWijgj + bi) + Ii −kigi
+Considering the i-th gene, gi is the expression level, Wij is the regulatory influence of gene j on i, bi determines the
+gene transcription rate in absence of regulation, ki is the degradation rate, and Ii is a forcing signal coming from one
+of the sensed cell inputs. ϕ is a sigmoid function that ensures positive transcription rates saturating at high input
+levels.
+Gradient calculation
+Due to the presence of discrete stochastic events, the gradients of simulations involving cell division events cannot
+be calculated by direct application of the chain rule. Following REINFORCE [29], we can estimate the gradient of
+the expected loss for a single simulation:
+∇θL(θ) ≈
+T −1
+X
+t=0
+Lt∇θ log πθ(at|st)
+where Lt is the discounted future loss, θ represents the trainable gene network parameters and π is the probability of
+the division event parametrized by θ.
+ACKNOWLEDGMENTS
+This work is dedicated to the memory of Alma Dal Co. We thank for insightful discussions: the members of the
+Brenner Group, the members of the former Dal Co group, Boris Shraiman and Dillon Cislo. R.D. thanks Herv´e
+Turlier for helpful discussions. This work was supported by the Office of Naval Research through grant numbers ONR
+N00014-17-1-3029, ONR N00014-23-1-2654 and the NSF AI Institute of Dynamic Systems (2112085).
+DATA AVAILABILITY
+The custom library written to conduct this study is available at https://github.com/fmottes/jax-morph/, along
+with tutorial notebooks.
+[1] M. Rubenstein, A. Cornejo, and R. Nagpal, Programmable self-assembly in a thousand-robot swarm, Science 345, 795
+(2014).
+[2] C. Collinet and T. Lecuit, Programmed and self-organized flow of information during morphogenesis, Nature Reviews
+Molecular Cell Biology 22, 245 (2021).
+[3] J. Davies, Using synthetic biology to explore principles of development, Development (Cambridge, England) 144, 1146
+(2017).
+[4] J. J. Velazquez, E. Su, P. Cahan, and M. R. Ebrahimkhani, Programming Morphogenesis through Systems and Synthetic
+Biology, Trends in biotechnology 36, 415 (2018).
+
+
+===== PAGE 11 =====
+
+11
+[5] Y. Ma, M. W. Budde, M. N. Mayalu, J. Zhu, A. C. Lu, R. M. Murray, and M. B. Elowitz, Synthetic mammalian signaling
+circuits for robust cell population control, Cell 185, 967 (2022).
+[6] S. Toda, W. L. McKeithan, T. J. Hakkinen, P. Lopez, O. D. Klein, and W. A. Lim, Engineering synthetic morphogen
+systems that can program multicellular patterning, Science (New York, N.Y.) 370, 327 (2020).
+[7] M. A. Lancaster, N. S. Corsini, S. Wolfinger, E. H. Gustafson, A. Phillips, T. R. Burkard, T. Otani, F. J. Livesey, and
+J. A. Knoblich, Guided self-organization and cortical plate formation in human brain organoids, Nature biotechnology 35,
+659 (2017).
+[8] A. Lewis, R. Keshara, Y. H. Kim, and A. Grapin-Botton, Self-organization of organoids from endoderm-derived cells,
+Journal of Molecular Medicine 99, 449 (2021).
+[9] J. A. Brassard and M. P. Lutolf, Engineering Stem Cell Self-organization to Build Better Organoids, Cell Stem Cell 24,
+860 (2019).
+[10] M. M. Sthijns, V. L. LaPointe, and C. A. van Blitterswijk, Building Complex Life Through Self-Organization, Tissue
+Engineering. Part A 25, 1341 (2019).
+[11] S. Werner, H. T.-K. Vu, and J. C. Rink, Self-organization in development, regeneration and organoids, Current Opinion
+in Cell Biology Cell Architecture, 44, 102 (2017).
+[12] M. Hofer and M. P. Lutolf, Engineering organoids, Nature Reviews Materials 6, 402 (2021).
+[13] P. Fran¸cois and V. Hakim, Design of genetic networks with specified functions by evolution in silico, Proceedings of the
+National Academy of Sciences of the United States of America 101, 580 (2004).
+[14] P. Fran¸cois, V. Hakim, and E. D. Siggia, Deriving structure from evolution: metazoan segmentation, Molecular systems
+biology 3, 154 (2007).
+[15] J. M. Osborne, A. G. Fletcher, J. M. Pitt-Francis, P. K. Maini, and D. J. Gavaghan, Comparing individual-based approaches
+to modelling the self-organization of multicellular tissues, PLoS Computational Biology 13, e1005387 (2017).
+[16] S. Runser, R. Vetter, and D. Iber, Simucell3d: three-dimensional simulation of tissue mechanics with cell polarization,
+Nature Computational Science 4, 299 (2024).
+[17] R. Anil, A. M. Dai, O. Firat, M. Johnson, D. Lepikhin, A. Passos, S. Shakeri, E. Taropa, P. Bailey, Z. Chen, et al., Palm
+2 technical report, arXiv preprint arXiv:2305.10403 (2023).
+[18] T. Brown, B. Mann, N. Ryder, M. Subbiah, J. D. Kaplan, P. Dhariwal, A. Neelakantan, P. Shyam, G. Sastry, A. Askell,
+et al., Language models are few-shot learners, Advances in neural information processing systems 33, 1877 (2020).
+[19] C. P. Goodrich, E. M. King, S. S. Schoenholz, E. D. Cubuk, and M. P. Brenner, Designing self-assembling kinetics with
+differentiable statistical physics models, Proceedings of the National Academy of Sciences 118, e2024083118 (2021).
+[20] Y. Bar-Sinai, S. Hoyer, J. Hickey, and M. P. Brenner, Learning data-driven discretizations for partial differential equations,
+Proceedings of the National Academy of Sciences 116, 15344 (2019).
+[21] M. C. Engel, J. A. Smith, and M. P. Brenner, Optimal control of nonequilibrium systems through automatic differentiation,
+Physical Review X 13, 041032 (2023).
+[22] R. A. Vargas-Hern´andez, R. T. Q. Chen, K. A. Jung, and P. Brumer, Fully differentiable optimization protocols for
+non-equilibrium steady states, New Journal of Physics 23, 123006 (2021).
+[23] A. Mordvintsev, E. Randazzo, E. Niklasson, and M. Levin, Growing Neural Cellular Automata, Distill 5, e23 (2020).
+[24] T. W. Hiscock, Adapting machine-learning algorithms to design gene circuits, BMC Bioinformatics 20, 214 (2019).
+[25] H. Koyama, H. Okumura, A. M. Ito, K. Nakamura, T. Otani, K. Kato, and T. Fujimori, Effective mechanical potential
+of cell–cell interaction explains three-dimensional morphologies during early embryogenesis, PLOS Computational Biology
+19, e1011306 (2023), publisher: Public Library of Science.
+[26] J. Bradbury, R. Frostig, P. Hawkins, M. J. Johnson, C. Leary, D. Maclaurin, G. Necula, A. Paszke, J. VanderPlas,
+S. Wanderman-Milne, and Q. Zhang, JAX: composable transformations of Python+NumPy programs (2018).
+[27] P. Kidger and C. Garcia, Equinox: neural networks in JAX via callable PyTrees and filtered transformations, Differentiable
+Programming workshop at Neural Information Processing Systems 2021 (2021).
+[28] S. S. Schoenholz and E. D. Cubuk, Jax m.d. a framework for differentiable physics, in Advances in Neural Information
+Processing Systems, Vol. 33 (Curran Associates, Inc., 2020).
+[29] R. S. Sutton and A. G. Barto, Reinforcement Learning: An Introduction, 2nd ed. (The MIT Press, 2018).
+[30] https://github.com/fmottes/jax-morph/tree/eqx/tutorials (2024), accessed: 2024-07-06.
+[31] D. P. Kingma and J. Ba, Adam: A Method for Stochastic Optimization (2017), arXiv:1412.6980 [cs].
+[32] Y. Guo, M. Nitzan, and M. P. Brenner, Programming cell growth into different cluster shapes using diffusible signals,
+PLOS Computational Biology 17, e1009576 (2021).
+[33] S. Darras, J. H. Fritzenwanker, K. R. Uhlinger, E. Farrelly, A. M. Pani, I. A. Hurley, R. P. Norris, M. Osovitz, M. Terasaki,
+M. Wu, J. Aronowicz, M. Kirschner, J. C. Gerhart, and C. J. Lowe, Anteroposterior axis patterning by early canonical
+wnt signaling during hemichordate development, PLoS Biology 16, e2003698 (2018).
+[34] C. Lam, S. Saluja, G. Courcoubetis, D. Yu, C. Chung, J. Courte, and L. Morsut, Parameterized computational framework
+for the description and design of genetic circuits of morphogenesis based on contact-dependent signaling and changes in
+cell-cell adhesion, ACS synthetic biology 11, 1417 (2022).
+[35] J. Courte, C. Chung, N. Jain, C. Salazar, N. Phuchane, S. Grosser, C. Lam, and L. Morsut, Programming the elongation
+of mammalian cell aggregates with synthetic gene circuits, bioRxiv , 2024.12.11.627621 (2024).
+[36] B. Boehm, H. Westerberg, G. Lesnicar-Pucko, S. Raja, M. Rautschka, J. Cotterell, J. Swoger, and J. Sharpe, The role of
+spatially controlled cell proliferation in limb bud morphogenesis, PLoS biology 8, e1000420 (2010).
+[37] J. Hicks-Berthet, B. Ning, A. Federico, A. Tilston-Lunel, A. Matschulat, X. Ai, M. E. Lenburg, J. Beane, S. Monti, and
+X. Varelas, Yap/taz inhibit goblet cell fate to maintain lung epithelial homeostasis, Cell Reports 36, 109347 (2021).
+
+
+===== PAGE 12 =====
+
+12
+[38] J. M. Kim, C. Lin, Z. Stavre, M. B. Greenblatt, and J. H. Shim, Osteoblast-osteoclast communication and bone homeostasis,
+Cells 9, 2073 (2020).
+[39] X. Zhou, R. A. Franklin, M. Adler, J. B. Jacox, W. Bailis, J. A. Shyer, R. A. Flavell, A. Mayo, U. Alon, and R. Medzhitov,
+Circuit Design Features of a Stable Two-Cell System, Cell 172, 744 (2018), publisher: Elsevier.
+[40] N. Saiz, L. Mora-Bitria, S. Rahman, H. George, J. P. Herder, J. Garcia-Ojalvo, and A. K. Hadjantonakis, Growth-factor-
+mediated coupling between lineage size and cell fate choice underlies robustness of mammalian development, eLife 9, e56079
+(2020).
+[41] D. Raina, A. Bahadori, A. Stanoev, M. Protzek, A. Koseska, and C. Schr¨oter, Cell-cell communication through FGF4
+generates and maintains robust proportions of differentiated cell types in embryonic stem cells, Development 148, dev199926
+(2021).
+[42] P. Agarwal and R. Zaidel-Bar, Mechanosensing in embryogenesis, Current Opinion in Cell Biology Cell Architecture, 68,
+1 (2021).
+[43] K. D. Irvine and B. I. Shraiman, Mechanical control of growth: ideas, facts and challenges, Development 144, 4238 (2017).
+[44] D.-C. Trinh, J. Alonso-Serra, M. Asaoka, L. Colin, M. Cortes, A. Malivert, S. Takatani, F. Zhao, J. Traas, C. Trehin, and
+O. Hamant, How Mechanical Forces Shape Plant Organs, Current biology: CB 31, R143 (2021).
+[45] L. LeGoff, H. Rouault, and T. Lecuit, A global pattern of mechanical stress polarizes cell divisions and cell shape in the
+growing Drosophila wing disc, Development 140, 4051 (2013).
+[46] B. I. Shraiman, Mechanical feedback as a possible regulator of tissue growth, Proceedings of the National Academy of
+Sciences 102, 3318 (2005), publisher: Proceedings of the National Academy of Sciences.
+[47] L. Hufnagel, A. A. Teleman, H. Rouault, S. M. Cohen, and B. I. Shraiman, On the mechanism of wing size determination
+in fly development, Proceedings of the National Academy of Sciences 104, 3835 (2007), publisher: Proceedings of the
+National Academy of Sciences.
+[48] B. K. Tripathi and K. D. Irvine, The wing imaginal disc, Genetics 220, iyac020 (2022).
+
+
+===== PAGE 13 =====
+
+SUPPLEMENTARY INFORMATION
+Engineering morphogenesis of cell clusters with differentiable programming
+Ramya Deshpande∗, Francesco Mottes∗, Ariana-Dalia Vlad, Michael Brenner and Alma Dal Co
+CONTENTS
+I. Forward Simulation
+2
+Cell Growth
+2
+Mechanical Interactions
+2
+Cell Division
+2
+Diffusion
+3
+Chemical Gradients
+4
+Mechanical Stress
+4
+Gene Networks
+4
+II. The REINFORCE Optimization Algorithm
+4
+A. Underlying Theory
+4
+Markov Decision Processes
+4
+Policy Gradients Theorem
+5
+Monte Carlo Estimation
+6
+Parameters Update Rule
+6
+Baseline for Variance Reduction
+6
+B. Optimization of Cell Divisions
+6
+III. Additional Results
+7
+Chemical Regulation of Cellular Adhesion
+7
+Elongation (Single cell type)
+8
+Branching
+8
+IV. Experiment Details
+10
+Chemical Regulation of Cellular Adhesion
+10
+Elongation (Two cell types)
+10
+Elongation (Single cell type)
+11
+Branching
+11
+Chemical Homeostasis
+11
+Mechanical Control of Cell Proliferation
+14
+V. Scaling of Optimization Performance with Model Complexity
+16
+References
+17
+arXiv:2407.06295v3  [q-bio.CB]  27 Feb 2025
+
+
+===== PAGE 14 =====
+
+2
+I.
+FORWARD SIMULATION
+We run simulations using JAX-MD [1], a molecular dynamics engine built using the automatic differentiation
+framework JAX [2]. Cells are particles instantiated in ”free” space, with a set of properties represented by a CellState
+datatype; this object contains the position of particles, their radii, division propensities, chemical concentrations at
+the center of each cell and any additional state information appropriate for a simulation (for example: stress, finite
+difference gradients of the chemical concentrations, etc.). At the start of the simulation, arrays of size (T, n + T,
+Dim) are instantiated for each property in CellState, where T is the number of timesteps, n is the initial number of
+cells, and Dim is the dimension of the cell property (2D or 3D). Each simulation timestep consists of one cell division,
+so the final configuration will contain N = n + T cells.
+To create an initial state with n cells, we place a cell at the origin, and run n −1 iterations of cell division, cell
+growth, and mechanical relaxation to generate a cluster of the desired initial size. All division propensities are equal
+in the initial state, so each cell is chosen to divide with equal probability, generating a radially symmetric cluster. The
+actual simulation can be customized to contain any subset or combination of the steps detailed below; the specifics of
+the simulation used for each instantiation in the main text is detailed in the Experimental Details section. The code
+used for the simulations can be found in the following GitHub repository: https://github.com/fmottes/jax-morph.
+Cell Growth
+All cell radii grow constantly in time, up to a specified maximum radius Rmax:
+Ri(t + ∆t) = min(Ri(t) + ∆R, Rmax)
+This operation can also be made differentiable if necessary, by means of a suitable smoothing function in place of
+the hard min operation.
+Mechanical Interactions
+Cells mechanically interact with one another via a pairwise Morse potential. The potential has a minimum at
+a distance defined by the sum of the two interacting cells’ radii. It is very repulsive at shorter distances (volume-
+exclusion interactions) and slightly attractive at longer distances (cell-cell adhesion). The range of attraction, the
+strength of the exclusion and the stiffness of the interaction can be modified by changing the potential parameters.
+Relaxation is performed by gradient descent energy minimization of the Morse potential for a fixed number of steps
+(except in the case where we learn cell adhesion). The pairwise potential is defined by the following expression:
+Vij(r) = ϵij
+h
+1 −e−αij(rij−σij)i2
+−ϵij
+where ϵij is the well depth for the potential between particle i and j, αij is the range of interaction, σij is the sum
+of radii of particles i and j, and rij is the distance between the two particles. In most simulations, we assume for
+simplicity that αij = α and ϵij = ϵ. This need not be the case in general. In particular, in the example where we learn
+the regulation of cell-to-cell adhesion, the values of ϵij are determined by the cells’ internal regulatory mechanisms.
+Cell Division
+Each cell i is endowed with a division propensity di calculated by the internal gene network and stored in the
+CellState. One cell divides at each time step, with probability:
+P(i divides) =
+di
+P
+j dj
+A cell i is first randomly chosen to divide with these probabilities. A random direction is then selected as θ ∈[0, 2π].
+The positions of the daughter cells are calculated as:
+
+
+===== PAGE 15 =====
+
+3
+¯r1,x = ¯r0,x + Rbirthcos(θ), ¯r1,y = ¯r0,y + Rbirthsin(θ)
+(1)
+¯r2,x = ¯r0,x −Rbirthcos(θ), ¯r2,y = ¯r0,y −Rbirthsin(θ)
+(2)
+where (¯r1,x, ¯r1,y) and (¯r2,x, ¯r2,y) are the positions of the daughter cells, (¯r0,x, ¯r0,y) is the position of the mother cell
+and Rbirth is fixed as the radius of newly born cells. Each daughter cell inherits all other properties of its mother cell.
+Diffusion
+We assume that chemicals diffuse freely in the environment and are taken up by cells at a constant rate. It is also
+assumed that diffusion is much faster than all other processes and can be therefore be considered at steady state.
+Concentrations of a chemical k (in arbitrary units) at each cell site are determined by the following equation:
+∂ck
+∂t = Dk∇2ck −Kkck + Sk = 0
+The equation is discretized and solved on the lattice formed by the cells’ centers with the graph Laplacian technique.
+The PDE above is first reformulated by substituting the diffusion operator with the discrete graph Laplacian L. This
+results in a linear system of ODEs for each chemical, describing the concentration of a chemical on each lattice site.
+The equation is then solved for the steady state concentrations {ck}:
+∂ck
+∂t = DkLck −Kkck + Sk = 0
+Dk is the diffusion coefficient of chemical k and Kk is the uptake rate for chemical k, the same for every cell for
+simplicity. Sk is an N x 1 vector of secretion rates of chemical k by every cell, calculated by the gene networks. ck is
+an N x 1 vector containing the concentration of chemical k at all cell sites. The discrete graph Laplacian operator is
+constructed as:
+L = deg(A) −A
+where A is the adjacency matrix that describes the connections between the discrete spatial sites. deg(A) is a matrix
+that has the sum of A’s rows (that is, the node degrees) as diagonal elements and is zero everywhere else. For all cells
+i:
+{deg(A)}ii =
+N
+X
+j=0
+Aij
+Apart from the branching and homogeneous growth examples, we construct the graph Laplacian to simulate diffusion
+in a closed system with reflecting boundary conditions. In this case the adjacency matrix A is calculated as the inverse
+of the pairwise distance between every pair of cells:
+Aij =
+1
+dist(i, j) =
+1
+∥¯ri −¯rj∥
+In order to simulate permeable boundaries without the additional burden of having a higher resolution lattice only
+for chemical diffusion, we adopt an approximate approach. We now construct the adjacency matrix by connecting
+cells that are nearest neighbors with an edge of weight 1 (that is approximately their distance) and zero otherwise:
+Aij =
+(
+1
+if dist(i, j) ≤Ri + Rj
+0,
+otherwise
+We then heuristically detect the nodes that are on the boundaries of the cluster by looking at the number of nodes
+they are connected to. We connect all of these boundary nodes to a ghost sink node that receives and dissipates
+chemicals, to simulate the effect of chemicals lost in the medium surrounding the cluster. In practice, this is done by
+adding, in the degree matrix, an extra unit of degree to the nodes on the boundary.
+
+
+===== PAGE 16 =====
+
+4
+Chemical Gradients
+Multicellular collectives can infer weak concentration gradients across the collective through individual cells mea-
+suring differences in chemical concentrations across their diameters [3]. To achieve such an estimate of the spatial
+gradient of chemical k sensed by cell j, a unit vector pointing to each nearest neighbor i of cell j is scaled by the
+concentration of chemical k in those cells, and the the contributions from all neighbors are summed up:
+∇ck(¯rj) ≈
+X
+i∈nn(j)
+ck(¯ri) ¯ri −¯rj
+∥¯ri −¯rj∥
+(3)
+Here, ¯ri is the position of cell i, and ck(¯ri) is the concentration of chemical k at position ¯ri.
+Mechanical Stress
+As a proxy for the mechanical stress exerted by cell i on cell j in our 2D environment, the component-wise force
+on i by j, (Fij,x, Fij,y), is multiplied by the component-wise unit vector pointing from j to i, (¯rj,x −¯ri,x, ¯rj,y −¯ri,y);
+this is summed over the components. For cell i we compute:
+σi = Σj
+
+Fij,x · ¯rj,x −¯ri,x
+|¯rj,x −¯ri,x| + Fij,y · ¯rj,y −¯ri,y
+|¯rj,y −¯ri,y|
+
+This formulation allows for differentiation between compressive and tensile forces.
+Gene Networks
+Methods presented in Hiscock et al. [4] are adapted to model N genes that can interact with each other, with
+the sign of the interaction term determining whether it is an activating or inhibitory coupling. Weights of the gene
+networks are shared by all cells, in the same spirit in which actual cells share the same genetic material. Gene networks
+are specified by the following ODE model:
+dgi
+dt = ϕ(ΣjWijgj + bi) + Ii −kigi
+(4)
+Considering the i-th gene, gi is the expression level, Wij is the regulatory influence of gene j on i, bi determines the
+gene transcription rate in absence of regulation, ki is the degradation rate, and Ii is a forcing signal coming from one
+of the sensed cell inputs. ϕ is a sigmoid function that ensures positive transcription rates saturating at high input
+levels. Local signals sensed by the cell (chemicals, stress, etc.) are fed as input signal to input nodes in the network
+(colored green in the diagrams in the main text). All other genes receive no external inputs. The last output gene’s
+readout is the division propensity, and the last Nc genes readout the secretion rates of chemicals. In the case where
+cellular adhesion is chemically regulated, there are also output genes that readout cadherin concentrations.
+II.
+THE REINFORCE OPTIMIZATION ALGORITHM
+A.
+Underlying Theory
+REINFORCE is a widely used reinforcement learning algorithm that allows to optimize the action policy directly,
+in a context where stochastic decisions must be taken. This is the algorithm we use for most of our optimizations,
+and below are the main steps in its derivation.
+Markov Decision Processes
+We assume that our simulation follows a Markov Decision Process (MDP). That is, the probability of a trajectory
+τ is the product of the probability of the initial state and the probabilities of each action and state transition along
+
+
+===== PAGE 17 =====
+
+5
+the trajectory. Let τ = (s0, a0, s1, a1, . . . , sT , aT ) represent a trajectory, where st and at are the state and action
+(cell division) at time t, respectively. Assume π(at|st) is the policy (the division propensity calculated by the gene
+network), P(st+1|st, at) is the state transition probability, and P(s0) is the initial state distribution. The probability
+of the trajectory τ is given by:
+P(τ) = P(s0)
+T
+Y
+t=0
+π(at|st)P(st+1|st, at)
+Where:
+P(s0) is the probability of the initial state s0
+π(at|st) is the probability of taking action at given state st
+P(st+1|st, at) is the probability of transitioning to state st+1 given state st and action at.
+Policy Gradients Theorem
+The goal is to maximize the expected return J(θ), where θ are the parameters of the policy πθ(a|s). The expected
+return is defined as:
+J(θ) = Eπθ [Gt]
+where Gt is the (possibly discounted) return starting from time step t. The expected gradient of the return with
+respect to the policy parameters θ can be computed using the log-derivative trick, also known as the REINFORCE
+algorithm. The expected return J(θ) is given by:
+J(θ) =
+X
+τ
+P(τ)G(τ)
+The gradient of the expected return is:
+∇θJ = ∇θ
+X
+τ
+P(τ)G(τ) =
+X
+τ
+G(τ)∇θP(τ)
+Using the log-derivative trick, ∇θP(τ) can be written as:
+∇θP(τ) = P(τ)∇θ log P(τ)
+Thus, the expected gradient is:
+∇θJ(θ) =
+X
+τ
+P(τ)G(τ)∇θ log P(τ)
+Using the definition of MDP given above, the gradient of the expected return with respect to θ can be simplified to
+only include the policy πθ:
+∇θJ(θ) = Eπθ [∇θ log πθ(a|s)Gt]
+
+
+===== PAGE 18 =====
+
+6
+Monte Carlo Estimation
+In practice, the expectation is estimated using Monte Carlo sampling. By sampling trajectories τ = (s0, a0, r0, s1, a1, r1, . . .)
+from the policy πθ, the gradient can be approximated as:
+∇θJ(θ) ≈1
+N
+N
+X
+i=1
+T −1
+X
+t=0
+∇θ log πθ(ai
+t|si
+t)Gi
+t
+where N is the number of sampled trajectories, and T is the length of each trajectory.
+Parameters Update Rule
+The REINFORCE algorithm updates the policy parameters θ by gradient ascent (if we are considering the case of
+maximizing total rewards):
+θ ←θ + η∇θJ(θ)
+where η is the learning rate. In order to calculate the actual update, we substitute the Monte Carlo gradient estimate
+for the gradient derived above.
+Baseline for Variance Reduction
+To reduce the variance of the gradient estimate, a baseline function b(st) is introduced, leading to the modified
+gradient:
+∇θJ(θ) = Eπθ [∇θ log πθ(a|s)(Gt −b(st))]
+A common choice for the baseline is the state-value function V π(st), which represents the expected return from state
+st. Another common basic technique for variance reduction is to normalize the rewards after each batch of simulations,
+resulting in half of the actions being favored and half unfavored on average. We adopt the latter in this work.
+B.
+Optimization of Cell Divisions
+In our simulations, we consider the policy to be the gene regulatory network inside each cell. Cells sense inputs
+from the environment and use them to decide how likely they should be to divide next. Notice that a loss applied
+naively at the end of the simulation — like for example a measure of distance from a given target — would produce
+undefined gradients. Stochastic operations (like sampling a cell for division) do not have a mathematically well-
+defined differentiation rule; therefore as soon as the back-propagation procedure encounters such operations, the
+whole gradient becomes ill-defined (or zero, in practice in the code). In order to overcome this obstacle, we resort to
+techniques like the one presented in the previous section.
+Our simulation presents an additional complication with respect to the policy gradient case defined above. Cells
+influence the environment not only through their division decisions but also, mainly, through the modulation of
+chemical secretion. This creates a long feedback loop connecting secretions at one step to the chemical landscape at
+the next step, which in turn influences division decisions. As a consequence, the gradient of a loss applied to cell
+division events – like REINFORCE – must be propagated through the environment updates till the very beginning
+of the simulation. This makes automatic differentiation algorithms critical for this sort of optimization.
+In all our optimizations, we use the Adam optimizer for gradient descent (hyperparameters are listed below).
+Reported losses, here and in the main text, are validation losses calculated on a batch of simulations different from
+the one used for updating the parameters.
+
+
+===== PAGE 19 =====
+
+7
+a
+b
+c
+1
+1
+1
+2
+Loss
+Loss
+Loss
+Epoch
+Epoch
+Epoch
+homotypic 
+adhesion molecule
+heterotypic
+adhesion molecule
+activation
+inhibition
+FIG. S1. Chemical Regulation of Cellular Adhesion. Learned chemical regulation of cellular adhesion guides the assembly
+of different spatial cluster arrangements. The top part of the panels show the training loss curves for three different optimization
+targets. The insets show the final state of a simulation after the learning, with colors denoting different cell types. The bottom
+sections show the learned and pruned gene network; Cad1, Cad2, and Cad3 are the homotypic cadherins of the three cell
+types, and Het is the heterotypic cadherin expressed in all cell types. (a) Lattice-like structure. Cells are arranged to minimize
+the sum of pairwise distances between heterotypic cells. (b) Lobed structure. Cells minimize the sum of pairwise distances
+between homotypic cells. (c) Core-shell structure. Cells are arranged to minimize the distance of cells from a predefined radius,
+dependent on their type. The final configuration is here shown as a cross-section to highlight the internal structure.
+III.
+ADDITIONAL RESULTS
+We report in this section on a set of additional experiments and results that we do not include in the main text.
+Chemical Regulation of Cellular Adhesion
+The differential adhesion hypothesis posits that populations of cells can adopt specific morphologies based on
+differences in adhesive strength [5].
+During morphogenesis, a cadherin code regulates the spatial organization of
+developing tissue [6, 7].
+Engineered cellular circuits can use gene regulatory networks to dynamically modulate
+adhesion and program self-organization [8]. Here, we show that gene interactions can be learned that use chemical
+signaling to modulate homotypic and heterotypic adhesion to achieve a target spatial pattern in a population with
+different cell types.
+In our model, a population of three cell types is subject to Brownian motion and interacts via a Morse pairwise
+potential. The well depth of the potential between a pair of cells is dictated by the concentration of homotypic
+and heterotypic “cadherins” in each cell. Each cell type produces its respective homotypic cadherin and a shared
+heterotypic cadherin, regulated by chemical signaling. Each cell type utilizes the same gene network, but can only
+secrete chemicals and express cadherins of its own type. To achieve a desired spatial organization, we construct three
+loss functions based on pairwise distances between cells. For a lattice-like structure, we minimize the sum of pairwise
+distances between cells of different types (Fig S1a). To organize the structure into three lobes, we minimize the sum
+of pairwise distances between cells of the same type (Fig S1b). To achieve a core-shell structure, we minimize the
+
+
+===== PAGE 20 =====
+
+8
+a
+b
+c
+activation
+inhibition
+FIG. S2. Elongation. Maximization of the squared sum of the z-coordinates of cells, resulting in vertical elongation in the
+optimized cluster. (a) Loss curve for one successful optimization run. On the left the final configuration of a simulation with
+randomly initialized parameters, on the right the final state after learning. (b) Visualization of the optimized and pruned gene
+network, displaying activation and inhibition interactions that regulate cell behavior during elongation. (c) Two examples of
+emerging chemical gradients that are used to guide growth.
+distance of each cell to a pre-specified radius, based on the cell type (Fig S1c).
+We model cell adhesion in 3D, with a cluster of 60 cells that do not divide. The cluster has three cell types, 3
+cell-type specific signalling chemicals and 0 hidden genes. Each cell’s gene regulatory network senses as input only
+local chemical concentrations, and outputs the concentration of a homotypic cadherin (controlling the well depth
+between the same cell type) and a heterotypic cadherin (controlling the well depth with a different cell type).
+The optimization process identifies effective solutions by allowing cells to observe their own type and regulate the
+pairwise potential between cell types. For a lattice-like structure, cells up-regulate their heterotypic cadherin and
+down-regulate their homotypic cadherin. Conversely, to create a lobed structure, they up-regulate their homotypic
+cadherin and down-regulate their heterotypic cadherin. These patterns of homo- and heterotypic adhesion are consis-
+tent with observations from cell culture sorting experiments [6]. Although the formation of a lattice and lobe structure
+are trivial, achieving a core-shell structure with three cell types requires a more complex regulatory network to achieve
+the correct differential adhesion - the inner cells have strong homotypic adhesion, while the outermost cells require
+heterotypic adhesion to stick to the second layer of cells. (Fig S1c).
+Elongation (Single cell type)
+We model the elongation of a single cell type in three dimensions, optimizing the cell cluster to minimize the sum
+of squared z-coordinates, thus promoting vertical elongation (Fig. S2a). This contrasts with the previous example by
+focusing on a single cell type and incorporating the cells’ ability to sense chemical gradients. Each cell’s gene network
+receives as input local chemical concentrations, estimated chemical gradients, cell size, and division propensity (Fig.
+S2b). These inputs drive positional information inference through local physical communication. Simulations initiate
+with a single cell and proceed until the cluster reaches 120 cells.
+Critically, cells autonomously establish or manipulate existing chemical gradients to achieve the global elongated
+shape, a feature not explicitly encoded in the optimization objective (Fig.
+S2c).
+The gene networks evolve to
+concentrate cell division primarily at the cluster’s ends. Because the cluster boundary dynamically shifts with cell
+division, the gene networks must implement a sophisticated control mechanism to sustain directed growth.
+Branching
+We simulate the growth of a cluster from a single cell to 130 cells, restricting ourselves to the 2-dimensional case
+for computational simplicity. The simulation is initialized with 1 cell in 2D, and run for 129 cell division steps to
+
+
+===== PAGE 21 =====
+
+9
+a
+b
+c
+d
+N = 630
+N = 130
+FIG. S3. Branching. Optimizing growth in a V-shaped reward landscape results in a learned branched structure of the final
+cluster. (a) Loss curve for one successful optimization run. On the left, the final configuration of a simulation with randomly
+initialized parameters.
+On the right, the final state after learning with a visualization of the reward mask (red areas are
+associated to penalties, white ones with rewards). (b) Two examples of emerging chemical gradients that are used to guide
+growth. (c) Final optimized state after 129 cell divisions, the same number used for the training (top) and with 500 extra cell
+divisions. Note the spontaneous branching on the main arms. (d) Loss of the final state after removal, at random, of a fraction
+of cells. The red dashed line is the loss associated to the final simulation state before cell removals.
+generate a cluster of 130 cells. Simulations are done with 20 chemicals and 50 internal genes. With a similar spirit to
+diffusion-based geometry [9], we simulate permeable diffusive boundaries between the cell cluster and the surrounding
+implicit medium by connecting boundary cells to a ghost chemical sink node. Gene networks have access to the local
+chemical concentrations, estimates of local chemical gradients, their own cell radius and division propensity. They do
+not have access to their own absolute spatial coordinates.
+To learn more complex branched structures, we construct a position-based shape loss. At each time point, cell
+divisions that place cells within the region designating the desired shape are assigned a reward, the others a penalty.
+In this case, we impose a V-shaped spatial reward structure (Fig. S3a on the right) augmented with an asymmetry
+penalty on the x-coordinate, in order to promote the growth of both arms at the same time. Also in this case, a variety
+of chemical patterns emerge in the learned simulation (Fig S3b), and the cluster learns to divide cells primarily at the
+tips of the branching structure. Clusters visually acquire a branched shape, even when simulated for 500 cell divisions
+more than optimized for. While shape errors clearly emerge, they do mostly in the form of smaller branches that
+begin to sprout from the main branched structure (Fig S3c). Furthermore, the learned network displays emergent
+regenerative capabilities. After reaching the final branched configuration, we remove a fraction of cells chosen at
+random and we allow the cluster grow back to its original size. As shown in Fig S3d, eliminating up to 60% of cells
+still results in the regeneration of a branched structure. Even more interestingly, it appears that randomly removing
+cell actually promotes error-correction in the regrowth, reaching even slightly better performances in the training loss.
+
+
+===== PAGE 22 =====
+
+10
+IV.
+EXPERIMENT DETAILS
+Chemical Regulation of Cellular Adhesion
+The simulation is initialized with 60 cells and 3 cell types, and done in 3D. Cell positions and identities are
+randomly initialized. For the lattice and lobe structures, the cluster consists of equal numbers of each cell type (20
+cells each); for optimizing a core-shell structure, the cluster consists of 10 blue cells, 20 yellow cells and 30 red cells.
+The simulation is run for 50 time steps, with 200 Brownian relaxation steps between each time step; the temperature
+is high to allow for sufficient rearrangement of the system without trapping. No cell division occurs. The simulation
+contains 0 internal genes, and each cell type can secrete 3 cell type specific morphogens.
+Cadherin.
+The system contains Nctype+ 1 cadherins, with each cell able to regulate concentrations of its cell
+type specific cadherin (cad1, cad2, etc.), as well as a heterotypic cadherin (het). The gene network takes as input
+sensed chemicals and regulates only the concentrations of cadherins. The well depth of the pairwise potential between
+cells is calculated as the sum of the concentration of homotypic cadherins (if they are the same cell type) or the sum
+of the concentration of heterotypic cadherins (if they are different cell types). This also ensures that the pairwise well
+depth matrix is always symmetric. The calculated well depth value is then scaled by a sigmoid to be between .8 and
+3.8, ensuring a stable range of values are used for the Morse potential.
+Optimization. Since there is no cell division in this simulation, we directly backpropagate through the simulation
+without using REINFORCE. To improve the quality of gradients when backpropagating through long simulations,
+we ”discount” gradients in the backward pass by a discounting factor of 0.99 - this results in gradients from time
+steps closer to the end of the simulation providing a greater contribution to the optimization. Training is done over
+a batch of 4 simulations, and the validation loss is averaged over a batch of 64 simulations. Additionally, at each
+gradient descent step, we constrain the learned network by setting to zero all outgoing edges from output nodes.
+Three different loss functions are utilized. To learn a lobe-like arrangement, the following loss is used:
+1
+Nt
+ΣtΣcell iΣcell j
+(
+dist(i, j),
+if type(i) == type(j)
+0,
+otherwise
+This is the sum of pairwise distances between cells of the same type, averaged over all time steps of the simulation.
+Conversely, to attain a lattice-like structure, the sum of pairwise dustances between unlike cell types is minimized:
+1
+Nt
+ΣtΣcell iΣcell j
+(
+0,
+if type(i) == type(j)
+dist(i, j),
+otherwise
+For the core-shell structure, the distance of cells from a predefined radius (based on the cell’s type) with respect to
+the center of the core cells is minimized:
+C = 1
+N1
+Σi∈type 1 cells ¯ri
+1
+Nt
+ΣtΣcell i
+
+
+
+
+
+(dist(i, C) −1)2,
+if type(i) == 1
+(dist(i, C) −2)2,
+if type(i) == 2
+(dist(i, C) −3)2,
+if type(i) == 3
+Here, C is the average position of the core cells, N1is the number or core cells, type(i) is the cell type of cell i, and
+dist(i,j) is the Euclidean distance between the positions of cells iand j. To optimize, we used a learning rate of 0.001
+for 1000 gradient descent steps with Adam optimizer. The weights of the gene network are not regularized, but the
+network is distilled by pruning.
+Elongation (Two cell types)
+This is the elongation example shown in the main text. The initial state is composed of 15 cells, 10 source cells
+and 5 proliferating cells. The simulation is run for 135 cell division events, so the final state has a total of 150 cells.
+
+
+===== PAGE 23 =====
+
+11
+Source cells secrete the chemical factor that diffuses through space. Proliferating cells sense the chemical factor and
+use this information to modulate cell division propensity.
+Optimization. The loss function is calculated as the sum of the squares of the x-coordinate of the cells. Training is
+done on a batch of 4 simulations. We use a learning rate of 0.005 for 1000 gradient descent steps with Adam optimizer.
+The weights of the learned gene network are L1-regularized with λ = 1..
+Elongation (Single cell type)
+The forward simulation is initialized with 1 cell in 3D, and run for 119 cell division steps. The simulation consists
+of 10 chemicals and 32 internal genes, and the gene network takes as input sensed chemical concentrations, chemical
+gradients, division propensities, and cell radii. Diffusion occurs in a closed system.
+Optimization.
+The loss function is calculated as the sum of the squares of the z-coordinate of each cell; mini-
+mizing this forces the cluster to elongate vertically. Training is done on a batch of 4 simulations, and a batch of 4
+simulations is used to evaluate the validation loss. We use a learning rate of 0.001 for 500 gradient descent steps
+with Adam optimizer. The weights of the learned gene network are L1-regularized with λ = .1. The weights of the
+gene network are initialized to values drawn from a normal distribution with σ = .1. The weights of the learned gene
+interaction matrix are pruned (set to zero) if they are below ϵ = 0.9. This threshold is determined by pruning the
+learned parameters at various thresholds and measuring the loss of 50 simulations run with pruned parameters (Fig.
+IVa).
+Branching
+Optimization. The loss function is calculated by defining a shape mask that specifies the region of space cells should
+occupy to be rewarded. Cells that are within the mask are given a reward of 3.0 and cells that are not are given
+a penalty of -1. These values are summed over all cells and an asymmetry penalty is added to prevent cells from
+forming just one branch. The asymmetry penalty is given by the absolute value of the sum of the x-coordinates of
+cells. We use a learning rate of 0.01 for 500 gradient descent steps with Adam optimizer. The weights of the learned
+gene network are L1-regularized with λ = .1. The weights of the gene network are initialized to values drawn from a
+normal distribution with σ = 0.1.
+Regeneration.
+To obtain the regeneration plot shown in Fig S3d, forward simulations are run using optimized
+parameters. A fraction f of cells is removed by deleting f ∗N random indices, where N is the total number of cells
+in the structure, and a simulation is run for (1 −f) ∗N steps using the partial structure as the initial state. The final
+loss after regeneration is averaged for 15 simulations, for various f ∈[0, 1].
+Chemical Homeostasis
+The simulation is initialized with 20 cells, and run for 100 cell division steps. The initial cells are divided into two
+cell types, where each cell type can only secrete one of two chemicals in the simulation. An initial imbalance between
+the two cell types is set by assigning 20% of the initial cells to be the first cell type and the remaining to be the
+second cell type. The simulation contains 8 internal genes, and the gene network takes as input the sensed chemical
+concentrations. Diffusion occurs in a closed system.
+In this case each cell type is equipped with a different regulatory network, shared among all cells of the same
+type. Each cell type can still only secrete one chemical of the two but sense the concentration of both of them. Fig
+IVa showcases gene networks for cell type 1 and 2 obtained from different optimization runs. Out of 20 optimization
+runs, 12 converged to the architectures in the top row, the other on one of the other two cases. Notice the consistency
+in the discovered architectures, especially of the stronger (bolder) connections. Fig IVb schematically represents the
+model optimized in this context.
+Optimization. The loss function is calculated as the imbalance in the number of cell types, given by:
+Lt = |num type 1 cells −num type 2 cells|
+
+
+===== PAGE 24 =====
+
+12
+Cell Type 2
+Cell Type 1
+Cell Type 1
+sc2
+sc1
+c1
+c2
+c1
+c2
+C1  , C2: genes encoding receptors 
+             that sense chemical 1 or 2
+Sc1  , Sc2: genes encoding proteins
+              that control secretion rate
+              of chemical 1 or 2
+Cell Type 2
+Optimization Run 1
+Optimization Run 2
+Optimization Run 3
+activation
+inhibition
+a
+b
+FIG. S4. Chemical Regulation of Homeostasis with Cell Type Specific Networks. (a) Gene network architectures for
+each cell type (on columns) obtained from different optimization runs (on rows). Green nodes are sensory inputs (i.e. sensed
+chemical concentrations, while red nodes are outputs (secretion of the cell type specific chemical and division probability). (b)
+Schematic representation of the model we optimize over.
+We used a learning rate of 0.01 for 400 gradient descent steps with Adam optimizer. The weights of the learned
+gene network are L1-regularized with λ = .1. To have the untrained state maintain the initial imbalance of the
+cell types in the generated structure, the weights of the gene network are initialized to very low values, resulting
+in a homogeneous division propensity that could only be broken by learning how to chemically regulate division to
+maintain equal numbers of cell types.
+
+
+===== PAGE 25 =====
+
+13
+a
+Elongation
+b
+Branching
+c
+Chemical Homeostasis
+FIG. S5.
+Elongation, Branching and Chemical Regulation of Homeostasis.
+Final losses for a range of pruning
+thresholds shown on the left for gene network learned for (a) Elongation, (b) Branching, and (c) Chemical Homeostasis. Losses
+are averaged over 50 simulations, and shaded area shows one standard deviation. On the right, histograms comparing the
+distribution of final losses from the untrained and trained models for each of the three cases; there is a clear separation of the
+trained model from the untrained.
+
+
+===== PAGE 26 =====
+
+14
+Mechanical Control of Cell Proliferation
+The forward simulation starts from one cell and is run for 200 time steps. Throughout the simulation, an external
+field is established over the cells to mimic the effect of a growth factor gradient. The value of the field scales as 1/r2,
+with r being the distance to the center of the cluster. At every cell division step, the division propensity calculated
+by the gene network is scaled by the value of this field:
+di = di ∗
+1
+2 + 0.4 ∗r2
+where di is the division propensity of cell i. This emulates the effect of a growth factor gradient - cells closer to the
+center are more likely to divide than cells closer to the edge. The simulation is run with 2 chemicals and 4 hidden
+genes, with the gene network being able to sense the cell’s chemical concentration, chemical gradients, and mechanical
+stress. Mechanical relaxation occurs for a fewer number of steps in this simulation than in the other examples to
+prevent rearrangements from dissipating stress. Diffusion occurs with heuristic boundary conditions.
+Optimization.
+Optimization is performed with a batch of 4 simulations for training, and a batch of 16 simula-
+tions for evaluation of the validation loss. We use a learning rate of 0.001 for 300 gradient descent steps with Adam
+optimizer. The weights of the learned gene network are L1-regularized with λ = .1. The loss function is the coefficient
+of variation of division propensities at the final time step. This optimization worked best without a REINFORCE
+gradient estimate - information from the last time step is enough to learn a mechanism. The weights of the gene
+network are initialized to zero so that the initial cluster grows as prescribed by the growth factor gradient.
+To evaluate the nature of the learned mechanism, inputs to the trained model are ablated, by replacing the weights
+of the gene network corresponding to a specific input to zeros. In this way, we ablated chemicals, chemical gradients
+and stress as inputs, finding that ablating stress results in markedly decreased performance of the mechanism (Fig
+S6c). We additionally tested the learned mechanism on other kinds of fields (as described in the main text) and saw
+that the distribution of unscaled division propensities seem to match the distribution of stress buildup in the cluster
+(Fig S6d).
+
+
+===== PAGE 27 =====
+
+15
+a
+b
+c
+Mechanical
+ stress
+Divrate/ﬁeld
+Power Law
+Exponential
+Two Peaks
+Oﬀ Center
+d
+e
+FIG. S6. Mechanical Control of Cell Proliferation. (a) Final costs of 300 forward simulations ran with trained parameters
+and untrained parameters. (b) Final costs of 300 forward simulations ran with trained parameters, ablating one of the input
+features to the gene network. Ablation is performed by setting outgoing edges from the desired feature to zero. Ablations show
+that mechanical stress is the most important feature used by the gene network to regulate division rates. (c) Visualizations of
+forward simulations run with trained parameters, but with a different shape of field than the one trained on. Top row shows the
+mechanical stress accumulation under different kinds of field, which follows the prescribed field. Bottom row shows the division
+rate unscaled by the field - the learned values weakly follow the pattern of stress accumulation. (d) Pruning plot showing final
+costs for various pruning thresholds of network weights.
+
+
+===== PAGE 28 =====
+
+16
+V.
+SCALING OF OPTIMIZATION PERFORMANCE WITH MODEL COMPLEXITY
+Over-parametrized deep networks have shown a remarkable generalizability in learning target functions. In a similar
+vein, we preliminarily investigated how our optimization performance scales with the complexity of the regulatory
+network in our cells – i.e, the number of secreted morphogens and the number of interacting genes (Fig S7). We restrict
+ourselves for simplicity to the 2D case of growing elongated and branched structures. In learning the decision-making
+circuits required for cells to grow into a pre-specified shape (either an elongated cluster or a branched ”V-shaped”
+structure), a lower validation loss is reached by increasing the number of morphogens each cell can locally communicate
+with. The rate of success of optimizations - the fraction of optimizations that are able to successfully create the desired
+shape - also increases with the number of morphogens. Without a sufficient number of morphogens, however, none
+of the optimizations can learn a successful decision-making network to create the desired shape. In the case of the
+V-shape, increasing the number of interacting genes did not have a pronounced effect. Interestingly, for the case of the
+elongated cluster, increasing the number of genes helped learn successful mechanisms in systems with low numbers
+of morphogens. In both cases, a sufficient number of both morphogens and genes is necessary to learn a successful
+mechanism. These findings indicate a minimal complexity required to build shapes and an interesting tradeoff between
+the quantity of communication signals (number of morphogens) versus the complexity of the local communication
+network (number of interacting genes).
+FIG. S7. Scaling of Optimization Performance with Model Complexity. (a) Scaling of validation loss and success
+rates for elongation. Losses are collected for 10 optimizations run from a different random seed for each condition. Training is
+done over 500 gradient descent steps and a batch of 8 simulations. (b) Scaling plots for V-shape case. Losses are collected for
+10 optimizations run from a different random seed for each condition. Training is done over 300 gradient descent steps and a
+batch of 8 simulations.
+
+
+===== PAGE 29 =====
+
+17
+TABLE I. Definition of Notation
+Notation
+Definition
+T
+number of timesteps
+N
+number of cells in final state
+n
+number of cells in initial state
+Dim
+dimension of cell property
+R
+cell radii
+Nc
+number of chemicals in system
+Nctype
+number of celltypes in system
+Nt
+number of timesteps
+¯ri
+position of cell i
+di
+division propensity of cell i
+¯gi
+gene concentration vector of cell i
+ck(¯ri)
+chemical kconcentration at position ¯ri
+D
+diffusion coefficients
+S
+secretion rates
+K, ki
+degradation rates
+Wij
+interaction weight of gene j regulating gene i
+Ii
+input signal to gene i
+[1] S. S. Schoenholz and E. D. Cubuk, Jax m.d. a framework for differentiable physics, in Advances in Neural Information
+Processing Systems, Vol. 33 (Curran Associates, Inc., 2020).
+[2] J. Bradbury, R. Frostig, P. Hawkins, M. J. Johnson, C. Leary, D. Maclaurin, G. Necula, A. Paszke, J. VanderPlas,
+S. Wanderman-Milne, and Q. Zhang, JAX: composable transformations of Python+NumPy programs (2018).
+[3] R. G. Endres and N. S. Wingreen, Accuracy of direct gradient sensing by single cells, Proceedings of the National Academy
+of Sciences 105, 15749 (2008), publisher: Proceedings of the National Academy of Sciences.
+[4] T. W. Hiscock, Adapting machine-learning algorithms to design gene circuits, BMC Bioinformatics 20, 214 (2019).
+[5] M. S. Steinberg, Does differential adhesion govern self-assembly processes in histogenesis? Equilibrium configurations and
+the emergence of a hierarchy among populations of embryonic cells, Journal of Experimental Zoology 173, 395 (1970),
+eprint: https://onlinelibrary.wiley.com/doi/pdf/10.1002/jez.1401730406.
+[6] T. Y.-C. Tsai, M. Sikora, P. Xia, T. Colak-Champollion, H. Knaut, C.-P. Heisenberg, and S. G. Megason, An adhesion code
+ensures robust pattern formation during tissue morphogenesis, Science 370, 113 (2020), publisher: American Association
+for the Advancement of Science.
+[7] M. Bao, J. Cornwall-Scoones, E. Sanchez-Vasquez, A. L. Cox, D.-Y. Chen, J. De Jonghe, S. Shadkhoo, F. Hollfelder,
+M. Thomson, D. M. Glover, and M. Zernicka-Goetz, Stem cell-derived synthetic embryos self-assemble by exploiting cadherin
+codes and cortical tension, Nature Cell Biology 24, 1341 (2022), publisher: Nature Publishing Group.
+[8] S. Toda, W. L. McKeithan, T. J. Hakkinen, P. Lopez, O. D. Klein, and W. A. Lim, Engineering synthetic morphogen
+systems that can program multicellular patterning, Science (New York, N.Y.) 370, 327 (2020).
+[9] D. Iber and D. Menshykau, The control of branching morphogenesis, Open Biology 3, 130088 (2013).

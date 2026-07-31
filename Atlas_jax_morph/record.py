@@ -13,11 +13,13 @@ direction:
               candidates README already lists `divide` colliding three ways with different code.
   refinement  hides a breaking change. Widening a signature to fit a new caller silently
               invalidates every existing user of that contract.
-  new         flatters the atlas. 130 operator names already sit unpromoted in `prototype/` and
-              `candidates/`. Rediscovering one of those is our backlog, not a discovery.
+  new         flatters the atlas, and it is the verdict the whole measurement rests on.
 
 So a verdict is not a label, it is an obligation: name the contract you are aliasing, name the
-field you are widening, or show that no tier of the frozen baseline already has the name.
+field you are widening, or show that the frozen baseline does not already have the name.
+
+THE BASELINE IS THE PROMOTED LANGUAGE. `plexus.operators` and nothing else. Unreviewed code in
+`prototype/` or `candidates/` is not part of the language and is not consulted here.
 
 THE STATUS LADDER is monotone and each rung is earned by an artefact, never by an assertion:
 
@@ -83,11 +85,8 @@ def _rank(status):
 
 
 def _baseline_names(baseline):
-    """Every operator name Plexus already knows, at any tier of promotion."""
-    names = set(baseline["registered"])
-    names |= set(baseline.get("candidates", {}))
-    names |= set(baseline.get("prototypes", {}))
-    return names
+    """Every operator name the promoted language already knows."""
+    return set(baseline["registered"])
 
 
 def validate(doc: dict, baseline: dict) -> list:
@@ -153,23 +152,18 @@ def validate(doc: dict, baseline: dict) -> list:
                 if not tgt:
                     v.append(("R4_verdict", mid, f"verdict {verdict!r} must name `of:`"))
                 elif tgt not in reg:
-                    v.append(("R4_verdict", mid,
-                              f"`of: {tgt}` is not a registered contract "
-                              f"(candidates/prototypes do not count -- promote it first)"))
+                    v.append(("R4_verdict", mid, f"`of: {tgt}` is not a registered contract"))
             if not m.get("why"):
                 v.append(("R4_verdict", mid, "verdict asserted with no `why:`"))
 
-        # R5 -- `new` must survive the frozen baseline at EVERY tier
+        # R5 -- `new` must survive the frozen baseline
         if verdict == "new":
             name = (m.get("contract") or {}).get("name")
-            if name and name in known:
-                where = ("registered" if name in reg else
-                         "candidates" if name in baseline.get("candidates", {}) else "prototype")
-                if not m.get("collision_note"):
-                    v.append(("R5_not_new", mid,
-                              f"claims `new` but {name!r} already exists in {where}; "
-                              f"either it is an alias/refinement, or say why the contracts "
-                              f"differ in `collision_note:`"))
+            if name and name in known and not m.get("collision_note"):
+                v.append(("R5_not_new", mid,
+                          f"claims `new` but {name!r} is already a registered contract; "
+                          f"either it is an alias/refinement, or say why the contracts differ "
+                          f"in `collision_note:`"))
 
         # ---- the typed contract ---------------------------------------------------------- #
         c = m.get("contract") or {}
