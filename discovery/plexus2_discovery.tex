@@ -705,6 +705,95 @@ predictions and retractions as the evidence.
 \end{phasebox}
 
 %======================================================================
+\section{Phase 0 report --- 31 July, 11:15}\label{sec:p0report}
+
+\emph{This is a phase boundary. Four of the seven items are done and independently checked; three
+have not been started. I have stopped here.}
+
+\textbf{How it was checked.} Three agents made the fixes, each required to demonstrate the defect
+before and its absence after. Then six independent checkers --- two per fix, told to disbelieve by
+default --- re-derived each defect \emph{from the committed code} rather than from the fixing
+agent's account, and re-ran its demonstration. All six confirmed, with high confidence. One of
+their warnings turned out to be a false alarm when I checked it myself.
+
+\subsection{What was repaired}
+
+\textbf{The survive-test now measures the run.} It was returning 1.014 for everything. Continuing
+properly from each run's end state instead of a fresh sphere:
+
+\begin{center}\small
+\begin{tabular}{@{}l r r r@{}}
+\toprule
+run & protrusion at the end & old test & \textbf{new test}\\
+\midrule
+\code{d1x\_nocons} & 1.928 & 1.014 & \textbf{1.596}\\
+\code{r002c\_00}   & 1.703 & 1.014 & \textbf{1.617}\\
+\code{r002c\_02}   & 1.024 & 1.014 & \textbf{1.021}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+It now separates runs that differ, and agrees with the flat one. (A detail worth recording: a
+checkpoint-based version of this code had already been written and had \emph{never been
+executed} --- a confident docstring over a path nothing ran.)
+
+\textbf{The camera made growth look like shrinkage.} Measuring the apparent size of the tissue
+across the six panels of a strip, on a run whose true extent grew by half:
+
+\begin{center}\small
+\begin{tabular}{@{}l l r@{}}
+\toprule
+& apparent size, first $\to$ last panel & ratio\\
+\midrule
+before & 40492 $\to$ 20988 & \textbf{0.52 --- it looked like it halved}\\
+after  & 19087 $\to$ 21002 & 1.10\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A growing vesicle was being drawn as a shrinking one, in every movie, for as long as this code has
+existed. One frame size is now held for the whole run, and there is a second viewpoint looking
+down on it so a tube cannot hide behind the body.
+
+\textbf{The 1778 ceiling is confirmed as arithmetic and is now flagged.} The mesh buffer gave a
+hard cap of exactly $(3552{+}4)/2 = 1778$ cells. A run that reaches its cap is now marked
+\emph{not evidence} as the first line of its record, and the worker exits with an error rather
+than reporting a number.
+
+\textbf{The agents are now timed.} Nine call sites bypassed the stopwatch; all are routed through
+it, and a round now reports where its time went, per role.
+
+\subsection{What the checkers found that the fixers had not said}
+
+\begin{itemize}
+\item \textbf{The stored survive-test values are poison.} Thirty-three records across the archive
+carry the old constant. Anything that re-scores from the archive still eats the artefact; they must
+be deleted and recomputed, not trusted.
+\item \textbf{The success criterion is now unreachable \emph{honestly}.} It demands a survival
+score of 2.0; the best real value measured is 1.62. It used to be unreachable by accident, because
+the number was a constant. It now needs a justification or a new threshold --- a real decision, not
+a tuning.
+\item \textbf{A crash mid-round still loses that round's timing} --- the bookkeeping runs on every
+normal exit but there is no protection against an exception.
+\item \textbf{The default growth headroom still hits a wall} at the small starting size. It is now
+\emph{flagged} rather than silent, but Phase~1 must set it explicitly or it will reproduce the
+original artefact in a visible form.
+\item \textbf{The Phase~1 renderer did not get the second viewpoint.} The camera was repaired in
+the campaign's path, not in the study's. It must be fixed before Phase~1 runs, or those movies stay
+half-blind.
+\item Rendering is about twice as slow. Acceptable.
+\end{itemize}
+
+\subsection{Still not started --- the rest of Phase 0}
+
+\begin{enumerate}
+\item Remove the silent parameter caps; derive the real stability limit and make breaching it loud.
+\item Write, test and promote the geometry-weighted chemical flow (\S\ref{sec:okuda}c).
+\item Separate the three mesh-failure modes so the horizon stops being provisional
+(\S\ref{sec:phantom}).
+\end{enumerate}
+
+%======================================================================
 \section{What I need from you}
 
 Nothing blocking. Two things worth knowing:
