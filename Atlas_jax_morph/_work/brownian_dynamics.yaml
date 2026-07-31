@@ -90,11 +90,107 @@ surprises:
   at trace time, not as an obscure broadcast error.
 - 'gamma and kT are plain ''object'' fields, not eqx static: a Python float is static, a jax.Array is
   traced -- so both are differentiable/optimizable. Only n_space_dim and tag are eqx static.'
-verdict: null
+verdict: new
 of: null
-why: null
-contract: null
-status: inspected
+why: 'new -- a motion-family primitive `agitate`: a temperature-controlled thermal (Brownian) random
+
+  walk of cell positions. Earned by stripping away everything the frozen language already owns.
+
+  (1) The Euler-Maruyama scheme, the dt-scaling, the dynamic-delta accumulation, and the whole
+
+  StochasticStep trace/replay/logp machinery are engine plumbing (out_of_scope; the base mixin
+
+  writes nothing). (2) The deterministic drift F/gamma is the pluggable `potential` -- a SEPARATE
+
+  pair-potential contract (soft_sphere / hertzian / the Morse family), integrated by the engine''s
+
+  overdamped mobility 1/gamma. What is left as this step''s own constitutive content is a
+
+  temperature-driven Brownian random walk: amplitude std = sqrt(2 kT dt / gamma), diffusion
+
+  D = kT/gamma (Einstein / fluctuation-dissipation), Wiener sqrt(dt) scaling. With potential=None
+
+  the step IS nothing but this bath -- the exact mechanism the paper names for differential-adhesion
+
+  sorting ("high-temperature Brownian relaxation", p. 19).
+
+  THE STRONGEST OBJECTION, confronted: the frozen baseline ALREADY jitters cell positions. Three
+
+  registered operators each bolt on an isotropic `noise * randn` term -- drag (role `thermal_noise`,
+
+  acc = -k*v + noise*randn, commented "drag + noise = a Brownian/Langevin bath"), glide (role
+
+  `translational_noise`, "glide + noise = an active Brownian walker"), and attraction_repulsion
+
+  (role `exploration_noise`, "exploratory noise on the overdamped velocity"). A skeptic reads that
+
+  as: thermal noise is already in the language, so this is an alias. Rebuttal: those are all the
+
+  SAME uncalibrated modifier -- a bare amplitude times a standard normal, OFF BY DEFAULT, bolted
+
+  onto a PRIMARY deterministic force. None carries a temperature; none obeys the Einstein relation
+
+  (amplitude is a free knob uncoupled from friction); none applies the Wiener sqrt(dt) scaling (the
+
+  engine integrates them deterministically, so their diffusion constant is dt-scaling-wrong); none
+
+  is a scorable stochastic process (raw torch.randn, no trace/replay/logp, not pathwise-
+
+  differentiable); and none can stand alone as a bath (drag needs velocity, glide needs a heading,
+
+  attraction_repulsion needs neighbors). That three operators independently accreted three
+
+  different role-names for the same ad-hoc jitter is itself evidence of a MISSING abstraction, not a
+
+  present one: the language keeps reinventing exploration noise because it has no first-class
+
+  thermostat. `agitate` is that thermostat -- constitutive, temperature-parameterized, FDT-
+
+  calibrated, Wiener-scaled. The closest contract to widen is drag, and widening dissipative inertial
+
+  friction (acc = -k*v, an acceleration, the energy-SINK half of fluctuation-dissipation) into an
+
+  overdamped temperature-scaled fluctuation SOURCE inverts both its regime (2nd-order -> 1st-order)
+
+  and its sign convention (sink -> source) -- violence to its biology, not a signature widening.
+
+  `diffuse` is the wrong set (a grid Laplacian on a concentration field, deterministic spreading),
+
+  not a per-cell stochastic kick. SOURCE vs PAPER (source wins): the paper''s Methods write only
+
+  deterministic gradient-descent Morse minimization (no kT, no gamma); the source''s kT=0 case
+
+  reduces to exactly that, and kT>0 is the noisy regime this contract names.
+
+  '
+contract:
+  name: agitate
+  kind: lateral
+  family: motion
+  set: cell
+  inputs:
+  - kT (thermal_energy / cellular temperature) -- the one knob that turns the bath on; sets std = sqrt(2
+    kT dt / gamma). kT=0 -> no agitation, degenerates to pure relaxation.
+  - gamma (translational_drag) -- mobility 1/gamma; also sits under the noise sqrt, coupling amplitude
+    to friction via the Einstein / fluctuation-dissipation relation D = kT/gamma.
+  - dt (macro-step size, engine-supplied) -- the noise scales as sqrt(dt) (Wiener), NOT dt; the drift
+    scales as dt.
+  - potential (a SEPARATE pluggable pair-potential contract, engine-integrated) -- supplies the deterministic
+    drift F/gamma this walk rides on; pass None for a pure thermal gas.
+  outputs:
+  - a dynamic dt-scaled position delta (a per-cell Gaussian Wiener increment), summed across dynamic writers
+    by the model.
+  reads:
+  - position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift is
+    evaluated.
+  - alive (ALIVE) -- masks dead/padded cells in both the delta and the score.
+  - potential.state_reads() -- any extra fields the drift potential couples from (empty for a pure bath).
+  writes:
+  - position (POSITION) -- the dynamic thermal displacement delta; the exogenous noise and the realized
+    displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable
+    and scorable.
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

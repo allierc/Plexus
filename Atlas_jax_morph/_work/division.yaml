@@ -85,11 +85,93 @@ surprises:
   'physics' knob is orientation_snr).
 - A zero division_axis falls back to pure isotropic placement even at high orientation_snr (safe_norm
   plus the 1e-12 guard make a_hat = 0), so orientation silently no-ops unless an axis is set.
-verdict: null
-of: null
-why: null
-contract: null
-status: inspected
+verdict: refinement
+of: cell_divide
+implementation_of: cell_divide
+why: "Refinement of `cell_divide`, the registered proliferation primitive (structural / growth / cell;\n\
+  tags proliferation|mitosis|growth). The forward biology is IDENTICAL -- one cell becomes two, the\n\
+  daughter wakes a free capacity slot and inherits the mother's heritable fields, and the per-cell\nevent\
+  \ is the same Bernoulli hazard p = 1 - exp(-clip(rate,0,inf)*dt) on a fixed buffer -- so this\nis NOT\
+  \ `new`: minting a second division contract would inflate the very yield the ledger exists to\nmeasure,\
+  \ and a sibling entry already fixes the reading (order 5 StochasticStep `why`: \"a Bernoulli\ndivision\
+  \ IS cell_divide\"). But jax-morph's Division does not fit cell_divide's REGISTERED signature,\nso it\
+  \ is not a clean drop-in `alias` either: the signature must WIDEN, and a refinement nobody\ncosted is\
+  \ a breaking change.\n\nWHAT WIDENS (the typed signature fields), and what each breaks for existing\
+  \ users:\n\n- writes: + radius, with VOLUME-CONSERVING semantics. Registered cell_divide is mass-DOUBLING\n\
+  \  proliferation -- the daughter appears at the mother's size (radius inherited unchanged), so\n  tissue\
+  \ AREA/mass grows per division (the confluent Okuda biology, and exactly how the embryo\n  campaign\
+  \ uses it: buffer-driven 2x/3x/4x growth). Division instead HALVES both radii by\n  m = 2^(-1/d) (n_space_dim\
+  \ sets the exponent) so the two daughters conserve the mother's d-volume\n  (cleavage-stage division:\
+  \ the embryo does not grow, cells just get smaller). Admitting a `radius`\n  write by the 2^(-1/d) factor\
+  \ FLIPS the invariant every current cell_divide caller relies on --\n  growth-by-division becomes conservation-without-growth,\
+  \ and packing / contact / virial stress\n  change. This is the load-bearing breaking change.\n\n- reads:\
+  \ + division_axis, params: + orientation_snr -- ORIENTED division. cell_divide places the\n  daughter\
+  \ ISOTROPICALLY (random jitter). Division blends an oriented unit axis a_hat with unit-RMS\n  isotropic\
+  \ noise at signal-to-noise `orientation_snr` and places the daughter just-touching along\n  dir = normalize(s*a_hat\
+  \ + xi) (spindle-axis / Hertwig's-rule division). This is the argument that\n  DEFEATS the alias alternative:\
+  \ NO promoted operator reads a `division_axis` field today, so the\n  capability genuinely does not\
+  \ exist in the frozen language -- filing Division as a bare second\n  implementation would flatter the\
+  \ vocabulary in exactly the way the baseline warns against\n  (recording an alias without asking whether\
+  \ the two contracts actually agree on their I/O). A zero\n  axis / orientation_snr=0 falls back to isotropic,\
+  \ so the widening is additive for current callers,\n  but the declared read set genuinely grows (a dependency\
+  \ existing schedulers did not track).\n\n- writes: + mother (+ born): LINEAGE. cell_divide writes only\
+  \ a `birth` flag; Division also records\n  the parent slot index (mother, sentinel -1 elsewhere) so\
+  \ clonal lineage is reconstructable.\n  Additive (existing users ignore it) but a new state field the\
+  \ contract must own.\n\n- writes: + division_overflow: a GLOBAL capacity-bookkeeping counter (surplus\
+  \ dividers past a full\n  buffer are dropped and tallied rather than crashing). This is numerics, not\
+  \ biology --\n  cell_divide already handles a full buffer by simply stopping -- so it rides along as\
+  \ a gained\n  write but carries no biological weight; a reimplementer who RAISES on overflow diverges.\n\
+  \nNOT part of this contract (excluded on purpose, so the widening is not over-claimed): the\nstraight-through\
+  \ / pathwise differentiability and the logp score are gradient-estimator machinery\nalready ruled out_of_scope\
+  \ at order 5 (StochasticStep) -- differentiability is an ENGINE concern in\nPlexus, not a forward operator.\n\
+  \nCLOSEST-CONTRACT check: cell_divide is unambiguously closest -- the only other growth-family op is\n\
+  cell_grow, which is cell MASS increase, not TOPOLOGY change. Widening cell_divide does less violence\n\
+  than a fresh contract: its own docstring already declares the daughter-inherits-state, fixed-buffer,\n\
+  hazard-driven core, and a volume-conserving + oriented + lineage-tracked division is the SAME divide\n\
+  biology, refined -- hence also `implementation_of: cell_divide` (once the signature is widened, the\n\
+  current isotropic mass-doubling cell_divide is its first implementation and this differentiable,\nvolume-conserving,\
+  \ oriented Division is a second co-implementation of the one contract).\n\nSOURCE-vs-PAPER (rule 5,\
+  \ recorded in surprises): the paper chooses the division plane UNIFORMLY at\nrandom and describes only\
+  \ the discrete score-function estimator; the CODE adds oriented placement\n(division_axis + orientation_snr)\
+  \ and a reparameterized pathwise branch. The code wins; it does not\nchange the verdict -- either reading\
+  \ is still stochastic cell division.\n"
+contract:
+  name: cell_divide
+  kind: structural
+  family: growth
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - division_rate
+  - division_axis
+  - radius
+  - position
+  - alive
+  writes:
+  - position
+  - radius
+  - alive
+  - celltype
+  - born
+  - mother
+  - division_overflow
+  maps:
+  - hazard = per-cell Bernoulli event with probability p = 1 - exp(-clip(division_rate,0,inf)*dt) on a
+    fixed capacity buffer; a committed divider wakes one free slot, the daughter inherits every heritable
+    field and resets the rest to default; a division past capacity is dropped (registered cell_divide
+    stops when the buffer is full, jax-morph drops-and-tallies into division_overflow)
+  - volume_conservation = both daughters take radius r*m with m = 2^(-1/d) (n_space_dim sets the exponent),
+    halving the mother's d-volume into two equal daughters -- vs registered cell_divide's mass-doubling,
+    where the daughter inherits the mother's radius unchanged
+  - placement = daughter offset by the NEW radius r*m along dir = normalize(orientation_snr*a_hat + isotropic_unit_RMS_noise),
+    so the two daughters end exactly just-touching (centre gap 2*r*m = sum of radii); orientation_snr=0
+    or a zero division_axis falls back to isotropic placement
+  - lineage = a born flag plus the mother parent-slot index recorded on the woken slot (sentinel -1 elsewhere),
+    reconstructing clonal ancestry that the registered birth flag alone cannot
+status: normalized
 module: null
 test: null
 evidence:

@@ -247,23 +247,43 @@ def _skeptic_verdict(mech_id, ok, out, mins):
     with open(SKEPTIC_LOG, "a") as f:
         f.write(json.dumps({"mech": mech_id, "ok": ok, "minutes": round(mins, 2),
                             "verdict": verdict, "raw_tail": (out or "")[-800:]}) + "\n")
+    # An unparseable verdict IS a refutation. The first phase printed "treated as refuted" and
+    # then did not demote -- so silence really was agreement, in the one place the loop exists to
+    # stop that.
     if verdict is None:
         print(f"  skeptic/{mech_id}: NO PARSEABLE VERDICT -- treated as refuted "
               f"(silence is not agreement)")
-        return False, ["skeptic returned no JSON"]
+        verdict = {"refuted": True, "confidence": None, "correct_verdict": None,
+                   "evidence": "the skeptic returned no JSON; refusing to read that as assent"}
     refuted = bool(verdict.get("refuted", True))
     print(f"  skeptic/{mech_id}: refuted={refuted} conf={verdict.get('confidence')} "
-          f"-> {verdict.get('correct_verdict')}  ({verdict.get('evidence', '')[:120]})")
+          f"-> {verdict.get('correct_verdict')}  ({(verdict.get('evidence') or '')[:120]})")
     if refuted:
-        doc = record.load(RECORD)
+        demote(mech_id, verdict)
+    return (not refuted), verdict
+
+
+def demote(mech_id, verdict):
+    """Send a refuted mechanism back a rung, UNDER THE LOCK and through the mirror.
+
+    The first version wrote the record directly. With several agents in flight that write looks
+    exactly like tampering to `_master_locked()`, which dutifully restored the mirror and erased
+    the demotion -- so the loop's one adversarial check was silently undone by its own integrity
+    check. The driver is the only writer; the skeptic goes through it like everyone else.
+    """
+    global _MIRROR
+    with _RECORD_LOCK:
+        doc, _ = _master_locked()
         m = _entry(doc, mech_id)
+        if m is None:
+            return
         m["status"] = "inspected"
         m["disputed"] = {"by": "skeptic", "was": m.get("verdict"),
                          "claimed": verdict.get("correct_verdict"),
                          "evidence": verdict.get("evidence"),
                          "what_would_settle_it": verdict.get("what_would_settle_it")}
         record.save(doc, RECORD)
-    return (not refuted), verdict
+        _MIRROR = copy.deepcopy(doc)
 
 
 # ------------------------------------------------------------------------------------------- #

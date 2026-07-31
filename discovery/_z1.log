@@ -1,0 +1,107 @@
+[zz_refcheck_p1_bf] comp=C08666c8bf72 region='mechanics-only (no growth)' frames=60 dt=0.02 device=cuda:1
+
+premise check -- zz_refcheck_p1_bf (static, pre-run)
+  [ok  ] P5   mechanics is fast, biology is slow
+            the reaction advances 1 time units per frame
+  [--  ] P2   morphogen sets where/how fast, not whether
+  [--  ] P3   a cell divides because it got big
+  ALL PREMISES HOLD   (1 pass, 0 declared ablation, 2 n/a)
+[engine] 60 sim frames -> recording 61 set frames (stride 1), fields every 1 steps (<= 256)
+[engine] === zz_refcheck_p1_bf ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=60
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, cell_rd_seed, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
+[zz_refcheck_p1_bf] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[zz_refcheck_p1_bf] {"saturated": false, "inert_operators": [], "retention": 1.0, "valid_evidence": true, "protr_final": 1.013, "protr_peak": 1.013, "horizon_frame": 60, "horizon_why": "broken_n never sustained damage to the end (max 8)", "first_damage_frame": 3, "valid_frac": 1.0, "protr_peak_untruncated": 1.013, "protr_final_untruncated": 1.013, "n_cells_final": 2000, "red_frac_final": 0.193, "act_max_final": 0.681, "frames": 61, "wall_s": 18.6, "ta_hollow_n_peak": 24, "ta_hollow_n_final": 24, "ta_area_cv_final": 0.404, "ta_vol_cv_final": 0.403, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.012, "ta_red_frac_final": 0.193, "ta_tip_act_final": -0.103, "mech_force_mean": 1.3783, "mech_p_body": 0.8351, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 0.0779, "mech_migration": 0.00943}
+[zz_refcheck_p1_bf] D4 ok: all 9 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_rd_seed': 1, 'cell_adjacency': 1} ...)
+[zz_refcheck_p1_bf] camera: FIXED Lbox=5.663 for all 61 frames and both views (per-frame autofit would have run 5.602 -> 5.663, x1.01: that rescaling is what hid growth)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[zz_refcheck_p1_bf] artefacts -> log/okuda/zz_refcheck_p1_bf/{strip.png,movie.mp4}
+
+premise check -- zz_refcheck_p1_bf (post-run)
+  [ok  ] P11  tissue cannot pass through itself
+            at every frame at least 100.0% of rays cross the surface exactly once
+  [ok  ] P4   the chemistry must not be silently extinguished
+            activator ends at 0.89 of its peak (0.768 -> 0.681)
+  [ok  ] P5   mechanics is fast, biology is slow
+            the reaction advances 1 time units per frame
+  [ok  ] P5b  the mechanical relaxation keeps up with the tissue
+            residual force after relaxation 1.37 -> 1.38 (x1.01) while the tissue grew from 2000 to 2000 cells
+  [ok  ] P7   a sheet does not absorb added area by stretching
+            the stretched tail stays at shape index 3.83 over the final fifth; reduced volume 0.997
+  [ok  ] P8   the shape index has a hard geometric floor
+            minimum shape index 3.6450 respects the floor 3.5449
+  [ok  ] P9   a closed epithelium is a sphere with no holes
+            genus 0 at all 40 recorded frames
+  [--  ] P1   cells grow by taking material in
+  [--  ] P2   morphogen sets where/how fast, not whether
+  [--  ] P3   a cell divides because it got big
+  [--  ] P3b  mean cell volume holds under proliferation
+  ALL PREMISES HOLD   (7 pass, 0 declared ablation, 4 n/a)

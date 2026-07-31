@@ -31,3 +31,31 @@ wrapping steps actually call `virial_pressure` vs `forces` (VirialStress / Mecha
 BrownianDynamics are separate entries) -- I only asserted from the signatures that the base writes no state
 itself. Whether `mix` is ever overridden by a shipped subclass I did not check (none of the five in this file
 override it).
+
+---
+
+**NORMALIZER.** Verdict: **alias of `attraction_repulsion`** (implementation_of: attraction_repulsion). The
+abstract pair-potential base is the energy-form statement of the pairwise attraction-repulsion contract Plexus
+already registers: a radial cell-cell force with a repulsive core (excluded volume) and an adhesive tail — the
+Morse well IS attraction_repulsion's "long-range pull minus short-range push", and both are the same
+conservative radial pair force (attraction_repulsion's `f(r)·(pos_j−pos_i)` is itself the gradient of a radial
+potential). Morse/SoftSphere/Hertzian/Harmonic/LennardJones are interchangeable force-law shapes over this one
+contract (the pattern the registry is built to hold), and the NoForce normalizer already named exactly this
+landing. Plexus's own criterion clinches it: the registered `stillinger_weber` docstring says every prior
+interaction op is *pairwise* and only its *three-body* term earns a new contract — PairwisePotential is strictly
+two-body, and SW is itself an energy-defined, autodiff-force interaction, so neither "pairwise" nor
+"energy+autodiff" is novel here. **Strongest argument AGAINST (and why it loses):** the energy formulation is a
+genuine capability attraction_repulsion lacks — a scalar potential U(r) unlocks two things the D'Orsogna
+velocity law cannot give: a virial *pressure* readout and relaxation to a differentiable mechanical
+*equilibrium* (FIRE / gradient descent). If the atlas counts "carries a conservative energy whose equilibrium is
+itself differentiable" as contract-level content, this is at least a **refinement** (widen attraction_repulsion
+to carry an energy, a pressure output, and an equilibrium-minimiser consumer), not a drop-in alias. It loses
+because (a) attraction_repulsion's radial pair force is *already* conservative, so storing-and-differentiating an
+energy vs hand-coding the force is a representation strategy, not new biology; (b) the family already spans both
+integration modes (attraction_repulsion EMITs velocity, squared_law/stillinger_weber EMIT acceleration) and both
+pair topologies (squared_law's all_pairs option; SW's dense min-image list), so none of that discriminates a
+contract; and (c) the pressure and the equilibrium-relaxation are separate *registered* concerns (the VirialStress
+and MechanicalRelaxation entries), not outputs of this interaction — folding them in would double-count. The one
+residual is honest and recorded as a surprise, not a contract: the scalar/per-cell coupling restriction cannot
+express the paper's type×type cadherin matrix — an expressiveness weakness of this implementation, not a wider
+contract.

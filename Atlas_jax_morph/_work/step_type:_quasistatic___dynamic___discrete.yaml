@@ -3,97 +3,168 @@ order: 22
 raw_name: 'step type: quasistatic / dynamic / discrete'
 raw_kind: step taxonomy
 code_path: papers/jax-morph/jax_morph/core/step.py:L50-L56
-paper_section: guides/concepts.md '## Models are ordered step pipelines' (step-type table);
-  also core-abstractions.md '### StepType'
-summary: '`step_type` is a class-level StrEnum tag (QUASISTATIC / DYNAMIC / DISCRETE) each step
-  declares; it touches no state itself but fixes (1) which of the three macro-step phases the step
-  runs in and (2) how the Model interprets the step''s return value. Quasistatic and discrete steps
-  return a COMPLETE new state and run sequentially in pipeline order; a dynamic step returns a
-  SPARSE, dt-scaled delta (via `state.deltas`) that the Model evaluates for every dynamic writer at
-  the SAME post-quasistatic state, then sums, alive-masks, and applies once. It classifies a step by
-  TIME-SCALE SEMANTICS (fast constraint / finite rate / instantaneous event), orthogonal to which
-  fields it touches.'
-equations: |
-  StepType is a StrEnum: DYNAMIC='dynamic', QUASISTATIC='quasistatic', DISCRETE='discrete'
-  (step.py:L50-L56). It is declared per step as the class var `step_type` and consumed by the Model.
-
-  One macro-step is a first-order Lie-Trotter operator split of three phase maps in a FIXED order
-  (concepts.md; Model.__call__ step.py:L519):
-
-      s_{n+1} = ( Phi_discrete  o  Phi_dynamic  o  Phi_quasistatic )( s_n ),   then  t <- t + dt
-
-  Phase A  QUASISTATIC  (Model._run L497; pipeline/sequential -- each step sees prior updates):
-      for each quasistatic step k in order:  s <- step_k(s, dt=dt, key=key)        # returns a FULL state
-
-  Phase B  DYNAMIC  (Model._run L504, _accumulate_dynamic L342; all at the SAME post-qs state s*):
-      delta_k   = step_k(s*, dt=dt, key=key)   for each dynamic step k             # returns state.deltas(field=incr_over_dt), other fields None
-      total[f]  = sum_k delta_k[f]                                                 # summed by field name; None (untouched) skipped
-      total[f] <- where(alive, total[f], 0)    for cell-scope f                    # dead slots not integrated; global fields unmasked
-      s <- eqx.apply_updates(s*, total)                                            # applied ONCE; None fields left exactly as-is
-
-  Phase C  DISCRETE  (Model._run L513; pipeline/sequential -- each step sees earlier jumps):
-      for each discrete step k in order:  s <- step_k(s, dt=dt, key=key)           # returns a FULL state
-
-  dt-scaling is baked INSIDE each dynamic step (its returned increment is already over dt); the
-  accumulator does NO scaling. Return-value contract (SimulationStep.__call__ docstring L126):
-  QUASISTATIC/DISCRETE -> new full state; DYNAMIC -> sparse per-dt delta.
+paper_section: guides/concepts.md '## Models are ordered step pipelines' (step-type table); also core-abstractions.md
+  '### StepType'
+summary: '`step_type` is a class-level StrEnum tag (QUASISTATIC / DYNAMIC / DISCRETE) each step declares;
+  it touches no state itself but fixes (1) which of the three macro-step phases the step runs in and (2)
+  how the Model interprets the step''s return value. Quasistatic and discrete steps return a COMPLETE
+  new state and run sequentially in pipeline order; a dynamic step returns a SPARSE, dt-scaled delta (via
+  `state.deltas`) that the Model evaluates for every dynamic writer at the SAME post-quasistatic state,
+  then sums, alive-masks, and applies once. It classifies a step by TIME-SCALE SEMANTICS (fast constraint
+  / finite rate / instantaneous event), orthogonal to which fields it touches.'
+equations: "StepType is a StrEnum: DYNAMIC='dynamic', QUASISTATIC='quasistatic', DISCRETE='discrete'\n\
+  (step.py:L50-L56). It is declared per step as the class var `step_type` and consumed by the Model.\n\
+  \nOne macro-step is a first-order Lie-Trotter operator split of three phase maps in a FIXED order\n\
+  (concepts.md; Model.__call__ step.py:L519):\n\n    s_{n+1} = ( Phi_discrete  o  Phi_dynamic  o  Phi_quasistatic\
+  \ )( s_n ),   then  t <- t + dt\n\nPhase A  QUASISTATIC  (Model._run L497; pipeline/sequential -- each\
+  \ step sees prior updates):\n    for each quasistatic step k in order:  s <- step_k(s, dt=dt, key=key)\
+  \        # returns a FULL state\n\nPhase B  DYNAMIC  (Model._run L504, _accumulate_dynamic L342; all\
+  \ at the SAME post-qs state s*):\n    delta_k   = step_k(s*, dt=dt, key=key)   for each dynamic step\
+  \ k             # returns state.deltas(field=incr_over_dt), other fields None\n    total[f]  = sum_k\
+  \ delta_k[f]                                                 # summed by field name; None (untouched)\
+  \ skipped\n    total[f] <- where(alive, total[f], 0)    for cell-scope f                    # dead slots\
+  \ not integrated; global fields unmasked\n    s <- eqx.apply_updates(s*, total)                    \
+  \                        # applied ONCE; None fields left exactly as-is\n\nPhase C  DISCRETE  (Model._run\
+  \ L513; pipeline/sequential -- each step sees earlier jumps):\n    for each discrete step k in order:\
+  \  s <- step_k(s, dt=dt, key=key)           # returns a FULL state\n\ndt-scaling is baked INSIDE each\
+  \ dynamic step (its returned increment is already over dt); the\naccumulator does NO scaling. Return-value\
+  \ contract (SimulationStep.__call__ docstring L126):\nQUASISTATIC/DISCRETE -> new full state; DYNAMIC\
+  \ -> sparse per-dt delta.\n"
 params:
-  step_type: class-level time-scale-semantics tag selecting phase AND return-value interpretation
-    (QUASISTATIC=fast constraint solved at current slow state / DYNAMIC=finite-rate increment over
-    dt / DISCRETE=instantaneous event or reset). Declared as `eqx.AbstractClassVar[StepType]` on each
-    SimulationStep subclass -- a CLASS variable fixed at class-definition time, NOT a constructor
-    argument, so it is not tunable per instance and is baked into the compiled program as a constant.
+  step_type: class-level time-scale-semantics tag selecting phase AND return-value interpretation (QUASISTATIC=fast
+    constraint solved at current slow state / DYNAMIC=finite-rate increment over dt / DISCRETE=instantaneous
+    event or reset). Declared as `eqx.AbstractClassVar[StepType]` on each SimulationStep subclass -- a
+    CLASS variable fixed at class-definition time, NOT a constructor argument, so it is not tunable per
+    instance and is baked into the compiled program as a constant.
 state_io:
   reads:
-  - alive   # read by the dynamic-phase combiner (_accumulate_dynamic L357) to zero dead cell slots before applying summed deltas; cell-scope totals only, global grids/scalars unmasked
+  - alive
   writes:
-  - t       # Model.__call__ advances simulation time t <- t + dt after the three phases (a Model-level write, not any step's)
-  note: 'The taxonomy declares NO physical fields itself; each concrete step declares its own
-    state_reads()/state_writes(). What step_type fixes is the WRITE-CONFLICT policy over those
-    declarations (Model._validate L394): a quasistatic field admits exactly one writer; a dynamic
-    field admits many additive writers; a field cannot be both; discrete steps are exempt from the
-    write-conflict check entirely.'
+  - t
+  note: 'The taxonomy declares NO physical fields itself; each concrete step declares its own state_reads()/state_writes().
+    What step_type fixes is the WRITE-CONFLICT policy over those declarations (Model._validate L394):
+    a quasistatic field admits exactly one writer; a dynamic field admits many additive writers; a field
+    cannot be both; discrete steps are exempt from the write-conflict check entirely.'
 surprises:
-- 'PAPER CONTRADICTION (source wins). The paper (Deshpande 2025, p. 14 ''FORWARD SIMULATION'') has
-  NO step-type taxonomy: it describes the simulation as "any subset or combination of the steps
-  detailed below" -- a flat, customizable sequence of full-state operations (cell growth, mechanical
-  relaxation, cell division, diffusion) applied per timestep, with "each simulation timestep
-  [consisting] of one cell division." The words quasistatic / dynamic / discrete / Lie-Trotter /
-  hybrid / macro-step appear ZERO times in the paper text. The three-phase time-scale taxonomy, the
-  operator split, and the dt-scaled sparse-delta contract are a library RE-ARCHITECTURE of the
-  original flat pipeline. Recorded per rule 5: SOURCE WINS.'
-- 'The DYNAMIC phase is NOT Gauss-Seidel. Every dynamic step is evaluated at the SAME
-  post-quasistatic state (it does not see other dynamic steps'' updates); their sparse deltas are
-  SUMMED and applied in one op, so the dynamic phase is order-independent. Quasistatic and discrete
-  phases ARE sequential (each step sees prior updates). A reimplementer who runs dynamic steps one
-  after another (each on the last one''s output) changes the dynamics.'
-- 'Return value is OVERLOADED by type behind one identical signature `__call__(state, *, dt, key) ->
-  state`. A dynamic step MUST return `state.deltas(...)` (a sparse increment over dt, every untouched
-  field None), NOT a full state; returning a full state from a dynamic step is a silent correctness
-  bug (AGENTS.md explicitly: "Do not implement a dynamic step by returning a complete updated
-  state"). Quasistatic/discrete return a full state.'
-- 'dt-scaling lives INSIDE each dynamic step, not in the combiner. `_accumulate_dynamic` sums the
-  deltas with NO dt multiplication ("each step baked its own dt-scaling in"). A reimplementer who
-  expects the model to multiply increments by dt will mis-scale the finite-rate terms.'
-- 'Write-conflict policy is per-type and ASYMMETRIC (Model._validate). A QUASISTATIC field admits
-  EXACTLY ONE writer; a DYNAMIC field admits MANY (additive) writers; a field cannot be both
-  quasistatic- and dynamic-written (ValueError). DISCRETE steps are EXEMPT from write-conflict checks
-  entirely ("discrete steps are resets") -- two discrete steps may write the same field and the
-  later-in-pipeline one silently wins, no error.'
-- 'StepType is a StrEnum, but phase dispatch and validation compare by IDENTITY (`step.step_type is
-  StepType.DYNAMIC`), not by `==`. `StepType.DYNAMIC == ''dynamic''` is True, yet assigning the raw
-  string ''dynamic'' as a step''s `step_type` passes no `is`-check: the step would silently run in NO
-  phase (never executed) rather than raise. Set the enum member, not the string.'
-- 'Cell-scope dynamic totals are alive-masked (dead slots zeroed) before `apply_updates`; GLOBAL
-  fields (grids, scalars) are NOT masked. Bool/discrete base fields like `alive` are protected from
-  accidental integration only because a well-formed dynamic delta leaves them None -- the summed
-  update touches an untouched (None) field never, so a dynamic step that wrongly writes `alive` would
-  bypass that protection.'
-verdict: null
+- 'PAPER CONTRADICTION (source wins). The paper (Deshpande 2025, p. 14 ''FORWARD SIMULATION'') has NO
+  step-type taxonomy: it describes the simulation as "any subset or combination of the steps detailed
+  below" -- a flat, customizable sequence of full-state operations (cell growth, mechanical relaxation,
+  cell division, diffusion) applied per timestep, with "each simulation timestep [consisting] of one cell
+  division." The words quasistatic / dynamic / discrete / Lie-Trotter / hybrid / macro-step appear ZERO
+  times in the paper text. The three-phase time-scale taxonomy, the operator split, and the dt-scaled
+  sparse-delta contract are a library RE-ARCHITECTURE of the original flat pipeline. Recorded per rule
+  5: SOURCE WINS.'
+- The DYNAMIC phase is NOT Gauss-Seidel. Every dynamic step is evaluated at the SAME post-quasistatic
+  state (it does not see other dynamic steps' updates); their sparse deltas are SUMMED and applied in
+  one op, so the dynamic phase is order-independent. Quasistatic and discrete phases ARE sequential (each
+  step sees prior updates). A reimplementer who runs dynamic steps one after another (each on the last
+  one's output) changes the dynamics.
+- 'Return value is OVERLOADED by type behind one identical signature `__call__(state, *, dt, key) -> state`.
+  A dynamic step MUST return `state.deltas(...)` (a sparse increment over dt, every untouched field None),
+  NOT a full state; returning a full state from a dynamic step is a silent correctness bug (AGENTS.md
+  explicitly: "Do not implement a dynamic step by returning a complete updated state"). Quasistatic/discrete
+  return a full state.'
+- dt-scaling lives INSIDE each dynamic step, not in the combiner. `_accumulate_dynamic` sums the deltas
+  with NO dt multiplication ("each step baked its own dt-scaling in"). A reimplementer who expects the
+  model to multiply increments by dt will mis-scale the finite-rate terms.
+- Write-conflict policy is per-type and ASYMMETRIC (Model._validate). A QUASISTATIC field admits EXACTLY
+  ONE writer; a DYNAMIC field admits MANY (additive) writers; a field cannot be both quasistatic- and
+  dynamic-written (ValueError). DISCRETE steps are EXEMPT from write-conflict checks entirely ("discrete
+  steps are resets") -- two discrete steps may write the same field and the later-in-pipeline one silently
+  wins, no error.
+- 'StepType is a StrEnum, but phase dispatch and validation compare by IDENTITY (`step.step_type is StepType.DYNAMIC`),
+  not by `==`. `StepType.DYNAMIC == ''dynamic''` is True, yet assigning the raw string ''dynamic'' as
+  a step''s `step_type` passes no `is`-check: the step would silently run in NO phase (never executed)
+  rather than raise. Set the enum member, not the string.'
+- Cell-scope dynamic totals are alive-masked (dead slots zeroed) before `apply_updates`; GLOBAL fields
+  (grids, scalars) are NOT masked. Bool/discrete base fields like `alive` are protected from accidental
+  integration only because a well-formed dynamic delta leaves them None -- the summed update touches an
+  untouched (None) field never, so a dynamic step that wrongly writes `alive` would bypass that protection.
+verdict: out_of_scope
 of: null
-why: null
-contract: null
-status: inspected
+why: '`step_type` is a class-level classification TAG, not a forward operator over sets and fields.
+
+  It declares no physics of its own (the state_writes a step advertises belong to the concrete
+
+  step, never to the tag); what the tag fixes is (a) which of the three fixed macro-step phases a
+
+  step runs in and (b) how the Model interprets that step''s return value (full state vs sparse
+
+  dt-delta), plus the per-type write-conflict policy in Model._validate. That is
+
+  integration/scheduling machinery -- the engine layer that COMPOSES the forward operators, not a
+
+  member of the forward algebra. It is the per-step annotation consumed by the sibling Lie-Trotter
+
+  macro-step split (order 21), which is itself the engine''s composition map; the two are one
+
+  engine concern seen from two sides (the tag classifies, the split dispatches).
+
+
+  Not alias/refinement: no registered contract models a time-scale-classification tag, and
+
+  widening one (say `diffuse`, or any lateral force) to carry a phase / return-value-dispatch
+
+  attribute would graft a scheduler concern onto a forward-dynamics signature and break every
+
+  existing user of that contract. Not new: counting an operator-CLASSIFICATION tag as a new
+
+  OPERATOR would inflate the atlas yield with framework machinery -- exactly what out_of_scope
+
+  exists to prevent, and the same call already made for StochasticStep (order 5), where
+
+  differentiability is ruled an engine concern, not a forward operator. The biology lives entirely
+
+  in the concrete steps each tag labels (grow, relax, divide, diffuse), each already its own atlas
+
+  entry with its own real contract; the tag adds only WHEN and HOW those effects are composed in
+
+  time, never a new effect on state.
+
+
+  MEASUREMENT NOTE (the load-bearing observation). step_type is a genuine axis Plexus''s IR does
+
+  not currently carry: a TIME-SCALE / integration-phase classification (fast constraint / finite
+
+  rate / instantaneous event). Plexus does classify its operators -- but along a DIFFERENT axis.
+
+  Its `kind` taxonomy (lateral/aggregate/broadcast/exchange/field/structural/rewire) is a
+
+  data-flow-SHAPE axis (which sets and fields an operator couples), orthogonal to time-scale. So
+
+  the closest Plexus analogue is not any registered contract at all but Plexus''s own `kind`
+
+  meta-taxonomy, and even that is a different axis. This is a gap in the engine/IR meta-layer, not
+
+  a missing forward operator; a classification-of-operators is not an operator, so it is recorded
+
+  out_of_scope with the axis noted rather than promoted into the vocabulary.
+
+
+  CONTRACT FIELDS BELOW are a validator formality: R6/R7 require a typed, writes-non-empty
+
+  contract even for out_of_scope. No Plexus kind genuinely fits a scheduling meta-tag;
+
+  kind=exchange / family=coupling names only the write-into-shared-state coupling the taxonomy
+
+  governs, and writes:[t] mirrors the single field the macro-step it dispatches actually advances.
+
+  '
+contract:
+  name: timescale
+  kind: exchange
+  family: coupling
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - alive
+  writes:
+  - t
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

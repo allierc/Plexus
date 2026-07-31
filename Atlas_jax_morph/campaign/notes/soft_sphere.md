@@ -40,3 +40,35 @@ Potential->Step relationship from the base/protocol, but did not grep for a mode
 `SoftSphere`). And I did not verify whether the ORIGINAL Deshpande code (vs this hardened
 reimplementation) even contains a `SoftSphere` class, or whether it is a Plexus-library addition --
 the paper text alone cannot settle that.
+
+---
+
+## Normalization
+
+**Verdict: `new`, `implementation_of: adhere`.** SoftSphere is the purely-repulsive
+(zero-adhesion) member of the pairwise cell-cell mechanical-interaction contract `adhere` -- a
+Lateral force whose range is set by the two cells' physical radii (contact at sigma = r_i + r_j)
+and which drives cell positions through a wrapping integrator step. Following the record's own
+`regulate` rule, Morse / SoftSphere / Hertzian share one typed signature and differ only in the
+pair-energy law U(r), so they collapse to ONE contract with several implementations, not three;
+`adhere` is absent from the frozen 42, hence `new` rather than alias/refinement (R4 rejects a
+non-registered `of:`), and the instruction's own gloss -- "`morse_potential` is an implementation
+of `adhere`" -- fixes the name. The closest registered slots lose their biology if widened:
+`attraction_repulsion` is a fixed-global-width D'Orsogna velocity law with per-type params and no
+cell radius, and `separation` is a mean-aggregated 1/|d|^2 boids steering nudge with no contact
+distance, energy, or virial.
+
+**Strongest argument against.** SoftSphere has *zero* adhesion -- it is excluded volume and nothing
+else -- so calling it an implementation of `adhere` mis-names a purely repulsive cell gas, and one
+could argue steric repulsion is its own biological contract (`exclude_volume`) distinct from
+adhesion: a cell can exclude volume without adhering, and the two are separable affordances that the
+paper's Morse merely happens to bundle. I reject the split because the atlas counts CONTRACTS = typed
+signatures, and SoftSphere and Morse have an IDENTICAL signature (read position/radius/epsilon, drive
+position via the force slot, expose the same virial) -- they differ only in U(r), which is exactly
+the "differ only in the vector field f -> one contract" rule the record already committed to for
+`regulate`. Adhesion strength is a knob whose zero limit recovers SoftSphere, not a separate
+contract; splitting on the presence of the attractive tail would inflate the contract yield on an
+implementation detail -- the precise failure mode the measurement exists to avoid. (If a later pass
+finds adhesion carries state or a map that repulsion does not -- a cadherin field, a bond edge-set --
+that would be real signature divergence and would reopen the split; the harmonic/Morse pair shows
+none.)

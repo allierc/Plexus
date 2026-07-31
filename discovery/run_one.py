@@ -332,9 +332,9 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
               flush=True)
 
     # --------------------------------------------------------------- artefacts
-    if movie:
+    if True:
         try:
-            render(name, fr, out_dir)
+            render(name, fr, out_dir, movie=movie)
             # Captioning is NOT done here. The cluster environment has no `transformers`, so an
             # in-job caption fails on exactly the runs a long campaign produces -- leaving the
             # Watcher blind where it matters most. caption_wave.py does it on the devcontainer
@@ -466,7 +466,7 @@ def run_box(fr, pad=1.12):
     return float(max(np.abs(pt).max() for pt, _, _ in fr)) * pad
 
 
-def render(name, fr, out_dir, n_strip=8, movie_frames=60):
+def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     """Strip + movie, matching the minisite convention (black bg, activator LUT).
 
     THREE rows / TWO 3D panels, not one. A protrusion growing along the side camera's view
@@ -584,6 +584,18 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
+
+    # THE STRIP IS NOT OPTIONAL. `--no-movie` used to gate this whole function, so skipping the
+    # expensive mp4 also threw away the cheap contact sheet -- and the contact sheet is the only
+    # detector in this campaign with a perfect record. Every one of the ten defects found on
+    # 31 July was found by a human scanning a picture: a ball that shrank, a tissue that went
+    # green all at once, a coral that began uniformly red. Saving a minute by suppressing the
+    # image removes the one instrument that has never missed. The mp4 may be skipped; the strip
+    # may not.
+    if not movie:
+        print(f"[{name}] artefacts -> {os.path.relpath(out_dir, ROOT)}/strip.png (mp4 skipped)",
+              flush=True)
+        return
 
     # movie: the two 3D viewpoints side by side + the cross-section inset (bottom-right).
     # Laid out here rather than via make_movie_axes, which only makes the single-view layout.
