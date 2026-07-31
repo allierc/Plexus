@@ -3,103 +3,80 @@ order: 1
 raw_name: GeneNetworkConnectionist
 raw_kind: step (ODEController)
 code_path: papers/jax-morph/jax_morph/control/ode.py:L202
-paper_section: 'p. 10, Materials and Methods, "Genetic regulatory interactions" (dg_i/dt = phi(sum_j W_ij g_j + b_i) + I_i - k_i g_i); model inspired by Hiscock 2019 [ref 24]. Guides do not describe it.'
-summary: >-
-  A per-cell continuous-time gene regulatory circuit. Each cell holds a vector of gene
-  concentrations (optional hidden/intermediate genes concatenated ahead of the observed output
-  genes); every macro-step it integrates dg/dt = sigmoid(W_gene*g + W_in*u + b) - gamma*g, where u
-  are the cell's fixed sensed inputs, and writes back the resulting per-gene concentration change as
-  a sparse state delta. It is the decision function that turns sensed chemistry/mechanics into gene
-  outputs that downstream steps read to set division/secretion behavior.
-equations: |
-  CODE (authoritative; ode.py:L261-278 vector_field, integrated by ODEController.__call__ L161-199):
-    g            = evolving = concat([hidden, outputs])  # per-cell gene concentrations (n_cells, n_gene)
-    u            = inputs                                 # packed fixed driver fields (n_cells, in_size)
-    drive        = g @ W_gene.T + u @ W_in.T + b
-    dg/dt        = sigma_alg(drive) - gamma * g
-    sigma_alg(x) = 0.5 + 0.5 * x / sqrt(1 + x^2)          # rescaled/algebraic sigmoid (_rescaled_sigmoid),
-                                                          # NOT logistic; range (0,1), sigma_alg(0)=0.5
-  n_gene = hidden_size + out_size. Integrated over one macro-step by diffrax Dopri5 (PIDController
-  rtol=1e-4, atol=1e-6, dt0=dt) from t=0 to t=dt; the step emits the SPARSE DELTA y(dt)-y(0) per
-  hidden/output field (summed in the dynamic phase), never the updated state. The vector field is
-  autonomous (t unused) and u is a fixed snapshot for the whole step.
-
-  PAPER (p. 10, "Genetic regulatory interactions"; inspired by Hiscock 2019 [24]):
-    dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i
-  g_i expression level; W_ij regulatory influence of gene j on i; b_i basal transcription; k_i
-  degradation; I_i a forcing signal from ONE sensed input; phi a saturating sigmoid.
-
-  CONTRADICTION (source wins): the paper ADDS the sensed input I_i linearly OUTSIDE the sigmoid; the
-  code MIXES inputs through a full trainable matrix W_in INSIDE the sigmoid. The paper's I_i is a
-  direct per-gene additive forcing; the code's W_in is an (n_gene x in_size) learnable coupling. The
-  code therefore saturates the input drive together with the regulatory drive, whereas the paper's
-  input forcing is unsaturated.
+paper_section: p. 10, Materials and Methods, "Genetic regulatory interactions" (dg_i/dt = phi(sum_j W_ij
+  g_j + b_i) + I_i - k_i g_i); model inspired by Hiscock 2019 [ref 24]. Guides do not describe it.
+summary: A per-cell continuous-time gene regulatory circuit. Each cell holds a vector of gene concentrations
+  (optional hidden/intermediate genes concatenated ahead of the observed output genes); every macro-step
+  it integrates dg/dt = sigmoid(W_gene*g + W_in*u + b) - gamma*g, where u are the cell's fixed sensed
+  inputs, and writes back the resulting per-gene concentration change as a sparse state delta. It is the
+  decision function that turns sensed chemistry/mechanics into gene outputs that downstream steps read
+  to set division/secretion behavior.
+equations: "CODE (authoritative; ode.py:L261-278 vector_field, integrated by ODEController.__call__ L161-199):\n\
+  \  g            = evolving = concat([hidden, outputs])  # per-cell gene concentrations (n_cells, n_gene)\n\
+  \  u            = inputs                                 # packed fixed driver fields (n_cells, in_size)\n\
+  \  drive        = g @ W_gene.T + u @ W_in.T + b\n  dg/dt        = sigma_alg(drive) - gamma * g\n  sigma_alg(x)\
+  \ = 0.5 + 0.5 * x / sqrt(1 + x^2)          # rescaled/algebraic sigmoid (_rescaled_sigmoid),\n     \
+  \                                                   # NOT logistic; range (0,1), sigma_alg(0)=0.5\n\
+  n_gene = hidden_size + out_size. Integrated over one macro-step by diffrax Dopri5 (PIDController\nrtol=1e-4,\
+  \ atol=1e-6, dt0=dt) from t=0 to t=dt; the step emits the SPARSE DELTA y(dt)-y(0) per\nhidden/output\
+  \ field (summed in the dynamic phase), never the updated state. The vector field is\nautonomous (t unused)\
+  \ and u is a fixed snapshot for the whole step.\n\nPAPER (p. 10, \"Genetic regulatory interactions\"\
+  ; inspired by Hiscock 2019 [24]):\n  dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i\ng_i expression\
+  \ level; W_ij regulatory influence of gene j on i; b_i basal transcription; k_i\ndegradation; I_i a\
+  \ forcing signal from ONE sensed input; phi a saturating sigmoid.\n\nCONTRADICTION (source wins): the\
+  \ paper ADDS the sensed input I_i linearly OUTSIDE the sigmoid; the\ncode MIXES inputs through a full\
+  \ trainable matrix W_in INSIDE the sigmoid. The paper's I_i is a\ndirect per-gene additive forcing;\
+  \ the code's W_in is an (n_gene x in_size) learnable coupling. The\ncode therefore saturates the input\
+  \ drive together with the regulatory drive, whereas the paper's\ninput forcing is unsaturated.\n"
 params:
-  input_specs: >-
-    sensor_field_bindings: the fixed per-cell driver fields (u) the circuit senses (e.g. chemical /
-    mechanical inputs). Their flattened widths sum to in_size. Static field-spec tuple; held constant
-    across the macro-step integration.
-  output_specs: >-
-    output_gene_field_bindings: the observed gene-concentration fields written back to state -- the
-    action-modifying ("red") output genes. Widths sum to out_size. Static field-spec tuple.
-  hidden_size: >-
-    latent_regulator_count: number of intermediate ("blue") hidden genes carried in a heritable
-    {tag}_hidden field of shape (hidden_size,); 0 gives a pure-output circuit with no hidden field.
-    Static; must be >= 0.
-  W_gene: >-
-    regulatory_coupling_matrix (n_gene x n_gene): signed excitatory/inhibitory influence W_ij of gene
-    j on gene i, n_gene = hidden_size + out_size. Trainable; None -> zeros, shape-validated.
-  W_in: >-
-    input_sensitivity_matrix (n_gene x in_size): trainable coupling of each sensed input to each gene,
-    applied INSIDE the sigmoid. Trainable; None -> zeros, shape-validated.
-  b: >-
-    basal_production_bias (n_gene): per-gene transcription drive absent regulation (bias into the
-    sigmoid). Trainable; None -> zeros, shape-validated.
-  gamma: >-
-    degradation_rate: scalar or per-gene (n_gene) linear decay rate applied to every evolving gene
-    (including hidden). Default 0.1. Stored verbatim -- NOT passed through _resolve_param, so it is
-    NOT shape-checked or zero-defaulted, unlike W_gene/W_in/b.
-  tag: >-
-    state_namespace: string prefix for the latent hidden field name ({tag}_hidden), default "gene".
-    Bookkeeping only; no physical role.
+  input_specs: 'sensor_field_bindings: the fixed per-cell driver fields (u) the circuit senses (e.g. chemical
+    / mechanical inputs). Their flattened widths sum to in_size. Static field-spec tuple; held constant
+    across the macro-step integration.'
+  output_specs: 'output_gene_field_bindings: the observed gene-concentration fields written back to state
+    -- the action-modifying ("red") output genes. Widths sum to out_size. Static field-spec tuple.'
+  hidden_size: 'latent_regulator_count: number of intermediate ("blue") hidden genes carried in a heritable
+    {tag}_hidden field of shape (hidden_size,); 0 gives a pure-output circuit with no hidden field. Static;
+    must be >= 0.'
+  W_gene: 'regulatory_coupling_matrix (n_gene x n_gene): signed excitatory/inhibitory influence W_ij of
+    gene j on gene i, n_gene = hidden_size + out_size. Trainable; None -> zeros, shape-validated.'
+  W_in: 'input_sensitivity_matrix (n_gene x in_size): trainable coupling of each sensed input to each
+    gene, applied INSIDE the sigmoid. Trainable; None -> zeros, shape-validated.'
+  b: 'basal_production_bias (n_gene): per-gene transcription drive absent regulation (bias into the sigmoid).
+    Trainable; None -> zeros, shape-validated.'
+  gamma: 'degradation_rate: scalar or per-gene (n_gene) linear decay rate applied to every evolving gene
+    (including hidden). Default 0.1. Stored verbatim -- NOT passed through _resolve_param, so it is NOT
+    shape-checked or zero-defaulted, unlike W_gene/W_in/b.'
+  tag: 'state_namespace: string prefix for the latent hidden field name ({tag}_hidden), default "gene".
+    Bookkeeping only; no physical role.'
 state_io:
   reads:
-    - 'input_specs -- the driver fields u (declared via ODEController.state_reads()); read as a fixed snapshot.'
+  - input_specs -- the driver fields u (declared via ODEController.state_reads()); read as a fixed snapshot.
   writes:
-    - 'output_specs -- per-gene concentration increments (the observed output genes).'
-    - '{tag}_hidden of shape (hidden_size,) -- emitted ONLY when hidden_size > 0 (heritable latent regulator state).'
+  - output_specs -- per-gene concentration increments (the observed output genes).
+  - '{tag}_hidden of shape (hidden_size,) -- emitted ONLY when hidden_size > 0 (heritable latent regulator
+    state).'
 surprises:
-  - >-
-    Input placement contradicts the paper: code feeds sensed inputs THROUGH the sigmoid via W_in
-    (sigma(W_gene*g + W_in*u + b)); the paper adds a per-gene forcing I_i OUTSIDE the sigmoid. A
-    reimplementer coding from the paper equation would get different saturation and different
-    gradients.
-  - >-
-    The sigmoid is the ALGEBRAIC/rescaled sigmoid 0.5 + 0.5*x/sqrt(1+x^2), not the logistic
-    1/(1+exp(-x)). Notably the sibling GeneNetworkMWC in the SAME file uses jax.nn.sigmoid (logistic)
-    -- the two gene circuits do not share a sigmoid.
-  - >-
-    Default parameters are NOT a no-op. W_gene/W_in/b default to zeros but gamma defaults to 0.1, so
-    drive=0 -> production=sigma_alg(0)=0.5 and dg/dt = 0.5 - 0.1*g, driving every gene to steady state
-    g*=5.0. An "inert" circuit still evolves the state.
-  - >-
-    gamma is the only regulatory parameter not routed through _resolve_param, so unlike the weight
-    matrices it is never shape-validated and a shape-mismatched gamma would broadcast silently.
-  - >-
-    The step returns a SPARSE DELTA (integrated endpoint minus start), consistent with the dynamic-phase
-    contract where deltas are summed. Returning a full updated field instead would double-apply the state.
-  - >-
-    Inputs u are a FIXED quasistatic snapshot for the entire macro-step and the vector field is
-    autonomous (t and the PRNG key are both explicitly discarded). Chemistry is treated as steady-state
-    within a step.
-  - >-
-    Evolving order is [hidden, outputs] and W_gene is full (n_gene x n_gene), so hidden genes both
-    regulate and are regulated by all genes, and gamma decays hidden genes too. W_gene index meaning
-    depends on this concatenation order.
-  - >-
-    _rescaled_sigmoid deliberately clips x to the dtype's finite range and rescales x*x to avoid
-    float32 overflow/NaN at large |drive|; a naive x/sqrt(1+x^2) can overflow before the ODE solver
-    would otherwise diverge.
+- 'Input placement contradicts the paper: code feeds sensed inputs THROUGH the sigmoid via W_in (sigma(W_gene*g
+  + W_in*u + b)); the paper adds a per-gene forcing I_i OUTSIDE the sigmoid. A reimplementer coding from
+  the paper equation would get different saturation and different gradients.'
+- The sigmoid is the ALGEBRAIC/rescaled sigmoid 0.5 + 0.5*x/sqrt(1+x^2), not the logistic 1/(1+exp(-x)).
+  Notably the sibling GeneNetworkMWC in the SAME file uses jax.nn.sigmoid (logistic) -- the two gene circuits
+  do not share a sigmoid.
+- Default parameters are NOT a no-op. W_gene/W_in/b default to zeros but gamma defaults to 0.1, so drive=0
+  -> production=sigma_alg(0)=0.5 and dg/dt = 0.5 - 0.1*g, driving every gene to steady state g*=5.0. An
+  "inert" circuit still evolves the state.
+- gamma is the only regulatory parameter not routed through _resolve_param, so unlike the weight matrices
+  it is never shape-validated and a shape-mismatched gamma would broadcast silently.
+- The step returns a SPARSE DELTA (integrated endpoint minus start), consistent with the dynamic-phase
+  contract where deltas are summed. Returning a full updated field instead would double-apply the state.
+- Inputs u are a FIXED quasistatic snapshot for the entire macro-step and the vector field is autonomous
+  (t and the PRNG key are both explicitly discarded). Chemistry is treated as steady-state within a step.
+- Evolving order is [hidden, outputs] and W_gene is full (n_gene x n_gene), so hidden genes both regulate
+  and are regulated by all genes, and gamma decays hidden genes too. W_gene index meaning depends on this
+  concatenation order.
+- _rescaled_sigmoid deliberately clips x to the dtype's finite range and rescales x*x to avoid float32
+  overflow/NaN at large |drive|; a naive x/sqrt(1+x^2) can overflow before the ODE solver would otherwise
+  diverge.
 verdict: null
 of: null
 why: null

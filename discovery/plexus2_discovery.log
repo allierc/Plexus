@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  31 JUL 2026 14:57
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  31 JUL 2026 17:33
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -679,16 +679,16 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texmf/fonts/enc/
 dvips/cm-super/cm-super-t1.enc}]
 
-[2{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
+[2]
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 156.
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 179.
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <7> on input line 172.
+(Font)              <7> on input line 195.
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <5> on input line 172.
+(Font)              <5> on input line 195.
 
 
-[3]
+[3{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
 
 [4]
 
@@ -704,7 +704,7 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 
 [10]
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <9> on input line 651.
+(Font)              <9> on input line 674.
 
 
 [11]
@@ -713,6 +713,20 @@ Overfull \vbox (48.3765pt too high) has occurred while \output is active []
 
 
 [12]
+Overfull \hbox (20.51616pt too wide) in paragraph at lines 761--773
+ [] 
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 792--794
+[]\T1/cmr/bx/n/10.95 Where it lives. \T1/cmtt/m/n/10.95 discovery/PREMISES.md \
+T1/cmr/m/n/10.95 (what we be-lieve) and
+ []
+
+
+Overfull \vbox (131.97421pt too high) has occurred while \output is active []
+
+
 
 [13]
 
@@ -722,20 +736,26 @@ Overfull \vbox (48.3765pt too high) has occurred while \output is active []
 
 [16]
 
-[17] (./plexus2_discovery.aux)
+[17]
+
+[18]
+
+[19]
+
+[20] (./plexus2_discovery.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `plexus2_discovery.out' has not changed.
-(rerunfilecheck)             Checksum: B57DCB4E19B2F950D5393499FC5AC34C;4729.
+(rerunfilecheck)             Checksum: 6935C13E56659EFE956E99F8A1DB1117;5562.
  ) 
 Here is how much of TeX's memory you used:
- 22598 strings out of 475102
- 434011 string characters out of 5764878
- 822412 words of memory out of 5000000
- 45182 multiletter control sequences out of 15000+600000
- 575161 words of font info for 69 fonts, out of 8000000 for 9000
+ 22615 strings out of 475102
+ 434236 string characters out of 5764878
+ 823483 words of memory out of 5000000
+ 45191 multiletter control sequences out of 15000+600000
+ 575860 words of font info for 70 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,12n,121p,509b,608s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></us
@@ -746,22 +766,23 @@ dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fon
 ts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
 ic/amsfonts/cm/cmsy9.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1095
-.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx0900.pfb></usr/share/tex
-mf/fonts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/publi
-c/cm-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.
-pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texm
-f/fonts/type1/public/cm-super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public
-/cm-super/sfrm1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.p
-fb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf
-/fonts/type1/public/cm-super/sfti0900.pfb></usr/share/texmf/fonts/type1/public/
-cm-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1095.pf
-b></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/share/texmf/
-fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/c
-m-super/sftt1095.pfb>
-Output written on plexus2_discovery.pdf (17 pages, 530922 bytes).
+.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/tex
+mf/fonts/type1/public/cm-super/sfbx0900.pfb></usr/share/texmf/fonts/type1/publi
+c/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1095.
+pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb></usr/share/texm
+f/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public
+/cm-super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.p
+fb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf
+/fonts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/
+cm-super/sfti0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pf
+b></usr/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/
+fonts/type1/public/cm-super/sftt0900.pfb></usr/share/texmf/fonts/type1/public/c
+m-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb
+>
+Output written on plexus2_discovery.pdf (20 pages, 572886 bytes).
 PDF statistics:
- 353 PDF objects out of 1000 (max. 8388607)
- 282 compressed objects within 3 object streams
- 82 named destinations out of 1000 (max. 500000)
- 165 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 389 PDF objects out of 1000 (max. 8388607)
+ 312 compressed objects within 4 object streams
+ 89 named destinations out of 1000 (max. 500000)
+ 197 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -4,95 +4,72 @@ raw_name: ODEController
 raw_kind: step (SimulationStep)
 code_path: papers/jax-morph/jax_morph/control/ode.py:L46
 paper_section: p. 10 ("Genetic regulatory interactions"); fig. 1b
-summary: >-
-  Abstract DYNAMIC step that integrates a per-cell ODE over one macro-step. It packs each cell's
-  evolving state y = concat(hidden latent genes, observed output genes), holds the sensed driver
-  inputs FIXED, integrates dy/dt = vector_field(t, y, inputs) from t=0 to t=dt with an adaptive
-  Dopri5 solver, and returns the exact integrated increment y(dt) - y(0) as a sparse per-field
-  delta (hidden field plus each output field). The base defines only the integration machinery;
-  the vector_field is abstract and supplied by subclasses (GeneNetworkConnectionist, NeuralODE,
-  GeneNetworkMWC).
-equations: |
-  Base ODEController (integration machinery, subclass-agnostic), per cell:
-    y0        = concat(hidden, outputs)                      # hidden width = hidden_size, outputs width = out_size
-    inputs    = pack(input_specs)   held FIXED over [0, dt]  # driver fields do not evolve during the solve
-    y(dt)     = ODESolve( dy/dt = vector_field(t, y, inputs),
-                          y(0) = y0, t in [0, dt],
-                          Dopri5, PIDController(rtol=1e-4, atol=1e-6), dt0=dt )
-    delta     = y(dt) - y0          # RETURNED as a sparse dynamic delta, NOT the new state
-                                    # sliced back: first hidden_size cols -> {tag}_hidden, then each output spec in order
-
-  Paper's realized field (p. 10, "inspired by Hiscock [24]"), per gene i:
-    dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i
-      g_i = expression level; W_ij = regulatory influence of gene j on i; b_i = basal transcription rate;
-      k_i = degradation rate; I_i = forcing signal from a sensed cell input; phi = saturating sigmoid.
-    NOTE the input I_i is ADDITIVE and OUTSIDE the sigmoid.
-
-  Code's closest subclass, GeneNetworkConnectionist.vector_field (L261):
-    dg/dt = sigma( W_gene @ g + W_in @ u + b ) - gamma * g
-    Here the driver input u enters INSIDE the sigmoid via W_in @ u (see surprises) and there is no
-    separate additive input term; sigma is the ALGEBRAIC sigmoid 0.5 + 0.5 * x/sqrt(1 + x^2), not
-    the logistic. GeneNetworkMWC uses a log-occupancy (MWC) drive with jax.nn.sigmoid instead.
+summary: Abstract DYNAMIC step that integrates a per-cell ODE over one macro-step. It packs each cell's
+  evolving state y = concat(hidden latent genes, observed output genes), holds the sensed driver inputs
+  FIXED, integrates dy/dt = vector_field(t, y, inputs) from t=0 to t=dt with an adaptive Dopri5 solver,
+  and returns the exact integrated increment y(dt) - y(0) as a sparse per-field delta (hidden field plus
+  each output field). The base defines only the integration machinery; the vector_field is abstract and
+  supplied by subclasses (GeneNetworkConnectionist, NeuralODE, GeneNetworkMWC).
+equations: "Base ODEController (integration machinery, subclass-agnostic), per cell:\n  y0        = concat(hidden,\
+  \ outputs)                      # hidden width = hidden_size, outputs width = out_size\n  inputs   \
+  \ = pack(input_specs)   held FIXED over [0, dt]  # driver fields do not evolve during the solve\n  y(dt)\
+  \     = ODESolve( dy/dt = vector_field(t, y, inputs),\n                        y(0) = y0, t in [0, dt],\n\
+  \                        Dopri5, PIDController(rtol=1e-4, atol=1e-6), dt0=dt )\n  delta     = y(dt)\
+  \ - y0          # RETURNED as a sparse dynamic delta, NOT the new state\n                          \
+  \        # sliced back: first hidden_size cols -> {tag}_hidden, then each output spec in order\n\nPaper's\
+  \ realized field (p. 10, \"inspired by Hiscock [24]\"), per gene i:\n  dg_i/dt = phi( sum_j W_ij g_j\
+  \ + b_i ) + I_i - k_i g_i\n    g_i = expression level; W_ij = regulatory influence of gene j on i; b_i\
+  \ = basal transcription rate;\n    k_i = degradation rate; I_i = forcing signal from a sensed cell input;\
+  \ phi = saturating sigmoid.\n  NOTE the input I_i is ADDITIVE and OUTSIDE the sigmoid.\n\nCode's closest\
+  \ subclass, GeneNetworkConnectionist.vector_field (L261):\n  dg/dt = sigma( W_gene @ g + W_in @ u +\
+  \ b ) - gamma * g\n  Here the driver input u enters INSIDE the sigmoid via W_in @ u (see surprises)\
+  \ and there is no\n  separate additive input term; sigma is the ALGEBRAIC sigmoid 0.5 + 0.5 * x/sqrt(1\
+  \ + x^2), not\n  the logistic. GeneNetworkMWC uses a log-occupancy (MWC) drive with jax.nn.sigmoid instead.\n"
 params:
-  input_specs: >-
-    sensed_input_field_specs -- per-cell driver fields (chemical concentrations, mechanical stress)
-    held FIXED while the ODE integrates; these are the paper's forcing/sensed inputs I_i. Read-only.
-  output_specs: >-
-    observed_output_gene_field_specs -- per-cell evolving fields the ODE integrates and PERSISTS as
-    physical state; they drive downstream cell actions (division rate, secretion rates, adhesion).
-  hidden_size: >-
-    latent_regulator_width -- number of hidden/intermediate regulator genes (paper fig. 1b blue
-    nodes) evolved alongside the outputs; 0 allocates no latent field and gives a pure-output ODE.
-  tag: >-
-    latent_field_namespace -- string prefix for the heritable latent-state field '{tag}_hidden', so
+  input_specs: sensed_input_field_specs -- per-cell driver fields (chemical concentrations, mechanical
+    stress) held FIXED while the ODE integrates; these are the paper's forcing/sensed inputs I_i. Read-only.
+  output_specs: observed_output_gene_field_specs -- per-cell evolving fields the ODE integrates and PERSISTS
+    as physical state; they drive downstream cell actions (division rate, secretion rates, adhesion).
+  hidden_size: latent_regulator_width -- number of hidden/intermediate regulator genes (paper fig. 1b
+    blue nodes) evolved alongside the outputs; 0 allocates no latent field and gives a pure-output ODE.
+  tag: latent_field_namespace -- string prefix for the heritable latent-state field '{tag}_hidden', so
     multiple controllers can coexist without a field-name collision.
 state_io:
   reads:
-    - input_specs (the sensed driver fields, held fixed during the solve)
-    - '{tag}_hidden (only when hidden_size > 0; read back to seed y0)'
-    - output_specs (read back to seed y0)
+  - input_specs (the sensed driver fields, held fixed during the solve)
+  - '{tag}_hidden (only when hidden_size > 0; read back to seed y0)'
+  - output_specs (read back to seed y0)
   writes:
-    - output_specs (each output field's dt-increment)
-    - '{tag}_hidden, shape (hidden_size,) -- only when hidden_size > 0 (heritable latent state)'
+  - output_specs (each output field's dt-increment)
+  - '{tag}_hidden, shape (hidden_size,) -- only when hidden_size > 0 (heritable latent state)'
 surprises:
-  - >-
-    RETURNS A DELTA, NOT THE INTEGRATED STATE. Being a DYNAMIC step, __call__ returns
-    solution.ys[-1] - y0 as a sparse delta; the Model accumulates it. A reimplementer who returns
-    the integrated value y(dt) directly (quasistatic-style) would double-apply the change.
-  - >-
-    The dt-increment is the EXACT integrated change over the interval (adaptive Dopri5), not a
-    first-order rate*dt like a typical dynamic step. Because dynamic deltas are SUMMED across
-    writers and the ODE increment is nonlinear in the field, a second dynamic writer of the same
-    output field would corrupt the result -- the controller must solely own its output fields.
-  - >-
-    INPUTS ARE FROZEN during the solve. vector_field closes over `inputs` packed once from the
-    pre-step state; the driver fields do not evolve inside [0, dt]. This is the ODE-scale
-    quasistatic assumption and is easy to miss.
-  - >-
-    PAPER vs CODE contradiction on where the input enters. Paper (p. 10): dg_i/dt = phi(sum_j W_ij
-    g_j + b_i) + I_i - k_i g_i -- the sensed input I_i is ADDITIVE and OUTSIDE the sigmoid. Code's
-    closest subclass GeneNetworkConnectionist puts the input INSIDE the sigmoid (sigma(W_gene@g +
-    W_in@u + b)). The abstract base is agnostic (vector_field is abstract), but a reimplementer
-    matching the paper's forcing term would build a different circuit than the code ships. SOURCE WINS.
-  - >-
-    hidden_size = 0 allocates NO latent field: state_writes then returns only output_specs, and the
-    hidden block is a width-0 array. hidden_size < 0 raises ValueError in __init__.
-  - >-
-    Solver magic constants a reimplementer must match to reproduce trajectories: Dopri5,
-    PIDController(rtol=1e-4, atol=1e-6), dt0=dt (initial step = whole macro-step), SaveAt(t1=True)
-    (only the endpoint is saved).
-  - >-
-    Scalar vs vector output packing. _width returns 1 for a scalar spec (shape ()); on unpacking, a
-    scalar output delta is squeezed to chunk[:, 0] (per-cell 1-D) while a shaped output is reshaped
-    to (n_cells, *spec.shape). Packing/unpacking is in DECLARATION ORDER of the specs -- order is
-    load-bearing.
-  - >-
-    hidden and outputs are integrated as ONE coupled system (concatenated into y); cross-regulation
-    between latent and output genes happens inside vector_field, not field-by-field.
-  - >-
-    The `key` argument is accepted for the uniform step interface but unused (del key): the step is
-    deterministic. The ODE is integrated for ALL cell slots including dead ones; the Model's
-    _accumulate_dynamic alive-masks dead slots to zero afterward, so the step does not mask itself.
+- RETURNS A DELTA, NOT THE INTEGRATED STATE. Being a DYNAMIC step, __call__ returns solution.ys[-1] -
+  y0 as a sparse delta; the Model accumulates it. A reimplementer who returns the integrated value y(dt)
+  directly (quasistatic-style) would double-apply the change.
+- The dt-increment is the EXACT integrated change over the interval (adaptive Dopri5), not a first-order
+  rate*dt like a typical dynamic step. Because dynamic deltas are SUMMED across writers and the ODE increment
+  is nonlinear in the field, a second dynamic writer of the same output field would corrupt the result
+  -- the controller must solely own its output fields.
+- INPUTS ARE FROZEN during the solve. vector_field closes over `inputs` packed once from the pre-step
+  state; the driver fields do not evolve inside [0, dt]. This is the ODE-scale quasistatic assumption
+  and is easy to miss.
+- 'PAPER vs CODE contradiction on where the input enters. Paper (p. 10): dg_i/dt = phi(sum_j W_ij g_j
+  + b_i) + I_i - k_i g_i -- the sensed input I_i is ADDITIVE and OUTSIDE the sigmoid. Code''s closest
+  subclass GeneNetworkConnectionist puts the input INSIDE the sigmoid (sigma(W_gene@g + W_in@u + b)).
+  The abstract base is agnostic (vector_field is abstract), but a reimplementer matching the paper''s
+  forcing term would build a different circuit than the code ships. SOURCE WINS.'
+- 'hidden_size = 0 allocates NO latent field: state_writes then returns only output_specs, and the hidden
+  block is a width-0 array. hidden_size < 0 raises ValueError in __init__.'
+- 'Solver magic constants a reimplementer must match to reproduce trajectories: Dopri5, PIDController(rtol=1e-4,
+  atol=1e-6), dt0=dt (initial step = whole macro-step), SaveAt(t1=True) (only the endpoint is saved).'
+- Scalar vs vector output packing. _width returns 1 for a scalar spec (shape ()); on unpacking, a scalar
+  output delta is squeezed to chunk[:, 0] (per-cell 1-D) while a shaped output is reshaped to (n_cells,
+  *spec.shape). Packing/unpacking is in DECLARATION ORDER of the specs -- order is load-bearing.
+- hidden and outputs are integrated as ONE coupled system (concatenated into y); cross-regulation between
+  latent and output genes happens inside vector_field, not field-by-field.
+- 'The `key` argument is accepted for the uniform step interface but unused (del key): the step is deterministic.
+  The ODE is integrated for ALL cell slots including dead ones; the Model''s _accumulate_dynamic alive-masks
+  dead slots to zero afterward, so the step does not mask itself.'
 verdict: null
 of: null
 why: null
