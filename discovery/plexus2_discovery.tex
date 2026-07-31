@@ -284,6 +284,46 @@ therefore be made at a \textbf{common frame} --- the earliest horizon in the bat
 My rho sweep compared final values across runs that almost certainly broke at different times, and
 truncation on its own would not have saved it.
 
+\paragraph{Done today: the curves are now readable, and they already say a lot.}
+Two changes, both small. The per-frame measurements are now saved in the same format as the
+mechanical ones, so a single loader reads both --- they were in two different formats, which is
+part of why nothing read them. And the \emph{shape} of each curve is now classified
+automatically, by arithmetic rather than judgement, into one of: flat, still-rising, settled,
+peaked-then-declined, blown-up, or \textbf{held against a hard limit}.
+
+That last one is the 1778 case. A settling quantity still wobbles in its last few samples; a
+quantity pinned against a ceiling repeats \emph{identically}, sample after sample. One line of
+arithmetic separates them, and it would have caught the overnight study on its first run.
+
+Applied to all 24 archived runs:
+
+\begin{center}\small
+\begin{tabular}{@{}p{10.2cm} r@{}}
+\toprule
+\textbf{What the trajectories say} & \textbf{Runs}\\
+\midrule
+Cell count \textbf{still rising} at the final frame --- the run was stopped, not finished, so
+its ``final'' value is just where we happened to halt & \textbf{18 / 24}\\
+Mesh quality \textbf{still degrading} at the final frame & 15 / 24\\
+Tube diameter \textbf{peaked mid-run then declined} --- so the recorded final value reports the
+decay rather than the phenomenon & \textbf{10 / 24}\\
+Cell count \textbf{pinned against a hard ceiling} & 4 / 24\\
+Mesh degrades somewhere before the end & 18 / 24\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two things are worth singling out. The classifier independently flagged one run as pinned --- and
+it is the same run the type-checker had separately rejected for overflowing its buffer. Two
+unrelated detectors agreeing on real data is the best evidence the classifier works. And three
+runs come out as trustworthy for only the first three-to-five percent of their length, while
+sitting in the archive as results.
+
+\textbf{The caveat is load-bearing and I will not bury it:} those percentages rest on the blended
+number, so a run marked ``5\% trustworthy'' may be five percent broken cells or five percent
+harmless slivers. They are a list of runs to \emph{re-examine}, not a verdict on any of them.
+Separating the three failure modes is what turns this from a flag into a measurement.
+
 \paragraph{The retroactive part.} If broken cells were present in the archived runs --- and the
 84\% figure says they were in at least one --- then the runs behind the withdrawn conclusion were
 computed on partly-destroyed meshes. That is a \emph{second, independent} reason Phase~1 must
