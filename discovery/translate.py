@@ -49,6 +49,26 @@ CKPT = os.path.join("prototype", "Tyssue", "archive", "smoke_hom", "ckpt.npz")
 VBUF, CBUF = 30000, 16000
 DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never composition-dependent
 
+# D5  THE CHEMISTRY RAN 50x TOO SLOW, AND THE CELLS COULD NEVER DIVIDE.
+# ------------------------------------------------------------------------------------------------
+# dt=0.02 is the MECHANICS substep -- the vesicle relaxes toward force balance many times per
+# biological event. But cell_react and cell_diffuse both EMIT=velocity into `chem`, so the engine
+# integrated the chemistry with that same dt: 300 frames bought 300*0.02 = 6 units of Gray-Scott
+# time, against the ~500 the validated minisite spec (dt=1.0, 500 frames) needed. The activator sat
+# at its seed value for the whole run and every measured "no pattern" was an artefact of the clock.
+# Scaling reaction AND diffusion together by 1/dt restores one minisite time unit per frame and
+# leaves their RATIO -- the thing that actually selects the Turing wavelength -- untouched.
+# CFL stays satisfied: dt*chi*max(d_a,d_h) = 0.02*65*0.16 = 0.21 <= 1.
+RD_PER_FRAME = 1.0 / DT_GLOBAL
+
+# The growth ceiling must sit ABOVE the division trigger. `morphogen_growth_3d` caps each cell's
+# target volume at vth_frac*v_ref, while `divide_3d` fires at factor*Vbirth -- and vth_frac was
+# 1.5 against factor 2.0, so a cell's target could never reach the size that makes it divide.
+# Volume-triggered division was arithmetically impossible; the only divisions ever seen came from
+# the max_cycle timeout. Deriving the ceiling from the trigger keeps them from drifting apart.
+DIV_FACTOR = 2.0
+GROWTH_CEILING = DIV_FACTOR * 1.25    # 25% headroom so cells cross the trigger, not asymptote to it
+
 # The engine executes the schedule in this order regardless of graph insertion order: readouts
 # first, then patterning, then growth, then mechanics, then topology, then recording.
 SCHEDULE_ORDER = [
@@ -142,7 +162,7 @@ def _emit_rd_seed(g, n, ga):
 def _emit_react(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
     base = {"op": "cell_react", "at": "cell", "implementation": impl,
-            "rate": float(_p(g, i, "rd_rate"))}
+            "rate": float(_p(g, i, "rd_rate")) * RD_PER_FRAME}   # D5: physical time, not substeps
     if impl == "gierer_meinhardt":
         base.update({"gm_rho": 1.0, "mu_a": 1.0, "mu_h": float(_p(g, i, "mu_h")),
                      "a0": float(_p(g, i, "a0"))})
@@ -158,13 +178,13 @@ def _emit_growth(g, n, ga):
     return {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell",
             "rate": float(_p(g, i, "rate")), "a_sw": float(_p(g, i, "a_sw")),
             "hill": float(_p(g, i, "alpha")), "rho": float(_p(g, i, "rho")),
-            "vth_frac": 1.5, "after_frame": ga, "dt": DT_GLOBAL,
+            "vth_frac": GROWTH_CEILING, "after_frame": ga, "dt": DT_GLOBAL,
             "conserve_amount": g.impl_of(n) == "hill_conserve_amount"}
 
 
 def _emit_divide(g, n, ga):
     i = n["id"]
-    return {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12,
+    return {"op": "divide_3d", "at": "vertex", "factor": DIV_FACTOR, "reset_noise": 0.12,
             "cycle_cv": float(_p(g, i, "cycle_cv")), "p0": 3.90,
             "every": 1,                                        # D1: the ENGINE owns the clock
             # max_div is ALSO per-call, and cap_div = max(max_div, max_div_frac*nF) makes it a
@@ -208,7 +228,8 @@ EMIT = {
     "cell_diffuse": lambda g, n, ga: {
         "op": "cell_diffuse", "at": "cell", "implementation": g.impl_of(n),
         "d_a": float(_p(g, n["id"], "d_a")),
-        "d_h": float(_p(g, n["id"], "d_h")), "chi": float(_p(g, n["id"], "chi"))},
+        "d_h": float(_p(g, n["id"], "d_h")),
+        "chi": float(_p(g, n["id"], "chi")) * RD_PER_FRAME},        # D5: scaled WITH the reaction
     "vesicle_growth": lambda g, n, ga: {
         "op": "vesicle_growth", "at": "vertex", "cell_set": "cell",
         "rate": float(_p(g, n["id"], "rate")), "dt": DT_GLOBAL},

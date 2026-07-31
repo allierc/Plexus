@@ -1,9 +1,9 @@
 general:
-  name: ref_uniform_inflation
+  name: p1_ph_tube
   seed: 0
-  n_frames: 900
+  n_frames: 300
   dt: 0.02
-  record_cap: 902
+  record_cap: 302
   record_every: 1
   boundary: free
   dim: 3
@@ -32,22 +32,44 @@ operators:
   before_frame: 1
   n_cells: 500
   vseed_cv: 0.15
-- op: vesicle_growth
+- op: cell_geometry_3d
+  at: cell
+- op: cell_rd_seed
+  at: cell
+  mode: scatter
+  seed_frac: 0.02
+- op: cell_adjacency
+  at: cell
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.0
+- op: cell_react
+  at: cell
+  implementation: gray_scott
+  rate: 1.0
+  F: 0.055
+  kk: 0.062
+- op: morphogen_growth_3d
   at: vertex
   cell_set: cell
-  rate: 0.001
+  rate: 0.02
+  a_sw: 0.3
+  hill: 4.0
+  rho: 0.3
+  vth_frac: 1.5
+  after_frame: 100
   dt: 0.02
+  conserve_amount: true
 - op: shape_energy_3d
+  implementation: monolayer
   at: vertex
-  p0: 3.9
-  K_A: 1.0
-  K_P: 1.0
-  Gamma: 0.05
-  Lambda: 0.2
-  K_V: 6.0
-  K_R: 0.02
-  K_bend: 0.0
-  antiinv: 0.0
+  k_v: 6.0
+  kappa_s: 0.2
+  h0: 0.4
+  gamma: 0.06
   mu: 1.0
   dt: 0.02
   relax_iters: 30
@@ -80,29 +102,51 @@ operators:
   every: 1
 schedule:
 - seed_mesh_3d
-- vesicle_growth
+- cell_geometry_3d
+- cell_rd_seed
+- cell_adjacency
+- cell_diffuse
+- cell_react
+- morphogen_growth_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d
 - topo_snapshot_3d
 _discovery:
-  comp_hash: C6a07112cc06
+  comp_hash: Ca3c659380f8
   structure:
     operators:
+    - id: cell_adjacency0
+      op: cell_adjacency
+    - id: cell_diffuse0
+      op: cell_diffuse
+      impl: graph_laplacian
+    - id: cell_geometry_3d0
+      op: cell_geometry_3d
+    - id: cell_rd_seed0
+      op: cell_rd_seed
+      impl: scatter
+    - id: cell_react0
+      op: cell_react
+      impl: gray_scott
     - id: divide_3d0
       op: divide_3d
       impl: hertwig
+    - id: morphogen_growth_3d0
+      op: morphogen_growth_3d
+      impl: hill_conserve_amount
     - id: reconnect_t1_3d0
       op: reconnect_t1_3d
     - id: seed_mesh_3d0
       op: seed_mesh_3d
     - id: shape_energy_3d0
       op: shape_energy_3d
-      impl: default
-    - id: vesicle_growth0
-      op: vesicle_growth
-    connections: []
-  region: uniform inflation (no patterning)
+      impl: monolayer
+    connections:
+    - src_op: cell_react
+      dst_op: morphogen_growth_3d
+      slot: gate
+  region: growth-driven monolayer (Okuda route)
   defect_fixes:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=0.02

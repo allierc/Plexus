@@ -38,3 +38,12 @@ STRUCTURALLY REQUIRED -- these cannot be removed at all, which is a result:
   [start cuda:0] p1_ph_undulation
   [start cuda:1] p1_ph_tube
   [start cuda:1] p1_ph_divide_only
+  [done  cuda:1] p1_ph_rd_only               153.1s  exit 0
+  [done  cuda:1] p1_ph_tube                  150.0s  exit 0
+  [done  cuda:0] p1_ko_cell_geometry_3d      159.1s  exit 0
+  [done  cuda:0] p1_ph_growth_only           156.0s  exit 0
+  [done  cuda:0] p1_ph_undulation            156.0s  exit 0
+  [done  cuda:1] p1_ph_divide_only           972.1s  exit 0
+
+[phase1] 12 specs in 1131s wall (sum of run times 2695s)
+[phase1] -> /workspace/Plexus/discovery/_phase1/battery.json

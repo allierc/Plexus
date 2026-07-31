@@ -1,9 +1,9 @@
 general:
-  name: ref_uniform_inflation
+  name: p1_ph_divide_only
   seed: 0
-  n_frames: 900
+  n_frames: 300
   dt: 0.02
-  record_cap: 902
+  record_cap: 302
   record_every: 1
   boundary: free
   dim: 3
@@ -35,7 +35,7 @@ operators:
 - op: vesicle_growth
   at: vertex
   cell_set: cell
-  rate: 0.001
+  rate: 0.006
   dt: 0.02
 - op: shape_energy_3d
   at: vertex

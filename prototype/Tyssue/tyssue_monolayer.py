@@ -117,6 +117,74 @@ class MonolayerShapeEnergy3D(Lateral):
         self.mu = float(params.get("mu", 1.0)); self.dt = float(params.get("dt", 1.0))
         self.relax_iters = int(params.get("relax_iters", 30)); self.eta = float(params.get("eta", 0.08))
         self.cap_frac = float(params.get("cap_frac", 0.12))
+        # REST STATE. "force_balance" makes the seeded vesicle an equilibrium; "volume_only" is the
+        # original behaviour, kept so the collapse can be reproduced deliberately. See _rest_offset.
+        self.rest_calibration = str(params.get("rest_calibration", "force_balance"))
+
+    def _rest_offset(self, x0, es, et, ef, nF, h, V_eq0, alive, R0t, eocc, vocc):
+        """The constant to add to every cell's target volume so the SEEDED SHELL IS AT REST.
+
+        WHY THIS EXISTS. The energy is  U = 1/2 k_v (v-V_eq)^2 + kappa_s s + 1/2 gamma P^2.  Only the
+        first term can push outward; the other two always pull the surface in. Calibrating V_eq to
+        the rest volume alone -- which is what the `mono_k` line below does -- balances the volume
+        term against nothing, so a freshly seeded ball is NOT in equilibrium and collapses under its
+        own tension. Measured: radius 5.00 -> 1.80 in 20 frames at the shipped settings, and still
+        falling; with gamma=0 it is 2.95, with gamma=0 AND kappa_s=0 it is exactly 5.00. Runs that
+        looked healthy avoided this only by loading a pre-relaxed checkpoint (round_40_mc8 starts at
+        radius 6.14) rather than seeding, so the collapse was invisible for the whole campaign.
+
+        WHY A CONSTANT, NOT A FACTOR. At force balance
+            V_eq - v = (2 kappa_s + 1/2 gamma p0^2) / (k_v h0),
+        because both tension terms contribute a SIZE-INDEPENDENT amount to dU/dA (P = p0 sqrt(A), so
+        1/2 gamma P^2 = 1/2 gamma p0^2 A, whose derivative carries no A). The offset must therefore
+        survive unchanged when a cell grows or divides -- a multiplicative correction would shrink
+        with V0f and quietly reintroduce the collapse after the first division.
+
+        WHY SOLVED, NOT TYPED IN. The loop sweeps k_v, kappa_s, gamma, h0, the seed radius and the
+        cell count; a tension that happens to balance at one setting collapses at the next. The
+        offset enters the force exactly linearly --
+            g(delta) = g(0) - k_v delta grad(V_total)
+        because U_vol is quadratic in (v - V_eq) -- so one gradient pair gives the exact root. What
+        is zeroed is the RADIAL component: tangential forces are the cell-shape relaxation we want
+        to keep, and only the radial resultant inflates or deflates the vesicle.
+
+        WHY IT ITERATES. One solve is not enough in practice: it zeroes the radial force on the
+        SEEDED mesh, but the first thing the relaxation does is even out cell shapes tangentially,
+        and that moves the balance. Measured with a single solve, the defaults held to x1.014 but
+        gamma=0 still drifted to x0.80 and gamma=0.3 to x1.10. So alternate -- relax the shape, put
+        it back on the target sphere, re-solve -- until the shape stops changing. The rescaling is
+        what pins the answer: it asks for the offset whose equilibrium radius IS the seed radius,
+        rather than whatever radius the relaxation happens to wander to.
+        """
+        R_target = x0.norm(dim=1).mean().clamp(min=1e-9)
+        delta = torch.zeros((), dtype=x0.dtype, device=x0.device)
+        x = x0.clone()
+        for _ in range(8):
+            V_eq = (V_eq0 + delta).clamp(min=1e-9)
+            u = x / x.norm(dim=1, keepdim=True).clamp(min=1e-9)         # outward radial direction
+            g0 = self._grad(x, es, et, ef, nF, h, V_eq, alive, R0t, eocc, vocc)
+            with torch.enable_grad():                                   # grad of TOTAL cell volume
+                xg = x.detach().requires_grad_(True)
+                vf, _, _, _ = monolayer_geometry_3d(xg, es, et, ef, nF, h, eocc)
+                gV = torch.autograd.grad((vf * alive).sum(), xg)[0]
+            den = self.k_v * (u * torch.nan_to_num(gV)).sum()
+            if not torch.isfinite(den) or den.abs() < 1e-12:
+                break
+            step = ((u * g0).sum() / den).detach()
+            if not torch.isfinite(step):
+                break
+            delta = delta + step
+            # let the shape relax under the new offset, then put it back on the target sphere so the
+            # next solve is asked about the radius we actually want
+            V_eq = (V_eq0 + delta).clamp(min=1e-9)
+            with torch.no_grad():
+                cap = self.cap_frac * (x[et] - x[es]).norm(dim=-1).mean().clamp(min=1e-6)
+            for _ in range(max(1, self.relax_iters)):
+                s = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, h, V_eq, alive,
+                                                       R0t, eocc, vocc)
+                x = x + s * torch.clamp(cap / (s.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
+            x = x * (R_target / x.norm(dim=1).mean().clamp(min=1e-9))
+        return delta.detach()
 
     def _grad(self, x, es, et, ef, nF, h, V_eq, alive, R0t, eocc, vocc):
         with torch.enable_grad():
@@ -144,6 +212,11 @@ class MonolayerShapeEnergy3D(Lateral):
             wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]
             m["mono_k"] = float((v_rest.median() / wedge.median().clamp(min=1e-9)).item())
         V_eq = (m["mono_k"] * m["V0f"]).clamp(min=1e-9)
+        if self.rest_calibration == "force_balance":
+            if "mono_delta" not in m:
+                m["mono_delta"] = self._rest_offset(x0, es, et, ef, nF, h_cell, V_eq,
+                                                    m["alive"], R0t, eocc, vocc)
+            V_eq = (V_eq + m["mono_delta"]).clamp(min=1e-9)
         with torch.no_grad():
             cap = self.cap_frac * (x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-6)
         x = x0.clone()
