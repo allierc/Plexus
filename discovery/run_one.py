@@ -461,6 +461,11 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
           f"(per-frame autofit would have run {l_first:.3f} -> {l_last:.3f}, "
           f"x{l_last / max(l_first, 1e-9):.2f}: that rescaling is what hid growth)", flush=True)
 
+    # A cell counts as "just divided" for this many division-calls. The movie samples ~60 of
+    # ~260 frames, so a 1-2 frame window would be missed more often than not; 4 is short enough to
+    # mean "recent" and long enough to actually be seen.
+    DIVIDED_WINDOW = 4
+
     def faults_of(pt, mt):
         """Per-cell `divided` / `broken` masks for the render, computed ONCE per frame.
 
@@ -473,7 +478,21 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
         try:
             from tyssue_diag import mesh_faults
             f = mesh_faults(pt, mt)
-            return f["sliver"], f["broken"]
+            # GREEN = RECENTLY DIVIDED, taken from the division event itself.
+            # It used to come from the `sliver` mask (area far below the local mean) and was
+            # simply wrong: on a 260-frame run with 101 divisions the sliver count was 0 in every
+            # sampled frame, so nothing was ever green. A division makes two roughly equal halves
+            # -- a daughter is ~50-70% of its neighbours -- while the sliver test looks below 15%,
+            # so it finds DEGENERATE cells, not new ones. `age` is reset to 0 by divide_3d, which
+            # is the event we actually mean.
+            age = mt.get("age")
+            if age is None:
+                print(f"[{name}] no per-cell age recorded -- movie drawn WITHOUT the divided "
+                      f"colour (older run, or topo_snapshot predates it)", flush=True)
+                div = None
+            else:
+                div = np.asarray(age)[:mt["nF"]] <= DIVIDED_WINDOW
+            return div, f["broken"]
         except Exception as e:
             # Not swallowed silently: a missing overlay must announce itself, or a movie with no
             # green looks like a tissue that never divided.

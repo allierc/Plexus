@@ -644,7 +644,14 @@ class TopoSnapshot3D(Structural):
             E_trgt=m["E_trgt"].detach().cpu().numpy().copy(),
             E_face=m["E_face"].detach().cpu().numpy().copy(),
             nF=int(m["nF"]), Nv=int(m["Nv"]),
-            A0=cp("A0"), P0=cp("P0"), V0f=cp("V0f")))           # targets -> analyze_forces reconstructs the energy
+            A0=cp("A0"), P0=cp("P0"), V0f=cp("V0f"),            # targets -> analyze_forces reconstructs the energy
+            # `age` = division-calls since this cell was born (divide_3d resets it to 0 on
+            # division). Recorded so a renderer can colour RECENTLY DIVIDED cells. The first
+            # attempt inferred "just divided" from cell AREA -- a sliver test -- and it never
+            # fired: a division splits a cell into two roughly equal halves, so a normal daughter
+            # is ~50-70% of its neighbours while the sliver test looks below 15%. It detects
+            # DEGENERATE cells, not new ones. Age is the actual event, not a proxy for it.
+            age=cp("age")))
         return {}
 
 
