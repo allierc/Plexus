@@ -20,11 +20,98 @@ params: {}
 state_io:
   reads: []
   writes: []
-verdict: null
+verdict: out_of_scope
 of: null
-why: null
-contract: null
-status: inspected
+why: 'OUT_OF_SCOPE: NoForce carries no biological content. It is the null / identity element of the
+
+  mechanical-interaction slot -- the value ``potential=None`` resolves to inside BrownianDynamics,
+
+  ActiveBrownianDynamics2D, MechanicalRelaxation and relax_equilibrium (each does
+
+  ``potential if potential is not None else NoForce()``). Its energy is the constant 0 and its force
+
+  is identically zero; it has no parameters, reads no field values, contributes no leaves to the
+
+  model pytree, and has no counterpart in the paper (the paper''s cells ALWAYS interact via the Morse
+
+  pair potential, Fig. 1d). It is a software null-object -- framework plumbing so a position-integrator
+
+  step always has a ``Potential`` object to call -- not a forward operation on state.
+
+
+  DECISIVE TEST in the Plexus algebra: "no mechanical interaction" is the EMPTY COMPOSITION -- a
+
+  pipeline that includes zero interaction operators -- i.e. the identity of operator composition. An
+
+  algebra need not register its identity element as an operator; you get it for free by composing
+
+  nothing. jax-morph must materialize NoForce only because its ``Potential`` slot has to be filled by
+
+  SOME object; a Plexus model expresses the same free / non-interacting regime by omitting the
+
+  interaction operator entirely. Nothing in the promoted vocabulary is gained or missing here.
+
+
+  CLOSEST registered contract: the lateral/interaction pairwise-force slot -- ``attraction_repulsion``
+
+  (with ``cohesion`` / ``separation``), the home the paper''s Morse potential and its SoftSphere /
+
+  Hertzian / Harmonic / LennardJones siblings will normalize to. NoForce is NOT an implementation_of
+
+  that contract: it has no pairwise neighbour map, reads no separations, and emits zero -- it is the
+
+  ABSENCE of the interaction, not a member of it. It also cannot be `alias` or `refinement`: there is
+
+  no registered no-op / identity contract to alias, and widening any interaction contract to admit
+
+  "reads nothing, writes zero, no map" would erase the pairwise force that IS that contract. And not
+
+  `new`: registering a do-nothing operator would inflate the atlas yield with content-free plumbing --
+
+  exactly what out_of_scope exists to prevent (R7 already flags a writes-nothing operator as an
+
+  undetectable no-op; the ``contract.writes: [position]`` below is only the formal force-slot the
+
+  potential drives, carrying an identically-zero increment, mirroring the StochasticStep out_of_scope
+
+  entry whose ``contract.writes: [trace]`` is likewise a formal, not a persistent, write).
+
+
+  STRONGEST COUNTERARGUMENT (and why it loses): in an operator ALGEBRA the identity element is a
+
+  first-class member, and NoForce is type-level interchangeable with Morse (same ``Potential``
+
+  protocol, consumed by the same integrator steps), so one could record it as the degenerate
+
+  implementation_of the pairwise-interaction contract rather than dismiss it as plumbing -- a view
+
+  that captures the real modeling affordance that jax-morph represents "no coupling" as a value of
+
+  the same type as "Morse coupling" (the base for active-matter / flocking models whose only coupling
+
+  lives in a separate alignment step). It loses because the biological measurement counts CONTRACTS,
+
+  not type slots: NoForce reads nothing, writes nothing real, carries no map or parameters, and is
+
+  never constructed in the paper -- it is the ``potential=None`` sentinel, which Plexus realizes by
+
+  omitting the operator, so there is no forward mechanism here to normalize.
+
+  '
+contract:
+  name: no_interaction
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads: []
+  writes:
+  - position
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

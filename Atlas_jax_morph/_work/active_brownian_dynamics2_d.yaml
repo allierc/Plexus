@@ -87,11 +87,59 @@ surprises:
   version would need a heading vector/quaternion, not this class. Minor idiom trap: this class sizes noise
   with state.n_cells (= full padded capacity), while the sibling BrownianDynamics uses state.position.shape;
   n_cells here is capacity, NOT the alive count.'
-verdict: null
+verdict: new
 of: null
-why: null
-contract: null
-status: inspected
+why: "ActiveBrownianDynamics2D is a COMPOSITE overdamped step; its three legs decompose cleanly onto\n\
+  the algebra and only ONE leg is uncovered -- that leg is the contract recorded here.\n\n(1) The passive\
+  \ drift F/gamma is a pair-potential force under an overdamped mobility: the force\nis any registered\
+  \ pair potential (attraction_repulsion / cohesion / stillinger_weber /\nsquared_law) and 1/gamma is\
+  \ the mobility, so this leg ALIASES an existing contract; it is not new.\n(2) The self-propulsion v0*e\
+  \ plus the translational noise std_t is EXACTLY `glide` (motion/cell):\nglide emits vel = move_speed\
+  \ * heading and adds an isotropic `noise` translational term; its\nMECHANISM_TAGS already read [\"self_propulsion\"\
+  ,\"motility\",\"active_brownian\"] and its docstring\nstates \"glide + noise = an active Brownian walker\"\
+  . active_speed -> move_speed, active_heading ->\nheading, std_t -> glide.noise is an exact map, so this\
+  \ leg ALSO aliases an existing contract.\n(3) The ONLY uncovered leg is the rotational diffusion of\
+  \ the persistent heading\n(dtheta = sqrt(2 D_r dt) * xi_r): a single-body, neighbour-independent Brownian\
+  \ rotation of the\ncell's own orientation, ZERO-drift, scored against mean 0. NO registered operator\
+  \ performs it.\nThat is the recorded contract `reorient` (polarity/cell, writes heading) -- the orientational-\n\
+  decorrelation half of an active Brownian particle, the ingredient that gives the walk its finite\npersistence\
+  \ length and its ballistic->diffusive crossover. With kT=0 (the textbook ABP, and an\nexplicitly-supported\
+  \ non-crashing limit here) it is the ONLY source of wandering.\n\nCLOSEST REGISTERED CONTRACTS, and\
+  \ why neither can widen to admit it:\n- `glide` (motion/cell) is closest by mechanism -- it IS the propulsion\
+  \ half of the very same\n  prototype. But glide is deliberately factored to own ONE concern, translational\
+  \ propulsion:\n  EMIT=velocity, it READS heading and never writes it. Widening glide to also WRITE heading\
+  \ (a\n  rot_diffusion channel) grafts heading dynamics onto a position operator and breaks its clean\n\
+  \  composition with the polarity family, which owns every heading write. The factoring is not\n  incidental:\
+  \ the prototype `candidates/motility.py` bundled propulsion AND heading rotational\n  diffusion (cell.heading\
+  \ += rot*randn) in ONE class; the promotion to `glide` SPLIT OFF the\n  propulsion and DROPPED the diffusion.\
+  \ So the gap in the promoted language is a documented\n  promotion decision, and `reorient` is exactly\
+  \ the dropped half.\n- `polarity_align` / `polarity_flow_align` (polarity/cell) are the only registered\
+  \ heading-writers,\n  so `reorient` is their sibling and shares their kind/family. But both are SOCIAL,\
+  \ DETERMINISTIC\n  steering: they relax the heading toward a TARGET (neighbour-mean heading, or the\
+  \ tissue flow) and\n  return {} for an isolated cell with no neighbours / no flow. reorient is the opposite\
+  \ -- a\n  single-body STOCHASTIC decorrelation with no target and no coupling; widening an alignment\n\
+  \  operator to also inject free rotational noise when isolated would conflate \"align to a target\"\n\
+  \  with \"spontaneously randomize\", two distinct biological concerns.\n\nRecording only the reorientation\
+  \ leg as `new` (not the whole step, and not a flat alias of glide)\nis the non-inflating call: 2 of\
+  \ 3 legs are already in the language, so the entry's true marginal\nyield is exactly one contract. SOURCE-vs-PAPER\
+  \ (see surprises): the paper's mechanics is passive\nMorse-potential energy minimization -- no self-propulsion,\
+  \ heading, or rotational diffusion appears\nanywhere in the paper; the whole active step, this contract\
+  \ included, is a library-side\ngeneralization. SOURCE WINS.\n"
+contract:
+  name: reorient
+  kind: exchange
+  family: polarity
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - heading
+  writes:
+  - heading
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

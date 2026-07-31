@@ -43,3 +43,33 @@ would grow.
   per-cell. I read this as an intentional elaboration, but the paper does not say so.
 - verdict/contract left null on purpose (normalizer's call, per the loop rules).
 
+## saturating_cell_growth (NORMALIZER, status -> normalized)
+
+**Verdict: `refinement` of `cell_grow`** (`of: cell_grow`, `implementation_of: cell_grow`). Same
+biology as the registered growth primitive -- a cell grows toward a maximum size by a *saturating*
+law -- so this is not `new` (a second growth contract would inflate the yield), and cell_grow is
+unambiguously the closest contract (the only other growth-family op, `cell_divide`, is topology,
+not size). But it does not fit cell_grow's *registered* signature, so it is not a clean `alias`
+either: the signature must **widen** on four fields -- `kind` (structural, returns `{}` ->
+delta-emitting `field` on `radius`, which breaks the invariant that growth adds nothing to the
+dynamic-phase accumulation), `writes` (`grow_V` + child particle occ -> a `radius` delta on a
+point-cell, dropping the required `mpm_particle` child), `reads`/params (constant `rate` param ->
+heritable per-cell state field `growth_rate`, the differentiable-control design point), and the
+growth `law` (logistic -> von Bertalanffy exact flow; additive, harmless).
+
+**Strongest argument AGAINST (why this could instead be a plain `alias` + implementation_of):**
+cell_grow's own docstring *already* declares the discretisation swappable and the growth law the
+invariant -- "swap the discretisation ... and the growth LAW stays identical." Under that reading a
+scalar radius on a soft-sphere cell is exactly the anticipated "another discretisation," so nothing
+needs to widen; the structural-vs-delta and MPM-vs-scalar differences are realization plumbing
+*beneath* the contract, and calling it a refinement over-costs a change the contract's authors
+already sanctioned -- inviting the very "refinement hides a breaking change" failure record.py
+warns about, in reverse (flagging a break that isn't one). **Why I still chose refinement:** the
+frozen baseline record.py compares against is the *promoted language* -- `plexus.operators` and
+nothing else -- i.e. the registered signature (`kind=structural`, `EMIT=None`, MPM-child
+realization), not the docstring's aspiration. That registered signature genuinely cannot emit a
+differentiable `radius` delta without an MPM child; admitting this mechanism *does* mutate the
+frozen contract, and a change to the baseline is a refinement by definition -- one a downstream
+user of structural-only growth must be shown the cost of. A downstream role that reads the source
+and finds the registry can already host a delta-emitting growth realization *without* editing
+cell_grow's signature should downgrade this to `alias`.

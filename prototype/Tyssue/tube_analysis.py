@@ -183,6 +183,42 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
         m_size["genus"] = int(_g.get("genus", -1))
     except Exception:
         pass
+    # SELF-INTERSECTION. Cast rays from the tissue centroid and count how many times each pierces
+    # the surface. A simple closed shell gives EXACTLY ONE crossing per ray; more means the sheet
+    # has folded through itself, which is the one thing a physical tissue cannot do.
+    #
+    # GENUS DOES NOT SUBSTITUTE FOR THIS, and believing it did cost a wrong conclusion. Euler
+    # characteristic is COMBINATORIAL -- it reads the connectivity, not the coordinates -- so a
+    # shell crumpled seventeen layers deep through itself still reports genus 0, "sphere (as
+    # built)". Measured on mini_grow_divide_bigger: genus 0 at every frame, while the ray test goes
+    # from 100% single crossings at frame 384 to 0% (median 13) at frame 423. The buckling
+    # transition was called physical on the strength of the genus check alone.
+    try:
+        _liv = ef < nF
+        _es, _et, _ef = es[_liv], et[_liv], ef[_liv]
+        _cnt = np.bincount(_ef, minlength=nF).astype(float)
+        _cen = np.zeros((nF, 3)); np.add.at(_cen, _ef, pt[_es]); _cen /= np.maximum(_cnt, 1)[:, None]
+        _A, _B, _C = _cen[_ef], pt[_es], pt[_et]          # the same fan triangulation used below
+        _e1, _e2 = _B - _A, _C - _A
+        _o = pt.mean(0)
+        _g = np.random.default_rng(12345)
+        _d = _g.normal(size=(96, 3)); _d /= np.linalg.norm(_d, axis=1, keepdims=True)
+        _tv = _o - _A; _hits = []
+        for _k in range(_d.shape[0]):                      # Moeller-Trumbore, one ray at a time
+            _pv = np.cross(_d[_k], _e2); _det = (_e1 * _pv).sum(1)
+            _ok = np.abs(_det) > 1e-12
+            _inv = np.zeros_like(_det); _inv[_ok] = 1.0 / _det[_ok]
+            _u = (_tv * _pv).sum(1) * _inv
+            _qv = np.cross(_tv, _e1)
+            _v = (_d[_k] * _qv).sum(1) * _inv
+            _t = (_e2 * _qv).sum(1) * _inv
+            _hits.append(int((_ok & (_u >= 0) & (_u <= 1) & (_v >= 0) & (_u + _v <= 1)
+                              & (_t > 1e-9)).sum()))
+        _h = np.asarray(_hits)
+        m_size["ray_single_frac"] = round(float((_h == 1).mean()), 4)
+        m_size["ray_cross_med"] = int(np.median(_h))
+    except Exception:
+        pass
     # Fan each face from its own centroid: for half-edge (s,t) of face f the triangle is
     # (c_f, p_s, p_t). Needs no new vertex array and inherits the half-edges' orientation, so the
     # signed volume comes out consistently. Dead half-edges (ef >= nF) are dropped.

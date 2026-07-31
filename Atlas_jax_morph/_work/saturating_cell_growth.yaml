@@ -83,11 +83,65 @@ surprises:
   mother''s growth propensity on division unless a controller overwrites it.
 
   '
-verdict: null
-of: null
-why: null
-contract: null
-status: inspected
+verdict: refinement
+of: cell_grow
+implementation_of: cell_grow
+why: "Refinement of `cell_grow`, the registered growth primitive. Same biology -- a cell grows\ntoward\
+  \ a maximum size by a SATURATING growth law -- so this is NOT `new`: promoting a second\ngrowth contract\
+  \ would inflate the yield the ledger exists to measure. But it does not fit\ncell_grow's REGISTERED\
+  \ signature, so it is not a clean `alias`/drop-in implementation either;\nthe signature must WIDEN,\
+  \ and a refinement nobody costed is a breaking change.\n\nWHAT WIDENS (the typed signature fields):\n\
+  \n- kind: structural -> field (delta-emitting). Registered cell_grow is `structural`\n  (EMIT=None,\
+  \ forward() returns {}): it advances a rest-VOLUME multiplier grow_V by a\n  logistic law and REALIZES\
+  \ it by waking dormant MPM reserve particles in place. This\n  mechanism is a DYNAMIC per-cell relaxation\
+  \ that emits an integrable delta on `radius`\n  (dr = (R-r)(1-exp(-k*dt/R))) and mutates no state directly.\
+  \ Admitting it flips the kind,\n  and that BREAKS the invariant every current cell_grow user relies\
+  \ on -- that growth is\n  structural and contributes NOTHING to the dynamic-phase delta accumulation.\
+  \ Any co-writer\n  of the size field must now operator-split with growth.\n\n- outputs / writes: {}\
+  \ + grow_V + child particle occ  ->  an additive delta on `radius`, a\n  geometric size scalar carried\
+  \ by a point/soft-sphere cell. The realization is a scalar\n  radius, not MPM reserve particles, so\
+  \ the contract can no longer REQUIRE an mpm_particle\n  `child` with a grow_reserve pool.\n\n- reads\
+  \ / params: the growth RATE moves from a constructor scalar `rate` to a per-cell\n  HERITABLE STATE\
+  \ FIELD `growth_rate` (default 0), read each macro-step so an upstream\n  controller (gene network /\
+  \ MLP) can drive it and gradients flow back from a morphology\n  objective. That differentiable, per-cell,\
+  \ controllable rate is the whole design point.\n\n- maps (growth law): generalizes from logistic-only\
+  \ (dV/dt = rate*V*(1-V/target)) to a\n  family of saturating laws including the von Bertalanffy EXACT\
+  \ flow used here\n  (dr/dt = k(1-r/R), integrated in closed form -- unconditionally stable, monotone,\
+  \ no\n  min/clamp). This one is additive and breaks nothing.\n\nCLOSEST-CONTRACT check: cell_grow is\
+  \ unambiguously the closest registered contract (the only\nother growth-family op is cell_divide, which\
+  \ is TOPOLOGY, not size). Widening cell_grow does\nless violence than minting a new contract: cell_grow's\
+  \ own contract already declares the\ndiscretisation swappable and the growth LAW the invariant, and\
+  \ a scalar radius on a\npoint-cell is exactly 'another discretisation' of the same cell-growth biology\
+  \ -- so it\nbelongs to the SAME contract, refined, not a fresh one.\n\nSOURCE-vs-PAPER (recorded in\
+  \ surprises, rule 5): the paper's Methods state constant-rate\nlinear growth with a hard clamp, R(t+dt)=min(R+dR,\
+  \ Rmax); the CODE implements the saturating\nexponential relaxation above with no clamp. The code wins;\
+  \ the disagreement is a genuine\npaper/code contradiction, not a normalization choice, and it does not\
+  \ change the verdict --\neither reading is still cell growth toward a maximum size.\n"
+contract:
+  name: cell_grow
+  kind: field
+  family: growth
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - radius
+  - growth_rate
+  writes:
+  - radius
+  maps:
+  - growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)),
+    the closed-form integral of dr/dt = k*(1 - r/R); saturating, monotone, unconditionally stable for
+    any dt, no min/clamp
+  - realization = per-cell scalar radius on a point / soft-sphere cell (NO MPM reserve particles); dt-scaling
+    is baked into the returned delta, which is summed with any other radius writers (stable operator-split
+    contribution)
+  - rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step
+    by an upstream controller so gradients flow through it; the sole constructor param is max_radius (a
+    traced, optimizable target)
+status: normalized
 module: null
 test: null
 evidence:

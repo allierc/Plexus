@@ -1,6 +1,6 @@
 # What we take as known about cell tissue
 
-Ten basics. Not a literature review — the minimum a person needs to look at one of our runs and
+Eleven basics. Not a literature review — the minimum a person needs to look at one of our runs and
 say "that cannot be right". Each one is written as something you could **check against a run**,
 because a premise nobody can check is an opinion.
 
@@ -154,16 +154,39 @@ really did collapse.
 *If violated:* T1s fired as maintenance are a remesher, not a mechanism, and any "the tissue
 flowed" conclusion is about the remesher.
 
+## 11. A tissue cannot pass through itself — **certain**
+
+Two parts of the same epithelium cannot occupy the same space. It is a physical body. When a bud
+grows back into the ball, something has to give — the tissue deforms, or it stops.
+
+*Constrains:* every geometric reading we take, because a self-overlapping surface makes all of them
+meaningless.
+*Check:* cast rays from the tissue centroid. A simple closed shell gives **exactly one** crossing
+per ray.
+*Why it is separate from #9:* **the Euler characteristic cannot see this.** Genus is
+*combinatorial* — it reads the connectivity, never the coordinates — so a shell crumpled seventeen
+layers through itself still reports genus 0, "sphere (as built)". Measured on
+`mini_grow_divide_bigger`: genus 0 at *every* frame, while single-ray crossings go from 100% at
+frame 384 to **0%, median 13**, at frame 423.
+*Caught:* the buckling transition was reported as physical on the strength of the genus check
+alone. The transition is not a solver artefact — it survives quadrupling the relaxation — but the
+state it produces is not a tissue. Likely cause: the radial spring's target radius is frozen at the
+seed value while cell target volumes grow sixteenfold, so the shell is held at radius 5 while its
+cells demand far more area than that sphere has. It has nowhere to go but through itself.
+
 ---
 
 ## Why this document exists
 
-Three defects were found today — a vesicle that collapsed under its own tension, chemistry running
-50× too slow, and a growth ceiling below the division trigger. All three were found by Cedric
-looking at a picture and saying it looked wrong.
+Ten defects were found in a single day — a vesicle that collapsed under its own tension, chemistry
+running 50× too slow, a growth ceiling below the division trigger, a pattern re-stamped every frame,
+gauges that could not see what they measured. All ten were found by Cedric looking at a picture and
+saying it looked wrong.
 
 Premises **6**, **5** and **3** above each state one of them in advance, as a check that costs
-seconds to run. That is the point of the corpus: not to make the agents better read, but to give
+seconds to run. Premise **11** was added afterwards, from a mistake of exactly the kind this
+document exists to prevent: a result was called physical because the topology check passed, when
+the check simply could not see the failure. That is the point of the corpus: not to make the agents better read, but to give
 them something they can *fail*.
 
 The rule that follows: **every premise here is a claim about the specimen, not the simulation.**
