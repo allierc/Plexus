@@ -121,12 +121,35 @@ def frame_metrics(pt, mt, act=None):
     area, vf = area.numpy(), vf.numpy()
     a = area[area > 1e-9]; v = np.abs(vf[np.abs(vf) > 1e-9])
     hollow, _, hst = hollow_flags(pt, mt)
+    # CELL SHAPE, not cell size. Everything else recorded here is size (area_cv, vol_cv) or
+    # tissue-level (protrusion, tube diameter). Nothing measured the SHAPE of a cell -- and
+    # `face_polygons_3d` has been computing the shape index, perimeter/sqrt(area), and throwing it
+    # away since the beginning.
+    #
+    # It matters because it has two principled reference values, not an arbitrary bar:
+    #     p0     the cells' own PREFERRED shape index (3.50 in this recipe)
+    #     3.81   the rigidity transition (Bi 2015) -- above it a tissue FLOWS and cannot hold a
+    #            shape; below it the tissue is solid and resists rearrangement
+    # Measured on the run-up end state: body cells 3.85, TUBE cells 3.97, worst 5% at 4.24 (a 2:1
+    # rectangle). So every cell is stretched past its preference and the whole tissue is above the
+    # transition -- which may be the crux of forced-versus-grown: a tissue has to be fluid to flow
+    # into a tube, and a fluid tissue cannot then hold one.
+    # Found by Cedric looking at the cross-section and saying the tube cells were too thin.
+    from tyssue_ops3d import face_polygons_3d as _fp
+    _, _a, _p, _si = _fp(pt, mt)
+    _ok = np.isfinite(_si) & (_a > 1e-9)
+    m_shape = (dict(shape_idx_mean=round(float(np.nanmean(_si[_ok])), 3),
+                    shape_idx_med=round(float(np.nanmedian(_si[_ok])), 3),
+                    shape_idx_p95=round(float(np.nanpercentile(_si[_ok], 95)), 3),
+                    shape_idx_max=round(float(np.nanmax(_si[_ok])), 3))
+               if _ok.any() else dict(shape_idx_mean=0.0, shape_idx_med=0.0,
+                                      shape_idx_p95=0.0, shape_idx_max=0.0))
     # THE THREE MESH-FAILURE MODES, SEPARATELY (see tyssue_diag.mesh_faults). They used to be ORed
     # into `hollow_frac` alone, which cannot distinguish a fifth of the cells being slightly bent
     # from a fifth being destroyed -- and the archive has runs at hollow_frac 0.97. Only `broken`
     # (under-connected, or the ring is not a valid polygon) invalidates the physics; a sliver is
     # usually just a cell that divided last frame.
-    m = dict(cells=int(nF),
+    m = dict(cells=int(nF), **m_shape,
              broken_n=int(hst["n_broken"]), broken_frac=round(float(hst["frac_broken"]), 4),
              folded_n=int(hst["n_folded"]), folded_frac=round(float(hst["frac_folded"]), 4),
              sliver_n=int(hst["n_sliver"]), sliver_frac=round(float(hst["frac_sliver"]), 4),

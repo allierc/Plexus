@@ -16,6 +16,9 @@
 \definecolor{rule}{HTML}{2B4C7E}
 
 \newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
+\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
+\newcommand{\ns}{\textcolor{grey}{not started}}
 \newcommand{\done}{\textcolor{good}{\textbf{DONE}}}
 \newcommand{\prog}{\textcolor{warn}{\textbf{IN PROGRESS}}}
 \newcommand{\todo}{\textcolor{grey}{\textbf{NOT STARTED}}}
@@ -608,133 +611,92 @@ certainly cannot reach branching without.
 
 Eight stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
 
-\begin{phasebox}{Phase 0 --- Pre-flight: fix the instruments \hfill \prog\ (2 of 6)}
-\textbf{Goal.} Make the measurements trustworthy. Nothing runs unattended until this lands.
+\begin{phasebox}{Phase 0 --- Pre-flight: fix the instruments \hfill \prog\ (26 of 28)}
+\textbf{Goal.} Make every measurement trustworthy. Nothing runs unattended until this lands.
+Not one of the items below is science; each one makes a question \emph{askable}.
 
-\textbf{Why.} Running before this writes uninterpretable results into a permanent record. Four
-rulers were wrong; two are now right.
-
-\textbf{Remaining.}
-\begin{itemize}
-\item \textbf{The ``does the shape survive?'' test} (\S\ref{sec:rulers}, item~1). Either repair it
-so it continues from the end state, or remove it from the score. A constant carrying full weight is
-worse than no term at all.
-\item \textbf{The camera} (\S\ref{sec:rulers}, item~4). Fix the frame so it does not follow the
-object --- one size, held for the whole run and shared across runs, as in Okuda's figures --- and
-add a second viewpoint so a tube cannot hide behind the body. This was originally scheduled much
-later as a presentation nicety. It is not: it is the ruler the eye-check reads, and until it is
-fixed we cannot say whether the eye-check's vetoes were right.
-\item \textbf{Start from Okuda's cell counts} (\S\ref{sec:okuda}). Set the starting number to
-his, and size the buffer for where the run is going rather than where it began. Four numbers.
-\item \textbf{Put a stopwatch on every agent call} (\S\ref{sec:agents}). Route them through the
-existing time ledger so the next round reports what it actually cost. Measuring only --- speeding
-it up is Phase~2b.
-\item \textbf{Remove the silent parameter caps.} The search is confined to hand-written ranges by
-a clamp it is never told about, and the same ranges are not enforced on us at all. \emph{This is
-the 1778 bug again}: an invisible limit that turns ``we did not look there'' into ``there is
-nothing there''. Where a real stability limit exists, derive it from the timestep and the mesh and
-make breaching it \textbf{loud} --- not evidence, like a saturated buffer. A bound is either
-physical and derived, or it does not exist.
-\item \textbf{Write the missing shape-to-chemistry coupling, test it, and promote it}
-(\S\ref{sec:okuda}c). Okuda published this mechanism; implementing it is reproduction, not
-discovery, so we build it rather than waiting for the loop to invent it.
-\item \textbf{Check that the cells are still cells} (\S\ref{sec:phantom}). Broken cells are
-currently detected only as a blended number and never block anything. Separate the failure modes,
-check them where the topology changes, and make a broken mesh \emph{not evidence}.
-\end{itemize}
-
-\textbf{What you get.} A one-line confirmation that the rulers are sound, plus one before/after
-movie so you can see the camera change with your own eyes.
+\textbf{What has to be done}
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt]
+\item Measure distance from the tissue's own centre, not the coordinate origin.
+\item Install the frame-pairing guard where the danger actually is.
+\item Make the ``does the shape survive?'' test continue from the run's end state.
+\item Hold one frame size for a whole run --- stop drawing growth as shrinkage.
+\item Add a second viewpoint, in \emph{both} renderers, so a tube cannot hide behind the body.
+\item Derive the tube threshold from geometry instead of guessing it.
+\item Take peak and final over \emph{valid} frames only.
+\item Compare a batch at a \emph{common} frame.
+\item Report the three mesh-failure modes separately --- folded, sliver, broken.
+\item Set the evidence horizon on an absolute count of genuinely broken cells.
+\item Establish whether the ``folded'' test can tell curvature from damage.
+\item Refuse a run that overruns its cell buffer.
+\item Remove the silent parameter caps; derive the real stability limit; make breaching it loud.
+\item Widen the ranges so Okuda's three out-of-range values are reachable.
+\item Start from Okuda's cell counts, with the buffer sized for the destination.
+\item Write, test and promote the geometry-weighted chemical flow.
+\item Save the per-frame measurements in one format.
+\item Classify each trajectory's shape automatically.
+\item Put those shapes in front of the Analysts.
+\item Rename to the explicit vocabulary.
+\item Time every agent call.
+\item Make the timing survive a crash.
+\item Quarantine the poisoned survival values.
+\item Make the movie say something true: no accidental grey, division and breakage each their
+      own colour.
+\item Run the engine up on the ground before flying it.
+\end{enumerate}
 \end{phasebox}
 
-\subsection*{Phase 0 in full --- the checklist}\label{sec:p0list}
-
-Phase~0 began as four items and is now twenty. That growth is not scope creep: every item is
-``make an instrument trustworthy'', and we keep finding broken ones faster than we repair them.
-The rate of discovery is itself the finding --- it says how much of the existing record cannot be
-relied on. This list is the single place Phase~0 is tracked.
-
-\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
-\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
-\newcommand{\ns}{\textcolor{grey}{not started}}
-
-\subsection*{0A --- Measurements that were lying}
-\begin{center}\small
-\begin{tabular}{@{}r p{10.6cm} l@{}}
+\begin{phasebox}{Phase 0 --- what actually happened, point for point}
+\footnotesize
+\begin{tabular}{@{}r@{.\ } l p{9.1cm}@{}}
 \toprule
-& \textbf{Item} & \textbf{State}\\
+& \textbf{state} & \textbf{the issue found, and what was interesting}\\
 \midrule
-1 & Distance measured from the tissue's own centre, not the coordinate origin, so drift is no
-    longer read as elongation & \dn\\
-2 & The frame-pairing guard installed where the danger actually is & \dn\\
-3 & The survive-test continues from the run's end state instead of relaxing a fresh sphere
-    (was returning the same number for everything) & \dn\\
-4 & Camera: one frame size held for the whole run, plus a second viewpoint --- growth was being
-    drawn as shrinkage & \dn\\
-5 & The same camera repair in the \emph{study} renderer, which Phase~1 uses & \fl\\
-6 & Success threshold derived from the geometry of known shapes rather than guessed & \fl\\
-7 & \textbf{Peak and final must be computed over VALID frames only.} Until this lands, the score
-    still rewards a mesh that tears itself apart & \ns\\
-8 & Batch comparisons made at a \emph{common} frame --- two runs that stop being valid at
-    different moments cannot have their ``final'' states compared & \ns\\
+1 & \dn & Two quantities carried one name. Drift was being read as elongation.\\
+2 & \dn & The guard existed and was never installed here. \emph{Third} time we found that.\\
+3 & \dn & It relaxed a fresh sphere and returned 1.014 for every run. Now real:
+          \textbf{1.415 $\to$ 1.325, so 94\% of the elongation survived the drivers going off} ---
+          the first honest survival number the campaign has produced.\\
+4 & \dn & Growth was drawn as \emph{shrinkage}: apparent size fell to 0.52$\times$ on a run that
+          grew by half.\\
+5 & \dn & Justified itself on its first outing: in the run-up \textbf{the tube is invisible from
+          the side and obvious from the top}. The old camera would have called it a plain sphere.\\
+6 & \dn & \textbf{No capsule of any aspect ratio can reach the old bar of 2.0} (ceiling 1.90). The
+          criterion was not asking for a tube, it was asking for the spike artefact.\\
+7 & \dn & The score \emph{paid} for a mesh tearing itself apart. No threshold fixes it --- damage
+          and the spike are simultaneous --- so the horizon is ``the last frame the mesh was
+          clean''.\\
+8 & \ns & Two runs that stop being valid at different moments still have their ``final'' states
+          compared.\\
+9 & \dn & The blend was counting \emph{cell division}: sliver correlates with the tip count at
+          $+0.94$, while broken stayed at \textbf{0 for 300 frames}.\\
+10 & \dn & A fraction gets more permissive as the tissue grows --- it tolerated 72 broken cells at
+          the start and 119 by the end.\\
+11 & \dn & My curvature explanation was \textbf{refuted}: perfect spheres flag 0\% at every radius.
+          The sliver term was the answer.\\
+12 & \dn & The ceiling was arithmetic, not physics: $(3552{+}4)/2 = 1778$ exactly, and all 32 runs of the overnight study stopped there.\\
+13 & \dn & Removing the caps also deleted the only reaction guard. Moved from a guess before the
+          run to a measurement after it.\\
+14 & \dn & Three of Okuda's published values sat outside the box we were searching, so a faithful run was impossible at any effort.\\
+15 & \dn & We had been starting at 150 cells; his cases start at 200, 2000 and 4000.\\
+16 & \dn & The emitter never passed the implementation through --- the ablation would have
+          reported ``no effect'' \emph{without ever running the new code}.\\
+17 & \dn & A run's two time series were stored in two different formats, so nothing could load both --- and in practice nothing loaded either.\\
+18 & \dn & A single number cannot tell a plateau from a spike at the moment of tearing; both report the same peak, and the campaign ranks on that peak.\\
+19 & \dn & The curve plot was referenced \textbf{nowhere in the codebase}: drawn every run since
+          the beginning, read by nobody.\\
+20 & \ns & 129 references still to change.\\
+21 & \dn & The round reported \code{calls: 0} for a round that made about 25.\\
+22 & \dn & Seven exit paths all did the bookkeeping and there was not one \code{try} block, so any crash mid-round lost the whole round's timing.\\
+23 & \dn & \emph{Open issue:} quarantining a poisoned value flips a run from failure to success,
+          because the fallback substitutes a different measurement.\\
+24 & \dn & The grey was never phantom cells --- it was the shaded \emph{side} of a pale cell. Zero
+          empty rings, zero broken cells. Green now comes from the division event; the first
+          version inferred it from cell area and never once fired.\\
+25 & \dn & Found four things in one run, including two of the above.\\
 \bottomrule
 \end{tabular}
-\end{center}
-
-\subsection*{0B --- Knowing when a run stopped being real}
-\begin{center}\small
-\begin{tabular}{@{}r p{10.6cm} l@{}}
-\toprule
-9  & The three mesh-failure modes reported separately --- folded, sliver, genuinely broken ---
-     instead of one blended number & \fl\\
-10 & Evidence horizon keyed on an \textbf{absolute count} of genuinely broken cells (bar $\approx$
-     20), not a fraction. A fraction grows more permissive as the tissue grows & \dn\\
-11 & \textbf{Establish whether the ``folded'' test can tell curvature from damage.} It correlates
-     with the tip-cell count at $+0.97$ --- on the run examined it was counting the tube, not
-     damage. Until this is settled, ``folded'' cannot be used for anything & \ns\\
-12 & A run that overruns its cell buffer is refused as evidence & \dn\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection*{0C --- What the search is allowed to reach}
-\begin{center}\small
-\begin{tabular}{@{}r p{10.6cm} l@{}}
-\toprule
-13 & Remove the silent parameter caps; derive the real stability limit and make breaching it loud
-     & \fl\\
-14 & Widen the ranges so Okuda's three out-of-range values are reachable & \fl\\
-15 & Start from Okuda's cell counts (200 / 2000 / 4000), with the buffer sized for where the run
-     is going & \dn\\
-16 & Write, test and promote the geometry-weighted chemical flow, and make swapping it a legal
-     one-move edit so the loop can ablate it itself & \fl\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection*{0D --- What gets recorded, named and read}
-\begin{center}\small
-\begin{tabular}{@{}r p{10.6cm} l@{}}
-\toprule
-17 & Per-frame measurements saved in the same format as the mechanical ones & \dn\\
-18 & Trajectory shapes classified automatically --- still-rising, settled, peaked, blown-up, held
-     against a limit & \dn\\
-19 & \textbf{Those shapes put into the record and into what the analysts read.} They are computed
-     but nothing consumes them yet, and the plot of the curves is still read by nobody & \ns\\
-20 & \textbf{Rename to the explicit vocabulary} (elongation / \ldots\_peak / \ldots\_at\_end /
-     \ldots\_unforced), old keys aliased on read & \ns\\
-21 & Every agent call timed, with a per-role breakdown & \dn\\
-22 & Timing survives a crash & \fl\\
-23 & The 33 archived records holding the old constant survive-test value flagged so they cannot be
-     silently re-scored & \fl\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\medskip
-\textbf{Nine done, seven in flight, seven not started.} Phase~1 does not begin until items 7, 11
-and 19 are closed --- they are the three that would let a bad number back into the record.
-
+\end{phasebox}
 
 \begin{phasebox}{Phase 1 --- Re-measure what Phase 0 invalidated \hfill \todo\ ($\sim$1 hour)}
 \textbf{Goal.} Re-run the 32-simulation study with a buffer ten times larger and the frame-pairing
