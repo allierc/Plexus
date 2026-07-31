@@ -49,56 +49,66 @@
    "note": "Gray-Scott stable-spot regime"
   }
  ],
+ "labelled_frames": 901,
  "scores": {
   "ref_uniform_inflation": {
-   "saturated": false,
-   "inert_operators": [
-    "divide_3d"
-   ],
-   "retention": 1.0,
+   "saturated": true,
+   "inert_operators": [],
+   "retention": 0.986,
    "valid_evidence": false,
-   "protr_final": 1.016,
-   "protr_peak": 1.016,
-   "n_cells_final": 500,
+   "protr_final": 1.019,
+   "protr_peak": 1.033,
+   "n_cells_final": 15002,
    "red_frac_final": 0.0,
    "act_max_final": 0.0,
-   "frames": 41,
-   "wall_s": 5.2,
-   "ta_hollow_n_peak": 0,
-   "ta_hollow_n_final": 0,
-   "ta_area_cv_final": 0.122,
-   "ta_vol_cv_final": 0.122,
+   "frames": 901,
+   "wall_s": 551.1,
+   "ta_hollow_n_peak": 1109,
+   "ta_hollow_n_final": 1089,
+   "ta_area_cv_final": 0.713,
+   "ta_vol_cv_final": 0.713,
    "ta_tube_diam_final": 0.0,
    "ta_n_tubes_final": 0,
    "ta_tube_len_final": 0.0,
-   "ta_protr_final": 1.013,
+   "ta_protr_final": 1.019,
    "ta_red_frac_final": 0.0,
-   "ta_tip_act_final": 0.0
+   "ta_tip_act_final": 0.0,
+   "mech_force_mean": 1.2578,
+   "mech_p_body": 0.5406,
+   "mech_p_tube": 0.0,
+   "mech_p_ratio": 0.0,
+   "mech_tension_mean": 0.1736,
+   "mech_migration": 0.32795
   },
   "round_44_base": {
    "saturated": false,
-   "inert_operators": [
-    "rd_interface_tension"
-   ],
+   "inert_operators": [],
    "retention": 1.0,
-   "valid_evidence": false,
+   "valid_evidence": true,
    "protr_final": 1.449,
    "protr_peak": 1.449,
    "n_cells_final": 2983,
    "red_frac_final": 0.109,
    "act_max_final": 0.993,
    "frames": 901,
-   "wall_s": 368.7,
+   "wall_s": 304.1,
    "ta_hollow_n_peak": 212,
    "ta_hollow_n_final": 212,
    "ta_area_cv_final": 0.709,
    "ta_vol_cv_final": 0.679,
-   "ta_tube_diam_final": 0.0,
-   "ta_n_tubes_final": 0,
-   "ta_tube_len_final": 0.0,
-   "ta_protr_final": 1.24,
+   "ta_tube_diam_final": 3.804,
+   "ta_n_tubes_final": 7,
+   "ta_tube_len_final": 2.493,
+   "ta_protr_final": 1.448,
    "ta_red_frac_final": 0.109,
-   "ta_tip_act_final": 0.589
+   "ta_tip_act_final": -0.218,
+   "ta_aspect_len_over_diam": 0.655,
+   "mech_force_mean": 0.7823,
+   "mech_p_body": 2.0087,
+   "mech_p_tube": 0.6034,
+   "mech_p_ratio": 0.3,
+   "mech_tension_mean": 0.26,
+   "mech_migration": 0.07569
   },
   "round_41_hertwig": {
    "saturated": false,
@@ -111,18 +121,24 @@
    "red_frac_final": 0.015,
    "act_max_final": 0.972,
    "frames": 901,
-   "wall_s": 262.3,
+   "wall_s": 265.1,
    "ta_hollow_n_peak": 305,
    "ta_hollow_n_final": 305,
    "ta_area_cv_final": 0.69,
    "ta_vol_cv_final": 0.675,
-   "ta_tube_diam_final": 2.074,
-   "ta_n_tubes_final": 1,
-   "ta_tube_len_final": 14.289,
-   "ta_protr_final": 3.108,
+   "ta_tube_diam_final": 3.357,
+   "ta_n_tubes_final": 2,
+   "ta_tube_len_final": 4.182,
+   "ta_protr_final": 1.368,
    "ta_red_frac_final": 0.015,
-   "ta_tip_act_final": 0.266,
-   "ta_aspect_len_over_diam": 6.89
+   "ta_tip_act_final": 0.232,
+   "ta_aspect_len_over_diam": 1.246,
+   "mech_force_mean": 1.9129,
+   "mech_p_body": 6.0294,
+   "mech_p_tube": 11.9369,
+   "mech_p_ratio": 1.98,
+   "mech_tension_mean": 0.8846,
+   "mech_migration": 0.03858
   },
   "round_41_relax60": {
    "saturated": false,
@@ -135,18 +151,24 @@
    "red_frac_final": 0.015,
    "act_max_final": 0.972,
    "frames": 901,
-   "wall_s": 438.0,
+   "wall_s": 431.6,
    "ta_hollow_n_peak": 389,
    "ta_hollow_n_final": 389,
    "ta_area_cv_final": 0.693,
    "ta_vol_cv_final": 0.681,
-   "ta_tube_diam_final": 2.472,
+   "ta_tube_diam_final": 3.16,
    "ta_n_tubes_final": 2,
-   "ta_tube_len_final": 7.89,
-   "ta_protr_final": 2.911,
+   "ta_tube_len_final": 4.315,
+   "ta_protr_final": 1.412,
    "ta_red_frac_final": 0.015,
-   "ta_tip_act_final": 0.288,
-   "ta_aspect_len_over_diam": 3.192
+   "ta_tip_act_final": 0.249,
+   "ta_aspect_len_over_diam": 1.366,
+   "mech_force_mean": 1.8863,
+   "mech_p_body": 4.7573,
+   "mech_p_tube": 14.2288,
+   "mech_p_ratio": 2.991,
+   "mech_tension_mean": 0.8296,
+   "mech_migration": 0.04246
   },
   "round_40_mc8": {
    "saturated": false,
@@ -159,18 +181,24 @@
    "red_frac_final": 0.019,
    "act_max_final": 0.972,
    "frames": 901,
-   "wall_s": 328.7,
+   "wall_s": 187.4,
    "ta_hollow_n_peak": 367,
    "ta_hollow_n_final": 364,
    "ta_area_cv_final": 0.722,
    "ta_vol_cv_final": 0.689,
-   "ta_tube_diam_final": 1.579,
-   "ta_n_tubes_final": 1,
-   "ta_tube_len_final": 14.687,
-   "ta_protr_final": 3.124,
+   "ta_tube_diam_final": 2.349,
+   "ta_n_tubes_final": 2,
+   "ta_tube_len_final": 4.131,
+   "ta_protr_final": 1.336,
    "ta_red_frac_final": 0.019,
-   "ta_tip_act_final": 0.295,
-   "ta_aspect_len_over_diam": 9.301
+   "ta_tip_act_final": 0.268,
+   "ta_aspect_len_over_diam": 1.759,
+   "mech_force_mean": 1.9015,
+   "mech_p_body": 5.8501,
+   "mech_p_tube": 14.704,
+   "mech_p_ratio": 2.513,
+   "mech_tension_mean": 0.7997,
+   "mech_migration": 0.0445
   },
   "round_42_k05": {
    "saturated": false,
@@ -183,18 +211,24 @@
    "red_frac_final": 0.055,
    "act_max_final": 0.972,
    "frames": 901,
-   "wall_s": 535.9,
+   "wall_s": 588.8,
    "ta_hollow_n_peak": 786,
    "ta_hollow_n_final": 750,
    "ta_area_cv_final": 5.634,
    "ta_vol_cv_final": 9.582,
-   "ta_tube_diam_final": 0.853,
-   "ta_n_tubes_final": 4,
-   "ta_tube_len_final": 3.194,
-   "ta_protr_final": 21.121,
+   "ta_tube_diam_final": 0.979,
+   "ta_n_tubes_final": 1,
+   "ta_tube_len_final": 5.611,
+   "ta_protr_final": 1.858,
    "ta_red_frac_final": 0.055,
-   "ta_tip_act_final": 0.377,
-   "ta_aspect_len_over_diam": 3.744
+   "ta_tip_act_final": 0.434,
+   "ta_aspect_len_over_diam": 5.731,
+   "mech_force_mean": 24.6547,
+   "mech_p_body": 8.9743,
+   "mech_p_tube": 10.9304,
+   "mech_p_ratio": 1.218,
+   "mech_tension_mean": -1.4186,
+   "mech_migration": 0.24563
   },
   "round_42_k05_ex4": {
    "saturated": false,
@@ -207,36 +241,84 @@
    "red_frac_final": 0.014,
    "act_max_final": 0.972,
    "frames": 901,
-   "wall_s": 596.9,
+   "wall_s": 341.0,
    "ta_hollow_n_peak": 736,
    "ta_hollow_n_final": 736,
    "ta_area_cv_final": 4.165,
    "ta_vol_cv_final": 5.965,
-   "ta_tube_diam_final": 0.498,
-   "ta_n_tubes_final": 4,
-   "ta_tube_len_final": 1.11,
-   "ta_protr_final": 61.419,
+   "ta_tube_diam_final": 0.516,
+   "ta_n_tubes_final": 1,
+   "ta_tube_len_final": 17.656,
+   "ta_protr_final": 2.291,
    "ta_red_frac_final": 0.014,
-   "ta_tip_act_final": 0.23,
-   "ta_aspect_len_over_diam": 2.229
+   "ta_tip_act_final": 0.303,
+   "ta_aspect_len_over_diam": 34.217,
+   "mech_force_mean": 12.1164,
+   "mech_p_body": 8.7985,
+   "mech_p_tube": 8.7787,
+   "mech_p_ratio": 0.998,
+   "mech_tension_mean": -1.6909,
+   "mech_migration": 0.25853
+  },
+  "round_21_gs": {
+   "saturated": true,
+   "inert_operators": [],
+   "retention": 1.0,
+   "valid_evidence": false,
+   "protr_final": 2.283,
+   "protr_peak": 2.283,
+   "n_cells_final": 15002,
+   "red_frac_final": 0.005,
+   "act_max_final": 1.036,
+   "frames": 901,
+   "wall_s": 1179.4,
+   "ta_hollow_n_peak": 5084,
+   "ta_hollow_n_final": 4410,
+   "ta_area_cv_final": 3.431,
+   "ta_vol_cv_final": 4.698,
+   "ta_tube_diam_final": 5.289,
+   "ta_n_tubes_final": 16,
+   "ta_tube_len_final": 13.847,
+   "ta_protr_final": 2.281,
+   "ta_red_frac_final": 0.005,
+   "ta_tip_act_final": 0.255,
+   "ta_aspect_len_over_diam": 2.618,
+   "mech_force_mean": 6.729,
+   "mech_p_body": 8.7665,
+   "mech_p_tube": 13.6128,
+   "mech_p_ratio": 1.553,
+   "mech_tension_mean": 2.7086,
+   "mech_migration": 0.2922
   }
  },
+ "invalid": {
+  "ref_uniform_inflation": [
+   "P2_BUFFER_SATURATED"
+  ],
+  "round_21_gs": [
+   "P2_BUFFER_SATURATED"
+  ]
+ },
+ "provenance_drift": [],
+ "controls_lost": [
+  0
+ ],
  "verdicts": {
   "ta_aspect_len_over_diam": {
-   "admit": false,
-   "why": "tau=-0.71 FOOLED: a lower-ranked run outscores the top"
-  },
-  "ta_tube_len_final": {
-   "admit": false,
-   "why": "tau=+0.18 FOOLED: a lower-ranked run outscores the top"
-  },
-  "ta_n_tubes_final": {
    "admit": true,
    "why": "tau=+1.00"
   },
-  "protr_final": {
+  "ta_tube_len_final": {
    "admit": true,
-   "why": "tau=+0.67"
+   "why": "tau=+1.00"
+  },
+  "ta_n_tubes_final": {
+   "admit": false,
+   "why": "tau=-1.00 FOOLED: a lower-ranked run outscores the top"
+  },
+  "protr_final": {
+   "admit": false,
+   "why": "tau=+0.50 NOT SEPARATED: min gap -0.077 vs within-class spread 0.033"
   },
   "protr_peak": {
    "admit": true,
@@ -244,17 +326,19 @@
   },
   "retention": {
    "admit": false,
-   "why": "tau=-1.00 FOOLED: a lower-ranked run outscores the top"
+   "why": "tau=-1.00 FOOLED: a lower-ranked run outscores the top NOT SEPARATED: min gap -0.467 vs within-class spread 0.038"
   },
   "n_cells_final": {
    "admit": false,
-   "why": "tau=-0.22 FOOLED: a lower-ranked run outscores the top"
+   "why": "tau=-0.83 FOOLED: a lower-ranked run outscores the top NOT SEPARATED: min gap -484.000 vs within-class spread 32.404"
   }
  },
- "admitted": [
-  "ta_n_tubes_final",
-  "protr_final",
+ "admitted": [],
+ "provisional": [
+  "ta_aspect_len_over_diam",
+  "ta_tube_len_final",
   "protr_peak"
  ],
- "passed": true
+ "passed": false,
+ "why": "NOT CERTIFIED: the low-rank control(s) are invalid runs -- re-run them below saturation before trusting any admission"
 }

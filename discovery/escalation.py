@@ -174,6 +174,16 @@ def decide(cfg, sup, backlog, n_legal_edits):
     if cfg.stage_gate < 3:
         return "open_stage_gate", (f"stage {cfg.stage_gate} -> {cfg.stage_gate + 1}: admit the "
                                    f"next stage's operators into the legal move set")
+    # THE BACKLOG CHECK MUST COME FIRST. It used to sit BELOW `frozen_all`, and `frozen_all` is
+    # the state a spent campaign settles into permanently -- so once the last cluster froze,
+    # `decide()` returned `request_operator` on EVERY subsequent round, forever, and `exhausted`
+    # was unreachable. That is not escalation, it is a loop filing duplicate wishes against a
+    # language nobody is extending. If a request is already open, the answer is "stop and build",
+    # whatever the cluster state.
+    if backlog.open_requests():
+        return "exhausted", (f"{len(backlog.open_requests())} operator request(s) already open "
+                             f"and no new region is reachable; waiting on the language, not on "
+                             f"compute")
     if n_legal_edits == 0:
         return "request_operator", ("every stage is open and the composition has NO legal edit "
                                     "left -- the language is the limit")
@@ -181,10 +191,6 @@ def decide(cfg, sup, backlog, n_legal_edits):
     if frozen_all:
         return "request_operator", ("every stage is open and every proximity cluster is frozen: "
                                     "the reachable space is explored and none of it improved")
-    if backlog.open_requests():
-        return "exhausted", (f"{len(backlog.open_requests())} operator request(s) already open "
-                             f"and no new region is reachable; waiting on the language, not on "
-                             f"compute")
     return "request_operator", "dry rounds with every stage open"
 
 
@@ -242,9 +248,16 @@ if __name__ == "__main__":
         assert decide(cfg, sup, bl2, 0)[0] == "request_operator"
         assert decide(cfg, sup, bl2, 12)[0] == "request_operator"   # all clusters frozen
         bl2.set_status(r.rid, "open")
+        # THE REGRESSION THIS ORDERING PREVENTS: an open request AND every cluster frozen is the
+        # state a spent campaign settles into permanently. With the backlog check below the freeze
+        # check, `decide` returned `request_operator` here on every round forever and `exhausted`
+        # was unreachable -- the loop filing duplicate wishes instead of stopping to build.
+        assert sup.prox.clusters and not sup.prox.active()            # frozen, as in the live state
+        assert decide(cfg, sup, bl2, 12)[0] == "exhausted", \
+            "an open request must win over a frozen cluster, or escalation never terminates"
         sup.prox.clusters = {}                                       # nothing frozen, none active
         assert decide(cfg, sup, bl2, 12)[0] == "exhausted"
-        print("decision table OK: gate -> request -> exhausted")
+        print("decision table OK: gate -> request -> exhausted (open request wins over freeze)")
 
         p = bl2.render(os.path.join(d, "operator_backlog.md"))
         body = open(p).read()

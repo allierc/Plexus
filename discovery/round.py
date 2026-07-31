@@ -341,7 +341,22 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
     A.meta_review(rid)
-    save_frontier([g for _, g, _, _, _, _ in kept] or load_frontier())
+    # THE CONTROL IS ALWAYS RETAINED, whatever it scored.
+    # `kept` is a RANKING product, and a Watcher veto sets the score to -inf -- so in round 2 the
+    # control (the parent, unchanged, protr_peak 4.03) was vetoed, fell out of `kept`, and the
+    # frontier became exactly its two ablations (-extrude 1.39, -morphogen_growth_3d 1.03). The
+    # search was then breeding from knockouts of a composition it no longer carried, and every
+    # subsequent diff would be measured against a parent that is not in the pool. A veto is a
+    # statement about what the MOVIE SHOWS, not about whether the composition is a useful parent;
+    # it must not silently delete the reference the round's own diffs were taken against.
+    front = [g for _, g, _, _, _, _ in kept]
+    ctrl = [g for _, g, _, _, _, h in rows if h.intent == "control"]
+    for g in ctrl:
+        if not any(comp_hash(g) == comp_hash(x) for x in front):
+            front.append(g)
+            print(f"  [frontier] control {comp_hash(g)} retained despite score/veto -- the "
+                  f"round's diffs are measured against it")
+    save_frontier(front or load_frontier())
 
     # ------------------------------------------------ escalate if the space is spent
     # `terminal()` has always been able to return "ESCALATE: ...", and nothing ever read it. So
