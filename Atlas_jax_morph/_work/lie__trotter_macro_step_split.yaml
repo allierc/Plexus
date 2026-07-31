@@ -1,0 +1,80 @@
+id: lie__trotter_macro_step_split
+order: 21
+raw_name: Lie-Trotter macro-step split
+raw_kind: integration contract
+code_path: papers/jax-morph/jax_morph/core/step.py:L364
+paper_section: "guides/concepts.md, 'A simulation integrates a hybrid dynamical system' (F_dt = F_disc o F_dyn o F_qs)"
+summary: >-
+  Model.__call__ advances the shared state by ONE macro-step as a fixed-order Lie-Trotter operator
+  split, s_{n+1} = (Phi_discrete o Phi_dynamic o Phi_quasistatic)(s_n), then t += dt. Phase A runs
+  every quasistatic step in pipeline order (each returns a full state, later steps see earlier
+  updates); phase B evaluates every dynamic step at the SAME post-quasistatic state, sums their
+  alive-masked, already-dt-scaled sparse deltas, and applies them once; phase C runs every discrete
+  step in pipeline order. First-order (O(dt)) accurate; a whole simulation iterates this one map.
+equations: |
+  Macro-step operator (Model.__call__, step.py:519; phase skeleton Model._run, step.py:485):
+    s_{n+1} = (Phi_disc o Phi_dyn o Phi_qs)(s_n),   then   t <- t + dt
+    ("o" is function composition: the RIGHTMOST map (quasistatic) is applied FIRST.)
+  Whole trajectory is the n_steps-fold iterate of the identical map:
+    s(T) = F_dt^{n_steps}(s_0),   T = n_steps * dt.
+
+  Phase A - quasistatic (sequential, pipeline order over i in QS):
+    s <- Phi^qs_i(s)          # each step returns a COMPLETE new state; later steps see earlier ones
+  Phase B - dynamic (Jacobi: every dyn step read the ONE post-A state s*, then summed once):
+    delta_i = Phi^dyn_i(s*)   # sparse delta (state.deltas); untouched fields = None; dt-scaling baked in
+    total_f = sum over writers i of delta_i.f     (None contributions skipped)
+    total_f <- where(alive, total_f, 0)  for cell-scope fields only  (global/grid fields NOT masked)
+    s <- eqx.apply_updates(s*, total)             # NO extra dt multiply here (_accumulate_dynamic, :342)
+  Phase C - discrete (sequential, pipeline order over k in DISC):
+    s <- Phi^disc_k(s)        # each returns a COMPLETE new state; sees earlier jumps
+  Time: t advances by dt exactly ONCE, after all three phases (out.set('t', out['t']+dt), step.py:548).
+  PRNG: keys = jax.random.split(key, len(steps)); step i receives keys[i] (step.py:542-545).
+
+  Paper form (guides/concepts.md): F_dt = F^disc_dt o F^dyn_dt o F^qs_dt, s_{n+1}=F_dt(s_n),
+  s(T)=F_dt^{n_steps}(s_0), T=n_steps*dt -- identical to the code.
+params:
+  steps: >-
+    operator_sequence: ordered tuple of SimulationStep sub-maps composed into the macro-step
+    (Model.__init__, step.py:382). List order is honored WITHIN the quasistatic and discrete phases
+    (pipeline, each sees prior updates) but is IGNORED within the dynamic phase (all dynamic steps
+    read the same post-quasistatic state).
+  dt: >-
+    integration_timestep: macro-step duration and the O(dt) accuracy knob; also the scale each
+    dynamic step pre-multiplies its own delta by. Call-time keyword-only argument, not a stored
+    constructor field.
+  key: >-
+    stochastic_seed: JAX PRNG key split once into len(steps) sub-keys, one per step by index;
+    deterministic steps are still handed a key and ignore it. Call-time keyword-only argument.
+state_io:
+  reads:
+    - "t: read to advance simulation time (out['t'])."
+    - "alive (+ n_cells): dynamic-phase masking zeroes dead cell-scope deltas (_accumulate_dynamic, step.py:357-359)."
+    - "the union of every constituent step's state_reads() via Model.state_requires() (step.py:608); the split declares no physics reads of its own."
+  writes:
+    - "t: t + dt, once per macro-step, after all three phases (step.py:548)."
+    - "every stochastic step's trace fields, reset to their declared defaults at macro-step start (_reset_traces, step.py:467/494)."
+    - "the union of every constituent step's state_writes(); the split orchestrates the phase writes but itself writes only t."
+surprises:
+  - "Fixed phase order overrides list order: the macro-step is ALWAYS quasistatic -> dynamic -> discrete no matter how steps are ordered in Model(steps=...). List order only sequences steps WITHIN the quasistatic and discrete phases. A reimplementer who simply runs steps in declaration order gets different dynamics."
+  - "Dynamic phase is JACOBI, not Gauss-Seidel: every dynamic step is evaluated at the ONE frozen post-quasistatic state s* (step.py:504-508), so no dynamic writer sees another's increment; deltas are summed. Running them sequentially (each seeing the last) is a different, wrong integrator -- the docstring flags this explicitly (step.py:530-531)."
+  - "No dt-scaling in accumulation: each dynamic step returns an increment ALREADY multiplied by dt (contract, step.py:76-78); _accumulate_dynamic (step.py:342) only sums and applies. Multiplying by dt again double-scales every dynamic force."
+  - "Return-shape contract splits by type: quasistatic/discrete return a COMPLETE state; dynamic returns a SPARSE delta from state.deltas(...) with every untouched field None. Summation reads fields by attribute and skips None (step.py:353); a dynamic step that returns a full state breaks the sum."
+  - "Alive-masking is cell-scope only: summed dynamic deltas are zeroed on dead slots via state.alive (step.py:357-359), but global/grid fields are NOT masked. Dead cells are not integrated; the environment (grids, globals) still is."
+  - "Time advances exactly once, last: t <- t + dt happens after all three phases (step.py:548), not per step or per phase, so simulated time is real physical time T = n_steps*dt."
+  - "One key split per macro-step by index: keys = jax.random.split(key, len(steps)) and step i gets keys[i] (step.py:542-545). Deterministic steps receive (and ignore) a key. Replay substitutes a fixed _PLACEHOLDER_KEY = PRNGKey(0) for deterministic steps (step.py:34, 563)."
+  - "Trace fields reset FIRST, every macro-step: _reset_traces (step.py:494) wipes ephemeral stochastic traces to their defaults before phase A, making each recorded trace per-macro-step; a dynamic (additive) trace field must default to 0 or reset-then-accumulate would record default+value instead of the step's own increment."
+  - "Composition reads right-to-left: Phi_discrete o Phi_dynamic o Phi_quasistatic applies QUASISTATIC first despite being written last -- easy to misread as discrete-first, which would invert the whole integrator."
+  - "PAPER vs CODE: the paper never names 'Lie-Trotter', operator splitting, or first-order accuracy -- that formalization is the library's (guides/concepts.md). The paper (Fig. 1a caption, p.2 line 100; Methods 'To create an initial state', p.14 lines 747-748) describes an informal per-timestep sequence -- 'cell division, cell growth, and mechanical relaxation', one division per step -- with division positioned differently from the code's fixed order where division (a discrete event) runs LAST. SOURCE WINS: the contract is the three-phase fixed split; the paper's one-division-per-step is a modeling choice layered on top, not the integrator."
+  - "Sampling and scoring share ONE skeleton: forward __call__ and score-time _replay_transition both call _run (step.py:547, 570) with different per_step closures, so the composition order is identical forward and in replay; a replay that reordered the phases would silently break gradient consistency."
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

@@ -59,8 +59,13 @@ BudgetLedger = _llm.BudgetLedger
 # change the record get Edit/Write. The excavator reads a lot of unfamiliar source, so it is the
 # only reader with a large turn budget.
 ATLAS_BUDGETS = {
-    "excavator":   (10, 30, ["Read", "Grep", "Glob", "Edit"]),
-    "normalizer":  ( 8, 20, ["Read", "Grep", "Edit"]),
+    # Write, not just Edit. The first parallel batch lost five calls to this: the agents chose to
+    # rewrite their YAML working copy wholesale rather than patch it, Write was not granted, the
+    # tool call was denied, and the agent ended its turn ASKING A HUMAN TO APPROVE THE WRITE --
+    # in a headless subprocess, where nobody was listening. The retry recovered every one, but a
+    # tool list that quietly turns work into a question is a bad tool list.
+    "excavator":   (10, 30, ["Read", "Grep", "Glob", "Edit", "Write"]),
+    "normalizer":  ( 8, 20, ["Read", "Grep", "Edit", "Write"]),
     "skeptic":     ( 5, 12, ["Read", "Grep"]),                 # cannot edit: it argues, it does not decide
     "implementer": (15, 60, ["Read", "Grep", "Glob", "Edit", "Write", "Bash"]),
     "differ":      (12, 40, ["Read", "Edit", "Write", "Bash"]),
@@ -123,7 +128,11 @@ THE RULES OF THIS LOOP.
    language, though it is often worth reading before reimplementing something.
 5. If the source and the paper disagree, the SOURCE WINS -- and record the contradiction in
    `why:`. That contradiction is one of the most valuable things this exercise can produce.
-6. Do not run the reference by importing jax in the Plexus environment. It is not installed
+6. THE WORKING COPY MUST STAY VALID YAML. Any string containing a colon-space, a leading `-`,
+   `#`, `{`, `[`, or a line break belongs in a block scalar (`key: |`) or in quotes. One entry was
+   lost to an unquoted `... it is NOT a constructor param: it ...`. Equations and prose always go
+   in a block scalar.
+7. Do not run the reference by importing jax in the Plexus environment. It is not installed
    there, deliberately. Use `cd Atlas_jax_morph && python oracle.py run <script>`.
 """
 
@@ -339,10 +348,20 @@ THE ORDER OF OPERATIONS IS THE WHOLE TEST. Do it in exactly this order:
 2. Write the oracle script under `Atlas_jax_morph/_oracle/scripts/<id>.py`; run it with
    `cd Atlas_jax_morph && python oracle.py run _oracle/scripts/<id>.py --name diff_<id>`. It must write a `.npz` and
    a `summary.json` into its run directory.
-3. Write the matching Plexus spec under `config/atlas/<id>.yaml` and run it. SAME initial
-   condition, SAME parameters, same number of steps. If the two cannot be given the same
-   initial condition, say so and stop -- an unmatched initial condition makes the comparison
-   meaningless, however good the numbers look.
+3. Write the matching Plexus spec under `config/atlas/<id>.yaml` and RUN IT THROUGH THE ENGINE
+   with `python Atlas_jax_morph/run_spec.py <id>`, which writes a real evidence folder at
+   `log/atlas/<id>/` in the same shape as `log/okuda/coral_fixed_ball/`:
+       spec_run.yaml   the spec exactly as run
+       diag.json       config, summary numbers, the ACTED LEDGER, wall clock, run id
+       metrics.json    summary + the per-frame series
+       metrics.npz     the arrays, so a new observable can re-score without re-simulating
+       strip.png       panels on ONE common spatial scale
+       movie.mp4
+   SAME initial condition, SAME parameters, same number of frames as the oracle run. If the two
+   cannot be given the same initial condition, say so and stop -- an unmatched initial condition
+   makes the comparison meaningless, however good the numbers look.
+   Check the acted ledger before you look at any metric: a run in which a scheduled operator
+   never acted is not evidence, whatever it produced.
 4. Compute the metric. Fill `evidence.oracle_run`, `evidence.value`, `evidence.passed`.
 5. If it passed: `status: validated`. If it did not: leave the status at `implemented`, and
    write in `evidence.why_failed:` your best single hypothesis plus the ONE experiment that
@@ -376,8 +395,9 @@ If you promote:
 2. Add the library page `library/<name>.qmd` in the house style of its neighbours, and its card
    in `library_operators.qmd` under the right family.
 3. Write a spec in `config/atlas/` that composes it with at least one operator Plexus already
-   had, and run it. A vocabulary item that only works beside its own siblings has not joined the
-   language.
+   had, and run it with `run_spec.py` so it leaves an evidence folder under `log/atlas/`. A
+   vocabulary item that only works beside its own siblings has not joined the language, and one
+   with no run behind it has not been demonstrated at all.
 4. Set `status: promoted` and fill `test:`.
 
 If you refuse, leave the status alone and write the reason in `why_not_promoted:`. Refusing is a

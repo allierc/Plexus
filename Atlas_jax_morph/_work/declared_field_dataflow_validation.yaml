@@ -1,0 +1,118 @@
+id: declared_field_dataflow_validation
+order: 23
+raw_name: declared field dataflow validation
+raw_kind: composition contract
+code_path: papers/jax-morph/jax_morph/core/step.py:364
+paper_section: guides/concepts.md, 'Physics and control compose through fields'
+summary: >-
+  Steps couple ONLY through named state fields -- there is no other channel. Each step
+  declares the fields it reads (state_reads), writes (state_writes) and, if stochastic, its
+  ephemeral records (trace_writes) as tuples of StateFieldSpec. When a Model is constructed,
+  Model._validate cross-checks those declarations (write-conflict policy + trace uniqueness +
+  spec consistency) and build_state_from_model then SYNTHESIZES the typed state class as exactly
+  the base fields merged with the union of every step's required fields. So the contract does not
+  transform field values; it defines and validates the schema through which steps couple, which
+  is why recomposition is add/remove/reorder rather than editing a monolithic simulator.
+equations: |
+  This is a composition/validation contract, not a numeric update. The "update" is the set of
+  build-time predicates and the schema synthesis.
+
+  SCHEMA SYNTHESIS  (state.py: merge_specs, build_state_from_model)
+    specs        = merge_specs(BASE_SPECS, U_step  step.state_requires())
+    step.state_requires() = merge_specs(state_reads(), state_writes()[, trace_writes()]).values()
+    StateCls     = eqx.Module with one jax.Array attribute per name in specs, shape:
+                     global scope -> spec.shape
+                     cell   scope -> (capacity, *spec.shape)
+    merge_specs raises ValueError if two declarations SHARE a name but are not EXACTLY equal.
+
+  BUILD-TIME WRITE-CONFLICT VALIDATION  (step.py: Model._validate, over NON-discrete steps)
+    let Q(f) = {quasistatic steps writing field f},  D(f) = {dynamic steps writing f}
+      require  |Q(f)| <= 1                     (a quasistatic field admits exactly ONE writer)
+      require  a field is Q-owned XOR D-owned  (never both quasistatic- and dynamic-written)
+      |D(f)| unrestricted -> deltas SUMMED:   total_f = sum_d  delta_d[f]  (alive-masked, cell scope)
+      DISCRETE steps EXEMPT from this check    (resets are allowed to clobber)
+
+  TRACE-FIELD VALIDATION  (step.py: Model._validate, over stochastic steps)
+      each trace name owned by exactly ONE stochastic step (no sharing)
+      trace name NOT in reserved,  reserved = {base field names} U {every step.state_writes()}
+      dynamic trace field: spec.default == 0   (reset-then-accumulate records only its own increment)
+
+  READS ARE NOT VALIDATED. A field may be read with no writer (allocated at spec.default, held by
+  the initial condition or as a never-changing constant). Reads still enter state_requires(), so a
+  DECLARED read guarantees the field is allocated -- but nothing checks that a writer exists.
+
+  Symbols: f = field name; capacity = fixed cell-slot count (static shapes for compiled rollouts);
+  BASE_SPECS = (position, radius, celltype, alive, t).
+params:
+  name: coupling-key / field identity -- the name by which steps couple; the ONLY inter-step channel.
+  shape: per-cell feature dimension (trailing array shape; () = scalar). Full cell array is (capacity, *shape).
+  dtype: storage dtype (None -> JAX default float; e.g. ALIVE is bool).
+  heritable: division-inheritance policy -- True daughter copies mother's value, False daughter reset to default (cell scope only).
+  default: fill / reset value -- allocates empty states, resets ephemeral trace fields each macro-step, inits non-inherited daughters. Also the dynamic-trace validity check (must be 0).
+  scope: locality -- 'cell' (per-cell, leading capacity axis, alive-masked, resized on division) vs 'global' (time/scalar/Eulerian grid; storage only, no grid coupling provided).
+  'Model(steps)': pipeline order -- the ordered tuple of steps whose declarations are cross-validated at construction and whose union defines the synthesized state schema.
+state_io:
+  reads: >-
+    Schema-level only -- consumes each step's declared state_reads()/state_writes()/trace_writes()
+    SPEC tuples; it does not read any field VALUE. Always-in-scope base fields it merges against:
+    position, radius, celltype, alive, t.
+  writes: >-
+    Synthesizes (does not mutate) the generated BaseState subclass schema =
+    merge_specs(BASE_SPECS, union of step.state_requires()); raises ValueError on any write/spec/trace
+    conflict at Model build time. Writes no state field values.
+surprises:
+  - >-
+    Named "dataflow VALIDATION" but it validates WRITES only. Reads are deliberately never
+    cross-checked (Model._validate comment: "The model does not police reads"): a field read with
+    no writer is legal, and there is NO DAG / read-before-write / dependency-order check. The name
+    over-promises what is enforced.
+  - >-
+    Validation does NOT verify that a step's __call__ body touches only its declared fields. The
+    declaration is an unenforced PROMISE. A step that reads state.foo without declaring foo either
+    AttributeErrors at run time (if no step allocated foo) or silently works (if another step
+    happened to allocate it) -- never a build-time error. Correctness of the wiring rests on steps
+    declaring honestly.
+  - >-
+    DISCRETE steps are entirely EXEMPT from the write-conflict policy ("discrete steps are resets"):
+    two discrete steps may both write `alive` and clobber, and a discrete write never reserves a
+    field against quasistatic/dynamic writers. BUT discrete writes DO reserve their names against
+    trace fields (reserved is built from every step's state_writes(), discrete included).
+  - >-
+    The quasistatic/dynamic writer rule is per-field and decided by StepType: >1 DYNAMIC writer of a
+    field is allowed and the deltas are ADDED (alive-masked); a QUASISTATIC field admits exactly one
+    writer; a field cannot be both. A reimplementer treating "one writer per field" as universal
+    would wrongly reject multi-writer dynamic accumulation.
+  - >-
+    merge_specs dedups only EXACTLY-equal specs. Customizing a base spec inline in one step
+    (POSITION(heritable=False)) while another step uses the plain POSITION is a build-time
+    ValueError -- a shared field must be declared IDENTICALLY by every step that names it.
+  - >-
+    Reads are intentionally NOT reserved against trace-field names, so the Emit->React pattern (a
+    downstream step reads an upstream step's within-macro-step trace as a state_read equal to a
+    trace_write) stays legal. Reserving reads would forbid that intended consumption path.
+  - >-
+    The contract is split across two files: the declaration vocabulary and merge (StateFieldSpec,
+    merge_specs, build_state_from_model) live in core/state.py; the build-time cross-validation
+    (Model._validate, reached from Model.__init__) lives in core/step.py. It is not in one place.
+  - >-
+    PAPER vs SOURCE. Source (this hardened library): steps declare reads/writes and Model build-time
+    validates + synthesizes the state type. Paper (Deshpande 2025, p.14, "I. Forward Simulation"):
+    a single CellState datatype holds "the position of particles, their radii, division propensities,
+    chemical concentrations ... and any additional state information," and the simulation "can be
+    customized to contain any subset or combination of the steps" -- composition purely by CONVENTION,
+    with NO declared reads/writes and NO build-time validation (a paper grep for
+    valid/conflict/schema/declare/contract finds only "validation LOSS"). A reader of the paper alone
+    would model steps as freely mutating a shared struct; the declared-field dataflow contract is an
+    invention of the library re-engineering, not described in the paper.
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

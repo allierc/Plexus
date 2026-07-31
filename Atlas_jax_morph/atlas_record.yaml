@@ -210,25 +210,104 @@ mechanisms:
   raw_name: GeneNetworkMWC
   raw_kind: step (ODEController)
   code_path: papers/jax-morph/jax_morph/control/ode.py:L364
-  paper_section: null
-  summary: Thermodynamic gene circuit with a log-occupancy (MWC-style) regulatory drive.
+  paper_section: 'eq. (4), p. 16 (Methods: "Gene Networks"); first stated p. 10 lines 534-536'
+  summary: A per-cell dynamic controller (ODEController subclass) whose evolving state is a vector of
+    gene concentrations. Over one macro-step it integrates a gene-regulatory ODE with diffrax (Dopri5,
+    adaptive) holding the sensed driver inputs fixed, and writes back the sparse DELTA of each output
+    (and optional latent) gene field. Each gene evolves as saturating production minus first-order decay,
+    but the regulatory drive is a THERMODYNAMIC log-occupancy (MWC / statistical-mechanics) form -- a
+    sum of signed interaction weights times ln(1 + concentration/threshold) -- rather than the linear
+    W*g drive the paper's eq. (4) specifies.
+  equations: "Per cell, for gene i (n_gene = hidden_size + out_size), with fixed driver inputs u (n_in):\n\
+    \n  F_i = F0_i\n        + sum_j H_gene_ij * ln(1 + g_j / K_gene_ij)     # gene -> gene log-occupancy\
+    \ drive\n        + sum_k H_in_ik  * ln(1 + u_k / K_in_ik)         # input -> gene log-occupancy drive\n\
+    \  dg_i/dt = rho_i * sigmoid(F_i)  -  g_i / tau_i          # saturating production minus decay\n\n\
+    where (code, ode.py:449-475):\n  - g_j = max(evolving_j, 0), u_k = max(inputs_k, 0)   (clamped non-negative\
+    \ before occupancy)\n  - rho   = exp(log_rho)   maximum production rate per gene\n  - tau   = exp(log_tau)\
+    \   lifetime per gene (degradation rate k_i = 1/tau_i)\n  - K_gene= exp(log_K_gene), K_in = exp(log_K_in)\
+    \   half-occupancy concentration thresholds\n  - sigmoid = jax.nn.sigmoid  (logistic 1/(1+e^-x))\n\
+    \  - the occupancy ratio g/K is capped at finfo.max before log1p (overflow guard)\n  - DECAY uses\
+    \ the RAW evolving_i (not the clamped g_i); production uses the clamped g_i.\n\n__call__ integrates\
+    \ dy/dt = vector_field over [0, dt] (Dopri5, PIDController rtol=1e-4 atol=1e-6,\ndt0=dt), then returns\
+    \ state.deltas(...) = y(dt) - y(0) for the hidden field and each output field.\n\nPAPER (eq. 4, p.\
+    \ 16 / p. 10) instead specifies a CONNECTIONIST LINEAR drive:\n  dg_i/dt = phi( sum_j W_ij g_j + b_i\
+    \ ) + I_i - k_i g_i\nwith phi a unit-max sigmoid, W_ij linear couplings, b_i basal rate, I_i an input\
+    \ forcing ADDED\nOUTSIDE the sigmoid, and k_i the degradation rate. The code's GeneNetworkConnectionist\n\
+    (ode.py:202) implements that linear form; GeneNetworkMWC is a distinct thermodynamic variant."
   params:
-    input_specs: null
-    output_specs: null
-    hidden_size: null
-    log_rho: null
-    log_tau: null
-    F0: null
-    H_gene: null
-    log_K_gene: null
-    H_in: null
-    log_K_in: null
-    tag: null
+    input_specs: 'input_field_binding: static tuple of driver-field specs (sensed chemicals, stress, ...)
+      held fixed during integration; sets n_in and the fields read as forcing u'
+    output_specs: 'output_field_binding: static tuple of observed gene-field specs that are the readout
+      genes (division propensity, secretion / cadherin rates); sets out_size'
+    hidden_size: 'latent_regulator_count: number of hidden-state genes with no external readout that co-evolve
+      and regulate every gene; keyword-only, default 0 (0 = pure-output circuit, no {tag}_hidden field
+      allocated)'
+    log_rho: 'max_production_rate (log-space): rho = exp(log_rho), the saturating ceiling of each gene''s
+      production term rho*sigmoid(F)'
+    log_tau: 'degradation_timescale / molecule_lifetime (log-space): tau = exp(log_tau); linear decay
+      g/tau, i.e. paper rate k = 1/tau'
+    F0: 'basal_activation_bias: per-gene additive drive inside the sigmoid (paper b_i); sets basal expression
+      when all interactions are zero (sigmoid(F0))'
+    H_gene: 'gene_coupling_strength (signed): (n_gene,n_gene) regulatory weights; sign = activating(+)/inhibitory(-),
+      magnitude scales the ln(1+g/K) occupancy; diagonal allows self-regulation'
+    log_K_gene: 'gene_binding_threshold (log-space): K_gene = exp(...), (n_gene,n_gene) half-occupancy
+      concentration for each regulator gene j acting on gene i'
+    H_in: 'input_coupling_strength / field_sensitivity (signed): (n_gene,n_in) weights coupling each sensed
+      driver to each gene through its log-occupancy'
+    log_K_in: 'input_binding_threshold (log-space): K_in = exp(...), (n_gene,n_in) half-occupancy concentration
+      for each driver input k on gene i'
+    tag: 'state_field_namespace: string prefix for the latent state field name ("{tag}_hidden"); default
+      "gene" -- keeps multiple gene circuits'' hidden fields distinct'
+  state_io:
+    reads:
+    - 'input_specs (declared via state_reads()): the fixed driver fields u for this macro-step'
+    - output_specs (effective, read in __call__ as the ODE initial condition y0 -- current gene concentrations)
+    - '{tag}_hidden (effective, only when hidden_size>0 -- current latent gene concentrations)'
+    writes:
+    - '{tag}_hidden : StateFieldSpec shape (hidden_size,), only when hidden_size>0 -- sparse DELTA of
+      latent genes'
+    - 'each output_spec : sparse DELTA of that output gene over dt (DYNAMIC step; deltas targeting the
+      same field are summed by the integrator)'
+  surprises:
+  - 'PAPER-VS-CODE CONTRADICTION (source wins): the paper (eq. 4, p. 16 and p. 10) only ever states the
+    LINEAR connectionist drive phi(sum_j W_ij g_j + b_i) + I_i - k_i g_i inspired by Hiscock [24]. The
+    MWC log-occupancy drive F_i = F0 + sum H*ln(1+g/K) implemented here is NOT in the paper; it is a code-only
+    thermodynamic (Monod-Wyman-Changeux-style) reparameterization. A reimplementer working from the paper
+    would build the connectionist form (which exists separately as GeneNetworkConnectionist) and never
+    produce this class.'
+  - 'INPUT PLACEMENT differs from the paper even structurally: the paper adds the sensed forcing I_i OUTSIDE
+    the sigmoid (phi(...) + I_i); here every input enters INSIDE the drive via H_in*ln(1+u/K_in) and is
+    passed through the sigmoid. Saturation therefore couples inputs and genes, unlike eq. (4).'
+  - 'Two DIFFERENT sigmoids live in the same file: GeneNetworkMWC uses jax.nn.sigmoid (logistic), but
+    the sibling GeneNetworkConnectionist uses _rescaled_sigmoid (algebraic x/sqrt(1+x^2) rescaled to [0,1]).
+    Reusing the algebraic helper here would silently change dynamics.'
+  - Positive parameters (rho, tau, K) are stored in LOG space and exponentiated by _positive_from_log,
+    which CLIPS the log to [log(tiny), log(max) - log(4.0)]. The "- log(4.0)" is a magic headroom constant
+    leaving room for subsequent arithmetic before overflow; passing raw rho/tau/K instead of their logs
+    would be wrong by an exp.
+  - 'DEFAULT (all params None -> zeros) is NOT a silent circuit: log-zeros give rho=tau=K=1, H=0, F0=0,
+    so production = 1*sigmoid(0) = 0.5 and decay = g, driving every gene to a steady state of 0.5. "Inert"
+    in the docstring means zero-INTERACTION, not zero-dynamics.'
+  - Non-negativity is enforced by clamping genes and drivers to >=0 ONLY inside the occupancy terms (ln(1+.)
+    would NaN on negatives). The DECAY term uses the raw (possibly negative) evolving state, not the clamped
+    value -- an intentional asymmetry (raw decay is restorative toward 0) a reimplementer might "fix"
+    and break.
+  - 'Overflow guard: the ratio g/K is capped at finfo.max via jnp.minimum before log1p, documented (ode.py:465-466)
+    as preventing a mixed-sign interaction row from forming (+inf)+(-inf)=NaN. Easy to omit and get NaNs
+    only on extreme inputs.'
+  - The step is DYNAMIC and returns a SPARSE DELTA (y(dt) - y(0)), not a full updated state. Inputs u
+    are held FIXED across the whole diffrax integration (closed over in the ODETerm lambda) -- gene concentrations
+    evolve, sensed drivers do not. Returning a full new state, or letting u evolve, would both be wrong
+    per the macro-step contract.
+  - 'H_gene is a full (n_gene,n_gene) matrix INCLUDING the diagonal, so a gene may regulate itself through
+    ln(1+g_i/K_gene_ii). n_gene = hidden_size + out_size, and output genes are ordered so the last output
+    is the readout consumed downstream (paper: last output gene = division propensity, last Nc = secretion
+    rates) -- ordering of output_specs is semantically load-bearing, not documented in this class.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -241,18 +320,80 @@ mechanisms:
   raw_name: ODEController
   raw_kind: step (SimulationStep)
   code_path: papers/jax-morph/jax_morph/control/ode.py:L46
-  paper_section: null
-  summary: Abstract dynamic controller that integrates a per-cell ODE over one macro-step.
+  paper_section: p. 10 ("Genetic regulatory interactions"); fig. 1b
+  summary: Abstract DYNAMIC step that integrates a per-cell ODE over one macro-step. It packs each cell's
+    evolving state y = concat(hidden latent genes, observed output genes), holds the sensed driver inputs
+    FIXED, integrates dy/dt = vector_field(t, y, inputs) from t=0 to t=dt with an adaptive Dopri5 solver,
+    and returns the exact integrated increment y(dt) - y(0) as a sparse per-field delta (hidden field
+    plus each output field). The base defines only the integration machinery; the vector_field is abstract
+    and supplied by subclasses (GeneNetworkConnectionist, NeuralODE, GeneNetworkMWC).
+  equations: "Base ODEController (integration machinery, subclass-agnostic), per cell:\n  y0        =\
+    \ concat(hidden, outputs)                      # hidden width = hidden_size, outputs width = out_size\n\
+    \  inputs    = pack(input_specs)   held FIXED over [0, dt]  # driver fields do not evolve during the\
+    \ solve\n  y(dt)     = ODESolve( dy/dt = vector_field(t, y, inputs),\n                        y(0)\
+    \ = y0, t in [0, dt],\n                        Dopri5, PIDController(rtol=1e-4, atol=1e-6), dt0=dt\
+    \ )\n  delta     = y(dt) - y0          # RETURNED as a sparse dynamic delta, NOT the new state\n \
+    \                                 # sliced back: first hidden_size cols -> {tag}_hidden, then each\
+    \ output spec in order\n\nPaper's realized field (p. 10, \"inspired by Hiscock [24]\"), per gene i:\n\
+    \  dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i\n    g_i = expression level; W_ij = regulatory\
+    \ influence of gene j on i; b_i = basal transcription rate;\n    k_i = degradation rate; I_i = forcing\
+    \ signal from a sensed cell input; phi = saturating sigmoid.\n  NOTE the input I_i is ADDITIVE and\
+    \ OUTSIDE the sigmoid.\n\nCode's closest subclass, GeneNetworkConnectionist.vector_field (L261):\n\
+    \  dg/dt = sigma( W_gene @ g + W_in @ u + b ) - gamma * g\n  Here the driver input u enters INSIDE\
+    \ the sigmoid via W_in @ u (see surprises) and there is no\n  separate additive input term; sigma\
+    \ is the ALGEBRAIC sigmoid 0.5 + 0.5 * x/sqrt(1 + x^2), not\n  the logistic. GeneNetworkMWC uses a\
+    \ log-occupancy (MWC) drive with jax.nn.sigmoid instead.\n"
   params:
-    input_specs: null
-    output_specs: null
-    hidden_size: null
-    tag: null
+    input_specs: sensed_input_field_specs -- per-cell driver fields (chemical concentrations, mechanical
+      stress) held FIXED while the ODE integrates; these are the paper's forcing/sensed inputs I_i. Read-only.
+    output_specs: observed_output_gene_field_specs -- per-cell evolving fields the ODE integrates and
+      PERSISTS as physical state; they drive downstream cell actions (division rate, secretion rates,
+      adhesion).
+    hidden_size: latent_regulator_width -- number of hidden/intermediate regulator genes (paper fig. 1b
+      blue nodes) evolved alongside the outputs; 0 allocates no latent field and gives a pure-output ODE.
+    tag: latent_field_namespace -- string prefix for the heritable latent-state field '{tag}_hidden',
+      so multiple controllers can coexist without a field-name collision.
+  state_io:
+    reads:
+    - input_specs (the sensed driver fields, held fixed during the solve)
+    - '{tag}_hidden (only when hidden_size > 0; read back to seed y0)'
+    - output_specs (read back to seed y0)
+    writes:
+    - output_specs (each output field's dt-increment)
+    - '{tag}_hidden, shape (hidden_size,) -- only when hidden_size > 0 (heritable latent state)'
+  surprises:
+  - RETURNS A DELTA, NOT THE INTEGRATED STATE. Being a DYNAMIC step, __call__ returns solution.ys[-1]
+    - y0 as a sparse delta; the Model accumulates it. A reimplementer who returns the integrated value
+    y(dt) directly (quasistatic-style) would double-apply the change.
+  - The dt-increment is the EXACT integrated change over the interval (adaptive Dopri5), not a first-order
+    rate*dt like a typical dynamic step. Because dynamic deltas are SUMMED across writers and the ODE
+    increment is nonlinear in the field, a second dynamic writer of the same output field would corrupt
+    the result -- the controller must solely own its output fields.
+  - INPUTS ARE FROZEN during the solve. vector_field closes over `inputs` packed once from the pre-step
+    state; the driver fields do not evolve inside [0, dt]. This is the ODE-scale quasistatic assumption
+    and is easy to miss.
+  - 'PAPER vs CODE contradiction on where the input enters. Paper (p. 10): dg_i/dt = phi(sum_j W_ij g_j
+    + b_i) + I_i - k_i g_i -- the sensed input I_i is ADDITIVE and OUTSIDE the sigmoid. Code''s closest
+    subclass GeneNetworkConnectionist puts the input INSIDE the sigmoid (sigma(W_gene@g + W_in@u + b)).
+    The abstract base is agnostic (vector_field is abstract), but a reimplementer matching the paper''s
+    forcing term would build a different circuit than the code ships. SOURCE WINS.'
+  - 'hidden_size = 0 allocates NO latent field: state_writes then returns only output_specs, and the hidden
+    block is a width-0 array. hidden_size < 0 raises ValueError in __init__.'
+  - 'Solver magic constants a reimplementer must match to reproduce trajectories: Dopri5, PIDController(rtol=1e-4,
+    atol=1e-6), dt0=dt (initial step = whole macro-step), SaveAt(t1=True) (only the endpoint is saved).'
+  - Scalar vs vector output packing. _width returns 1 for a scalar spec (shape ()); on unpacking, a scalar
+    output delta is squeezed to chunk[:, 0] (per-cell 1-D) while a shaped output is reshaped to (n_cells,
+    *spec.shape). Packing/unpacking is in DECLARATION ORDER of the specs -- order is load-bearing.
+  - hidden and outputs are integrated as ONE coupled system (concatenated into y); cross-regulation between
+    latent and output genes happens inside vector_field, not field-by-field.
+  - 'The `key` argument is accepted for the uniform step interface but unused (del key): the step is deterministic.
+    The ODE is integrated for ALL cell slots including dead ones; the Model''s _accumulate_dynamic alive-masks
+    dead slots to zero afterward, so the step does not mask itself.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -265,14 +406,89 @@ mechanisms:
   raw_name: StochasticStep
   raw_kind: step (SimulationStep)
   code_path: papers/jax-morph/jax_morph/core/step.py:L148
-  paper_section: null
-  summary: 'Mixin for a stochastic step: it records a trace, replays it, and scores it.'
-  params: {}
+  paper_section: p. 10 (Methods, "Gradient calculation", the REINFORCE estimator); appendix pp. 16-18
+    (REINFORCE / policy-gradient derivation); guide jax_morph/guides/extending.md heading "Stochastic
+    steps"
+  summary: An abstract mixin (subclass of SimulationStep, is_stochastic=True) that does not itself write
+    physical state but fixes the sample/replay/score contract for a stochastic step. The DERIVED forward
+    __call__ samples a *trace* -- parameter-free exogenous noise plus the realized action (e.g. the 0/1
+    divided, or a displacement dx) -- and replays it pathwise to produce the step's actual effect (a new
+    state for quasistatic/discrete, a dt-scaled sparse delta for dynamic), co-emitting the trace into
+    ephemeral trace fields of the post-step state. Separately, the model's scoring drivers read that recorded
+    trace back out and replay it with parameters live, summing each selected step's log-density (logp)
+    -- this is the differentiable REINFORCE policy the paper needs.
+  equations: "The mixin has no numeric physics update of its own; its \"update to the state\" is the composition\n\
+    it forces on every subclass.\n\nForward sampler (derived __call__, L327-339):\n    __call__(s; dt,\
+    \ key) = replay(s, sample_trace(s; dt, key); dt, pathwise=True)\n\nPer-step scoring (Model._replay_transition,\
+    \ L550-572); with the recorded post-step state s'_rec,\n    trace = trace_from_state(stop_gradient(s'_rec))\
+    \          # trace detached; only s / theta carry gradient\n    scored   step i:  L += logp(s, trace,\
+    \ dt);  s <- replay(s, trace; dt, pathwise=False)  # frozen action\n    unscored step i:  s <- replay(s,\
+    \ trace; dt, pathwise=True)                             # recompute from noise\n    pathwise = not\
+    \ scored                                    # set by the MODEL, not the step\n\nReparameterization\
+    \ lives inside replay, keyed on `pathwise` (extending.md Example B, L374-380):\n    pathwise=True\
+    \  -> dx = mean(s) + std(theta) * xi          # recomputed with live theta\n    pathwise=False ->\
+    \ dx = frozen realized value              # a discrete node ignores pathwise entirely\n\nThe score-function\
+    \ gradient this implements (paper p. 10, eq.):\n    grad_theta L(theta) ~= sum_{t=0..T-1} L_t * grad_theta\
+    \ log pi_theta(a_t | s_t)\nwhere logp = log pi_theta(a_t | s_t), L_t is the discounted future loss,\
+    \ a_t the division action.\nMDP trajectory density (appendix p. 17): P(tau) = P(s0) * prod_t pi(a_t|s_t)\
+    \ P(s_{t+1}|s_t,a_t);\nthe code factorizes exactly this, one pi_theta term per stochastic step per\
+    \ macro-step.\n"
+  params:
+    score_by_default: scoring-inclusion policy flag -- a static, keyword-only bool (default True). Whether
+      this step's logp is summed when a scoring driver is called with score=None; 'all' overrides it.
+      It is the ONLY per-instance knob the mixin adds, is NOT a physics parameter, and is NOT the reparameterizability
+      switch (that is intrinsic to the distribution and lives inside replay, selected by the model's pathwise
+      = not scored).
+  state_io:
+    reads: None declared by the mixin itself -- state_reads() defaults to () and is subclass-defined (e.g.
+      Division reads division_rate, division_axis).
+    writes: None declared by the mixin itself -- state_writes() defaults to () and is subclass-defined.
+      A stochastic output that must PERSIST across macro-steps is a state_writes field (written by replay),
+      never a trace field.
+    trace_writes: 'The mixin adds a THIRD, ephemeral I/O category (trace_writes(), default ()): the recorded
+      trace -- exogenous noise + realized action + an {action}_eligible mask -- reset to its declared
+      default at the start of every macro-step (Model._reset_traces, L467-483). Folded into state_requires()
+      (state_reads U state_writes U trace_writes, L197-203) but kept disjoint from state_writes.'
+  surprises:
+  - '__call__ is DERIVED, not implemented by the subclass (L327-339): it is exactly sample_trace then
+    replay(pathwise=True). A reimplementer who writes __call__ directly loses the guarantee that the forward
+    pass records precisely what a later replay would reconstruct.'
+  - 'replay is the SINGLE source of the effect AND must co-emit every declared trace field into the state/delta
+    it returns. Forgetting one is a SILENT failure: the forward records the reset default, trace_from_state
+    reads that default back, and logp scores garbage with no error. check_stochastic_step (L625) is the
+    only guard -- it drives the step from two different sentinel pre-fills and asserts the recorded trace
+    round-trips (a single-run/reset-to-default inspection cannot catch it).'
+  - 'Reparameterizability is NOT a constructor knob -- it is intrinsic to the distribution and encoded
+    by whether replay honours pathwise=True. The model always passes pathwise = not scored: a scored step
+    freezes its realized action (score-function/REINFORCE gradient through its own logp), an unscored
+    reparameterizable step recomputes its value from the frozen noise with live theta so the gradient
+    flows pathwise into a later scored step''s logp. A discrete node has nothing to reparameterize and
+    ignores pathwise.'
+  - 'Trace fields are EPHEMERAL and validated hard (Model._validate, L426-462): a trace field may not
+    shadow a base or state_writes field (the per-macro-step reset would wipe it), must be unique per stochastic
+    step (two steps sharing a name clobber one allocation -- namespace by the action verb), and a DYNAMIC
+    (additive) trace field must default to 0 or reset-then-accumulate records default+value instead of
+    the step''s own increment.'
+  - 'sample_trace may OMIT a derived realized value (a Brownian dx = mean + std*xi): the pathwise replay
+    recomputes and records it, so there are never "two formulas that must agree". But it must return every
+    entry replay(pathwise=True) reads (the noise + any directly sampled discrete action), and each entry
+    AS it will be recorded -- eligibility masking happens inside sample_trace, not replay.'
+  - _dist(state, dt) is the recommended SINGLE source of the distribution parameters, called by both sample_trace
+    and logp so a step cannot sample under one distribution and score under another.
+  - Scoring stop_gradient's the recorded next-state ONCE (L558) so the trace is detached and only the
+    live conditioning state and theta carry gradient; deterministic steps inside replay get a fixed _PLACEHOLDER_KEY
+    = PRNGKey(0) (L34), since replay is a re-execution with live params, not a re-draw.
+  - 'PAPER-vs-CODE gap: the paper describes ONLY the discrete-event REINFORCE / score-function estimator
+    for cell division ("stochastic operations do not have a well-defined differentiation rule", p. 9-10),
+    and treats the division plane as chosen uniformly at random (p. 2). The code GENERALIZES this into
+    a reparameterizable pathwise branch (replay(pathwise=True)) and an oriented placement -- a second,
+    lower-variance gradient path the paper never mentions. The two estimators must not be summed in one
+    run (division.py L1-8); the source is authoritative here.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -285,15 +501,85 @@ mechanisms:
   raw_name: Death
   raw_kind: step (StochasticStep)
   code_path: papers/jax-morph/jax_morph/physics/death.py:L26
-  paper_section: null
-  summary: 'Discrete stochastic removal: each alive cell dies as an independent Bernoulli event.'
+  paper_section: 'p. 2 (Forward Model): death is ABSENT from the model''s cell capabilities; see surprises'
+  summary: 'Discrete stochastic removal (apoptosis) as a scorable jump: each cell alive at the death decision
+    independently draws a Bernoulli death event with per-cell hazard probability p = 1 - exp(-death_rate*dt).
+    A cell that draws 1 has its boolean `alive` flipped to False; the step also writes a persistent per-step
+    `death` record (float 0/1) for lineage postprocessing and co-emits the ephemeral scored trace (`died`,
+    `die_eligible`). It does NOT free or recycle the vacated slot within the step -- reuse is deferred
+    to a later macro-step.'
+  equations: "Indices: i ranges over state-array slots (0..capacity-1). lambda_i = death_rate_i (per-cell\n\
+    hazard rate), dt = macro-step duration, alive_i = boolean liveness mask.\n\nPer-cell hazard over one\
+    \ macro-step (Death._dist, shared by sample and score):\n    p_i = 1 - exp(-lambda_i * dt)       \
+    \     # code: -jnp.expm1(-clip(death_rate,0,None)*dt)\n\nForward sample (sample_trace):\n    died_i\
+    \         = Bernoulli(p_i) * alive_i   # exact 0/1 forward draw, masked to live cells\n          \
+    \                                      #   identity surrogate: d died_i / d p_i = 1\n    die_eligible_i\
+    \ = alive_i                    # cells alive AT the death decision\n\nEffect (replay; hard, ignores\
+    \ `pathwise` -- a discrete node has nothing to reparameterize):\n    die_i    = (died_i > 0.5) AND\
+    \ alive_i       # re-AND with live `alive` is a guard\n    alive_i' = alive_i AND (NOT die_i)    \
+    \      # slot flipped dead; NOT freed this macro-step\n    death_i  = 1.0 if die_i else 0.0      \
+    \      # persistent per-step record, cast to float\n\nScore (logp -- score-function / REINFORCE term,\
+    \ not pathwise):\n    logp = sum_i die_eligible_i * [ died_i*log(p_i) + (1-died_i)*log(1-p_i) ]\n\n\
+    PAPER vs CODE: the paper writes NO death equation -- \"death\"/\"apoptosis\" never appear in it\n\
+    (see surprises). The above is the CODE only. It mirrors Division's hazard p = 1 - exp(-lambda*dt).\n"
   params:
-    score_by_default: null
+    score_by_default: default-scoring / gradient-term inclusion flag -- whether this stochastic step contributes
+      its `logp` (the score-function term for survival/death objectives) when a scoring driver is called
+      with score=None. Static bool, not a physical parameter. NOTE the tunable physical parameter is `death_rate`,
+      which is NOT a constructor argument but a per-cell STATE field (heritable) supplied by an initial
+      condition or an upstream controller.
+  state_io:
+    reads:
+    - death_rate
+    writes:
+    - alive
+    - death
+    trace_writes:
+    - died
+    - die_eligible
+  surprises:
+  - 'PAPER CONTRADICTION (source wins, and the most valuable item here): the paper does NOT model cell
+    death. The strings "death"/"apoptosis"/"necrosis" appear ZERO times in it; the forward model''s cell-capability
+    list (p. 2) is exactly "division, growth, mechanical stress sensing, and morphogen excretion and detection"
+    -- no death. The paper''s only cell removal is an EXTERNAL robustness ablation applied post-hoc to
+    a finished cluster ("robustness to cell removal", p. 8; Fig. caption "Loss of the final state after
+    removal, at random, of a fraction of cells", p. 21) to measure loss sensitivity -- NOT a per-cell
+    hazard dynamic inside the model. So `Death` is a reimplemented-library step with no counterpart mechanism
+    in the paper; a reader who trusts the paper would omit it entirely.'
+  - Composition ordering is load-bearing. Division MUST run before Death in the discrete phase (divide-then-die).
+    Both are DISCRETE, run in pipeline order, and are exempt from write-conflict checks. In one macro-step
+    a mother AND its newborn daughters can all die. Reversing the order, or recycling death-freed slots
+    in the same step, corrupts lineage reconstruction.
+  - Death flips `alive` to False but does NOT free/recycle the vacated slot within the step. Division's
+    slot allocator (`jnp.nonzero(~alive)`) reuses the slot only on a LATER macro-step; deferring reuse
+    is deliberate so the `death` record survives for `reconstruct_lineage`, which processes births-then-deaths
+    within each frame.
+  - Two look-alike fields. `died` is the EPHEMERAL trace (reset each macro-step, scored by logp, straight-through
+    float 0/1). `death` is a PERSISTENT state_writes float 0/1 record and is RE-DERIVED inside replay
+    by `(died > 0.5) & state.alive`, not copied from `died`. A reimplementer who persists `died` directly,
+    or drops the re-AND with `alive`, would mark an already-dead slot as newly dead.
+  - '`death` is OVERWRITTEN each macro-step (set to that step''s die mask), NOT accumulated. It is meaningful
+    only as the full (n_steps+1, capacity) trajectory fed to `reconstruct_lineage`; reading a single final
+    `death` array as a lifetime death count is wrong. It is cast to float (death_rate.dtype), not bool,
+    so it can be summed/averaged/differentiated downstream; `alive` stays boolean.'
+  - 'Eligibility mask: `die_eligible = alive` is captured at the death DECISION (after Division has already
+    run within the same discrete phase). `logp` multiplies the per-cell Bernoulli density by `die_eligible`,
+    so a cell dead-at-decision contributes 0. Re-reading a live `alive` at score time would use the wrong
+    mask (alive changes between decision and score). This is the codebase''s `{action}_eligible` trace
+    convention.'
+  - '`death_rate` is clipped to >= 0 (`jnp.clip(rate, 0, None)`) before forming p, so a negative rate
+    (e.g. an unconstrained controller output) yields p = 0 rather than a negative probability that would
+    NaN through `bernoulli_logp`. Omitting the clip silently corrupts the score.'
+  - 'Gradient-estimator discipline: the forward `died` is an EXACT Bernoulli draw (bit-identical to the
+    hard sample, temperature-free identity surrogate), but the physical effect is a hard boolean mask
+    -- so survival/death objectives must use the SCORE-FUNCTION gradient via `logp` (REINFORCE), never
+    a pathwise gradient through the alive mask. A discrete node has nothing to reparameterize; `replay`
+    ignores `pathwise`. Use exactly one estimator per run, never both.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -306,21 +592,110 @@ mechanisms:
   raw_name: FreeScreenedDiffusion
   raw_kind: step (SimulationStep)
   code_path: papers/jax-morph/jax_morph/physics/diffusion.py:L92
-  paper_section: null
-  summary: 'Quasistatic free-space field: superpose each cell''s finite-size screened-diffusion Green''s
-    function.'
+  paper_section: 'p. 15 (Materials and Methods: Diffusion; steady state dc/dt = D grad^2 c - K c + S =
+    0); main-text Fig. 1c, p. 3'
+  summary: Quasistatic step that OVERWRITES the per-cell chemical field each macro-step with the steady-state
+    screened-diffusion (modified Helmholtz) concentration. It reads every live cell's per-species secretion
+    rate and sets each cell's concentration to the superposition of all live sources' finite-size, open-boundary
+    (free-space) analytic Green's functions evaluated at that cell's center. dt and key are unused (the
+    field is an instantaneous constraint solve, not integrated); the written field is non-heritable and
+    recomputed from scratch every step.
+  equations: "Steady screened-diffusion (modified Helmholtz) PDE that BOTH the paper and the code\nsolve,\
+    \ per species k. Symbols: c_k = concentration, D_k = diffusion (`diffusion`), K_k =\ndegradation /\
+    \ uptake rate (`degradation`), S_k = per-cell secretion rate (`source_name` field):\n\n    dc_k/dt\
+    \ = D_k * grad^2 c_k - K_k * c_k + S_k = 0\n\nCODE (this class) -- analytic FREE-SPACE Green's-function\
+    \ superposition, NOT a lattice solve.\nSymbols: i = receiver cell (array slot), j = source cell; r_ij\
+    \ = ||pos_i - pos_j|| (safe_norm of\nthe state space's pairwise displacement); a_j = radius of the\
+    \ SOURCE cell j (broadcast over the\nreceiver rows i); alive_j in {0,1}; kappa_k = sqrt(K_k / D_k)\
+    \ = inverse screening length;\nr_eff = max(r_ij, a_j) = receiver distance clamped to the source surface\
+    \ (on-surface self/near\nvalue, so the i == j diagonal DOES contribute).\n\nSuperposition (per species,\
+    \ a matrix-vector over live sources):\n    c_i = sum_j  alive_j * G_dim(r_ij, a_j, kappa_k, D_k) *\
+    \ S_j        # c = (G .* alive) @ S\n    c_i = c_i * alive_i                                     \
+    \           # dead receivers zeroed\n\nDimension-selected finite-size Green's function G_dim (n_space_dim\
+    \ in {1,2,3} picks one):\n    1-D segment:  G = exp(-kappa*(r_eff - a)) / (2*D*kappa)\n    2-D disk:\
+    \     G = K0(kappa*r_eff) / (2*pi*D*a*kappa*K1(kappa*a))   # K0,K1 modified Bessel\n    3-D sphere:\
+    \   G = exp(-kappa*(r_eff - a)) / (4*pi*D*r_eff*(1 + kappa*a))\nGuards: a <- max(a, 1e-12); 1-D/2-D\
+    \ also floor kappa <- max(kappa, 1e-12); the 3-D kernel is\nleft exact (bounded at kappa=0, reducing\
+    \ to the unscreened 1/(4*pi*D*r_eff)). Species are vmapped\nso D,K may be scalars or shape (n_field_species,),\
+    \ each species with its own kappa.\n\nPAPER (Materials & Methods, p. 15) -- the SAME steady PDE but\
+    \ solved on the GRAPH LAPLACIAN of\nthe cell-center lattice, NOT via free-space Green's functions:\n\
+    \    D_k * L * c_k - K_k * c_k + S_k = 0   ->   c_k = (K_k*I - D_k*L)^{-1} * S_k\nwith L = deg(A)\
+    \ - A. Closed/reflecting system: A_ij = 1/||r_i - r_j||. Permeable variant:\nA_ij = 1 if dist(i,j)\
+    \ <= R_i + R_j else 0, plus a heuristic ghost SINK node wired to detected\nboundary cells to bleed\
+    \ chemical into the surrounding medium. The paper has no source radius a\nand no Bessel/exponential\
+    \ kernel. WHICH IS THE CODE: the free-space Green's-function form above;\nthe graph-Laplacian solve\
+    \ is the paper only. See surprises for the full divergence.\n"
   params:
-    n_field_species: null
-    n_space_dim: null
-    diffusion: null
-    degradation: null
-    source_name: null
-    field_name: null
+    n_field_species: number_of_field_species -- static channel count; the source and field arrays have
+      shape (capacity, n_field_species). Shape-determining int (eqx static), not a physical tunable.
+    n_space_dim: spatial_dimension_selector -- static int 1/2/3 that SELECTS the segment / disk / sphere
+      Green's-function kernel; must equal state.position.shape[1] or __call__ raises. Not a physical scalar;
+      it changes the functional form, not a coefficient.
+    diffusion: diffusion_coefficient (D_k) -- scalar or per-species (n_field_species,); sets the kernel
+      prefactor and the screening length kappa = sqrt(K/D). Stored as a plain eqx field, so a Python float
+      is static while a jax.Array is traced/optimizable. Defaults to 1.0.
+    degradation: degradation_rate / uptake_rate (K_k) -- first-order screened-decay (chemical consumption)
+      rate; the paper's uptake constant K. Scalar or per-species; sets kappa. Must be > 0 in 1-D/2-D (unscreened
+      low-dim field is unbounded); 3-D admits 0. Defaults to 1.0.
+    source_name: source_field_plumbing_name -- name of the per-cell secretion-rate state field READ (the
+      source term S). Data-flow wiring, not a physical value. Defaults to 'secretion_rate'.
+    field_name: output_field_plumbing_name -- name of the per-cell concentration field WRITTEN. Data-flow
+      wiring, not a physical value. Defaults to 'chemical'.
+  state_io:
+    reads:
+    - secretion_rate
+    writes:
+    - chemical
+  surprises:
+  - 'PAPER CONTRADICTION (source wins; the most valuable item here): the paper and the code solve the
+    SAME steady PDE (D grad^2 c - K c + S = 0) by fundamentally DIFFERENT methods with different boundaries.
+    The paper (p. 15) discretizes on the graph Laplacian of the cell-center lattice, L = deg(A) - A, and
+    inverts a linear system c = (K*I - D*L)^{-1} S, with EXPLICITLY MODELED boundary conditions: closed/reflecting
+    (adjacency A_ij = 1/dist(i,j)) OR permeable via a heuristic ghost SINK node connected to detected
+    boundary cells. The CODE superposes ANALYTIC free-space (open-boundary) screened-diffusion Green''s
+    functions -- no adjacency matrix, no graph Laplacian, no ghost node; open boundaries are automatic
+    and pairing with a bounded/periodic space is a modeling error the user owns (NOT enforced). A reader
+    trusting the paper would build a lattice/Laplacian solver and get different numbers, especially near
+    the cluster boundary.'
+  - The finite SOURCE RADIUS a has NO paper counterpart. The paper's concentration is an N x 1 vector
+    sampled at cell sites with no notion of source size; the code models each source as a finite sphere/disk/segment
+    of radius a = the emitting cell's radius, giving the r_eff = max(r,a) surface clamp and the 3-D (1
+    + kappa*a) correction. A reimplementer using a bare point-source e^{-kappa r}/r would drop this finite-size
+    normalization and get the wrong self/near magnitude.
+  - The kernel is DIMENSION-SPECIFIC and the choice is a STATIC constructor arg (n_space_dim), not read
+    from the state. 1-D, 2-D and 3-D use three different closed forms (2-D needs modified Bessel K0/K1);
+    n_space_dim must equal state.position.shape[1] or __call__ raises ValueError. Screening is MANDATORY
+    in 1-D/2-D (degradation > 0, enforced at construction for a static value) because the unscreened low-dimension
+    field diverges; only 3-D admits degradation = 0.
+  - Self / near field is INCLUDED, not excluded. r_eff = max(r_ij, a_j) clamps the receiver distance to
+    the source surface, so the i == j diagonal contributes the on-surface value -- a cell reads its OWN
+    secretion. This is unlike a typical neighbor sum that drops the self term; a reimplementer who masks
+    the diagonal would omit the self-field.
+  - 'Alive-masking is applied TWICE and asymmetrically: sources are masked so only live cells emit (G
+    .* alive over columns j), AND receivers are masked so dead cells hold zero field (field * alive over
+    rows i). Dropping either leaves dead slots emitting or carrying phantom concentration.'
+  - 'Three numerical GUARDS exist only to stay finite under jax_debug_nans and would be easy to omit:
+    (1) a <- max(a, 1e-12) so a dead cell''s zero radius does not make 1/r_eff or K1(0) singular (those
+    entries are zeroed by the alive mask anyway, but the floor prevents inf*0 -> NaN); (2) the 1-D and
+    2-D kernels floor kappa <- max(kappa, 1e-12) because they divide by kappa and evaluate K1(kappa*a)
+    -- a no-op for any real screened config, only guarding a transiently-traced kappa=0 during optimization;
+    (3) the 3-D kernel is deliberately NOT floored (it is exact and bounded at kappa=0).'
+  - The source radius used is the EMITTER's (a = state.radius[None, :], broadcast over receiver rows i),
+    not the receiver's -- the finite-size correction is per-source. Confusing the two axes transposes
+    the kernel.
+  - 'Field-plumbing, not physics: source_name / field_name make the step species-agnostic (default secretion_rate
+    -> chemical), and diffusion/degradation may be per-species arrays vmapped with in_axes=(0,0,1), out_axes=1.
+    The write is non-heritable and recomputed every macro-step (a quasistatic constraint), so reading
+    a stale chemical field across a step is wrong; dt and key are ignored.'
+  - 'Undeclared geometry reads: state_reads() declares ONLY source_name (secretion_rate). The step ALSO
+    reads the base fields position, radius and alive plus the space''s displacement function, none of
+    which appear in state_reads(). Wiring dataflow from state_reads() alone would miss the geometric inputs
+    the field depends on.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -432,16 +807,91 @@ mechanisms:
   raw_name: SaturatingCellGrowth
   raw_kind: step (SimulationStep)
   code_path: papers/jax-morph/jax_morph/physics/growth.py:L23
-  paper_section: null
-  summary: 'Dynamic step: grow each cell radius toward ``max_radius`` by a saturating (von Bertalanffy)
-    law.'
+  paper_section: p. 9 Methods "Cell Growth" eq. Ri(t+dt)=min(Ri(t)+dR, Rmax); restated p. 14
+  summary: Dynamic step. For each cell it grows the per-cell radius toward the module target max_radius
+    by the exact closed-form flow of a saturating (von Bertalanffy) law dr/dt = k*(1 - r/R), where the
+    rate k is read per cell from the growth_rate state field. It returns a sparse, dt-scaled delta on
+    radius only; growth is fastest at small r and relaxes to zero as r approaches max_radius.
+  equations: "Code (authoritative) -- the exact flow of the linear ODE dr/dt = k*(1 - r/R):\n  decay =\
+    \ exp(-growth_rate * dt / max_radius)\n  dr    = (max_radius - radius) * (1 - decay)\nreturned as\
+    \ state.deltas(radius=dr). Symbols: r = per-cell radius (state field radius);\nk = per-cell growth_rate\
+    \ (state field, default 0); R = max_radius (module param);\ndt = macro-step duration. As dt grows\
+    \ the increment saturates at (R - r), so r\napproaches but never overshoots R for k >= 0, and no min/clamp\
+    \ is used.\nPaper (Methods, stated twice): Ri(t+dt) = min(Ri(t) + dR, Rmax) -- a CONSTANT\nincrement\
+    \ dR per step (linear growth) with a hard min clamp at Rmax. The code does\nNOT implement that constant-rate-plus-min\
+    \ law; it implements the saturating\nexponential relaxation above. Per the loop rule the code wins;\
+    \ the disagreement is\nrecorded under surprises.\n"
   params:
-    max_radius: null
+    max_radius: asymptotic_target_size
+  state_io:
+    reads:
+    - radius
+    - growth_rate
+    writes:
+    - radius
+  surprises:
+  - 'Paper/code contradiction (the most important thing here). The paper specifies
+
+    CONSTANT-rate linear growth with a hard min clamp -- Ri(t+dt)=min(Ri+dR,Rmax),
+
+    Methods "Cell Growth" twice, plus the intro "cells grow at a fixed rate until
+
+    reaching a maximum radius". The code implements a SATURATING von Bertalanffy law
+
+    dr/dt=k(1-r/R) with NO clamp (saturation is intrinsic). Different trajectories: the
+
+    paper radius grows at constant speed then stops abruptly at Rmax; the code radius
+
+    decelerates smoothly toward R and asymptotes. A reimplementer following the paper
+
+    would produce the wrong dynamics.
+
+    '
+  - 'The growth rate is NOT a constructor parameter. growth_rate is a per-cell STATE
+
+    FIELD (module-level spec GROWTH_RATE, heritable=True, default 0.0), designed to be
+
+    rewritten each macro-step by an upstream controller (gene network / MLP) so
+
+    gradients flow through it from a morphology objective. Default 0 means no growth
+
+    unless a rate is supplied. The sole constructor param is max_radius (default 1.0; a
+
+    jax.Array makes it a traced, optimizable target).
+
+    '
+  - 'The increment is the EXACT flow of the linear law, not forward Euler. A naive Euler
+
+    reimplementation dr = k*(1 - r/R)*dt would differ numerically and can overshoot for
+
+    large dt; the closed form dr=(R-r)*(1-exp(-k*dt/R)) is unconditionally stable and
+
+    monotone for any dt and any k >= 0.
+
+    '
+  - 'dt-scaling is baked into the returned delta (the exponential already contains dt).
+
+    This is a DYNAMIC step: the model sums its delta with any other radius writers and
+
+    does NOT re-scale by dt afterward. The exact-flow property holds only while this is
+
+    the sole dynamic writer of radius; with a co-writer it degrades to a stable
+
+    operator-split contribution (still additive).
+
+    '
+  - 'GROWTH_RATE is exported from the module so a separate control step can declare the
+
+    SAME spec and remain merge-compatible; heritable=True means a daughter inherits the
+
+    mother''s growth propensity on division unless a controller overwrites it.
+
+    '
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -454,21 +904,97 @@ mechanisms:
   raw_name: ActiveBrownianDynamics2D
   raw_kind: step (StochasticStep)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L199
-  paper_section: null
-  summary: Overdamped active Brownian (self-propelled) dynamics as a reparameterized dynamic step.
+  paper_section: p. 14 (SI I, 'Mechanical Interactions'); active variant ABSENT -- see surprises
+  summary: One Euler-Maruyama macro-step of overdamped active Brownian (self-propelled) dynamics in 2-D.
+    On top of the passive Langevin drift (potential force / gamma) and translational noise, each cell
+    self-propels at its per-cell speed active_speed along a persistent heading angle active_heading, and
+    that heading rotationally diffuses. It writes a position displacement delta and a heading increment
+    delta, recording both exogenous noises so the step is pathwise-differentiable and scorable (a Gaussian
+    kernel on the displacement and on the heading increment).
+  equations: "Per alive cell i, over a macro-step dt (F_i = potential forces = -grad_i U; theta_i =\n\
+    active_heading; v0_i = active_speed; D_r = rot_diffusion):\n\n  e_i      = (cos theta_i, sin theta_i)\
+    \                      # heading unit vector (2-D)\n  drift_i  = F_i / gamma + v0_i * e_i        \
+    \                # NOTE: v0 term is NOT divided by gamma\n  mean_t_i = dt * drift_i\n  std_t    =\
+    \ sqrt(2 * kT * dt / gamma)                       # translational noise scale (shared)\n  dx_i   \
+    \  = mean_t_i + std_t * xi_t_i,   xi_t_i ~ N(0, I_2) # position displacement\n  std_r    = sqrt(2\
+    \ * D_r * dt)                              # heading noise scale (NO gamma)\n  dtheta_i = std_r *\
+    \ xi_r_i,              xi_r_i ~ N(0, 1)   # heading increment; drift is ZERO\n\nApplied as dynamic\
+    \ (additive) deltas:  position_i += dx_i ;  active_heading_i += dtheta_i.\n\nScore (logp), summed\
+    \ over alive cells, deterministic component contributes 0:\n  logp = sum_i [ log N(dx_i | mean_t_i,\
+    \ std_t^2) + log N(dtheta_i | 0, std_r^2) ]\n\nPassive limit v0 = 0 recovers BrownianDynamics (dynamics.py:L36).\
+    \ Paper's mechanics (p. 14) is a\nDIFFERENT operation entirely: deterministic gradient-descent energy\
+    \ minimization of the Morse\npotential Vij(r) = eps[(1 - exp(-alpha(r - sigma)))^2 - 1]; no noise,\
+    \ no self-propulsion."
   params:
-    potential: null
-    n_space_dim: null
-    gamma: null
-    kT: null
-    rot_diffusion: null
-    tag: null
-    score_by_default: null
+    potential: 'interaction_potential -- a Potential whose autodiff forces (-grad U) give the mechanical
+      drift term; None resolves to NoForce (a free active gas: self-propulsion + heading noise only).'
+    n_space_dim: spatial_dimension -- static int, must be 2 (heading is a scalar angle); sizes the (N,
+      2) translational trace fields and is re-checked against the live state's actual dimension at trace
+      time. Constructor raises ValueError if != 2.
+    gamma: translational_drag_coefficient -- divides the potential force in the drift AND sets the translational
+      noise scale std_t = sqrt(2 kT dt / gamma). Does NOT scale the self-propulsion term. Default 1.0.
+    kT: translational_noise_temperature -- thermal energy setting the translational Gaussian noise std_t;
+      kT = 0 makes translation deterministic (contributes 0 to logp). Default 0.1.
+    rot_diffusion: heading_rotational_diffusion_rate (D_r) -- sets the heading noise std_r = sqrt(2 D_r
+      dt) (the Vicsek 'noise'); D_r = 0 fixes the heading (contributes 0 to logp). Default 1.0.
+    tag: trace_namespace -- static string prefixing the four trace fields ({tag}_xi_t, {tag}_dx, {tag}_xi_r,
+      {tag}_dtheta) so several instances coexist in one model. Default 'active'.
+    score_by_default: score_inclusion_flag -- static bool; whether a scoring driver called with score=None
+      includes this step's logp. Constructor default here is False (the StochasticStep base default is
+      True).
+  state_io:
+    reads:
+    - position (drift is applied to it)
+    - active_speed (per-cell self-propulsion speed v0; heritable; READ-only here, set externally)
+    - active_heading (per-cell heading angle theta; heritable; read then incremented)
+    - '*potential.state_reads() (e.g. per-cell coupling fields the potential sources params from)'
+    writes:
+    - position (dynamic displacement delta dx)
+    - active_heading (dynamic heading-increment delta dtheta; persistent, heritable, shared)
+    trace_writes:
+    - '{tag}_xi_t  shape (2,)  -- exogenous translational noise (heritable=False, default 0)'
+    - '{tag}_dx    shape (2,)  -- realized displacement (default 0)'
+    - '{tag}_xi_r  scalar      -- exogenous rotational noise (default 0)'
+    - '{tag}_dtheta scalar     -- realized heading increment (default 0)'
+  surprises:
+  - 'THE ENTIRE STEP IS ABSENT FROM THE PAPER. The paper''s mechanics (SI I ''Mechanical Interactions'',
+    p. 14) is passive and even noise-free: deterministic gradient-descent energy minimization of a Morse
+    potential, described in the main text (p. 3, Fig. 1d; p. 19) as high-temperature ''Brownian motion
+    / relaxation'' for rearrangement. No self-propulsion, active heading, or rotational diffusion appears
+    anywhere in the paper. ActiveBrownianDynamics2D is a library-side active-matter generalization --
+    its docstring calls it ''the natural base for a Vicsek-type model'', and examples/04_physics_examples.ipynb
+    pairs it with a VicsekAlignment step to build a flocker. SOURCE WINS; the recorded disagreement is
+    that the paper is silent on active/self-propelled dynamics.'
+  - The self-propulsion term v0 * e is NOT divided by gamma, whereas the force term IS (F / gamma). So
+    active_speed is a genuine velocity while the force enters as force/drag. A reimplementer who divides
+    v0 by gamma (by analogy to the force) is wrong.
+  - 'The heading has ZERO drift: dtheta = std_r * xi_r only, and logp scores dtheta against mean 0 (not
+    a state-dependent, recomputed mean). Only the translational channel carries a state-conditioned mean.'
+  - 'The two channels use different noise scalings: std_t = sqrt(2 kT dt / gamma) (has gamma) but std_r
+    = sqrt(2 D_r dt) (NO gamma -- the heading has its own rate D_r). Do not reuse one for the other.'
+  - 'kT = 0 and/or rot_diffusion = 0 must not crash (kT = 0 is in fact the textbook ABP: pure self-propulsion
+    + heading noise). _gaussian_logp_or_zero substitutes std = 1 before gaussian_logp then masks that
+    component''s density to 0, avoiding 1/0 and log(0) NaNs under the always-on jax_debug_nans. A naive
+    log N(...) would NaN.'
+  - active_heading is a persistent, heritable state_write emitted as a DYNAMIC (additive) delta -- the
+    step returns the increment dtheta, not the absolute angle, so a second dynamic writer (e.g. an alignment
+    torque) accumulates into the same field. Writing the absolute angle would break both composition and
+    the dt-scaling contract.
+  - logp is a scalar SUM over alive cells (masked by state.alive), not a per-cell array; dead/padded slots
+    contribute 0, and the model's dynamic accumulator separately zeroes dead-slot deltas.
+  - In pathwise replay dx and dtheta are RECOMPUTED from the frozen noise (xi_t, xi_r) with live params;
+    the recorded {tag}_dx / {tag}_dtheta are used only for non-pathwise (scored) replay. sample_trace
+    deliberately records only the noise (not dx/dtheta) -- replay co-emits the realized increments (the
+    check_stochastic_step round-trip guards exactly this).
+  - '2-D ONLY: the heading is a scalar angle, so the constructor raises for n_space_dim != 2. A 3-D active
+    version would need a heading vector/quaternion, not this class. Minor idiom trap: this class sizes
+    noise with state.n_cells (= full padded capacity), while the sibling BrownianDynamics uses state.position.shape;
+    n_cells here is capacity, NOT the alive count.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -481,20 +1007,100 @@ mechanisms:
   raw_name: BrownianDynamics
   raw_kind: step (StochasticStep)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L36
-  paper_section: null
-  summary: Overdamped Langevin (Brownian) dynamics as a reparameterized dynamic stochastic step.
+  paper_section: 'p. 14 (Materials and Methods, ''Mechanical Interactions'': relaxation = gradient-descent
+    energy minimization of the Morse potential); high-temperature ''Brownian relaxation steps'' p. 19
+    (SI, ''Chemical Regulation of Cellular Adhesion'')'
+  summary: 'One Euler-Maruyama step of overdamped Langevin (Brownian) dynamics. It moves cell positions
+    by a dt-scaled displacement = deterministic drift down the potential''s force field plus Gaussian
+    thermal noise, and records that displacement so the same step can be replayed pathwise or scored.
+    It is a DYNAMIC step: it returns a sparse position *delta* (dt-scaled increment) that the model accumulates,
+    not an absolute position. With kT=0 the noise vanishes and it degenerates to a single gradient-descent
+    relaxation step (learning rate dt/gamma); with potential=None the drift vanishes and it is a free
+    Brownian gas (pure noise).'
+  equations: "Update (code): dx = mean + std * xi, applied as a delta to position, with\n  mean = dt *\
+    \ F(state) / gamma,  where F = potential.forces(state) = -grad U  (forces already carry the minus\
+    \ sign),\n  std  = sqrt(2 * kT * dt / gamma),\n  xi ~ N(0, I) standard normal, shape (capacity, n_space_dim).\n\
+    i.e. dx = -(grad U / gamma) * dt + sqrt(2 kT dt / gamma) * xi  (the docstring's Euler-Maruyama form).\
+    \ NOTE the split dt-scaling: drift ~ dt (linear), noise ~ sqrt(dt) (Wiener increment). Score (logp):\
+    \ sum over ALIVE cells and dims of gaussian_logp(dx; mean, std), where\n  gaussian_logp(x, mean, std)\
+    \ = -0.5*((x-mean)/std)^2 - log(std) - 0.5*log(2*pi)\n  (a fully-normalized Gaussian log-density).\
+    \ It scores the recorded realized dx, not xi.\n  If std == 0 (kT == 0, deterministic) the contribution\
+    \ is masked to 0 (degenerate delta,\n  no finite density) instead of dividing by zero.\nSymbols: U\
+    \ = interaction potential energy (Morse etc.); F = per-cell force -grad U;\n  gamma = translational\
+    \ drag; kT = thermal energy (temperature); dt = macro-step size;\n  xi = exogenous standard-normal\
+    \ noise; N = number of live cells; capacity = padded array size.\nPAPER FORM (contrast): the paper\
+    \ writes no Langevin/Euler-Maruyama equation; its relaxation is\n  deterministic 'gradient descent\
+    \ energy minimization of the Morse potential for a fixed number\n  of steps' (p. 14) = the kT=0 special\
+    \ case of the above."
   params:
-    potential: null
-    n_space_dim: null
-    gamma: null
-    kT: null
-    tag: null
-    score_by_default: null
+    potential: 'interaction_potential -- source of the mechanical drift; its forces(state) = -grad U give
+      the deterministic drift. Pass None -> NoForce (a free Brownian gas: pure noise, no drift).'
+    n_space_dim: spatial_dimension (static) -- sizes the trailing dim of the recorded xi/dx trace arrays
+      at model-build time (before any state exists); _check_dim raises at trace time if it differs from
+      the state's actual position dim.
+    gamma: translational_drag_coefficient (friction). Sets mobility 1/gamma converting force to drift
+      velocity, and appears under the noise sqrt. Plain field (float -> static, jax.Array -> traced/optimizable).
+      Default 1.0.
+    kT: thermal_energy (temperature). Controls translational noise amplitude via std = sqrt(2 kT dt /
+      gamma); kT=0 -> deterministic gradient-descent relaxation. Plain field (optimizable). Default 0.1.
+    tag: trace_namespace (static string) -- prefixes the trace fields {tag}_xi and {tag}_dx so several
+      BrownianDynamics instances coexist in one model. Default 'brownian'.
+    score_by_default: 'scoring_inclusion_flag (static) -- whether default trajectory scoring includes
+      this step''s logp. Defaults to False here (overriding the StochasticStep base default True): the
+      displacement is reparameterized, so its gradient flows pathwise through replay regardless; the score-function
+      term is off by default to avoid double-counting.'
+  state_io:
+    reads:
+    - position (POSITION) -- the drift is evaluated at current positions.
+    - potential.state_reads() -- any per-cell field the potential sources couplings from (e.g. radius
+      via sigma = r_i + r_j; a per-cell epsilon StateFieldSpec when adhesion is field-driven). Empty for
+      NoForce.
+    writes:
+    - position (POSITION) -- a DYNAMIC dt-scaled displacement delta, summed across dynamic writers by
+      the model (not an absolute position).
+    trace_writes:
+    - '{tag}_xi -- exogenous standard-normal noise, shape (n_space_dim,), heritable=False, default 0 (ephemeral,
+      reset each macro-step).'
+    - '{tag}_dx -- realized displacement dx, shape (n_space_dim,), heritable=False, default 0. logp scores
+      this field.'
+  surprises:
+  - 'PAPER vs SOURCE (the key contradiction): the paper''s Methods (p. 14) defines mechanical relaxation
+    as DETERMINISTIC ''gradient descent energy minimization of the Morse potential for a fixed number
+    of steps'' -- no thermal noise, and neither gamma nor kT is written down. Thermal ''Brownian relaxation
+    steps ... temperature is high'' appear only in the SI differential-adhesion experiment (p. 19), again
+    with no equation. The SOURCE implements a full overdamped Langevin step with explicit gamma and kT
+    and a sqrt(2 kT dt / gamma) noise term. SOURCE WINS: the code unifies both regimes under one parameterized
+    step -- kT=0 reduces exactly to one gradient-descent step (dx = -(grad U/gamma)*dt, learning rate
+    dt/gamma), kT>0 is the noisy high-temperature relaxation.'
+  - 'Split dt-scaling: drift ~ dt but noise ~ sqrt(dt) (Wiener). A reimplementer who scales the noise
+    by dt (not sqrt(dt)) gets the diffusion constant wrong. This is the Euler-Maruyama discretization,
+    not simple explicit Euler.'
+  - forces() already returns -grad U (F = -grad energy), so mean = dt * forces / gamma is the drift down
+    the potential; do NOT add another minus sign.
+  - 'Dynamic-delta contract: replay returns state.deltas(position=dx, ...) -- a sparse increment with
+    every untouched field None -- NOT a full updated state. The model sums these across dynamic writers
+    and alive-masks them once.'
+  - 'kT=0 guard: logp routes through _gaussian_logp_or_zero, which replaces std with 1.0 before gaussian_logp
+    then masks the result to 0, so a deterministic (std=0) component contributes 0 log-density and never
+    NaNs under jax_debug_nans. A naive gaussian_logp would divide by zero.'
+  - score_by_default defaults to False here, overriding the StochasticStep base default (True). Because
+    the Gaussian displacement is reparameterizable, its gradient is carried pathwise through replay; adding
+    the logp (score-function) term by default would double-count. Flipping this adds a spurious REINFORCE-style
+    term to a reparameterized draw.
+  - sample_trace returns ONLY the noise xi (shape (capacity, n_space_dim)); it does not sample dx. replay
+    derives dx = mean + std*xi and records BOTH xi and dx, so the recorded dx is by construction the value
+    replay computed (no sampler/replay disagreement). logp then scores the recorded dx, not xi.
+  - Trace fields are heritable=False and reset to 0 at the start of every macro-step (ephemeral); a daughter
+    cell created by a division step does not inherit {tag}_xi / {tag}_dx. n_space_dim is a static int
+    that sizes these arrays before any state exists; a mismatch with the state's real dim raises in _check_dim
+    at trace time, not as an obscure broadcast error.
+  - 'gamma and kT are plain ''object'' fields, not eqx static: a Python float is static, a jax.Array is
+    traced -- so both are differentiable/optimizable. Only n_space_dim and tag are eqx static.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -507,14 +1113,28 @@ mechanisms:
   raw_name: NoForce
   raw_kind: potential (Potential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L108
-  paper_section: null
-  summary: 'The trivial potential: no interactions, so every cell feels zero energy and zero force.'
+  paper_section: p. 3, Fig. 1d (the mechanical-interaction slot; the paper fills it only with Morse)
+  summary: 'The trivial (null) interaction potential: total energy is identically zero and every cell
+    feels zero force, so it leaves positions untouched. It is the neutral default the position-moving
+    steps resolve ``potential=None`` to - a free Brownian / active-Brownian gas, or a no-op mechanical
+    relaxation - and the natural base for active-matter / flocking models whose only coupling lives in
+    a separate step (e.g. a neighbour-alignment torque).'
+  equations: "Let x be the (capacity, d) position array and i index a cell. NoForce defines\n  U(x, state)\
+    \ = 0                       (total interaction energy, a scalar constant)\n  F_i = -grad_{x_i} U =\
+    \ 0  for all i    (per-cell force, shape (capacity, d))\nIn the source: ``total_energy`` returns ``jnp.asarray(0.0)``\
+    \ (a scalar, ignoring both positions and state); ``forces`` is OVERRIDDEN to return ``jnp.zeros_like(state.position)``\
+    \ directly rather than autodiffing the zero energy. Symbols: x = state.position, d = n_space_dim,\
+    \ U = total interaction energy, F_i = force on cell i. Same as the code; the paper writes no NoForce\
+    \ (its only potential is the Morse energy U(r) = eps[(1 - exp(-alpha(r - sigma)))^2 - 1], p. 3 / Methods)."
   params: {}
+  state_io:
+    reads: []
+    writes: []
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -522,19 +1142,119 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  surprises:
+  - 'NOT IN THE PAPER. The paper''s cells ALWAYS interact via a pairwise Morse potential (p. 3, Fig. 1d:
+    repulsion for excluded volume, attraction for adhesion). NoForce has no paper / biological counterpart
+    - it is a library engineering affordance (a null Potential) for active-matter base models where the
+    coupling lives elsewhere. A reimplementer mapping the paper 1:1 would never produce it.'
+  - '``forces`` is deliberately OVERRIDDEN to return zeros directly instead of inheriting the base ``forces``
+    (which autodiffs ``total_energy``). Both give zero, but the override skips building and differentiating
+    the energy graph. NB: NoForce is a direct ``Potential`` subclass (not ``PairwisePotential``), so its
+    own ``total_energy`` is a bare ``0.0`` with no pairwise sum - the class docstring''s "skipping the
+    dense O(N^2) pairwise sum" describes the general motivation, not this class''s own energy (there is
+    no sum here to skip). The real cost avoided is the grad trace.'
+  - 'NoForce is almost never constructed by name: it is what ``potential=None`` resolves to inside ``BrownianDynamics``,
+    ``ActiveBrownianDynamics2D``, ``MechanicalRelaxation``, and ``relax_equilibrium`` (each does ``potential
+    if potential is not None else NoForce()``). Miss that None-mapping and you lose the free-gas / no-op-relaxation
+    default.'
+  - It is parameterless - an ``eqx.Module`` with no fields, hence no tunable knobs. There is nothing to
+    differentiate through and nothing to optimize; it contributes no leaves to the model pytree.
+  - '``total_energy`` returns a scalar ``jnp.asarray(0.0)`` at the default dtype (float32 unless x64 is
+    enabled; the test suite enables x64), whereas ``forces`` returns ``zeros_like(state.position)`` which
+    inherits position''s exact shape and dtype. A hand-rolled version that returned a scalar or a wrong-dtype
+    array from ``forces`` would break the ``dt * forces / gamma`` drift broadcast.'
+  - 'Under ``MechanicalRelaxation`` the no-op is realized through the GENERAL FIRE path, not a special
+    case: because ``grad U = 0`` everywhere the residual is 0 <= f_tol at iteration 0, so the ``while_loop``
+    body never runs and positions pass through unchanged. ``relax_equilibrium`` also has an explicit ``if
+    potential is None`` short-circuit, but the step stores an actual ``NoForce()`` (not None) and relies
+    on the loop''s immediate convergence instead.'
 - id: pairwise_potential
   order: 13
   raw_name: PairwisePotential
   raw_kind: potential (Potential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L128
-  paper_section: null
-  summary: A pair potential defined by ``pair_energy(r, *params)`` and per-pair ``pair_params(state)``.
-  params: {}
+  paper_section: p. 9, 'Mechanical interactions', eq. V_ij(r) (also fig. 1d; SI p. 14 'Mechanical Interactions')
+  summary: 'The abstract base for every soft-matter pair interaction. Given a subclass''s elementwise
+    pair_energy(r, *params) and per-pair pair_params(state), it derives the cluster''s total interaction
+    energy (dense N x N, half-summed over live non-self pairs so each unordered pair counts once), the
+    per-cell forces (-grad of that energy w.r.t. position, by autodiff -- no jax-md), and the per-cell
+    virial pressure. It touches NO state field of its own: it is a read-only energy/force/pressure provider
+    that a moving step (relaxation / Brownian) or a stress step consumes. Couplings (epsilon, alpha, k,
+    ...) resolve from a shared scalar or a per-cell field, symmetrised per pair by mix (the arithmetic
+    mean); the contact distance uses a separate additive rule sigma = r_i + r_j so interactions stay size-consistent
+    as cells grow.'
+  equations: "Given a subclass's pair energy U(r; p_1..p_k) and pair_params(state) -> (p_1..p_k), each\
+    \ an\n(N,N) matrix broadcastable with r:\n\n  separation:    r_ij = safe_norm( displacement(pos_i,\
+    \ pos_j) )         # (N,N); 0 on the i==i diagonal\n  total energy:  E    = 0.5 * sum_i sum_{j !=\
+    \ i, alive_i & alive_j} U(r_ij; p_ij)\n                        # neighbor_sum masks self & dead pairs;\
+    \ the 0.5 dedups the symmetric double count\n  forces:        F_i  = -dE / d(pos_i)              \
+    \                    # jax.grad, inherited from Potential; NO jax-md force law\n  virial press.: p_i\
+    \  = -(1 / (2 d V_i)) * sum_{j != i, alive} r_ij * (dU/dr)(r_ij) * alive_i\n                     \
+    \   # Irving-Kirkwood one-half bond split; d = n_space_dim;\n                        # V_i = 2 r_i\
+    \ (d=1) | pi r_i^2 (d=2) | 4/3 pi r_i^3 (d=3); dead cell -> 0\n  coupling:      shared scalar c  \
+    \      -> broadcast_to (N,N)\n                 per-cell field spec f  -> mix( state.f )\n  mix (default):\
+    \ M_ij = 0.5 (v_i + v_j)                                 # arithmetic mean: no sqrt -> finite grad\
+    \ at 0/dead cells\n\nConcrete Morse (paper eq., p.9) -- the one instance the paper actually describes:\n\
+    \  U(r) = eps * [ (1 - exp(-alpha (r - sigma)))^2 - 1 ],   sigma = r_i + r_j\nIn code (Morse.pair_energy)\
+    \ this is additionally multiplied by a sigma-relative smooth cutoff\nthat the paper's V_ij does not\
+    \ mention.\n"
+  params:
+    (base class has no constructor fields): PairwisePotential is abstract -- it declares no eqx fields;
+      all tunables live on the concrete subclasses (Morse.epsilon/alpha, SoftSphere.epsilon, Harmonic.k,
+      ...). The three entries below are the mechanism's actual tunable surface.
+    pair_energy: 'extension_point (method): the elementwise interaction-energy law U(r, *params) -> (N,N);
+      abstract here (raises NotImplementedError). Sets the potential shape (repulsive core / adhesive
+      tail).'
+    pair_params: 'extension_point (method): builds the per-pair (N,N) parameter matrices from state (e.g.
+      sigma = r_i + r_j, epsilon, alpha); abstract here. Where a coupling becomes size-consistent.'
+    mix: 'pair_combination_rule: turns a per-cell coupling v (N,) into a symmetric per-pair coupling 0.5(v_i
+      + v_j); default arithmetic mean, overridable (e.g. geometric mean / Lorentz-Berthelot).'
+    coupling (epsilon/alpha/k/...): 'interaction_coupling: each subclass coupling is EITHER a shared scalar
+      (broadcast to every pair) OR a per-cell StateFieldSpec of shape () read from state and mixed per
+      pair; per-type or per-cell ARRAYS are rejected by __check_init__.'
+  state_io:
+    reads:
+    - position
+    - alive
+    - radius
+    - displacement
+    - n_space_dim
+    - <coupling field>
+    writes: []
+  surprises:
+  - 'SOURCE vs PAPER: the paper (Methods, p. 9, line 498) says ''JAX-MD was used to perform molecular
+    dynamics simulations for cell mechanics'', but the source computes forces by autodiff of the energy
+    with NO jax-md dependency (module docstring: ''forces come from autodiff of the energy, with no jax-md
+    dependency''). SOURCE WINS -- a reimplementer trusting the paper would pull in jax-md and a hand-coded
+    force law this code deliberately avoids.'
+  - 'The 0.5 in total_energy is a DOUBLE-COUNT dedup, not a bond split: neighbor_sum already sums every
+    ordered (i,j) with j!=i, and U is symmetric, so each unordered pair appears twice; the 0.5 corrects
+    it. Drop it and you double both energy AND force.'
+  - 'virial_pressure''s factor of 2 is a DIFFERENT 1/2: it is the Irving-Kirkwood one-half bond split
+    (each pair''s virial shared between its two cells), NOT the total_energy double-count dedup (there
+    neighbor_sum already gives cell i its full per-cell virial). Conflating the two halves is easy and
+    wrong.'
+  - mix is the ARITHMETIC mean 0.5(v_i+v_j), not the geometric / Lorentz-Berthelot mean standard in MD.
+    Chosen for a finite gradient everywhere (no sqrt at zero / dead cells under the always-on jax_debug_nans).
+    The additive contact rule sigma = r_i + r_j is a SEPARATE convention the subclasses apply in pair_params,
+    not routed through mix.
+  - Couplings are restricted to a shared scalar OR a per-cell scalar StateFieldSpec; per-TYPE and per-cell
+    ARRAYS are rejected at construction (__check_init__). So heterotypic adhesion (the paper's type x
+    type 'cadherin' matrix, p. 20) cannot be an arbitrary type-type interaction matrix here -- it must
+    be encoded as a per-cell scalar field, and every pair coupling is then forced to be the MEAN of two
+    per-cell values. A real expressiveness limit vs the paper's differential-adhesion story.
+  - pair_energy is evaluated on the i==i diagonal (r=0 via safe_norm) and on dead-dead padded pairs even
+    though neighbor_sum masks them out of the SUM -- and jax.grad still flows through those masked entries.
+    So every subclass MUST be value- AND gradient-safe at r=0 (LJ uses safe_divide(sigma, r); the compact
+    repulsions use a double-where). A naive 1/r would NaN under debug_nans despite the mask.
+  - forces() lives on the Potential base (line 84), so PairwisePotential inherits force = -jax.grad(total_energy).
+    Any custom energy (not just pairwise) can subclass Potential directly and get forces for free; NoForce
+    (line 108) overrides forces to zeros to skip the O(N^2) autodiff entirely.
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -547,14 +1267,96 @@ mechanisms:
   raw_name: Morse
   raw_kind: potential (PairwisePotential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L269
-  paper_section: null
-  summary: Morse pair potential with a sigma-relative smooth cutoff.
-  params: {}
+  paper_section: p. 9 (Methods, 'Mechanical interactions', eq. V_ij(r), lines 514-520); restated p. 14
+    (SI, 'Mechanical Interactions'); fig. 1d (repulsive core = volume exclusion, attractive tail = cell-cell
+    adhesion)
+  summary: An interaction ENERGY, not a state-writing step. It evaluates a Morse pair potential over every
+    live, non-self pair -- a repulsive core plus an adhesive tail with its minimum -epsilon at the contact
+    distance sigma = r_i + r_j -- and sums it into the scalar total interaction energy; the base class
+    turns that into per-cell forces (autodiff of the energy) and per-cell virial pressure. Morse itself
+    writes NOTHING to state; a wrapping step (MechanicalRelaxation, BrownianDynamics, VirialStress) consumes
+    total_energy / forces / virial_pressure and moves positions or records stress. The code multiplies
+    the well by a sigma-relative smooth cutoff on [1.5*sigma, 2.5*sigma] that the paper's written formula
+    does not have.
+  equations: "Indices: i, j range over state-array slots (0..capacity-1); r_ij = |displacement(pos_i,\
+    \ pos_j)|.\n\nPer-pair parameters (Morse.pair_params):\n    sigma_ij = radius_i + radius_j       \
+    \   # contact distance = well minimum (ADDITIVE rule)\n    eps_ij   = coupling(epsilon)          \
+    \  # scalar -> broadcast (N,N); StateFieldSpec -> mix()\n    alpha_ij = coupling(alpha)          \
+    \    # scalar -> broadcast (N,N); StateFieldSpec -> mix()\n    mix(v)_ij = 0.5*(v_i + v_j)       \
+    \      # arithmetic mean for a per-cell coupling (NOT for sigma)\n\nElementwise Morse energy with\
+    \ cutoff (Morse.pair_energy):\n    e_ij    = 1 - exp(-alpha_ij * (r_ij - sigma_ij))\n    U_ij    =\
+    \ eps_ij * (e_ij^2 - 1)         # = eps*(1 - exp(-alpha(r-sigma)))^2 - eps\n    Ucut_ij = U_ij * S(r_ij;\
+    \ r_on = 1.5*sigma_ij, r_off = 2.5*sigma_ij)   # <-- cutoff NOT in paper\n    U(sigma) = -eps (well\
+    \ minimum);  U(r -> inf) -> 0 already (e -> 1), the cutoff truncates the tail.\n\njax-md multiplicative_isotropic_cutoff\
+    \ S (helper _smooth_cutoff, C1 in value and 1st derivative):\n    S(r) = 1                       \
+    \                                         for r <= r_on\n         = (r_off^2 - r^2)^2 (r_off^2 + 2\
+    \ r^2 - 3 r_on^2) / (r_off^2 - r_on^2)^3   for r_on < r < r_off\n         = 0                    \
+    \                                            for r >= r_off\n\nReductions inherited from PairwisePotential:\n\
+    \    E(positions, state) = 0.5 * sum_i sum_{j!=i, alive} Ucut_ij      # 0.5 counts each pair once\n\
+    \    forces(state)       = -grad_positions E                          # autodiff, shape (N, dim)\n\
+    \    p_i (virial)        = -(1/(2 d V_i)) * sum_{j!=i,alive} r_ij (dU/dr)(r_ij)   # V_i = d-ball volume(radius_i)\n\
+    \nPaper form (p. 9 / p. 14), IDENTICAL to U_ij but with NO cutoff factor:\n    V_ij(r) = eps_ij [1\
+    \ - exp(-alpha_ij (r_ij - sigma_ij))]^2 - eps_ij\nThe CODE is authoritative: it adds the [1.5*sigma,\
+    \ 2.5*sigma] smooth cutoff the paper omits.\n"
+  params:
+    epsilon: well depth (energy scale) -- how deep the adhesive well / how strong the interaction; at
+      contact V = -epsilon. Shared scalar (default 3.0) or a per-cell StateFieldSpec combined per pair
+      by the arithmetic-mean mix(). This is the knob the paper's adhesion example learns (epsilon_ij set
+      by regulated cadherin concentration).
+    alpha: well steepness / inverse interaction range -- larger alpha narrows the well (steeper, shorter-range
+      interaction), smaller alpha widens the attractive tail. Shared scalar (default 2.8) or per-cell
+      StateFieldSpec, mixed by arithmetic mean.
+    r_onset_frac: interaction-range onset, as a multiple of the contact distance sigma. Below r_onset_frac*sigma
+      the energy is untouched (S=1). Default 1.5. Pure numeric field (never per-cell).
+    r_cutoff_frac: interaction-range end, as a multiple of sigma. Beyond r_cutoff_frac*sigma the energy
+      is exactly 0 (S=0). Default 2.5. Construction requires r_onset_frac < r_cutoff_frac (_check_config).
+  state_io:
+    reads: 'position (the (N,dim) positions the energy is evaluated at, passed by the wrapping step);
+      radius (sigma_ij = r_i + r_j, per pair, and the d-ball volume for virial); alive (self/dead-pair
+      mask via neighbor_sum); displacement (the space metric, i.e. free vs periodic, for pairwise separations);
+      n_space_dim (virial_pressure only, for the d-ball volume). Plus any per-cell field named by an epsilon/alpha
+      StateFieldSpec -- state_reads() returns exactly those specs (default: none, since the defaults are
+      scalars).'
+    writes: 'NONE. Morse is a Potential, not a SimulationStep: it returns an energy (scalar), a force
+      array, or a virial vector, never a state or a state delta. All persistent state changes are made
+      by the wrapping step that consumes these (relaxation/Brownian write position; VirialStress writes
+      a stress field).'
+  surprises:
+  - 'PAPER-vs-CODE gap (the point of this entry): the paper''s written Morse energy (p. 9 eq. and p. 14
+    SI, both V_ij(r) = eps[1-exp(-alpha(r-sigma))]^2 - eps) is UNTRUNCATED. The code multiplies it by
+    a jax-md-style smooth multiplicative cutoff on [1.5*sigma, 2.5*sigma]. A reimplementer following only
+    the paper''s formula gets a different force in the 1.5-2.5*sigma window and a non-compact interaction.
+    The SOURCE wins; the cutoff, its window fractions, and its C1 (not C-infinity) form are code-only
+    decisions.'
+  - The bare Morse well ALREADY decays to 0 as r -> inf (e -> 1 so U -> eps*(1-1) = 0); the "-epsilon"
+    shift sets V(inf)=0 and V(sigma)=-epsilon. So the cutoff is NOT needed to bound or zero the energy
+    -- it only truncates the residual exponential tail exactly and keeps the force continuous. Easy to
+    assume the cutoff is load-bearing when the potential is already asymptotically zero.
+  - 'TWO different pair-combining rules live in one potential: sigma uses an ADDITIVE rule (r_i + r_j),
+    while a per-cell epsilon/alpha uses the arithmetic-MEAN mix() = 0.5*(v_i+v_j). A reimplementer who
+    averages radii too (or sums the couplings) is wrong. mix is arithmetic (no sqrt) on purpose so the
+    gradient stays finite at zeros / dead cells under jax_debug_nans -- a geometric (Lorentz-Berthelot)
+    mean would NaN.'
+  - 'epsilon/alpha accept ONLY a shared scalar or a per-cell SCALAR StateFieldSpec -- __check_init__ rejects
+    any N-vector or N x N array. The paper''s differential-adhesion example (Fig. S1) needs a full per-PAIR,
+    type-dependent well-depth matrix: homotypic vs heterotypic cadherin SUM, sigmoid- scaled to [0.8,
+    3.8]. That per-pair, sum-based, type-aware rule is NOT expressible through this class''s arithmetic-mean
+    coupling API; the model must supply epsilon by another route or override mix(). I could NOT determine
+    from potentials.py alone how the pattern example wires this -- flagged as an open uncertainty.'
+  - Default magic constants epsilon=3.0, alpha=2.8, r_onset_frac=1.5, r_cutoff_frac=2.5 appear NOWHERE
+    in the paper (which gives no numeric alpha, epsilon, or cutoff). They cannot be recovered from the
+    paper and a reimplementer must copy them from the source.
+  - 'NaN guards are load-bearing under the suite''s always-on jax_debug_nans: dead-dead padded pairs have
+    sigma = 0 -> r_on = r_off = 0, so S''s denominator (r_off^2 - r_on^2)^3 is 0/0; safe_divide returns
+    0 there. safe_norm gives the r=0 self-diagonal a zero value AND zero gradient. Reimplement without
+    these and a masked pair NaNs the whole energy/force (test_morse_padded_dead_cells_do_not_nan).'
+  - The 0.5 in total_energy (0.5 * sum(neighbor_sum(U, alive))) counts each pair once; neighbor_sum already
+    masks self (i!=j) and dead pairs. Dropping the 0.5 doubles the energy and every force.
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -567,14 +1369,97 @@ mechanisms:
   raw_name: SoftSphere
   raw_kind: potential (PairwisePotential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L315
-  paper_section: null
-  summary: 'Harmonic soft-sphere repulsion: a purely repulsive, compact excluded-volume interaction.'
-  params: {}
+  paper_section: p. 9, Materials and Methods "Mechanical interactions" (also p. 14) -- but the paper defines
+    cell mechanics as the Morse potential, NOT this harmonic soft sphere; see surprises.
+  summary: 'A pairwise interaction ENERGY (not a step): purely repulsive, compact harmonic excluded volume.
+    For a pair at separation r with contact distance sigma = r_i + r_j (sum of the two cells'' radii),
+    it contributes overlap energy U(r) = (epsilon/2)(1 - r/sigma)^2 while the cells overlap (r < sigma)
+    and exactly zero at and beyond contact. It does not itself write state; a wrapping step (MechanicalRelaxation
+    / BrownianDynamics / ActiveBrownianDynamics2D / a stress step) turns its autodiff-derived forces into
+    a position update. Both energy and force vanish at r = sigma (C1), so cells feel a soft push that
+    fades smoothly as the overlap closes -- the canonical soft-disk / active-matter excluded-volume model,
+    with no adhesive tail and no cutoff to tune.'
+  params:
+    epsilon:
+      role: repulsion_strength (excluded-volume energy scale / contact stiffness). Shared scalar (Python
+        float or scalar jax.Array, default 1.0) OR a per-cell StateFieldSpec of shape () -- the per-cell
+        form lets a regulatory network set per-cell repulsion, combined per pair by the arithmetic-mean
+        mix. Per-type / per-cell raw arrays are rejected at construction; only a scalar or a per-cell
+        scalar spec is accepted.
+  equations: "CODE (this class). pair_energy(r, sigma, eps) delegates to _compact_repulsion(r, sigma,\
+    \ eps, exponent=2.0, prefactor=0.5), i.e.\n\n    U(r) = 0.5 * eps * (1 - r/sigma)^2   for r < sigma,\
+    \   U(r) = 0   for r >= sigma,\n\nwith sigma = r_i + r_j (contact distance = SUM of radii, per pair)\
+    \ and eps the repulsion strength (a shared scalar, or the arithmetic mean 0.5*(eps_i + eps_j) when\
+    \ epsilon is a per-cell field). Radial force magnitude F = -dU/dr = eps*(1 - r/sigma)/sigma > 0 inside\
+    \ contact (repulsion); at r -> sigma both U -> 0 and dU/dr -> 0 (C1; the second derivative jumps from\
+    \ eps/sigma^2 to 0). Forces are obtained by autodiff of the total energy, never hand-coded: total_energy\
+    \ = 0.5 * sum_i sum_{j != i, alive} U(r_ij)  (the leading 0.5 counts each pair once and is DISTINCT\
+    \ from the per-pair 0.5 above; self- and dead-pairs are dropped by neighbor_sum). Per-cell virial\
+    \ pressure (inherited from PairwisePotential): p_i = -(1/(2 d V_i)) * sum_j r_ij (dU/dr)(r_ij), V_i\
+    \ the d-ball volume of radius r_i (2 r, pi r^2, 4/3 pi r^3 for d = 1,2,3); the sign makes compression\
+    \ give p > 0. --- PAPER (p. 9 / p. 14). The paper's cell mechanics is NOT a harmonic soft sphere but\
+    \ the Morse potential  V_ij(r) = eps_ij[(1 - exp(-alpha_ij (r_ij - sigma_ij)))^2 - 1],  sigma_ij =\
+    \ R_i + R_j, which has BOTH a repulsive core and an attractive adhesion tail. The paper calls its\
+    \ cells \"adhesive soft spheres\" as a descriptor of that Morse model; it never writes the harmonic\
+    \ (epsilon/2)(1 - r/sigma)^2 that this SoftSphere class implements. The SOURCE (this class) wins:\
+    \ SoftSphere is a purely-repulsive library alternative the paper does not use for its results."
+  state_io:
+    reads:
+    - 'position (base POSITION): cell centres -> pairwise separations r_ij = safe_norm(pairwise_displacements(position,
+      displacement)).'
+    - 'radius (base RADIUS): sets the per-pair contact distance sigma = r_i + r_j, and the d-ball volume
+      V_i in virial_pressure.'
+    - 'alive (base ALIVE): masks self-pairs (j != i) and dead/padded cells in neighbor_sum; virial_pressure
+      also zeroes dead cells.'
+    - 'displacement (structural space metric): the pairwise displacement operator (handles any boundary/topology).'
+    - 'n_space_dim (structural): dimension d, used only by virial_pressure to pick the d-ball volume.'
+    - 'epsilon field: ONLY when epsilon is a per-cell StateFieldSpec -- then state_reads() returns that
+      one spec so build_state_from_model allocates it. With the default scalar epsilon, state_reads()
+      == () (declares nothing).'
+    writes:
+    - 'none. SoftSphere is a Potential (an energy), not a Step: it exposes total_energy / forces / virial_pressure
+      and declares no state_writes. The position (or stress) update is written by whatever step consumes
+      these forces.'
+  surprises:
+  - 'PAPER vs SOURCE (the headline): the paper''s "adhesive soft spheres" are realized by the MORSE potential
+    (repulsion + adhesion), not by this class. This SoftSphere is a purely-repulsive harmonic with NO
+    attractive tail, so it is a mechanism the paper describes in name only. A reader who assumes "SoftSphere
+    == the paper''s cell mechanics" is wrong; the paper''s force law is Morse (a sibling class in this
+    same file).'
+  - sigma = r_i + r_j is the SUM of the two radii, not their mean and not a single diameter. Contact happens
+    when centres are one full (R_i + R_j) apart. Using (R_i+R_j)/2 halves the contact distance and quadruples
+    the effective stiffness.
+  - 'The energy carries a 1/2 prefactor: U = (epsilon/2)(1 - r/sigma)^2, not epsilon(1 - r/sigma)^2. It
+    is the literal prefactor=0.5 inside _compact_repulsion. Dropping it doubles the force.'
+  - TWO independent halves. The per-pair 0.5 (harmonic prefactor) and the leading 0.5 in total_energy
+    (each undirected pair counted once over the dense N x N sum) are different factors; a reimplementer
+    who folds them into one under-counts either the energy or the stiffness.
+  - 'Gradient-safety double `where` (in the shared _compact_repulsion): base = 1 - safe_divide(r, sigma);
+    the power is evaluated on where(base>0, base, 1.0) and then masked by where(base>0, ..., 0). For SoftSphere''s
+    integer exponent 2 this looks redundant, but it is what keeps the FRACTIONAL exponents of the siblings
+    (Hertzian 5/2) NaN-free at r >= sigma under the always-on jax_debug_nans. Omit it and the sibling
+    potentials'' gradients NaN.'
+  - 'safe_divide(r, sigma) guards dead-dead PADDED pairs where both radii (hence sigma) are 0: plain r/sigma
+    would be 0/0 -> NaN, and the alive-mask in neighbor_sum removes the pair''s VALUE but not a NaN that
+    has already poisoned the sum under debug_nans. The guard must sit at the divide, not at the reduction.'
+  - 'Per-cell epsilon combines by the ARITHMETIC mean 0.5*(eps_i+eps_j) (PairwisePotential.mix), deliberately
+    NOT the geometric mean / Lorentz-Berthelot -- chosen because it has a finite gradient at zeros (no
+    sqrt). So within one pair epsilon mixes by MEAN while sigma mixes by SUM: two different combination
+    rules.'
+  - On the self-diagonal (i == j) r = 0, so base = 1 and pair_energy returns 0.5*eps (NONZERO), not 0.
+    It is neighbor_sum's j != i mask -- not the energy formula -- that removes the spurious self-energy.
+    A naive full-matrix sum without the self-mask adds a constant offset.
+  - 'No cutoff parameter and none needed: the support is exactly [0, sigma), so U and F are already compact
+    and C1 at contact. Unlike Morse / LennardJones / Harmonic there is no r_onset_frac / r_cutoff_frac;
+    porting cutoff code from a sibling would be a bug.'
+  - Forces come from jax.grad of total_energy, not a hand-written -dU/dr. The pair_energy must therefore
+    be autodiff-clean everywhere it is evaluated (including the masked diagonal and dead pairs) -- which
+    is the whole reason for safe_norm / safe_divide / the double where.
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -587,14 +1472,77 @@ mechanisms:
   raw_name: Hertzian
   raw_kind: potential (PairwisePotential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L345
-  paper_section: null
-  summary: 'Hertzian elastic-contact repulsion: purely repulsive and compact, with a soft onset.'
-  params: {}
+  paper_section: absent from paper; nearest anchor is the Morse-only mechanics, p. 9 "Mechanical interactions"
+    / eq. V_ij on p. 14 / Fig. 1d
+  summary: 'A pair-interaction ENERGY (not a state-mutating step): a purely repulsive, compact Hertzian
+    elastic-contact potential. It contributes a per-pair energy U(r) = (2/5) eps (1 - r/sigma)^(5/2) for
+    cells overlapping within the contact distance sigma = r_i + r_j, and exactly zero at/beyond contact.
+    It writes nothing itself; a wrapping dynamic step (MechanicalRelaxation / BrownianDynamics) autodiffs
+    its total energy into forces and moves the cells. Softer at contact than SoftSphere: both the force
+    AND its slope vanish at r = sigma (deformable elastic spheres).'
+  equations: "Pair energy (code, Hertzian.pair_energy -> _compact_repulsion(r, sigma, eps, 2.5, 0.4)):\n\
+    \n  U(r) = 0.4 * eps_ij * (1 - r/sigma_ij)^2.5   for r < sigma_ij,   else 0\n       = (2/5) eps_ij\
+    \ (1 - r_ij/sigma_ij)^(5/2)\n\nwith contact distance (additive rule, NOT the arithmetic mix used for\
+    \ eps):\n  sigma_ij = r_i + r_j            (sum of the two cell radii)\nand coupling:\n  eps_ij  \
+    \ = 0.5*(eps_i + eps_j)  if epsilon is a per-cell StateFieldSpec (mix = arithmetic mean),\n      \
+    \     = eps                  if epsilon is a shared scalar.\n\nRadial repulsive force magnitude (from\
+    \ f = -dU/dr, the 2/5 chosen so this has coeff 1):\n  f(r) = (eps_ij / sigma_ij) (1 - r/sigma_ij)^(3/2)\
+    \   for r < sigma, else 0.\n\nTotal energy summed once per live non-self pair (base class):\n  E =\
+    \ 0.5 * sum_{i != j, both alive} U(r_ij);   forces = -grad_positions E (autodiff);\nper-cell virial\
+    \ pressure p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr) is inherited (repulsion -> p>0).\nSymbols: r =\
+    \ |x_i - x_j| pair separation; sigma = contact distance (sum of radii); eps = contact stiffness; d\
+    \ = n_space_dim; V_i = d-ball volume of cell i.\nPAPER (code disagrees): the paper defines ONLY the\
+    \ Morse potential for mechanics,\n  V_ij(r) = eps_ij [ (1 - exp(-alpha_ij (r_ij - sigma_ij)))^2 -\
+    \ 1 ]  (adhesive soft spheres).\nHertzian is a code-only addition to the potential library; it is\
+    \ not in the paper."
+  params:
+    epsilon: contact_stiffness (repulsion strength / elastic-modulus scale); default 1.0. The ONLY constructor
+      parameter. Accepts a shared scalar OR a per-cell StateFieldSpec combined per pair by the arithmetic-mean
+      mix() (per-type / per-cell raw arrays are rejected at construction).
+    _implicit_not_a_constructor_param: interaction_length sigma = r_i + r_j is sourced from state.radius,
+      NOT a tunable field on the potential; the exponent 5/2 and prefactor 2/5 are hard-coded (no cutoff
+      parameter -- the interaction is self-truncating exactly at contact, unlike Morse/LJ/Harmonic).
+  state_io:
+    reads:
+    - POSITION (state.position -> pair separations r_ij)
+    - RADIUS (state.radius -> contact distance sigma_ij = r_i + r_j; and d-ball volume for virial)
+    - ALIVE (state.alive -> neighbor_sum masks dead cells and self-pairs)
+    - space metric (state.displacement, state.n_space_dim -- static, sets minimum-image r and virial volume)
+    - epsilon field (ONLY if epsilon is a per-cell StateFieldSpec; declared via state_reads())
+    writes:
+    - none -- a Potential mutates no state; it exposes total_energy/forces/virial that a wrapping dynamic
+      step consumes, and that step writes POSITION.
+  surprises:
+  - NOT IN THE PAPER. The paper models mechanics with a single Morse potential (adhesive soft spheres,
+    p. 9 / p. 14 / Fig. 1d). Hertzian is a code-only extension of the pair-potential library, exercised
+    only by tests (tests/physics/test_potentials.py) and the examples notebook (examples/03_potentials.ipynb);
+    no paper model, config, or oracle script instantiates it. It is PURELY REPULSIVE with NO adhesive
+    tail, so it cannot reproduce the paper cell-cell adhesion.
+  - 'Magic constant 2/5 (prefactor 0.4) is NOT arbitrary: it equals 1/exponent, which normalizes the force
+    prefactor to exactly eps/sigma (f = (eps/sigma)(1 - r/sigma)^1.5). A reimplementer who writes U =
+    eps (1 - r/sigma)^2.5 gets a force 2.5x too strong. (SoftSphere uses the same trick: 0.5 = 1/2 for
+    exponent 2.)'
+  - 'Softer-than-harmonic onset: exponent 5/2 makes energy ~overlap^2.5, so force ~overlap^1.5 and force-slope
+    ~overlap^0.5 BOTH vanish at contact (C2 energy). SoftSphere (exponent 2) has a nonzero force-slope
+    at contact (only C1). This is the whole point of Hertzian vs SoftSphere.'
+  - 'Fractional-power gradient guard (double where in _compact_repulsion): the (possibly fractional) power
+    is evaluated on a base forced strictly positive (safe = where(base>0, base, 1.0)) before the outer
+    where zeros it. A naive single where(base>0, eps*base**2.5, 0) NaNs the gradient for r >= sigma under
+    the always-on jax_debug_nans, because base**2.5 is differentiated at base<=0.'
+  - Dead/padded-pair masking is EXTERNAL, not in the energy. For a dead-dead pair sigma=0, safe_divide(r,0)=0
+    so base = 1 - 0 = 1 > 0 and _compact_repulsion returns a spurious 0.4*eps, NOT zero. That nonzero
+    per-pair energy is cancelled downstream by neighbor_sum(u, state.alive), which masks self-pairs and
+    dead cells. Reordering (masking inside the energy) or dropping the alive mask would inject phantom
+    repulsion between dead cells.
+  - Contact distance sigma uses the ADDITIVE rule r_i + r_j, a different combining rule from the epsilon
+    coupling (arithmetic-mean mix). Do not mix sigma with mean().
+  - epsilon as a StateFieldSpec is combined per PAIR by arithmetic mean (mix), chosen over a geometric
+    mean specifically because it has a finite gradient at zeros/dead cells (no sqrt).
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -607,14 +1555,73 @@ mechanisms:
   raw_name: Harmonic
   raw_kind: potential (PairwisePotential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L375
-  paper_section: null
-  summary: 'Finite-range harmonic spring: a shifted parabola with its minimum at contact.'
-  params: {}
+  paper_section: p. 9 (Methods, "Mechanical interactions", eq. Vij); p. 14 (SI, "Mechanical Interactions")
+    -- both define ONLY the Morse potential. Harmonic itself is absent from the paper (library-only pair
+    potential); see surprises.
+  summary: 'A pairwise energy over live cell pairs: a finite-range harmonic spring whose parabola is shifted
+    down so it vanishes at a sigma-relative cutoff. Minimum sits at the contact distance sigma=r_i+r_j,
+    so the interaction is repulsive when cells are compressed (r<sigma) and adhesive when stretched (sigma<r<r_c).
+    It writes no state directly: it supplies total_energy, and forces = -grad(energy) are consumed by
+    the wrapping dynamics/relaxation step, which moves positions.'
+  equations: "CODE (this class, potentials.py:412-416):\n  sigma = r_i + r_j                         \
+    \         # contact distance = sum of the two radii\n  r_c   = r_cutoff_frac * sigma             \
+    \         # cutoff distance (default 2.5 * sigma)\n  U(r)  = 0.5 * k * [ (r - sigma)^2 - (r_c - sigma)^2\
+    \ ]   for r < r_c\n  U(r)  = 0                                               for r >= r_c   (jnp.where\
+    \ hard truncation)\n  # well depth at contact:  U(sigma) = -0.5*k*(r_c - sigma)^2 = -0.5*k*sigma^2*(r_cutoff_frac-1)^2\n\
+    \  # radial force:  F(r) = -dU/dr = -k*(r - sigma)  for r < r_c, 0 beyond\n  #   -> jumps by k*(r_c\
+    \ - sigma) at r_c (energy is C0 there, force is discontinuous)\n\nReductions (inherited from PairwisePotential,\
+    \ potentials.py:228-240):\n  total_energy = 0.5 * sum over {i,j alive, i != j} U(r_ij)   # neighbor_sum\
+    \ masks self+dead pairs;\n                                                              # 0.5 counts\
+    \ each unordered pair once\n  forces       = -grad_position(total_energy)                 # jax.grad\
+    \ (autodiff, no analytic force)\n  k_ij         = 0.5 * (k_i + k_j)                            # arithmetic-mean\
+    \ mix, only when k is a\n                                                              # per-cell\
+    \ StateFieldSpec; scalar broadcasts\n\nPAPER (the only mechanical potential the paper defines, eq.\
+    \ Vij, p. 9 / p. 14) -- NOT this class:\n  V_ij(r) = eps_ij * [ (1 - exp(-alpha_ij*(r - sigma_ij)))^2\
+    \ - 1 ]\n  # Morse well; harmonic is a code-side alternative with the same sigma=r_i+r_j contact convention.\n"
+  params:
+    k: interaction_stiffness -- spring constant; sets BOTH the repulsion slope and the adhesion (well)
+      depth simultaneously (they are not independently tunable). Shared scalar (default 1.0) or a per-cell
+      StateFieldSpec combined per pair by arithmetic-mean mix.
+    r_cutoff_frac: interaction_range -- cutoff distance as a multiple of the contact distance sigma=r_i+r_j
+      (default 2.5); energy is shifted to 0 and truncated at r_c=r_cutoff_frac*sigma, force vanishes beyond.
+      Constructor requires r_cutoff_frac > 1 (clamp must sit beyond contact).
+  state_io:
+    reads:
+    - position
+    - radius
+    - alive
+    writes: []
+  surprises:
+  - NOT IN THE PAPER. The paper (Methods p. 9 and SI p. 14) defines a single mechanical potential, the
+    Morse well. Harmonic -- and SoftSphere, Hertzian, LennardJones -- are library-only pair potentials
+    added by this implementation. A reimplementer working from the paper alone would implement only Morse
+    and never encounter this class.
+  - The down-shift is the whole point, and easy to drop. A naive "harmonic spring" 0.5*k*(r-sigma)^2 has
+    its minimum value 0 at contact and grows without bound (purely repulsive, infinite range). Subtracting
+    (r_c-sigma)^2 makes the well minimum NEGATIVE (=-well depth) at contact and lets the energy hit 0
+    exactly at r_c, which is what turns it into a finite-range ADHESIVE well (attractive for sigma<r<r_c).
+    Forget the shift and you lose both adhesion and the truncation.
+  - 'C0-only cutoff: unlike Morse/LJ (C1 _smooth_cutoff) and SoftSphere/Hertzian (compact C1 tail), Harmonic
+    hard-truncates with a bare jnp.where, so the FORCE is discontinuous at r_c -- it jumps from -k*(r_c-sigma)
+    to 0. The docstring calls this harmless because r_c (2.5*sigma) sits well beyond the resting contact
+    distance; a reimplementer who "fixes" it with a smoothing changes the force law.'
+  - 'sigma-relative range. r_cutoff_frac multiplies sigma = r_i + r_j (the per-pair sum of radii), NOT
+    an absolute distance, so the interaction range scales with cell size and stays size-consistent as
+    cells grow. Two combining rules coexist in one potential: sigma uses an ADDITIVE rule (r_i+r_j), while
+    the coupling k uses an arithmetic-MEAN mix (0.5*(k_i+k_j), deliberately not the Lorentz-Berthelot
+    geometric mean -- no sqrt, so the gradient stays finite at zeros/dead cells).'
+  - Self and dead-pair terms ARE computed then masked. pair_energy at the r=0 self-diagonal returns a
+    nonzero value (0.5*k*(sigma^2-(r_c-sigma)^2)); correctness depends entirely on neighbor_sum masking
+    self-pairs and dead cells, and on the leading 0.5 in total_energy that avoids double-counting the
+    symmetric (N,N) matrix. Skip either and the energy is wrong without crashing.
+  - 'Forces are autodiff, not analytic: forces = -jax.grad(total_energy). There is no hand-written force;
+    the jnp.where truncation is differentiated directly (fine because U is a plain polynomial inside the
+    cutoff, so no double-where NaN guard is needed as in the _compact_repulsion helpers).'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -627,15 +1634,83 @@ mechanisms:
   raw_name: LennardJones
   raw_kind: potential (PairwisePotential)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L419
-  paper_section: null
-  summary: 'Lennard-Jones potential (r_min form): minimum ``-epsilon`` at contact, with a sigma-relative
-    cutoff.'
-  params: {}
+  paper_section: p. 9 'Mechanical interactions' (Morse energy Vij, eq. lines 514-520; also Methods p.
+    14 lines 758-772) - the paper's mechanics are Morse ONLY; LennardJones appears nowhere in the paper.
+  summary: 'A pair-interaction ENERGY component (not a step): given cell positions it returns a scalar
+    total interaction energy over live, non-self pairs, from which the wrapping step (MechanicalRelaxation
+    / BrownianDynamics / ActiveBrownianDynamics2D) derives per-cell forces by autodiff. The pair energy
+    is Lennard-Jones in ``r_min`` form: a hard r^-12 repulsive core plus a 2*r^-6 adhesive tail whose
+    minimum is exactly ``-epsilon`` at the contact distance ``sigma = r_i + r_j``, multiplied by a smooth
+    cutoff that truncates the tail between ``r_onset_frac*sigma`` and ``r_cutoff_frac*sigma``. It writes
+    no state itself.'
+  equations: "Pair energy (LJ, r_min form), for a pair at separation r with contact distance sigma:\n\
+    \  x       = safe_divide(sigma, r)              # = sigma/r, but 0 (not inf) at r=0\n  U_lj(r) = epsilon\
+    \ * ( x**12 - 2 * x**6 )     # minimum -epsilon exactly at r = sigma\n  U(r)    = U_lj(r) * S(r; r_on,\
+    \ r_off)        # tail truncated by the smooth cutoff\nwhere\n  sigma   = r_i + r_j              \
+    \            # contact distance = sum of the two radii (per pair)\n  r_on    = r_onset_frac  * sigma\
+    \              # default 1.5 * sigma\n  r_off   = r_cutoff_frac * sigma              # default 2.5\
+    \ * sigma\nSmooth cutoff S (jax-md multiplicative switch, C1), with r2=r^2, ron2=r_on^2, roff2=r_off^2:\n\
+    \  S(r) = 1                                              for r <= r_on\n  S(r) = (roff2-r2)^2 (roff2\
+    \ + 2 r2 - 3 ron2)/(roff2-ron2)^3   for r_on < r < r_off\n  S(r) = 0                             \
+    \                 for r >= r_off\nAggregation (inherited from PairwisePotential.total_energy):\n \
+    \ E_total = 0.5 * sum_i sum_{j alive, j != i} U(r_ij)   # each live pair counted once\n  forces  =\
+    \ -grad_positions(E_total)                    # via jax.grad; no analytic force\nPer-cell virial pressure\
+    \ (inherited, optional consumer):\n  p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij)         # V_i is\
+    \ the d-ball volume of radius r_i\nCODE vs PAPER: the paper uses the MORSE energy for all mechanics,\
+    \ never Lennard-Jones:\n  V_morse(r) = epsilon * [ (1 - exp(-alpha (r - sigma)))^2 - 1 ]   (paper\
+    \ eq., p. 9 / p. 14)\n"
+  params:
+    epsilon: well_depth / adhesion_energy_scale - sets BOTH the repulsion strength and the adhesive well
+      depth (the minimum equals -epsilon at contact). A shared scalar OR a per-cell ``StateFieldSpec``;
+      a per-cell epsilon is combined per pair by the ARITHMETIC mean ``0.5*(e_i+e_j)`` (base ``mix``),
+      not a geometric / Lorentz-Berthelot rule. Default 1.0.
+    r_onset_frac: interaction_cutoff_onset - start of the smooth truncation window as a multiple of the
+      contact distance sigma; the tail is untouched (S=1) inside this radius. Default 1.5.
+    r_cutoff_frac: interaction_range / cutoff - end of the smooth truncation window as a multiple of sigma,
+      beyond which the energy is exactly 0. Must satisfy r_onset_frac < r_cutoff_frac (checked at construction).
+      Default 2.5.
+  state_io:
+    reads:
+    - position (capacity, n_space_dim) - supplied to total_energy; also state.position for virial
+    - radius (capacity,) - forms the per-pair contact distance sigma = r_i + r_j
+    - alive (capacity,) - masks dead cells and self-pairs in neighbor_sum
+    - 'displacement (static, from the state''s space: free_space / periodic) - the pairwise metric'
+    - n_space_dim (static) - only for the inherited virial_pressure (d-ball volume)
+    - epsilon field - ONLY if epsilon is a StateFieldSpec; then declared via state_reads() so the wrapping
+      step allocates it. With the default scalar epsilon, reads nothing beyond base fields.
+    writes:
+    - 'NONE. This is an energy component, not a step: it returns a scalar energy / a force array / a per-cell
+      pressure. The consuming step writes position (relaxation, Brownian) or a pressure field (virial
+      stress); LennardJones declares no state_writes of its own.'
+  surprises:
+  - THE PAPER DOES NOT USE LENNARD-JONES. Every mechanical interaction in the paper is the MORSE potential
+    (p. 9 'Mechanical interactions'; Methods p. 14). ``LennardJones`` is a library-only alternative pair
+    potential, exercised by no paper experiment - a reimplementer targeting the paper would never instantiate
+    this class. Recorded as the source/paper divergence; source wins.
+  - It is the ``r_min`` LJ form ``eps*((sigma/r)^12 - 2 (sigma/r)^6)``, NOT the textbook ``4 eps ((sigma/r)^12
+    - (sigma/r)^6)``. Here sigma is the location of the MINIMUM (= contact distance r_i+r_j) with value
+    -epsilon, NOT the zero-crossing. Coding the standard 4-eps form puts the well at 2^(1/6) sigma with
+    the wrong depth - a silent, plausible-looking error.
+  - sigma is per-pair and size-dependent (r_i + r_j), and BOTH cutoff radii are sigma-relative, so the
+    interaction rescales as cells grow. A fixed absolute cutoff would break size-consistency.
+  - The smooth cutoff S multiplies the WHOLE energy (core included), not just the r^-6 tail. It is inert
+    on the core only because r_on = 1.5*sigma > sigma keeps S=1 for r < sigma; a reimplementer who lowers
+    r_onset_frac below 1 would start cutting into the repulsive core.
+  - 'Zero-safety: ``x = safe_divide(sigma, r)`` returns 0 (not inf) at r=0, so the self-diagonal and dead-dead
+    padded pairs give U=0 instead of NaN under the always-on jax_debug_nans. A naive sigma/r blows up.
+    _smooth_cutoff and safe_divide similarly guard the sigma=0 dead-pair case.'
+  - Aggregation carries a 0.5 factor (each pair counted once) and neighbor_sum masks self and dead pairs.
+    Dropping the 0.5 double-counts the energy and hence the forces.
+  - 'No analytic force: forces are ``-jax.grad(total_energy)`` and there is NO jax-md dependency - the
+    energy is hand-written and differentiated. The C1 cutoff keeps the force continuous but with a small
+    slope kink at the window edges.'
+  - 'Unlike Morse, LJ has NO width/steepness knob: the 12-6 exponents fix the shape. Only epsilon and
+    the two cutoff fractions are tunable, so it cannot be tuned to reproduce a given Morse alpha.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -648,18 +1723,121 @@ mechanisms:
   raw_name: MechanicalRelaxation
   raw_kind: step (SimulationStep)
   code_path: papers/jax-morph/jax_morph/physics/mechanics/relaxation.py:L221
-  paper_section: null
-  summary: 'Quasistatic step: relax positions to mechanical equilibrium under ``potential`` each step.'
+  paper_section: 'p. 14 (Materials and Methods, ''Mechanical Interactions''): "Relaxation is performed
+    by gradient descent energy minimization of the Morse potential for a fixed number of steps (except
+    in the case where we learn cell adhesion)"; framework slot Fig. 1a (''mechanical relaxation'').'
+  summary: 'Quasistatic step: relaxes cell positions to a mechanical equilibrium of an interaction potential,
+    overwriting POSITION with the force-balanced configuration x* where grad_x U(x*) = 0. The forward
+    runs FIRE (a momentum-accelerated minimizer) to a genuine force tolerance f_tol -- a real equilibrium,
+    not a fixed step count -- and the backward differentiates that EQUILIBRIUM by the implicit function
+    theorem (jax.custom_vjp), restricted to the physical (deformation) subspace, so the rigid-body gauge
+    modes carry no gradient. potential=None -> NoForce makes it a no-op.'
+  equations: "FORWARD (code) -- relax to a mechanical equilibrium x* = argmin_x U(x; state), realized\
+    \ as the\n  ROOT of grad_x U(x*, params) = 0, by FIRE (Fast Inertial Relaxation Engine; Bitzek 2006),\
+    \ NOT\n  plain gradient descent. Per iteration with force f = -grad_x U(x):\n    P     = f . v   \
+    \                                 (power; step is \"uphill\" when P <= 0)\n    v     <- 0 if uphill\
+    \ else v ;   v <- v + dt * f  (zero the velocity on an uphill step)\n    v     <- (1 - alpha) v +\
+    \ alpha (f / |f|) |v|     (mix velocity toward the force direction)\n    x     <- x + dt * v     \
+    \                         (semi-implicit Euler position update)\n    dt,alpha adapted: after n_min(=5)\
+    \ consecutive downhill steps dt <- min(dt*f_inc, dt_max) and\n      alpha <- alpha*f_alpha; on an\
+    \ uphill step dt <- dt*f_dec and alpha <- alpha_start, v <- 0.\n  STOP when |grad_x U|_inf <= f_tol\
+    \ (a genuine force balance) OR the iteration count reaches\n  max_steps. Then position <- x*. (NoForce:\
+    \ grad U = 0 at step 0, the loop body never runs.)\nBACKWARD (code) -- gradient of the EQUILIBRIUM\
+    \ by the implicit function theorem, not the solver\n  path. At x*, grad_x U(x*, p) = 0, so by IFT\
+    \  dx*/dp = -H^{-1} d(grad_x U)/dp  with the Hessian\n  H = d^2 U / dx^2. For an output cotangent\
+    \ g = dL/dx*, solve the adjoint on the PHYSICAL subspace\n      (P H P + ridge) u = P g       by conjugate\
+    \ gradient (maxiter 500),\n  where P projects OUT the rigid-body null modes -- dead-cell DOFs, d global\
+    \ translations, and\n  d(d-1)/2 global rotations of the alive cells (all exact zero modes of a distance-only\
+    \ U). Then\n      dL/dp = -u^T d(grad_x U)/dp   (the vjp of grad_x U wrt p = (potential, state), applied\
+    \ to -u)\n  yielding gradients for BOTH the potential's parameters and the incoming state (radii ->\
+    \ sigma...).\n  Symbols: U = interaction energy; x* = relaxed positions; H = Hessian at x*; P = physical-subspace\n\
+    \  projector; ridge = Tikhonov damping on residual soft modes; g/u = output/adjoint cotangents.\n\
+    PAPER FORM (contrast, p. 14): \"gradient descent energy minimization of the Morse potential for a\n\
+    \  FIXED NUMBER OF STEPS (except in the case where we learn cell adhesion)\" -- plain first-order\n\
+    \  descent, no momentum, no force-tolerance stop, and (implied) backprop through the unrolled\n  descent.\
+    \ SOURCE WINS: FIRE-to-tolerance forward + implicit-diff equilibrium backward."
   params:
-    potential: null
-    max_steps: null
-    f_tol: null
-    ridge: null
+    potential: interaction_potential -- its total_energy(x, state) defines the energy landscape U whose
+      force balance grad_x U = 0 is the equilibrium this step relaxes to. Any Potential; its float leaves
+      are traced/optimizable. Pass None -> NoForce (relaxation becomes a no-op; positions pass through).
+    max_steps: solver_iteration_cap (eqx.field static int) -- a FALLBACK bound on FIRE iterations, NOT
+      the convergence criterion (that is f_tol). Static so the jax.lax.while_loop is jittable. Reaching
+      it without hitting f_tol emits a runtime RuntimeWarning and returns the last (off-equilibrium) iterate
+      anyway. Default 500.
+    f_tol: equilibrium_tolerance (force convergence threshold) -- FIRE stops when the force inf-norm |grad_x
+      U|_inf <= f_tol, i.e. a genuine mechanical equilibrium (the residual measured at the returned configuration).
+      Plain float field. Default 1e-3.
+    ridge: 'adjoint_regularization (Tikhonov damping) -- added to the PROJECTED Hessian in the backward
+      implicit-diff solve (P H P + ridge) u = P g to condition residual near-zero soft modes. BACKWARD-ONLY:
+      it changes gradients, never the forward relaxation. Plain float field. Default 1e-6.'
+  state_io:
+    reads:
+    - position (POSITION) -- explicitly declared; supplies the FIRE initial condition x0 = state.position.
+    - potential.state_reads() -- any NON-base per-cell field the potential sources its couplings from
+      (e.g. a per-cell epsilon StateFieldSpec when adhesion is field-driven). Empty for NoForce and for
+      scalar-coupling potentials.
+    writes:
+    - 'position (POSITION) -- QUASISTATIC absolute overwrite: returns state.set(''position'', x*), the
+      relaxed equilibrium positions (a full state, NOT a dynamic delta).'
+  surprises:
+  - 'PAPER vs SOURCE (the key contradiction). The paper''s Methods (p. 14) defines mechanical relaxation
+    as "gradient descent energy minimization of the Morse potential for a FIXED NUMBER OF STEPS (except
+    in the case where we learn cell adhesion)". The SOURCE differs on THREE axes: (1) the minimizer is
+    FIRE (momentum + adaptive timestep), not plain gradient descent; (2) it runs to a force TOLERANCE
+    f_tol (a real equilibrium), with max_steps only a fallback bound, not a fixed step count; (3) the
+    gradient is the implicit-function-theorem sensitivity of the EQUILIBRIUM, not backprop through the
+    descent iterates. The paper''s own parenthetical "(except in the case where we learn cell adhesion)"
+    marks exactly the regime where fixed-step solver-path gradients break down -- which is the problem
+    the code''s implicit-diff approach solves in general. SOURCE WINS.'
+  - The gradient is NOT taken through the solver path. jax.custom_vjp replaces the forward FIRE loop's
+    autodiff with the IFT adjoint, so _fire_to_tol is forward-only and its internal ops are never differentiated.
+    A reimplementer who autodiffs through the FIRE while_loop gets path-dependent (not equilibrium) gradients
+    plus O(max_steps) memory; the whole point is that the answer depends only on the converged x*, not
+    on how FIRE got there.
+  - 'Rigid-body null modes carry ZERO gradient by design. The adjoint is solved only on the physical (deformation)
+    subspace: dead-cell DOFs, one global translation (d modes), and one global rotation (d(d-1)/2 modes)
+    are projected out of BOTH the operator and the RHS (P g). A shape objective is unaffected; a translation-/rotation-sensitive
+    objective simply gets NO gradient for that sensitivity (rather than a spurious ridge-scaled one).
+    To make absolute position/orientation optimizable you must break the symmetry physically (pin a cell,
+    add a field/substrate). A naive H u = g solve without projection is singular / ill-conditioned at
+    a free-space equilibrium.'
+  - max_steps is a FALLBACK bound, not the loop count (the opposite of the paper's fixed-step relaxation).
+    On non-convergence the step returns the last iterate anyway and warns via jax.debug.callback -- a
+    HOST-side warning that fires even from inside a jitted / vmapped / differentiated call. Under vmap
+    the guarding lax.cond runs both branches, so the callback re-checks the tolerance host-side and only
+    warns for lanes that genuinely missed f_tol.
+  - 'The FIRE integrator constants are HARDCODED in _fire_to_tol, not constructor knobs: dt_start=0.01,
+    dt_max=0.1, n_min=5, f_inc=1.1, f_dec=0.5, alpha_start=0.1, f_alpha=0.99 (the standard Bitzek-2006
+    FIRE schedule). Only max_steps / f_tol / ridge are exposed; a reimplementer expecting to tune the
+    timestep or velocity-mixing from the step API finds no such parameter.'
+  - ridge is BACKWARD-ONLY and applied on the PROJECTED subspace (+ ridge * vp), not on the full-space
+    Hessian. It perturbs gradients, never the relaxed positions. ridge=0 risks a singular adjoint on residual
+    soft modes; a large ridge biases the physical-mode sensitivities -- which is why the exact rigid modes
+    are PROJECTED out first rather than merely ridge-damped.
+  - 'The adjoint differentiates wrt the incoming STATE too, not only the potential''s parameters: params
+    = (potential, state) rides the custom_vjp as ONE differentiable pytree (its float leaves traced, its
+    bool/callable leaves -- the alive mask, callables -- getting float0), so gradients flow back to cell
+    radii (radius -> sigma) etc. State cannot be a nondiff_argnum because nondiff_argnums must be hashable
+    and a state carrying array leaves is not.'
+  - Declared state_reads OMITS radius / alive / displacement. total_energy actually consumes state.radius
+    (sigma = r_i + r_j), state.alive (pair masking), and state.displacement, but the step declares only
+    POSITION + potential.state_reads() -- those three are BASE fields assumed present, not re-declared.
+    A reimplementer building the dataflow graph off state_reads() alone would miss that radius (and liveness)
+    drive the equilibrium.
+  - 'The force is carried through the while_loop carry, not recomputed in cond: body computes f = -grad
+    U at the new position for the next iteration and cond tests that CARRIED force, so the O(N^2) energy
+    gradient is evaluated exactly once per FIRE step. Recomputing grad inside cond would double the force
+    evaluations per step.'
+  - 'The NoForce no-op is realized through the GENERAL FIRE path, not a special case in the step: grad
+    U = 0 everywhere gives residual 0 <= f_tol at iteration 0, so the while_loop body never runs and positions
+    pass through unchanged. relax_equilibrium has an explicit `if potential is None` short-circuit, but
+    the step stores an actual NoForce() (potential is not None), so that branch is never taken -- it relies
+    on immediate convergence instead.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -671,15 +1849,83 @@ mechanisms:
   order: 20
   raw_name: VirialStress
   raw_kind: step (SimulationStep)
-  code_path: papers/jax-morph/jax_morph/physics/mechanics/stress.py:L15
-  paper_section: null
-  summary: Quasistatic step writing each cell's virial pressure into a per-cell ``stress`` field.
-  params: {}
+  code_path: papers/jax-morph/jax_morph/physics/mechanics/stress.py:L15-L58
+  paper_section: p. 16, Methods "Mechanical Stress" (the sigma_i equation); used in main text "Mechanical
+    Control of Cell Proliferation" p. 7-8 (d_i = g_i(stress, chemicals) * f(r)), fig. 4, fig. S6
+  summary: A quasistatic (pure-sensing) step that computes each live cell's Irving-Kirkwood virial pressure
+    from the attached pairwise potential and writes it into the transient per-cell ``stress`` field (heritable=False),
+    recomputed from the live configuration every macro-step. It moves nothing and changes no dynamics;
+    it only exposes local mechanical load so a downstream gene-network / division-control step can sense
+    it. Delegates the actual math to ``PairwisePotential.virial_pressure(state)``.
+  equations: "CODE (VirialStress.__call__ -> PairwisePotential.virial_pressure) -- the per-cell\nIrving-Kirkwood\
+    \ virial pressure:\n\n    p_i = -(1 / (2 d V_i)) * sum_{j != i, j alive} r_ij * (dU/dr)(r_ij)\n\n\
+    r_ij = ||x_i - x_j||   (safe_norm of the space displacement; self-diagonal r=0 kept finite)\ndU/dr\
+    \                  = jax.grad of pair_energy w.r.t. separation, elementwise --\n                 \
+    \        INCLUDES the smooth-cutoff factor, not just the bare potential core\nd                  \
+    \    = state.n_space_dim (spatial dimension)\nV_i                    = the cell's OWN d-ball volume:\
+    \ 2 R_i (d=1), pi R_i^2 (d=2),\n                         4/3 pi R_i^3 (d=3)\n1/2                 \
+    \   = Irving-Kirkwood bond split (each pair's virial shared by its two cells)\nminus sign        \
+    \     = makes repulsion (dU/dr < 0, compression) read p_i > 0, tension < 0\nmasking              \
+    \  = neighbor_sum drops self-pairs and dead-cell sources; a final\n                         ``* alive``\
+    \ zeroes dead i; safe_divide makes V_i=0 give 0, not inf.\nstate.set('stress', p) writes p of shape\
+    \ (capacity,).\n\nPAPER (p. 16, \"Mechanical Stress\") -- a DIFFERENT scalar, defined only in 2D:\n\
+    \n    sigma_i = sum_j [ F_ij,x * (dx / |dx|) + F_ij,y * (dy / |dy|) ],   d = (dx, dy) = r_j - r_i\n\
+    \ni.e. each force COMPONENT times the SIGN of that displacement component (a per-component /\ntaxicab\
+    \ weighting, NOT the Euclidean radial unit vector), summed over x and y. It has NO\nvolume normalization,\
+    \ NO 1/(2 d) factor, and NO 1/2 bond split. THE SHIPPED CODE IS THE\nVIRIAL PRESSURE ABOVE, not this\
+    \ expression (see surprises: SOURCE WINS).\n"
+  params:
+    potential: interaction_potential -- the ``PairwisePotential`` whose pairwise force law (dU/dr) and
+      per-pair couplings supply the virial; the sole constructor field. It is a structural dependency
+      (the interaction model), not a numeric tunable. Its own parameters (e.g. a traced ``epsilon`` array)
+      are exactly what the written ``stress`` remains differentiable/optimizable through -- the step itself
+      carries no scalar knob.
+  state_io:
+    reads:
+    - position
+    - radius
+    - alive
+    - '<potential.state_reads(): any per-cell coupling field the potential sources params from, e.g. a
+      StateFieldSpec epsilon; empty for a plain scalar-parameter potential>'
+    writes:
+    - stress
+  surprises:
+  - 'SOURCE-vs-PAPER CONTRADICTION (the headline). The code computes the standard Irving-Kirkwood virial
+    pressure; the paper (p. 16) defines a non-standard scalar ``sigma_i = sum_j F_ij,x*sgn(dx) + F_ij,y*sgn(dy)``.
+    They differ three ways: (1) the paper uses a per-component SIGN (taxicab) weighting, the code uses
+    the true Euclidean radial projection r_ij*(dU/dr); (2) the paper has NO volume/dimension normalization,
+    the code divides by 2 d V_i; (3) the paper has no 1/2 bond split. A reimplementer following the paper
+    would get an unnormalized, differently-weighted number, off by roughly a per-cell factor of 2 d V_i.
+    Per the loop rule, SOURCE WINS: the shipped quantity is the virial pressure.'
+  - 'Minus-sign / compression convention. p_i = -(...): repulsion (dU/dr < 0) gives p_i > 0. Drop the
+    sign and compression reads negative -- which inverts the mechanosensing signal the trained gene circuit
+    relies on (in the paper stress INHIBITS division; a sign flip would flip the learned rule).'
+  - The 1/2 is a bond split, not cosmetic. Each pair's virial is shared between its two cells; omitting
+    it double-counts every cell's pressure by 2x.
+  - V_i is the cell's OWN d-ball volume from its radius R_i (dimension-branched 2r / pi r^2 / 4/3 pi r^3),
+    NOT a Voronoi area, NOT the pair contact distance sigma. Using sigma or a fixed area gives wrong per-cell
+    scaling and miscompares cells of different radius.
+  - dU/dr is the autodiff derivative of the FULL pair_energy, INCLUDING the multiplicative smooth cutoff.
+    Pairs inside the transition window carry a switch-function term; differentiating only the bare Morse/LJ
+    core is wrong. Beyond r_cutoff both energy and derivative are exactly 0, so far cells contribute 0.
+  - 'Masking and NaN guards: neighbor_sum excludes the self-pair (r=0 diagonal) and dead-cell sources;
+    a trailing ``* alive`` zeroes dead i; safe_norm/safe_divide keep value AND gradient finite at r=0
+    and at V_i=0 (dead cell, radius 0) under the always-on jax_debug_nans. A naive implementation NaNs
+    on the diagonal or on padded dead slots.'
+  - Pure sensing, quasistatic, transient. It writes only ``stress`` with heritable=False and is recomputed
+    every macro-step; it does not move cells, add force, or persist across division (a daughter starts
+    at the default, not the mother's value). No step INSIDE the library reads ``stress`` -- the consumer
+    is a control/gene-network input in the examples. A reimplementer might wrongly make it persistent/heritable
+    or expect a mechanical feedback loop.
+  - 'Not sure I could establish: whether this hardened reimplementation''s ``virial_pressure`` matches
+    the ORIGINAL jax-morph numeric stress trajectory. The FORM clearly disagrees with the paper text,
+    but I did not run the oracle to compare against a reference stress signal -- that is a validation-stage
+    check, not settled here.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -691,16 +1937,97 @@ mechanisms:
   order: 21
   raw_name: Lie-Trotter macro-step split
   raw_kind: integration contract
-  code_path: papers/jax-morph/jax_morph/core/step.py:L1
-  paper_section: guides/concepts.md, 'A simulation integrates a hybrid dynamical system'
-  summary: One macro-step = discrete o dynamic o quasistatic, each advancing the shared state over dt;
-    first-order accurate operator splitting.
-  params: {}
+  code_path: papers/jax-morph/jax_morph/core/step.py:L364
+  paper_section: guides/concepts.md, 'A simulation integrates a hybrid dynamical system' (F_dt = F_disc
+    o F_dyn o F_qs)
+  summary: Model.__call__ advances the shared state by ONE macro-step as a fixed-order Lie-Trotter operator
+    split, s_{n+1} = (Phi_discrete o Phi_dynamic o Phi_quasistatic)(s_n), then t += dt. Phase A runs every
+    quasistatic step in pipeline order (each returns a full state, later steps see earlier updates); phase
+    B evaluates every dynamic step at the SAME post-quasistatic state, sums their alive-masked, already-dt-scaled
+    sparse deltas, and applies them once; phase C runs every discrete step in pipeline order. First-order
+    (O(dt)) accurate; a whole simulation iterates this one map.
+  equations: "Macro-step operator (Model.__call__, step.py:519; phase skeleton Model._run, step.py:485):\n\
+    \  s_{n+1} = (Phi_disc o Phi_dyn o Phi_qs)(s_n),   then   t <- t + dt\n  (\"o\" is function composition:\
+    \ the RIGHTMOST map (quasistatic) is applied FIRST.)\nWhole trajectory is the n_steps-fold iterate\
+    \ of the identical map:\n  s(T) = F_dt^{n_steps}(s_0),   T = n_steps * dt.\n\nPhase A - quasistatic\
+    \ (sequential, pipeline order over i in QS):\n  s <- Phi^qs_i(s)          # each step returns a COMPLETE\
+    \ new state; later steps see earlier ones\nPhase B - dynamic (Jacobi: every dyn step read the ONE\
+    \ post-A state s*, then summed once):\n  delta_i = Phi^dyn_i(s*)   # sparse delta (state.deltas);\
+    \ untouched fields = None; dt-scaling baked in\n  total_f = sum over writers i of delta_i.f     (None\
+    \ contributions skipped)\n  total_f <- where(alive, total_f, 0)  for cell-scope fields only  (global/grid\
+    \ fields NOT masked)\n  s <- eqx.apply_updates(s*, total)             # NO extra dt multiply here\
+    \ (_accumulate_dynamic, :342)\nPhase C - discrete (sequential, pipeline order over k in DISC):\n \
+    \ s <- Phi^disc_k(s)        # each returns a COMPLETE new state; sees earlier jumps\nTime: t advances\
+    \ by dt exactly ONCE, after all three phases (out.set('t', out['t']+dt), step.py:548).\nPRNG: keys\
+    \ = jax.random.split(key, len(steps)); step i receives keys[i] (step.py:542-545).\n\nPaper form (guides/concepts.md):\
+    \ F_dt = F^disc_dt o F^dyn_dt o F^qs_dt, s_{n+1}=F_dt(s_n),\ns(T)=F_dt^{n_steps}(s_0), T=n_steps*dt\
+    \ -- identical to the code.\n"
+  params:
+    steps: 'operator_sequence: ordered tuple of SimulationStep sub-maps composed into the macro-step (Model.__init__,
+      step.py:382). List order is honored WITHIN the quasistatic and discrete phases (pipeline, each sees
+      prior updates) but is IGNORED within the dynamic phase (all dynamic steps read the same post-quasistatic
+      state).'
+    dt: 'integration_timestep: macro-step duration and the O(dt) accuracy knob; also the scale each dynamic
+      step pre-multiplies its own delta by. Call-time keyword-only argument, not a stored constructor
+      field.'
+    key: 'stochastic_seed: JAX PRNG key split once into len(steps) sub-keys, one per step by index; deterministic
+      steps are still handed a key and ignore it. Call-time keyword-only argument.'
+  state_io:
+    reads:
+    - 't: read to advance simulation time (out[''t'']).'
+    - 'alive (+ n_cells): dynamic-phase masking zeroes dead cell-scope deltas (_accumulate_dynamic, step.py:357-359).'
+    - the union of every constituent step's state_reads() via Model.state_requires() (step.py:608); the
+      split declares no physics reads of its own.
+    writes:
+    - 't: t + dt, once per macro-step, after all three phases (step.py:548).'
+    - every stochastic step's trace fields, reset to their declared defaults at macro-step start (_reset_traces,
+      step.py:467/494).
+    - the union of every constituent step's state_writes(); the split orchestrates the phase writes but
+      itself writes only t.
+  surprises:
+  - 'Fixed phase order overrides list order: the macro-step is ALWAYS quasistatic -> dynamic -> discrete
+    no matter how steps are ordered in Model(steps=...). List order only sequences steps WITHIN the quasistatic
+    and discrete phases. A reimplementer who simply runs steps in declaration order gets different dynamics.'
+  - 'Dynamic phase is JACOBI, not Gauss-Seidel: every dynamic step is evaluated at the ONE frozen post-quasistatic
+    state s* (step.py:504-508), so no dynamic writer sees another''s increment; deltas are summed. Running
+    them sequentially (each seeing the last) is a different, wrong integrator -- the docstring flags this
+    explicitly (step.py:530-531).'
+  - 'No dt-scaling in accumulation: each dynamic step returns an increment ALREADY multiplied by dt (contract,
+    step.py:76-78); _accumulate_dynamic (step.py:342) only sums and applies. Multiplying by dt again double-scales
+    every dynamic force.'
+  - 'Return-shape contract splits by type: quasistatic/discrete return a COMPLETE state; dynamic returns
+    a SPARSE delta from state.deltas(...) with every untouched field None. Summation reads fields by attribute
+    and skips None (step.py:353); a dynamic step that returns a full state breaks the sum.'
+  - 'Alive-masking is cell-scope only: summed dynamic deltas are zeroed on dead slots via state.alive
+    (step.py:357-359), but global/grid fields are NOT masked. Dead cells are not integrated; the environment
+    (grids, globals) still is.'
+  - 'Time advances exactly once, last: t <- t + dt happens after all three phases (step.py:548), not per
+    step or per phase, so simulated time is real physical time T = n_steps*dt.'
+  - 'One key split per macro-step by index: keys = jax.random.split(key, len(steps)) and step i gets keys[i]
+    (step.py:542-545). Deterministic steps receive (and ignore) a key. Replay substitutes a fixed _PLACEHOLDER_KEY
+    = PRNGKey(0) for deterministic steps (step.py:34, 563).'
+  - 'Trace fields reset FIRST, every macro-step: _reset_traces (step.py:494) wipes ephemeral stochastic
+    traces to their defaults before phase A, making each recorded trace per-macro-step; a dynamic (additive)
+    trace field must default to 0 or reset-then-accumulate would record default+value instead of the step''s
+    own increment.'
+  - 'Composition reads right-to-left: Phi_discrete o Phi_dynamic o Phi_quasistatic applies QUASISTATIC
+    first despite being written last -- easy to misread as discrete-first, which would invert the whole
+    integrator.'
+  - 'PAPER vs CODE: the paper never names ''Lie-Trotter'', operator splitting, or first-order accuracy
+    -- that formalization is the library''s (guides/concepts.md). The paper (Fig. 1a caption, p.2 line
+    100; Methods ''To create an initial state'', p.14 lines 747-748) describes an informal per-timestep
+    sequence -- ''cell division, cell growth, and mechanical relaxation'', one division per step -- with
+    division positioned differently from the code''s fixed order where division (a discrete event) runs
+    LAST. SOURCE WINS: the contract is the three-phase fixed split; the paper''s one-division-per-step
+    is a modeling choice layered on top, not the integrator.'
+  - 'Sampling and scoring share ONE skeleton: forward __call__ and score-time _replay_transition both
+    call _run (step.py:547, 570) with different per_step closures, so the composition order is identical
+    forward and in replay; a replay that reordered the phases would silently break gradient consistency.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -712,16 +2039,89 @@ mechanisms:
   order: 22
   raw_name: 'step type: quasistatic / dynamic / discrete'
   raw_kind: step taxonomy
-  code_path: papers/jax-morph/jax_morph/core/step.py:L1
-  paper_section: guides/concepts.md, 'Models are ordered step pipelines'
-  summary: A step is classified by its TIME-SCALE SEMANTICS (fast constraint / finite rate / instantaneous
-    event), orthogonal to what part of the state it touches.
-  params: {}
+  code_path: papers/jax-morph/jax_morph/core/step.py:L50-L56
+  paper_section: guides/concepts.md '## Models are ordered step pipelines' (step-type table); also core-abstractions.md
+    '### StepType'
+  summary: '`step_type` is a class-level StrEnum tag (QUASISTATIC / DYNAMIC / DISCRETE) each step declares;
+    it touches no state itself but fixes (1) which of the three macro-step phases the step runs in and
+    (2) how the Model interprets the step''s return value. Quasistatic and discrete steps return a COMPLETE
+    new state and run sequentially in pipeline order; a dynamic step returns a SPARSE, dt-scaled delta
+    (via `state.deltas`) that the Model evaluates for every dynamic writer at the SAME post-quasistatic
+    state, then sums, alive-masks, and applies once. It classifies a step by TIME-SCALE SEMANTICS (fast
+    constraint / finite rate / instantaneous event), orthogonal to which fields it touches.'
+  equations: "StepType is a StrEnum: DYNAMIC='dynamic', QUASISTATIC='quasistatic', DISCRETE='discrete'\n\
+    (step.py:L50-L56). It is declared per step as the class var `step_type` and consumed by the Model.\n\
+    \nOne macro-step is a first-order Lie-Trotter operator split of three phase maps in a FIXED order\n\
+    (concepts.md; Model.__call__ step.py:L519):\n\n    s_{n+1} = ( Phi_discrete  o  Phi_dynamic  o  Phi_quasistatic\
+    \ )( s_n ),   then  t <- t + dt\n\nPhase A  QUASISTATIC  (Model._run L497; pipeline/sequential --\
+    \ each step sees prior updates):\n    for each quasistatic step k in order:  s <- step_k(s, dt=dt,\
+    \ key=key)        # returns a FULL state\n\nPhase B  DYNAMIC  (Model._run L504, _accumulate_dynamic\
+    \ L342; all at the SAME post-qs state s*):\n    delta_k   = step_k(s*, dt=dt, key=key)   for each\
+    \ dynamic step k             # returns state.deltas(field=incr_over_dt), other fields None\n    total[f]\
+    \  = sum_k delta_k[f]                                                 # summed by field name; None\
+    \ (untouched) skipped\n    total[f] <- where(alive, total[f], 0)    for cell-scope f             \
+    \       # dead slots not integrated; global fields unmasked\n    s <- eqx.apply_updates(s*, total)\
+    \                                            # applied ONCE; None fields left exactly as-is\n\nPhase\
+    \ C  DISCRETE  (Model._run L513; pipeline/sequential -- each step sees earlier jumps):\n    for each\
+    \ discrete step k in order:  s <- step_k(s, dt=dt, key=key)           # returns a FULL state\n\ndt-scaling\
+    \ is baked INSIDE each dynamic step (its returned increment is already over dt); the\naccumulator\
+    \ does NO scaling. Return-value contract (SimulationStep.__call__ docstring L126):\nQUASISTATIC/DISCRETE\
+    \ -> new full state; DYNAMIC -> sparse per-dt delta.\n"
+  params:
+    step_type: class-level time-scale-semantics tag selecting phase AND return-value interpretation (QUASISTATIC=fast
+      constraint solved at current slow state / DYNAMIC=finite-rate increment over dt / DISCRETE=instantaneous
+      event or reset). Declared as `eqx.AbstractClassVar[StepType]` on each SimulationStep subclass --
+      a CLASS variable fixed at class-definition time, NOT a constructor argument, so it is not tunable
+      per instance and is baked into the compiled program as a constant.
+  state_io:
+    reads:
+    - alive
+    writes:
+    - t
+    note: 'The taxonomy declares NO physical fields itself; each concrete step declares its own state_reads()/state_writes().
+      What step_type fixes is the WRITE-CONFLICT policy over those declarations (Model._validate L394):
+      a quasistatic field admits exactly one writer; a dynamic field admits many additive writers; a field
+      cannot be both; discrete steps are exempt from the write-conflict check entirely.'
+  surprises:
+  - 'PAPER CONTRADICTION (source wins). The paper (Deshpande 2025, p. 14 ''FORWARD SIMULATION'') has NO
+    step-type taxonomy: it describes the simulation as "any subset or combination of the steps detailed
+    below" -- a flat, customizable sequence of full-state operations (cell growth, mechanical relaxation,
+    cell division, diffusion) applied per timestep, with "each simulation timestep [consisting] of one
+    cell division." The words quasistatic / dynamic / discrete / Lie-Trotter / hybrid / macro-step appear
+    ZERO times in the paper text. The three-phase time-scale taxonomy, the operator split, and the dt-scaled
+    sparse-delta contract are a library RE-ARCHITECTURE of the original flat pipeline. Recorded per rule
+    5: SOURCE WINS.'
+  - The DYNAMIC phase is NOT Gauss-Seidel. Every dynamic step is evaluated at the SAME post-quasistatic
+    state (it does not see other dynamic steps' updates); their sparse deltas are SUMMED and applied in
+    one op, so the dynamic phase is order-independent. Quasistatic and discrete phases ARE sequential
+    (each step sees prior updates). A reimplementer who runs dynamic steps one after another (each on
+    the last one's output) changes the dynamics.
+  - 'Return value is OVERLOADED by type behind one identical signature `__call__(state, *, dt, key) ->
+    state`. A dynamic step MUST return `state.deltas(...)` (a sparse increment over dt, every untouched
+    field None), NOT a full state; returning a full state from a dynamic step is a silent correctness
+    bug (AGENTS.md explicitly: "Do not implement a dynamic step by returning a complete updated state").
+    Quasistatic/discrete return a full state.'
+  - dt-scaling lives INSIDE each dynamic step, not in the combiner. `_accumulate_dynamic` sums the deltas
+    with NO dt multiplication ("each step baked its own dt-scaling in"). A reimplementer who expects the
+    model to multiply increments by dt will mis-scale the finite-rate terms.
+  - Write-conflict policy is per-type and ASYMMETRIC (Model._validate). A QUASISTATIC field admits EXACTLY
+    ONE writer; a DYNAMIC field admits MANY (additive) writers; a field cannot be both quasistatic- and
+    dynamic-written (ValueError). DISCRETE steps are EXEMPT from write-conflict checks entirely ("discrete
+    steps are resets") -- two discrete steps may write the same field and the later-in-pipeline one silently
+    wins, no error.
+  - 'StepType is a StrEnum, but phase dispatch and validation compare by IDENTITY (`step.step_type is
+    StepType.DYNAMIC`), not by `==`. `StepType.DYNAMIC == ''dynamic''` is True, yet assigning the raw
+    string ''dynamic'' as a step''s `step_type` passes no `is`-check: the step would silently run in NO
+    phase (never executed) rather than raise. Set the enum member, not the string.'
+  - Cell-scope dynamic totals are alive-masked (dead slots zeroed) before `apply_updates`; GLOBAL fields
+    (grids, scalars) are NOT masked. Bool/discrete base fields like `alive` are protected from accidental
+    integration only because a well-formed dynamic delta leaves them None -- the summed update touches
+    an untouched (None) field never, so a dynamic step that wrongly writes `alive` would bypass that protection.
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -733,16 +2133,95 @@ mechanisms:
   order: 23
   raw_name: declared field dataflow validation
   raw_kind: composition contract
-  code_path: papers/jax-morph/jax_morph/core/state.py:L1
+  code_path: papers/jax-morph/jax_morph/core/step.py:364
   paper_section: guides/concepts.md, 'Physics and control compose through fields'
-  summary: Steps couple ONLY through named state fields; reads/writes are declared and cross-validated
-    when the model is built, so recomposition is add/remove/reorder.
-  params: {}
+  summary: Steps couple ONLY through named state fields -- there is no other channel. Each step declares
+    the fields it reads (state_reads), writes (state_writes) and, if stochastic, its ephemeral records
+    (trace_writes) as tuples of StateFieldSpec. When a Model is constructed, Model._validate cross-checks
+    those declarations (write-conflict policy + trace uniqueness + spec consistency) and build_state_from_model
+    then SYNTHESIZES the typed state class as exactly the base fields merged with the union of every step's
+    required fields. So the contract does not transform field values; it defines and validates the schema
+    through which steps couple, which is why recomposition is add/remove/reorder rather than editing a
+    monolithic simulator.
+  equations: "This is a composition/validation contract, not a numeric update. The \"update\" is the set\
+    \ of\nbuild-time predicates and the schema synthesis.\n\nSCHEMA SYNTHESIS  (state.py: merge_specs,\
+    \ build_state_from_model)\n  specs        = merge_specs(BASE_SPECS, U_step  step.state_requires())\n\
+    \  step.state_requires() = merge_specs(state_reads(), state_writes()[, trace_writes()]).values()\n\
+    \  StateCls     = eqx.Module with one jax.Array attribute per name in specs, shape:\n            \
+    \       global scope -> spec.shape\n                   cell   scope -> (capacity, *spec.shape)\n \
+    \ merge_specs raises ValueError if two declarations SHARE a name but are not EXACTLY equal.\n\nBUILD-TIME\
+    \ WRITE-CONFLICT VALIDATION  (step.py: Model._validate, over NON-discrete steps)\n  let Q(f) = {quasistatic\
+    \ steps writing field f},  D(f) = {dynamic steps writing f}\n    require  |Q(f)| <= 1            \
+    \         (a quasistatic field admits exactly ONE writer)\n    require  a field is Q-owned XOR D-owned\
+    \  (never both quasistatic- and dynamic-written)\n    |D(f)| unrestricted -> deltas SUMMED:   total_f\
+    \ = sum_d  delta_d[f]  (alive-masked, cell scope)\n    DISCRETE steps EXEMPT from this check    (resets\
+    \ are allowed to clobber)\n\nTRACE-FIELD VALIDATION  (step.py: Model._validate, over stochastic steps)\n\
+    \    each trace name owned by exactly ONE stochastic step (no sharing)\n    trace name NOT in reserved,\
+    \  reserved = {base field names} U {every step.state_writes()}\n    dynamic trace field: spec.default\
+    \ == 0   (reset-then-accumulate records only its own increment)\n\nREADS ARE NOT VALIDATED. A field\
+    \ may be read with no writer (allocated at spec.default, held by\nthe initial condition or as a never-changing\
+    \ constant). Reads still enter state_requires(), so a\nDECLARED read guarantees the field is allocated\
+    \ -- but nothing checks that a writer exists.\n\nSymbols: f = field name; capacity = fixed cell-slot\
+    \ count (static shapes for compiled rollouts);\nBASE_SPECS = (position, radius, celltype, alive, t).\n"
+  params:
+    name: coupling-key / field identity -- the name by which steps couple; the ONLY inter-step channel.
+    shape: per-cell feature dimension (trailing array shape; () = scalar). Full cell array is (capacity,
+      *shape).
+    dtype: storage dtype (None -> JAX default float; e.g. ALIVE is bool).
+    heritable: division-inheritance policy -- True daughter copies mother's value, False daughter reset
+      to default (cell scope only).
+    default: fill / reset value -- allocates empty states, resets ephemeral trace fields each macro-step,
+      inits non-inherited daughters. Also the dynamic-trace validity check (must be 0).
+    scope: locality -- 'cell' (per-cell, leading capacity axis, alive-masked, resized on division) vs
+      'global' (time/scalar/Eulerian grid; storage only, no grid coupling provided).
+    Model(steps): pipeline order -- the ordered tuple of steps whose declarations are cross-validated
+      at construction and whose union defines the synthesized state schema.
+  state_io:
+    reads: 'Schema-level only -- consumes each step''s declared state_reads()/state_writes()/trace_writes()
+      SPEC tuples; it does not read any field VALUE. Always-in-scope base fields it merges against: position,
+      radius, celltype, alive, t.'
+    writes: Synthesizes (does not mutate) the generated BaseState subclass schema = merge_specs(BASE_SPECS,
+      union of step.state_requires()); raises ValueError on any write/spec/trace conflict at Model build
+      time. Writes no state field values.
+  surprises:
+  - 'Named "dataflow VALIDATION" but it validates WRITES only. Reads are deliberately never cross-checked
+    (Model._validate comment: "The model does not police reads"): a field read with no writer is legal,
+    and there is NO DAG / read-before-write / dependency-order check. The name over-promises what is enforced.'
+  - Validation does NOT verify that a step's __call__ body touches only its declared fields. The declaration
+    is an unenforced PROMISE. A step that reads state.foo without declaring foo either AttributeErrors
+    at run time (if no step allocated foo) or silently works (if another step happened to allocate it)
+    -- never a build-time error. Correctness of the wiring rests on steps declaring honestly.
+  - 'DISCRETE steps are entirely EXEMPT from the write-conflict policy ("discrete steps are resets"):
+    two discrete steps may both write `alive` and clobber, and a discrete write never reserves a field
+    against quasistatic/dynamic writers. BUT discrete writes DO reserve their names against trace fields
+    (reserved is built from every step''s state_writes(), discrete included).'
+  - 'The quasistatic/dynamic writer rule is per-field and decided by StepType: >1 DYNAMIC writer of a
+    field is allowed and the deltas are ADDED (alive-masked); a QUASISTATIC field admits exactly one writer;
+    a field cannot be both. A reimplementer treating "one writer per field" as universal would wrongly
+    reject multi-writer dynamic accumulation.'
+  - merge_specs dedups only EXACTLY-equal specs. Customizing a base spec inline in one step (POSITION(heritable=False))
+    while another step uses the plain POSITION is a build-time ValueError -- a shared field must be declared
+    IDENTICALLY by every step that names it.
+  - Reads are intentionally NOT reserved against trace-field names, so the Emit->React pattern (a downstream
+    step reads an upstream step's within-macro-step trace as a state_read equal to a trace_write) stays
+    legal. Reserving reads would forbid that intended consumption path.
+  - 'The contract is split across two files: the declaration vocabulary and merge (StateFieldSpec, merge_specs,
+    build_state_from_model) live in core/state.py; the build-time cross-validation (Model._validate, reached
+    from Model.__init__) lives in core/step.py. It is not in one place.'
+  - 'PAPER vs SOURCE. Source (this hardened library): steps declare reads/writes and Model build-time
+    validates + synthesizes the state type. Paper (Deshpande 2025, p.14, "I. Forward Simulation"): a single
+    CellState datatype holds "the position of particles, their radii, division propensities, chemical
+    concentrations ... and any additional state information," and the simulation "can be customized to
+    contain any subset or combination of the steps" -- composition purely by CONVENTION, with NO declared
+    reads/writes and NO build-time validation (a paper grep for valid/conflict/schema/declare/contract
+    finds only "validation LOSS"). A reader of the paper alone would model steps as freely mutating a
+    shared struct; the declared-field dataflow contract is an invention of the library re-engineering,
+    not described in the paper.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -754,17 +2233,159 @@ mechanisms:
   order: 24
   raw_name: stochastic trace / replay / score
   raw_kind: stochasticity contract
-  code_path: papers/jax-morph/jax_morph/core/logp.py:L1
-  paper_section: guides/concepts.md, 'Differentiability -- score-based'
-  summary: A stochastic step samples parameter-free noise, records an ephemeral trace, replays the trace
-    to produce the effect, and scores the same trace in logp -- which is what makes a discrete event (division,
-    death) differentiable.
-  params: {}
+  code_path: papers/jax-morph/jax_morph/core/step.py:148
+  paper_section: 'guides/concepts.md "## Differentiability -> ### Score-based" (contract);
+
+    paper SI "THE REINFORCE OPTIMIZATION ALGORITHM" p. 16-18, trajectory prob. P(tau)'
+  summary: A StochasticStep is a simulation step that samples parameter-free exogenous noise (plus any
+    directly-drawn discrete action), records it into declared EPHEMERAL trace fields that its replay co-emits
+    into the post-step state, and owns a single `replay` that turns a trace into the step's effect. Forward,
+    `__call__` draws a trace and replays it pathwise; the top-level scoring drivers (`trajectory_logp`,
+    `transition_logp`) read the recorded trace back out of a later state and either replay it FROZEN while
+    adding its `logp` (scored) or replay it PATHWISE (unscored). This one sample/record/replay/score contract
+    is what lets a discrete event (division, death, type-flip) contribute a score-function (REINFORCE)
+    gradient and a reparameterized event (a Brownian displacement) contribute either a pathwise or a score
+    gradient -- from a single forward sample.
+  equations: "Symbols: dt macro-step duration; key PRNG key; xi standard-normal exogenous noise;\nlambda\
+    \ = division_rate (per-cell hazard); p Bernoulli success prob; mean/std drift and\nnoise scale of\
+    \ a reparameterized kernel; theta live parameters; pi policy; s_t / a_t state\nand action; \"scored\"\
+    \ a static frozenset of selected step indices.\n\nForward sampler (StochasticStep.__call__, step.py:327):\n\
+    \    trace  = sample_trace(state, dt=dt, key=key)\n    state' = replay(state, trace, dt=dt, pathwise=True)\n\
+    \nScoring one transition (Model._replay_transition, step.py:550), per stochastic step i,\nrecorded\
+    \ next-state trace detached via stop_gradient, live pre-step `state` NOT detached:\n    if i in scored:\
+    \  total += logp(state, trace, dt);  out = replay(state, trace, pathwise=False)\n    else:       \
+    \                                        out = replay(state, trace, pathwise=True)\nThe model ALWAYS\
+    \ passes  pathwise = (not scored).\ntrajectory_logp returns the vector of per-macro-step sums (shape\
+    \ (T,)); transition_logp a scalar.\n\nReparameterized replay (BrownianDynamics, dynamics.py:170):\n\
+    \    dx = mean(state) + std(theta) * xi         # recompute from frozen xi w/ live params if pathwise\n\
+    \    dx = trace[dx]                             # frozen realized displacement if not pathwise\n \
+    \   logp = sum_alive  gaussian_logp(dx | mean, std)      # N(dx | mean, std^2)\n\nDiscrete replay\
+    \ (Division, division.py:148) IGNORES `pathwise` (nothing to reparameterize):\n    p = 1 - exp(-clip(division_rate,\
+    \ 0) * dt)            # _dist(), single sample+score source\n    divided ~ Bernoulli(p), straight-through\
+    \ (hard 0/1 forward, identity surrogate gradient)\n    logp = sum_i  bernoulli_logp(divided_i, p_i)\
+    \ * divide_eligible_i   # eligible = alive at decision\n\nPaper (SI p. 16-18):  P(tau) = P(s0) * prod_t\
+    \ pi(a_t|s_t) P(s_{t+1}|s_t,a_t);\n    grad_theta log P(tau)  simplified to  grad_theta log pi_theta(a|s)\
+    \   (policy term only).\n"
+  params:
+    score_by_default:
+      role: 'default-scoring inclusion flag. The ONE per-instance constructor knob of the base
+
+        contract (eqx.field static, kw-only, default True): whether a scoring driver called with
+
+        no explicit `score=` selection includes THIS step''s logp in the default REINFORCE term.
+
+        Not physical -- it selects which stochastic steps score, not what any of them compute.'
+    _non_params:
+      role: 'NOTE, not a constructor parameter. All PHYSICAL knobs live in the subclasses, not this
+
+        base contract: e.g. division_rate/orientation_snr (Division), gamma/kT/rot_diffusion
+
+        (Brownian). And `pathwise` is a per-call replay argument the model sets to (not scored),
+
+        NOT a step knob -- listed because reimplementers routinely mistake it for one.'
+  state_io:
+    reads:
+    - 'subclass-declared via state_reads(): the fields conditioning the distribution _dist().
+
+      Examples: division_rate + division_axis (Division); position + the potential''s fields
+
+      + active_speed/active_heading (Brownian). The base class reads nothing itself.'
+    writes:
+    - 'PERSISTENT physical outputs via state_writes() (ordinary single/dynamic-writer fields).
+
+      Examples: position, radius, celltype, alive, born, mother, division_overflow (Division);
+
+      position + active_heading (Brownian).'
+    - 'EPHEMERAL trace via trace_writes(): exogenous noise + realized action, RESET to the
+
+      field default at each macro-step start (Model._reset_traces) so a trace is per-step.
+
+      Examples: divided, divide_eligible, division_dir (Division); brownian_xi, brownian_dx
+
+      (Brownian). Disjoint from state_writes -- a stochastic output that must persist is a
+
+      state_writes field written by replay, never a trace field (the reset would wipe it).'
+  surprises:
+  - 'The pathwise/scored inversion is the core gotcha: an UNSCORED reparameterizable step is
+
+    replayed pathwise=True (recomputes dx from frozen noise with live params, so it still
+
+    carries a pathwise gradient), while a SCORED step is replayed pathwise=False (frozen
+
+    action) and instead adds its logp. `pathwise = not scored` -- getting it backwards
+
+    silently double-counts or drops the gradient. A DISCRETE step ignores pathwise entirely.'
+  - 'replay MUST co-emit EVERY declared trace field into the state/delta it returns, or the
+
+    forward records the reset default, trace_from_state reads that default back, and logp
+
+    scores garbage with NO error. `check_stochastic_step` (step.py:625) exists solely to
+
+    catch this via a two-sentinel round-trip; a reimplementer who omits it has no guard.'
+  - 'Trace fields are reset to their default every macro-step; a DYNAMIC (additive) trace
+
+    field must default to 0 (additive identity) or reset-then-accumulate records default+value
+
+    instead of the step''s own increment. Model._validate enforces this and also forbids a
+
+    trace field colliding with a base/physical field (the reset would wipe it) or being
+
+    declared by two stochastic steps (they would share one allocation and clobber).'
+  - 'logp is masked by a recorded eligibility trace field (divide_eligible = alive AT the
+
+    decision), NOT by re-reading state.alive at score time -- cells may have divided or died
+
+    between sampling and scoring. Convention: name it `{action}_eligible`.'
+  - 'The discrete action `divided` is a soft straight-through 0/1 (sample_bernoulli_st returns
+
+    the hard Bernoulli draw with an identity surrogate gradient); the HARD `> 0.5` decision
+
+    drives slot allocation, but `committed_soft` carries the forward straight-through gradient
+
+    into position/radius. Use either this ST pathwise surrogate OR the logp score term per
+
+    run, never both (AGENTS.md gradient-estimator rule).'
+  - '_dist() is the deliberate single source of the distribution''s parameters, called by BOTH
+
+    sample_trace and logp so a step cannot sample under one distribution and score under
+
+    another. A reimplementer who inlines the parameters twice can silently desync them.'
+  - 'In trajectory_logp the recorded history/trace is stop_gradient-ed (only the recomputed
+
+    distribution carries gradient) but the reconstructed state CARRY is deliberately NOT
+
+    detached, so it crosses numerical macro-step boundaries live -- this is how the
+
+    environment''s theta-dependence (secretion/diffusion feeding future division propensities)
+
+    propagates while the discrete action gets only its score term.'
+  - 'SOURCE vs PAPER: the SI derives grad_theta log P(tau) and simplifies it to the policy
+
+    term grad_theta log pi_theta(a|s) alone, dropping the transition kernel P(s_{t+1}|s_t,a_t)
+
+    as theta-independent (textbook MDP REINFORCE). The CODE does NOT drop it: trajectory_logp
+
+    carries a LIVE (non-detached) state so the environment''s theta-dependence flows PATHWISE,
+
+    and it also scores reparameterized continuous transitions (Brownian) with a Gaussian logp.
+
+    The paper''s own SI (p. 16, "the gradient ... must be propagated through the environment
+
+    updates till the very beginning") acknowledges this, so the clean policy-only equation
+
+    understates what the code differentiates -- the score term and a pathwise environment term
+
+    are summed, not the pure score of the derivation.'
+  - 'score= selection rejects a boolean mask rather than reinterpreting it (bool subclasses
+
+    int, so a mask would silently read as the index set {0,1}); _is_bool_like also catches
+
+    numpy/jax bools. Selecting a non-stochastic step index is an error.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:

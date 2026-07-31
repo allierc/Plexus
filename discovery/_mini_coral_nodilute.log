@@ -1,0 +1,11 @@
+[mini_coral_nodilute] comp=MINI_coral_nodilute region='minisite coral, conserve_amount OFF' frames=500 dt=1.0 device=cuda:0
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === mini_coral_nodilute ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=500
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
+[mini_coral_nodilute] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[mini_coral_nodilute] {"saturated": false, "inert_operators": [], "retention": 1.0, "valid_evidence": true, "protr_final": 1.131, "protr_peak": 1.131, "horizon_frame": 500, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.131, "protr_final_untruncated": 1.131, "n_cells_final": 6114, "red_frac_final": 0.318, "act_max_final": 0.502, "frames": 501, "wall_s": 117.3, "ta_hollow_n_peak": 133, "ta_hollow_n_final": 94, "ta_area_cv_final": 0.495, "ta_vol_cv_final": 0.469, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.131, "ta_red_frac_final": 0.0, "ta_tip_act_final": 0.077, "mech_force_mean": 4.8847, "mech_p_body": 13.0965, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 4.1984, "mech_migration": 0.66394}
+[mini_coral_nodilute] D4 ok: all 11 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_rd_seed': 3, 'cell_adjacency': 117} ...)
+[mini_coral_nodilute] camera: FIXED Lbox=10.023 for all 501 frames and both views (per-frame autofit would have run 5.497 -> 9.263, x1.69: that rescaling is what hid growth)
+[mini_coral_nodilute] artefacts -> log/okuda/mini_coral_nodilute/{strip.png,movie.mp4}

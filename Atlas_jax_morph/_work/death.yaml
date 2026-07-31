@@ -1,0 +1,112 @@
+id: death
+order: 6
+raw_name: Death
+raw_kind: step (StochasticStep)
+code_path: papers/jax-morph/jax_morph/physics/death.py:L26
+paper_section: 'p. 2 (Forward Model): death is ABSENT from the model''s cell capabilities; see surprises'
+summary: >-
+  Discrete stochastic removal (apoptosis) as a scorable jump: each cell alive at the death
+  decision independently draws a Bernoulli death event with per-cell hazard probability
+  p = 1 - exp(-death_rate*dt). A cell that draws 1 has its boolean `alive` flipped to False;
+  the step also writes a persistent per-step `death` record (float 0/1) for lineage
+  postprocessing and co-emits the ephemeral scored trace (`died`, `die_eligible`). It does NOT
+  free or recycle the vacated slot within the step -- reuse is deferred to a later macro-step.
+equations: |
+  Indices: i ranges over state-array slots (0..capacity-1). lambda_i = death_rate_i (per-cell
+  hazard rate), dt = macro-step duration, alive_i = boolean liveness mask.
+
+  Per-cell hazard over one macro-step (Death._dist, shared by sample and score):
+      p_i = 1 - exp(-lambda_i * dt)            # code: -jnp.expm1(-clip(death_rate,0,None)*dt)
+
+  Forward sample (sample_trace):
+      died_i         = Bernoulli(p_i) * alive_i   # exact 0/1 forward draw, masked to live cells
+                                                  #   identity surrogate: d died_i / d p_i = 1
+      die_eligible_i = alive_i                    # cells alive AT the death decision
+
+  Effect (replay; hard, ignores `pathwise` -- a discrete node has nothing to reparameterize):
+      die_i    = (died_i > 0.5) AND alive_i       # re-AND with live `alive` is a guard
+      alive_i' = alive_i AND (NOT die_i)          # slot flipped dead; NOT freed this macro-step
+      death_i  = 1.0 if die_i else 0.0            # persistent per-step record, cast to float
+
+  Score (logp -- score-function / REINFORCE term, not pathwise):
+      logp = sum_i die_eligible_i * [ died_i*log(p_i) + (1-died_i)*log(1-p_i) ]
+
+  PAPER vs CODE: the paper writes NO death equation -- "death"/"apoptosis" never appear in it
+  (see surprises). The above is the CODE only. It mirrors Division's hazard p = 1 - exp(-lambda*dt).
+params:
+  score_by_default: >-
+    default-scoring / gradient-term inclusion flag -- whether this stochastic step contributes
+    its `logp` (the score-function term for survival/death objectives) when a scoring driver is
+    called with score=None. Static bool, not a physical parameter. NOTE the tunable physical
+    parameter is `death_rate`, which is NOT a constructor argument but a per-cell STATE field
+    (heritable) supplied by an initial condition or an upstream controller.
+state_io:
+  reads:
+    - death_rate            # per-cell hazard rate lambda (heritable=True); the only read
+  writes:                   # persistent state_writes (survive the macro-step)
+    - alive                 # boolean liveness mask; base spec ALIVE
+    - death                 # per-step removal record, float 0/1, heritable=False
+  trace_writes:             # ephemeral; reset to defaults at the start of every macro-step
+    - died                  # scored 0/1 action (straight-through float), consumed by logp
+    - die_eligible          # alive-at-decision mask; masks the per-cell density in logp
+surprises:
+  - >-
+    PAPER CONTRADICTION (source wins, and the most valuable item here): the paper does NOT model
+    cell death. The strings "death"/"apoptosis"/"necrosis" appear ZERO times in it; the forward
+    model's cell-capability list (p. 2) is exactly "division, growth, mechanical stress sensing,
+    and morphogen excretion and detection" -- no death. The paper's only cell removal is an
+    EXTERNAL robustness ablation applied post-hoc to a finished cluster ("robustness to cell
+    removal", p. 8; Fig. caption "Loss of the final state after removal, at random, of a fraction
+    of cells", p. 21) to measure loss sensitivity -- NOT a per-cell hazard dynamic inside the
+    model. So `Death` is a reimplemented-library step with no counterpart mechanism in the paper;
+    a reader who trusts the paper would omit it entirely.
+  - >-
+    Composition ordering is load-bearing. Division MUST run before Death in the discrete phase
+    (divide-then-die). Both are DISCRETE, run in pipeline order, and are exempt from write-conflict
+    checks. In one macro-step a mother AND its newborn daughters can all die. Reversing the order,
+    or recycling death-freed slots in the same step, corrupts lineage reconstruction.
+  - >-
+    Death flips `alive` to False but does NOT free/recycle the vacated slot within the step.
+    Division's slot allocator (`jnp.nonzero(~alive)`) reuses the slot only on a LATER macro-step;
+    deferring reuse is deliberate so the `death` record survives for `reconstruct_lineage`, which
+    processes births-then-deaths within each frame.
+  - >-
+    Two look-alike fields. `died` is the EPHEMERAL trace (reset each macro-step, scored by logp,
+    straight-through float 0/1). `death` is a PERSISTENT state_writes float 0/1 record and is
+    RE-DERIVED inside replay by `(died > 0.5) & state.alive`, not copied from `died`. A
+    reimplementer who persists `died` directly, or drops the re-AND with `alive`, would mark an
+    already-dead slot as newly dead.
+  - >-
+    `death` is OVERWRITTEN each macro-step (set to that step's die mask), NOT accumulated. It is
+    meaningful only as the full (n_steps+1, capacity) trajectory fed to `reconstruct_lineage`;
+    reading a single final `death` array as a lifetime death count is wrong. It is cast to float
+    (death_rate.dtype), not bool, so it can be summed/averaged/differentiated downstream; `alive`
+    stays boolean.
+  - >-
+    Eligibility mask: `die_eligible = alive` is captured at the death DECISION (after Division has
+    already run within the same discrete phase). `logp` multiplies the per-cell Bernoulli density
+    by `die_eligible`, so a cell dead-at-decision contributes 0. Re-reading a live `alive` at score
+    time would use the wrong mask (alive changes between decision and score). This is the codebase's
+    `{action}_eligible` trace convention.
+  - >-
+    `death_rate` is clipped to >= 0 (`jnp.clip(rate, 0, None)`) before forming p, so a negative
+    rate (e.g. an unconstrained controller output) yields p = 0 rather than a negative probability
+    that would NaN through `bernoulli_logp`. Omitting the clip silently corrupts the score.
+  - >-
+    Gradient-estimator discipline: the forward `died` is an EXACT Bernoulli draw (bit-identical to
+    the hard sample, temperature-free identity surrogate), but the physical effect is a hard boolean
+    mask -- so survival/death objectives must use the SCORE-FUNCTION gradient via `logp` (REINFORCE),
+    never a pathwise gradient through the alive mask. A discrete node has nothing to reparameterize;
+    `replay` ignores `pathwise`. Use exactly one estimator per run, never both.
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

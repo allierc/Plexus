@@ -57,16 +57,40 @@ involved. A reaction whose fixed point sits at zero is driven to extinction by g
 *If violated:* the tissue is manufacturing morphogen in proportion to its own growth, which feeds
 the tip from nothing.
 
-## 5. Mechanics is fast, biology is slow — **certain**
+## 5. Mechanics is fast, biology is slow — **certain**, but read it narrowly
 
-An epithelium relaxes elastic stress in seconds to minutes. It grows and divides over hours. So at
-every instant the tissue is essentially at force balance, and there is no inertia.
+An epithelium relaxes elastic stress in seconds to minutes. It grows and divides over hours. So on
+the timescale of morphogenesis the tissue has no inertia, and the configuration you see at any
+instant is a mechanical equilibrium of the current cell targets.
 
-*Constrains:* the relationship between the mechanics substep and the biology step — `dt`,
-`relax_iters`, and the rates of every biological operator.
-*Check:* one growth or division step must correspond to *many* mechanical relaxation steps, and
-each biological operator must advance in **biological** time, not in solver substeps.
-*Caught:* this is defect D5a. `dt = 0.02` is the mechanics substep, and the chemistry was being
+**This does NOT mean the tissue is unstressed.** Cedric pushed on the first draft of this premise,
+which said "at every instant the tissue is essentially at force balance" and read as if stress
+could not build up. Force balance and zero stress are different things — a stretched drumhead is
+at perfect force balance and stores large tension indefinitely — and tissues really do accumulate
+stress over long times:
+
+  * cut an epithelial junction with a laser and it recoils; that tension had been sitting there,
+    at equilibrium, for hours
+  * tumour spheroids under confinement build compressive stress over days
+  * arteries and plant stems carry residual stress that only appears when you cut them open
+  * differential growth in a constrained geometry leaves residual stress for the whole of
+    development
+
+Our own runs are an example: in `mini_grow_divide_bigger` the cells are compressed from 3.63 to
+2.45 in volume, against a target that is rising the whole time, before the shell buckles and
+releases it. That is stored stress, and it is the mechanism, not an error.
+
+So the premise forbids exactly two things: **inertia**, and **unrelaxed transients** — the
+configuration lagging behind the forces because the solver ran out of iterations.
+
+*Constrains:* `dt`, `relax_iters`, and the rate of every biological operator.
+*Check, part A (the clock):* each biological operator must advance in **biological** time, not in
+solver substeps. One growth or division step must correspond to many mechanical relaxation steps.
+*Check, part B (convergence):* the relaxation must actually reach equilibrium each frame. The
+residual force after relaxation must not grow as the tissue does — `relax_iters` is a constant
+while the system it has to relax keeps getting bigger, so this is a real risk and not a
+hypothetical one. Measured on `mini_grow_divide_bigger`, mean residual force rises 8.4 → 22.9.
+*Caught by part A:* defect D5a. `dt = 0.02` is the mechanics substep and the chemistry was being
 integrated with it too — 300 frames bought 6 units of reaction time instead of ~500. Every "no
 pattern formed" reading in the campaign was an artefact of the clock.
 

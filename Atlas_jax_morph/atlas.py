@@ -155,7 +155,15 @@ def guarded(role, mech_id, ledger=None, retry=True, extra=""):
     baseline = registry_view.load()
     with _RECORD_LOCK:
         _master_locked()                        # sync the mirror before anything runs
+    # The note file is CREATED HERE, not by the agent: the reading roles are given Read/Edit and
+    # deliberately no Write, so a note they were told to "create" could never exist. Found by the
+    # first parallel batch, which produced four good entries and zero notes.
     os.makedirs(os.path.join(CAMPAIGN, "notes"), exist_ok=True)
+    note = os.path.join(CAMPAIGN, "notes", f"{mech_id}.md")
+    if not os.path.exists(note):
+        with open(note, "w") as f:
+            f.write(f"<!-- {mech_id} -- append below; the driver merges this into "
+                    f"campaign/analysis.md -->\n")
     work = A.work_file(mech_id)                 # the agent's isolated copy of this one entry
     work_before = open(work).read()
 
