@@ -103,20 +103,54 @@ def _mesh_from_build(n_cells=NCELLS):
 INNER = 0.82                                                    # basal radius fraction (thin monolayer wall)
 
 
-def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None):
+def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
+          divided=None, broken=None, wall_shade=1.0):
     """3D monolayer: each cell is a prism -- an apical face (outer), a basal face (inner), and lateral
-    walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white); the
-    apical faces are bevelled and edged black so the cells read as raised 3D blocks (many faces each)."""
+    walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white).
+
+    EVERY COLOUR MEANS EXACTLY ONE THING. (Cedric, 31 July: "make sure the movie does not show
+    misleading grey faces", and "maybe use a green colour for dividing cells".)
+
+        white -> red   the activator level. This is the measurement.
+        GREEN          the cell divided recently. Benign and expected.
+        MAGENTA        the cell is genuinely BROKEN -- under-connected, or its ring is not a
+                       polygon. An alarm. If nothing is broken this colour never appears.
+
+    WHY THE GREY WENT. The lateral walls used to be drawn at 0.72 x the cap colour, so an
+    unactivated (white) cell had GREY sides. On a smooth sphere those hide at the silhouette, but a
+    growing, dividing tissue is bumpy and they show constantly -- and a grey face reads as a
+    distinct cell state when it is only the side of a pale cell. It was read, reasonably, as
+    "phantom cells" and as evidence the mesh was breaking. It was not: on a real deformed frame
+    there are ZERO empty rings, ZERO degenerate rings and ZERO broken cells, while 20% of caps sit
+    at the bottom of the colour scale. Walls now take their cap's own colour (`wall_shade=1.0`), so
+    a visible wall reads as part of its own cell and grey is no longer a colour the render can
+    produce by accident. Removing the walls entirely was also tested -- the apical faces already
+    tile into a closed opaque surface, so nothing is hidden either way.
+
+    WHY GREEN MATTERS BEYOND LOOKS. The "damage" count is dominated by SLIVERS -- just-divided
+    daughters -- at r=+0.94 with the tip-cell count, while genuinely broken cells stayed at zero
+    for 300 frames. So the eye, and the model reading these movies, must be able to tell "this
+    cell just divided" from "this cell is destroyed". Now they are different colours.
+
+    `divided` / `broken`: optional boolean masks per face. The caller computes them once per frame
+    (tyssue_diag.mesh_faults) and passes them to both viewpoints rather than recomputing.
+    """
     ax.clear(); ax.set_facecolor("black")
     polys, area, perim, shape = face_polygons_3d(pos, mesh)
     if act is None:
         act = np.zeros(len(polys))                              # activation = 0 -> white (Goal 2 RD lights the red)
     cmap = plt.cm.Reds
+    C_DIVIDED = (0.16, 0.78, 0.36, 1.0)                         # green  -- just divided, benign
+    C_BROKEN = (1.00, 0.10, 0.85, 1.0)                          # magenta -- not a cell any more
     faces3d, cols = [], []
     for f, ap in enumerate(polys):
         base = cmap(float(np.clip(act[f], 0.0, 1.0)))
+        if divided is not None and f < len(divided) and divided[f]:
+            base = C_DIVIDED
+        if broken is not None and f < len(broken) and broken[f]:
+            base = C_BROKEN                                      # alarm wins over everything
         bp = ap * inner                                          # basal ring (apical scaled toward the sphere centre)
-        wall = tuple(0.72 * np.array(base[:3])) + (1.0,)        # lateral wall: lightly shadowed (only shows at silhouette)
+        wall = tuple(wall_shade * np.array(base[:3])) + (1.0,)  # lateral wall: its OWN cap's colour
         k = len(ap)
         for i in range(k):                                      # lateral walls first (drawn behind the apical cap)
             faces3d.append(np.array([ap[i], ap[(i + 1) % k], bp[(i + 1) % k], bp[i]])); cols.append(wall)

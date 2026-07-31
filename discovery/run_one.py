@@ -407,8 +407,29 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
           f"(per-frame autofit would have run {l_first:.3f} -> {l_last:.3f}, "
           f"x{l_last / max(l_first, 1e-9):.2f}: that rescaling is what hid growth)", flush=True)
 
-    def draw3d(ax, pt, mt, a, cam):
-        _draw(ax, pt, mt, 3.90, azim=cam["azim"], act=col(a), Lbox=L3)
+    def faults_of(pt, mt):
+        """Per-cell `divided` / `broken` masks for the render, computed ONCE per frame.
+
+        Grey used to be the only non-red colour in these movies, and it meant nothing -- it was
+        the shaded side of a pale cell, and it was reasonably mistaken for phantom cells. Now the
+        two states that actually matter are drawn explicitly: green for a just-divided cell
+        (benign; these dominate the "damage" count) and magenta for a genuinely broken one (an
+        alarm; zero in every frame measured so far, which is the point of showing it).
+        """
+        try:
+            from tyssue_diag import mesh_faults
+            f = mesh_faults(pt, mt)
+            return f["sliver"], f["broken"]
+        except Exception as e:
+            # Not swallowed silently: a missing overlay must announce itself, or a movie with no
+            # green looks like a tissue that never divided.
+            print(f"[{name}] fault overlay unavailable ({type(e).__name__}: {str(e)[:70]}) -- "
+                  f"movie drawn WITHOUT the divided/broken colours", flush=True)
+            return None, None
+
+    def draw3d(ax, pt, mt, a, cam, div=None, brk=None):
+        _draw(ax, pt, mt, 3.90, azim=cam["azim"], act=col(a), Lbox=L3,
+              divided=div, broken=brk)
         # _draw hardwires elev=18 as its last statement; re-aim afterwards to get the 2nd view.
         ax.view_init(elev=cam["elev"], azim=cam["azim"])
 
@@ -417,8 +438,9 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     fig.patch.set_facecolor("black")
     for i, t in enumerate([int(round(f * (T - 1))) for f in np.linspace(0, 1, n_strip)]):
         pt, mt, a = fr[t]
-        draw3d(fig.add_subplot(3, n_strip, i + 1, projection="3d"), pt, mt, a, CAM_SIDE)
-        draw3d(fig.add_subplot(3, n_strip, n_strip + i + 1, projection="3d"), pt, mt, a, CAM_TOP)
+        div, brk = faults_of(pt, mt)
+        draw3d(fig.add_subplot(3, n_strip, i + 1, projection="3d"), pt, mt, a, CAM_SIDE, div, brk)
+        draw3d(fig.add_subplot(3, n_strip, n_strip + i + 1, projection="3d"), pt, mt, a, CAM_TOP, div, brk)
         ax3 = fig.add_subplot(3, n_strip, 2 * n_strip + i + 1)
         # NO try/except here. Swallowing the error is exactly the silent-no-op pattern this
         # project keeps being bitten by: the first version caught a TypeError from a wrong
@@ -443,8 +465,9 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=85):
         for t in keep:
             pt, mt, a = fr[int(t)]
-            draw3d(axs, pt, mt, a, CAM_SIDE)
-            draw3d(axt, pt, mt, a, CAM_TOP)
+            div, brk = faults_of(pt, mt)
+            draw3d(axs, pt, mt, a, CAM_SIDE, div, brk)
+            draw3d(axt, pt, mt, a, CAM_TOP, div, brk)
             # _draw calls ax.clear(), which drops the label -- re-stamp it every frame.
             axs.text2D(0.02, 0.96, "side  elev 18", transform=axs.transAxes, color="w",
                        fontsize=9)
