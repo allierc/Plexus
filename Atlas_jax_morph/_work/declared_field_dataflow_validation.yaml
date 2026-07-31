@@ -84,11 +84,127 @@ surprises:
   NO build-time validation (a paper grep for valid/conflict/schema/declare/contract finds only "validation
   LOSS"). A reader of the paper alone would model steps as freely mutating a shared struct; the declared-field
   dataflow contract is an invention of the library re-engineering, not described in the paper.'
-verdict: null
+verdict: out_of_scope
 of: null
-why: null
-contract: null
-status: inspected
+why: 'OUT_OF_SCOPE: declared-field dataflow validation is the declaration discipline and TYPE SYSTEM
+
+  of the operator algebra, not an operator in it. It reads no field VALUE and writes none: it only
+
+  (a) cross-validates each step''s declared state_reads()/state_writes()/trace_writes() at Model
+
+  build time (write-conflict policy + trace uniqueness + spec consistency) and (b) synthesizes the
+
+  typed state class as merge_specs(BASE_SPECS, union of step.state_requires()). "Advance the state"
+
+  has nothing to name here -- there is no biological process called "check that the steps declare
+
+  their fields honestly", so the contract rule that an operator take a biological name (divide /
+
+  diffuse / adhere) finds nothing to name.
+
+
+  It is the fourth face of the one core/step.py engine layer whose other three faces are already
+
+  out_of_scope: the Lie-Trotter macro-step split (order 21, `integrate`), the step_type time-scale
+
+  taxonomy (order 22, `timescale`), and the StochasticStep differentiability mixin (order 5 / 24).
+
+  Both the 21 and 22 why-blocks explicitly name order 23 for this same verdict. In an operator
+
+  ALGEBRA the composition law -- how operators declare and share the state they couple through --
+
+  is part of the algebra''s DEFINITION, not one of its elements; Plexus''s engine and IR already own
+
+  that discipline (typed reads/writes per operator, and record.py R7 rejecting a writes-nothing
+
+  operator is the direct analogue of "a declared write is the only coupling channel").
+
+
+  Not alias / refinement: no registered contract models a build-time schema validator, and widening
+
+  any forward operator (say `diffuse`, or any lateral force) to carry declaration cross-checking
+
+  would graft a validator onto a forward-dynamics signature -- pure violence to its biology. Not
+
+  new: `new` requires the capability be ABSENT from the promoted language, and this is the exact
+
+  opposite of absent -- it is the FRAME the language is written in, so registering it as an operator
+
+  would inflate the atlas yield with the very type discipline every entry already presupposes,
+
+  exactly what out_of_scope exists to prevent.
+
+
+  CONTRACT FIELDS BELOW are a validator formality: R6/R7 require a typed, writes-non-empty contract
+
+  even for out_of_scope. No Plexus kind fits a schema validator; kind=exchange / family=coupling
+
+  names only the write-into-shared-named-state coupling this contract governs; reads = the BASE_SPECS
+
+  it merges every step''s declarations against (position, radius, celltype, alive, t); writes=[alive]
+
+  is the formal allocation representative (a non-physics write mirroring the siblings'' writes:[t] and
+
+  stochastic_step''s writes:[trace]).
+
+
+  STRONGEST COUNTERARGUMENT (and why it loses): this is arguably the atlas''s most valuable POSITIVE
+
+  result rather than a scope exclusion. The target has INDEPENDENTLY reinvented the very discipline
+
+  the Plexus algebra is built on -- typed per-operator reads/writes as the sole coupling channel,
+
+  plus a write-conflict policy that is R7''s no-op rule made per-field -- which one could read as a
+
+  `new` build-time-dataflow-validator capability the language should register. It loses because the
+
+  atlas measures the OPERATOR VOCABULARY (typed forward maps over sets and fields), and a validator
+
+  is not a forward map -- it is the type system those maps are written in, which Plexus already
+
+  embodies; and `new` further requires ABSENCE, whereas this is the frame, not a gap. The honest
+
+  resolution is out_of_scope WITH the correspondence logged as a MEASUREMENT NOTE: jax-morph carries
+
+  one axis Plexus''s IR does not -- a per-StepType (time-scale-keyed) write-conflict policy
+
+  (quasistatic = one writer; dynamic = many, summed; discrete = exempt) that REFINES R7''s flat
+
+  no-op/writes rule. That axis is worth DOCUMENTING against the engine, not counting as a word in
+
+  the vocabulary.
+
+
+  SOURCE-vs-PAPER (recorded in surprises): the paper (Deshpande 2025, p.14, "I. Forward Simulation")
+
+  describes a single CellState struct composed "by any subset or combination of the steps" -- by
+
+  CONVENTION, with no declared reads/writes and no build-time validation (a paper grep for
+
+  valid/conflict/schema/declare/contract finds only "validation LOSS"). SOURCE WINS: the declared-
+
+  field dataflow contract is an invention of the hardened library, invisible to a paper-only reader.
+
+  '
+contract:
+  name: couple
+  kind: exchange
+  family: coupling
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - position
+  - radius
+  - celltype
+  - alive
+  - t
+  writes:
+  - alive
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

@@ -83,92 +83,79 @@ surprises:
   and a masked pair NaNs the whole energy/force (test_morse_padded_dead_cells_do_not_nan).'
 - The 0.5 in total_energy (0.5 * sum(neighbor_sum(U, alive))) counts each pair once; neighbor_sum already
   masks self (i!=j) and dead pairs. Dropping the 0.5 doubles the energy and every force.
-verdict: alias
+verdict: refinement
 of: attraction_repulsion
 implementation_of: attraction_repulsion
-why: 'ALIAS of `attraction_repulsion` (implementation_of: attraction_repulsion). Morse is the pairwise
+why: |
+  REFINEMENT of `attraction_repulsion` (implementation_of: attraction_repulsion). Morse is the paper's
+  ACTUAL pairwise cell-cell interaction (p. 9 / p. 14 / Fig. 1d): a repulsive core = excluded volume plus
+  an adhesive tail = cell-cell adhesion, well minimum -epsilon at the contact distance sigma = r_i + r_j.
+  The BIOLOGY is exactly attraction_repulsion's "long-range pull minus short-range push", so this is NOT a
+  new contract. But Morse does not fit attraction_repulsion's REGISTERED signature as it stands, so it is
+  not a clean drop-in `alias` either: the contract must WIDEN, and the skeptic's dispute (was: alias,
+  claimed: refinement) is UPHELD.
 
-  cell-cell interaction the paper ACTUALLY uses (p. 9 / p. 14 / Fig. 1d): a repulsive core = excluded
+  WHAT WIDENS (the typed signature fields), and what it costs existing users:
 
-  volume, plus an adhesive tail = cell-cell adhesion, with its minimum -epsilon at the contact
+  - reads: + per-cell radius (cell SIZE). Registered attraction_repulsion
+    (src/plexus/operators/attraction_repulsion.py:43,63) reads position, the per-TYPE force-law params p,
+    and occupancy -- it reads NO per-cell size. Its interaction length is a SINGLE GLOBAL SCALAR sigma (a
+    Gaussian width, params["sigma"]), shared by every pair and BLIND to cell size. Morse's defining feature
+    is a size-CONSISTENT contact distance sigma_ij = r_i + r_j, read per pair from each cell's radius, so
+    the excluded-volume core tracks size as cells grow and divide (cell_grow / cell_divide are both live in
+    this paper). Hosting Morse therefore forces attraction_repulsion to read a per-cell size. No frozen
+    INTERACTION operator reads a per-cell size to set its length today: squared_law reads charge/mass for
+    STRENGTH (its length is a global `softening`); separation relies on a global graph `min_radius`;
+    stillinger_weber and cohesion carry their own global scales. So this is a genuine growth of the declared
+    dependency set, not a below-signature detail.
 
-  distance sigma = r_i + r_j. That is exactly attraction_repulsion''s biology -- its "long-range pull
+  - maps: single global interaction length -> per-pair ADDITIVE contact distance sigma_ij = r_i + r_j
+    (size-consistent). This is the map-level counterpart of the radius read; it is the change that lets the
+    core swell as a cell grows, which a fixed global sigma cannot express.
 
-  minus short-range push". The Morse well eps[(1-exp(-alpha(r-sigma)))^2 - 1] and
+  WHAT IT BREAKS. Nothing for existing D'Orsogna callers: the widening is ADDITIVE (keep the global-sigma
+  mode; the radius-derived per-pair contact distance is a second branch), so no current attraction_repulsion
+  user is invalidated. But an additive widening is still a refinement, not an alias -- this ledger's own bar
+  (the Division entry that widened cell_divide's reads by an ADDITIVE oriented axis and STILL landed
+  refinement, because "the declared read set genuinely grows -- a dependency existing schedulers did not
+  track", and "a refinement nobody costed is a breaking change") is exactly on point. Discharging that
+  obligation -- costing the +radius read rather than hiding it -- is why this is refinement.
 
-  attraction_repulsion''s two-Gaussian f(r)*(pos_j-pos_i) are two functional SHAPES of the one
+  NOT `alias`. attraction_repulsion's registered signature cannot compute sigma_ij = r_i + r_j (it has no
+  size read), so it does not already ADMIT Morse; the contract must gain a field first. The prior alias
+  reading leaned on "default-compatible, breaks no existing user" -- which is precisely the reasoning
+  record.py's own docstring names as the way `refinement` HIDES a widening. I diverge from it here on that
+  ground.
 
-  conservative radial pair force (attraction_repulsion''s force is itself the gradient of a radial
+  NOT `new`. Minting a second pairwise-attraction-repulsion contract (as the SoftSphere sibling did with
+  `adhere`) inflates the very yield this ledger measures. The additive widening PRESERVES
+  attraction_repulsion's global-sigma D'Orsogna mode -- it adds a branch, it does not delete the fixed-width
+  pattern-former -- so it does no violence to that biology and there is no need to leave the contract.
+  energy -> autodiff-force vs a hand-coded force is an implementation STRATEGY, not a contract
+  (stillinger_weber is itself an energy-defined interaction in this same lateral/interaction family), so it
+  neither mints nor widens on its own.
 
-  potential); one hand-codes the force, the other writes the energy and autodiffs it. Of the whole
+  FAMILY SPLIT (the measurement, recorded honestly). The PairwisePotential family is currently normalized
+  THREE ways against the same attraction_repulsion: the abstract parent PairwisePotential (order 13) and
+  Hertzian landed `alias`; SoftSphere landed `new` (mint `adhere`); this entry lands `refinement`. The
+  disagreement is real and is exactly the axis worth surfacing -- whether a size-consistent per-pair contact
+  distance read from a per-cell radius is (a) below attraction_repulsion's signature [alias], (b) an additive
+  widening of it [refinement], or (c) a different biology from the fixed-width D'Orsogna model [new]. I read
+  it as (b): the biology is the same (so not new), but the registered reads genuinely grow (so not alias).
+  The parent's alias UNDER-costs the read growth; SoftSphere's `new` OVER-costs a well-shape difference that
+  shares one signature. Refinement is the calibrated middle.
 
-  PairwisePotential family Morse is the CANONICAL member -- the only sibling carrying BOTH terms
+  SCOPE / SOURCE. The smooth cutoff the code multiplies onto the well on [1.5*sigma, 2.5*sigma] (which the
+  paper's V_ij omits -- SOURCE wins) is a range / pair-topology implementation option below the signature,
+  the same axis squared_law already carries (all_pairs vs the neighbour graph). The per-cell VIRIAL PRESSURE
+  the base also derives from this energy is the separate VirialStress entry's output (it writes a `stress`
+  field), kept out of scope here. The coupling restriction -- shared scalar OR per-cell scalar epsilon /
+  alpha only, per-pair / type matrices rejected at __check_init__ -- is a real EXPRESSIVENESS limit of THIS
+  implementation against the paper's type x type cadherin adhesion matrix (Fig. S1); it is an implementation
+  weakness recorded in surprises, not a further contract change (an override of mix() or an external epsilon
+  route would supply it). The defaults epsilon 3.0 / alpha 2.8 / cutoff 1.5 / 2.5 are code-only numerics
+  absent from the paper.
 
-  (SoftSphere / Hertzian are purely repulsive), so it maps onto attraction_repulsion most exactly.
-
-
-  THE PARENT IS ALREADY NORMALIZED. PairwisePotential (order 13) landed alias -> attraction_repulsion,
-
-  and its why names the subclasses verbatim: "Morse, SoftSphere, Hertzian, Harmonic and LennardJones
-
-  are interchangeable force-law SHAPES over this one contract ... each concrete subclass is
-
-  implementation_of: attraction_repulsion." Morse is that Morse. The NoForce normalizer likewise
-
-  named "attraction_repulsion ... the home the paper''s Morse potential ... will normalize to". This
-
-  is the several-implementations-per-contract pattern the registry exists to hold; finding it is the
-
-  GOOD result, not a missed contract.
-
-
-  NOT `refinement`: no field of attraction_repulsion''s signature is FORCED to change, and every Morse
-
-  difference lives below the signature. (1) The code''s smooth cutoff on [1.5*sigma, 2.5*sigma] (which
-
-  the paper omits -- SOURCE wins) is a range / pair-topology implementation option, the same axis on
-
-  which squared_law already carries BOTH all-pairs and a neighbour graph, and on which
-
-  attraction_repulsion already truncates via its radius_graph map. (2) energy -> autodiff-force vs a
-
-  hand-coded force is an implementation strategy, not a contract: stillinger_weber is itself an
-
-  energy-defined interaction in this same lateral/interaction family, so "write an energy and
-
-  differentiate it" does not, by itself, mint a contract. (3) The coupling reads (per-cell scalar
-
-  epsilon / alpha symmetrised by the arithmetic-mean mix; additive sigma = r_i + r_j) are
-
-  default-compatible, break no existing user, and so are not a costed widening.
-
-
-  NOT `new`: attraction_repulsion already IS the pairwise attraction-repulsion contract; minting a
-
-  second for a different well SHAPE inflates exactly the yield this ledger measures. NOT
-
-  `out_of_scope`: unlike NoForce (the identity element, absence of interaction) Morse is a real
-
-  forward interaction with a pair map, separation reads, and a force output.
-
-
-  SCOPE / SOURCE notes. The per-cell VIRIAL PRESSURE the base also derives from this energy is NOT an
-
-  output of this interaction contract; it is the separate VirialStress entry''s mechanism (it writes a
-
-  `stress` field), so I keep it out of scope here. The coupling restriction -- shared scalar OR
-
-  per-cell scalar field only, per-pair / type matrices rejected at __check_init__ -- is a real
-
-  EXPRESSIVENESS limit of THIS implementation against the paper''s type x type cadherin adhesion matrix
-
-  (Fig. S1); it is an implementation weakness recorded in surprises, not a contract change (an
-
-  override of mix() or an external epsilon route would supply it). The default magic constants
-
-  (epsilon 3.0, alpha 2.8, cutoff 1.5 / 2.5) are code-only numerics absent from the paper.
-
-  '
 contract:
   name: attraction_repulsion
   kind: lateral
@@ -199,3 +186,16 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: alias
+  claimed: refinement
+  evidence: 'Registered attraction_repulsion uses a GLOBAL scalar interaction length (attraction_repulsion.py:43
+    self.sigma=float(params[''sigma''])) and reads no per-cell radius; Morse''s contact distance is per-pair
+    r_i+r_j from radius (potentials.py:305). Hosting Morse forces a new `radius` read + per-pair contact
+    distance onto attraction_repulsion = costed widening = refinement, per the division-entry bar (atlas_record.yaml:1249-1258).
+    Parent pillar also false: pairwise_potential verdict:null (1964).'
+  what_would_settle_it: Confirm attraction_repulsion has no per-cell radius/size read and only a global
+    scalar sigma (attraction_repulsion.py:43,32). If so, its declared signature must widen (+radius read,
+    sigma -> per-pair additive r_i+r_j) to host Morse's size-consistent contact distance, which is refinement,
+    not alias.

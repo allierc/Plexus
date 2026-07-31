@@ -73,73 +73,85 @@ surprises:
   kink at the window edges.'
 - 'Unlike Morse, LJ has NO width/steepness knob: the 12-6 exponents fix the shape. Only epsilon and the
   two cutoff fractions are tunable, so it cannot be tuned to reproduce a given Morse alpha.'
-verdict: alias
-of: attraction_repulsion
-implementation_of: attraction_repulsion
+verdict: new
+of: null
+implementation_of: adhere
 why: |
-  ALIAS of `attraction_repulsion` (implementation_of: attraction_repulsion). LennardJones is a
-  conservative radial pair force over live non-self cell pairs: a hard repulsive r^-12 core
-  (excluded volume) plus an adhesive 2*r^-6 tail (cell-cell adhesion), the well minimum exactly
-  -epsilon sitting at the contact distance sigma = r_i + r_j, its force = -grad of that radial
-  energy by autodiff. That is exactly attraction_repulsion's biology -- its "long-range pull
-  minus short-range push", a radial pair force that is itself the gradient of a radial potential.
-  The 12-6 r_min well eps*((sigma/r)^12 - 2(sigma/r)^6) and attraction_repulsion's two-Gaussian
-  f(r)*(pos_j - pos_i) are two functional SHAPES of the one contract; the balance of core-vs-tail
-  sets the phase in both.
+  VERDICT new -- contract `adhere`, implementation_of: adhere. LennardJones is the 12-6 SHAPE of a
+  pairwise cell-cell mechanical-interaction contract the frozen 42 do NOT carry: a Lateral force over
+  live non-self cell pairs whose interaction range is set by the two cells' PHYSICAL RADII (contact
+  distance sigma = r_i + r_j, so the excluded-volume core and adhesive well track cell size as cells
+  grow and divide), reading a shared-or-per-cell interaction strength (epsilon), defined by a
+  conserved pair ENERGY whose autodiff gives the force. LJ is an ADHESIVE member -- a hard r^-12 core
+  minus a 2 r^-6 tail, minimum -epsilon exactly at contact -- so `adhere` names it directly (the
+  repulsion-only SoftSphere / Hertzian are the adhesion-off limit of the SAME signature). The six
+  PairwisePotential members (Morse, SoftSphere, Hertzian, Harmonic, LennardJones + the abstract
+  parent) share ONE typed signature and differ ONLY in the pair-energy law U(r); they collapse to
+  ONE contract with several implementations, so soft_sphere / morse / hertzian / harmonic /
+  lennard_jones are all implementation_of: adhere. That is ONE new contract for the whole family, not
+  six -- the several-implementations-per-contract result the ledger wants, NOT an inflated `new`
+  count. R4 forbids `of: adhere` (unregistered), so this entry NAMES adhere only as the shared
+  implementation_of; promoting it is a separate step.
 
-  SAME CONTRACT AS Morse, DIFFERENT SHAPE. The abstract parent PairwisePotential (order 13)
-  landed alias -> attraction_repulsion (implementation_of: attraction_repulsion) and its why
-  names the members verbatim: "Morse, SoftSphere, Hertzian, Harmonic and LennardJones are
-  interchangeable force-law SHAPES over this one contract ... each concrete subclass is
-  implementation_of: attraction_repulsion." Morse (order 14) and Harmonic (order 17) both
-  reaffirmed that and cited the parent. LennardJones is that LennardJones -- a third CORE+TAIL
-  (adhesive) member alongside Morse and Harmonic (SoftSphere/Hertzian are purely repulsive, no
-  adhesion), so like them it maps onto attraction_repulsion most exactly; it just swaps the Morse
-  exponential well for the classical 12-6 well. This is the several-implementations-per-contract
-  pattern the registry exists to hold; finding it is the GOOD result the ledger measures, not a
-  missed contract. (I depart from the SoftSphere entry, order 15, which minted a NEW contract
-  `adhere` for the purely-repulsive limit; I follow the parent + Morse + Hertzian + Harmonic
-  majority instead, because splitting one member off to a second contract while its siblings stay
-  attraction_repulsion would fracture the one pair-potential family the parent explicitly unified
-  -- either ALL pair potentials are one contract or none are, and the parent chose
-  attraction_repulsion.)
+  WHY NOT alias -- verified AT THE SOURCE. The nearest registered contract is attraction_repulsion,
+  and its NAME matches the pull-minus-push biology, which is the tempting alias the parent
+  pairwise_potential + Morse + Hertzian + Harmonic entries all made. But rule 4 pins `of:` to the
+  PROMOTED operator, and src/plexus/operators/attraction_repulsion.py factually does not cover LJ:
+    - set="particle", EMIT="velocity" (lines 28, 30): a hand-coded D'Orsogna self-propelled-particle
+      overdamped VELOCITY law, not a cell energy differentiated into a force.
+    - REQUIRES_PARAMS=["sigma"], self.sigma=float(params["sigma"]) (lines 32, 43): a single GLOBAL
+      scalar interaction length -- a free tuning knob, NOT a per-pair contact distance.
+    - REQUIRES_TYPE_PROPS=["p"], p indexed by node_type (lines 33, 61): per-TYPE coupling, not a
+      per-cell / shared scalar.
+    - forward() reads pos / occ / edge_index / node_type and NEVER reads radius (lines 52-61); it is
+      O(E) message passing on a neighbour graph, with no energy, no virial, and no size-consistent
+      contact distance.
+  So attraction_repulsion does NOT "already IS" this contract; asserting alias flatters the language
+  by hiding a missing capability -- the exact failure record.py names for `alias`. The alias-majority
+  siblings are the mis-normalization (their own skeptics flagged refinement / new); I decline to
+  propagate a false alias for family cosmetics.
 
-  NOT `refinement`: no field of attraction_repulsion's signature is FORCED to change, and every
-  LennardJones difference lives below the signature. (1) energy -> autodiff-force (forces =
-  -jax.grad(total_energy)) vs attraction_repulsion's hand-coded velocity law is an implementation
-  STRATEGY, not a contract: stillinger_weber is itself an energy-defined interaction in this same
-  lateral/interaction family, and attraction_repulsion's force is already the gradient of a radial
-  potential -- "write an energy and differentiate it" does not mint a contract. (2) the dense
-  O(N^2) half-sum vs a neighbour-graph reduction is the range / pair-topology axis squared_law
-  already carries (all_pairs AND a radius_graph neighbour list) and on which attraction_repulsion
-  already truncates via its radius_graph map; LennardJones's own finite range is just its smooth
-  C1 cutoff on [1.5*sigma, 2.5*sigma]. (3) the coupling reads (a shared scalar epsilon, or a
-  per-cell scalar field symmetrised per pair by the arithmetic-mean mix; additive sigma = r_i + r_j
-  read from radius) are default-compatible and break no existing user. Notably LennardJones is
-  NARROWER than Morse in the axis that matters -- the 12-6 exponents FIX the well shape, so unlike
-  Morse it has NO width/steepness knob (alpha); only epsilon and the two cutoff fractions are
-  tunable. A narrower, less expressive parameterization demands LESS of the signature, not more.
+  WHY NOT refinement -- the honest closest alternative. One could keep a single interaction contract
+  and WIDEN attraction_repulsion to host LJ, paying the cost openly (cell_divide / cell_grow set the
+  precedent that growing the declared read set is a costed widening). I reject it because the widening
+  is NOT bounded to a field or two: hosting LJ changes set (particle -> cell), changes emit (a
+  velocity law -> an energy whose grad is the force), re-sources the interaction range from a free
+  global knob to a physical consequence of cell size (sigma = r_i + r_j read from radius), swaps
+  per-type programming for a per-cell coupling, and grows an energy output. That DELETES the
+  fixed-width, type-programmed D'Orsogna self-propelled-particle pattern-forming model that IS
+  attraction_repulsion and breaks every existing user of its global sigma / per-type p. Widening that
+  does violence to the contract's biology is exactly what the record distinguishes from a refinement
+  -> `new`, and beyond even a bounded refinement.
 
-  NOT `new`: attraction_repulsion already IS the pairwise attraction-repulsion contract; minting a
-  second for a different well SHAPE inflates exactly the yield this ledger measures. NOT
-  `out_of_scope`: unlike NoForce (the identity element / absence of interaction) LennardJones is a
-  real forward interaction with a pair map, radial separation reads, and a force output.
+  WHY NOT new-per-shape / out_of_scope. Minting a SEPARATE contract for the 12-6 shape (vs Morse's
+  exponential well or the harmonic core) would inflate exactly the yield this ledger measures; LJ
+  differs from its siblings ONLY in U(r), an implementation detail below the signature. And unlike
+  NoForce (the identity element / absence of interaction), LJ is a real forward interaction with a
+  pair map, radius-coupled separation reads, and a force output, so it is not out_of_scope. The
+  registered near-misses beyond attraction_repulsion all lose their biology if widened: `separation`
+  is a mean-aggregated 1/|d|^2 boids steering nudge (no cell radius, no compact support, no energy);
+  `cohesion` is attraction-only steering; `squared_law` is a size-blind inverse-square with no soft
+  core -- turning any of them into a size-coupled, energy-defined hard-matter potential converts a
+  steering heuristic into cell mechanics.
 
-  SCOPE / SOURCE notes (rule 5, SOURCE wins). THE PAPER DOES NOT USE LENNARD-JONES: every
-  mechanical interaction in the paper is the ADHESIVE Morse well (Methods p. 9, SI p. 14, Fig. 1d);
-  LennardJones is a code-only library alternative that no paper experiment instantiates -- a
-  reimplementer from the paper alone would never encounter it, but the SOURCE carries it and it
-  normalizes to the same contract Morse does. It is the r_min LJ form (minimum -epsilon at
-  sigma = r_i + r_j), NOT the textbook 4-eps zero-crossing form -- a source-only convention. The
-  per-cell VIRIAL PRESSURE the base derives from this energy is NOT an output of this interaction
-  contract; it is the separate VirialStress entry's mechanism (it writes a `stress` field), kept
-  out of scope here, consistent with Morse/Harmonic/Hertzian. The smooth C1 cutoff multiplying the
-  WHOLE energy, the safe_divide(sigma, r) zero-guard, the 0.5 double-count dedup, the SUM-vs-MEAN
-  combining rules, and the default magic constants (epsilon 1.0, r_onset_frac 1.5, r_cutoff_frac
-  2.5, absent from the paper) are implementation properties of THIS member recorded in surprises,
-  not contract-level distinctions.
+  I ALIGN WITH soft_sphere (order 15, new -> adhere, which survived its skeptic dispute), not the
+  alias majority: LJ has the IDENTICAL signature to SoftSphere and, being adhesive, fits `adhere` even
+  more naturally than the repulsion-only SoftSphere does. Splitting the family across alias /
+  refinement / new fractures the one pair-potential family -- either the whole family is `adhere` or
+  attraction_repulsion must widen, and it cannot widen without deleting the D'Orsogna model.
+
+  SCOPE / SOURCE. Rule 5, SOURCE wins: the paper's mechanics are Morse ONLY (p. 9 / p. 14 / Fig. 1d);
+  LennardJones appears in NO paper experiment -- it is a code-only library alternative, and a
+  reimplementer targeting the paper would never instantiate it. Recorded as the source/paper
+  divergence. The per-cell VIRIAL PRESSURE the base also derives from this energy is NOT an output of
+  this interaction contract; it is the separate VirialStress entry's mechanism (it writes a `stress`
+  field), kept out of scope here, consistent with Morse / Hertzian / SoftSphere. The r_min 12-6 form
+  (well at contact, not the textbook 4-eps zero-crossing form), the whole-energy smooth C1 cutoff on
+  [1.5, 2.5]*sigma, the SUM-vs-MEAN combining rules, the safe_divide zero guards, and the 0.5
+  pair-double-count factor are implementation properties of THIS member recorded in surprises, not
+  contract-level distinctions.
 contract:
-  name: attraction_repulsion
+  name: adhere
   kind: lateral
   family: interaction
   set: cell
@@ -151,19 +163,24 @@ contract:
   - position
   - radius
   - alive
-  - coupling field (shared scalar OR per-cell scalar field, here epsilon = well depth / repulsion
-    strength), symmetrised per pair by the arithmetic-mean mix rule
+  - |
+    epsilon (shared scalar OR per-cell scalar StateFieldSpec interaction strength; the field is read
+    only when epsilon is a per-cell spec, else it is a shared scalar), symmetrised per pair by the
+    arithmetic-mean mix rule 0.5*(e_i + e_j)
   writes:
   - position
   maps:
-  - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered
-    pair counts once); force on each cell = -grad of the conservative Lennard-Jones pair energy by
-    autodiff
-  - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive r^-12
-    core (excluded volume) + adhesive 2*r^-6 tail (cell-cell adhesion) in r_min 12-6 form with
-    minimum -epsilon at contact, truncated by a smooth C1 cutoff on [r_onset_frac*sigma,
-    r_cutoff_frac*sigma]; a radial pair force integrated overdamped or minimised by the wrapping
-    motion step
+  - |
+    pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each
+    unordered pair counts once); force on each cell = -grad of the conservative pair energy by
+    autodiff, integrated overdamped / minimised by a wrapping motion or relaxation step
+  - |
+    contact distance sigma = r_i + r_j (ADDITIVE, size-consistent as cells grow and divide); the
+    LennardJones member is the r_min 12-6 form U = epsilon*((sigma/r)^12 - 2 (sigma/r)^6), minimum
+    -epsilon exactly at contact, its adhesive tail truncated by a sigma-relative smooth C1 cutoff on
+    [r_onset_frac, r_cutoff_frac]*sigma (default 1.5-2.5); adhesive members (Morse, Harmonic,
+    LennardJones) carry the tail, repulsion-only members (SoftSphere, Hertzian) switch it off -- same
+    signature
 status: normalized
 module: null
 test: null

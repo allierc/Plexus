@@ -381,6 +381,21 @@ OPERATORS = {
         # CFL and it is JOINT in (chi, d): see diffusion_cfl / T1_DIFFUSION_UNSTABLE.
         params={"d_a": (0.0, D_CEIL, D_A_DEFAULT), "d_h": (0.0, D_CEIL, D_H_DEFAULT),
                 "chi": (0.0, CHI_CEIL, CHI_DEFAULT)}),
+    # THE MISSING ARROW. Chemistry patterns the shell and the shell deforms, but the shape it takes
+    # never reaches back -- half of Okuda's loop, and the mechanism behind every branching
+    # morphology, was simply absent from the space. FOUR IMPLEMENTATIONS, structural, because WHICH
+    # shape feature the chemistry listens to is the hypothesis and not a number: curvature-sensing
+    # and tension-sensing are different biology and predict different things. impl_structural=True
+    # makes `=shape_to_chem:tension` a legal one-edit move, so the loop can run that comparison
+    # itself rather than waiting for a human to hand-write four configs.
+    # `force` and `size` are deliberately NOT implementations -- see the operator's docstring.
+    "shape_to_chem": dict(
+        stage=3, role="patterning", outputs=[], slots=[], needs=["adjacency"],
+        impls=["curvature", "tension", "apical_area", "pressure"], impl_structural=True,
+        # beta spans BOTH SIGNS and includes zero. Zero is the null and must stay reachable: without
+        # it, "shape feeds back" is asserted rather than tested. The sign is a real hypothesis --
+        # do deformed cells signal more, or less? -- so a one-sided box would silently answer it.
+        params={"beta": (-3.0, 3.0, 0.0), "F0": (0.0, 0.12, 0.055)}),
     "cell_react": dict(
         stage=3, role="patterning", outputs=["morphogen"], slots=[], needs=["adjacency"],
         impls=["gierer_meinhardt", "gray_scott", "brusselator"], impl_structural=True,

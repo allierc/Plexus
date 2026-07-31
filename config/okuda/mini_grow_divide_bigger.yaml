@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 30000
+    n: 3552
   cell:
-    n: 16000
+    n: 1800
     state:
       chem:
         width: 2
@@ -91,4 +91,5 @@ schedule:
 - topo_snapshot_3d
 _discovery:
   comp_hash: MINI_mini_grow_divide_bigger
-  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing
+  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference
+    buffers 3552/1800]

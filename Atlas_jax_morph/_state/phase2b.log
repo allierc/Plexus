@@ -1,0 +1,45 @@
+normalizer: 6 mechanisms, 6 at a time -- odecontroller, morse, soft_sphere, hertzian, harmonic, lennard_jones
+
+Done. Here's what I changed and why.
+
+## Verdict: `new` — contract `regulate` (kind=exchange, family=fields, set=cell, maps=[])
+
+The entry arrived with a live **skeptic dispute** claiming this is a `refinement` of `signal`. I engaged it head-on rather than rubber-stamping either side. My conclusion: **the skeptic is right about the defect, wrong about the fix.**
+
+**What was wrong:** the prior `why:` named `decay`/`pacemaker` as the closest contracts and never mentioned `signal` — which is genuinely the nearest neighbour (the *only* other registered per-agent internal-state ODE of the firing-rate/recurrent-network class). That's a real hole, and I rewrote `why:` to lead with `signal`.
+
+**Why `new` still stands** — the dispute's own `what_would_settle_it` sets the bar: a widening survives only if it does *not* break `signal`'s connectome/engine-integration identity. It can't:
+
+| | `signal` (registered) | `regulate` (this) |
+|---|---|---|
+| coupling | `synapse` EDGE-SET via `pre`/`post` maps — "the maps are PART of the signature" | dense per-operator matrix, `maps=[]`, **zero** cell-to-cell coupling (intracellular) |
+| integration | `EMIT=velocity`; the ENGINE integrates | SELF-SOLVES the macro-step (adaptive Dopri5), returns exact `y(dt)-y0` delta |
+| forcing | recurrent presynaptic input only | reads a FIXED sensed driver `u` (`W_in@u`) |
+| kind | lateral | exchange |
+
+Expressing `regulate` through `signal` forces changing its set, emptying its maps, dropping the edge-set, adding a forcing read, and flipping engine-integration to self-solve — five signature changes that dissolve `signal`'s identity and break every existing connectome user. So the mismatch **forces a distinct operator → `new` stands.** They're two contracts of the same recurrent-network *family*, not two implementations of one contract.
+
+## Edits made
+- `_work/odecontroller.yaml`: rewrote `why:` (now names `signal` first, rebuts the refinement point via the settle-it test, keeps decay/pacemaker as more-distant neighbours), converted it to a safe literal block scalar, and set `status: normalized`. Contract signature was already correct — left intact.
+- `campaign/notes/odecontroller.md`: appended a revised normalization paragraph stating the verdict and, per the role's requirement, **the single strongest argument against it** (the skeptic's "same math object, `signal` already carries it" refinement case, stated at full strength) followed by why it fails.
+
+The three subclasses (`GeneNetworkConnectionist`, `GeneNetworkMWC`, `NeuralODE`) are interchangeable implementations of this one contract — noted in `why:` as `implementation_of: regulate`; this base entry itself carries the contract, so it stays `new`, not an implementation.
+
+Note: I couldn't run `record.py` to self-validate (python is approval-blocked in this sandbox, per the campaign gotchas), so I verified the twelve rules by inspection — code_path exists with L46 in range, `regulate` isn't a registered name (R5 safe), writes are non-empty (R7), all params carry roles (R8), verdict+why present (R4). The driver's validation pass will confirm.
+  committed  normalizer/odecontroller  (7.1 min)
+Both artifacts are complete and consistent. Here's what I did.
+
+  REVERTED  normalizer/lennard_jones after 9.2 min:
+    - the agent call failed or timed out
+  handing the violations back to lennard_jones, once.
+The YAML is structurally sound — every prose field is a literal block scalar (`|`), so all the rule-6 hazards (colon-space, `[`, `--`, `1/|d|^2`, apostrophes) sit inside opaque blocks; the only plain scalars are single tokens. Indentation boundaries are clean (block content always deeper than its key; each block terminates on a sibling key at lower indent).
+
+  REVERTED  normalizer/soft_sphere after 9.8 min:
+    - the agent call failed or timed out
+  handing the violations back to soft_sphere, once.
+I've normalized the `harmonic` entry. Here's the decision and why.
+
+  REVERTED  normalizer/harmonic after 10.3 min:
+    - the agent call failed or timed out
+  handing the violations back to harmonic, once.
+Error: Reached max turns (20)

@@ -2,113 +2,122 @@
   "repository": "fmottes/jax-morph",
   "commit": "ace08b87a30015ca6c899467ac302e60ecf3b621",
   "baseline_contracts": 52,
-  "baseline_unpromoted": 130,
   "counts": {
-    "alias": 0,
-    "refinement": 0,
-    "new": 0,
-    "backlog": 0,
-    "out_of_scope": 0,
-    "unclassified": 24
+    "alias": 4,
+    "refinement": 2,
+    "new": 8,
+    "implementation": 3,
+    "out_of_scope": 6,
+    "unclassified": 1
   },
-  "scored": 0,
-  "yield_new_per_mechanism": null,
+  "scored": 17,
+  "yield_new_per_mechanism": 0.47058823529411764,
+  "new_contracts": [
+    "adhere",
+    "agitate",
+    "apoptose",
+    "mechanosense",
+    "morphogen",
+    "regulate",
+    "relax",
+    "reorient"
+  ],
   "curve": [
     {
       "n": 1,
-      "cum_new": 0
+      "cum_new": 1
     },
     {
       "n": 2,
-      "cum_new": 0
+      "cum_new": 1
     },
     {
       "n": 3,
-      "cum_new": 0
+      "cum_new": 1
     },
     {
       "n": 4,
-      "cum_new": 0
+      "cum_new": 1
     },
     {
       "n": 5,
-      "cum_new": 0
+      "cum_new": 1
     },
     {
       "n": 6,
-      "cum_new": 0
+      "cum_new": 2
     },
     {
       "n": 7,
-      "cum_new": 0
+      "cum_new": 3
     },
     {
       "n": 8,
-      "cum_new": 0
+      "cum_new": 3
     },
     {
       "n": 9,
-      "cum_new": 0
+      "cum_new": 3
     },
     {
       "n": 10,
-      "cum_new": 0
+      "cum_new": 4
     },
     {
       "n": 11,
-      "cum_new": 0
+      "cum_new": 5
     },
     {
       "n": 12,
-      "cum_new": 0
+      "cum_new": 5
     },
     {
       "n": 13,
-      "cum_new": 0
+      "cum_new": 5
     },
     {
       "n": 14,
-      "cum_new": 0
+      "cum_new": 5
     },
     {
       "n": 15,
-      "cum_new": 0
+      "cum_new": 6
     },
     {
       "n": 16,
-      "cum_new": 0
+      "cum_new": 6
     },
     {
       "n": 17,
-      "cum_new": 0
+      "cum_new": 6
     },
     {
       "n": 18,
-      "cum_new": 0
+      "cum_new": 6
     },
     {
       "n": 19,
-      "cum_new": 0
+      "cum_new": 7
     },
     {
       "n": 20,
-      "cum_new": 0
+      "cum_new": 8
     },
     {
       "n": 21,
-      "cum_new": 0
+      "cum_new": 8
     },
     {
       "n": 22,
-      "cum_new": 0
+      "cum_new": 8
     },
     {
       "n": 23,
-      "cum_new": 0
+      "cum_new": 8
     },
     {
       "n": 24,
-      "cum_new": 0
+      "cum_new": 8
     }
   ],
   "rows": [
@@ -116,154 +125,154 @@
       "n": 1,
       "id": "gene_network_connectionist",
       "raw_name": "GeneNetworkConnectionist",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "regulate",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 2,
       "id": "neural_ode",
       "raw_name": "NeuralODE",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "implementation",
+      "contract": "regulate",
+      "of": "gene_network_connectionist",
+      "status": "normalized"
     },
     {
       "n": 3,
       "id": "gene_network_mwc",
       "raw_name": "GeneNetworkMWC",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "implementation",
+      "contract": "regulate",
+      "of": "gene_network_connectionist",
+      "status": "normalized"
     },
     {
       "n": 4,
       "id": "odecontroller",
       "raw_name": "ODEController",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "implementation",
+      "contract": "regulate",
+      "of": "gene_network_connectionist",
+      "status": "normalized"
     },
     {
       "n": 5,
       "id": "stochastic_step",
       "raw_name": "StochasticStep",
-      "class": "unclassified",
-      "contract": null,
+      "class": "out_of_scope",
+      "contract": "sample_score",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 6,
       "id": "death",
       "raw_name": "Death",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "apoptose",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 7,
       "id": "free_screened_diffusion",
       "raw_name": "FreeScreenedDiffusion",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "morphogen",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 8,
       "id": "division",
       "raw_name": "Division",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "refinement",
+      "contract": "cell_divide",
+      "of": "cell_divide",
+      "status": "normalized"
     },
     {
       "n": 9,
       "id": "saturating_cell_growth",
       "raw_name": "SaturatingCellGrowth",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "refinement",
+      "contract": "cell_grow",
+      "of": "cell_grow",
+      "status": "normalized"
     },
     {
       "n": 10,
       "id": "active_brownian_dynamics2_d",
       "raw_name": "ActiveBrownianDynamics2D",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "reorient",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 11,
       "id": "brownian_dynamics",
       "raw_name": "BrownianDynamics",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "agitate",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 12,
       "id": "no_force",
       "raw_name": "NoForce",
-      "class": "unclassified",
-      "contract": null,
+      "class": "out_of_scope",
+      "contract": "no_interaction",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 13,
       "id": "pairwise_potential",
       "raw_name": "PairwisePotential",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "alias",
+      "contract": "attraction_repulsion",
+      "of": "attraction_repulsion",
+      "status": "normalized"
     },
     {
       "n": 14,
       "id": "morse",
       "raw_name": "Morse",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "alias",
+      "contract": "attraction_repulsion",
+      "of": "attraction_repulsion",
+      "status": "inspected"
     },
     {
       "n": 15,
       "id": "soft_sphere",
       "raw_name": "SoftSphere",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "adhere",
       "of": null,
-      "status": "candidate"
+      "status": "inspected"
     },
     {
       "n": 16,
       "id": "hertzian",
       "raw_name": "Hertzian",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "alias",
+      "contract": "attraction_repulsion",
+      "of": "attraction_repulsion",
+      "status": "inspected"
     },
     {
       "n": 17,
       "id": "harmonic",
       "raw_name": "Harmonic",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "candidate"
+      "class": "alias",
+      "contract": "attraction_repulsion",
+      "of": "attraction_repulsion",
+      "status": "inspected"
     },
     {
       "n": 18,
@@ -272,62 +281,81 @@
       "class": "unclassified",
       "contract": null,
       "of": null,
-      "status": "candidate"
+      "status": "inspected"
     },
     {
       "n": 19,
       "id": "mechanical_relaxation",
       "raw_name": "MechanicalRelaxation",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "relax",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 20,
       "id": "virial_stress",
       "raw_name": "VirialStress",
-      "class": "unclassified",
-      "contract": null,
+      "class": "new",
+      "contract": "mechanosense",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 21,
       "id": "lie__trotter_macro_step_split",
       "raw_name": "Lie-Trotter macro-step split",
-      "class": "unclassified",
-      "contract": null,
+      "class": "out_of_scope",
+      "contract": "integrate",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 22,
       "id": "step_type:_quasistatic___dynamic___discrete",
       "raw_name": "step type: quasistatic / dynamic / discrete",
-      "class": "unclassified",
-      "contract": null,
+      "class": "out_of_scope",
+      "contract": "timescale",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 23,
       "id": "declared_field_dataflow_validation",
       "raw_name": "declared field dataflow validation",
-      "class": "unclassified",
-      "contract": null,
+      "class": "out_of_scope",
+      "contract": "couple",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     },
     {
       "n": 24,
       "id": "stochastic_trace___replay___score",
       "raw_name": "stochastic trace / replay / score",
-      "class": "unclassified",
-      "contract": null,
+      "class": "out_of_scope",
+      "contract": "sample_score",
       "of": null,
-      "status": "candidate"
+      "status": "normalized"
     }
   ],
-  "disputed": []
+  "disputed": [
+    {
+      "id": "neural_ode",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "regulate"
+    },
+    {
+      "id": "gene_network_mwc",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "regulate"
+    },
+    {
+      "id": "odecontroller",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "regulate"
+    }
+  ]
 }

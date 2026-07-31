@@ -292,13 +292,25 @@ def demote(mech_id, verdict):
 NEEDS = {"excavator": "candidate", "normalizer": "inspected", "implementer": "normalized",
          "differ": "implemented", "curator": "validated"}
 
+# Only some verdicts have downstream work. An `alias` is already in the language and an
+# `out_of_scope` mechanism has no biology to implement -- running an implementer on either would
+# produce a module nobody wants and, worse, a promotion path for something we decided we already
+# had. Their terminal state IS `normalized`, and the ledger counts them there.
+IMPLEMENTABLE = {"new", "refinement"}
+
 
 def due(role):
     doc = record.load(RECORD)
     want = NEEDS.get(role)
     blocked = json.load(open(BLOCKED)) if os.path.exists(BLOCKED) else {}
-    return [m["id"] for m in doc["mechanisms"]
-            if m.get("status", "candidate") == want and m["id"] not in blocked]
+    out = []
+    for m in doc["mechanisms"]:
+        if m.get("status", "candidate") != want or m["id"] in blocked:
+            continue
+        if role == "implementer" and m.get("verdict") not in IMPLEMENTABLE:
+            continue
+        out.append(m["id"])
+    return out
 
 
 def status():

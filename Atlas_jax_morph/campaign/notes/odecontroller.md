@@ -49,3 +49,34 @@ quasistatic-chemistry assumption), and the integrated increment returned as an a
 Those are modeling commitments, not solver plumbing, and the whole ATLAS measurement turns on
 whether the language has this contract-slot at all -- it does not. (A weaker counter, that this is a
 `refinement` of `decay`, is answered in the entry's `why:`.)
+
+## Normalization revised -- answering the skeptic (normalizer, 2026-07-31)
+
+The skeptic disputed `new`, claiming `refinement` of `signal` (`src/plexus/operators/signal.py`):
+`signal` is a registered per-agent internal-state ODE, `EMIT=velocity`,
+`tau*dv/dt = -v + b + sum W*phi(v_pre)`, tag `recurrent` -- the SAME firing-rate-RNN class as
+`GeneNetworkConnectionist` `dg/dt = sigma(W@g + W_in@u + b) - gamma*g`, and my predecessor's `why:`
+never even named it (it called `decay`/`pacemaker` "closest", which was wrong). I agree with the
+critique of the `why:` and have rewritten it to lead with `signal`; the verdict stays **`new`**.
+
+**Strongest argument AGAINST `new` (the skeptic's, stated at full strength):** both operators are
+literally the same math object -- a per-node first-order ODE whose drive is an activated linear
+combination of node states plus a bias, minus linear decay. `signal` already carries that contract.
+Its docstring even advertises the degenerate case ("drop the synapse state and the edge-set
+collapses to a plain weighted connectome, one Lateral operator"). So the gene circuit is just
+`signal` on a `cell` set with a self-loop connectome and pseudo-node inputs -- a `refinement` that
+widens `signal`'s `set`/`maps`, not a new contract; two names for one recurrent-network operator is
+exactly the `alias`/`refinement` inflation this loop exists to catch.
+
+**Why it nonetheless fails.** `signal`'s typed identity is a CONNECTOME morphism: weights live on a
+first-class `synapse` EDGE-SET read through `pre`/`post` incidence maps (`MAPS=[pre,post]`, "the maps
+are PART of the signature"), and it `EMIT`s a velocity the ENGINE integrates. `regulate` has `maps=[]`
+(dense per-operator matrix, zero cell-to-cell coupling -- purely intracellular), reads a FIXED sensed
+forcing input `signal` lacks, and SELF-SOLVES the whole macro-step (adaptive Dopri5) to return the
+exact `y(dt)-y0` delta. The skeptic's own `what_would_settle_it` sets the bar: a widening survives
+only if it does NOT break `signal`'s connectome/engine-integration identity. Expressing `regulate`
+forces changing the set, emptying the maps, dropping the edge-set, adding a forcing read, and flipping
+engine-integration to self-solve -- it breaks exactly that identity. So the mismatch forces a distinct
+operator and `new` stands. (`signal` and `regulate` are two contracts of the same recurrent-network
+FAMILY, not two implementations of one contract -- their typed signatures differ in kind, set, maps
+and integration mode.)

@@ -72,3 +72,34 @@ implementation detail -- the precise failure mode the measurement exists to avoi
 finds adhesion carries state or a map that repulsion does not -- a cadherin field, a bond edge-set --
 that would be real signature divergence and would reopen the split; the harmonic/Morse pair shows
 none.)
+
+---
+
+## Normalization (dispute pass)
+
+**Verdict stands: `new`, `implementation_of: adhere`; status -> normalized.** The skeptic disputed
+this as `alias of attraction_repulsion`, invoking "record.py's regulate/consistency rule". Two things
+settle it against the skeptic. First, that rule *does not exist*: record.py enforces R0-R12 and none
+force siblings to share a verdict -- `validate()` judges each mechanism independently, so the earlier
+note's own appeal to a "regulate rule" (and the sibling entries' appeal to the parent) is not a rule
+of this ledger. Second, R4 requires an alias `of:` to be a *registered* contract, and the only
+candidate -- `attraction_repulsion` -- factually does not cover this: its promoted source has a GLOBAL
+scalar `sigma` (attraction_repulsion.py:43), per-TYPE `p` (REQUIRES_TYPE_PROPS), `EMIT=velocity`,
+`set=particle`, and no `radius` read, hence no size-consistent per-pair contact and no energy/virial.
+The skeptic's own settling test (does attraction_repulsion read radius / use a global sigma?) is thus
+met *against* alias. That also means the sibling Morse/Hertzian/Harmonic `alias` verdicts are the
+mis-normalization, not this one -- their own skeptics flagged refinement/new.
+
+**Strongest argument against (the honest one, post-dispute).** Not `alias` -- that's refuted by the
+source -- but `refinement of attraction_repulsion`: since attraction_repulsion IS the registered
+"attraction + repulsion" pairwise-interaction slot and I agree it does not yet cover SoftSphere, the
+minimal move is to *widen* it (add a `radius` read, allow a per-pair additive `sigma = r_i + r_j`,
+allow a per-cell coupling) rather than mint a second interaction contract -- keeping ONE interaction
+force in the language and paying the widening cost openly. I still reject it for `new` because the
+widening is not bounded to a field or two: it changes `set` particle -> cell, re-sources the
+interaction range from a free global knob to a physical consequence of cell size, and swaps per-type
+for per-cell programming -- which deletes the fixed-width, type-programmed D'Orsogna self-propelled
+particle model that IS attraction_repulsion and breaks every existing user. Widening that does
+violence to the contract's biology is exactly what the record distinguishes from a refinement, so the
+size-consistent cell-cell mechanical interaction is a genuinely new contract `adhere`, carrying all
+six pair potentials as implementations (one new contract, not six).

@@ -289,7 +289,8 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
         else:
             thr = act.min() + 0.5 * (act.max() - act.min())                 # relative fallback (blind; see above)
             m["red_frac"] = round(float((act > thr).mean()), 3)
-        m["act_mean"] = round(float(act.mean()), 4)                         # unconditional, threshold-free
+        m["act_mean"] = round(float(act.mean()), 4)
+        m["act_min"] = round(float(act.min()), 6)     # premise 12: a concentration cannot be negative                         # unconditional, threshold-free
         m["act_max"] = round(float(act.max()), 4)
         m["act_p95"] = round(float(np.percentile(act, 95)), 4)
         radc, ok = radl, livem                                 # tip_act: corr(activator, radius). +1 = activator
