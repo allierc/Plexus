@@ -1,0 +1,31 @@
+# A deliberately boring spec, built only from operators Plexus ALREADY has.
+#
+# Its job is to prove `Atlas_jax_morph/run_spec.py` -- the engine run, the acted ledger, the
+# common-scale strip, the evidence folder -- before Phase 4 depends on it. Verifying the
+# instrument on a known-good composition is cheaper than debugging it under a new operator.
+general:
+  name: _smoke_cluster
+  seed: 0
+  n_frames: 60
+  dt: 0.1
+  boundary: periodic
+
+sets:
+  particle:
+    n: 400
+    types:
+      t0: { fraction: 0.5, p: [1.6233, 1.0413, 1.6012, 1.5615] }
+      t1: { fraction: 0.5, p: [1.7667, 1.8308, 1.0855, 1.9055] }
+
+fields: {}
+
+operators:
+  - { op: radius_graph, at: particle, radius: 0.075 }
+  - { op: attraction_repulsion, at: particle, sigma: 0.005 }
+
+schedule: [radius_graph, attraction_repulsion]
+
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 4.0

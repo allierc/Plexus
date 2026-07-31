@@ -4,28 +4,22 @@ raw_name: NoForce
 raw_kind: potential (Potential)
 code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L108
 paper_section: p. 3, Fig. 1d (the mechanical-interaction slot; the paper fills it only with Morse)
-summary: >-
-  The trivial (null) interaction potential: total energy is identically zero and every cell feels
-  zero force, so it leaves positions untouched. It is the neutral default the position-moving steps
-  resolve ``potential=None`` to - a free Brownian / active-Brownian gas, or a no-op mechanical
-  relaxation - and the natural base for active-matter / flocking models whose only coupling lives in
-  a separate step (e.g. a neighbour-alignment torque).
-equations: >-
-  Let x be the (capacity, d) position array and i index a cell. NoForce defines
-    U(x, state) = 0                       (total interaction energy, a scalar constant)
-    F_i = -grad_{x_i} U = 0  for all i    (per-cell force, shape (capacity, d))
-  In the source: ``total_energy`` returns ``jnp.asarray(0.0)`` (a scalar, ignoring both positions and
-  state); ``forces`` is OVERRIDDEN to return ``jnp.zeros_like(state.position)`` directly rather than
-  autodiffing the zero energy. Symbols: x = state.position, d = n_space_dim, U = total interaction
-  energy, F_i = force on cell i. Same as the code; the paper writes no NoForce (its only potential is
-  the Morse energy U(r) = eps[(1 - exp(-alpha(r - sigma)))^2 - 1], p. 3 / Methods).
+summary: 'The trivial (null) interaction potential: total energy is identically zero and every cell feels
+  zero force, so it leaves positions untouched. It is the neutral default the position-moving steps resolve
+  ``potential=None`` to - a free Brownian / active-Brownian gas, or a no-op mechanical relaxation - and
+  the natural base for active-matter / flocking models whose only coupling lives in a separate step (e.g.
+  a neighbour-alignment torque).'
+equations: "Let x be the (capacity, d) position array and i index a cell. NoForce defines\n  U(x, state)\
+  \ = 0                       (total interaction energy, a scalar constant)\n  F_i = -grad_{x_i} U = 0\
+  \  for all i    (per-cell force, shape (capacity, d))\nIn the source: ``total_energy`` returns ``jnp.asarray(0.0)``\
+  \ (a scalar, ignoring both positions and state); ``forces`` is OVERRIDDEN to return ``jnp.zeros_like(state.position)``\
+  \ directly rather than autodiffing the zero energy. Symbols: x = state.position, d = n_space_dim, U\
+  \ = total interaction energy, F_i = force on cell i. Same as the code; the paper writes no NoForce (its\
+  \ only potential is the Morse energy U(r) = eps[(1 - exp(-alpha(r - sigma)))^2 - 1], p. 3 / Methods)."
 params: {}
 state_io:
-  reads: []          # state_reads() returns () - declares NO non-base state fields; forces() touches
-                     # state.position only for its SHAPE (jnp.zeros_like), never its value, and
-                     # total_energy ignores both its positions and state arguments.
-  writes: []         # a Potential is not a Step and declares no writes; the wrapping step
-                     # (BrownianDynamics / MechanicalRelaxation / ...) owns POSITION reads+writes.
+  reads: []
+  writes: []
 verdict: null
 of: null
 why: null
@@ -39,35 +33,28 @@ evidence:
   threshold: null
   passed: null
 surprises:
-  - >-
-    NOT IN THE PAPER. The paper's cells ALWAYS interact via a pairwise Morse potential (p. 3, Fig.
-    1d: repulsion for excluded volume, attraction for adhesion). NoForce has no paper / biological
-    counterpart - it is a library engineering affordance (a null Potential) for active-matter base
-    models where the coupling lives elsewhere. A reimplementer mapping the paper 1:1 would never
-    produce it.
-  - >-
-    ``forces`` is deliberately OVERRIDDEN to return zeros directly instead of inheriting the base
-    ``forces`` (which autodiffs ``total_energy``). Both give zero, but the override skips building
-    and differentiating the energy graph. NB: NoForce is a direct ``Potential`` subclass (not
-    ``PairwisePotential``), so its own ``total_energy`` is a bare ``0.0`` with no pairwise sum - the
-    class docstring's "skipping the dense O(N^2) pairwise sum" describes the general motivation, not
-    this class's own energy (there is no sum here to skip). The real cost avoided is the grad trace.
-  - >-
-    NoForce is almost never constructed by name: it is what ``potential=None`` resolves to inside
-    ``BrownianDynamics``, ``ActiveBrownianDynamics2D``, ``MechanicalRelaxation``, and
-    ``relax_equilibrium`` (each does ``potential if potential is not None else NoForce()``). Miss
-    that None-mapping and you lose the free-gas / no-op-relaxation default.
-  - >-
-    It is parameterless - an ``eqx.Module`` with no fields, hence no tunable knobs. There is nothing
-    to differentiate through and nothing to optimize; it contributes no leaves to the model pytree.
-  - >-
-    ``total_energy`` returns a scalar ``jnp.asarray(0.0)`` at the default dtype (float32 unless x64
-    is enabled; the test suite enables x64), whereas ``forces`` returns ``zeros_like(state.position)``
-    which inherits position's exact shape and dtype. A hand-rolled version that returned a scalar or
-    a wrong-dtype array from ``forces`` would break the ``dt * forces / gamma`` drift broadcast.
-  - >-
-    Under ``MechanicalRelaxation`` the no-op is realized through the GENERAL FIRE path, not a special
-    case: because ``grad U = 0`` everywhere the residual is 0 <= f_tol at iteration 0, so the
-    ``while_loop`` body never runs and positions pass through unchanged. ``relax_equilibrium`` also
-    has an explicit ``if potential is None`` short-circuit, but the step stores an actual
-    ``NoForce()`` (not None) and relies on the loop's immediate convergence instead.
+- 'NOT IN THE PAPER. The paper''s cells ALWAYS interact via a pairwise Morse potential (p. 3, Fig. 1d:
+  repulsion for excluded volume, attraction for adhesion). NoForce has no paper / biological counterpart
+  - it is a library engineering affordance (a null Potential) for active-matter base models where the
+  coupling lives elsewhere. A reimplementer mapping the paper 1:1 would never produce it.'
+- '``forces`` is deliberately OVERRIDDEN to return zeros directly instead of inheriting the base ``forces``
+  (which autodiffs ``total_energy``). Both give zero, but the override skips building and differentiating
+  the energy graph. NB: NoForce is a direct ``Potential`` subclass (not ``PairwisePotential``), so its
+  own ``total_energy`` is a bare ``0.0`` with no pairwise sum - the class docstring''s "skipping the dense
+  O(N^2) pairwise sum" describes the general motivation, not this class''s own energy (there is no sum
+  here to skip). The real cost avoided is the grad trace.'
+- 'NoForce is almost never constructed by name: it is what ``potential=None`` resolves to inside ``BrownianDynamics``,
+  ``ActiveBrownianDynamics2D``, ``MechanicalRelaxation``, and ``relax_equilibrium`` (each does ``potential
+  if potential is not None else NoForce()``). Miss that None-mapping and you lose the free-gas / no-op-relaxation
+  default.'
+- It is parameterless - an ``eqx.Module`` with no fields, hence no tunable knobs. There is nothing to
+  differentiate through and nothing to optimize; it contributes no leaves to the model pytree.
+- '``total_energy`` returns a scalar ``jnp.asarray(0.0)`` at the default dtype (float32 unless x64 is
+  enabled; the test suite enables x64), whereas ``forces`` returns ``zeros_like(state.position)`` which
+  inherits position''s exact shape and dtype. A hand-rolled version that returned a scalar or a wrong-dtype
+  array from ``forces`` would break the ``dt * forces / gamma`` drift broadcast.'
+- 'Under ``MechanicalRelaxation`` the no-op is realized through the GENERAL FIRE path, not a special case:
+  because ``grad U = 0`` everywhere the residual is 0 <= f_tol at iteration 0, so the ``while_loop`` body
+  never runs and positions pass through unchanged. ``relax_equilibrium`` also has an explicit ``if potential
+  is None`` short-circuit, but the step stores an actual ``NoForce()`` (not None) and relies on the loop''s
+  immediate convergence instead.'

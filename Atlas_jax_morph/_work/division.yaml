@@ -1,0 +1,99 @@
+id: division
+order: 8
+raw_name: Division
+raw_kind: step (StochasticStep)
+code_path: papers/jax-morph/jax_morph/physics/division.py:L38-L229
+paper_section: guides/extending.md 'Example A - a discrete Bernoulli step' (the MaybeDivide skeleton this
+  class fills out) and guides/optimization/pathwise.md 'Straight-through discrete events such as Division'.
+  The paper PDF could not be rendered in this environment (no poppler/pdftotext), so the anchors are the
+  installed library guides rather than a figure or equation number in the PDF.
+summary: 'Discrete stochastic macro-step: each alive cell independently divides as a Bernoulli event with
+  probability p = 1 - exp(-division_rate*dt). A committed mother shrinks its radius by the volume-conserving
+  factor 2^(-1/d) and spawns an equal-radius daughter into a free capacity slot, placed just-touching
+  along an orientable direction, with the daughter inheriting every heritable field; lineage is recorded
+  as born/mother and divisions past capacity are capped into a global division_overflow counter rather
+  than crashing.'
+equations: "Probability (hazard over dt) -- _dist L116-119:\n  lambda_i = clip(division_rate_i, 0, inf)\
+  \          # a negative rate is floored to 0 (no division)\n  p_i      = 1 - exp(-lambda_i * dt) = -expm1(-lambda_i*dt)\n\
+  Division draw -- sample_trace L135:\n  divided_i = Bernoulli_ST(p_i) * alive_i           # forward:\
+  \ exact 0/1 sample; backward: d/dp = 1\nPlacement direction -- L136-145  (s = orientation_snr, a_i =\
+  \ division_axis, d = n_space_dim):\n  a_hat_i = a_i / (||a_i|| + 1e-12)\n  xi_i    ~ Normal(0, I_d)\
+  \ / sqrt(d)                 # unit-RMS isotropic noise\n  dir_i   = (s*a_hat_i + xi_i) / (||s*a_hat_i\
+  \ + xi_i|| + 1e-12)\nVolume-conserving radii -- L169,182-183  (m = 2^(-1/d); each daughter's d-volume\
+  \ is half the mother's):\n  committed_i = divide_i AND (a free slot existed)\n  r_mother_i  = r_i *\
+  \ (1 - committed_soft_i*(1 - m))   # = r_i*m for a committed mother\n  r_daughter  = r_i * m       \
+  \                          # scattered into the free slot\nPlacement -- L181-185  (offset uses the NEW\
+  \ radius r_i*m):\n  offset_i   = (r_i*m) * dir_i\n  x_mother_i = x_i + committed_soft_i * offset_i\n\
+  \  x_daughter = x_i - offset_i        # centre separation 2*r_i*m = sum of the two daughter radii\n\
+  Slot allocation -- L174-177  (n = capacity):\n  free_idx   = indices of dead (~alive) slots, padded\
+  \ with n\n  new_slot_i = free_idx[cumsum(divide)-1] if divide_i else n     # n = \"no slot\" -> dropped\n\
+  Overflow -- L204,212-213  (GLOBAL, accumulates across macro-steps):\n  division_overflow += sum(divide)\
+  \ - sum(committed)\nLineage -- L202-203:\n  born[new_slot] = 1 ; mother[new_slot] = parent slot index\
+  \ (sentinel -1 elsewhere)\nScore -- logp L227-228:\n  logp = sum_i bernoulli_logp(divided_i, p_i) *\
+  \ divide_eligible_i   # divide_eligible_i = alive_i at decision\nThe class/module docstring states the\
+  \ same p = 1 - e^{-lambda*dt}; the CODE is authoritative and\nadds the >=0 clip, the straight-through\
+  \ surrogate, the 1e-12 guards, and the capacity cap, none of\nwhich the docstring writes as equations."
+params:
+  n_space_dim: spatial_dimension (static int, must be 1/2/3) -- sets the (d,) shape of division_axis and
+    division_dir AND the volume-conservation exponent m = 2^(-1/d); not a mere array-shape knob.
+  orientation_snr: division_axis_alignment_strength -- amplitude signal-to-noise ratio of oriented vs
+    unit-RMS isotropic placement (0 -> isotropic; larger -> daughters split more sharply along division_axis).
+    Stored as a plain (non-static) field, so an Array value is traced and optimizable.
+  score_by_default: gradient_scoring_default -- bookkeeping flag for whether this step's logp is summed
+    when a scoring driver is called with score=None; NOT a physical parameter.
+state_io:
+  reads:
+  - division_rate
+  - division_axis
+  writes:
+  - position
+  - radius
+  - celltype
+  - alive
+  - division_overflow
+  - born
+  - mother
+  trace_writes:
+  - divided
+  - divide_eligible
+  - division_dir
+  implicit_reads:
+  - alive, radius, position
+  - every cell-scope field
+surprises:
+- The daughter offset uses the NEW (halved) radius r*m, not the mother's pre-division radius, so the two
+  daughters end up exactly touching (centre distance 2*r*m = sum of their radii). Using the old radius
+  would overlap or gap them.
+- 'm = 2^(-1/d) makes the radius shrink DIMENSION-DEPENDENT: n_space_dim silently sets how much a cell
+  shrinks on division (~0.707 in 2D, ~0.794 in 3D), not just array shapes. A hardcoded 1/2, or a 3D factor
+  used in 2D, breaks volume conservation.'
+- 'Capacity is a hard wall: if more cells divide than there are free slots, the surplus dividers are silently
+  DROPPED (new_slot = capacity, mode=''drop'') and counted into the GLOBAL, running division_overflow.
+  The step never errors, so a reimplementer who raises on overflow diverges.'
+- The mother update is soft/differentiable (committed_soft scales its radius and position delta, carrying
+  d/dp=1 from the straight-through Bernoulli), but the daughter slot is written with HARD scatter values
+  -- the hazard gradient flows through the mother side only.
+- Eligibility is recorded as the trace field divide_eligible (= alive at decision) and logp masks by it;
+  re-reading state.alive at score time would be wrong because a division mutates alive mid-macro-step.
+- 'Composition order is load-bearing: Division must precede Death, and slots freed by Death are not recycled
+  until the next macro-step, or the per-step death lineage record is corrupted.'
+- 'Only division_rate and division_axis are DECLARED reads, but replay also reads alive, radius, position
+  and EVERY cell-scope field: the daughter inherits heritable fields from the mother and resets the rest
+  to their default (a recycled dead slot may still hold stale values).'
+- division_rate is clipped to >= 0, so a negative rate is a silent no-division rather than an error; the
+  real per-cell rate and axis are heritable STATE fields, not constructor arguments (the only constructor
+  'physics' knob is orientation_snr).
+- A zero division_axis falls back to pure isotropic placement even at high orientation_snr (safe_norm
+  plus the 1e-12 guard make a_hat = 0), so orientation silently no-ops unless an axis is set.
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

@@ -80,11 +80,70 @@ surprises:
 - 'UNKNOWN I could not establish empirically: whether any oracle script / smoke trajectory actually instantiates
   NeuralODE (vs the gene-network controllers). Its parameter count and typical field bindings in a real
   run are undetermined here - I read the class statically only.'
-verdict: null
+verdict: new
 of: null
-why: null
-contract: null
-status: inspected
+implementation_of: regulate
+why: 'NEW: no registered Plexus contract integrates a per-cell, sensor-driven, internal regulatory ODE.
+
+  NeuralODE is one of THREE interchangeable vector-field implementations (with
+
+  GeneNetworkConnectionist and GeneNetworkMWC) of a SINGLE contract -- a cell-autonomous controller
+
+  that reads sensed driver fields u (held fixed over the macro-step) plus its own evolving
+
+  gene/latent state y, integrates dy/dt = f(u, y) with an adaptive Dopri5 solver, and writes the
+
+  integrated increment back as a sparse dt-delta. The three differ ONLY in f (sigmoid-linear drive,
+
+  log-occupancy MWC drive, or a free-form MLP), so this is the Morse/SoftSphere/Hertzian pattern:
+
+  implementation_of regulate, NOT a separate contract -- the family yields one new contract with
+
+  three implementations, not three contracts. Closest REGISTERED contracts are decay and pacemaker
+
+  (family fields; autonomous temporal dynamics of a per-cell concentration) and sense (a sensed-field
+
+  to cell transduction). Widening any of them does violence to its biology: decay is single-field
+
+  first-order relaxation with no production, no input coupling and no latent state; pacemaker is an
+
+  autonomous periodic clock with no sensed drive; sense emits a steering heading, not an integrated
+
+  multi-gene internal state. A driven, coupled, latent-carrying regulatory circuit is genuinely absent
+
+  from the promoted language. Classified exchange/cell because it transduces sensed input cell-fields
+
+  into gene-output cell-fields with no neighbour map; placed in the fields family as the nearest home
+
+  for per-cell concentration dynamics, with a dedicated regulation/genetics family FLAGGED (not
+
+  declared, to avoid silent family proliferation). Per rule 5 the SOURCE sets scope: this MLP member
+
+  has NO paper counterpart (the paper''s only ODE controller is the gene network eq. 4), so a
+
+  paper-only reimplementer would never build it -- it is a library generalization, recorded here as
+
+  the black-box implementation of the same biological role.
+
+  '
+contract:
+  name: regulate
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - input_specs sensed driver fields u, held fixed over the macro-step
+  - output_specs current gene/output state read back as the ODE initial condition
+  - tag-prefixed hidden latent field, read only when hidden_size > 0
+  writes:
+  - output_specs fields as per-dt gene-expression increments (delta)
+  - tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

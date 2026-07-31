@@ -115,7 +115,7 @@ What changed on 31 July is a different thing: the register of \textbf{assumption
 empty. Ten basics about cell tissue are written down in \texttt{discovery/PREMISES.md} --- not a
 literature review, but the minimum a person needs in order to look at one of our runs and say
 ``that cannot be right''. Each is phrased so that a computer can check it against a run, and each
-one now does (Phase~1a).
+one now does (Phase~1).
 
 The distinction matters. A result is something we found out. A premise is something we are
 \emph{assuming}, stated plainly enough that it can be caught being wrong. Writing the second kind
@@ -406,7 +406,7 @@ Separating the three failure modes is what turns this from a flag into a measure
 
 \paragraph{The retroactive part.} If broken cells were present in the archived runs --- and the
 84\% figure says they were in at least one --- then the runs behind the withdrawn conclusion were
-computed on partly-destroyed meshes. That is a \emph{second, independent} reason Phase~1 must
+computed on partly-destroyed meshes. That is a \emph{second, independent} reason Phase~5 must
 re-measure, and because the three failure modes were blended, the recorded numbers cannot tell us
 how bad it was. We have to re-run with them separated.
 
@@ -493,7 +493,7 @@ two stories in parallel, and the distillation. \textbf{About four to five minute
 number.}
 
 Two items follow, and they are separated deliberately: \emph{measuring} is cheap and goes into
-Phase~0 with the other instruments; \emph{making it fast} is real work and goes into Phase~2b.
+Phase~0 with the other instruments; \emph{making it fast} is real work and goes into Phase~3.
 
 %======================================================================
 \section{What stands between us and the Okuda figure}\label{sec:okuda}
@@ -721,7 +721,7 @@ Not one of the items below is science; each one makes a question \emph{askable}.
 \end{tabular}
 \end{phasebox}
 
-\begin{phasebox}{Phase 1a --- Teach the loop what a tissue is: the premise gate \hfill \dn\ (31 July)}
+\begin{phasebox}{Phase 1 --- Teach the loop what a tissue is: the premise gate \hfill \dn\ (31 July)}
 \textbf{Why this became its own phase.} On 31 July we found ten defects in one day. Every single
 one was found by Cedric looking at a picture --- a ball that shrank, a movie where every cell went
 green, a coral that started uniformly red. Not one was found by the loop. And they were all the
@@ -792,46 +792,6 @@ balance, exactly as he suspected.
 \textbf{Where it lives.} \texttt{discovery/PREMISES.md} (what we believe) and
 \texttt{discovery/premise\_check.py} (what runs). The gate is wired into every run.
 \end{phasebox}
-
-\begin{phasebox}{Phase 1b --- A fresh experiment, on working instruments \hfill \todo\ ($\sim$1 hour, local)}
-\textbf{Not a re-run, and not a comparison.} The earlier overnight study is quarantined, not
-inherited: every one of those runs was measured with at least one instrument since proved wrong,
-and re-running them ``to see if the conclusion survives'' would import the old design and the old
-question. Cedric: \emph{``a new test, not any comparison with the previous overnight run, for which
-I have no confidence anyway.''} Correct --- and I should not have framed it as a comparison.
-
-\textbf{What changes, beyond the instruments}
-\begin{itemize}
-\item \textbf{Several seed spots, not one.} One protrusion per run is a single sample: you cannot
-tell ``this mechanism makes tubes'' from ``this run made a tube''. Several spots give
-\emph{within-run replication for free} --- the spread across tubes in one run is a direct measure
-of reproducibility --- and it is what Okuda shows.
-\item \textbf{Baseline growth on.} The old recipe ran with the growth floor at zero, so the body
-could not grow at all and a protrusion could only be drawn from existing material. That is not a
-setting, it is unphysiological: cells grow by taking up nutrients. The floor goes above zero and
-the activator supplies \emph{extra} growth on top.
-\item \textbf{Chemistry inside the search.} Every reaction--diffusion operator is stage 3 while the
-gate sits at 2, so the entire Turing half --- the number of spots, the diffusion ratio, the reaction
-speed, and the shape-to-chemistry ablation --- is outside the loop's reach. The stage curriculum
-was written when the objective was ``find a tube''; under ``reproduce the figures'' it is backwards.
-Chemistry is not an advanced topic to unlock later, it is half the model.
-\item \textbf{Buffers sized for the destination}, so nothing stops at a ceiling and reports it as
-biology.
-\end{itemize}
-
-\textbf{Runs locally.} Two GPUs; a 260-frame run took 52 seconds on one of them. The cluster is not
-needed and is currently off.
-
-\textbf{The one thing to decide first} --- what the batch is \emph{for}. The map says solo operator
-effects are characterised for \textbf{0 of 8} operators, so the emptiest and cheapest cell to fill
-is ``what does each operator do on its own''. The alternative is to aim straight at the easiest
-morphology to recognise (undulation: many shallow bumps, low elongation). The first builds the map;
-the second buys a scoreboard row. They are both defensible and they are different experiments.
-
-\textbf{What you get.} A batch whose every number was taken with an instrument that has been
-checked --- and, for the first time, an honest reading of what a single operator does.
-\end{phasebox}
-
 \begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \todo\ ($\sim$1 week)}
 \textbf{Goal.} Widen the three out-of-range settings; replace the mislabelled length-scale with the
 quantity Okuda actually varies; add the missing shape-to-chemistry feedback; add a fixture that
@@ -841,8 +801,7 @@ asserts his published constants rather than tuning them.
 
 \textbf{What you get.} A list of what now matches his paper and what still does not, with reasons.
 \end{phasebox}
-
-\begin{phasebox}{Phase 2b --- Switch on the two agents that never run \hfill \todo\ (1 day)}
+\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \todo\ (1 day)}
 \textbf{Goal.} Put \textbf{Evolution} and the \textbf{Referee} into the live round
 (\S\ref{sec:agents}); run the twenty per-run calls together instead of one after another; move
 the proposal off the critical path by starting it while the simulations run. Target: \textbf{a
@@ -890,8 +849,7 @@ and the Supervisor does not own this --- it holds the objective, not the method.
 measured wall-clock against the five-minute target, and a batch that was rejected for asserting
 cause without testing necessity.
 \end{phasebox}
-
-\begin{phasebox}{Phase 3 --- Measurements that can tell his regimes apart \hfill \todo\ (2 days)}
+\begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \todo\ (2 days)}
 \textbf{Goal.} Four measurements: how many spots, how thick the tube, how many branches over time,
 and the shape of the surface. Calibrate against his roughly five spots at 2000 cells, then freeze
 the calibration.
@@ -901,26 +859,64 @@ a branch --- precisely the three outcomes the figure has to show.
 
 \textbf{What you get.} The four numbers, checked against his published figures.
 \end{phasebox}
+\begin{phasebox}{Phase 5 --- The experiment, on an apparatus that is finally complete \hfill \todo\ ($\sim$1 hour, local)}
+\textbf{Why this moved to the end.} It used to sit right after the instrument repair, and Cedric
+moved it behind Phases~2--4. He is right, and the reason is the same lesson that cost us 31 July.
+Phase~4 is not a feature phase --- it is an \emph{instrument} phase: ``measurements that can tell
+his regimes apart''. Running the experiment before it means taking a batch with rulers that cannot
+distinguish the answers we are asking for, reading a plausible result off them, and then re-running
+everything once the real rulers exist. That is precisely what happened three times today, and each
+time the batch was thrown away.
 
-\begin{phasebox}{Phase 3b --- Point the camera \emph{along the tube} \hfill \todo\ (half a day)}
-\textbf{Goal.} Phase~0 makes the camera honest --- fixed frame, second viewpoint. This phase makes
-it \emph{smart}: lock it to the tube's own axis, one view side-on and one looking straight down the
-tube.
+The rule that follows is simple enough to state once: \textbf{no experiment until every instrument
+it will be read with exists and has been proved to work.} Phase~2 makes Okuda's settings reachable,
+Phase~3 switches on the agents that would notice a problem, Phase~4 builds the measurements that
+can tell his three morphologies apart. Only then is there any point running the thing.
 
-\textbf{Why.} The end-on view \emph{is} the thickness and branch-count measurement, so camera and
-measurement share one axis. It is a refinement, not a repair --- the repair is in Phase~0.
+\textbf{Not a re-run, and not a comparison.} The earlier overnight study is quarantined, not
+inherited: every one of those runs was measured with at least one instrument since proved wrong,
+and re-running them ``to see if the conclusion survives'' would import the old design and the old
+question. Cedric: \emph{``a new test, not any comparison with the previous overnight run, for which
+I have no confidence anyway.''} Correct --- and I should not have framed it as a comparison.
 
-\textbf{What you get.} Movies in which the tube is always in full profile, whichever way it grew.
+\textbf{What changes, beyond the instruments}
+\begin{itemize}
+\item \textbf{Several seed spots, not one.} One protrusion per run is a single sample: you cannot
+tell ``this mechanism makes tubes'' from ``this run made a tube''. Several spots give
+\emph{within-run replication for free} --- the spread across tubes in one run is a direct measure
+of reproducibility --- and it is what Okuda shows.
+\item \textbf{Baseline growth on.} The old recipe ran with the growth floor at zero, so the body
+could not grow at all and a protrusion could only be drawn from existing material. That is not a
+setting, it is unphysiological: cells grow by taking up nutrients. The floor goes above zero and
+the activator supplies \emph{extra} growth on top.
+\item \textbf{Chemistry inside the search.} Every reaction--diffusion operator is stage 3 while the
+gate sits at 2, so the entire Turing half --- the number of spots, the diffusion ratio, the reaction
+speed, and the shape-to-chemistry ablation --- is outside the loop's reach. The stage curriculum
+was written when the objective was ``find a tube''; under ``reproduce the figures'' it is backwards.
+Chemistry is not an advanced topic to unlock later, it is half the model.
+\item \textbf{Buffers sized for the destination}, so nothing stops at a ceiling and reports it as
+biology.
+\end{itemize}
+
+\textbf{Runs locally.} Two GPUs; a 260-frame run took 52 seconds on one of them. The cluster is not
+needed and is currently off.
+
+\textbf{The one thing to decide first} --- what the batch is \emph{for}. The map says solo operator
+effects are characterised for \textbf{0 of 8} operators, so the emptiest and cheapest cell to fill
+is ``what does each operator do on its own''. The alternative is to aim straight at the easiest
+morphology to recognise (undulation: many shallow bumps, low elongation). The first builds the map;
+the second buys a scoreboard row. They are both defensible and they are different experiments.
+
+\textbf{What you get.} A batch whose every number was taken with an instrument that has been
+checked --- and, for the first time, an honest reading of what a single operator does.
 \end{phasebox}
-
-\begin{phasebox}{Phase 4 --- The demonstration \hfill \todo\ (one wave, $\sim$1 hour)}
+\begin{phasebox}{Phase 6 --- The demonstration \hfill \todo\ (one wave, $\sim$1 hour)}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at his settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
-
-\begin{phasebox}{Phase 5 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 7 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 
@@ -984,9 +980,9 @@ able to tell whether a \emph{simulation} succeeded --- did it finish, is the mes
 numbers finite. It has never been able to tell whether the \emph{specimen} was a tissue. Those are
 different questions, and only the second one was ever going to catch a ball that quietly implodes.
 
-Phase~1a is the answer to it: ten premises about tissue, each one executable, each one proved to
+Phase~1 is the answer to it: ten premises about tissue, each one executable, each one proved to
 fail on a case where it should. Whether that is enough is the next thing to find out --- and the
-only way to find out is to run Phase~1b and see whether the gate catches anything before Cedric
+only way to find out is to run Phase~5 and see whether the gate catches anything before Cedric
 does.
 
 \subsection{What came out of it that is worth keeping}
@@ -1077,10 +1073,10 @@ a tuning.
 \item \textbf{A crash mid-round still loses that round's timing} --- the bookkeeping runs on every
 normal exit but there is no protection against an exception.
 \item \textbf{The default growth headroom still hits a wall} at the small starting size. It is now
-\emph{flagged} rather than silent, but Phase~1 must set it explicitly or it will reproduce the
+\emph{flagged} rather than silent, but Phase~5 must set it explicitly or it will reproduce the
 original artefact in a visible form.
-\item \textbf{The Phase~1 renderer did not get the second viewpoint.} The camera was repaired in
-the campaign's path, not in the study's. It must be fixed before Phase~1 runs, or those movies stay
+\item \textbf{The Phase~5 renderer did not get the second viewpoint.} The camera was repaired in
+the campaign's path, not in the study's. It must be fixed before Phase~5 runs, or those movies stay
 half-blind.
 \item Rendering is about twice as slow. Acceptable.
 \end{itemize}

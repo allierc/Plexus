@@ -99,11 +99,75 @@ mechanisms:
   - _rescaled_sigmoid deliberately clips x to the dtype's finite range and rescales x*x to avoid float32
     overflow/NaN at large |drive|; a naive x/sqrt(1+x^2) can overflow before the ODE solver would otherwise
     diverge.
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: regulate
+  why: 'No registered contract expresses a per-cell INTERNAL regulatory dynamical system: a heritable
+
+    gene-state vector whose autonomous per-cell ODE (dense recurrent gene->gene coupling through a
+
+    saturating nonlinearity + linear decay + a learnable drive from SENSED external fields) is
+
+    integrated over the macro-step to emit the action-setting outputs that division / secretion /
+
+    adhesion steps read. The closest registered contract is `signal` -- a first-order recurrent
+
+    network ODE (its own MECHANISM_TAGS include "recurrent"), with the same -decay + bias +
+
+    saturated-weighted-drive skeleton. But `signal` is LATERAL: its recurrence runs BETWEEN nodes
+
+    across a fixed connectome EDGE-SET, and its typed signature is load-bearing on that topology --
+
+    INPUTS ["neuron","synapse"], MAPS ["pre","post"], REQUIRES_PARAMS ["edge_set"], activation on
+
+    the PRESYNAPTIC input. The gene circuit has NO edge set and NO cross-cell coupling: W_gene is a
+
+    dense WITHIN-cell gene->gene matrix applied independently per cell (vmap), the sigmoid wraps the
+
+    WHOLE production drive, and the environmental drive enters via W_in on sensed FIELDS -- a term
+
+    `signal` has no place for. Widening `signal` to admit it would force MAPS / edge_set to become
+
+    optional and add a field-input coupling, i.e. delete the "connectome signalling across a
+
+    connectome" that IS the contract for its only user (a neuron network), converting a lateral
+
+    graph operator into a per-cell field->state controller. That is a different contract, not a
+
+    widening. Near-misses that also fail: `sense` / `chemotax` (exchange/fields) read a field into
+
+    cell state but carry no internal heritable state and no recurrent dynamics; `pacemaker` is a
+
+    per-cell internal temporal SOURCE but a fixed-form oscillator with no input coupling and no
+
+    learnable regulatory matrix. So: `new`. This class is the CONNECTIONIST (linear-drive)
+
+    implementation of the contract; GeneNetworkMWC (thermodynamic log-occupancy drive) and NeuralODE
+
+    (black-box MLP vector field) are sibling implementations of the SAME `regulate` contract, so the
+
+    three ODEController subclasses collapse to ONE new contract, not three -- the convergence result
+
+    the ledger is meant to record.
+
+    '
+  contract:
+    name: regulate
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    - sensed_input_fields
+    outputs:
+    - cell
+    reads:
+    - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
+    - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)
+    writes:
+    - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -193,11 +257,70 @@ mechanisms:
   - 'UNKNOWN I could not establish empirically: whether any oracle script / smoke trajectory actually
     instantiates NeuralODE (vs the gene-network controllers). Its parameter count and typical field bindings
     in a real run are undetermined here - I read the class statically only.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: regulate
+  why: 'NEW: no registered Plexus contract integrates a per-cell, sensor-driven, internal regulatory ODE.
+
+    NeuralODE is one of THREE interchangeable vector-field implementations (with
+
+    GeneNetworkConnectionist and GeneNetworkMWC) of a SINGLE contract -- a cell-autonomous controller
+
+    that reads sensed driver fields u (held fixed over the macro-step) plus its own evolving
+
+    gene/latent state y, integrates dy/dt = f(u, y) with an adaptive Dopri5 solver, and writes the
+
+    integrated increment back as a sparse dt-delta. The three differ ONLY in f (sigmoid-linear drive,
+
+    log-occupancy MWC drive, or a free-form MLP), so this is the Morse/SoftSphere/Hertzian pattern:
+
+    implementation_of regulate, NOT a separate contract -- the family yields one new contract with
+
+    three implementations, not three contracts. Closest REGISTERED contracts are decay and pacemaker
+
+    (family fields; autonomous temporal dynamics of a per-cell concentration) and sense (a sensed-field
+
+    to cell transduction). Widening any of them does violence to its biology: decay is single-field
+
+    first-order relaxation with no production, no input coupling and no latent state; pacemaker is an
+
+    autonomous periodic clock with no sensed drive; sense emits a steering heading, not an integrated
+
+    multi-gene internal state. A driven, coupled, latent-carrying regulatory circuit is genuinely absent
+
+    from the promoted language. Classified exchange/cell because it transduces sensed input cell-fields
+
+    into gene-output cell-fields with no neighbour map; placed in the fields family as the nearest home
+
+    for per-cell concentration dynamics, with a dedicated regulation/genetics family FLAGGED (not
+
+    declared, to avoid silent family proliferation). Per rule 5 the SOURCE sets scope: this MLP member
+
+    has NO paper counterpart (the paper''s only ODE controller is the gene network eq. 4), so a
+
+    paper-only reimplementer would never build it -- it is a library generalization, recorded here as
+
+    the black-box implementation of the same biological role.
+
+    '
+  contract:
+    name: regulate
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - input_specs sensed driver fields u, held fixed over the macro-step
+    - output_specs current gene/output state read back as the ODE initial condition
+    - tag-prefixed hidden latent field, read only when hidden_size > 0
+    writes:
+    - output_specs fields as per-dt gene-expression increments (delta)
+    - tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -303,11 +426,82 @@ mechanisms:
     ln(1+g_i/K_gene_ii). n_gene = hidden_size + out_size, and output genes are ordered so the last output
     is the readout consumed downstream (paper: last output gene = division propensity, last Nc = secretion
     rates) -- ordering of output_specs is semantically load-bearing, not documented in this class.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: regulate
+  why: 'No registered contract expresses a per-cell INTERNAL regulatory dynamical system: a heritable
+
+    gene-state vector whose autonomous per-cell ODE is integrated over one macro-step -- reading the
+
+    cell''s own gene concentrations plus a fixed snapshot of SENSED external fields, and emitting the
+
+    sparse gene-expression deltas that division / secretion / adhesion steps read. This class is the
+
+    THERMODYNAMIC (MWC / statistical-mechanics log-occupancy) implementation of that contract: its
+
+    vector field is dg/dt = rho*sigmoid(F0 + sum H*ln(1+g/K)) - g/tau. Its two siblings in the same
+
+    file -- GeneNetworkConnectionist (linear W*g drive) and NeuralODE (black-box MLP vector field) --
+
+    share the SAME integration and I/O contract and differ ONLY in the vector field f. This is the
+
+    Morse/SoftSphere/Hertzian pattern: the three ODEController subclasses collapse to ONE contract
+
+    `regulate` with three implementations, NOT three contracts -- so `implementation_of: regulate`,
+
+    and the phase yields one new contract, not an inflated three. The verdict is `new` (not
+
+    alias/refinement) only because `regulate` is absent from the frozen 42 and therefore cannot be an
+
+    `of:` target until it is promoted; R4 rejects a non-registered `of:`. The closest REGISTERED
+
+    contracts all lose their biology if widened to admit this. `signal` (lateral/interaction) is a
+
+    recurrent nonlinear first-order ODE network -- the same -decay + bias + saturated-drive skeleton
+
+    -- but its recurrence runs BETWEEN nodes across a fixed connectome EDGE-SET (INPUTS neuron/synapse,
+
+    MAPS pre/post, REQUIRES edge_set); the gene circuit has NO edge set and no cross-cell coupling:
+
+    H_gene is a dense WITHIN-cell gene->gene matrix applied independently per cell (vmap), and the
+
+    environmental drive enters via H_in*ln(1+u/K_in) on sensed FIELDS, a term `signal` has no slot
+
+    for. Widening `signal` to fit would make MAPS/edge_set optional and bolt on field sensing -- i.e.
+
+    delete the connectome signalling that IS the contract for its only user. Other near-misses fail
+
+    too: `sense` / `chemotax` (exchange/fields) read a field into cell state but carry no heritable
+
+    internal state and no recurrent dynamics; `decay` is a bare first-order relaxation with no
+
+    production and no coupling; `pacemaker` is a fixed-form autonomous clock with no sensed drive and
+
+    no learnable regulatory matrix. Per rule 5 the SOURCE sets scope: this MWC log-occupancy drive is
+
+    NOT in the paper (which states only the linear connectionist eq. 4), so it is a code-only
+
+    thermodynamic variant recorded as the third implementation of the same biological role.
+
+    '
+  contract:
+    name: regulate
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    - sensed_input_fields
+    outputs:
+    - cell
+    reads:
+    - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
+    - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics, held fixed
+      over dt)
+    writes:
+    - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -389,11 +583,82 @@ mechanisms:
   - 'The `key` argument is accepted for the uniform step interface but unused (del key): the step is deterministic.
     The ODE is integrated for ALL cell slots including dead ones; the Model''s _accumulate_dynamic alive-masks
     dead slots to zero afterward, so the step does not mask itself.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'No registered contract covers a per-cell, continuous-time internal regulatory network -- an
+
+    intracellular gene-regulatory / signaling ODE that reads the cell''s sensed driver fields (held
+
+    fixed for the step), evolves a coupled vector of latent + output gene concentrations over the
+
+    developmental macro-step, and persists the result as heritable per-cell state. This is the
+
+    genotype->phenotype DECISION FUNCTION of the paper''s cells (its output genes set division,
+
+    secretion and adhesion rates read by downstream steps), and the promoted language has no operator
+
+    for it. Closest registered contract is `decay` (fields): dg/dt = production - gamma*g literally
+
+    contains decay''s linear degradation term, so a maximalist could call this a widening of `decay`.
+
+    But `decay` is an elementwise, single-field, in-place evaporation (c <- max(0, c - k*dt)) with no
+
+    production, no cross-field coupling, no inputs and no memory; widening it to admit a
+
+    sensed-input-forced, nonlinearly-regulated, multi-gene system integrated by an adaptive
+
+    continuous-time solver with heritable latent state would erase everything that makes `decay`
+
+    `decay` -- the degradation term would be one line of a network it cannot name. `pacemaker` (a
+
+    per-cell temporal SOURCE) is the next closest, since both emit a per-cell time-varying signal, but
+
+    pacemaker "owns ONLY timing": an open-loop clock with no state feedback, no sensed drive and no
+
+    coupling, so a closed-loop regulated circuit is not a pacemaker. `sense`/`chemotax` couple a field
+
+    to agent MOTION, not to internal chemistry. Hence `new`. This entry is the ABSTRACT base that
+
+    carries the contract (state_reads/state_writes + the macro-step integration machinery + an
+
+    abstract vector_field); its three subclasses GeneNetworkConnectionist, GeneNetworkMWC and NeuralODE
+
+    are interchangeable IMPLEMENTATIONS of this one `regulate` contract, differing only in the reaction
+
+    law -- exactly the several-implementations-per-contract shape a mature vocabulary should show, so
+
+    they should each carry implementation_of: regulate rather than a fresh contract.
+
+    Classification note: kind=exchange (not field) because a SET is involved -- Plexus''s FieldUpdate
+    is
+
+    defined as "no set involved" (pure grid dynamics), whereas this transduces the cell''s own sensed
+
+    driver fields into its gene-expression fields; maps=[] because, unlike the gather-based exchanges
+
+    (chemotax/sense read a spatial field), the coupling is entirely among the cell''s own per-cell
+
+    fields with no spatial gather and no neighbour edges (each cell integrates independently).
+
+    '
+  contract:
+    name: regulate
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - driver_inputs
+    - gene_state
+    - hidden_state
+    writes:
+    - gene_state
+    - hidden_state
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -484,11 +749,78 @@ mechanisms:
     a reparameterizable pathwise branch (replay(pathwise=True)) and an oriented placement -- a second,
     lower-variance gradient path the paper never mentions. The two estimators must not be summed in one
     run (division.py L1-8); the source is authoritative here.'
-  verdict: null
+  verdict: out_of_scope
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'StochasticStep is an ABSTRACT differentiability mixin, not a forward-dynamics operator. Its own
+
+    state_writes() and trace_writes() both default to (): it writes no physical state of its own and
+
+    adds exactly one non-physical constructor knob (score_by_default, a scoring-inclusion flag). Its
+
+    entire content is the gradient-estimator machinery -- sample parameter-free exogenous noise,
+
+    replay it to produce the effect, and score each selected step''s logp -- i.e. the REINFORCE /
+
+    score-function estimator (paper p. 10) for discrete events plus a reparameterized pathwise branch
+
+    the model selects via `pathwise = not scored`. That is autodiff / optimization plumbing. In
+
+    Plexus, differentiability is an ENGINE concern (torch autograd over the forward operators), not an
+
+    operator in the forward algebra, so there is nothing here for the vocabulary to gain.
+
+
+    The biology lives entirely in the concrete subclasses, each already its own atlas entry and each
+
+    carrying its own real contract: a Bernoulli division IS `cell_divide` (order 26 `division`), death
+
+    IS apoptosis (order 6 `death`), a Brownian displacement IS motion. The mixin adds nothing to those
+
+    forward effects; it adds only the gradient PATH (which estimator, how the trace round-trips into
+
+    scoring). Hence not `alias`/`refinement`: no registered contract models gradient estimation, and
+
+    widening one to admit trace/replay/score would graft an optimization concern onto a
+
+    forward-dynamics signature. And not `new`: counting a differentiability contract as a new operator
+
+    would inflate the yield with framework machinery, exactly the failure out_of_scope exists to
+
+    prevent. The strongest counter -- "an operator whose effect is a scored random draw" is a genuine
+
+    gap -- is rejected because that forward effect already has a biological home in the subclass''s own
+
+    contract; only the AD path is left over, and that is not a forward operation on state.
+
+
+    SOURCE-vs-PAPER (recorded in surprises): the paper describes ONLY the discrete score-function
+
+    estimator and a uniformly-random division plane; the code additionally supports a reparameterized
+
+    pathwise branch and oriented placement -- a lower-variance path the paper never mentions. The two
+
+    estimators must not be summed in one run (division.py L1-8); the source is authoritative.
+
+
+    OVERLAP: the sibling entry `stochastic_trace___replay___score` (order 24) is the SAME
+
+    core/step.py:148 class and should receive the same out_of_scope verdict.
+
+    '
+  contract:
+    name: sample_score
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads: []
+    writes:
+    - trace
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -575,11 +907,57 @@ mechanisms:
     -- so survival/death objectives must use the SCORE-FUNCTION gradient via `logp` (REINFORCE), never
     a pathwise gradient through the alive mask. A discrete node has nothing to reparameterize; `replay`
     ignores `pathwise`. Use exactly one estimator per run, never both.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'No registered contract removes cells or models cell death. The frozen baseline has proliferation
+
+    (cell_divide) and size change (cell_grow) in the growth family, but nothing that RETIRES a set
+
+    member. The closest contract is cell_divide, and the resemblance is real -- Death shares its exact
+
+    Bernoulli hazard p = 1 - exp(-death_rate*dt), its >=0 rate clip, its straight-through discrete
+
+    draw, its {action}_eligible trace convention, and its structural/growth/cell typing. But it is
+
+    cell_divide''s biological INVERSE: division wakes a dormant slot (occ 0->1), shrinks the mother
+
+    by 2^(-1/d), scatters a volume-conserving daughter that inherits the mother''s heritable state,
+
+    and records born/mother lineage; Death flips `alive` True->False (a live slot 1->0), frees no slot
+
+    within the macro-step, and writes a per-step float `death` lineage record. Widening cell_divide to
+
+    also destroy set members would force ONE contract to both create and remove cells -- violence to
+
+    its biology (mitosis is not apoptosis; the paper itself lists division as a cell capability and
+
+    never mentions death, see surprises). The shared Bernoulli-hazard timing is an interchangeable
+
+    IMPLEMENTATION detail -- death could equally be threshold- or stress-triggered -- not contract
+
+    identity, which Plexus fixes by what the operator does to the state (its outputs/writes and
+
+    semantics), not by the noise model it borrows. Hence `new`: a distinct structural/growth operator
+
+    `apoptose` on the cell set, not an alias or refinement of cell_divide.
+
+    '
+  contract:
+    name: apoptose
+    kind: structural
+    family: growth
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - death_rate
+    writes:
+    - alive
+    - death
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:

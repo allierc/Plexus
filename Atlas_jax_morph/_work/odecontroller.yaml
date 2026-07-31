@@ -70,11 +70,81 @@ surprises:
 - 'The `key` argument is accepted for the uniform step interface but unused (del key): the step is deterministic.
   The ODE is integrated for ALL cell slots including dead ones; the Model''s _accumulate_dynamic alive-masks
   dead slots to zero afterward, so the step does not mask itself.'
-verdict: null
+verdict: new
 of: null
-why: null
-contract: null
-status: inspected
+why: 'No registered contract covers a per-cell, continuous-time internal regulatory network -- an
+
+  intracellular gene-regulatory / signaling ODE that reads the cell''s sensed driver fields (held
+
+  fixed for the step), evolves a coupled vector of latent + output gene concentrations over the
+
+  developmental macro-step, and persists the result as heritable per-cell state. This is the
+
+  genotype->phenotype DECISION FUNCTION of the paper''s cells (its output genes set division,
+
+  secretion and adhesion rates read by downstream steps), and the promoted language has no operator
+
+  for it. Closest registered contract is `decay` (fields): dg/dt = production - gamma*g literally
+
+  contains decay''s linear degradation term, so a maximalist could call this a widening of `decay`.
+
+  But `decay` is an elementwise, single-field, in-place evaporation (c <- max(0, c - k*dt)) with no
+
+  production, no cross-field coupling, no inputs and no memory; widening it to admit a
+
+  sensed-input-forced, nonlinearly-regulated, multi-gene system integrated by an adaptive
+
+  continuous-time solver with heritable latent state would erase everything that makes `decay`
+
+  `decay` -- the degradation term would be one line of a network it cannot name. `pacemaker` (a
+
+  per-cell temporal SOURCE) is the next closest, since both emit a per-cell time-varying signal, but
+
+  pacemaker "owns ONLY timing": an open-loop clock with no state feedback, no sensed drive and no
+
+  coupling, so a closed-loop regulated circuit is not a pacemaker. `sense`/`chemotax` couple a field
+
+  to agent MOTION, not to internal chemistry. Hence `new`. This entry is the ABSTRACT base that
+
+  carries the contract (state_reads/state_writes + the macro-step integration machinery + an
+
+  abstract vector_field); its three subclasses GeneNetworkConnectionist, GeneNetworkMWC and NeuralODE
+
+  are interchangeable IMPLEMENTATIONS of this one `regulate` contract, differing only in the reaction
+
+  law -- exactly the several-implementations-per-contract shape a mature vocabulary should show, so
+
+  they should each carry implementation_of: regulate rather than a fresh contract.
+
+  Classification note: kind=exchange (not field) because a SET is involved -- Plexus''s FieldUpdate is
+
+  defined as "no set involved" (pure grid dynamics), whereas this transduces the cell''s own sensed
+
+  driver fields into its gene-expression fields; maps=[] because, unlike the gather-based exchanges
+
+  (chemotax/sense read a spatial field), the coupling is entirely among the cell''s own per-cell
+
+  fields with no spatial gather and no neighbour edges (each cell integrates independently).
+
+  '
+contract:
+  name: regulate
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - driver_inputs
+  - gene_state
+  - hidden_state
+  writes:
+  - gene_state
+  - hidden_state
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:
