@@ -201,6 +201,64 @@ a unit it did not recognise, it declined 32 times rather than inventing 32 confi
 \end{itemize}
 
 %======================================================================
+\section{The grey cells --- a broken mesh that nothing stops}\label{sec:phantom}
+
+You saw grey faces in the videos where cells should be white or red, and read it as the cell
+representation breaking. I went through the code. \textbf{You are right, and the situation is
+worse than not-noticing: it is noticed, blended into an average, and then ignored.}
+
+\textbf{Why grey.} A cell is drawn as a little block: a coloured top face and darker side walls,
+the sides shaded to 72\% brightness so they only show at the silhouette. An unactivated cell is
+white, so \emph{its side walls are grey}. Seeing grey head-on means you are looking at the side of
+a cell where its top should be --- the cell has folded over, collapsed, or turned inside out.
+
+\paragraph{1. Does the system see it?} \emph{Partly, and in the worst possible way.} There is a
+measurement, and it lumps three completely different problems into one number: caps that have
+folded over; slivers so thin they are barely cells (often harmless --- a cell that just divided);
+and cells with fewer than three neighbours, which is \textbf{genuinely broken topology}, a cell
+that is no longer a cell. All three land in a single figure. A reading of ``20\% flagged'' could
+be twenty percent of mildly bent caps or twenty percent of destroyed cells, and nothing
+distinguishes them.
+
+Worse, a proper validity test \emph{exists in this codebase} and is used by the two-dimensional
+runners --- and was never wired into the three-dimensional path the entire campaign runs on. That
+is now the third time we have found a guard that was written and then not installed where the
+danger was.
+
+\paragraph{2. Does it care?} \textbf{No.} That number is recorded and nothing acts on it. In my
+overnight study one setting flagged \textbf{84\% of cells}. It still produced a protrusion number,
+that number was still scored, still ranked, and still went into my conclusions. Nothing anywhere
+refused it.
+
+\paragraph{3. Does it do anything about it?} \textbf{No.} There is no check when the topology
+actually changes --- not after a cell divides, not after neighbours swap. The validation plan
+specifies exactly these checks. They were never built.
+
+\paragraph{4. What should happen, and who decides?} Both specification and code, and the
+specification first, because the definition is the hard part.
+
+\begin{itemize}
+\item \textbf{Separate the three failure modes.} A folded cap, a fresh sliver and a cell with two
+neighbours are not the same event and must never again share an average.
+\item \textbf{Check where the topology changes}, not at render time. By the time you can see it,
+the physics has already run on a broken mesh for hundreds of frames.
+\item \textbf{A broken mesh makes a run \emph{not evidence}} --- the same status as a run that
+overflowed its buffer. Not a poor score: \emph{no} score. Once the mesh is invalid the physics has
+been integrating nonsense, so every number after that moment is meaningless, including the good
+ones.
+\item \textbf{Who:} the \textbf{Metrologist} owns the standard, since it owns the validation
+plan and is the only role that can retract things already recorded. The \textbf{Critic} applies it
+--- free, automatic, before anything is scored. Not the eye-check: by the time grey is visible on a
+video, the run is already paid for.
+\end{itemize}
+
+\paragraph{The retroactive part.} If broken cells were present in the archived runs --- and the
+84\% figure says they were in at least one --- then the runs behind the withdrawn conclusion were
+computed on partly-destroyed meshes. That is a \emph{second, independent} reason Phase~1 must
+re-measure, and because the three failure modes were blended, the recorded numbers cannot tell us
+how bad it was. We have to re-run with them separated.
+
+%======================================================================
 \section{The team of agents --- what is actually switched on}\label{sec:agents}
 
 You were told 6 of 12 are implemented or used. I audited it directly against the code rather than
@@ -318,18 +376,106 @@ five spots on a 2000-cell ball. Tune our diffusion until we get five spots at 20
 freeze it. That is a calibration against an observation, and it sidesteps the units problem
 entirely.
 
-\subsection{What is left after that}
+\subsection{What is left after that --- in full}
 
-\begin{itemize}
-\item \textbf{Two ranges are simply too narrow} --- the sharpness of the growth switch (he uses 10,
-we allow up to 8) and how far the inhibitor spreads (he uses 10, we allow up to 2). Widening two
-numbers.
-\item \textbf{One real gap.} In Okuda's model the chemistry responds to the tissue's \emph{shape}:
-chemical flows between neighbouring cells in proportion to how much wall they share. Ours ignores
-geometry entirely, so patterning cannot react to deformation. This probably does not block the
-plain tube, but it is likely to matter for \emph{branching}, where domains split as cells stretch.
-This is the one item that is genuine work rather than a number change.
-\end{itemize}
+Three things remain once the starting conditions are right. Two are numbers; one is not.
+
+\paragraph{(a) How sharply a cell decides to grow.}
+Each cell reads the local chemical concentration and decides how fast to grow. The question is how
+\emph{abruptly} it decides. One number controls that. At the low end the response is gentle and
+proportional: a cell with a little chemical grows a little, a cell with a lot grows a lot, and
+every cell in the tissue is growing to some degree. At the high end it becomes almost a switch:
+below a threshold a cell does nothing at all, above it the cell grows at full rate, and there is
+almost nothing in between.
+
+\textbf{Okuda uses 10. Our search is allowed up to 8.} That sounds like a small shortfall, but the
+behaviour is very nonlinear in this number and the difference is not cosmetic --- it is the
+difference between a bulge and a tube.
+
+Here is why. With a gentle response, the whole ball inflates and the chemical spot merely inflates
+slightly faster than its surroundings: you get a broad, soft swelling with no clear edge. With a
+sharp switch, the tissue divides into two populations --- growing and not growing --- separated by
+a crisp boundary. \emph{That boundary is the neck.} A tube is not simply a region that grew; it is
+a region that grew while the tissue immediately around it stayed put and held the base narrow.
+Without a sharp switch there is nothing to hold the base narrow, and a tube relaxes into a dome.
+
+\textbf{Fix: widen one range.} Half an hour of work.
+
+\paragraph{(b) How far the inhibitor travels compared with the activator.}
+The surface pattern is made by two chemicals. One is self-reinforcing and short-range --- it builds
+up locally and makes more of itself. The other suppresses it and travels further. Wherever the
+first wins locally you get a spot; the second spreads out around that spot and stops another
+forming too close. \textbf{The ratio of the two travel distances sets the spacing of the spots}, and
+therefore how many appear on a ball of a given size.
+
+Okuda's inhibitor spreads with a value of 10 against the activator's 1. \textbf{Our search allows
+at most 2.} With a ratio that low the inhibitor barely outruns the activator, which puts us close
+to the edge of where any pattern forms at all --- and where one does form, it is the wrong pattern:
+many small spots crowded together, or a fine speckle, instead of a few well-separated domains.
+
+This is why we cannot currently produce his roughly five spots on a two-thousand-cell ball. It also
+means \textbf{this is the number we calibrate}, rather than copying: turn it up until we count five
+spots at two thousand cells, then freeze it and never touch it again. Matching a thing he
+\emph{observed} is safe; matching a parameter value across two differently-scaled models is not.
+
+\textbf{Fix: widen one range, then calibrate against a spot count.} Half a day.
+
+\paragraph{(c) The real gap: the tissue's shape does not feed back into the chemistry.}
+The coupling between chemistry and shape is supposed to run in both directions. Ours runs in one.
+
+\emph{Chemistry to shape} works: a cell with a lot of chemical grows, the tissue deforms. That half
+is built and it is what produces the bulges we have seen.
+
+\emph{Shape to chemistry} is absent. Chemical moves between neighbouring cells, and in Okuda's
+model the amount that moves depends on the geometry --- how much wall two cells actually share, and
+how much volume the receiving cell has to dilute it into. Our code does something much cruder: each
+cell simply \textbf{averages its neighbours}, counting each one equally. Two cells sharing a thin
+sliver of wall exchange exactly as much chemical as two sharing a broad face. A cell stretched to
+twice its volume dilutes its contents exactly as if it had not stretched at all.
+
+The consequence is that \textbf{deformation is invisible to the chemistry}. The pattern sits on the
+tissue like a decal: the tissue can bend, stretch and grow underneath it, and the pattern carries on
+as though nothing happened.
+
+\textbf{Why this probably does not block a plain tube.} A tube needs one thing from the chemistry:
+a spot that stays put and stays on. A decal does that perfectly well. So we may get tubes without
+touching this.
+
+\textbf{Why it almost certainly blocks branching.} Branching, in Okuda's account, is a consequence
+of the feedback we are missing. A tube grows; the cells at its tip stretch and their volumes
+change; that dilutes the chemical unevenly across the tip; the single chemical domain splits into
+two; the growth zone splits with it; and the tube forks. \emph{Every step of that chain runs through
+shape affecting chemistry.} With the feedback missing, a tube in our model can grow indefinitely but
+has no mechanism by which it could ever decide to divide. We would not get branching, and --- worse
+--- we would not know whether that was a real result or our missing arrow.
+
+\textbf{Fix --- and it belongs in the pre-flight, not later.} Write the flow between two cells so
+it is weighted by their shared wall area and divided by the receiving cell's volume. The mesh
+already knows both quantities; they are simply not being used.
+
+This is a \emph{second implementation of a contract we already have}, not a new concept: same set
+of things it acts on, same kind of operation, same family. So no decision about the language is
+needed --- it is exactly the split between ``what a mechanism is'' and ``how it is realised''
+working as intended, in the same way that three different chemistries already sit behind one
+reaction contract.
+
+\textbf{The payoff is bigger than the fix.} Today the diffusion operator has only one
+implementation, and the code does not even offer swapping it as a move --- so the loop could not
+test this even if it wanted to. Register the geometric version alongside the blind one and mark
+the swap as a real mechanism change, and the necessity experiment becomes a \emph{single legal
+move the loop can propose by itself}: run the same composition with geometry-aware flow and with
+geometry-blind flow, and see which phenotypes survive. That is the ablation that produces the claim
+Okuda never makes --- \emph{branching requires this arrow} --- and it is expressible in the search
+language rather than being something we run by hand.
+
+Then: write it, test it against the case where it must agree with the old one (all walls equal, all
+volumes equal), promote it into the shared codebase with its declarations, and re-run the spot
+calibration --- changing how the chemical spreads changes how far it spreads.
+
+\medskip
+\textbf{In short:} two numbers to widen, one of which we then calibrate against something Okuda
+actually reported --- and one missing arrow, which we can probably reach a tube without, but
+certainly cannot reach branching without.
 
 %======================================================================
 \section{The phases}
@@ -357,6 +503,18 @@ his, and size the buffer for where the run is going rather than where it began. 
 \item \textbf{Put a stopwatch on every agent call} (\S\ref{sec:agents}). Route them through the
 existing time ledger so the next round reports what it actually cost. Measuring only --- speeding
 it up is Phase~2b.
+\item \textbf{Remove the silent parameter caps.} The search is confined to hand-written ranges by
+a clamp it is never told about, and the same ranges are not enforced on us at all. \emph{This is
+the 1778 bug again}: an invisible limit that turns ``we did not look there'' into ``there is
+nothing there''. Where a real stability limit exists, derive it from the timestep and the mesh and
+make breaching it \textbf{loud} --- not evidence, like a saturated buffer. A bound is either
+physical and derived, or it does not exist.
+\item \textbf{Write the missing shape-to-chemistry coupling, test it, and promote it}
+(\S\ref{sec:okuda}c). Okuda published this mechanism; implementing it is reproduction, not
+discovery, so we build it rather than waiting for the loop to invent it.
+\item \textbf{Check that the cells are still cells} (\S\ref{sec:phantom}). Broken cells are
+currently detected only as a blended number and never block anything. Separate the failure modes,
+check them where the topology changes, and make a broken mesh \emph{not evidence}.
 \end{itemize}
 
 \textbf{What you get.} A one-line confirmation that the rulers are sound, plus one before/after
@@ -400,8 +558,42 @@ never improve the best one --- which is half of what makes it a search rather th
 Without the Referee's tournament, ranking rests on a single number, and that number is the one
 Phase~0 is currently repairing.
 
-\textbf{What you get.} Confirmation that all fourteen automatic roles ran in one round, and the
-measured wall-clock against the five-minute target.
+\textbf{Also: make ablation compulsory, and make quantification somebody's job.} A causal claim
+needs two things and we currently enforce neither. \emph{Ablation} answers ``is this mechanism
+necessary'' --- run the identical model with the mechanism removed and see whether the phenotype
+dies. \emph{A sweep of the operator's main parameter} answers ``how much does it matter'' --- a
+dose--response curve instead of an assertion. Either alone is an opinion.
+
+The precedent for enforcing it already exists: the control is not left to the proposer's taste, it
+is \emph{mandated} --- slot~0, or the proposal is rejected. Ablation gets the same treatment. The
+duties split across agents that already exist:
+
+\begin{center}\small
+\begin{tabular}{@{}l p{9.4cm}@{}}
+\toprule
+\textbf{Agent} & \textbf{New duty}\\
+\midrule
+Proposer     & Must \emph{offer} the with/without pair for any mechanism it makes a causal claim
+               about --- an obligation, like the control slot, not a preference.\\
+Critic       & \textbf{Rejects the batch} if a causal claim arrives without its ablation. A
+               deterministic check, free, before any compute is spent.\\
+Reflection   & Judges whether it is the \emph{right} ablation --- are you removing the thing your
+               claim is actually about? That needs taste, so it needs a model.\\
+Evolution    & Owns \emph{quantification}: sweep the winner's main parameter to get the curve.
+               This also switches on one of the two idle agents.\\
+Interpreter  & \textbf{May not write ``causes''} without both. Only the additive direction ran?
+               Then the word is ``sufficient''.\\
+Metrologist  & Owns the standard, and retracts recorded claims that fail it.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two deliberate exclusions: the Proposer must not be its own enforcer (the author does not referee),
+and the Supervisor does not own this --- it holds the objective, not the method.
+
+\textbf{What you get.} Confirmation that all fourteen automatic roles ran in one round, the
+measured wall-clock against the five-minute target, and a batch that was rejected for asserting
+cause without testing necessity.
 \end{phasebox}
 
 \begin{phasebox}{Phase 3 --- Measurements that can tell his regimes apart \hfill \todo\ (2 days)}
