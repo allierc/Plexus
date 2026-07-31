@@ -120,10 +120,16 @@ def _emit_rd_seed(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
     # the engine's mode name for a fixed-angle cone is "cones" (plural). Emitting "cone" here
     # silently fell through to a different seeding mode -- caught by the V9 parameter check.
-    ENGINE_MODE = {"cone": "cones", "tip": "tip", "spot": "cones"}
+    ENGINE_MODE = {"cone": "cones", "tip": "tip", "spot": "cones", "scatter": "scatter"}
     d = {"op": "cell_rd_seed", "at": "cell", "mode": ENGINE_MODE[impl],
          "n_spots": int(_p(g, i, "n_spots")), "amp": float(_p(g, i, "amp"))}
-    if impl == "tip":
+    if impl == "scatter":
+        # random seeds over the whole shell -- the validated minisite condition. n_spots/amp are
+        # meaningless here, so do not emit them: an ignored parameter in a spec reads as if it
+        # were doing something.
+        d = {"op": "cell_rd_seed", "at": "cell", "mode": "scatter",
+             "seed_frac": float(_p(g, i, "seed_frac"))}
+    elif impl == "tip":
         d["tip_radius"] = float(_p(g, i, "tip_radius"))       # re-seeds EVERY frame: tip-tracking
     elif impl == "cone":
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
