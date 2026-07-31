@@ -27,8 +27,9 @@ WHAT EVERY ROLE IS TOLD, AND WHY
     prose and does not write it into `Atlas_jax_morph/atlas_record.yaml` has produced nothing.
   * A verdict is an obligation (see record.py). `new` must survive all three baseline tiers;
     `alias`/`refinement` must name a registered contract and say what differs.
-  * 130 operator names already sit unpromoted in `prototype/` and `candidates/`. Matching one of
-    those is our backlog, not a discovery, and the ledger will demote it whatever the record says.
+  * The baseline is the PROMOTED language only. A name that exists in `prototype/` or in the
+    `candidates/` anti-chamber does not make a mechanism un-new -- but do read that code before
+    writing a fresh implementation of it.
   * Never edit another mechanism's entry. One mechanism per call keeps attribution possible --
     the same rule as the discovery loop's one-edit-per-slot.
   * If the source contradicts the paper, the SOURCE WINS and the contradiction is recorded. It is
@@ -73,21 +74,15 @@ RECORD = os.path.join(ATLAS, "atlas_record.yaml")
 #  shared preamble
 # ------------------------------------------------------------------------------------------- #
 def baseline_digest(max_names=400) -> str:
-    """A compact, honest view of the frozen baseline for the prompt.
-
-    Honest means: the unpromoted tier is shown too. An agent that only sees the 52 registered
-    contracts will classify half of jax-morph as new vocabulary, and it will be wrong 130 times.
-    """
+    """The frozen baseline for the prompt: the PROMOTED language, and nothing else."""
     import registry_view
     b = registry_view.load()
     reg = [f"{n}({v['kind']}/{v['family']})" for n, v in sorted(b["registered"].items())
            if v["alias_of"] is None]
-    unp = sorted(b["unpromoted"])[:max_names]
-    return (f"REGISTERED CONTRACTS ({len(reg)}) -- these are Plexus's validated vocabulary:\n"
+    return (f"REGISTERED CONTRACTS ({len(reg)}) -- the whole of Plexus's validated vocabulary. "
+            f"This list IS the language; code in prototype/ or operators/candidates/ is "
+            f"unreviewed and is not part of it:\n"
             f"  {', '.join(reg)}\n\n"
-            f"UNPROMOTED NAMES ({len(b['unpromoted'])}) -- already written somewhere in "
-            f"prototype/ or operators/candidates/, NOT registered. A mechanism matching one of "
-            f"these is BACKLOG, not a discovery:\n  {', '.join(unp)}\n\n"
             f"KINDS: lateral, aggregate, broadcast, exchange, field, structural, rewire\n"
             f"FAMILIES: motion, interaction, polarity, fields, mechanics, mpm, coupling, "
             f"hierarchy, growth, topology\n")
@@ -104,8 +99,10 @@ language is incomplete. Inflating the yield destroys the measurement.
 
 THE TARGET. `papers/jax-morph` -- Deshpande, Mottes et al., "Engineering morphogenesis of cell
 clusters with differentiable programming" (Nat Comput Sci 2025). Apache-2.0, Python/JAX. The
-paper PDF is `papers/Deshpande_2025_jax_morph.pdf`; the library's own guides are under
-`papers/jax-morph/jax_morph/guides/`. It RUNS: `Atlas_jax_morph/oracle.py` drives it in an
+paper is extracted to PLAIN TEXT WITH PAGE MARKERS at
+`Atlas_jax_morph/_state/paper/Deshpande_2025_jax_morph.txt` -- Read that, do not try to render
+the PDF; `python Atlas_jax_morph/paper.py --grep <term>` finds a term with its page number. The
+library's own guides are under `papers/jax-morph/jax_morph/guides/`. It RUNS: `Atlas_jax_morph/oracle.py` drives it in an
 isolated venv, and `Atlas_jax_morph/_oracle/runs/smoke/` already holds a deterministic reference trajectory.
 
 THE RULES OF THIS LOOP.
@@ -113,8 +110,9 @@ THE RULES OF THIS LOOP.
 2. Edit ONLY the one mechanism entry you are given. Never touch another entry, never reorder.
 3. A verdict is an obligation, not a label. `record.py` enforces twelve rules and the driver
    runs it after you; if it fails, your edit is reverted and you are shown the violations.
-4. `new` means Plexus has this at NO tier -- not registered, not in prototype/, not in
-   operators/candidates/. 130 names sit unpromoted; matching one is BACKLOG, not a discovery.
+4. `new` means the PROMOTED language does not have it: not among the registered contracts in
+   `src/plexus/operators/`. That is the whole comparison -- unreviewed prototype code is not the
+   language, though it is often worth reading before reimplementing something.
 5. If the source and the paper disagree, the SOURCE WINS -- and record the contradiction in
    `why:`. That contradiction is one of the most valuable things this exercise can produce.
 6. Do not run the reference by importing jax in the Plexus environment. It is not installed
@@ -145,8 +143,10 @@ THE ENTRY (in `Atlas_jax_morph/atlas_record.yaml`):
 DO THIS
 1. Read the source at `code_path` -- the whole class, its base class, and whatever it calls.
    Fix `code_path` if the line has moved; it must point at the class definition.
-2. Read what the paper and the library guides say about it. Set `paper_section:` to the specific
-   place (a guide heading, a figure, an equation number), not to the document.
+2. Read what the paper and the library guides say about it. Set `paper_section:` to a CHECKABLE
+   anchor -- `p. 7`, `fig. 3b`, `eq. (4)`, or a guide heading -- never to the document as a
+   whole. If the paper turns out to say something the code does not do, that contradiction is
+   the most valuable thing in this entry: record it in `surprises:` with both readings.
 3. Fill in, in the entry and nowhere else:
    - `summary:`   one or two sentences of plain English: what does it do TO THE STATE?
    - `equations:` the actual update, as the source writes it. Symbols defined. If the source and
@@ -190,9 +190,9 @@ DO THIS
    - `refinement` -- an existing contract must WIDEN to admit this. Name it in `of:` and state
                     in `why:` exactly which signature field changes and what that breaks for
                     existing users. A refinement nobody costed is a breaking change.
-   - `new`        -- Plexus has this at no tier. Check the unpromoted list above by hand before
-                    you claim it. In `why:`, name the closest existing contract and say why it
-                    cannot be widened to cover this.
+   - `new`        -- no registered contract covers this and none can reasonably be widened to.
+                    In `why:`, name the closest existing contract and say why widening it would
+                    do violence to its biology.
    - `out_of_scope` -- numerics, plumbing, or framework mechanics with no biological content
                     (a serializer, a PRNG helper). Say why in `why:`.
 3. If the mechanism is an INTERCHANGEABLE IMPLEMENTATION of a contract rather than a new
@@ -220,9 +220,9 @@ THE FROZEN BASELINE:
 {baseline_digest()}
 
 Attack in whichever direction the record went:
-* If the verdict is `new`: find the contract that already covers it. Read the closest registered
-  operator's source in `src/plexus/operators/`, and the closest unpromoted name in `prototype/`
-  or `operators/candidates/`. A partial cover still refutes `new` if the signature could widen.
+* If the verdict is `new`: find the registered contract that already covers it. Read the closest
+  operator's source in `src/plexus/operators/`. A partial cover still refutes `new` if the
+  signature could widen without doing violence to the contract's biology.
 * If the verdict is `alias` or `refinement`: find where the two disagree -- a state field one
   writes and the other does not, a map one traverses, a dimension one supports, a stochastic
   contract one has. An alias that quietly loses a capability is how a language becomes a lie.

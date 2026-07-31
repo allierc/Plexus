@@ -11,21 +11,15 @@ the order it was inspected, it plots the cumulative number of genuinely new cont
 that flattens is the language saturating. A curve that keeps climbing is the language telling us
 it is not finished.
 
-FOUR OUTCOMES, NOT THREE. The paper names three (implementation / refinement / new operator).
-Working against a real registry forces a fourth, and it is the one that decides whether the
-number is honest:
+THREE OUTCOMES, AGAINST THE PROMOTED LANGUAGE ONLY:
 
     alias        a contract we already have, registered and validated.
     refinement   an existing contract whose typed signature has to widen to admit this.
-    new          vocabulary Plexus does not have at ANY tier.
-    backlog      a name that already exists in `prototype/` or `candidates/` but was never
-                 promoted. NOT new -- rediscovering our own unpromoted code and calling it a
-                 discovery is the single most flattering error available here, and there are
-                 130 such names to trip over.
+    new          vocabulary the promoted language does not have.
 
-`backlog` counts toward the atlas's *work*, never toward its *yield*: the saturation curve plots
-`new` only. It is reported separately, and loudly, because a run whose yield is mostly backlog
-has told us something true and unwelcome -- that the bottleneck is promotion, not vocabulary.
+The comparison is against `plexus.operators` and nothing else. Unreviewed code in `prototype/` or
+in the `candidates/` anti-chamber is not part of the language and does not enter this measurement:
+a saturation curve measured against code nobody has checked would be measuring the wrong thing.
 
     python saturation.py                    # the ledger + the curve, as text
     python saturation.py --plot             # _state/saturation.png
@@ -43,16 +37,15 @@ STATE = os.path.join(HERE, "_state")
 OUT_JSON = os.path.join(STATE, "saturation.json")
 OUT_PNG = os.path.join(STATE, "saturation.png")
 
-CLASSES = ["alias", "refinement", "new", "backlog", "out_of_scope", "unclassified"]
+CLASSES = ["alias", "refinement", "new", "out_of_scope", "unclassified"]
 
 
 def classify(mech: dict, baseline: dict) -> str:
     """One mechanism -> one of CLASSES, using the FROZEN baseline, never the live registry.
 
     The record states a verdict; this function is where that verdict meets the evidence. A
-    `new` whose contract name already exists somewhere in Plexus is reclassified as `backlog`
-    (or `alias`, if it is registered) regardless of what the record says -- the ledger is not
-    obliged to believe the ledger.
+    `new` whose contract name is already registered is reclassified as `alias` whatever the
+    record says -- the ledger is not obliged to believe the record.
     """
     verdict = mech.get("verdict")
     if verdict in (None, ""):
@@ -62,14 +55,10 @@ def classify(mech: dict, baseline: dict) -> str:
 
     name = (mech.get("contract") or {}).get("name")
     registered = set(baseline["registered"])
-    unpromoted = set(baseline.get("candidates", {})) | set(baseline.get("prototypes", {}))
-    unpromoted -= registered
 
     if verdict == "new":
         if name in registered:
             return "alias"                    # the record is wrong; say so in the ledger
-        if name in unpromoted:
-            return "backlog"
         return "new"
     return verdict                            # alias / refinement, as recorded
 
@@ -101,12 +90,11 @@ def ledger(doc: dict, baseline: dict) -> dict:
                      "of": m.get("of"), "status": m.get("status", "candidate")})
         curve.append({"n": i, "cum_new": cum_new})
 
-    scored = sum(counts[c] for c in ("alias", "refinement", "new", "backlog"))
+    scored = sum(counts[c] for c in ("alias", "refinement", "new"))
     return {
         "repository": doc.get("repository"),
         "commit": doc.get("commit"),
         "baseline_contracts": baseline["counts"]["contracts"],
-        "baseline_unpromoted": baseline["counts"].get("unpromoted"),
         "counts": counts,
         "scored": scored,
         "yield_new_per_mechanism": (cum_new / scored) if scored else None,
@@ -120,16 +108,14 @@ def render(led: dict) -> str:
     c = led["counts"]
     w = max((len(str(r["raw_name"] or r["id"])) for r in led["rows"]), default=10)
     lines = [f"{led['repository']}  @ {led['commit']}",
-             f"baseline: {led['baseline_contracts']} registered contracts, "
-             f"{led['baseline_unpromoted']} unpromoted names", ""]
+             f"baseline: {led['baseline_contracts']} registered contracts", ""]
     for r in led["rows"]:
         tgt = f"  -> {r['of']}" if r["of"] else ""
         lines.append(f"  {r['n']:>3}  {str(r['raw_name'] or r['id']):<{w}}  "
                      f"{r['class']:<13} {r['contract'] or '':<24}{tgt}   [{r['status']}]")
     lines += ["",
               f"  alias {c['alias']}   refinement {c['refinement']}   NEW {c['new']}   "
-              f"backlog {c['backlog']}   out_of_scope {c['out_of_scope']}   "
-              f"unclassified {c['unclassified']}"]
+              f"out_of_scope {c['out_of_scope']}   unclassified {c['unclassified']}"]
     if led["scored"]:
         lines.append(f"  yield: {led['yield_new_per_mechanism']:.2f} new contracts per "
                      f"scored mechanism ({c['new']}/{led['scored']})")
@@ -168,17 +154,12 @@ def plot(led: dict, path=OUT_PNG):
 
 # ------------------------------------------------------------------------------------------- #
 def selftest():
-    baseline = {
-        "registered": {"diffuse": {}, "cell_divide": {}},
-        "candidates": {"secrete": ["candidates/chemotaxis.py"]},
-        "prototypes": {"relax_energy": ["prototype/Tyssue/x.py"]},
-        "counts": {"contracts": 2, "unpromoted": 2},
-    }
+    baseline = {"registered": {"diffuse": {}, "cell_divide": {}}, "counts": {"contracts": 2}}
     doc = {"repository": "r", "commit": "c", "mechanisms": [
         {"id": "a", "order": 1, "verdict": "alias", "of": "diffuse",
          "contract": {"name": "diffuse"}},
         {"id": "b", "order": 2, "verdict": "new", "contract": {"name": "trace_replay"}},
-        {"id": "c", "order": 3, "verdict": "new", "contract": {"name": "secrete"}},      # backlog
+        {"id": "c", "order": 3, "verdict": "new", "contract": {"name": "secrete"}},
         {"id": "d", "order": 4, "verdict": "new", "contract": {"name": "diffuse"}},      # alias
         {"id": "e", "order": 5, "verdict": "refinement", "of": "cell_divide",
          "contract": {"name": "cell_divide"}},
@@ -187,15 +168,14 @@ def selftest():
     ]}
     led = ledger(doc, baseline)
     c = led["counts"]
-    ok = (c["alias"] == 2 and c["new"] == 1 and c["backlog"] == 1 and c["refinement"] == 1
+    ok = (c["alias"] == 2 and c["new"] == 2 and c["refinement"] == 1
           and c["out_of_scope"] == 1 and c["unclassified"] == 1
-          and [p["cum_new"] for p in led["curve"]] == [0, 1, 1, 1, 1, 1, 1]
-          and len(led["disputed"]) == 2)
+          and [p["cum_new"] for p in led["curve"]] == [0, 1, 2, 2, 2, 2, 2]
+          and len(led["disputed"]) == 1)
     print(render(led))
     print("\nSELFTEST", "PASSED" if ok else "FAILED")
-    print("  a `new` whose name is already registered was demoted to alias;")
-    print("  a `new` whose name sits unpromoted in prototype/ was demoted to backlog;")
-    print("  both demotions are reported as disputes rather than silently applied.")
+    print("  a `new` whose name is already registered was demoted to alias,")
+    print("  and the demotion is reported as a dispute rather than silently applied.")
     return 0 if ok else 1
 
 

@@ -27,3 +27,9 @@ STRUCTURALLY REQUIRED -- these cannot be removed at all, which is a result:
   [start cuda:1] p1_without_morphogen_growth_3d
   [start cuda:1] p1_without_divide_3d
   [start cuda:1] p1_without_reconnect_t1_3d
+  [done  cuda:1] p1_without_morphogen_growth_3d  219.0s  exit 0
+  [start cuda:1] p1_without_cell_geometry_3d
+  [done  cuda:1] p1_without_divide_3d        237.0s  exit 0
+  [start cuda:1] p1_ph_rd_only
+  [done  cuda:1] p1_ph_rd_only               195.0s  exit 0
+  [start cuda:1] p1_ph_growth_only

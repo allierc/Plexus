@@ -4,3 +4,22 @@
 [engine] sets:      vertex(30000)  cell(16000)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_react   mechanics: shape_energy_3d
+[p1_without_cell_diffuse] evidence horizon at frame 282: peak/final taken over the first 283 of 501 frames
+[p1_without_cell_diffuse] mechanics: p_tube/p_body = 0.373 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[p1_without_cell_diffuse] {"saturated": false, "inert_operators": [], "retention": 0.999, "valid_evidence": true, "protr_final": 1.179, "protr_peak": 1.18, "horizon_frame": 282, "horizon_why": "last frame with broken_n < 1 was 282; damage from there never recovers (reaching 9). First damage anywhere: frame 243.", "first_damage_frame": 243, "valid_frac": 0.564, "protr_peak_untruncated": 1.272, "protr_final_untruncated": 1.272, "n_cells_final": 12036, "red_frac_final": 0.057, "act_max_final": 0.504, "frames": 501, "wall_s": 510.6, "ta_hollow_n_peak": 5719, "ta_hollow_n_final": 5719, "ta_area_cv_final": 1.024, "ta_vol_cv_final": 1.093, "ta_tube_diam_final": 1.878, "ta_n_tubes_final": 12, "ta_tube_len_final": 2.55, "ta_protr_final": 1.268, "ta_red_frac_final": 0.057, "ta_tip_act_final": -0.004, "ta_aspect_len_over_diam": 1.358, "mech_force_mean": 22.5044, "mech_p_body": 12.9258, "mech_p_tube": 4.8226, "mech_p_ratio": 0.373, "mech_tension_mean": 2.1417, "mech_migration": 0.20647}
+[p1_without_cell_diffuse] D4 ok: all 10 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 391, 'morphogen_growth_3d': 401} ...)
+[p1_without_cell_diffuse] camera: FIXED Lbox=10.795 for all 501 frames and both views (per-frame autofit would have run 5.605 -> 10.626, x1.90: that rescaling is what hid growth)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_without_cell_diffuse] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)

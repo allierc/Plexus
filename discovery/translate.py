@@ -147,8 +147,17 @@ def _emit_rd_seed(g, n, ga):
         # random seeds over the whole shell -- the validated minisite condition. n_spots/amp are
         # meaningless here, so do not emit them: an ignored parameter in a spec reads as if it
         # were doing something.
+        # `before_frame: 1` IS THE WHOLE POINT OF A SCATTER SEED. It is an INITIAL CONDITION, and
+        # without the guard the engine re-applies it on every tick -- and cell_rd_seed sits BEFORE
+        # cell_diffuse and cell_react in the schedule, so each frame went: overwrite the chemistry
+        # with the seed, let the reaction advance it by one step, overwrite it again. The activator
+        # was pinned for the entire campaign. The signature in the record is unmistakable once you
+        # look: the acted-ledger shows cell_rd_seed firing 501 times in a 500-frame run, and
+        # act_max varies by 1.2e-3 across the whole run -- exactly one step of Gray-Scott.
+        # `tip` re-seeds every frame on purpose (it tracks the moving tip) and `cone` maintains a
+        # source; neither of those is an initial condition. This one is.
         d = {"op": "cell_rd_seed", "at": "cell", "mode": "scatter",
-             "seed_frac": float(_p(g, i, "seed_frac"))}
+             "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 1}
     elif impl == "tip":
         d["tip_radius"] = float(_p(g, i, "tip_radius"))       # re-seeds EVERY frame: tip-tracking
     elif impl == "cone":

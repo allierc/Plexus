@@ -1,0 +1,6 @@
+[mini_grow_divide] comp=MINI_mini_grow_divide region='minisite tyssue_vh_K4_cv15_d4 verbatim (ceiling 1.4 BELOW trigger 2.0)' frames=500 dt=1.0 device=cuda:0
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === mini_grow_divide ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=500
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d

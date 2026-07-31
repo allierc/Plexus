@@ -1,0 +1,526 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{good}{HTML}{1B7F3B}
+\definecolor{warn}{HTML}{B26B00}
+\definecolor{bad}{HTML}{B3261E}
+\definecolor{grey}{HTML}{666666}
+\definecolor{rule}{HTML}{2B4C7E}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
+\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
+\newcommand{\ns}{\textcolor{grey}{not started}}
+\newcommand{\done}{\textcolor{good}{\textbf{DONE}}}
+\newcommand{\prog}{\textcolor{warn}{\textbf{IN PROGRESS}}}
+\newcommand{\todo}{\textcolor{grey}{\textbf{NOT STARTED}}}
+\newcommand{\solid}{\textcolor{good}{\textbf{solid}}}
+\newcommand{\weak}{\textcolor{warn}{\textbf{weak}}}
+\newcommand{\unsup}{\textcolor{bad}{\textbf{unsupported}}}
+
+\titleformat{\section}{\large\bfseries\color{rule}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\setlist[itemize]{leftmargin=1.1em,itemsep=2pt,topsep=3pt}
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.25}
+
+\newtcolorbox{phasebox}[1]{colback=white,colframe=rule!55,boxrule=0.7pt,
+  arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
+  fonttitle=\color{white},colbacktitle=rule}
+
+\title{\textbf{Plexus Atlas --- jax-morph}\\[6pt]
+\large Progress note --- written to be read, not decoded}
+\author{}
+\date{31 July 2026}
+
+\begin{document}
+\maketitle
+\vspace{-2.2\baselineskip}
+
+\begin{center}\small\color{grey}
+The twin of \texttt{plexus2\_discovery.pdf}, for the other half of the programme.\\
+Plain English throughout. Organised by phase, because phases are where we stop and you decide.
+\end{center}
+
+\vspace{4pt}
+\hrule
+\vspace{10pt}
+
+%======================================================================
+\section{What we are doing --- the second way to grow the language}
+
+There are two ways to grow the Plexus vocabulary, and as of today both are running.
+
+\textbf{Discovery} (the Okuda folder) searches for a mechanism nobody has written down. It
+proposes a change to the model's structure, says what it expects \emph{before} running, runs, and
+records whether it was right. It is the harder science and the slower loop.
+
+\textbf{Atlas} (this folder) is the other one, and it is what Appendix~E of the Plexus~2 paper
+promises. It takes a published system whose code \emph{exists}, reads that code, and asks a
+narrower question: \emph{can the Plexus operator algebra say everything this framework says?}
+Whatever the language cannot say becomes a new operator. Whatever it can say twice over is
+evidence that the language is converging on something real.
+
+\textbf{The target is jax-morph} --- Deshpande, Mottes \emph{et al.}, \emph{Engineering
+morphogenesis of cell clusters with differentiable programming} (Nature Computational Science,
+2025). Cells as soft particles that grow, divide, die, push on one another, secrete and read
+chemical signals, and decide what to do next through a small gene network. Apache licensed, pure
+Python, 24 mechanisms --- and, the point, it runs.
+
+\textbf{Two deliverables, and neither one alone is enough.}
+
+\begin{enumerate}
+\item \textbf{The figure.} One headline result of the paper, reproduced inside Plexus out of
+operators translated from their code --- not fitted to their output.
+\item \textbf{The ledger.} Every mechanism in the repository sorted into one of three buckets:
+something the promoted language already has, something it has but must widen, or something
+genuinely new.
+\end{enumerate}
+
+The figure without the ledger is a demo. The ledger without the figure is a spreadsheet nobody
+has checked against reality.
+
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt]
+\textbf{What we compare against: the promoted language, and nothing else.} 52 registered operator
+contracts in \code{plexus.operators} --- validated, importable, typed, in the engine. Code sitting
+in \code{prototype/} or in the \code{candidates/} anti-chamber is not part of the language and
+does not enter this measurement. Measuring against code nobody has reviewed would be measuring
+the wrong thing.
+\end{tcolorbox}
+
+%======================================================================
+\section{Where we actually are}
+
+\textbf{Phase 0 is finished, and this note is its boundary.} Everything built today is an
+instrument. Not one line of it is a claim about biology, and that is deliberate --- it is the
+direct inheritance from the other folder, where three of the four measurements the loop relied on
+turned out to be broken after two days of confident reporting.
+
+One agent call has been made: a single excavator on a single mechanism, run to prove the plumbing
+end to end before twenty-four of them run unattended. It worked, it took 6.3 minutes, and it
+found something in the target that matters (\S6).
+
+\textbf{The belief register for jax-morph is otherwise empty}, and it should be. Twenty-three of
+the twenty-four mechanisms have not been read.
+
+%======================================================================
+\section{Why a target with code changes everything}
+
+\begin{tcolorbox}[colback=rule!4,colframe=rule!55,boxrule=0.7pt,arc=2pt]
+\textbf{The thing Okuda could never give us: an answer to compare against.}
+
+Okuda \emph{et al.} published a paper with no code. So when our tube looks wrong there are three
+explanations and no way to separate them: the operator is wrong, the parameter is wrong, or we
+read the figure wrong. Days of the discovery campaign went into exactly that fog.
+
+Here the authors' own implementation sits in \code{papers/jax-morph} and, as of today, \emph{runs}
+on this machine in its own isolated Python. We can put our reconstruction and their implementation
+on the same initial condition and subtract. Faithfulness stops being a judgement and becomes a
+number, against a threshold written down in advance.
+\end{tcolorbox}
+
+There is a second reason, and it is the more interesting one. jax-morph is not merely a simulator:
+it is built from \emph{composable physics steps} that compose by operator splitting, declare which
+state fields they read and write, and are cross-validated when a model is assembled. That is,
+independently, most of the Plexus thesis. If two groups arrived at nearly the same decomposition
+from opposite directions, the decomposition is probably not arbitrary --- and the places where
+they differ are where we should expect to learn something.
+
+Three differences are already visible from their documentation, before any agent has read a line:
+
+\begin{itemize}
+\item They classify a step by its \textbf{time-scale}: a fast constraint solved at the current
+configuration, a finite-rate process, or an instantaneous event. Plexus classifies an operator by
+\emph{which part of the state it touches}. The two are orthogonal, and we do not have theirs.
+\item Their randomness has a \textbf{contract}: a stochastic step records what it sampled, can
+replay it, and can score it --- which is what makes a discrete event like cell division
+differentiable at all. Plexus has no such contract.
+\item Their macro-step is an \textbf{explicit first-order operator split} with a stated error
+term. Ours is a schedule.
+\end{itemize}
+
+None of those three is a biological operator. All three are candidates to improve the
+\emph{language}, which is the second thing the atlas is for.
+
+%======================================================================
+\section{What is genuinely working}
+
+Everything here was run today, and its output checked.
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{4.3cm} l p{8.7cm}@{}}
+\toprule
+\textbf{piece} & \textbf{state} & \textbf{what was verified}\\
+\midrule
+frozen baseline & \dn &
+52 registered contracts, 42 canonical and 10 aliases, across 10 families. Written to a file, so
+the measurement cannot drift while it is being taken.\\
+
+the oracle & \dn &
+jax-morph 0.4.0 installed from our local clone (\code{ace08b8}) into its own interpreter. Nothing
+in the Plexus environment can import it.\\
+
+oracle determinism & \dn &
+the authors' proliferation model, run twice from one seed, is \emph{bit-identical}. Without this,
+a later disagreement could be their noise rather than our error.\\
+
+first reference run & \dn &
+4 cells $\to$ 82 over 40 macro-steps; cluster radius 0.65 $\to$ 3.23; the division buffer never
+overflows. Trajectory, summary and figure on disk, each with its provenance.\\
+
+record + validator & \dn &
+twelve rules. Self-tested against a record built to break every one: all twelve fire, and a
+well-formed record passes in silence.\\
+
+saturation ledger & \dn &
+self-tested, including its right to overrule the record: a ``new'' whose name is already
+registered is demoted to \emph{alias} and the disagreement is reported, not applied quietly.\\
+
+mechanism inventory & \dn &
+24 mechanisms from the clone's syntax tree --- 20 classes plus 4 architectural contracts that are
+not classes and that a scan alone would have missed.\\
+
+the guarded driver & \dn &
+every agent call is a transaction: blast radius, rung, twelve rules, then commit or revert.\\
+
+one live agent call & \dn &
+excavator on \code{Division}: committed in 6.3 minutes, nine reimplementer traps, verdict
+correctly left blank, and an explicit list of what it could \emph{not} establish.\\
+
+the paper, readable & \dn &
+29 pages, 14{,}142 words, extracted with page markers and greppable --- because the first agent
+call discovered it could not open the PDF.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{_oracle/runs/smoke/reference.png}\\
+{\small\color{grey}The reference, running here. Their model, their code, our machine: mechanical
+relaxation under a Morse potential, saturating growth, stochastic division. All six panels share
+one spatial scale --- the discovery loop spent a day being fooled by panels that did not.}
+\end{center}
+
+%======================================================================
+\section{The team of agents --- what is switched on}
+
+Six roles, each seeing one mechanism at a time.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l p{7.9cm} l l@{}}
+\toprule
+\textbf{role} & \textbf{what it does} & \textbf{may edit} & \textbf{budget}\\
+\midrule
+excavator & reads the mechanism at source: what it does to the state, the equations, the role of
+every knob, and what a reimplementer would get wrong. Forbidden from judging novelty. & the record
+& 10 min\\
+normalizer & writes it as a typed Plexus operator and commits to a verdict, with the whole
+promoted language in front of it. & the record & 8 min\\
+skeptic & tries to \emph{refute} that verdict, in whichever direction it went; defaults to refuted
+when unsure. & \textbf{nothing} & 5 min\\
+implementer & writes the Plexus operator into the anti-chamber, with a test of one property
+statable without the reference. & code & 15 min\\
+differ & writes one metric and one threshold \emph{first}, then runs both implementations on the
+same initial condition. & code + record & 12 min\\
+curator & promotes, or refuses to. Refusal is a result. & code + docs & 10 min\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The agents have no authority over the record}
+
+This is the part I would ask you to check hardest, because it is the lesson from the other folder.
+Every discovery-loop error came from a measurement nobody had checked, written down by an agent
+doing its best. So here the agents decide nothing. They edit; the driver decides whether the edit
+survives.
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Blast radius.} Only the mechanism it was given may have changed. An agent that tidies
+a neighbouring entry in passing has destroyed our ability to attribute anything, so the whole call
+is thrown away.
+\item \textbf{Rung.} Each role can only reach its own status. The excavator cannot declare
+something validated. A rung is earned by an artefact --- a code path that resolves, a module that
+imports, an oracle run on disk --- never by an assertion.
+\item \textbf{The twelve rules.} If the record does not validate, the edit is reverted and the
+violations are handed back to the agent, \emph{once}. A second failure marks the mechanism
+\textbf{blocked} and leaves it for a human. It is never silently skipped.
+\end{enumerate}
+
+Every revert is logged with the agent's own words, so a systematic misunderstanding shows up as a
+pattern rather than as noise. A call that changes \emph{nothing} also counts as a failure: the
+record is the product, and an agent that explains a brilliant normalization in prose has produced
+nothing.
+
+\subsection{The four ways this measurement could still lie}
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{3.4cm} p{11.6cm}@{}}
+\toprule
+\textbf{failure} & \textbf{what stops it}\\
+\midrule
+inflated novelty & the ledger re-derives every ``new'' against the frozen baseline itself and
+reports disagreement with the record by name.\\
+flattering aliases & calling two things the same operator hides a lost capability. The skeptic is
+aimed at this specifically, and a refinement must state what it breaks for existing users.\\
+a threshold chosen after the fact & the differ writes metric and threshold into the record before
+running anything. A criterion no valid configuration could meet is exactly how the discovery loop
+lost a week.\\
+a contaminated oracle & the reference lives in a separate interpreter. A Plexus process that could
+import it could borrow its answer, and a test that can be contaminated is not a test.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%======================================================================
+\section{The phases}
+
+Seven stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
+
+\begin{phasebox}{Phase 0 --- Instruments and the frozen baseline \hfill \done\ (16 of 16)}
+\textbf{Goal.} Make every later measurement trustworthy \emph{before} taking one. Nothing here is
+science; each item makes a question askable.
+
+\textbf{What had to be done}
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt]
+\item Choose a target with running code, a licence we can build on, and biology worth having.
+\item Freeze what Plexus can already say, before reading a line of the target.
+\item Put the reference in its own interpreter, and forbid it in ours.
+\item Prove the reference is deterministic at a fixed seed.
+\item Produce the first reference artefact, and check it against its own figure.
+\item Make every reference artefact carry the code and the versions that made it.
+\item Refuse a reference run that hits an array bound instead of a biological limit.
+\item Write the record down as \emph{rules}, not as a template.
+\item Self-test the rules against a record built to break every one of them.
+\item Let the ledger overrule the record, and report the disagreement.
+\item Self-test that overruling.
+\item Extract the mechanism inventory mechanically, not from memory.
+\item Add the mechanisms that are not classes and that a scan cannot see.
+\item Make every agent call a guarded transaction.
+\item Run one real agent call end to end before trusting the plumbing.
+\item Make the paper itself readable to an agent.
+\end{enumerate}
+\end{phasebox}
+
+\begin{phasebox}{Phase 0 --- what actually happened, point for point}
+\footnotesize
+\begin{tabular}{@{}r@{.\ } l p{9.1cm}@{}}
+\toprule
+& \textbf{state} & \textbf{the issue found, and what was interesting}\\
+\midrule
+1 & \dn & Four candidates were compared. jax-morph won on a criterion I had not expected to
+matter: \emph{its own architecture is an operator algebra}, so it tests the Plexus thesis directly
+rather than only supplying vocabulary.\\
+2 & \dn & \textbf{52 registered contracts} --- 42 canonical, 10 aliases, 10 families. That set is
+the whole comparison.\\
+3 & \dn & The devcontainer reaches PyPI, which the Okuda corpus note had recorded as blocked (only
+\code{arxiv.org} and \code{github.com}). That single fact is what makes an executable oracle
+possible here at all.\\
+4 & \dn & Held. Two runs from one seed are bit-identical in position and in which cells are alive.
+Had it failed, every later difference would have been unattributable.\\
+5 & \dn & 4 $\to$ 82 cells in 40 macro-steps; radius of gyration 0.65 $\to$ 3.23. The figure shows
+a rounded, jammed cluster --- the expected phenomenology, not a blown-up artefact.\\
+6 & \dn & Each run directory carries the script, the clone's commit, the interpreter and the
+resolved package versions. A trajectory with no provenance is a number of unknown origin, and this
+campaign has already been burned by one.\\
+7 & \dn & Their division step exposes a \code{division\_overflow} counter. The smoke run checks it
+and \emph{stops} if it is non-zero --- the same defect as our 1778-cell ceiling, in their units,
+caught before it can produce a conclusion.\\
+8 & \dn & Twelve rules. The hardest to write was not a type check: it is that \emph{a verdict is
+an obligation}. ``New'' must survive the baseline; ``alias'' must name a registered contract and
+say what differs.\\
+9 & \dn & All twelve fire on a record built to break them, and a well-formed record passes in
+silence. The rules matter more than the catch --- a validator whose failures cannot be enumerated
+is one nobody can argue with.\\
+10 & \dn & The ledger is not obliged to believe the record.\\
+11 & \dn & Verified in both directions, and the demotion is reported as a dispute rather than
+applied quietly.\\
+12 & \dn & 20 classes, each with its file and line, its constructor parameters and its docstring.
+No LLM: an enumeration a human can check against \code{git grep class} in ten seconds.\\
+13 & \dn & \textbf{The four most interesting mechanisms are not classes.} The time-scale step
+taxonomy, the declared-dataflow composition contract, the explicit operator split and the
+stochastic trace contract live in prose and base classes. A purely automatic extraction --- the
+obvious way to build an atlas at scale --- would have missed precisely the entries most likely to
+be new. They were added by hand, and the record says they were added by hand.\\
+14 & \dn & Blast radius, rung, twelve rules; revert with the agent's own words logged; two
+failures mark the mechanism \emph{blocked} rather than skipping it. A call that changes nothing
+counts as a failure.\\
+15 & \dn & The excavator on \code{Division}, committed on the first attempt. See \S7.\\
+16 & \dn & Found \emph{by} item 15: the agent could not open the PDF (no \code{pdftotext} in this
+image), so it anchored its citations to the library's guides and said so. PyMuPDF was already
+installed; the paper is now plain text with page markers, and \code{paper.py -{}-grep} finds a
+term with its page number.\\
+\bottomrule
+\end{tabular}
+\end{phasebox}
+
+\begin{phasebox}{Phase 1 --- Read all 24 mechanisms \hfill \todo\ ($\sim$2.5 h, local)}
+The excavator on every mechanism: what it does to the state, its equations, the role of every knob,
+and a \code{surprises} list --- the implicit units, orderings, guards and magic constants a
+reimplementer gets wrong. On the single call already made this took 6.3 minutes, so the phase is
+about two and a half hours if nothing needs a second attempt.
+
+\textbf{Stop condition:} 24 entries at \emph{inspected}, every code path resolving to a real line,
+zero blocked. \textbf{What I will be watching:} whether each entry states what it could
+\emph{not} determine. An unstated uncertainty becomes someone else's false belief, which is how
+the last campaign got into trouble --- and the one call so far did this well, unprompted.
+\end{phasebox}
+
+\begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \todo\ ($\sim$4 h)}
+Each mechanism becomes a typed Plexus contract with a verdict; the skeptic then tries to break each
+verdict; refuted ones go round again with the refutation in front of them.
+
+\textbf{The output is the first real ledger}, and the first honest answer to ``is the operator
+algebra converging?''
+
+\textbf{My prediction, on the record before we start:} the five pairwise potentials will normalize
+to \emph{one} existing contract with several interchangeable implementations; the genuinely new
+entries will be the three architectural ones, and those improve the language rather than the
+biological vocabulary. If that is wrong I want it to be wrong loudly, so it is written here.
+\end{phasebox}
+
+\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \todo\ ($\sim$1 day)}
+Every \emph{new} and every \emph{refinement} becomes a Plexus operator in the anti-chamber, with a
+test of one property statable without the reference: a conservation law, a sign, a limit, a
+symmetry. Nothing enters the validated library at this stage.
+\end{phasebox}
+
+\begin{phasebox}{Phase 4 --- Differential validation \hfill \todo\ ($\sim$1 day)}
+Metric and threshold first; then the same initial condition through both implementations; then
+subtract. \textbf{A failure here is the most informative outcome available} --- it is the
+reproduction telling us the contract is wrong, which is the whole reason for choosing a target
+with code.
+\end{phasebox}
+
+\begin{phasebox}{Phase 5 --- The figure \hfill \todo\ ($\sim$1 day)}
+One headline result of the paper, rebuilt in Plexus from the normalized operators. This is the
+evidence that the ledger describes something real rather than a filing system.
+\end{phasebox}
+
+\begin{phasebox}{Phase 6 --- Promotion, and past the paper \hfill \todo}
+Validated operators leave the anti-chamber with a library page and a spec that composes each one
+with an operator Plexus already had --- a vocabulary item that only works beside its own siblings
+has not joined the language. Then the part that is not reproduction at all: run compositions the
+authors did not, and see what the new vocabulary does.
+\end{phasebox}
+
+%======================================================================
+\section{Phase 0 report --- 31 July, 16:45}\label{sec:p0report}
+
+\emph{This is a phase boundary. All sixteen items are done; the sixteenth was created by the
+fifteenth. I have stopped here.}
+
+\textbf{How it was checked.} Every instrument was run, not inspected. The record validator and the
+saturation ledger each carry a self-test built to break them, and both were run to failure first:
+the validator against a record violating all twelve rules, the ledger against a record whose
+verdicts it is expected to overrule. The oracle was checked by the one property that makes it an
+oracle at all --- determinism at a fixed seed --- before any artefact of it was written down. And
+the agent layer was checked the only way that means anything: by running a real call, all the way
+through the driver, and reading what came out.
+
+\subsection{What was built}
+
+\textbf{An oracle in its own interpreter.} \code{oracle.py} builds a separate virtual environment,
+installs the reference from our local clone rather than from PyPI --- so the record's evidence
+points at bytes we can read --- and records the clone's commit, the interpreter and every resolved
+package version. Every run gets a directory containing the script that produced it and a copy of
+that provenance.
+
+\textbf{A baseline that cannot drift.} \code{registry\_view.py} enumerates the promoted registry
+into a frozen file. Saturation is measured against \emph{that}, never against the live registry: a
+registry that grows during the run cannot measure its own growth.
+
+\textbf{A record that is a set of rules.} \code{record.py} holds twelve, and a status ladder whose
+every rung is earned by an artefact rather than by an assertion --- \emph{inspected} needs a code
+path that resolves to a line that exists, \emph{implemented} needs a module that registers the name
+it claims, \emph{validated} needs an oracle run on disk with a threshold that was written before it.
+
+\textbf{A ledger that may overrule the record}, and a driver that gives agents no authority
+(\S5.1).
+
+\subsection{What the first real agent call found}
+
+The excavator was given one mechanism --- their cell-division step --- and 10 minutes. It used 6.3,
+committed on the first attempt, and produced an entry with the update equations, the role of every
+constructor argument, the declared \emph{and} undeclared state it touches, and nine traps a
+reimplementer would fall into. Three are worth repeating here because they are the kind of thing
+that decides whether a reproduction works:
+
+\begin{itemize}
+\item \textbf{The volume-halving factor is dimension-dependent} ($2^{-1/d}$), so what looks like a
+shape parameter is really a physics parameter. Hard-code $1/2$, or use the 3D factor in 2D, and
+volume conservation silently breaks.
+\item \textbf{The daughter is placed using the \emph{new} radius}, so the two cells end up exactly
+touching. Using the pre-division radius overlaps or gaps them --- a one-symbol error with a visible
+consequence.
+\item \textbf{The code contradicts its own docstring.} The docstring gives the clean hazard; the
+code additionally clips negative rates to zero, uses a straight-through surrogate for the
+gradient, guards two norms, and silently caps divisions at capacity. \emph{The code is
+authoritative} --- and this is precisely the class of finding we chose a target with code in order
+to make.
+\end{itemize}
+
+It also stated plainly what it could \emph{not} establish, unprompted: that it could not open the
+paper PDF, so the source-versus-paper check is still open; and that it could not tell whether
+oriented division is ever exercised in the shipped examples. That habit is the single behaviour
+the last campaign most lacked.
+
+\subsection{Still not started --- the known gaps}
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Twenty-three mechanisms are unread}, and until Phase 1 runs, the paper's own claims
+are unchecked against its code everywhere except in the division step.
+\item \textbf{No Plexus-side spec exists for any jax-morph composition.} \code{config/atlas/} is
+empty; Phase 4 cannot start until a spec can express their initial condition exactly.
+\item \textbf{The differential metric is unwritten, and it is not obvious.} Their macro-step is an
+operator split; ours is a schedule. Two integrators of the same equations diverge trajectory-wise
+while agreeing on everything that matters. The metric must measure the contract and not the
+integrator --- a real decision, not a tuning.
+\item \textbf{Two mechanisms have no torch equivalent yet}: their screened-diffusion solve and
+their neural-ODE controller. Either may be more work than the rest of the repository combined.
+\item \textbf{The agent could not run \code{record.py} itself} --- it is approval-gated in this
+image --- so it checked the rules by hand and the driver validated afterwards. That is the design,
+but it means an agent cannot iterate against the validator inside one call, which will cost extra
+round-trips in Phase 2.
+\end{enumerate}
+
+%======================================================================
+\section{What I need from you}
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Phase 1 is cheap --- shall I just run it?} Twenty-three excavator calls, about two
+and a half hours, no cluster. It produces no verdicts, only readings, so there is little to get
+wrong; and Phase 2 cannot start without it.
+\item \textbf{Which figure for Phase 5?} The paper's headline is engineered morphogenesis ---
+optimising a gene network until a cluster self-organises into a specified shape. Reproducing
+\emph{that} exercises the inverse half of Plexus, not just the forward simulator, and is the
+stronger result. A forward-only figure --- proliferation plus chemical patterning --- is perhaps a
+day's work and proves considerably less.
+\item \textbf{After this repository, which one?} A saturation curve only becomes an argument at
+the second and third framework. Cellular Potts (CompuCell3D) is the biggest step away from
+everything we have --- cells as lattice domains rather than points --- and therefore the sharpest
+test of whether the language is really complete.
+\end{enumerate}
+
+\vspace{6pt}
+\hrule
+\vspace{6pt}
+{\small\color{grey}
+\textbf{Where things are.} \code{atlas\_record.yaml} --- the record, the product.
+\code{campaign/analysis.md} --- the append-only log. \code{\_oracle/runs/} --- reference artefacts
+with provenance. \code{\_state/} --- the frozen baseline, the extracted paper, the ledger, the
+reverts and the blocked list. \code{README.md} --- how to run any of it.}
+
+\end{document}
