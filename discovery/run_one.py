@@ -60,6 +60,7 @@ def _lazy_engine():
     """Import the heavy stack only when we actually run (keeps validate_space fast)."""
     import plexus.operators                                          # noqa: F401
     import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa: F401
+    import tyssue_shape_to_chem                                       # noqa: F401
     import plexus.schema as S
     from plexus.engine import run as engine_run
     import instrument

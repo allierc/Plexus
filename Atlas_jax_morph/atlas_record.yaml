@@ -585,62 +585,48 @@ mechanisms:
     dead slots to zero afterward, so the step does not mask itself.'
   verdict: new
   of: null
-  why: 'No registered contract covers a per-cell, continuous-time internal regulatory network -- an
-
-    intracellular gene-regulatory / signaling ODE that reads the cell''s sensed driver fields (held
-
-    fixed for the step), evolves a coupled vector of latent + output gene concentrations over the
-
-    developmental macro-step, and persists the result as heritable per-cell state. This is the
-
-    genotype->phenotype DECISION FUNCTION of the paper''s cells (its output genes set division,
-
-    secretion and adhesion rates read by downstream steps), and the promoted language has no operator
-
-    for it. Closest registered contract is `decay` (fields): dg/dt = production - gamma*g literally
-
-    contains decay''s linear degradation term, so a maximalist could call this a widening of `decay`.
-
-    But `decay` is an elementwise, single-field, in-place evaporation (c <- max(0, c - k*dt)) with no
-
-    production, no cross-field coupling, no inputs and no memory; widening it to admit a
-
-    sensed-input-forced, nonlinearly-regulated, multi-gene system integrated by an adaptive
-
-    continuous-time solver with heritable latent state would erase everything that makes `decay`
-
-    `decay` -- the degradation term would be one line of a network it cannot name. `pacemaker` (a
-
-    per-cell temporal SOURCE) is the next closest, since both emit a per-cell time-varying signal, but
-
-    pacemaker "owns ONLY timing": an open-loop clock with no state feedback, no sensed drive and no
-
-    coupling, so a closed-loop regulated circuit is not a pacemaker. `sense`/`chemotax` couple a field
-
-    to agent MOTION, not to internal chemistry. Hence `new`. This entry is the ABSTRACT base that
-
-    carries the contract (state_reads/state_writes + the macro-step integration machinery + an
-
-    abstract vector_field); its three subclasses GeneNetworkConnectionist, GeneNetworkMWC and NeuralODE
-
-    are interchangeable IMPLEMENTATIONS of this one `regulate` contract, differing only in the reaction
-
-    law -- exactly the several-implementations-per-contract shape a mature vocabulary should show, so
-
-    they should each carry implementation_of: regulate rather than a fresh contract.
-
-    Classification note: kind=exchange (not field) because a SET is involved -- Plexus''s FieldUpdate
-    is
-
-    defined as "no set involved" (pure grid dynamics), whereas this transduces the cell''s own sensed
-
-    driver fields into its gene-expression fields; maps=[] because, unlike the gather-based exchanges
-
-    (chemotax/sense read a spatial field), the coupling is entirely among the cell''s own per-cell
-
-    fields with no spatial gather and no neighbour edges (each cell integrates independently).
-
-    '
+  why: "Closest registered contract is `signal` (lateral/interaction, set=neuron), NOT `decay` or\n`pacemaker`:\
+    \ `signal` is the only other registered per-agent internal-state ODE of the same\nfiring-rate / recurrent-network\
+    \ class. It integrates\ntau*dv_i/dt = -v_i + b_i + sum_e W_e*phi(v_pre(e)) on a neuron; this integrates\n\
+    dg/dt = sigma(W_gene@g + W_in@u + b) - gamma*g on a cell. The reaction laws rhyme, and a skeptic\n\
+    is right to name `signal` here (the earlier draft that called decay/pacemaker \"closest\" was wrong).\n\
+    But `signal`'s typed IDENTITY is a CONNECTOME morphism, and no widening of it can absorb this ODE\n\
+    without dissolving that identity. Three signature facts make them different contracts, not two\nimplementations\
+    \ of one:\n  1. COUPLING TOPOLOGY. `signal`'s regulatory weights live on a first-class `synapse` EDGE-SET\n\
+    \     read through the pre/post incidence maps (INPUTS=[neuron,synapse], MAPS=[pre,post]); it\n  \
+    \   gathers phi(v) along `pre` and scatters current along `post`. Its own docstring: \"the maps\n\
+    \     are PART of the signature\". `regulate` has NO edge-set and NO map -- W_gene/W_in are dense\n\
+    \     per-operator parameters and each cell integrates its OWN network in isolation (maps=[]),\n \
+    \    with ZERO cell-to-cell coupling. It is intracellular, not lateral. To make `signal` express\n\
+    \     this you must invent a per-cell all-to-all self-synapse-set plus input pseudo-nodes for the\n\
+    \     drive u -- which changes the SET it runs on and empties its MAPS, the exact connectome\n   \
+    \  identity the dispute's own what_would_settle_it says must not break.\n  2. INTEGRATION CONTRACT.\
+    \ `signal` EMITs velocity (an instantaneous dv/dt) and the ENGINE\n     integrates the voltage coordinate.\
+    \ `regulate` SELF-SOLVES the whole macro-step internally\n     (adaptive Dopri5 + PIDController, dt0=dt)\
+    \ and returns the EXACT integrated increment\n     y(dt)-y0 as a sparse delta. Widening `signal` to\
+    \ self-solve would break its\n     engine-integration identity -- again the disqualifying condition\
+    \ in what_would_settle_it.\n  3. FORCING INPUT. `regulate` reads sensed DRIVER fields u (chemical/mechanical)\
+    \ held FIXED over\n     the solve and entering as W_in@u; `signal` has no fixed external forcing term,\
+    \ only\n     recurrent presynaptic input. (The nonlinearity also sits differently: `signal` applies\
+    \ phi\n     to the presynaptic value before summing, W*phi(v); this applies sigma to the summed drive,\n\
+    \     phi(W@g).)\nSo `signal` could only \"cover\" this by changing its set, emptying its maps, dropping\
+    \ its\nedge-set, adding a forcing read, and flipping engine-integration to self-solve -- five signature\n\
+    changes that turn `signal` into a meaningless umbrella and break every existing connectome user.\n\
+    Per what_would_settle_it, \"if that mismatch forces a distinct operator -> new stands.\" It does.\n\
+    Hence `new`.\nThe more distant near-neighbours a maximalist might still reach for: `decay` (fields)\
+    \ literally\ncontains this ODE's -gamma*g term, but decay is an elementwise single-field in-place\
+    \ evaporation\n(c <- max(0, c - k*dt)) with no production, no cross-field coupling, no input and no\
+    \ memory -- the\ndegradation would be one line of a network it cannot name. `pacemaker` (a per-cell\
+    \ temporal\nSOURCE) shares \"emits a per-cell time-varying signal\" but owns ONLY timing: an open-loop\
+    \ clock\nwith no state feedback, sensed drive or coupling, so a closed-loop regulated circuit is not\
+    \ a\npacemaker. `sense`/`chemotax` couple a field to agent MOTION, not to internal chemistry.\nThis\
+    \ entry is the ABSTRACT base carrying the `regulate` contract (state_reads/state_writes + the\nmacro-step\
+    \ integration machinery + an abstract vector_field); its subclasses\nGeneNetworkConnectionist, GeneNetworkMWC\
+    \ and NeuralODE are interchangeable IMPLEMENTATIONS of this\none contract, differing only in the reaction\
+    \ law -- the several-implementations-per-contract shape\na mature vocabulary should show, so each\
+    \ should carry implementation_of: regulate.\nClassification: kind=exchange (a SET transduces its own\
+    \ fields; Plexus's FieldUpdate is \"no set\ninvolved\", pure grid dynamics) and maps=[] (unlike sense/chemotax\
+    \ there is no spatial gather and\nno neighbour edge -- each cell integrates independently).\n"
   contract:
     name: regulate
     kind: exchange
@@ -666,6 +652,17 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: refinement
+    evidence: "signal.py:36-80 is a registered per-node internal-state ODE: EMIT=velocity, tau*dv/dt=-v+b+sum\
+      \ W*phi(v_pre), tag 'recurrent' \u2014 same firing-rate-RNN class as GeneNetworkConnectionist dg/dt=sigma(W*g+W_in*u+b)-gamma*g\
+      \ (ode.py:277). The why: never names signal, wrongly calls decay/pacemaker the closest contracts."
+    what_would_settle_it: "Can signal's typed contract express GeneNetworkConnectionist by supplying a\
+      \ per-cell self-loop synapse-set + input pseudo-nodes and self-integration? If it widens to a maps=[],\
+      \ field-forced, self-solved cell ODE without breaking its connectome/engine-integration identity\
+      \ \u2192 refinement of signal; if that mismatch forces a distinct operator \u2192 new stands."
 - id: stochastic_step
   order: 5
   raw_name: StochasticStep
@@ -2396,7 +2393,7 @@ mechanisms:
       pair counts once); force on each cell = -grad of the conservative Morse pair energy by autodiff
     - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive core (excluded
       volume) + adhesive tail (cell-cell adhesion); a radial pair force integrated overdamped or minimised
-  status: normalized
+  status: inspected
   module: null
   test: null
   evidence:
@@ -2404,6 +2401,19 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: alias
+    claimed: refinement
+    evidence: 'Registered attraction_repulsion uses a GLOBAL scalar interaction length (attraction_repulsion.py:43
+      self.sigma=float(params[''sigma''])) and reads no per-cell radius; Morse''s contact distance is
+      per-pair r_i+r_j from radius (potentials.py:305). Hosting Morse forces a new `radius` read + per-pair
+      contact distance onto attraction_repulsion = costed widening = refinement, per the division-entry
+      bar (atlas_record.yaml:1249-1258). Parent pillar also false: pairwise_potential verdict:null (1964).'
+    what_would_settle_it: Confirm attraction_repulsion has no per-cell radius/size read and only a global
+      scalar sigma (attraction_repulsion.py:43,32). If so, its declared signature must widen (+radius
+      read, sigma -> per-pair additive r_i+r_j) to host Morse's size-consistent contact distance, which
+      is refinement, not alias.
 - id: soft_sphere
   order: 15
   raw_name: SoftSphere
@@ -2549,7 +2559,7 @@ mechanisms:
     writes:
     - position
     maps: []
-  status: normalized
+  status: inspected
   module: null
   test: null
   evidence:
@@ -2557,6 +2567,19 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: alias
+    evidence: "SoftSphere subclasses PairwisePotential, verdicted `alias of attraction_repulsion` (pairwise_potential.yaml:80-82);\
+      \ siblings morse.yaml:86-88 & harmonic.yaml:68-70 alias, hertzian.yaml:71-73 refinement \u2014 all\
+      \ of attraction_repulsion. attraction_repulsion.py:63-68 is a conservative radial pull\u2212push\
+      \ force; SoftSphere is its p1=0 repulsion-only limit. `adhere` is unregistered (R4) \u2014 inventing\
+      \ it inflates the `new` count."
+    what_would_settle_it: 'Apply record.py''s regulate/consistency rule across the sibling entries: since
+      the parent PairwisePotential and twins Morse/Harmonic normalize to `alias of attraction_repulsion`,
+      SoftSphere (differing only in pair_energy U(r)) must take the same registered target, not a minted
+      `adhere`.'
 - id: hertzian
   order: 16
   raw_name: Hertzian
@@ -2768,7 +2791,7 @@ mechanisms:
       soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail
       and no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact);
       a radial pair force integrated overdamped or minimised by the wrapping motion step
-  status: normalized
+  status: inspected
   module: null
   test: null
   evidence:
@@ -2776,6 +2799,19 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: alias
+    claimed: new
+    evidence: "attraction_repulsion.py:28-64 EMITs a VELOCITY from a hand-coded two-Gaussian over an edge-graph,\
+      \ fixed global sigma, per-TYPE params, noise \u2014 never reads radius, no energy/virial. Hertzian\
+      \ (potentials.py:367-372) reads radius (sigma=r_i+r_j), is energy-defined, per-cell, deterministic.\
+      \ Alias drops radius-read + per-cell coupling; identical twin SoftSphere landed new/adhere. Language\
+      \ keeps 4 distinct interaction contracts."
+    what_would_settle_it: "Try to configure attraction_repulsion for a size-consistent contact: its API\
+      \ (REQUIRES_PARAMS=['sigma'], REQUIRES_TYPE_PROPS=['p'], no state.radius read in forward()) cannot\
+      \ express sigma=r_i+r_j nor a per-cell epsilon \u2014 so it cannot reproduce Hertzian without deleting\
+      \ its fixed-width per-type D'Orsogna contract; reconcile with soft_sphere's new/adhere twin verdict."
 - id: harmonic
   order: 17
   raw_name: Harmonic
@@ -2967,7 +3003,7 @@ mechanisms:
       < sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell adhesion) from a down-shifted
       harmonic well truncated at r_c = r_cutoff_frac*sigma; a radial pair force integrated overdamped
       or minimised by the wrapping dynamics step
-  status: normalized
+  status: inspected
   module: null
   test: null
   evidence:
@@ -2975,6 +3011,19 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: alias
+    claimed: new
+    evidence: Sibling SoftSphere (_work/soft_sphere.yaml:90-113) landed new -> `adhere`, explicitly rejecting
+      attraction_repulsion for lacking 'a cell's physical radius, size-consistent contact distance, energy/virial,
+      per-cell coupling'. Harmonic (potentials.py:407-416, base 228-266) reads radius->sigma=r_i+r_j,
+      per-cell mix k, energy/virial -- same adhesive family as Morse. Alias silently loses these; entry
+      never addresses adhere.
+    what_would_settle_it: 'Reconcile the family''s conflicting record verdicts (Morse alias->attraction_repulsion
+      vs SoftSphere new->adhere): confirm attraction_repulsion.py:28-64 has no `radius` read and a fixed
+      global sigma + per-type p; if so, Harmonic''s size-consistent per-pair contact and per-cell coupling
+      force it under `adhere`, matching Morse''s true sibling home, not attraction_repulsion.'
 - id: lennard_jones
   order: 18
   raw_name: LennardJones
@@ -3179,11 +3228,98 @@ mechanisms:
     pass through unchanged. relax_equilibrium has an explicit `if potential is None` short-circuit, but
     the step stores an actual NoForce() (potential is not None), so that branch is never taken -- it relies
     on immediate convergence instead.'
-  verdict: null
+  verdict: new
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'NEW -- a QUASISTATIC MECHANICAL-EQUILIBRATION operator `relax`: it advances cell POSITION to
+
+    the force-balanced configuration x* where grad_x U(x*) = 0, running an inner minimizer (FIRE)
+
+    to a genuine force tolerance and returning the EQUILIBRIUM, not a single dynamic increment.
+
+    No registered contract carries this "relax to mechanical equilibrium" biology.
+
+
+    CLOSEST REGISTERED CONTRACT = attraction_repulsion (lateral/interaction), the canonical
+
+    pairwise force law that moves cells. Widening it to admit `relax` does violence to its biology
+
+    on three axes: (1) TEMPORAL MODE -- attraction_repulsion emits ONE overdamped velocity per
+
+    macro-step over a radius_graph edge-set (a dynamic forward map); `relax` is QUASISTATIC,
+
+    iterating an inner solver to a force-balanced fixed point and overwriting absolute position
+
+    with x*. (2) OUTPUT -- a single-step velocity/force delta versus a converged equilibrium
+
+    configuration. (3) BACKWARD -- forward autodiff of the force versus the IMPLICIT-FUNCTION-
+
+    THEOREM sensitivity of the EQUILIBRIUM (dx*/dp = -H^-1 d(grad U)/dp), solved on the physical
+
+    subspace with the rigid-body gauge modes projected out so translation and rotation carry no
+
+    gradient. Turning a per-step force emitter into an equilibrium solver is a DIFFERENT contract,
+
+    not a wider one, and would break every user who relies on attraction_repulsion being a pure
+
+    single-step motion law.
+
+
+    NOT the campaign-local `adhere` contract (Morse/SoftSphere/Hertzian, order 15). `adhere` is the
+
+    FORCE LAW -- a pair POTENTIAL whose energy/forces move cells; `relax` is the potential-AGNOSTIC
+
+    SOLVER that wraps ANY Potential (including NoForce, where it is a no-op) and relaxes it to
+
+    equilibrium. They lie on ORTHOGONAL axes (which force law vs how to advance under it) and
+
+    compose: the same `relax` step runs Morse, SoftSphere or NoForce. So `relax` is not an
+
+    implementation_of `adhere`, and cannot be aliased to it anyway -- adhere is absent from the
+
+    frozen 42 and R4 forbids a non-registered `of:`.
+
+
+    NOT alias of `agitate` (BrownianDynamics, order 17), the sibling stepper. `agitate` is the
+
+    motion-family THERMAL-NOISE primitive (std = sqrt(2 kT dt / gamma)); `relax` is the
+
+    DETERMINISTIC (kT=0) equilibration and, unlike agitate''s single Euler-Maruyama increment, runs
+
+    to a force balance rather than taking one time-step. Different biology (equilibration vs
+
+    thermal agitation), different backward (implicit-diff of a fixed point vs pathwise noise).
+
+
+    SOURCE-vs-PAPER (in surprises): the paper (p. 14) calls this "gradient descent energy
+
+    minimization ... for a FIXED NUMBER OF STEPS"; the source runs FIRE to a force TOLERANCE and
+
+    differentiates the EQUILIBRIUM by implicit diff. SOURCE WINS -- and that contradiction is
+
+    exactly why `relax` (a converged, implicitly-differentiated equilibrium) is a distinct contract
+
+    from a fixed-step descent, which would be mere repeated application of the force law.
+
+    '
+  contract:
+    name: relax
+    kind: lateral
+    family: mechanics
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - position
+    - radius
+    - alive
+    - '<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g.
+      a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>'
+    writes:
+    - position
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3898,11 +4034,127 @@ mechanisms:
     finds only "validation LOSS"). A reader of the paper alone would model steps as freely mutating a
     shared struct; the declared-field dataflow contract is an invention of the library re-engineering,
     not described in the paper.'
-  verdict: null
+  verdict: out_of_scope
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'OUT_OF_SCOPE: declared-field dataflow validation is the declaration discipline and TYPE SYSTEM
+
+    of the operator algebra, not an operator in it. It reads no field VALUE and writes none: it only
+
+    (a) cross-validates each step''s declared state_reads()/state_writes()/trace_writes() at Model
+
+    build time (write-conflict policy + trace uniqueness + spec consistency) and (b) synthesizes the
+
+    typed state class as merge_specs(BASE_SPECS, union of step.state_requires()). "Advance the state"
+
+    has nothing to name here -- there is no biological process called "check that the steps declare
+
+    their fields honestly", so the contract rule that an operator take a biological name (divide /
+
+    diffuse / adhere) finds nothing to name.
+
+
+    It is the fourth face of the one core/step.py engine layer whose other three faces are already
+
+    out_of_scope: the Lie-Trotter macro-step split (order 21, `integrate`), the step_type time-scale
+
+    taxonomy (order 22, `timescale`), and the StochasticStep differentiability mixin (order 5 / 24).
+
+    Both the 21 and 22 why-blocks explicitly name order 23 for this same verdict. In an operator
+
+    ALGEBRA the composition law -- how operators declare and share the state they couple through --
+
+    is part of the algebra''s DEFINITION, not one of its elements; Plexus''s engine and IR already own
+
+    that discipline (typed reads/writes per operator, and record.py R7 rejecting a writes-nothing
+
+    operator is the direct analogue of "a declared write is the only coupling channel").
+
+
+    Not alias / refinement: no registered contract models a build-time schema validator, and widening
+
+    any forward operator (say `diffuse`, or any lateral force) to carry declaration cross-checking
+
+    would graft a validator onto a forward-dynamics signature -- pure violence to its biology. Not
+
+    new: `new` requires the capability be ABSENT from the promoted language, and this is the exact
+
+    opposite of absent -- it is the FRAME the language is written in, so registering it as an operator
+
+    would inflate the atlas yield with the very type discipline every entry already presupposes,
+
+    exactly what out_of_scope exists to prevent.
+
+
+    CONTRACT FIELDS BELOW are a validator formality: R6/R7 require a typed, writes-non-empty contract
+
+    even for out_of_scope. No Plexus kind fits a schema validator; kind=exchange / family=coupling
+
+    names only the write-into-shared-named-state coupling this contract governs; reads = the BASE_SPECS
+
+    it merges every step''s declarations against (position, radius, celltype, alive, t); writes=[alive]
+
+    is the formal allocation representative (a non-physics write mirroring the siblings'' writes:[t] and
+
+    stochastic_step''s writes:[trace]).
+
+
+    STRONGEST COUNTERARGUMENT (and why it loses): this is arguably the atlas''s most valuable POSITIVE
+
+    result rather than a scope exclusion. The target has INDEPENDENTLY reinvented the very discipline
+
+    the Plexus algebra is built on -- typed per-operator reads/writes as the sole coupling channel,
+
+    plus a write-conflict policy that is R7''s no-op rule made per-field -- which one could read as a
+
+    `new` build-time-dataflow-validator capability the language should register. It loses because the
+
+    atlas measures the OPERATOR VOCABULARY (typed forward maps over sets and fields), and a validator
+
+    is not a forward map -- it is the type system those maps are written in, which Plexus already
+
+    embodies; and `new` further requires ABSENCE, whereas this is the frame, not a gap. The honest
+
+    resolution is out_of_scope WITH the correspondence logged as a MEASUREMENT NOTE: jax-morph carries
+
+    one axis Plexus''s IR does not -- a per-StepType (time-scale-keyed) write-conflict policy
+
+    (quasistatic = one writer; dynamic = many, summed; discrete = exempt) that REFINES R7''s flat
+
+    no-op/writes rule. That axis is worth DOCUMENTING against the engine, not counting as a word in
+
+    the vocabulary.
+
+
+    SOURCE-vs-PAPER (recorded in surprises): the paper (Deshpande 2025, p.14, "I. Forward Simulation")
+
+    describes a single CellState struct composed "by any subset or combination of the steps" -- by
+
+    CONVENTION, with no declared reads/writes and no build-time validation (a paper grep for
+
+    valid/conflict/schema/declare/contract finds only "validation LOSS"). SOURCE WINS: the declared-
+
+    field dataflow contract is an invention of the hardened library, invisible to a paper-only reader.
+
+    '
+  contract:
+    name: couple
+    kind: exchange
+    family: coupling
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads:
+    - position
+    - radius
+    - celltype
+    - alive
+    - t
+    writes:
+    - alive
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -4062,11 +4314,94 @@ mechanisms:
     int, so a mask would silently read as the index set {0,1}); _is_bool_like also catches
 
     numpy/jax bools. Selecting a non-stochastic step index is an error.'
-  verdict: null
+  verdict: out_of_scope
   of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'out_of_scope: StochasticStep (core/step.py:148) is an ABSTRACT differentiability contract, not
+    a
+
+    forward-dynamics operator over sets and fields. Its own state_writes() and trace_writes() BOTH
+
+    default to () -- the base writes no physical state and declares no trace -- and it adds exactly one
+
+    non-physical constructor knob, score_by_default (a static scoring-inclusion flag). Everything the
+
+    contract actually fixes is gradient-estimator machinery: sample parameter-free exogenous noise into
+
+    ephemeral trace fields, own a single `replay` that turns a trace into the effect, and score each
+
+    selected step''s logp -- the REINFORCE / score-function estimator (paper p. 10, SI pp. 16-18) for
+    a
+
+    discrete event, plus a reparameterized pathwise branch the model selects with `pathwise = not
+
+    scored`. That is autodiff / optimization plumbing. In Plexus differentiability is an ENGINE concern
+
+    (autograd over the forward operators), never an operator in the forward algebra, so the vocabulary
+
+    has nothing to gain here.
+
+
+    Not alias / refinement: no registered contract models gradient estimation, and widening one to
+
+    admit trace/replay/score would graft an optimization concern onto a forward-dynamics signature. Not
+
+    `new`: the FORWARD effect of every concrete stochastic step already has a biological home in its own
+
+    subclass contract -- a Bernoulli division IS `cell_divide` (registered), a Brownian displacement IS
+
+    motion, a type-flip / death is its own event -- and this mixin adds NOTHING to those effects; it
+
+    adds only the gradient PATH (which estimator, how the trace round-trips into scoring, where
+
+    stop_gradient falls). Counting a differentiability contract as a new operator would inflate the
+
+    atlas yield with framework machinery, exactly the failure out_of_scope exists to prevent. The empty
+
+    typed signature is itself the tell: the base has no set, no maps, reads nothing, and the only thing
+
+    it writes is the ephemeral `trace` record it exists to score.
+
+
+    SOURCE vs PAPER (in surprises): the SI simplifies grad_theta log P(tau) to the pure policy term
+
+    grad_theta log pi_theta(a|s), dropping the transition kernel P(s_{t+1}|s_t,a_t) as
+
+    theta-independent (textbook MDP REINFORCE); the CODE does NOT -- trajectory_logp carries a LIVE
+
+    (non-detached) state so the environment''s theta-dependence flows pathwise, and it also scores
+
+    reparameterized Brownian transitions with a Gaussian logp. The clean policy-only equation
+
+    understates what the code differentiates. This is a DIFFERENTIATION-PATH contradiction, which only
+
+    reinforces that the mechanism is about HOW gradients are taken, not what the state does.
+
+
+    OVERLAP: the sibling entry `stochastic_step` (order 5) is the SAME core/step.py:148 class, already
+
+    normalized out_of_scope with the same reasoning and explicitly directing this entry (order 24) to
+
+    the same verdict. Both entries resolve to it; the contract below (name sample_score, writing only
+
+    the ephemeral `trace`) is kept identical to the sibling so the two duplicate inspections of one
+
+    class do not diverge in the record.
+
+    '
+  contract:
+    name: sample_score
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - cell
+    reads: []
+    writes:
+    - trace
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:

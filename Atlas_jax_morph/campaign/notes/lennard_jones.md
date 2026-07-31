@@ -36,37 +36,76 @@ from the base-class docstrings, not from reading those steps.
 ## NORMALIZER note
 
 **Verdict: `refinement` of `attraction_repulsion` (implementation_of: attraction_repulsion).** LJ is
-the 12-6 well SHAPE of the one pairwise radial cell-cell interaction the registry already carries --
-a hard r^-12 core plus a -2 r^-6 adhesive tail, minimum -epsilon at contact `sigma = r_i + r_j` --
-which IS attraction_repulsion's pull-minus-push biology, so `implementation_of` is
-attraction_repulsion. It is `refinement` and not `alias` because the FROZEN operator has a single
-GLOBAL scalar interaction length (`attraction_repulsion.py:43 self.sigma = float(params["sigma"])`)
-and reads no per-cell radius, whereas LJ's contact distance is per-pair and radius-coupled
-(`sigma_ij = r_i + r_j`, potentials.py:452) and enters the force-law shape itself -- so admitting LJ
-ADDS a `radius` read and generalizes the interaction length to the additive per-pair rule. That is
-the same signature-growth the record already accepted as refinement for `cell_divide`
-(+division_axis) and `cell_grow` (+growth_rate), and it is the reading the record's skeptic imposed
-on the twin `morse` (refuting alias -> refinement on exactly this argument). Of the family LJ is the
-strongest refinement case: Hertzian (also refinement) shows the radius coupling only in the
-purely-repulsive limit, whereas LJ exercises it in the complete core+tail adhesive well.
+the 12-6 SHAPE of the one pairwise radial cell-cell interaction the language already carries -- a hard
+r^-12 excluded-volume core minus a 2 r^-6 adhesive tail, minimum -epsilon at the contact distance
+`sigma = r_i + r_j`, force = -grad of that conservative radial energy by autodiff -- which IS
+attraction_repulsion's pull-minus-push biology, so its home and closest contract are unambiguous. Not
+`new`: the biology is a pairwise radial law, the frozen language already holds an energy-defined
+interaction in this family (stillinger_weber), and minting a second pairwise-attraction-repulsion
+contract inflates the very yield the ledger measures (this also rejects SoftSphere's `new -> adhere`,
+order 15, as over-minting). But NOT a clean `alias`, and that is the entry: the PROMOTED operator
+(src/plexus/operators/attraction_repulsion.py, the D'Orsogna model) reads pos/edge_index/node_type/occ
+but **never `radius`** (52-61), makes a single GLOBAL scalar length UNCONDITIONALLY required
+(`REQUIRES_PARAMS=["sigma"]`, `self.sigma=float(params["sigma"])`, 32/43), and couples **per-TYPE**
+(`REQUIRES_TYPE_PROPS=["p"]`, 33/61). Hosting LJ therefore (a) grows the declared reads by `radius`,
+(b) relaxes the "exactly one global interaction length" guarantee to a per-pair additive
+`sigma=r_i+r_j`, and (c) generalises the coupling from type-indexed to a per-cell field. By the
+record's OWN normalized bar that is refinement, not alias: `cell_divide` and `cell_grow` (both
+refinement/normalized) establish that GROWING the declared read set -- "a dependency existing
+schedulers did not track" -- or FLIPPING an invariant is a costed widening even when additive. LJ does
+exactly that; the pure-D'Orsogna path still runs untouched, but the signature and its guarantee change,
+and a refinement nobody costed is a breaking change. Source vs paper (rule 5): LJ is in NO paper
+experiment -- Morse is the paper's only mechanical potential -- source wins, recorded, verdict
+unchanged.
 
-**Strongest argument AGAINST (and why it loses):** the two other full core+tail members, `morse` and
-`harmonic`, both landed **alias**, and LJ differs from Morse only in the well's functional form
-(12-6 vs exponential) -- the textbook interchangeable-implementation case -- so by nearest-twin
-consistency LJ "should" be alias too; the alias camp argues the `radius` read is additive and
-opt-in (a null-radius / global-sigma path recovers the exact D'Orsogna force), breaking no existing
-user, hence default-compatible rather than a costed widening. It loses on three source-checkable
-grounds: (a) the frozen operator genuinely does NOT read radius and its sigma is a global scalar
-(attraction_repulsion.py:32,43), so the read must truly be ADDED -- a signature change, not a
-field the alias contracts glossed as already-present; (b) the record's standing bar (division and
-cell_grow, both refinement) treats *adding a read to a frozen signature* as refinement even when
-additive/opt-in, and "breaks no existing user" is exactly the deflationary comfort that bar rejects;
-(c) the record's own skeptic already refuted this alias reading on the sibling `morse`
-(confidence 0.68). The honest cost is that this puts LJ at odds with `morse`/`harmonic` as they
-currently stand -- but those are the entries the skeptic flagged, not the Hertzian/refinement line I
-follow; the alias label under-reports a real gap (attraction_repulsion cannot, as registered,
-express a size-coupled per-pair contact distance), and surfacing that gap is the measurement this
-ledger exists for. (Source vs paper: LJ appears nowhere in the paper -- Morse is the paper's only
-mechanical potential -- source wins, recorded, verdict unchanged. Oracle not run; jax is absent and
-python is sandbox-blocked here, so the entry was checked by inspection against record.py's rules;
-the driver runs the validator.)
+**Strongest argument AGAINST (and why it is close).** The abstract parent `pairwise_potential` (order
+13) is already NORMALIZED as plain **alias -> attraction_repulsion**, and its normalized `contract:`
+block ALREADY lists `radius` in reads and `sigma=r_i+r_j` in maps while ruling exactly these fields
+"default-compatible and break no existing user ... not a costed widening." If that normalized parent
+signature -- not the raw registered operator -- is the ledger's operative contract, then the widening
+has already been paid and LJ is a clean ALIAS of it; re-costing it as refinement double-charges a
+settled result, and the family's landed majority (parent + Morse + Hertzian + Harmonic all alias)
+agrees. I resist this because rule 4 pins `of:` to the PROMOTED code in `plexus.operators`, and that
+operator demonstrably cannot express a size-coupled per-pair contact distance (no radius read, a
+required global sigma) -- the parent's contract block is a PROPOSED signature the frozen language has
+not adopted, so against the real baseline the widening is still owed. That is the genuine tension and I
+do not pretend it away: if the parent's normalized signature governs, alias is correct; against the
+frozen operator, refinement is. I land refinement because it is the only verdict that neither hides the
+missing `radius`/per-pair-`sigma` capability (alias) nor mints a whole redundant contract for a
+different well shape (adhere/new). (Oracle not run: jax is absent here and `python` is sandbox-blocked,
+so the entry was checked by inspection against record.py's twelve rules; the driver runs the validator
+on merge.)
+
+---
+
+## NORMALIZER note (landed verdict -- supersedes the refinement draft above)
+
+**Verdict: `new`, `implementation_of: adhere`.** I verified the registered operator directly at the
+source: `src/plexus/operators/attraction_repulsion.py` is a D'Orsogna self-propelled-**particle**
+velocity law -- `set="particle"`, `EMIT="velocity"`, a required **global scalar** `sigma`
+(32/43), **per-TYPE** `p` (33/61), reads `pos/occ/edge_index/node_type` and **never `radius`**
+(52-61), no energy, no virial. So `alias` is factually false, and hosting LJ is not a bounded field
+add: it changes `set` (particle->cell), swaps a velocity law for an energy whose grad is the force,
+re-sources the interaction range from a free global knob to a physical `sigma=r_i+r_j` read from
+radius, swaps per-type for per-cell coupling, and grows an energy output -- deleting the D'Orsogna
+model. Widening that does violence to the contract's biology, which is the record's `new` test, not
+refinement. The six pair potentials share ONE signature and differ only in `U(r)`, so they are ONE
+new contract `adhere` with several implementations -- one new contract for the family, not six, which
+is the several-implementations result the ledger wants, not inflation. LJ, being adhesive, fits
+`adhere` more directly than the repulsion-only SoftSphere that already landed `new -> adhere` (order
+15, dispute-survived); I align with it rather than the source-false alias majority.
+
+**Strongest argument AGAINST (and why I still reject it).** The honest counter is not `alias` but
+`refinement of attraction_repulsion` (my predecessor's draft above): `attraction_repulsion` IS the
+registered "attraction + repulsion" pairwise slot whose *name* matches this pull-minus-push biology,
+and the record already accepts refinements that merely grow the declared read set (`cell_divide`,
+`cell_grow`) -- so the minimal, non-inflating move is to widen it and keep ONE interaction force in
+the language rather than mint a parallel `adhere`, which risks two contracts ("radial pull-minus-push
+pair force") that a reader would struggle to tell apart. This is genuinely close, and if the ledger
+ever treats a *proposed/normalized* signature (the parent `pairwise_potential` contract block already
+lists `radius` + `sigma=r_i+r_j`) as the operative baseline, refinement -- or even alias -- becomes
+correct. I reject it because rule 4 pins the comparison to the PROMOTED code, and against that code
+the change is not one field but a rewrite of set/emit/coupling/range-ontology plus a new energy
+readout, which deletes the fixed-width, type-programmed D'Orsogna particle model and breaks its every
+user -- the definition of `new`, not a costed widening. (Oracle not run: jax absent, `python`
+sandbox-blocked; entry checked by inspection, driver runs record.py on merge.)

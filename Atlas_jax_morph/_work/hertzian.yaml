@@ -208,7 +208,7 @@ contract:
     soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail and
     no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact); a radial
     pair force integrated overdamped or minimised by the wrapping motion step
-status: normalized
+status: inspected
 module: null
 test: null
 evidence:
@@ -216,3 +216,16 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: alias
+  claimed: new
+  evidence: attraction_repulsion.py:28-64 EMITs a VELOCITY from a hand-coded two-Gaussian over an edge-graph,
+    fixed global sigma, per-TYPE params, noise — never reads radius, no energy/virial. Hertzian (potentials.py:367-372)
+    reads radius (sigma=r_i+r_j), is energy-defined, per-cell, deterministic. Alias drops radius-read
+    + per-cell coupling; identical twin SoftSphere landed new/adhere. Language keeps 4 distinct interaction
+    contracts.
+  what_would_settle_it: 'Try to configure attraction_repulsion for a size-consistent contact: its API
+    (REQUIRES_PARAMS=[''sigma''], REQUIRES_TYPE_PROPS=[''p''], no state.radius read in forward()) cannot
+    express sigma=r_i+r_j nor a per-cell epsilon — so it cannot reproduce Hertzian without deleting its
+    fixed-width per-type D''Orsogna contract; reconcile with soft_sphere''s new/adhere twin verdict.'

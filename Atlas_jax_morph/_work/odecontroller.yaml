@@ -72,61 +72,55 @@ surprises:
   dead slots to zero afterward, so the step does not mask itself.'
 verdict: new
 of: null
-why: 'No registered contract covers a per-cell, continuous-time internal regulatory network -- an
-
-  intracellular gene-regulatory / signaling ODE that reads the cell''s sensed driver fields (held
-
-  fixed for the step), evolves a coupled vector of latent + output gene concentrations over the
-
-  developmental macro-step, and persists the result as heritable per-cell state. This is the
-
-  genotype->phenotype DECISION FUNCTION of the paper''s cells (its output genes set division,
-
-  secretion and adhesion rates read by downstream steps), and the promoted language has no operator
-
-  for it. Closest registered contract is `decay` (fields): dg/dt = production - gamma*g literally
-
-  contains decay''s linear degradation term, so a maximalist could call this a widening of `decay`.
-
-  But `decay` is an elementwise, single-field, in-place evaporation (c <- max(0, c - k*dt)) with no
-
-  production, no cross-field coupling, no inputs and no memory; widening it to admit a
-
-  sensed-input-forced, nonlinearly-regulated, multi-gene system integrated by an adaptive
-
-  continuous-time solver with heritable latent state would erase everything that makes `decay`
-
-  `decay` -- the degradation term would be one line of a network it cannot name. `pacemaker` (a
-
-  per-cell temporal SOURCE) is the next closest, since both emit a per-cell time-varying signal, but
-
-  pacemaker "owns ONLY timing": an open-loop clock with no state feedback, no sensed drive and no
-
-  coupling, so a closed-loop regulated circuit is not a pacemaker. `sense`/`chemotax` couple a field
-
-  to agent MOTION, not to internal chemistry. Hence `new`. This entry is the ABSTRACT base that
-
-  carries the contract (state_reads/state_writes + the macro-step integration machinery + an
-
-  abstract vector_field); its three subclasses GeneNetworkConnectionist, GeneNetworkMWC and NeuralODE
-
-  are interchangeable IMPLEMENTATIONS of this one `regulate` contract, differing only in the reaction
-
-  law -- exactly the several-implementations-per-contract shape a mature vocabulary should show, so
-
-  they should each carry implementation_of: regulate rather than a fresh contract.
-
-  Classification note: kind=exchange (not field) because a SET is involved -- Plexus''s FieldUpdate is
-
-  defined as "no set involved" (pure grid dynamics), whereas this transduces the cell''s own sensed
-
-  driver fields into its gene-expression fields; maps=[] because, unlike the gather-based exchanges
-
-  (chemotax/sense read a spatial field), the coupling is entirely among the cell''s own per-cell
-
-  fields with no spatial gather and no neighbour edges (each cell integrates independently).
-
-  '
+why: |
+  Closest registered contract is `signal` (lateral/interaction, set=neuron), NOT `decay` or
+  `pacemaker`: `signal` is the only other registered per-agent internal-state ODE of the same
+  firing-rate / recurrent-network class. It integrates
+  tau*dv_i/dt = -v_i + b_i + sum_e W_e*phi(v_pre(e)) on a neuron; this integrates
+  dg/dt = sigma(W_gene@g + W_in@u + b) - gamma*g on a cell. The reaction laws rhyme, and a skeptic
+  is right to name `signal` here (the earlier draft that called decay/pacemaker "closest" was wrong).
+  But `signal`'s typed IDENTITY is a CONNECTOME morphism, and no widening of it can absorb this ODE
+  without dissolving that identity. Three signature facts make them different contracts, not two
+  implementations of one:
+    1. COUPLING TOPOLOGY. `signal`'s regulatory weights live on a first-class `synapse` EDGE-SET
+       read through the pre/post incidence maps (INPUTS=[neuron,synapse], MAPS=[pre,post]); it
+       gathers phi(v) along `pre` and scatters current along `post`. Its own docstring: "the maps
+       are PART of the signature". `regulate` has NO edge-set and NO map -- W_gene/W_in are dense
+       per-operator parameters and each cell integrates its OWN network in isolation (maps=[]),
+       with ZERO cell-to-cell coupling. It is intracellular, not lateral. To make `signal` express
+       this you must invent a per-cell all-to-all self-synapse-set plus input pseudo-nodes for the
+       drive u -- which changes the SET it runs on and empties its MAPS, the exact connectome
+       identity the dispute's own what_would_settle_it says must not break.
+    2. INTEGRATION CONTRACT. `signal` EMITs velocity (an instantaneous dv/dt) and the ENGINE
+       integrates the voltage coordinate. `regulate` SELF-SOLVES the whole macro-step internally
+       (adaptive Dopri5 + PIDController, dt0=dt) and returns the EXACT integrated increment
+       y(dt)-y0 as a sparse delta. Widening `signal` to self-solve would break its
+       engine-integration identity -- again the disqualifying condition in what_would_settle_it.
+    3. FORCING INPUT. `regulate` reads sensed DRIVER fields u (chemical/mechanical) held FIXED over
+       the solve and entering as W_in@u; `signal` has no fixed external forcing term, only
+       recurrent presynaptic input. (The nonlinearity also sits differently: `signal` applies phi
+       to the presynaptic value before summing, W*phi(v); this applies sigma to the summed drive,
+       phi(W@g).)
+  So `signal` could only "cover" this by changing its set, emptying its maps, dropping its
+  edge-set, adding a forcing read, and flipping engine-integration to self-solve -- five signature
+  changes that turn `signal` into a meaningless umbrella and break every existing connectome user.
+  Per what_would_settle_it, "if that mismatch forces a distinct operator -> new stands." It does.
+  Hence `new`.
+  The more distant near-neighbours a maximalist might still reach for: `decay` (fields) literally
+  contains this ODE's -gamma*g term, but decay is an elementwise single-field in-place evaporation
+  (c <- max(0, c - k*dt)) with no production, no cross-field coupling, no input and no memory -- the
+  degradation would be one line of a network it cannot name. `pacemaker` (a per-cell temporal
+  SOURCE) shares "emits a per-cell time-varying signal" but owns ONLY timing: an open-loop clock
+  with no state feedback, sensed drive or coupling, so a closed-loop regulated circuit is not a
+  pacemaker. `sense`/`chemotax` couple a field to agent MOTION, not to internal chemistry.
+  This entry is the ABSTRACT base carrying the `regulate` contract (state_reads/state_writes + the
+  macro-step integration machinery + an abstract vector_field); its subclasses
+  GeneNetworkConnectionist, GeneNetworkMWC and NeuralODE are interchangeable IMPLEMENTATIONS of this
+  one contract, differing only in the reaction law -- the several-implementations-per-contract shape
+  a mature vocabulary should show, so each should carry implementation_of: regulate.
+  Classification: kind=exchange (a SET transduces its own fields; Plexus's FieldUpdate is "no set
+  involved", pure grid dynamics) and maps=[] (unlike sense/chemotax there is no spatial gather and
+  no neighbour edge -- each cell integrates independently).
 contract:
   name: regulate
   kind: exchange
@@ -152,3 +146,14 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: new
+  claimed: refinement
+  evidence: 'signal.py:36-80 is a registered per-node internal-state ODE: EMIT=velocity, tau*dv/dt=-v+b+sum
+    W*phi(v_pre), tag ''recurrent'' — same firing-rate-RNN class as GeneNetworkConnectionist dg/dt=sigma(W*g+W_in*u+b)-gamma*g
+    (ode.py:277). The why: never names signal, wrongly calls decay/pacemaker the closest contracts.'
+  what_would_settle_it: Can signal's typed contract express GeneNetworkConnectionist by supplying a per-cell
+    self-loop synapse-set + input pseudo-nodes and self-integration? If it widens to a maps=[], field-forced,
+    self-solved cell ODE without breaking its connectome/engine-integration identity → refinement of signal;
+    if that mismatch forces a distinct operator → new stands.

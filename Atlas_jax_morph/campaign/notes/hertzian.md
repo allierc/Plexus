@@ -35,26 +35,32 @@ wants the exact minimum-image / masking mechanics should open that file. Left `v
 null for the normalizer (Hertzian, SoftSphere, and the `PairwisePotential` base likely collapse to
 one contract family, but that is not my call).
 
-**Normalizer verdict — `alias` of `attraction_repulsion` (implementation_of: attraction_repulsion).**
-Hertzian is a conservative radial pair force run in its repulsion-only limit — a compact soft core
-with contact `sigma = r_i + r_j`, the exact biology of `attraction_repulsion`'s "pull minus push"
-with the pull term set to zero. It is the purely-repulsive, C2-soft (force AND its slope vanish at
-contact), self-truncating member of the PairwisePotential family. The abstract parent — already alias
-→ attraction_repulsion — names Hertzian verbatim as `implementation_of: attraction_repulsion`, and
-Morse (order 14) and Harmonic (order 17) followed. Keeping the whole family under one contract is the
-several-implementations-per-contract pattern the ledger measures; minting a new contract would inflate
-the yield. **Strongest argument against:** the direct sibling `SoftSphere` (order 15), the OTHER
-purely-repulsive member, did NOT alias — it minted a NEW contract `adhere`, arguing the registered
-`attraction_repulsion` is specifically the D'Orsogna self-propelled-particle law (a hand-coded velocity
-of FIXED GLOBAL width `sigma`, keyed to per-TYPE `p=[pull,pull_range,push,push_range]`, message-passed
-over a `radius_graph` edge-set, that never reads a cell's physical radius). Hertzian instead reads
-`radius` to build a per-pair size-consistent `sigma = r_i + r_j`, takes a per-CELL scalar `epsilon`,
-and is an ENERGY over DENSE N×N pairs turned to force by `-jax.grad`. If the contract's identity is
-"hand-coded per-type force on a sparse graph" rather than "the conservative radial pull-minus-push
-law", then admitting a radius-derived, per-cell, energy-defined, dense-pairs realization is arguably a
-`refinement` (or, as SoftSphere ruled, a genuinely distinct `adhere` contract) rather than a free
-alias. I judge those to be sub-signature implementation axes — stillinger_weber is already an
-energy-defined interaction in this same family, squared_law already carries both all-pairs and a graph,
-and attraction_repulsion's own force is the gradient of a radial potential — and I follow the parent +
-Morse + Harmonic majority over the SoftSphere dissent so the pair-potential family does not fracture
-across two contracts. But the structural gap is real and is the honest case against the alias.
+**Normalizer verdict (revised) — `new`, `implementation_of: adhere`.** (This supersedes an earlier
+normalizer pass on this entry that landed `alias → attraction_repulsion`.) Hertzian is the
+purely-repulsive, C2-soft, self-truncating member of a pairwise cell-cell CONTACT-MECHANICS contract
+whose interaction range is set by the cells' physical size (`sigma = r_i + r_j` read from `radius`, so
+excluded volume tracks growth and division), defined by an energy that autodiffs to a force + virial,
+with a per-cell (or shared) stiffness. The frozen 42 do not carry that contract — it is exactly the
+`adhere` contract SoftSphere (order 15) surfaced. The decisive point: Hertzian and SoftSphere are the
+two most similar members in the whole family — the same `_compact_repulsion(r, sigma, eps, exponent,
+prefactor)` helper, both purely repulsive, single-param, differing ONLY in `(2.5, 0.4)` vs `(2.0,
+0.5)` — so they MUST share a verdict, and SoftSphere's `new → adhere` is already merged. The
+registered `attraction_repulsion` cannot host this: verified at source it is the D'Orsogna
+self-propelled-particle law (`EMIT="velocity"`, a global scalar `sigma = float(params["sigma"])`,
+per-TYPE `p`, edge-graph message passing, no `radius` read, no energy/virial), so aliasing overstates
+coverage and widening it to size-consistent per-cell energy-mechanics would delete its defining
+biology. Recording Hertzian as `implementation_of: adhere` adds ZERO contracts (the family yields ONE
+new contract with several implementations), so this is not yield-inflation. **Strongest argument
+against:** the family PLURALITY runs the other way — the abstract parent `PairwisePotential` (13),
+`Morse` (14) and `Harmonic` (17) all landed `alias → attraction_repulsion`, judging the radius-read,
+the energy→autodiff-force strategy, and the dense-vs-graph topology to be sub-signature implementation
+axes (stillinger_weber is already an energy-defined member of this family; squared_law already carries
+both all-pairs and a graph; attraction_repulsion's own force is the gradient of a radial potential).
+If they are right, then `attraction_repulsion` really is "the conservative radial pull-minus-push
+contract" abstractly, `adhere` is a spurious mint that fractures a family the parent explicitly
+unified and inflates the exact `new` count the ledger measures — and `adhere` is a poor biological
+name for a member that is PURELY REPULSIVE and never adheres. I still choose `new` because the
+registered operator's `reads` genuinely lacks `radius` (aliasing asserts coverage the signature does
+not have) and because splitting the near-identical twins SoftSphere/Hertzian is indefensible; but the
+right resolution is family-wide (pull parent + Morse + Harmonic toward `adhere`), and that
+reconciliation is flagged for the analysis phase.

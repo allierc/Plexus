@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 30000
+    n: 3552
   cell:
-    n: 16000
+    n: 1800
     state:
       chem:
         width: 2
@@ -91,4 +91,14 @@ schedule:
 - topo_snapshot_3d
 _discovery:
   comp_hash: MINI_mini_grow_divide
-  region: minisite tyssue_vh_K4_cv15_d4 verbatim (ceiling 1.4 BELOW trigger 2.0)
+  region: minisite tyssue_vh_K4_cv15_d4 verbatim (ceiling 1.4 BELOW trigger 2.0) [reference
+    buffers 3552/1800]
+_premises:
+  waive:
+    P3: REFERENCE REPRODUCTION. vth_frac 1.4 < factor 2.0 is a property OF the minisite
+      config we are reproducing, not our choice. It means every division there comes
+      from the max_cycle timer rather than from a cell reaching size, so cell number
+      doubles while mean cell volume halves and the ball never grows -- which is exactly
+      the behaviour Cedric observed in the reference movie. Reproducing it faithfully
+      requires reproducing this. mini_grow_divide_bigger is the same config with the
+      ceiling raised, and is the controlled comparison.

@@ -115,104 +115,95 @@ surprises:
   on immediate convergence instead.'
 verdict: new
 of: null
-why: |
-  NEW -- a mechanics-family primitive `relax`: drive cell positions to the MECHANICAL EQUILIBRIUM
-  (force balance grad_x U = 0) of a supplied interaction, a QUASISTATIC map that replaces the fast
-  mechanical trajectory with its asymptotic fixed point. This is the quasistatic-mechanics stance
-  of tissue morphogenesis -- mechanical relaxation is fast relative to growth/division, so between
-  the slow events the cluster is assumed to sit at force balance, and its shape at each
-  morphogenetic timepoint IS the equilibrium configuration. The paper names it as one of its core
-  framework steps (Fig. 1a, "mechanical relaxation").
+why: 'NEW -- a QUASISTATIC MECHANICAL-EQUILIBRATION operator `relax`: it advances cell POSITION to
 
-  Earned by stripping away everything the frozen language already owns, exactly as its DYNAMIC
-  sibling BrownianDynamics was stripped to `agitate`. (1) FIRE, the implicit-function-theorem
-  backward, the physical-subspace projection, `ridge`, `max_steps`, `f_tol`, and the non-convergence
-  warning are all NUMERICS -- the solver used to find the equilibrium and to differentiate it, not
-  physical content. (2) The force field itself is the pluggable `potential`, a SEPARATE registered
-  contract (attraction_repulsion and its Morse / SoftSphere / Hertzian implementations). What is
-  left as this step's own constitutive content is the OPERATION `relax`: map the set onto the
-  mechanical-equilibrium manifold of whatever force field is supplied. No registered contract
-  expresses that. All 42 are single-application maps -- an operator emits a velocity / acceleration /
-  force and the engine takes ONE Euler step (attractor_flow rides a vector field one step, drag is a
-  one-step damping acceleration, attraction_repulsion emits a one-step pair force). None runs to a
-  fixed point; the algebra has no equilibration / quasistatic-solve primitive at all.
+  the force-balanced configuration x* where grad_x U(x*) = 0, running an inner minimizer (FIRE)
 
-  THE STRONGEST OBJECTION, confronted: "relax to equilibrium" is not a new OPERATOR but a
-  driver/control-flow over an operator the language already has -- the mechanical equilibrium of
-  attraction_repulsion is just the FIXED POINT of iterating its overdamped motion, reachable by
-  composing that same interaction-plus-motion operator many times until the force vanishes, exactly
-  as NoForce is realized by composing NOTHING (the empty composition = the identity element the
-  algebra gets for free). And every knob `relax` exposes (max_steps, f_tol, ridge) is a numerical
-  tolerance, not a physical quantity -- the signature of plumbing (out_of_scope), in pointed
-  contrast to agitate, which owns the genuinely physical kT and gamma. So a skeptic reads this as
-  out_of_scope (a solver) or as an alias of attraction_repulsion (the thing already "minimised by
-  the wrapping motion step").
+  to a genuine force tolerance and returning the EQUILIBRIUM, not a single dynamic increment.
 
-  Why it loses. (a) The identity element is free because it is the empty composition; an
-  equilibrium is the OMEGA-LIMIT of iterated composition, and that is NOT free. The engine applies
-  each operator EXACTLY ONCE per macro-step (the fixed Lie-Trotter split), so "run to the
-  equilibrium manifold" is simply not expressible by composing registered operators within a
-  macro-step -- it needs an operator whose semantics ARE the convergence-gated map to the fixed
-  point. That is a distinct TYPE of operation from any of the 42 single-shot Euler maps, which is
-  precisely the gap this entry measures. (b) Unlike NoForce (out_of_scope because it writes a
-  zero increment -- an undetectable no-op, R7) `relax` performs a real forward transformation:
-  position -> the force-balanced configuration. It is not content-free. (c) It is
-  potential-AGNOSTIC -- it relaxes under Morse, SoftSphere, Harmonic or any energy equally -- so it
-  is the equilibration OPERATION, not a force law; aliasing it to attraction_repulsion is the
-  category error of identifying a fixed-point solver with the vector field it drives to zero.
-  attraction_repulsion HAS a pair map, a coupling, and a force SHAPE; `relax` has none of these.
+  No registered contract carries this "relax to mechanical equilibrium" biology.
 
-  CLOSEST registered contracts, and why each cannot be widened without violence. `drag`
-  (lateral/mechanics, dissipative friction acc = -k*v) is a per-step damping acceleration, not a
-  fixed-point solve; widening it into a convergence-gated quasistatic equilibration inverts its
-  regime (a finite-rate dynamic increment -> a quasistatic map-to-equilibrium) and erases its k*v
-  constitutive law. `agitate` (lateral/motion), the temperature-controlled Brownian walk, is the
-  DYNAMIC dual across BOTH the temperature axis (agitate is the thermostat kT>0; relax has no noise
-  and no temperature) and the time-scale axis (agitate returns a dt-scaled stochastic delta with
-  trace/replay/logp; relax is a deterministic quasistatic overwrite); widening agitate to admit a
-  noise-free, run-to-convergence fixed-point solve with implicit-diff gradients inverts its step
-  type and deletes the thermal bath that IS its biology -- BrownianDynamics at kT=0 is one descent
-  STEP, not the converged equilibrium. attraction_repulsion is the force being relaxed, not the
-  relaxation. SOURCE vs PAPER (rule 5, source wins): the paper's Methods (p. 14) call this "gradient
-  descent energy minimization of the Morse potential for a FIXED NUMBER OF STEPS"; the source runs
-  FIRE to a genuine force TOLERANCE (a real equilibrium, max_steps only a fallback) and
-  differentiates the EQUILIBRIUM by the implicit function theorem, not the descent path. That
-  contradiction is recorded in surprises; it does not change the verdict -- either way the mechanism
-  is the quasistatic map to mechanical force balance, which the frozen language lacks.
+
+  CLOSEST REGISTERED CONTRACT = attraction_repulsion (lateral/interaction), the canonical
+
+  pairwise force law that moves cells. Widening it to admit `relax` does violence to its biology
+
+  on three axes: (1) TEMPORAL MODE -- attraction_repulsion emits ONE overdamped velocity per
+
+  macro-step over a radius_graph edge-set (a dynamic forward map); `relax` is QUASISTATIC,
+
+  iterating an inner solver to a force-balanced fixed point and overwriting absolute position
+
+  with x*. (2) OUTPUT -- a single-step velocity/force delta versus a converged equilibrium
+
+  configuration. (3) BACKWARD -- forward autodiff of the force versus the IMPLICIT-FUNCTION-
+
+  THEOREM sensitivity of the EQUILIBRIUM (dx*/dp = -H^-1 d(grad U)/dp), solved on the physical
+
+  subspace with the rigid-body gauge modes projected out so translation and rotation carry no
+
+  gradient. Turning a per-step force emitter into an equilibrium solver is a DIFFERENT contract,
+
+  not a wider one, and would break every user who relies on attraction_repulsion being a pure
+
+  single-step motion law.
+
+
+  NOT the campaign-local `adhere` contract (Morse/SoftSphere/Hertzian, order 15). `adhere` is the
+
+  FORCE LAW -- a pair POTENTIAL whose energy/forces move cells; `relax` is the potential-AGNOSTIC
+
+  SOLVER that wraps ANY Potential (including NoForce, where it is a no-op) and relaxes it to
+
+  equilibrium. They lie on ORTHOGONAL axes (which force law vs how to advance under it) and
+
+  compose: the same `relax` step runs Morse, SoftSphere or NoForce. So `relax` is not an
+
+  implementation_of `adhere`, and cannot be aliased to it anyway -- adhere is absent from the
+
+  frozen 42 and R4 forbids a non-registered `of:`.
+
+
+  NOT alias of `agitate` (BrownianDynamics, order 17), the sibling stepper. `agitate` is the
+
+  motion-family THERMAL-NOISE primitive (std = sqrt(2 kT dt / gamma)); `relax` is the
+
+  DETERMINISTIC (kT=0) equilibration and, unlike agitate''s single Euler-Maruyama increment, runs
+
+  to a force balance rather than taking one time-step. Different biology (equilibration vs
+
+  thermal agitation), different backward (implicit-diff of a fixed point vs pathwise noise).
+
+
+  SOURCE-vs-PAPER (in surprises): the paper (p. 14) calls this "gradient descent energy
+
+  minimization ... for a FIXED NUMBER OF STEPS"; the source runs FIRE to a force TOLERANCE and
+
+  differentiates the EQUILIBRIUM by implicit diff. SOURCE WINS -- and that contradiction is
+
+  exactly why `relax` (a converged, implicitly-differentiated equilibrium) is a distinct contract
+
+  from a fixed-step descent, which would be mere repeated application of the force law.
+
+  '
 contract:
   name: relax
   kind: lateral
   family: mechanics
   set: cell
   inputs:
-  - cell -- the cluster whose positions are relaxed to force balance
-  - potential (a SEPARATE pluggable interaction contract such as attraction_repulsion or the Morse
-    family) supplies the force field grad_x U whose balance defines the equilibrium; potential=None
-    means no interaction and the step passes positions through unchanged
-  - f_tol / max_steps / ridge are NUMERICAL solver tolerances only with no physical content -- a
-    force-convergence threshold, a fallback iteration cap, and a backward adjoint regularization
+  - cell
   outputs:
-  - cell -- the same set with positions overwritten by the equilibrium configuration
+  - cell
   reads:
-  - position (POSITION) -- the initial condition the relaxation starts from
-  - radius (RADIUS) and alive (ALIVE) -- base fields the equilibrium depends on through the potential
-    energy (contact distance sigma = r_i + r_j, dead/self pair masking); consumed via the potential,
-    not re-declared by state_reads()
-  - potential.state_reads() -- any per-cell coupling field the interaction sources, e.g. a per-cell
-    epsilon when adhesion is field-driven
+  - position
+  - radius
+  - alive
+  - '<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g.
+    a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>'
   writes:
-  - position (POSITION) -- QUASISTATIC absolute overwrite with the force-balanced equilibrium x-star
-    where grad_x U(x-star) = 0, a full state not a dynamic delta
-  maps:
-  - drive positions to the mechanical equilibrium (force balance grad_x U = 0) of the supplied
-    interaction -- a QUASISTATIC map that replaces the fast mechanical trajectory with its asymptotic
-    fixed point (adiabatic elimination of the fast mechanical degrees of freedom, the tissue held at
-    force balance between the slow morphogenetic events); NOT a single-step force integration, the
-    equilibrium couples every cell through the pairwise force
-  - the differentiable equilibrium is taken on the PHYSICAL deformation subspace only -- the
-    rigid-body gauge modes (global translation and rotation of the alive cells, plus dead-cell
-    degrees of freedom) carry no gradient, so a reimplementer must expect no absolute position or
-    orientation sensitivity and break that symmetry physically (pin a cell, add a field) to optimize it
+  - position
+  maps: []
 status: normalized
 module: null
 test: null

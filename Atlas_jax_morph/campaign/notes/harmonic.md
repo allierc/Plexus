@@ -54,3 +54,31 @@ is already an energy-defined interaction in this same family, squared_law alread
 a graph, and attraction_repulsion's own hand-coded force *is* the gradient of a radial potential — so no
 signature field is forced to change and the alias holds; but the structural gap is real and is the honest
 case for refinement.
+
+**Normalizer verdict — REVISED to `new`, implementation_of `adhere` (supersedes the alias paragraph
+above).** The prior alias rested on treating the `radius` read as sub-signature. I checked the source and it
+does not survive that check. Registered `attraction_repulsion` (attraction_repulsion.py:28-64) reads NO
+`radius`, its interaction length is a single GLOBAL scalar (`self.sigma = float(params["sigma"])`), its
+force-law `p` is per-TYPE (`REQUIRES_TYPE_PROPS=["p"]`), and it EMITs a hand-coded velocity — the D'Orsogna
+point-particle law. It structurally cannot express `sigma = r_i + r_j` or a per-cell coupling. `reads` is a
+registered signature field, so attraction_repulsion AS REGISTERED does not cover Harmonic: aliasing drops
+the radius read and the size-consistency-under-growth that is the biology of an adhesive soft sphere. And
+hosting the family would replace nearly every distinctive attribute at once (velocity→energy/autodiff,
+global→per-pair sigma, per-type→per-cell coupling, graph→dense), which is not a one-field widening, so not
+`refinement`. Harmonic is a core+tail member of the `adhere` contract SoftSphere (order 15) minted; joining
+it adds no contract and is the convergent several-implementations-per-contract shape the ledger rewards.
+This is exactly the check the skeptic's `what_would_settle_it` demanded, now confirmed at source; I align
+Harmonic with SoftSphere and against the parent/Morse/Hertzian alias entries, whose premise the source
+contradicts.
+
+**Strongest argument AGAINST the revision.** The registry is designed to hold several implementations per
+contract, and it already treats energy-vs-force (`stillinger_weber`) and dense-vs-graph (`squared_law`) as
+below-signature — leaving only the `radius` read, which one can frame as merely another way to source the
+interaction length attraction_repulsion already has via its global sigma. On that reading all five pair
+potentials, SoftSphere included, are the ONE contract `attraction_repulsion` ("attraction minus repulsion,
+a radial pair force moving cells"), and minting/joining `adhere` splits a single biological contract on an
+implementation-internal length source, inflating precisely the `new` yield this ledger measures. The parent
+plus three siblings landing alias is real evidence that reading is defensible. I reject it because a
+per-pair contact tracking each cell's growing radius is a biologically load-bearing feature (size-aware cell
+mechanics vs a fixed-width swarming law are distinct model classes), not an alternate length source — but
+this is the genuine tension, and the family record stays split until the alias entries are revisited.

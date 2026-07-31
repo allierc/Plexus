@@ -3,136 +3,239 @@ order: 24
 raw_name: stochastic trace / replay / score
 raw_kind: stochasticity contract
 code_path: papers/jax-morph/jax_morph/core/step.py:148
-paper_section: |-
-  guides/concepts.md "## Differentiability -> ### Score-based" (contract);
-  paper SI "THE REINFORCE OPTIMIZATION ALGORITHM" p. 16-18, trajectory prob. P(tau)
-summary: >-
-  A StochasticStep is a simulation step that samples parameter-free exogenous noise (plus any
-  directly-drawn discrete action), records it into declared EPHEMERAL trace fields that its
-  replay co-emits into the post-step state, and owns a single `replay` that turns a trace into
-  the step's effect. Forward, `__call__` draws a trace and replays it pathwise; the top-level
-  scoring drivers (`trajectory_logp`, `transition_logp`) read the recorded trace back out of a
-  later state and either replay it FROZEN while adding its `logp` (scored) or replay it PATHWISE
-  (unscored). This one sample/record/replay/score contract is what lets a discrete event
-  (division, death, type-flip) contribute a score-function (REINFORCE) gradient and a
-  reparameterized event (a Brownian displacement) contribute either a pathwise or a score
-  gradient -- from a single forward sample.
-equations: |
-  Symbols: dt macro-step duration; key PRNG key; xi standard-normal exogenous noise;
-  lambda = division_rate (per-cell hazard); p Bernoulli success prob; mean/std drift and
-  noise scale of a reparameterized kernel; theta live parameters; pi policy; s_t / a_t state
-  and action; "scored" a static frozenset of selected step indices.
+paper_section: 'guides/concepts.md "## Differentiability -> ### Score-based" (contract);
 
-  Forward sampler (StochasticStep.__call__, step.py:327):
-      trace  = sample_trace(state, dt=dt, key=key)
-      state' = replay(state, trace, dt=dt, pathwise=True)
-
-  Scoring one transition (Model._replay_transition, step.py:550), per stochastic step i,
-  recorded next-state trace detached via stop_gradient, live pre-step `state` NOT detached:
-      if i in scored:  total += logp(state, trace, dt);  out = replay(state, trace, pathwise=False)
-      else:                                               out = replay(state, trace, pathwise=True)
-  The model ALWAYS passes  pathwise = (not scored).
-  trajectory_logp returns the vector of per-macro-step sums (shape (T,)); transition_logp a scalar.
-
-  Reparameterized replay (BrownianDynamics, dynamics.py:170):
-      dx = mean(state) + std(theta) * xi         # recompute from frozen xi w/ live params if pathwise
-      dx = trace[dx]                             # frozen realized displacement if not pathwise
-      logp = sum_alive  gaussian_logp(dx | mean, std)      # N(dx | mean, std^2)
-
-  Discrete replay (Division, division.py:148) IGNORES `pathwise` (nothing to reparameterize):
-      p = 1 - exp(-clip(division_rate, 0) * dt)            # _dist(), single sample+score source
-      divided ~ Bernoulli(p), straight-through (hard 0/1 forward, identity surrogate gradient)
-      logp = sum_i  bernoulli_logp(divided_i, p_i) * divide_eligible_i   # eligible = alive at decision
-
-  Paper (SI p. 16-18):  P(tau) = P(s0) * prod_t pi(a_t|s_t) P(s_{t+1}|s_t,a_t);
-      grad_theta log P(tau)  simplified to  grad_theta log pi_theta(a|s)   (policy term only).
+  paper SI "THE REINFORCE OPTIMIZATION ALGORITHM" p. 16-18, trajectory prob. P(tau)'
+summary: A StochasticStep is a simulation step that samples parameter-free exogenous noise (plus any directly-drawn
+  discrete action), records it into declared EPHEMERAL trace fields that its replay co-emits into the
+  post-step state, and owns a single `replay` that turns a trace into the step's effect. Forward, `__call__`
+  draws a trace and replays it pathwise; the top-level scoring drivers (`trajectory_logp`, `transition_logp`)
+  read the recorded trace back out of a later state and either replay it FROZEN while adding its `logp`
+  (scored) or replay it PATHWISE (unscored). This one sample/record/replay/score contract is what lets
+  a discrete event (division, death, type-flip) contribute a score-function (REINFORCE) gradient and a
+  reparameterized event (a Brownian displacement) contribute either a pathwise or a score gradient --
+  from a single forward sample.
+equations: "Symbols: dt macro-step duration; key PRNG key; xi standard-normal exogenous noise;\nlambda\
+  \ = division_rate (per-cell hazard); p Bernoulli success prob; mean/std drift and\nnoise scale of a\
+  \ reparameterized kernel; theta live parameters; pi policy; s_t / a_t state\nand action; \"scored\"\
+  \ a static frozenset of selected step indices.\n\nForward sampler (StochasticStep.__call__, step.py:327):\n\
+  \    trace  = sample_trace(state, dt=dt, key=key)\n    state' = replay(state, trace, dt=dt, pathwise=True)\n\
+  \nScoring one transition (Model._replay_transition, step.py:550), per stochastic step i,\nrecorded next-state\
+  \ trace detached via stop_gradient, live pre-step `state` NOT detached:\n    if i in scored:  total\
+  \ += logp(state, trace, dt);  out = replay(state, trace, pathwise=False)\n    else:                \
+  \                               out = replay(state, trace, pathwise=True)\nThe model ALWAYS passes \
+  \ pathwise = (not scored).\ntrajectory_logp returns the vector of per-macro-step sums (shape (T,));\
+  \ transition_logp a scalar.\n\nReparameterized replay (BrownianDynamics, dynamics.py:170):\n    dx =\
+  \ mean(state) + std(theta) * xi         # recompute from frozen xi w/ live params if pathwise\n    dx\
+  \ = trace[dx]                             # frozen realized displacement if not pathwise\n    logp =\
+  \ sum_alive  gaussian_logp(dx | mean, std)      # N(dx | mean, std^2)\n\nDiscrete replay (Division,\
+  \ division.py:148) IGNORES `pathwise` (nothing to reparameterize):\n    p = 1 - exp(-clip(division_rate,\
+  \ 0) * dt)            # _dist(), single sample+score source\n    divided ~ Bernoulli(p), straight-through\
+  \ (hard 0/1 forward, identity surrogate gradient)\n    logp = sum_i  bernoulli_logp(divided_i, p_i)\
+  \ * divide_eligible_i   # eligible = alive at decision\n\nPaper (SI p. 16-18):  P(tau) = P(s0) * prod_t\
+  \ pi(a_t|s_t) P(s_{t+1}|s_t,a_t);\n    grad_theta log P(tau)  simplified to  grad_theta log pi_theta(a|s)\
+  \   (policy term only).\n"
 params:
   score_by_default:
-    role: |-
-      default-scoring inclusion flag. The ONE per-instance constructor knob of the base
+    role: 'default-scoring inclusion flag. The ONE per-instance constructor knob of the base
+
       contract (eqx.field static, kw-only, default True): whether a scoring driver called with
-      no explicit `score=` selection includes THIS step's logp in the default REINFORCE term.
-      Not physical -- it selects which stochastic steps score, not what any of them compute.
+
+      no explicit `score=` selection includes THIS step''s logp in the default REINFORCE term.
+
+      Not physical -- it selects which stochastic steps score, not what any of them compute.'
   _non_params:
-    role: |-
-      NOTE, not a constructor parameter. All PHYSICAL knobs live in the subclasses, not this
+    role: 'NOTE, not a constructor parameter. All PHYSICAL knobs live in the subclasses, not this
+
       base contract: e.g. division_rate/orientation_snr (Division), gamma/kT/rot_diffusion
+
       (Brownian). And `pathwise` is a per-call replay argument the model sets to (not scored),
-      NOT a step knob -- listed because reimplementers routinely mistake it for one.
+
+      NOT a step knob -- listed because reimplementers routinely mistake it for one.'
 state_io:
   reads:
-    - |-
-      subclass-declared via state_reads(): the fields conditioning the distribution _dist().
-      Examples: division_rate + division_axis (Division); position + the potential's fields
-      + active_speed/active_heading (Brownian). The base class reads nothing itself.
+  - 'subclass-declared via state_reads(): the fields conditioning the distribution _dist().
+
+    Examples: division_rate + division_axis (Division); position + the potential''s fields
+
+    + active_speed/active_heading (Brownian). The base class reads nothing itself.'
   writes:
-    - |-
-      PERSISTENT physical outputs via state_writes() (ordinary single/dynamic-writer fields).
-      Examples: position, radius, celltype, alive, born, mother, division_overflow (Division);
-      position + active_heading (Brownian).
-    - |-
-      EPHEMERAL trace via trace_writes(): exogenous noise + realized action, RESET to the
-      field default at each macro-step start (Model._reset_traces) so a trace is per-step.
-      Examples: divided, divide_eligible, division_dir (Division); brownian_xi, brownian_dx
-      (Brownian). Disjoint from state_writes -- a stochastic output that must persist is a
-      state_writes field written by replay, never a trace field (the reset would wipe it).
+  - 'PERSISTENT physical outputs via state_writes() (ordinary single/dynamic-writer fields).
+
+    Examples: position, radius, celltype, alive, born, mother, division_overflow (Division);
+
+    position + active_heading (Brownian).'
+  - 'EPHEMERAL trace via trace_writes(): exogenous noise + realized action, RESET to the
+
+    field default at each macro-step start (Model._reset_traces) so a trace is per-step.
+
+    Examples: divided, divide_eligible, division_dir (Division); brownian_xi, brownian_dx
+
+    (Brownian). Disjoint from state_writes -- a stochastic output that must persist is a
+
+    state_writes field written by replay, never a trace field (the reset would wipe it).'
 surprises:
-  - |-
-    The pathwise/scored inversion is the core gotcha: an UNSCORED reparameterizable step is
-    replayed pathwise=True (recomputes dx from frozen noise with live params, so it still
-    carries a pathwise gradient), while a SCORED step is replayed pathwise=False (frozen
-    action) and instead adds its logp. `pathwise = not scored` -- getting it backwards
-    silently double-counts or drops the gradient. A DISCRETE step ignores pathwise entirely.
-  - |-
-    replay MUST co-emit EVERY declared trace field into the state/delta it returns, or the
-    forward records the reset default, trace_from_state reads that default back, and logp
-    scores garbage with NO error. `check_stochastic_step` (step.py:625) exists solely to
-    catch this via a two-sentinel round-trip; a reimplementer who omits it has no guard.
-  - |-
-    Trace fields are reset to their default every macro-step; a DYNAMIC (additive) trace
-    field must default to 0 (additive identity) or reset-then-accumulate records default+value
-    instead of the step's own increment. Model._validate enforces this and also forbids a
-    trace field colliding with a base/physical field (the reset would wipe it) or being
-    declared by two stochastic steps (they would share one allocation and clobber).
-  - |-
-    logp is masked by a recorded eligibility trace field (divide_eligible = alive AT the
-    decision), NOT by re-reading state.alive at score time -- cells may have divided or died
-    between sampling and scoring. Convention: name it `{action}_eligible`.
-  - |-
-    The discrete action `divided` is a soft straight-through 0/1 (sample_bernoulli_st returns
-    the hard Bernoulli draw with an identity surrogate gradient); the HARD `> 0.5` decision
-    drives slot allocation, but `committed_soft` carries the forward straight-through gradient
-    into position/radius. Use either this ST pathwise surrogate OR the logp score term per
-    run, never both (AGENTS.md gradient-estimator rule).
-  - |-
-    _dist() is the deliberate single source of the distribution's parameters, called by BOTH
-    sample_trace and logp so a step cannot sample under one distribution and score under
-    another. A reimplementer who inlines the parameters twice can silently desync them.
-  - |-
-    In trajectory_logp the recorded history/trace is stop_gradient-ed (only the recomputed
-    distribution carries gradient) but the reconstructed state CARRY is deliberately NOT
-    detached, so it crosses numerical macro-step boundaries live -- this is how the
-    environment's theta-dependence (secretion/diffusion feeding future division propensities)
-    propagates while the discrete action gets only its score term.
-  - |-
-    SOURCE vs PAPER: the SI derives grad_theta log P(tau) and simplifies it to the policy
-    term grad_theta log pi_theta(a|s) alone, dropping the transition kernel P(s_{t+1}|s_t,a_t)
-    as theta-independent (textbook MDP REINFORCE). The CODE does NOT drop it: trajectory_logp
-    carries a LIVE (non-detached) state so the environment's theta-dependence flows PATHWISE,
-    and it also scores reparameterized continuous transitions (Brownian) with a Gaussian logp.
-    The paper's own SI (p. 16, "the gradient ... must be propagated through the environment
-    updates till the very beginning") acknowledges this, so the clean policy-only equation
-    understates what the code differentiates -- the score term and a pathwise environment term
-    are summed, not the pure score of the derivation.
-  - |-
-    score= selection rejects a boolean mask rather than reinterpreting it (bool subclasses
-    int, so a mask would silently read as the index set {0,1}); _is_bool_like also catches
-    numpy/jax bools. Selecting a non-stochastic step index is an error.
-verdict: null
+- 'The pathwise/scored inversion is the core gotcha: an UNSCORED reparameterizable step is
+
+  replayed pathwise=True (recomputes dx from frozen noise with live params, so it still
+
+  carries a pathwise gradient), while a SCORED step is replayed pathwise=False (frozen
+
+  action) and instead adds its logp. `pathwise = not scored` -- getting it backwards
+
+  silently double-counts or drops the gradient. A DISCRETE step ignores pathwise entirely.'
+- 'replay MUST co-emit EVERY declared trace field into the state/delta it returns, or the
+
+  forward records the reset default, trace_from_state reads that default back, and logp
+
+  scores garbage with NO error. `check_stochastic_step` (step.py:625) exists solely to
+
+  catch this via a two-sentinel round-trip; a reimplementer who omits it has no guard.'
+- 'Trace fields are reset to their default every macro-step; a DYNAMIC (additive) trace
+
+  field must default to 0 (additive identity) or reset-then-accumulate records default+value
+
+  instead of the step''s own increment. Model._validate enforces this and also forbids a
+
+  trace field colliding with a base/physical field (the reset would wipe it) or being
+
+  declared by two stochastic steps (they would share one allocation and clobber).'
+- 'logp is masked by a recorded eligibility trace field (divide_eligible = alive AT the
+
+  decision), NOT by re-reading state.alive at score time -- cells may have divided or died
+
+  between sampling and scoring. Convention: name it `{action}_eligible`.'
+- 'The discrete action `divided` is a soft straight-through 0/1 (sample_bernoulli_st returns
+
+  the hard Bernoulli draw with an identity surrogate gradient); the HARD `> 0.5` decision
+
+  drives slot allocation, but `committed_soft` carries the forward straight-through gradient
+
+  into position/radius. Use either this ST pathwise surrogate OR the logp score term per
+
+  run, never both (AGENTS.md gradient-estimator rule).'
+- '_dist() is the deliberate single source of the distribution''s parameters, called by BOTH
+
+  sample_trace and logp so a step cannot sample under one distribution and score under
+
+  another. A reimplementer who inlines the parameters twice can silently desync them.'
+- 'In trajectory_logp the recorded history/trace is stop_gradient-ed (only the recomputed
+
+  distribution carries gradient) but the reconstructed state CARRY is deliberately NOT
+
+  detached, so it crosses numerical macro-step boundaries live -- this is how the
+
+  environment''s theta-dependence (secretion/diffusion feeding future division propensities)
+
+  propagates while the discrete action gets only its score term.'
+- 'SOURCE vs PAPER: the SI derives grad_theta log P(tau) and simplifies it to the policy
+
+  term grad_theta log pi_theta(a|s) alone, dropping the transition kernel P(s_{t+1}|s_t,a_t)
+
+  as theta-independent (textbook MDP REINFORCE). The CODE does NOT drop it: trajectory_logp
+
+  carries a LIVE (non-detached) state so the environment''s theta-dependence flows PATHWISE,
+
+  and it also scores reparameterized continuous transitions (Brownian) with a Gaussian logp.
+
+  The paper''s own SI (p. 16, "the gradient ... must be propagated through the environment
+
+  updates till the very beginning") acknowledges this, so the clean policy-only equation
+
+  understates what the code differentiates -- the score term and a pathwise environment term
+
+  are summed, not the pure score of the derivation.'
+- 'score= selection rejects a boolean mask rather than reinterpreting it (bool subclasses
+
+  int, so a mask would silently read as the index set {0,1}); _is_bool_like also catches
+
+  numpy/jax bools. Selecting a non-stochastic step index is an error.'
+verdict: out_of_scope
 of: null
-why: null
-contract: null
-status: inspected
+why: 'out_of_scope: StochasticStep (core/step.py:148) is an ABSTRACT differentiability contract, not a
+
+  forward-dynamics operator over sets and fields. Its own state_writes() and trace_writes() BOTH
+
+  default to () -- the base writes no physical state and declares no trace -- and it adds exactly one
+
+  non-physical constructor knob, score_by_default (a static scoring-inclusion flag). Everything the
+
+  contract actually fixes is gradient-estimator machinery: sample parameter-free exogenous noise into
+
+  ephemeral trace fields, own a single `replay` that turns a trace into the effect, and score each
+
+  selected step''s logp -- the REINFORCE / score-function estimator (paper p. 10, SI pp. 16-18) for a
+
+  discrete event, plus a reparameterized pathwise branch the model selects with `pathwise = not
+
+  scored`. That is autodiff / optimization plumbing. In Plexus differentiability is an ENGINE concern
+
+  (autograd over the forward operators), never an operator in the forward algebra, so the vocabulary
+
+  has nothing to gain here.
+
+
+  Not alias / refinement: no registered contract models gradient estimation, and widening one to
+
+  admit trace/replay/score would graft an optimization concern onto a forward-dynamics signature. Not
+
+  `new`: the FORWARD effect of every concrete stochastic step already has a biological home in its own
+
+  subclass contract -- a Bernoulli division IS `cell_divide` (registered), a Brownian displacement IS
+
+  motion, a type-flip / death is its own event -- and this mixin adds NOTHING to those effects; it
+
+  adds only the gradient PATH (which estimator, how the trace round-trips into scoring, where
+
+  stop_gradient falls). Counting a differentiability contract as a new operator would inflate the
+
+  atlas yield with framework machinery, exactly the failure out_of_scope exists to prevent. The empty
+
+  typed signature is itself the tell: the base has no set, no maps, reads nothing, and the only thing
+
+  it writes is the ephemeral `trace` record it exists to score.
+
+
+  SOURCE vs PAPER (in surprises): the SI simplifies grad_theta log P(tau) to the pure policy term
+
+  grad_theta log pi_theta(a|s), dropping the transition kernel P(s_{t+1}|s_t,a_t) as
+
+  theta-independent (textbook MDP REINFORCE); the CODE does NOT -- trajectory_logp carries a LIVE
+
+  (non-detached) state so the environment''s theta-dependence flows pathwise, and it also scores
+
+  reparameterized Brownian transitions with a Gaussian logp. The clean policy-only equation
+
+  understates what the code differentiates. This is a DIFFERENTIATION-PATH contradiction, which only
+
+  reinforces that the mechanism is about HOW gradients are taken, not what the state does.
+
+
+  OVERLAP: the sibling entry `stochastic_step` (order 5) is the SAME core/step.py:148 class, already
+
+  normalized out_of_scope with the same reasoning and explicitly directing this entry (order 24) to
+
+  the same verdict. Both entries resolve to it; the contract below (name sample_score, writing only
+
+  the ephemeral `trace`) is kept identical to the sibling so the two duplicate inspections of one
+
+  class do not diverge in the record.
+
+  '
+contract:
+  name: sample_score
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads: []
+  writes:
+  - trace
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

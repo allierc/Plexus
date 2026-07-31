@@ -261,6 +261,44 @@ def p4_chemistry_not_extinguished(cfg, s):
              f"loses.", dict(peak=peak, end=float(a[-1]), ratio=ratio))
 
 
+def p12_concentrations_are_physical(cfg, s):
+    """A molecular concentration is non-negative and finite. There is no such thing as -0.26 of a
+    substrate.
+
+    Nothing in the engine enforced this, and it is how the shape_to_chem operator failed on its
+    first end-to-end run: the substrate went to -0.261 at frame 15, and only THEN did Gray-Scott
+    diverge to +/-inf by frame 25. The negative concentration was the diagnosis and it was sitting
+    in the state ten frames before anything looked wrong. A run that reaches a negative
+    concentration has left the model, and every number after that point is arithmetic on a state
+    the model does not define.
+    """
+    if "cell_react" not in _ops(cfg):
+        return R("P12", "passive", "a concentration is non-negative and finite", "na",
+                 "no chemistry in this composition")
+    lo = _col(s, "act_min")
+    hi = _col(s, "act_max")
+    if hi is None:
+        return R("P12", "passive", "a concentration is non-negative and finite", "na",
+                 "activator statistics not recorded")
+    if not np.all(np.isfinite(hi)) or (lo is not None and not np.all(np.isfinite(lo))):
+        return R("P12", "passive", "a concentration is non-negative and finite", "fail",
+                 "the chemistry became non-finite. The run left the model; nothing measured after "
+                 "that point means anything.", dict(finite=False))
+    if lo is None:
+        return R("P12", "passive", "a concentration is non-negative and finite", "na",
+                 "act_min not recorded (only the maximum is)")
+    worst = float(np.nanmin(lo))
+    if worst >= -1e-9:
+        return R("P12", "passive", "a concentration is non-negative and finite", "pass",
+                 f"the activator stays non-negative throughout (minimum {worst:.4g})",
+                 dict(min=worst))
+    bad = int(np.argmin(lo)); f0 = int(s[bad].get("frame", bad))
+    return R("P12", "passive", "a concentration is non-negative and finite", "fail",
+             f"the activator reached {worst:.4g} at frame {f0}. A concentration cannot be "
+             f"negative -- the state has left the model, and a Gray-Scott system that goes "
+             f"negative diverges shortly afterwards.", dict(min=worst, first_bad_frame=f0))
+
+
 def p11_tissue_does_not_pass_through_itself(cfg, s):
     """Two parts of the same epithelium cannot occupy the same space. A tissue is a physical body.
 
@@ -466,7 +504,7 @@ def p6_resting_vesicle_rests(cfg, device="cpu", frames=40, tol=0.03):
 STATIC = [p2_gate_implies_baseline, p3_ceiling_above_trigger, p5_biology_advances_in_biological_time]
 PASSIVE = [p1_tissue_gains_material, p3b_mean_cell_volume_holds, p4_chemistry_not_extinguished,
            p7_no_absorbing_area_by_stretching, p8_shape_index_floor, p9_closed_sphere,
-           p11_tissue_does_not_pass_through_itself]
+           p11_tissue_does_not_pass_through_itself, p12_concentrations_are_physical]
 
 
 def _mech(run):

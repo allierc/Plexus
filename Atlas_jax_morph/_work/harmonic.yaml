@@ -189,7 +189,7 @@ contract:
     sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell adhesion) from a down-shifted
     harmonic well truncated at r_c = r_cutoff_frac*sigma; a radial pair force integrated overdamped or
     minimised by the wrapping dynamics step
-status: normalized
+status: inspected
 module: null
 test: null
 evidence:
@@ -197,3 +197,16 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: alias
+  claimed: new
+  evidence: Sibling SoftSphere (_work/soft_sphere.yaml:90-113) landed new -> `adhere`, explicitly rejecting
+    attraction_repulsion for lacking 'a cell's physical radius, size-consistent contact distance, energy/virial,
+    per-cell coupling'. Harmonic (potentials.py:407-416, base 228-266) reads radius->sigma=r_i+r_j, per-cell
+    mix k, energy/virial -- same adhesive family as Morse. Alias silently loses these; entry never addresses
+    adhere.
+  what_would_settle_it: 'Reconcile the family''s conflicting record verdicts (Morse alias->attraction_repulsion
+    vs SoftSphere new->adhere): confirm attraction_repulsion.py:28-64 has no `radius` read and a fixed
+    global sigma + per-type p; if so, Harmonic''s size-consistent per-pair contact and per-cell coupling
+    force it under `adhere`, matching Morse''s true sibling home, not attraction_repulsion.'

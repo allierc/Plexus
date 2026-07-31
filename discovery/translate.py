@@ -73,7 +73,7 @@ GROWTH_CEILING = DIV_FACTOR * 1.25    # 25% headroom so cells cross the trigger,
 # first, then patterning, then growth, then mechanics, then topology, then recording.
 SCHEDULE_ORDER = [
     "load_mesh_3d", "seed_mesh_3d", "cell_geometry_3d",
-    "cell_rd_seed", "cell_adjacency", "cell_diffuse", "cell_react",
+    "cell_rd_seed", "cell_adjacency", "cell_diffuse", "cell_react", "shape_to_chem",
     "vesicle_growth", "morphogen_growth_3d", "shape_energy_3d", "rd_interface_tension",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
@@ -92,6 +92,7 @@ ENGINE_NAME = {
     "cell_diffuse": "cell_diffuse",
     "cell_react": "cell_react",
     "cell_rd_seed": "cell_rd_seed",
+    "shape_to_chem": "shape_to_chem",
     "rd_interface_tension": "rd_interface_tension",
 }
 
@@ -157,7 +158,7 @@ def _emit_rd_seed(g, n, ga):
         # `tip` re-seeds every frame on purpose (it tracks the moving tip) and `cone` maintains a
         # source; neither of those is an initial condition. This one is.
         d = {"op": "cell_rd_seed", "at": "cell", "mode": "scatter",
-             "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 1}
+             "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 3}
     elif impl == "tip":
         d["tip_radius"] = float(_p(g, i, "tip_radius"))       # re-seeds EVERY frame: tip-tracking
     elif impl == "cone":
@@ -242,6 +243,13 @@ EMIT = {
     "vesicle_growth": lambda g, n, ga: {
         "op": "vesicle_growth", "at": "vertex", "cell_set": "cell",
         "rate": float(_p(g, n["id"], "rate")), "dt": DT_GLOBAL},
+    "shape_to_chem": lambda g, n, ga: {
+        "op": "shape_to_chem", "at": "cell", "implementation": g.impl_of(n),
+        "vertex_set": "vertex",
+        "beta": float(_p(g, n["id"], "beta")), "F0": float(_p(g, n["id"], "F0")),
+        # the feedback is chemistry and must run on the SAME clock as the reaction it modulates,
+        # or beta would mean something different at every dt (defect D5a, one more time)
+        "rate": RD_PER_FRAME},
     "rd_interface_tension": _emit_extrude,
 }
 

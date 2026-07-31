@@ -11,11 +11,20 @@ the order it was inspected, it plots the cumulative number of genuinely new cont
 that flattens is the language saturating. A curve that keeps climbing is the language telling us
 it is not finished.
 
-THREE OUTCOMES, AGAINST THE PROMOTED LANGUAGE ONLY:
+FOUR OUTCOMES, AGAINST THE PROMOTED LANGUAGE ONLY:
 
-    alias        a contract we already have, registered and validated.
-    refinement   an existing contract whose typed signature has to widen to admit this.
-    new          vocabulary the promoted language does not have.
+    alias           a contract we already have, registered and validated.
+    refinement      an existing contract whose typed signature has to widen to admit this.
+    new             vocabulary the promoted language does not have.
+    implementation  a SECOND mechanism normalizing to a contract this run has already counted
+                    as new. It is an interchangeable numerical realisation, not new vocabulary.
+
+The fourth class was not in the plan; the first real ledger produced it. Four of jax-morph's
+control steps -- three gene-network variants and their shared base -- all normalize to one
+contract, `regulate`. Counting them as four new contracts would have inflated the headline number
+by 36% on the very measurement the atlas exists to make, and it is exactly the outcome plexus2.tex
+App. E.1 calls the GOOD one: "the first outcome strengthens numerical diversity". The curve counts
+DISTINCT contracts.
 
 The comparison is against `plexus.operators` and nothing else. Unreviewed code in `prototype/` or
 in the `candidates/` anti-chamber is not part of the language and does not enter this measurement:
@@ -37,7 +46,8 @@ STATE = os.path.join(HERE, "_state")
 OUT_JSON = os.path.join(STATE, "saturation.json")
 OUT_PNG = os.path.join(STATE, "saturation.png")
 
-CLASSES = ["alias", "refinement", "new", "out_of_scope", "unclassified"]
+CLASSES = ["alias", "refinement", "new", "implementation", "out_of_scope",
+           "unclassified"]
 
 
 def classify(mech: dict, baseline: dict) -> str:
@@ -77,8 +87,15 @@ def ledger(doc: dict, baseline: dict) -> dict:
     rows, cum_new, curve = [], 0, []
     counts = {c: 0 for c in CLASSES}
     disputed = []
+    seen_new = {}                     # contract name -> the mechanism that first introduced it
     for i, m in enumerate(mechs, 1):
         cls = classify(m, baseline)
+        cname = (m.get("contract") or {}).get("name")
+        if cls == "new" and cname:
+            if cname in seen_new:
+                cls = "implementation"          # same contract, another way of computing it
+            else:
+                seen_new[cname] = m.get("id")
         counts[cls] += 1
         if cls != m.get("verdict") and m.get("verdict") not in (None, ""):
             disputed.append({"id": m.get("id"), "recorded": m.get("verdict"), "ledger": cls,
@@ -86,11 +103,13 @@ def ledger(doc: dict, baseline: dict) -> dict:
         if cls == "new":
             cum_new += 1
         rows.append({"n": i, "id": m.get("id"), "raw_name": m.get("raw_name"),
-                     "class": cls, "contract": (m.get("contract") or {}).get("name"),
-                     "of": m.get("of"), "status": m.get("status", "candidate")})
+                     "class": cls, "contract": cname,
+                     "of": m.get("of") or (seen_new.get(cname) if cls == "implementation"
+                                           else None),
+                     "status": m.get("status", "candidate")})
         curve.append({"n": i, "cum_new": cum_new})
 
-    scored = sum(counts[c] for c in ("alias", "refinement", "new"))
+    scored = sum(counts[c] for c in ("alias", "refinement", "new", "implementation"))
     return {
         "repository": doc.get("repository"),
         "commit": doc.get("commit"),
@@ -98,6 +117,7 @@ def ledger(doc: dict, baseline: dict) -> dict:
         "counts": counts,
         "scored": scored,
         "yield_new_per_mechanism": (cum_new / scored) if scored else None,
+        "new_contracts": sorted(seen_new),
         "curve": curve,
         "rows": rows,
         "disputed": disputed,
@@ -115,7 +135,9 @@ def render(led: dict) -> str:
                      f"{r['class']:<13} {r['contract'] or '':<24}{tgt}   [{r['status']}]")
     lines += ["",
               f"  alias {c['alias']}   refinement {c['refinement']}   NEW {c['new']}   "
-              f"out_of_scope {c['out_of_scope']}   unclassified {c['unclassified']}"]
+              f"implementation {c['implementation']}   out_of_scope {c['out_of_scope']}   "
+              f"unclassified {c['unclassified']}",
+              f"  new contracts: {', '.join(led['new_contracts']) or '-'}"]
     if led["scored"]:
         lines.append(f"  yield: {led['yield_new_per_mechanism']:.2f} new contracts per "
                      f"scored mechanism ({c['new']}/{led['scored']})")

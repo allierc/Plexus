@@ -139,7 +139,7 @@ contract:
   writes:
   - position
   maps: []
-status: normalized
+status: inspected
 module: null
 test: null
 evidence:
@@ -147,3 +147,15 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: new
+  claimed: alias
+  evidence: SoftSphere subclasses PairwisePotential, verdicted `alias of attraction_repulsion` (pairwise_potential.yaml:80-82);
+    siblings morse.yaml:86-88 & harmonic.yaml:68-70 alias, hertzian.yaml:71-73 refinement — all of attraction_repulsion.
+    attraction_repulsion.py:63-68 is a conservative radial pull−push force; SoftSphere is its p1=0 repulsion-only
+    limit. `adhere` is unregistered (R4) — inventing it inflates the `new` count.
+  what_would_settle_it: 'Apply record.py''s regulate/consistency rule across the sibling entries: since
+    the parent PairwisePotential and twins Morse/Harmonic normalize to `alias of attraction_repulsion`,
+    SoftSphere (differing only in pair_energy U(r)) must take the same registered target, not a minted
+    `adhere`.'
