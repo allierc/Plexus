@@ -95,6 +95,13 @@ surprises:
   ln(1+g_i/K_gene_ii). n_gene = hidden_size + out_size, and output genes are ordered so the last output
   is the readout consumed downstream (paper: last output gene = division propensity, last Nc = secretion
   rates) -- ordering of output_specs is semantically load-bearing, not documented in this class.'
+- 'IMPLEMENTATION vs ORACLE (Plexus torch operator, not a source surprise, flagged for the differ):
+  the torch operator returns the vector field dg/dt on the cell gene block (EMIT=velocity, INTEGRAND=gene)
+  and the ENGINE integrates it one explicit-Euler step per tick, whereas the reference self-solves with
+  an adaptive Dopri5 sub-solve over the same dt and returns y(dt)-y0. That is an Axis-A integration
+  difference, NOT a difference in the vector field f, and it WILL show up in a trajectory differ; to
+  compare the biology alone, evaluate vector_field(evolving, inputs) at t=0 against the reference
+  vector_field on matched state.'
 verdict: new
 of: null
 implementation_of: regulate
@@ -170,9 +177,9 @@ contract:
   writes:
   - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_gene_network_mwc.py
+test: tests/test_jax_morph_gene_network_mwc.py
 evidence:
   oracle_run: null
   diff_metric: null

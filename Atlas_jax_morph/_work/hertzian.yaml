@@ -24,7 +24,7 @@ equations: "Pair energy (code, Hertzian.pair_energy -> _compact_repulsion(r, sig
   \ sigma = contact distance (sum of radii); eps = contact stiffness; d = n_space_dim; V_i = d-ball volume\
   \ of cell i.\nPAPER (code disagrees): the paper defines ONLY the Morse potential for mechanics,\n  V_ij(r)\
   \ = eps_ij [ (1 - exp(-alpha_ij (r_ij - sigma_ij)))^2 - 1 ]  (adhesive soft spheres).\nHertzian is a\
-  \ code-only addition to the potential library; it is not in the paper."
+  \ code-only addition to the potential library; it is not in the paper.\n"
 params:
   epsilon: contact_stiffness (repulsion strength / elastic-modulus scale); default 1.0. The ONLY constructor
     parameter. Accepts a shared scalar OR a per-cell StateFieldSpec combined per pair by the arithmetic-mean
@@ -68,124 +68,127 @@ surprises:
   coupling (arithmetic-mean mix). Do not mix sigma with mean().
 - epsilon as a StateFieldSpec is combined per PAIR by arithmetic mean (mix), chosen over a geometric mean
   specifically because it has a finite gradient at zeros/dead cells (no sqrt).
-verdict: alias
-of: attraction_repulsion
-implementation_of: attraction_repulsion
-why: 'ALIAS of `attraction_repulsion` (implementation_of: attraction_repulsion). Hertzian is a
+verdict: new
+of: null
+implementation_of: adhere
+why: 'NEW to the frozen 42, and the SAME new contract its twin SoftSphere minted: `adhere`
 
-  conservative radial pair force over live non-self cell pairs: a compact, purely-repulsive
+  (implementation_of: adhere). The verdict is `new` with `of: null` because `adhere` is not yet a
 
-  elastic-contact core U = (2/5) eps (1 - r/sigma)^(5/2) supported exactly on [0, sigma) with the
+  registered contract and R4 forbids naming a non-registered `of:`; it can only be carried as the
 
-  contact distance sigma = r_i + r_j, whose force is -grad of that radial energy by autodiff. That
+  shared implementation_of. Hertzian is the purely-repulsive, C2-soft, self-truncating
 
-  is attraction_repulsion''s biology -- a radial pair force that is the gradient of a radial
+  IMPLEMENTATION of a pairwise cell-cell CONTACT-mechanics contract: a Lateral force between two
 
-  potential -- run in its REPULSION-ONLY limit (the adhesive tail switched off), exactly as the
+  cells whose interaction RANGE is set by their PHYSICAL RADII -- contact at sigma = r_i + r_j read
 
-  parent PairwisePotential normalizer calls it: "SoftSphere [and Hertzian] as its repulsion-only
+  from state.radius, so the excluded volume tracks size as cells grow and divide -- defined by a
 
-  limit". Hertzian''s compact soft core and attraction_repulsion''s two-Gaussian f(r)*(pos_j-pos_i)
+  compact soft-core ENERGY U = (2/5) eps (1 - r/sigma)^(5/2) supported exactly on [0, sigma),
 
-  are two functional SHAPES of the one contract; Hertzian simply sets the pull term to zero and
+  autodiffed to a force (and a per-cell virial), with a per-cell OR shared stiffness eps. The
 
-  softens the push so that BOTH the force and its slope vanish at contact (C2), where SoftSphere
+  adhesive members (Morse, LennardJones) add an attractive tail; SoftSphere and Hertzian switch it
 
-  (exponent 2) is only C1 and the adhesive members (Morse, Harmonic, LennardJones) keep a tail.
+  off. The whole family collapses to this ONE `adhere` contract with several implementations, so
 
+  recording Hertzian here adds ZERO contracts -- the `new` count rises once for the FAMILY (at
 
-  SAME CONTRACT AS ITS SIBLINGS. The abstract parent PairwisePotential (order 13) landed alias ->
-
-  attraction_repulsion and its why names the members verbatim: "Morse, SoftSphere, Hertzian,
-
-  Harmonic and LennardJones are interchangeable force-law SHAPES over this one contract ... each
-
-  concrete subclass is implementation_of: attraction_repulsion." Morse (order 14, the canonical
-
-  core+tail member) and Harmonic (order 17) both reaffirmed that and cited the parent. Hertzian is
-
-  that Hertzian -- the purely-repulsive, C2-soft, self-truncating member. Keeping the whole family
-
-  under ONE contract is the several-implementations-per-contract pattern the registry exists to
-
-  hold; finding it is the GOOD result the ledger measures, not a missed contract. (I depart from
-
-  the SoftSphere entry, order 15, which minted a NEW contract `adhere` for the same purely-repulsive
-
-  biology; I follow the parent + Morse + Harmonic majority instead, because splitting Hertzian off
-
-  to a second contract while its adhesive siblings stay attraction_repulsion would fracture the one
-
-  pair-potential family the parent explicitly unified -- either ALL pair potentials are one contract
-
-  or none are, and the parent chose attraction_repulsion.)
+  SoftSphere), not per member.
 
 
-  NOT `refinement`: no field of attraction_repulsion''s signature is FORCED to change, and every
+  THE DECIDING CONSTRAINT IS TWIN-CONSISTENCY, not family majority. SoftSphere (order 15) and
 
-  Hertzian difference lives below the signature. (1) energy -> autodiff-force (forces =
+  Hertzian (order 16) are the two most similar members in the whole potential library: both call
 
-  -jax.grad(total_energy)) vs a hand-coded velocity law is an implementation STRATEGY, not a
+  the SAME helper _compact_repulsion(r, sigma, eps, exponent, prefactor), both are purely
 
-  contract -- stillinger_weber is itself an energy-defined interaction in this same
+  repulsive, both single-parameter, differing ONLY in the two constants passed -- SoftSphere
 
-  lateral/interaction family, and attraction_repulsion''s force is already the gradient of a radial
+  (2.0, 0.5) at potentials.py:342, Hertzian (2.5, 0.4) at potentials.py:372. Two mechanisms
 
-  potential, so "write an energy and differentiate it" does not mint or widen a contract. (2) the
+  separated by two numeric literals handed to one function CANNOT take different verdicts.
 
-  dense O(N^2) half-sum vs a neighbour-graph reduction is the range / pair-topology axis squared_law
+  SoftSphere is already merged as `new -> adhere`; Hertzian must match it. This entry''s earlier
 
-  already carries (all_pairs AND a radius_graph neighbour list) and on which attraction_repulsion
+  pass landed `alias -> attraction_repulsion` (the skeptic disputed it toward `new`, and was
 
-  already truncates via its radius_graph map. (3) the coupling reads (a shared scalar OR a per-cell
-
-  scalar epsilon symmetrised per pair by the arithmetic-mean mix; additive sigma = r_i + r_j read
-
-  from radius) are default-compatible and break no existing user. Hertzian carries a NARROWER knob
-
-  set than any sibling -- epsilon alone, no alpha/width and no cutoff fraction, its support being
-
-  self-truncating exactly at sigma -- so it demands LESS of the signature, not more.
+  right): aliasing here would split literal twins, which is indefensible.
 
 
-  NOT `new`: attraction_repulsion already IS the pairwise attraction-repulsion contract; minting a
+  NOT `alias`/`refinement` of `attraction_repulsion` (the registered near-miss, and the earlier
 
-  second for a different well SHAPE (or for the repulsion-only limit) inflates exactly the yield
+  verdict). Read at source (src/plexus/operators/attraction_repulsion.py:28-84), the registered
 
-  this ledger measures. NOT `out_of_scope`: unlike NoForce (the identity element / absence of
+  operator is the D''Orsogna self-propelled-particle law: EMIT = "velocity" (a hand-coded overdamped
 
-  interaction) Hertzian is a real forward interaction with a pair map, radial separation reads, and
+  velocity, NOT an energy), a FIXED GLOBAL scalar width sigma = float(params["sigma"]), a per-TYPE
 
-  a force output.
+  parameter vector p = [pull, pull_range, push, push_range], Gaussian-difference message passing
+
+  over a radius_graph edge-set, optional isotropic noise. It never reads state.radius (its `reads`
+
+  literally carry no radius), has no size-consistent contact distance, no energy, and no virial,
+
+  and its coupling is per-TYPE not per-cell. Aliasing asserts coverage the registered signature
+
+  does not have; and widening attraction_repulsion to read radius, derive sigma = r_i + r_j, accept
+
+  a compact soft-core energy law, emit a force-plus-virial, and take a per-cell scalar is not a
+
+  widening but a DELETION of the fixed-width per-type pattern-forming model that IS that contract.
 
 
-  SCOPE / SOURCE notes. NOT IN THE PAPER (rule 5, SOURCE wins): the paper (Methods p. 9, SI p. 14,
+  NOT `out_of_scope`: unlike a serializer or a PRNG helper, Hertzian is a real forward interaction
+
+  with a pair map, radial-separation and radius reads, and a force output.
+
+
+  I DEPART from the family plurality, deliberately. The abstract parent PairwisePotential (order
+
+  13), Morse (14) and Harmonic (17) all landed `alias -> attraction_repulsion`, judging the
+
+  radius-read, the energy->autodiff-force strategy, and the dense-vs-graph topology to be
+
+  sub-signature implementation axes. They may be right in the abstract. But two facts overrule the
+
+  majority HERE: (a) the registered operator''s `reads` genuinely lacks `radius`, so aliasing
+
+  overstates coverage of the promoted language; (b) SoftSphere -- Hertzian''s near-identical twin --
+
+  is already merged as `new -> adhere`, and splitting the twins is worse than departing from the
+
+  majority. The right resolution is FAMILY-WIDE -- reconcile parent + Morse + Harmonic toward
+
+  `adhere` -- and that reconciliation is flagged for the analysis phase; it is not this entry''s to
+
+  make unilaterally.
+
+
+  SCOPE / SOURCE (rule 5, SOURCE wins). NOT IN THE PAPER: the paper (Methods p. 9, SI p. 14,
 
   Fig. 1d) defines a single mechanical potential, the ADHESIVE Morse well; Hertzian is a code-only
 
   library alternative, exercised only by tests and the potentials notebook, and being PURELY
 
-  REPULSIVE it cannot reproduce the paper''s cell-cell adhesion at all. A reimplementer from the
+  REPULSIVE it cannot reproduce the paper''s cell-cell adhesion at all. The per-cell VIRIAL PRESSURE
 
-  paper alone would never encounter it, but the SOURCE carries it and it normalizes to the same
+  the base derives from this energy is NOT an output of this interaction contract; it is the
 
-  contract Morse does. The per-cell VIRIAL PRESSURE the base derives from this energy is NOT an
+  separate VirialStress mechanism (it writes a `stress` field), kept out of scope here. The magic
 
-  output of this interaction contract; it is the separate VirialStress entry''s mechanism (it writes
+  2/5 prefactor (= 1/exponent, normalizing the force coefficient to eps/sigma), the C2 softness,
 
-  a `stress` field), kept out of scope here, consistent with Morse/Harmonic. The magic 2/5 prefactor
+  the compact self-truncating support, the double-`where` fractional-power gradient guard, and the
 
-  (= 1/exponent, normalizing the force coefficient to eps/sigma), the C2 softness, the compact
+  SUM-vs-MEAN combining rules are implementation properties of THIS member (recorded in surprises),
 
-  self-truncating support, the double-`where` fractional-power gradient guard, and the SUM-vs-MEAN
-
-  combining rules are implementation properties of THIS member recorded in surprises, not
-
-  contract-level distinctions.
+  not contract-level distinctions.
 
   '
 contract:
-  name: attraction_repulsion
+  name: adhere
   kind: lateral
   family: interaction
   set: cell
@@ -196,21 +199,21 @@ contract:
   reads:
   - position
   - radius
-  - alive
-  - coupling field (shared scalar OR per-cell scalar field, here epsilon = contact stiffness), symmetrised
-    per pair by the arithmetic-mean mix rule
+  - epsilon (per-cell OR shared contact stiffness; read via state_reads only when it is a per-cell field,
+    otherwise a shared scalar)
   writes:
   - position
   maps:
-  - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered pair
-    counts once); force on each cell = -grad of the conservative Hertzian pair energy by autodiff
+  - pairwise radial contact interaction over live non-self cell pairs (dense N x N, half-summed so each
+    unordered pair counts once); force on each cell = -grad of the conservative Hertzian pair energy by
+    autodiff
   - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); PURELY REPULSIVE compact
     soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail and
     no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact); a radial
     pair force integrated overdamped or minimised by the wrapping motion step
-status: inspected
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_hertzian.py
+test: tests/test_jax_morph_hertzian.py
 evidence:
   oracle_run: null
   diff_metric: null

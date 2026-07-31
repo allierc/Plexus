@@ -209,9 +209,9 @@ contract:
     compression-positive / tension-negative sign convention; transient (heritable=False), recomputed each
     macro-step; pure sensing -- writes only stress and moves nothing -- for downstream mechanotransduction
     (e.g. stress-gated division)
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_virial_stress.py
+test: tests/test_jax_morph_virial_stress.py
 evidence:
   oracle_run: null
   diff_metric: null

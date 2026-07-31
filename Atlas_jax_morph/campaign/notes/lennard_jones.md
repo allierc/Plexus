@@ -109,3 +109,63 @@ the change is not one field but a rewrite of set/emit/coupling/range-ontology pl
 readout, which deletes the fixed-width, type-programmed D'Orsogna particle model and breaks its every
 user -- the definition of `new`, not a costed widening. (Oracle not run: jax absent, `python`
 sandbox-blocked; entry checked by inspection, driver runs record.py on merge.)
+
+---
+
+## IMPLEMENTER note
+
+**Built:** `src/plexus/operators/candidates/jax_morph_lennard_jones.py` -- the `lennard_jones`
+implementation of the `adhere` contract (`@register_operator("adhere", family="interaction",
+set="cell", kind="lateral", implementation="lennard_jones")`), a `Lateral`, `EMIT="velocity"`.
+Torch, not JAX. It imports/registers cleanly under the neural-graph env.
+
+**Design (ported from the near-identical sibling `jax_morph_hertzian.py`, since the family shares
+one signature and differs only in `U(r)`).** The operator builds the total pair energy over live
+non-self cell pairs and takes the force by AUTODIFF (`force = -grad_positions E`), exactly as the
+source's base does (`forces = -jax.grad(total_energy)`; there is no analytic LJ force in the source
+either). The only member-specific pieces vs Hertzian:
+* pair energy is the **r_min 12-6 form** `eps*(q^12 - 2 q^6)` with `q = safe_divide(sigma, r)`
+  (NOT `r/sigma`), times a **sigma-relative smooth C1 cutoff** `_smooth_cutoff(r, 1.5 sigma,
+  2.5 sigma)` that multiplies the WHOLE energy;
+* two tunable cutoff fractions `r_onset_frac`/`r_cutoff_frac` with the source's construction-time
+  check `r_onset_frac < r_cutoff_frac` (raises ValueError otherwise);
+* `_smooth_cutoff` ported verbatim from potentials.py:L42, with a `safe_divide` on its
+  `(r_off^2 - r_on^2)^3` denominator to guard the dead-dead (sigma=0) pair.
+Shared with Hertzian and kept faithful: `sigma = r_i + r_j` (additive, from a `radius` buffer, with
+a scalar fallback); shared-or-per-cell `epsilon` mixed per pair by the ARITHMETIC mean; the 0.5
+half-sum so each unordered pair counts once; an EXTERNAL alive+non-self pair mask (the diagonal and
+dead pairs already evaluate to a clean 0 under the LJ law, but the mask keeps the `neighbor_sum`
+seam identical across the family); `safe_divide`/`safe_norm` double-`where` guards so the r=0
+diagonal keeps a finite gradient (a naive sigma/r would NaN a masked pair via 0*inf in backward);
+overdamped `velocity = mobility * force`; the `create_graph = outer_grad` autodiff so the force
+stays connected under a differentiable rollout.
+
+**Test:** `tests/test_jax_morph_lennard_jones.py`, 11 properties, all stated WITHOUT the reference
+(none can be passed by fitting the oracle's numbers); all 11 pass. The headline is the **r_min
+discriminator**: two cells at exactly `sigma = r_i + r_j` feel ZERO force (well at contact), and the
+force is clearly nonzero at `2^(1/6) sigma` -- so a reimplementer who coded the textbook
+`4 eps ((sigma/r)^12 - (sigma/r)^6)` form (well at `2^(1/6) sigma`) FAILS this test. Also checked:
+contact is a stable equilibrium (repel inside, adhere just outside; restoring sign flips across
+contact), the r^-12 core strengthens monotonically with overlap, Newton's third law (two-body
+equal-and-opposite), momentum conservation (net force ~0 over a jittered grid), the smooth cutoff
+(exactly 0 beyond `2.5 sigma`, nonzero adhesive tail inside the window), size-consistency (doubling
+both radii moves the rest separation 1.0 -> 2.0), the `r_onset_frac < r_cutoff_frac` guard,
+dead/masked cells emit nothing, position is not mutated, and 3-D genericity.
+
+**Test gotcha worth recording:** the first momentum-conservation draft used fully random positions
+and FAILED -- not a physics bug (Newton's third law passes pairwise) but float32 roundoff: random
+placement put cells in deep overlap where the r^-12 core hits ~1e8 and the exact antisymmetric
+cancellation is lost at that magnitude. Fixed by using a jittered contact-scale grid (no deep
+overlaps) and a RELATIVE tolerance (`net.norm() < 1e-4 * v.norm()`), which is the honest statement:
+the residual is roundoff, not net propulsion.
+
+**Could NOT establish / out of scope:** (1) I did NOT run the oracle or diff against the JAX
+reference -- jax is deliberately absent from the Plexus env, and (as the reader/normalizer notes
+record) NO paper experiment or oracle script instantiates LennardJones, so there is no reference
+trajectory to diff against; the differential test is the curator's next step, and `evidence:` stays
+null. (2) The tests confirm the operator's own stated invariants, not numeric agreement with the
+source (deliberately -- a fitted constant would teach us nothing). (3) The `epsilon_field`
+(per-cell well depth) branch is implemented (mirrors Hertzian) but only the shared-scalar path is
+exercised by the tests. (4) Per-cell VIRIAL PRESSURE (the base's other consumer of this energy) is
+out of scope here, consistent with the sibling entries. Verdict left as the normalizer landed it
+(`new`, `implementation_of: adhere`); implementing does not change it.

@@ -103,3 +103,81 @@ particle model that IS attraction_repulsion and breaks every existing user. Wide
 violence to the contract's biology is exactly what the record distinguishes from a refinement, so the
 size-consistent cell-cell mechanical interaction is a genuinely new contract `adhere`, carrying all
 six pair potentials as implementations (one new contract, not six).
+
+---
+
+## Normalization (final pass -- SUPERSEDES the two sections above)
+
+**Verdict reversed to `alias of attraction_repulsion` (implementation_of: attraction_repulsion);
+status -> normalized.** I read record.py in full to settle the factual dispute both prior passes and
+the skeptic hung their case on. Two facts decide it. (1) The skeptic's invoked "regulate/consistency
+rule" does NOT exist -- record.py enforces R0-R12, judges each mechanism independently, and never
+forces siblings to share a verdict; the prior pass was right about that, so my verdict cannot lean on
+it either. (2) I also read the REGISTERED operator (`src/plexus/operators/attraction_repulsion.py`)
+and confirmed the prior pass's characterization is accurate: `set=particle`, a GLOBAL scalar `sigma`,
+PER-TYPE `p`, `EMIT=velocity`, edge-graph message passing, no `radius` read. So on the merits, with no
+rule forcing my hand, why alias and not `new`/`adhere`? Because SoftSphere is a STRICT SPECIAL CASE of
+Morse -- Morse with the adhesive coefficient zeroed -- and the ledger AS IT STANDS aliases Morse (the
+paper's actual mechanics), Harmonic and Hertzian to attraction_repulsion, with the parent
+PairwisePotential naming SoftSphere by name as `implementation_of: attraction_repulsion`. Whatever
+Morse's verdict is, its adhesion-off limit must share it; minting a brand-new contract for the SIMPLER
+special case while its generalization aliases an existing one is incoherent and inflates the `new`
+yield the atlas measures. attraction_repulsion IS the registered "attraction + repulsion" pairwise
+interaction; the language already carries this biology, so `new` is the wrong call.
+
+**Strongest argument against (and why I still land on alias).** The honest counter is NOT the
+skeptic's phantom rule but `refinement`: the registered attraction_repulsion genuinely reads no
+radius, uses a global width and per-type params, emits a velocity, and is set=particle, so calling
+SoftSphere an "alias" quietly treats a LOT as below-signature -- radius-sourced size-consistent
+contact, per-cell coupling, an energy-and-virial formulation -- and the clean move would be to WIDEN
+attraction_repulsion (add a radius read, allow per-cell coupling) and pay that breaking change openly.
+I decline refinement only because the same widening was already declined when Morse/Harmonic/Hertzian
+were aliased; reopening it for the adhesion-off special case ALONE leaves the ledger incoherent. This
+is the load-bearing caveat: my alias is correct *conditional on the family's existing alias verdicts*.
+If a later pass re-normalizes the whole PairwisePotential family as refinement (or new `adhere`),
+SoftSphere moves with it -- being Morse's zero-adhesion limit, it cannot diverge from Morse's verdict.
+What is NOT defensible is the state the two prior passes left: SoftSphere = new/`adhere` while
+Morse = alias/attraction_repulsion. I corrected the entry to that coherence, not to flatter the
+language.
+
+---
+
+## Normalization (NORMALIZER pass -- SUPERSEDES all sections above; entry -> normalized)
+
+**Verdict: `new`, `implementation_of: adhere`; `of: null`; status -> normalized.** The "final pass"
+above landed `alias` for a coherence reason whose premise is now FALSE. It asserted "the ledger AS IT
+STANDS aliases Morse, Harmonic and Hertzian to attraction_repulsion." It does not: I re-read the
+sibling working copies and **Hertzian (order 16) and Harmonic (order 17) are both `new ->
+implementation_of: adhere`, status normalized.** That prior pass wrote its own escape clause -- "if a
+later pass re-normalizes the family as new `adhere`, SoftSphere moves with it, being Morse's
+zero-adhesion limit, it cannot diverge from Morse's verdict" -- and that condition has fired for two
+of the five members already. Coherence is now satisfied by moving SoftSphere TO `adhere` (joining its
+literal twin Hertzian), not by pinning it to Morse's lone remaining alias. Decisively, alias is
+refuted on the merits independent of any family vote: I read the REGISTERED operator
+`src/plexus/operators/attraction_repulsion.py` line by line -- `set="particle"`, `EMIT="velocity"`
+(a hand-coded overdamped velocity, not an energy), `REQUIRES_PARAMS=["sigma"]` /
+`self.sigma=float(params["sigma"])` (ONE global scalar width), `REQUIRES_TYPE_PROPS=["p"]` (a
+per-TYPE vector, indexed by `node_type[i]`), a `forward()` over an edge graph that NEVER reads
+`radius`. It has no size-consistent per-pair contact `sigma=r_i+r_j`, no per-cell coupling, no
+energy/force/virial. You cannot alias to a registered contract that demonstrably lacks the signature;
+so the alias is wrong for SoftSphere AND for Morse. `refinement` is also wrong -- widening
+attraction_repulsion to host this deletes its fixed-width, per-type, velocity-emitting D'Orsogna
+particle model (set particle->cell) and breaks every existing user, which the record distinguishes
+from a bounded refinement. What remains is `new`, named `adhere` via `implementation_of` because
+`adhere` is absent from the frozen 42 and R4 forbids a non-registered `of:`.
+
+**Strongest argument against (the honest one).** SoftSphere is Morse with the adhesion coefficient
+set to zero -- a strict special case of the paper's actual mechanics -- and `attraction_repulsion` is
+the language's registered "attraction + repulsion" pairwise-interaction slot. A reviewer who judges
+the radius read, the energy-vs-velocity strategy, and per-cell-vs-per-type coupling to be
+SUB-signature implementation axes (exactly what the parent PairwisePotential and Morse entries
+concluded) would say the promoted language already carries this biology, that minting `adhere` inflates
+the very `new` yield the atlas exists to measure, and that it is incoherent to call the SIMPLER special
+case `new` while its generalization Morse aliases. I reject it because that judgement is factually
+false at the source, not merely a matter of taste: attraction_repulsion's registered signature does
+not read `radius`, has no per-pair contact distance, and emits a velocity rather than a force from an
+energy -- so it cannot express SoftSphere without being redefined into a different operator. The
+SoftSphere<->Morse incoherence the prior pass feared is real, but its fix is to re-normalize Morse to
+`adhere` (its skeptic already disputes the alias toward refinement/new), a FAMILY-WIDE reconciliation
+flagged for the analysis phase -- not to mis-alias SoftSphere to a contract the source proves does not
+cover it.

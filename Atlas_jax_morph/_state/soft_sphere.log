@@ -1,0 +1,18 @@
+459 lines — L315 is valid. Every one of the twelve rules passes: `adhere` is absent from the frozen 42 so R5 is clean, the contract writes `position` (R7), `epsilon` carries a role (R8), `code_path` resolves (R3). The entry is normalized and will survive the merge.
+
+## Summary
+
+I normalized `soft_sphere` and resolved a live family dispute in the record.
+
+**Verdict: `new`, `implementation_of: adhere`, `status: normalized`.**
+
+**The decision turned on one verifiable fact.** The skeptic's dispute (and the note's earlier "final pass" that had reversed to `alias`) both rested on the claim that the registered `attraction_repulsion` covers this — that SoftSphere is merely its "p1=0 repulsion-only limit," so consistency forces the same target as its aliased parent/Morse. Rule 5 says the source wins, so I read `src/plexus/operators/attraction_repulsion.py` directly. It **refutes the premise**: `set="particle"`, `EMIT="velocity"` (a hand-coded overdamped velocity, not an energy), `REQUIRES_PARAMS=["sigma"]` → one **global scalar** width, `REQUIRES_TYPE_PROPS=["p"]` → a **per-type** vector, and a `forward()` that **never reads `radius`**. SoftSphere is the opposite on every signature field (per-pair `sigma=r_i+r_j` from radius, per-cell coupling, energy→autodiff-force+virial, `set=cell`). You cannot alias to a contract that demonstrably lacks the signature, and `refinement` would *delete* the D'Orsogna model (breaking every user), not widen it — so `new` is what remains.
+
+**Two things I caught that changed the outcome:**
+1. The note's most recent pass had reversed the entry to `alias` for "coherence with Morse" — but its stated premise ("the ledger aliases Morse, **Harmonic and Hertzian**") is now **stale**: I re-read the siblings and Hertzian *and* Harmonic have since normalized to `new → adhere`. That pass wrote its own escape clause ("if a later pass re-normalizes the family as new `adhere`, SoftSphere moves with it") — and that condition has fired. Coherence is now satisfied *by* `adhere`, not against it.
+2. **Twin-consistency, applied honestly, flips the skeptic's own argument.** SoftSphere (2.0, 0.5) and Hertzian (2.5, 0.4) are the *same* `_compact_repulsion` helper separated by two constants; Hertzian is already `new → adhere`. Splitting literal twins is indefensible.
+
+**What I changed in the entry:** strengthened `why` with the source citation and twin-consistency rebuttal; added `alive` to contract reads; populated `maps` (adhesion-OFF shape); `status → normalized`. I left the skeptic's `disputed:` block intact (it faithfully records the challenge; the record's value is in preserving the contradiction).
+
+**In the note**, I appended a superseding section stating the verdict and the honest strongest argument against it: SoftSphere is Morse-with-adhesion-zeroed, and a reviewer who treats the radius-read / energy-vs-velocity / per-cell-vs-per-type differences as *sub-signature* would call `adhere` yield-inflation and demand alias — I reject that only because it's **factually false at the source**, not a matter of taste. The remaining SoftSphere↔Morse incoherence is Morse's alias to fix (its own skeptic disputes it), flagged as a family-wide reconciliation for the analysis phase.
+  committed  normalizer/soft_sphere  (8.7 min)

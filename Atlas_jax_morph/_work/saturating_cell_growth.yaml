@@ -141,9 +141,9 @@ contract:
   - rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step
     by an upstream controller so gradients flow through it; the sole constructor param is max_radius (a
     traced, optimizable target)
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
+test: tests/test_jax_morph_saturating_cell_growth.py
 evidence:
   oracle_run: null
   diff_metric: null

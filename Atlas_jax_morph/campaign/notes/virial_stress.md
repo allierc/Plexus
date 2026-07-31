@@ -62,3 +62,48 @@ this is the alternative I had to defeat, not a free win: if a later entry shows 
 deformation readout and the virial pressure are interchangeable mechanical-load signals, then
 `mechanosense` and that fused reading should be reconciled as one contract with two
 implementations rather than left as separate vocabulary.
+
+---
+
+## Implementer: operator `mechanosense`
+
+Wrote `src/plexus/operators/candidates/jax_morph_virial_stress.py` and test
+`tests/test_jax_morph_virial_stress.py`. Both import/register clean; test passes 7/7.
+`status: implemented`.
+
+**Faithful, not fitted.** Modelled the shape on the `adhere:*` torch ports (same
+`safe_norm`/`safe_divide`/`_smooth_cutoff`/`_compact_repulsion`) and the `grow_radius`
+read-block-or-buffer recipe. Key decisions:
+
+- **Pure sensing = `EMIT=None`, `forward` returns `{}`.** The operator writes the per-cell `stress`
+  scalar in place (a schema block if the set declares one, else a lazily-provisioned buffer) and
+  moves nothing. Writing a `stress` state block mutates `Level.state`, which the engine's frame-0
+  integration-invariant guard (`engine.py:709-723`) flags -- VirialStress is exactly the
+  DERIVED-READOUT category that guard exempts, so the class sets `MAY_MUTATE_INTEGRATED_STATE =
+  True`. A test asserts pos/vel are byte-identical after the call (it really moves nothing).
+- **Pair law as a plug-in (`potential:` selector), reduced -- not a force.** `dU/dr` is taken by
+  autodiff of the FULL pair energy (`torch.autograd.grad(U.sum(), r)`, elementwise) so the
+  smooth-cutoff switch term rides in it, exactly as `jax.grad(pair_energy)` does. Default `morse`
+  (paper mechanics, eps 3.0); also soft_sphere / hertzian / harmonic / lennard_jones, each with its
+  own knobs. The reduction (`r_ij . dU/dr` over live non-self j) is the rank-0 SENSED scalar, versus
+  `adhere`'s rank-1 `-grad_i U` that MOVES cells -- the whole reason this is `new`, not a widening of
+  `adhere`.
+- **The three biology-carrying conventions are in and tested:** minus sign (compression-positive;
+  the Morse/harmonic adhesive tail correctly reads tension-negative in the smoke run), 1/(2d)
+  Irving-Kirkwood + 1/2 bond split, and V_i = the cell's OWN d-ball volume (2r / pi r^2 / 4/3 pi r^3,
+  branched on `d = pos.shape[-1]`). `safe_*` keep the r=0 diagonal and a dead cell's V_i=0 finite.
+- Differentiable through the coupling: with a per-cell `epsilon_field`, `d stress / d epsilon` is
+  finite/correct (the source's "optimizable through the written stress"); inert under the engine's
+  `no_grad` rollout.
+
+**Property test (no oracle numbers).** Anchor = compression-positive sign + the analytic
+soft_sphere pressure `p = eps r (1 - r/sigma)/(sigma 2 d V)` (derived BY HAND from `dU/dr = -eps(1 -
+r/sigma)/sigma`): two overlapping cells read exactly that, strictly > 0. Plus beyond-contact limit
+(r>=sigma -> 0), translation/reflection + identical-cell symmetry, size normalization (bigger V ->
+smaller pressure at equal overlap), moves-nothing, dead-cell masking, and the no-block buffer path.
+
+**Left for the differ (did NOT establish):** no oracle run yet -- the FORM and calculus-level
+properties are verified, but there is no run-vs-reference stress number. One simplification to watch:
+I differentiate `dU/dr` against a detached leaf clone of `r`, so the *value* is exact and the
+*epsilon*-gradient is preserved, but the position-gradient path through `dU/dr` is dropped (values --
+what the differ compares -- are unaffected).

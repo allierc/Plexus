@@ -73,3 +73,60 @@ frozen contract, and a change to the baseline is a refinement by definition -- o
 user of structural-only growth must be shown the cost of. A downstream role that reads the source
 and finds the registry can already host a delta-emitting growth realization *without* editing
 cell_grow's signature should downgrade this to `alias`.
+
+## saturating_cell_growth (IMPLEMENTER, status -> implemented)
+
+Wrote `src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py` (anti-chamber) and
+`tests/test_jax_morph_saturating_cell_growth.py` (9 passing). `module`/`test`/`status` updated.
+
+**The refinement is REJECTED by the registry -- and that settles the normalizer's refinement-vs-alias
+debate toward refinement.** The normalizer left the door open: "a downstream role that finds the
+registry can already host a delta-emitting growth realization *without* editing cell_grow's signature
+should downgrade this to `alias`." It cannot. `@register_operator("cell_grow", implementation=...,
+kind="lateral"|"field")` raises at import next to the shipped structural `cell_grow`:
+`operator 'cell_grow' implementation 'saturating_radius' has kind 'lateral', but the contract's kind
+is 'structural'; implementations may differ only in numerics` (registry.py:131). So this mechanism
+CANNOT be a silent second implementation of the frozen contract -- admitting it requires deliberately
+widening cell_grow's kind, i.e. a language change a downstream user must be shown the cost of. That is
+exactly the "refinement hides a breaking change" the ledger exists to catch, here enforced by the
+registry itself, not merely argued. The candidate therefore registers under the distinct name
+**`grow_radius`** (family=growth, set=cell); unifying it with cell_grow is the curator's call.
+
+**`kind: field` is read as "delta-emitting"; the faithful concrete kind is `lateral`.** Plexus's
+`field` kind is a FIELD's own grid self-dynamics (diffuse/decay), `EMIT=None`, `forward()` returns
+`{}` -- it CANNOT emit a per-cell `radius` delta. The operator is a per-cell autonomous ODE with no
+neighbour coupling and no field, which is precisely the shipped `attractor_flow`/`signal` shape
+(`dx/dt=f(x)`, kind=lateral). So I registered `kind=lateral` and recorded the field->lateral reading
+as a surprise. (The entry's contract.kind stays `field` -- the normalizer's artefact; the surprise +
+this note flag the concrete kind for the curator rather than my silently rewriting the verdict.)
+
+**Routing (faithful to the source's dynamic-delta contract).** The source returns the EXACT increment
+`dr = (R-r)(1-exp(-k*dt/R))` as a dt-scaled delta the Model adds. Plexus integrates a first-order
+block as `x += dt*delta`, so -- identical to the `regulate:neural_ode` sibling's self-solved increment
+-- I return the mean RATE `delta = dr/dt`; the engine's `dt*` recovers the exact endpoint (dt cancels,
+not a second integration). `EMIT="velocity"`, class `INTEGRAND="radius"` (a NON-coordinate first-order
+block, so `_resolve_emit` never constrains the cell's spatial order) + instance-`INTEGRAND` routing to
+a configurable size block; the delta lands in the `radius` accumulator, summed with any co-writer.
+`growth_rate` is read as a per-cell heritable STATE (block or buffer), falling back to a uniform `rate`
+param (default 0 -> k=0 -> byte no-op); the sole "target" knob is `max_radius` (guarded > 0). Pure
+torch (exp/mul) -> `DIFFERENTIABLE=True`, so gradients flow through r, k, and the optimizable R -- the
+whole point of keeping the rate in state.
+
+**Source wins (rule 5):** translated the CODE (von Bertalanffy exact flow, no clamp), not the paper's
+prose (`min(R+dR, Rmax)`, constant-rate), as the excavator/normalizer established. Not hard-coded to
+the oracle -- the tests assert facts about the ODE, never a fitted number.
+
+Tests (all reference-free): (a) one step reproduces the ODE's KNOWN analytic solution
+`r(dt)=R-(R-r0)exp(-k dt/R)` through `radius += dt*delta` to 1e-6; (b) UNCONDITIONAL STABILITY -- even
+dt=1e3 never overshoots R while a forward-Euler step with the same dt blows past it (the exact-flow
+headline); (c) fixed point at R (dr=0); (d) sign symmetry about R (below grows, above relaxes down);
+(e) k=0 exact no-op; (f) 400-step asymptote to R, approached from below, no overshoot; (g) dormant
+(occ=0) cells get zero; (h) the end-to-end path through the real engine `_integrate` lands on the
+analytic endpoint (the `_delta_blocks` radius routing composes); (i) registration/routing
+(kind=lateral, EMIT=velocity, INTEGRAND=radius, MAPS=[], writes=[radius]).
+
+Left for the validator/curator: the differential run against the oracle. jax is deliberately absent
+from the Plexus env, and no oracle/smoke scenario is known to exercise SaturatingCellGrowth yet, so
+there is no paired trajectory to diff -- `evidence`/`status: validated` untouched. Curator decision:
+whether `grow_radius` promotes as a widened second implementation of `cell_grow` (a kind-widening of
+the growth contract) or as its own contract.

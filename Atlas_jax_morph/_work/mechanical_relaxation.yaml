@@ -204,9 +204,9 @@ contract:
   writes:
   - position
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_mechanical_relaxation.py
+test: tests/test_jax_morph_mechanical_relaxation.py
 evidence:
   oracle_run: null
   diff_metric: null

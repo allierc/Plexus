@@ -3,15 +3,15 @@
   "commit": "ace08b87a30015ca6c899467ac302e60ecf3b621",
   "baseline_contracts": 52,
   "counts": {
-    "alias": 4,
+    "alias": 2,
     "refinement": 2,
     "new": 8,
-    "implementation": 3,
+    "implementation": 6,
     "out_of_scope": 6,
-    "unclassified": 1
+    "unclassified": 0
   },
-  "scored": 17,
-  "yield_new_per_mechanism": 0.47058823529411764,
+  "scored": 18,
+  "yield_new_per_mechanism": 0.4444444444444444,
   "new_contracts": [
     "adhere",
     "agitate",
@@ -245,7 +245,7 @@
       "class": "alias",
       "contract": "attraction_repulsion",
       "of": "attraction_repulsion",
-      "status": "inspected"
+      "status": "normalized"
     },
     {
       "n": 15,
@@ -260,28 +260,28 @@
       "n": 16,
       "id": "hertzian",
       "raw_name": "Hertzian",
-      "class": "alias",
-      "contract": "attraction_repulsion",
-      "of": "attraction_repulsion",
-      "status": "inspected"
+      "class": "implementation",
+      "contract": "adhere",
+      "of": "soft_sphere",
+      "status": "normalized"
     },
     {
       "n": 17,
       "id": "harmonic",
       "raw_name": "Harmonic",
-      "class": "alias",
-      "contract": "attraction_repulsion",
-      "of": "attraction_repulsion",
-      "status": "inspected"
+      "class": "implementation",
+      "contract": "adhere",
+      "of": "soft_sphere",
+      "status": "normalized"
     },
     {
       "n": 18,
       "id": "lennard_jones",
       "raw_name": "LennardJones",
-      "class": "unclassified",
-      "contract": null,
-      "of": null,
-      "status": "inspected"
+      "class": "implementation",
+      "contract": "adhere",
+      "of": "soft_sphere",
+      "status": "normalized"
     },
     {
       "n": 19,
@@ -356,6 +356,24 @@
       "recorded": "new",
       "ledger": "implementation",
       "name": "regulate"
+    },
+    {
+      "id": "hertzian",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
+      "id": "harmonic",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
+      "id": "lennard_jones",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
     }
   ]
 }

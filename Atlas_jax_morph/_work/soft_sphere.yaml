@@ -122,7 +122,23 @@ why: "SoftSphere is the purely-repulsive (zero-adhesion) IMPLEMENTATION of a pai
   realizes them with the adhesive MORSE potential, never this harmonic (epsilon/2)\n(1 - r/sigma)^2; SoftSphere\
   \ is a code-only, purely-repulsive library alternative,\nrecorded as the adhesion-off implementation\
   \ of `adhere`. The two 1/2 factors, the\nSUM-vs-MEAN combining rules, the double-`where` gradient guard\
-  \ and the virial sign\nare implementation details of THIS member, not contract-level distinctions.\n"
+  \ and the virial sign\nare implementation details of THIS member, not contract-level distinctions.\n\
+  \nSOURCE-VERIFIED, and it settles the dispute. The skeptic asks record.py's regulate/consistency rule\
+  \ to route this entry to the parent's alias -> attraction_repulsion. Read at source, src/plexus/operators/attraction_repulsion.py\
+  \ refutes the premise that target rests on: it is registered set=\"particle\" kind=\"lateral\" (line\
+  \ 28), EMIT=\"velocity\" (line 30 -- a hand-coded overdamped velocity, not an energy), REQUIRES_PARAMS=[\"\
+  sigma\"] with self.sigma=float(params[\"sigma\"]) (lines 32/43 -- ONE global scalar width), and REQUIRES_TYPE_PROPS=[\"\
+  p\"] (line 33 -- a per-TYPE vector p=[pull,pull_range,push,push_range] indexed by node_type[i], line\
+  \ 61); its forward() reads pos/edge_index/node_type/type_params/occ over a neighbour graph and NEVER\
+  \ reads radius. So the registered operator has no physical-radius read, no per-pair contact distance\
+  \ sigma=r_i+r_j, no energy/force/virial, a per-TYPE (not per-cell) coupling, and set=particle -- SoftSphere\
+  \ is the opposite on every one of those signature fields. Consistency therefore does NOT license the\
+  \ alias; applied honestly it forces the opposite verdict. SoftSphere (exponent 2.0, prefactor 0.5) and\
+  \ Hertzian (2.5, 0.4) are the SAME helper _compact_repulsion separated by two numeric constants, and\
+  \ Hertzian (order 16) plus the adhesive sibling Harmonic (order 17) have already normalized new -> adhere;\
+  \ splitting literal twins is indefensible, so this entry matches them. The parent PairwisePotential\
+  \ and Morse alias entries rest on the refuted premise that attraction_repulsion carries the pairwise-cell-mechanics\
+  \ signature; reconciling them toward adhere is flagged for the analysis phase, not made here.\n"
 contract:
   name: adhere
   kind: lateral
@@ -135,11 +151,19 @@ contract:
   reads:
   - position
   - radius
+  - alive
   - epsilon (per-cell OR shared interaction strength; SoftSphere reads it only when it is a per-cell field)
   writes:
   - position
-  maps: []
-status: inspected
+  maps:
+  - pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each unordered
+    pair counts once); force on each cell = -grad of the conservative SoftSphere pair energy by autodiff;
+    size-consistent contact distance sigma = r_i + r_j read from the physical radius (tracks cell growth/division)
+  - PURELY REPULSIVE compact soft core U = (epsilon/2)(1 - r/sigma)^2 with support exactly [0, sigma)
+    -- no adhesive tail and no cutoff parameter (self-truncating at contact), C1 (force vanishes at contact);
+    a radial pair force integrated overdamped or minimised by the wrapping motion step. This is the adhesion-OFF
+    shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive tail)
+status: normalized
 module: null
 test: null
 evidence:

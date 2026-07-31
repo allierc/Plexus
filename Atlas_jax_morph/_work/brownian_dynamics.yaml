@@ -190,9 +190,9 @@ contract:
     displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable
     and scorable.
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_brownian_dynamics.py
+test: tests/test_jax_morph_brownian_dynamics.py
 evidence:
   oracle_run: null
   diff_metric: null

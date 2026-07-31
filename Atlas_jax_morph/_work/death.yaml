@@ -126,9 +126,9 @@ contract:
   - alive
   - death
   maps: []
-status: normalized
-module: null
-test: null
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_death.py
+test: tests/test_jax_morph_death.py
 evidence:
   oracle_run: null
   diff_metric: null
