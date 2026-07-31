@@ -3,103 +3,81 @@ order: 5
 raw_name: StochasticStep
 raw_kind: step (SimulationStep)
 code_path: papers/jax-morph/jax_morph/core/step.py:L148
-paper_section: 'p. 10 (Methods, "Gradient calculation", the REINFORCE estimator); appendix
-  pp. 16-18 (REINFORCE / policy-gradient derivation); guide jax_morph/guides/extending.md
-  heading "Stochastic steps"'
-summary: >-
-  An abstract mixin (subclass of SimulationStep, is_stochastic=True) that does not itself write
-  physical state but fixes the sample/replay/score contract for a stochastic step. The DERIVED
-  forward __call__ samples a *trace* -- parameter-free exogenous noise plus the realized action
-  (e.g. the 0/1 divided, or a displacement dx) -- and replays it pathwise to produce the step's
-  actual effect (a new state for quasistatic/discrete, a dt-scaled sparse delta for dynamic),
-  co-emitting the trace into ephemeral trace fields of the post-step state. Separately, the model's
-  scoring drivers read that recorded trace back out and replay it with parameters live, summing each
-  selected step's log-density (logp) -- this is the differentiable REINFORCE policy the paper needs.
-equations: |
-  The mixin has no numeric physics update of its own; its "update to the state" is the composition
-  it forces on every subclass.
-
-  Forward sampler (derived __call__, L327-339):
-      __call__(s; dt, key) = replay(s, sample_trace(s; dt, key); dt, pathwise=True)
-
-  Per-step scoring (Model._replay_transition, L550-572); with the recorded post-step state s'_rec,
-      trace = trace_from_state(stop_gradient(s'_rec))          # trace detached; only s / theta carry gradient
-      scored   step i:  L += logp(s, trace, dt);  s <- replay(s, trace; dt, pathwise=False)  # frozen action
-      unscored step i:  s <- replay(s, trace; dt, pathwise=True)                             # recompute from noise
-      pathwise = not scored                                    # set by the MODEL, not the step
-
-  Reparameterization lives inside replay, keyed on `pathwise` (extending.md Example B, L374-380):
-      pathwise=True  -> dx = mean(s) + std(theta) * xi          # recomputed with live theta
-      pathwise=False -> dx = frozen realized value              # a discrete node ignores pathwise entirely
-
-  The score-function gradient this implements (paper p. 10, eq.):
-      grad_theta L(theta) ~= sum_{t=0..T-1} L_t * grad_theta log pi_theta(a_t | s_t)
-  where logp = log pi_theta(a_t | s_t), L_t is the discounted future loss, a_t the division action.
-  MDP trajectory density (appendix p. 17): P(tau) = P(s0) * prod_t pi(a_t|s_t) P(s_{t+1}|s_t,a_t);
-  the code factorizes exactly this, one pi_theta term per stochastic step per macro-step.
+paper_section: p. 10 (Methods, "Gradient calculation", the REINFORCE estimator); appendix pp. 16-18 (REINFORCE
+  / policy-gradient derivation); guide jax_morph/guides/extending.md heading "Stochastic steps"
+summary: An abstract mixin (subclass of SimulationStep, is_stochastic=True) that does not itself write
+  physical state but fixes the sample/replay/score contract for a stochastic step. The DERIVED forward
+  __call__ samples a *trace* -- parameter-free exogenous noise plus the realized action (e.g. the 0/1
+  divided, or a displacement dx) -- and replays it pathwise to produce the step's actual effect (a new
+  state for quasistatic/discrete, a dt-scaled sparse delta for dynamic), co-emitting the trace into ephemeral
+  trace fields of the post-step state. Separately, the model's scoring drivers read that recorded trace
+  back out and replay it with parameters live, summing each selected step's log-density (logp) -- this
+  is the differentiable REINFORCE policy the paper needs.
+equations: "The mixin has no numeric physics update of its own; its \"update to the state\" is the composition\n\
+  it forces on every subclass.\n\nForward sampler (derived __call__, L327-339):\n    __call__(s; dt, key)\
+  \ = replay(s, sample_trace(s; dt, key); dt, pathwise=True)\n\nPer-step scoring (Model._replay_transition,\
+  \ L550-572); with the recorded post-step state s'_rec,\n    trace = trace_from_state(stop_gradient(s'_rec))\
+  \          # trace detached; only s / theta carry gradient\n    scored   step i:  L += logp(s, trace,\
+  \ dt);  s <- replay(s, trace; dt, pathwise=False)  # frozen action\n    unscored step i:  s <- replay(s,\
+  \ trace; dt, pathwise=True)                             # recompute from noise\n    pathwise = not scored\
+  \                                    # set by the MODEL, not the step\n\nReparameterization lives inside\
+  \ replay, keyed on `pathwise` (extending.md Example B, L374-380):\n    pathwise=True  -> dx = mean(s)\
+  \ + std(theta) * xi          # recomputed with live theta\n    pathwise=False -> dx = frozen realized\
+  \ value              # a discrete node ignores pathwise entirely\n\nThe score-function gradient this\
+  \ implements (paper p. 10, eq.):\n    grad_theta L(theta) ~= sum_{t=0..T-1} L_t * grad_theta log pi_theta(a_t\
+  \ | s_t)\nwhere logp = log pi_theta(a_t | s_t), L_t is the discounted future loss, a_t the division\
+  \ action.\nMDP trajectory density (appendix p. 17): P(tau) = P(s0) * prod_t pi(a_t|s_t) P(s_{t+1}|s_t,a_t);\n\
+  the code factorizes exactly this, one pi_theta term per stochastic step per macro-step.\n"
 params:
-  score_by_default: >-
-    scoring-inclusion policy flag -- a static, keyword-only bool (default True). Whether this step's
-    logp is summed when a scoring driver is called with score=None; 'all' overrides it. It is the
-    ONLY per-instance knob the mixin adds, is NOT a physics parameter, and is NOT the
-    reparameterizability switch (that is intrinsic to the distribution and lives inside replay,
-    selected by the model's pathwise = not scored).
+  score_by_default: scoring-inclusion policy flag -- a static, keyword-only bool (default True). Whether
+    this step's logp is summed when a scoring driver is called with score=None; 'all' overrides it. It
+    is the ONLY per-instance knob the mixin adds, is NOT a physics parameter, and is NOT the reparameterizability
+    switch (that is intrinsic to the distribution and lives inside replay, selected by the model's pathwise
+    = not scored).
 state_io:
-  reads: >-
-    None declared by the mixin itself -- state_reads() defaults to () and is subclass-defined
-    (e.g. Division reads division_rate, division_axis).
-  writes: >-
-    None declared by the mixin itself -- state_writes() defaults to () and is subclass-defined.
-    A stochastic output that must PERSIST across macro-steps is a state_writes field (written by
-    replay), never a trace field.
-  trace_writes: >-
-    The mixin adds a THIRD, ephemeral I/O category (trace_writes(), default ()): the recorded trace
-    -- exogenous noise + realized action + an {action}_eligible mask -- reset to its declared default
-    at the start of every macro-step (Model._reset_traces, L467-483). Folded into state_requires()
-    (state_reads U state_writes U trace_writes, L197-203) but kept disjoint from state_writes.
+  reads: None declared by the mixin itself -- state_reads() defaults to () and is subclass-defined (e.g.
+    Division reads division_rate, division_axis).
+  writes: None declared by the mixin itself -- state_writes() defaults to () and is subclass-defined.
+    A stochastic output that must PERSIST across macro-steps is a state_writes field (written by replay),
+    never a trace field.
+  trace_writes: 'The mixin adds a THIRD, ephemeral I/O category (trace_writes(), default ()): the recorded
+    trace -- exogenous noise + realized action + an {action}_eligible mask -- reset to its declared default
+    at the start of every macro-step (Model._reset_traces, L467-483). Folded into state_requires() (state_reads
+    U state_writes U trace_writes, L197-203) but kept disjoint from state_writes.'
 surprises:
-  - >-
-    __call__ is DERIVED, not implemented by the subclass (L327-339): it is exactly
-    sample_trace then replay(pathwise=True). A reimplementer who writes __call__ directly loses the
-    guarantee that the forward pass records precisely what a later replay would reconstruct.
-  - >-
-    replay is the SINGLE source of the effect AND must co-emit every declared trace field into the
-    state/delta it returns. Forgetting one is a SILENT failure: the forward records the reset default,
-    trace_from_state reads that default back, and logp scores garbage with no error. check_stochastic_step
-    (L625) is the only guard -- it drives the step from two different sentinel pre-fills and asserts the
-    recorded trace round-trips (a single-run/reset-to-default inspection cannot catch it).
-  - >-
-    Reparameterizability is NOT a constructor knob -- it is intrinsic to the distribution and encoded
-    by whether replay honours pathwise=True. The model always passes pathwise = not scored: a scored
-    step freezes its realized action (score-function/REINFORCE gradient through its own logp), an
-    unscored reparameterizable step recomputes its value from the frozen noise with live theta so the
-    gradient flows pathwise into a later scored step's logp. A discrete node has nothing to
-    reparameterize and ignores pathwise.
-  - >-
-    Trace fields are EPHEMERAL and validated hard (Model._validate, L426-462): a trace field may not
-    shadow a base or state_writes field (the per-macro-step reset would wipe it), must be unique per
-    stochastic step (two steps sharing a name clobber one allocation -- namespace by the action verb),
-    and a DYNAMIC (additive) trace field must default to 0 or reset-then-accumulate records
-    default+value instead of the step's own increment.
-  - >-
-    sample_trace may OMIT a derived realized value (a Brownian dx = mean + std*xi): the pathwise
-    replay recomputes and records it, so there are never "two formulas that must agree". But it must
-    return every entry replay(pathwise=True) reads (the noise + any directly sampled discrete action),
-    and each entry AS it will be recorded -- eligibility masking happens inside sample_trace, not replay.
-  - >-
-    _dist(state, dt) is the recommended SINGLE source of the distribution parameters, called by both
-    sample_trace and logp so a step cannot sample under one distribution and score under another.
-  - >-
-    Scoring stop_gradient's the recorded next-state ONCE (L558) so the trace is detached and only the
-    live conditioning state and theta carry gradient; deterministic steps inside replay get a fixed
-    _PLACEHOLDER_KEY = PRNGKey(0) (L34), since replay is a re-execution with live params, not a re-draw.
-  - >-
-    PAPER-vs-CODE gap: the paper describes ONLY the discrete-event REINFORCE / score-function estimator
-    for cell division ("stochastic operations do not have a well-defined differentiation rule", p. 9-10),
-    and treats the division plane as chosen uniformly at random (p. 2). The code GENERALIZES this into a
-    reparameterizable pathwise branch (replay(pathwise=True)) and an oriented placement -- a second,
-    lower-variance gradient path the paper never mentions. The two estimators must not be summed in one
-    run (division.py L1-8); the source is authoritative here.
+- '__call__ is DERIVED, not implemented by the subclass (L327-339): it is exactly sample_trace then replay(pathwise=True).
+  A reimplementer who writes __call__ directly loses the guarantee that the forward pass records precisely
+  what a later replay would reconstruct.'
+- 'replay is the SINGLE source of the effect AND must co-emit every declared trace field into the state/delta
+  it returns. Forgetting one is a SILENT failure: the forward records the reset default, trace_from_state
+  reads that default back, and logp scores garbage with no error. check_stochastic_step (L625) is the
+  only guard -- it drives the step from two different sentinel pre-fills and asserts the recorded trace
+  round-trips (a single-run/reset-to-default inspection cannot catch it).'
+- 'Reparameterizability is NOT a constructor knob -- it is intrinsic to the distribution and encoded by
+  whether replay honours pathwise=True. The model always passes pathwise = not scored: a scored step freezes
+  its realized action (score-function/REINFORCE gradient through its own logp), an unscored reparameterizable
+  step recomputes its value from the frozen noise with live theta so the gradient flows pathwise into
+  a later scored step''s logp. A discrete node has nothing to reparameterize and ignores pathwise.'
+- 'Trace fields are EPHEMERAL and validated hard (Model._validate, L426-462): a trace field may not shadow
+  a base or state_writes field (the per-macro-step reset would wipe it), must be unique per stochastic
+  step (two steps sharing a name clobber one allocation -- namespace by the action verb), and a DYNAMIC
+  (additive) trace field must default to 0 or reset-then-accumulate records default+value instead of the
+  step''s own increment.'
+- 'sample_trace may OMIT a derived realized value (a Brownian dx = mean + std*xi): the pathwise replay
+  recomputes and records it, so there are never "two formulas that must agree". But it must return every
+  entry replay(pathwise=True) reads (the noise + any directly sampled discrete action), and each entry
+  AS it will be recorded -- eligibility masking happens inside sample_trace, not replay.'
+- _dist(state, dt) is the recommended SINGLE source of the distribution parameters, called by both sample_trace
+  and logp so a step cannot sample under one distribution and score under another.
+- Scoring stop_gradient's the recorded next-state ONCE (L558) so the trace is detached and only the live
+  conditioning state and theta carry gradient; deterministic steps inside replay get a fixed _PLACEHOLDER_KEY
+  = PRNGKey(0) (L34), since replay is a re-execution with live params, not a re-draw.
+- 'PAPER-vs-CODE gap: the paper describes ONLY the discrete-event REINFORCE / score-function estimator
+  for cell division ("stochastic operations do not have a well-defined differentiation rule", p. 9-10),
+  and treats the division plane as chosen uniformly at random (p. 2). The code GENERALIZES this into a
+  reparameterizable pathwise branch (replay(pathwise=True)) and an oriented placement -- a second, lower-variance
+  gradient path the paper never mentions. The two estimators must not be summed in one run (division.py
+  L1-8); the source is authoritative here.'
 verdict: null
 of: null
 why: null

@@ -129,7 +129,8 @@ THE RULES OF THIS LOOP.
 5. If the source and the paper disagree, the SOURCE WINS -- and record the contradiction in
    `why:`. That contradiction is one of the most valuable things this exercise can produce.
 6. THE WORKING COPY MUST STAY VALID YAML. Any string containing a colon-space, a leading `-`,
-   `#`, `{`, `[`, or a line break belongs in a block scalar (`key: |`) or in quotes. One entry was
+   `#`, a brace or a bracket, or a line break belongs in a block scalar (`key: |`) or in
+   quotes. One entry was
    lost to an unquoted `... it is NOT a constructor param: it ...`. Equations and prose always go
    in a block scalar.
 7. Do not run the reference by importing jax in the Plexus environment. It is not installed

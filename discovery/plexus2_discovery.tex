@@ -105,12 +105,35 @@ measured, and I presented it as if it were.
 \section{What we believe about the biology}
 
 \begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt]
-\begin{center}\large\textbf{Nothing. The register is empty.}\end{center}
+\begin{center}\large\textbf{Nothing \emph{measured}. But we now write down what we assume.}\end{center}
 
-Every measurement we have was taken with at least one of the four broken rulers in the path. There
-is no scientific claim in this document, and there should not be one until Phase~1 has re-measured
-with instruments that work.
+The register of \emph{results} is still empty, and should stay empty until a batch has been taken
+with instruments that work. Every number we have was measured with at least one broken ruler in the
+path.
+
+What changed on 31 July is a different thing: the register of \textbf{assumptions} is no longer
+empty. Ten basics about cell tissue are written down in \texttt{discovery/PREMISES.md} --- not a
+literature review, but the minimum a person needs in order to look at one of our runs and say
+``that cannot be right''. Each is phrased so that a computer can check it against a run, and each
+one now does (Phase~1a).
+
+The distinction matters. A result is something we found out. A premise is something we are
+\emph{assuming}, stated plainly enough that it can be caught being wrong. Writing the second kind
+down is not a claim about biology --- it is a way of making our own mistakes visible.
 \end{tcolorbox}
+
+\textbf{Why these ten and not seventy.} Five miners produced 70 candidate premises with full
+sourcing, and three adversarial readers attacked them for truth, checkability and internal
+consistency. Most were cut for being too specific --- true of mouse salivary gland, not true of
+tissue. What survives constrains \emph{any} run we do. Cedric's instruction was the filter:
+\emph{``the corpus should be very concise at the right level of description, the basics not the
+specific.''}
+
+\textbf{Three of the ten state one of today's defects in advance.} Premise~6 (a resting vesicle
+rests) is the collapsing ball. Premise~5 (mechanics is fast, biology is slow) is the chemistry that
+ran fifty times too slow. Premise~3 (a cell divides because it got big) is the growth ceiling that
+sat below the division trigger. They were written before the defects were found, which is the whole
+argument for having them.
 
 \textbf{An earlier draft of this section had a table grading five claims as ``solid'', ``weak'' or
 ``unsupported''. Cedric was right to strike it, and the reason is worth recording.}
@@ -698,7 +721,79 @@ Not one of the items below is science; each one makes a question \emph{askable}.
 \end{tabular}
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- A fresh experiment, on working instruments \hfill \todo\ ($\sim$1 hour, local)}
+\begin{phasebox}{Phase 1a --- Teach the loop what a tissue is: the premise gate \hfill \dn\ (31 July)}
+\textbf{Why this became its own phase.} On 31 July we found ten defects in one day. Every single
+one was found by Cedric looking at a picture --- a ball that shrank, a movie where every cell went
+green, a coral that started uniformly red. Not one was found by the loop. And they were all the
+same \emph{kind} of thing: an operator or an instrument not doing what its name says. The loop
+checked that runs finished, that the mesh was valid, that the numbers were finite. It never once
+checked that the thing it had simulated was a tissue.
+
+\textbf{The idea.} Write down what we take as known about cell tissue --- ten basics, no more ---
+and then make each one something a computer can \emph{run} and \emph{fail}. A premise nobody can
+run is an opinion, and an opinion catches nothing.
+
+\textbf{Three tiers, because they do not cost the same}
+\begin{itemize}
+\item \textbf{Read the recipe} (instant, no simulation). A recipe that cannot possibly work is now
+refused in milliseconds, before a GPU is touched --- instead of ten minutes later, as a
+plausible-looking null result. Two of today's ten defects are of exactly this kind: a number that
+contradicts another number in the same file.
+\item \textbf{Read the run} (free, after every simulation). Cannot stop anything --- the run
+already happened --- so it goes loudly into the record instead. An analyst who reads a summary
+without being told the chemistry was extinct is interpreting a corpse.
+\item \textbf{Run a small experiment of its own} (a minute). The most valuable one: switch off
+growth, chemistry and division, and let the ball sit for forty frames. It must not change size.
+\end{itemize}
+
+\textbf{A broken premise must be \emph{declared}, not silenced.} Deliberately switching off growth
+to ask what a protrusion is made of genuinely breaks premise~1 --- and that is science, not a bug.
+The only difference between an ablation and a mistake is whether someone \emph{meant} it. So a
+recipe may waive a premise \emph{in writing, with a reason}; an undeclared violation is a hard
+stop. This is what keeps ``the settings were wrong'' from looking identical to ``we tested an
+idea''.
+
+\textbf{Every check was proved to work before being trusted}, on real cases from this campaign
+whose answer we already knew --- because a check that has never been seen to fail is not a check,
+it is a line of code that says ``fine''. Fifteen out of fifteen:
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Check} & \textbf{On the known-bad case} & \textbf{On the known-good one} \\
+\midrule
+Cells can reach the size that divides them & correctly \textbf{fails} & passes \\
+The chemistry is not silently extinguished & correctly \textbf{fails} & passes \\
+Cell volume holds up under division        & correctly \textbf{fails} & passes \\
+Cells are not stretched to accommodate area & correctly \textbf{fails} & passes \\
+The measuring stick respects its own floor  & correctly \textbf{fails} & passes \\
+\textbf{A resting ball rests}               & \textbf{5.00 $\to$ 0.69} & holds to 0.1\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+That last row is the one to look at. Run against the code as it stood yesterday morning, the ball
+collapses to a seventh of its size in forty frames of ordinary CPU time. \textbf{That single check
+would have caught the worst defect of the campaign on the first day.} It costs about a minute.
+
+\textbf{One premise had to be rewritten, and Cedric is the reason.} It said the tissue is at force
+balance at every instant, and he asked whether that was too strong --- can a tissue not accumulate
+stress for a long time? It can, and the wording was sloppy. Being at force balance is not the same
+as being unstressed: a stretched drumhead is perfectly balanced and stores tension indefinitely.
+Real tissue does the same for hours or days --- cut an epithelium with a laser and it recoils;
+tumour spheroids under confinement build up pressure over days. So the premise now forbids only two
+narrow things --- no inertia, and no lagging behind because the solver ran out of steps --- and a
+new check watches the second, which is the one that can actually go wrong here.
+
+We then \emph{measured} it rather than arguing: the same run with four times the solver effort
+buckles at the same point. So the stress our ball accumulates is real, and it is held at force
+balance, exactly as he suspected.
+
+\textbf{Where it lives.} \texttt{discovery/PREMISES.md} (what we believe) and
+\texttt{discovery/premise\_check.py} (what runs). The gate is wired into every run.
+\end{phasebox}
+
+\begin{phasebox}{Phase 1b --- A fresh experiment, on working instruments \hfill \todo\ ($\sim$1 hour, local)}
 \textbf{Not a re-run, and not a comparison.} The earlier overnight study is quarantined, not
 inherited: every one of those runs was measured with at least one instrument since proved wrong,
 and re-running them ``to see if the conclusion survives'' would import the old design and the old
@@ -833,6 +928,84 @@ predictions and retractions as the evidence.
 \end{phasebox}
 
 %======================================================================
+\section{Report --- 31 July: ten defects in one day}\label{sec:july31}
+
+This is the most important page in the document, and not because of the defects.
+
+\subsection{What was wrong}
+
+Every measurement taken before this morning is void. Ten separate faults, found in a single day,
+each one making some earlier number meaningless:
+
+\begin{center}\small
+\begin{tabular}{@{}p{6.2cm}p{8.6cm}@{}}
+\toprule
+\textbf{What was wrong} & \textbf{What it did to the results} \\
+\midrule
+The ball had no resting size &
+  A freshly built vesicle collapsed from radius 5.0 to 1.8 in twenty frames, under nothing at all. \\
+The chemistry ran on the mechanics clock &
+  Three hundred frames bought six units of chemical time instead of five hundred. Every ``no
+  pattern formed'' was a statement about the clock. \\
+Cells could not reach the size that divides them &
+  The ceiling on growth sat \emph{below} the trigger for division, so dividing by growing was
+  arithmetically impossible. Every division came from a stopwatch. \\
+The starting pattern was re-stamped every frame &
+  The chemistry was overwritten with its own initial condition six hundred times, then allowed to
+  advance one step. It never moved. \\
+The pattern gauge could not see the pattern &
+  It measured ``the top half of whatever is there'', so it read the same number for a living
+  pattern and a dead one. It sat at exactly 0.070 for forty consecutive frames. \\
+Every cell turned green at once &
+  Green means ``just divided'', but it was computed in a way that also means ``just created'' ---
+  so the whole tissue flashed green in runs where nothing divided at all. \\
+Tissue size was never recorded &
+  Only how \emph{unequal} the cells were, never how big the tissue was. Three of our ten premises
+  were literally unmeasurable from our own records. \\
+Growth was starving the chemistry &
+  As cells grow, what is inside them is diluted --- correctly. But the pattern is sustained by a
+  self-reinforcing loop, and any steady loss beats it. This is why the coral never worked. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Who found them}
+
+\begin{tcolorbox}[colback=warn!8,colframe=warn!55,boxrule=0.8pt,arc=2pt]
+\textbf{All ten were found by Cedric, from a picture.} None by the loop.
+
+A ball that shrank to nothing. A movie where every cell went green at one second. A coral that
+began uniformly red. A cross-section that changed character halfway through. Each time, an
+ordinary look at an ordinary output, followed by a question the numbers could not answer.
+\end{tcolorbox}
+
+That is the finding, and it is about the method rather than about tissue. The loop has always been
+able to tell whether a \emph{simulation} succeeded --- did it finish, is the mesh valid, are the
+numbers finite. It has never been able to tell whether the \emph{specimen} was a tissue. Those are
+different questions, and only the second one was ever going to catch a ball that quietly implodes.
+
+Phase~1a is the answer to it: ten premises about tissue, each one executable, each one proved to
+fail on a case where it should. Whether that is enough is the next thing to find out --- and the
+only way to find out is to run Phase~1b and see whether the gate catches anything before Cedric
+does.
+
+\subsection{What came out of it that is worth keeping}
+
+Two results, both accidental, both from chasing a bug:
+
+\textbf{A buckling transition.} A growing ball divides smoothly, then at about 3\,500 cells its
+surface crenellates and stays that way. The numbers say compression then release: through the
+approach the enclosed volume actually \emph{falls} while surface area holds, and the cells are
+squeezed to two-thirds of their target --- then the shell gives way, area doubles, and the pent-up
+volume comes back. Nothing tears at any point, and the surface stays a topological sphere
+throughout. It survives quadrupling the solver effort, so it is physical rather than numerical.
+Kept in \texttt{log/okuda/\_keep\_transition/} with its full record.
+
+\textbf{A new measuring stick} that made the above visible: \emph{reduced volume}, the standard
+dimensionless measure of how much more surface a closed shell carries than a sphere of the same
+volume could hold. One for a sphere, less than one when the shell must wrinkle. Checked against
+known shapes before use --- 0.996 on a sphere, 0.55 on a badly crumpled one.
+
 \section{Phase 0 report --- 31 July, 11:15}\label{sec:p0report}
 
 \emph{This is a phase boundary. Four of the seven items are done and independently checked; three
