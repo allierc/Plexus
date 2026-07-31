@@ -1,0 +1,34 @@
+⚠ T4_OUTSIDE_DECLARED_BOX -- theta outside the declared box (a prior, not a physical wall): morphogen_growth_3d0.rate=0.0 not in [0.002, 0.03]
+⚠ T4_OUTSIDE_DECLARED_BOX -- theta outside the declared box (a prior, not a physical wall): morphogen_growth_3d0.a_sw=50.0 not in [0.2, 6]
+[phase1] 12 specs, 500 frames, 2 GPUs x 3
+
+    p1_control                 the base: RD + baseline growth + division + mechanics, no forcing
+    p1_ko_cell_rd_seed         KNOCKOUT cell_rd_seed: no initial pattern -- does RD start at all?
+    p1_ko_cell_diffuse         KNOCKOUT cell_diffuse: no spreading -- reaction alone
+    p1_ko_morphogen_growth_3d  KNOCKOUT morphogen_growth_3d: no growth -- mechanics and division only
+    p1_ko_divide_3d            KNOCKOUT divide_3d: no division -- growth without proliferation
+    p1_ko_reconnect_t1_3d      KNOCKOUT reconnect_t1_3d: no neighbour exchange -- can the tissue still flow?
+    p1_ko_cell_geometry_3d     KNOCKOUT cell_geometry_3d: no per-cell geometry readout
+    p1_ph_rd_only              PATTERN: growth off. Does a Turing pattern form on a static shell?
+    p1_ph_growth_only          GROWTH: uniform, activator switch off. Does the ball actually get bigger?
+    p1_ph_undulation           UNDULATION (Okuda Fig 7): many shallow bumps, not one deep protrusion
+    p1_ph_tube                 TUBE: one spot, stronger activator-driven growth
+    p1_ph_divide_only          DIVISION: uniform inflation + division, no chemistry at all
+
+
+STRUCTURALLY REQUIRED -- these cannot be removed at all, which is a result:
+    cell_react                 dangling slot: [('morphogen_growth_3d0', 'morphogen_growth_3d', 'gate')]
+    cell_adjacency             unmet precondition: [('cell_react0', 'cell_react', 'adjacency'), ('cell_diffuse0', 'cell_diffuse', 'adjacency')]
+
+  [start cuda:0] p1_control
+  [start cuda:0] p1_ko_cell_rd_seed
+  [start cuda:0] p1_ko_cell_diffuse
+  [start cuda:1] p1_ko_morphogen_growth_3d
+  [start cuda:1] p1_ko_divide_3d
+  [start cuda:1] p1_ko_reconnect_t1_3d
+  [done  cuda:1] p1_ko_morphogen_growth_3d   216.0s  exit 0
+  [start cuda:1] p1_ko_cell_geometry_3d
+  [done  cuda:1] p1_ko_divide_3d             234.0s  exit 0
+  [start cuda:1] p1_ph_rd_only
+  [done  cuda:1] p1_ph_rd_only               198.0s  exit 0
+  [start cuda:1] p1_ph_growth_only

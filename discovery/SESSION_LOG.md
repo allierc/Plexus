@@ -1279,3 +1279,51 @@ Turing×vertex structural limitation, and both of my retracted mechanism claims.
 | **Found** | no `drawtext` in the bundled ffmpeg; montage tiles are not spatially comparable and would have invited a false reading |
 | **Next** | round 3 (watch escalation fire); overlap the Proposer with cluster runs; analyst calls bypass the LLM budget ledger; common-`Lbox` re-render for a truthful montage |
 | **Blocked** | nothing |
+
+## 2026-07-31 15:50 — three defects behind the inert battery, fixed and verified
+
+Cedric looked at a Phase 1 strip and said "everything shrinks, oh no we broke it all?". It was not
+a rendering problem and it was not new: all 11 completed runs ended at exactly 500 cells (= the
+seeded count), protrusion 1.02 (a sphere) and activator 0.499 (= the seed amplitude). Nothing grew,
+divided or reacted in any of them. Bisection found three independent causes.
+
+D1  shape_energy_3d/monolayer had no rest state. Stripping the operator list one at a time: the
+    ball holds 5.000 exactly under every other operator and falls 5.00 -> 1.80 in 20 frames the
+    moment the mechanics is added. gamma=0 gives 2.95, gamma=0 and kappa_s=0 gives 5.00 -- so both
+    tension terms pull in and only the volume spring pushes out, and V_eq had been calibrated
+    against the volume term alone. Fixed by solving for the target-volume offset that puts the
+    seeded shell at force balance. Solved rather than chosen: the loop sweeps k_v/kappa_s/gamma/h0/
+    radius/n_cells and any hardcoded tension collapses at the next setting. Additive not
+    multiplicative (the offset is size-independent, so it must survive growth and division). One
+    solve was not enough -- it left gamma=0 at x0.80 -- so it iterates against the relaxed shape.
+    7 of 9 sweep settings now hold to within 1.5%; kappa_s=0.6 and gamma=0 still drift and are
+    RECORDED, not silenced.
+
+    Invisible for the whole campaign because the healthy-looking runs loaded a pre-relaxed
+    checkpoint (round_40_mc8 starts at radius 6.14) instead of seeding. The two quarantined runs
+    that did seed with this implementation, r01_00_bd318e and r01_01_d1076f, have no diag.json.
+
+D5a chemistry integrated with the mechanics dt. cell_react and cell_diffuse EMIT=velocity into
+    `chem`, so 300 frames bought 6 units of Gray-Scott time against the ~500 the validated minisite
+    spec needs. Every "no pattern formed" reading was an artefact of the clock. Both are now scaled
+    by 1/dt, leaving their ratio -- which selects the Turing wavelength -- untouched.
+
+D5b the growth ceiling sat below the division trigger: vth_frac*v_ref = 1.5 against factor*Vbirth
+    = 2.0. Volume-triggered division was arithmetically impossible; every division ever seen came
+    from the max_cycle timeout. The ceiling is now derived from the trigger.
+
+Also: grow_after=100 turns out to be a workaround for D1 -- a window to let the shell settle before
+growth. It survives as a pattern-formation window, which is a legitimate reason.
+
+VERIFIED. log/okuda cleared, battery relaunched at 500 frames, 12 specs, 2 GPUs x 3.
+  p1_ko_morphogen_growth_3d (no growth)  static baseline: folded 0, shape_idx pinned 3.76,
+                                         area_cv flat 0.15 -- the ball holds its size.
+  p1_ko_divide_3d (growth, no division)  the ball GROWS, a Turing pattern forms (act 0.465 vs the
+                                         minisite's 0.43), the shell buckles: folded 0 -> 145 ->
+                                         heals to 17, shape_idx crosses 3.81 (Bi rigidity
+                                         transition), area_cv 0.16 -> 0.04. broken_n 0 throughout.
+
+METHOD NOTE (Cedric). All three defects are "does this operator do what its name says", and all
+three were found by a human looking at a picture. This is the fourth time. The parameter-stability
+map I built by hand while fixing D1 is exactly what the loop should be producing on its own -- it
+goes in as a Phase 1 operator sweep result, not as constants I picked.

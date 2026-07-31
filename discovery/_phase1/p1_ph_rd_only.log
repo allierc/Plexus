@@ -1,23 +1,13 @@
-[p1_ph_rd_only] comp=Ca3c659380f8 region='growth-driven monolayer (Okuda route)' frames=300 dt=0.02 device=cuda:1
-[engine] 300 sim frames -> recording 301 set frames (stride 1), fields every 2 steps (<= 256)
-[engine] === p1_ph_rd_only ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=300
+[p1_ph_rd_only] comp=Ca3c659380f8 region='growth-driven monolayer (Okuda route)' frames=500 dt=0.02 device=cuda:1
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_ph_rd_only ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=500
 [engine] sets:      vertex(30000)  cell(16000)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
-[p1_ph_rd_only] evidence horizon at frame 23: peak/final taken over the first 24 of 301 frames
 [p1_ph_rd_only] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
-[p1_ph_rd_only] {"saturated": false, "inert_operators": [], "retention": 1.0, "valid_evidence": true, "protr_final": 1.02, "protr_peak": 1.02, "horizon_frame": 23, "horizon_why": "last frame with broken_n < 1 was 23; damage from there never recovers (reaching 36). First damage anywhere: frame 30.", "first_damage_frame": 30, "valid_frac": 0.077, "protr_peak_untruncated": 1.146, "protr_final_untruncated": 1.138, "n_cells_final": 500, "red_frac_final": 0.07, "act_max_final": 0.499, "frames": 301, "wall_s": 88.4, "ta_hollow_n_peak": 109, "ta_hollow_n_final": 80, "ta_area_cv_final": 1.117, "ta_vol_cv_final": 1.133, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.138, "ta_red_frac_final": 0.07, "ta_tip_act_final": -0.023, "mech_force_mean": 6.5542, "mech_p_body": 12.3918, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": -5.1191, "mech_migration": 0.17273}
-[p1_ph_rd_only] D4 ok: all 11 scheduled operators acted ({'seed_mesh_3d': 1, 'morphogen_growth_3d': 1, 'cell_adjacency': 31} ...)
-[p1_ph_rd_only] camera: FIXED Lbox=5.280 for all 301 frames and both views (per-frame autofit would have run 5.280 -> 1.000, x0.19: that rescaling is what hid growth)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
-[p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
+[p1_ph_rd_only] {"saturated": false, "inert_operators": [], "retention": 1.0, "valid_evidence": true, "protr_final": 1.066, "protr_peak": 1.066, "horizon_frame": 500, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.066, "protr_final_untruncated": 1.066, "n_cells_final": 500, "red_frac_final": 0.07, "act_max_final": 0.465, "frames": 501, "wall_s": 134.3, "ta_hollow_n_peak": 0, "ta_hollow_n_final": 0, "ta_area_cv_final": 0.152, "ta_vol_cv_final": 0.164, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.061, "ta_red_frac_final": 0.07, "ta_tip_act_final": 0.008, "mech_force_mean": 2.5833, "mech_p_body": 1.433, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 0.1364, "mech_migration": 0.01681}
+[p1_ph_rd_only] D4 ok: all 11 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 1, 'morphogen_growth_3d': 1} ...)
+[p1_ph_rd_only] camera: FIXED Lbox=5.927 for all 501 frames and both views (per-frame autofit would have run 5.605 -> 5.926, x1.06: that rescaling is what hid growth)
 [p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
 [p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
 [p1_ph_rd_only] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)

@@ -1,14 +1,13 @@
-[p1_ko_divide_3d] comp=C3efe390b691 region='growth-driven monolayer (Okuda route)' frames=300 dt=0.02 device=cuda:1
-[engine] 300 sim frames -> recording 301 set frames (stride 1), fields every 2 steps (<= 256)
-[engine] === p1_ko_divide_3d ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=300
+[p1_ko_divide_3d] comp=C3efe390b691 region='growth-driven monolayer (Okuda route)' frames=500 dt=0.02 device=cuda:1
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === p1_ko_divide_3d ===  dim=3  world=[80, 80, 80]  boundary=free  dt=0.02  frames=500
 [engine] sets:      vertex(30000)  cell(16000)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react   mechanics: shape_energy_3d
-[p1_ko_divide_3d] evidence horizon at frame 23: peak/final taken over the first 24 of 301 frames
 [p1_ko_divide_3d] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
-[p1_ko_divide_3d] {"saturated": false, "inert_operators": [], "retention": 1.0, "valid_evidence": true, "protr_final": 1.02, "protr_peak": 1.02, "horizon_frame": 23, "horizon_why": "last frame with broken_n < 1 was 23; damage from there never recovers (reaching 31). First damage anywhere: frame 30.", "first_damage_frame": 30, "valid_frac": 0.077, "protr_peak_untruncated": 1.146, "protr_final_untruncated": 1.142, "n_cells_final": 500, "red_frac_final": 0.07, "act_max_final": 0.499, "frames": 301, "wall_s": 95.2, "ta_hollow_n_peak": 109, "ta_hollow_n_final": 87, "ta_area_cv_final": 1.084, "ta_vol_cv_final": 1.127, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.137, "ta_red_frac_final": 0.07, "ta_tip_act_final": -0.029, "mech_force_mean": 7.47, "mech_p_body": 18.5963, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": -5.998, "mech_migration": 0.17241}
-[p1_ko_divide_3d] D4 ok: all 10 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 22, 'morphogen_growth_3d': 61} ...)
-[p1_ko_divide_3d] camera: FIXED Lbox=5.280 for all 301 frames and both views (per-frame autofit would have run 5.280 -> 1.016, x0.19: that rescaling is what hid growth)
+[p1_ko_divide_3d] {"saturated": false, "inert_operators": [], "retention": 0.933, "valid_evidence": true, "protr_final": 1.101, "protr_peak": 1.179, "horizon_frame": 500, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.179, "protr_final_untruncated": 1.101, "n_cells_final": 500, "red_frac_final": 0.07, "act_max_final": 0.468, "frames": 501, "wall_s": 168.2, "ta_hollow_n_peak": 157, "ta_hollow_n_final": 17, "ta_area_cv_final": 0.042, "ta_vol_cv_final": 0.199, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.095, "ta_red_frac_final": 0.07, "ta_tip_act_final": 0.031, "mech_force_mean": 20.2173, "mech_p_body": 15.828, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 1.7866, "mech_migration": 0.15741}
+[p1_ko_divide_3d] D4 ok: all 10 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_adjacency': 1, 'morphogen_growth_3d': 117} ...)
+[p1_ko_divide_3d] camera: FIXED Lbox=9.493 for all 501 frames and both views (per-frame autofit would have run 5.605 -> 9.493, x1.69: that rescaling is what hid growth)
 [p1_ko_divide_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
 [p1_ko_divide_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
 [p1_ko_divide_3d] no per-cell age recorded -- movie drawn WITHOUT the divided colour (older run, or topo_snapshot predates it)
