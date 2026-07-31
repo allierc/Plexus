@@ -104,7 +104,7 @@ INNER = 0.82                                                    # basal radius f
 
 
 def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
-          divided=None, broken=None, wall_shade=1.0):
+          divided=None, broken=None, wall_shade=1.0, classes=None):
     """3D monolayer: each cell is a prism -- an apical face (outer), a basal face (inner), and lateral
     walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white).
 
@@ -142,9 +142,17 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
     cmap = plt.cm.Reds
     C_DIVIDED = (0.16, 0.78, 0.36, 1.0)                         # green  -- just divided, benign
     C_BROKEN = (1.00, 0.10, 0.85, 1.0)                          # magenta -- not a cell any more
+    # STRUCTURAL CLASS, an alternative colouring (`classes=` overrides the activator LUT).
+    # Chosen not to collide with anything already meaningful: the activator ramp is white->red,
+    # green is "just divided", magenta is "broken". These three are none of those.
+    C_CLASS = {0: (0.22, 0.38, 0.75, 1.0),                      # body   -- blue
+               1: (0.95, 0.65, 0.15, 1.0),                      # branch -- amber
+               2: (0.98, 0.92, 0.25, 1.0),                      # tip    -- yellow
+               -1: (0.35, 0.35, 0.35, 1.0)}                     # dead slot (should never show)
     faces3d, cols = [], []
     for f, ap in enumerate(polys):
-        base = cmap(float(np.clip(act[f], 0.0, 1.0)))
+        base = (C_CLASS.get(int(classes[f]), C_CLASS[-1]) if classes is not None and f < len(classes)
+                else cmap(float(np.clip(act[f], 0.0, 1.0))))
         if divided is not None and f < len(divided) and divided[f]:
             base = C_DIVIDED
         if broken is not None and f < len(broken) and broken[f]:
