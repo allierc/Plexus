@@ -236,11 +236,29 @@ class Certification:
         return rec
 
     def may_admit(self):
+        """Admission = the stored certification AND the LIVE instrument-gate verdict.
+
+        `admission.json` cached `instrument_gate: true`, and `certify()` is only ever called with
+        that value hard-coded in a smoke test -- so the boolean was frozen the day it was written.
+        The instrument gate has since gone to NOT CERTIFIED (its blob and sphere controls are
+        invalid runs) and the campaign would still have admitted evidence, because nothing
+        re-read it. A gate whose verdict is cached is not a gate. Read the file the gate writes.
+        """
         if not os.path.exists(self.gate_path):
             return False, "not certified -- the Metrologist has not run"
         rec = json.load(open(self.gate_path))
-        return bool(rec.get("admit")), json.dumps(
-            {k: v for k, v in rec.items() if k != "t"})
+        ok = bool(rec.get("admit"))
+        ig = os.path.join(os.path.dirname(self.gate_path), "instrument_gate.json")
+        if os.path.exists(ig):
+            live = json.load(open(ig))
+            rec = dict(rec, instrument_gate_live=bool(live.get("passed")),
+                       instrument_gate_why=live.get("why", ""))
+            ok = ok and bool(live.get("passed"))
+        else:
+            rec = dict(rec, instrument_gate_live=None,
+                       instrument_gate_why="instrument_gate.json absent -- never scored")
+            ok = False
+        return ok, json.dumps({k: v for k, v in rec.items() if k != "t"})
 
 
 # ============================================================================ smoke

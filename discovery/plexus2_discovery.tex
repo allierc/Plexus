@@ -1,1320 +1,400 @@
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath,amssymb}
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
 \usepackage{booktabs}
-\usepackage{multirow}
-\usepackage{ifthen}
+\usepackage{array}
 \usepackage{xcolor}
-\usepackage{graphicx}
-\usepackage{parskip}
-\usepackage{listings}
-\usepackage{tikz}
-\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc,shapes.geometric}
-\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage[hidelinks]{hyperref}
 
-\definecolor{cset}{RGB}{31,119,180}
-\definecolor{cfield}{RGB}{44,160,44}
-\definecolor{cop}{RGB}{214,39,40}
-\definecolor{cgray}{RGB}{120,120,120}
-\definecolor{cwarn}{RGB}{181,133,47}
+\definecolor{good}{HTML}{1B7F3B}
+\definecolor{warn}{HTML}{B26B00}
+\definecolor{bad}{HTML}{B3261E}
+\definecolor{grey}{HTML}{666666}
+\definecolor{rule}{HTML}{2B4C7E}
 
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\op}[1]{\textcolor{cop}{\texttt{#1}}}
-\lstset{basicstyle=\ttfamily\footnotesize, breaklines=true, frame=none,
-        columns=fullflexible, keepspaces=true, showstringspaces=false}
+\newcommand{\done}{\textcolor{good}{\textbf{DONE}}}
+\newcommand{\prog}{\textcolor{warn}{\textbf{IN PROGRESS}}}
+\newcommand{\todo}{\textcolor{grey}{\textbf{NOT STARTED}}}
+\newcommand{\solid}{\textcolor{good}{\textbf{solid}}}
+\newcommand{\weak}{\textcolor{warn}{\textbf{weak}}}
+\newcommand{\unsup}{\textcolor{bad}{\textbf{unsupported}}}
 
-\title{\textbf{Plexus Discovery}\\[4pt]
-\large A specification for an autonomous mechanism-search campaign\\
-\large on Okuda tubulation}
-\author{Janelia Research Campus}
-\date{\today}
+\titleformat{\section}{\large\bfseries\color{rule}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\setlist[itemize]{leftmargin=1.1em,itemsep=2pt,topsep=3pt}
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.25}
+
+\newtcolorbox{phasebox}[1]{colback=white,colframe=rule!55,boxrule=0.7pt,
+  arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
+  fonttitle=\color{white},colbacktitle=rule}
+
+\title{\textbf{Plexus Discovery}\\[6pt]
+\large Progress note --- written to be read, not decoded}
+\author{}
+\date{31 July 2026}
 
 \begin{document}
 \maketitle
+\vspace{-2.2\baselineskip}
 
-\begin{abstract}
-\noindent
-This is a build specification, not an essay. It defines an agentic loop that searches for the
-\emph{mechanism} behind a morphogenetic phenotype --- as a composition of Plexus operators --- and
-that is designed to run unattended on a GPU partition for weeks without descending into the
-failure mode that consumed our last forty-four rounds.
+\begin{center}\small\color{grey}
+Plain English throughout. Organised by phase, because phases are where we stop and you decide.\\
+The technical specification is preserved separately in \texttt{plexus2\_technical.pdf}.
+\end{center}
 
-The target system is Okuda tubulation: a closed epithelial shell that grows a tube. We already
-make a tube; we make it \emph{by the wrong mechanism}, and we know this because relaxing our
-tube toward mechanical equilibrium destroys it (\S\ref{sec:question}). That gives the campaign a
-sharp, falsifiable objective rather than a resemblance target.
+\vspace{4pt}
+\hrule
+\vspace{10pt}
 
-Section~\ref{sec:have} states what machinery already exists and transfers. Section~\ref{sec:space}
-defines the Okuda composition space concretely --- operators, ports, stages, legal edits.
-Section~\ref{sec:rabbit} diagnoses why searches like ours go into rabbit holes, from our own
-record with numbers. Section~\ref{sec:control} is the core of the document: an explicit control
-law with a batch--triage--truncate--starve--freeze--terminate cycle, so that budget is
-\emph{taken away} from unproductive branches automatically. Section~\ref{sec:agents} assigns the
-work to agents, borrowing orchestration from two multi-agent systems published together in
-\emph{Nature} in July 2026 while deliberately diverging from their adjudication.
-Sections~\ref{sec:out}--\ref{sec:diff} define the artefacts, including the causal descriptions
-and the trigger that hands a problem to the differentiable fit. Section~\ref{sec:defects} is a
-pre-flight checklist of eleven defects that must be closed first --- five of them found while
-writing this document.
-\end{abstract}
+%======================================================================
+\section{What we are doing --- two things at once}
 
-\tableofcontents
+\textbf{Track A --- build the method.} An automated loop that searches for biological
+\emph{mechanisms} rather than parameter values. It proposes a change to the model's structure
+(``remove the pushing force'', ``add oriented cell division''), writes down what it expects
+\emph{before} running, runs the simulation, measures, and records whether it was right. The
+discipline that makes it worth building: a change of numbers can never masquerade as a new idea.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{The question the campaign answers}
-\label{sec:question}
+\textbf{Track B --- reproduce Okuda's result, as the proof that Track A works.} Okuda et al.\
+(2018) grew a hollow ball of cells that spontaneously forms tubes, undulations and branches,
+driven by a chemical pattern on its own surface. We are rebuilding that here. If the loop finds
+the mechanism largely by itself, the method is demonstrated. \emph{The figure is not a side quest
+--- it is the evidence.}
 
-\subsection{Not ``can we make a tube''}
+The two tracks feed each other: the reproduction is the honest test of the method, and the method
+is what makes the reproduction more than hand-tuning.
 
-We can. A tip-tracking activation driver on a growing, dividing vesicle produces a long, thin,
-constant-diameter tube with a length-to-diameter ratio above four, and its diameter tracks the
-morphogen diffusion coefficient --- a qualitative reproduction of the published law. That
-question is closed.
+%======================================================================
+\section{Where we actually are}
 
-\subsection{The question is which mechanism holds it open}
+Track A is further along than Track B, and until this morning I was over-reporting both.
 
-Round 41 of that campaign asked what happens if the tissue is pushed toward the published
-\emph{regime} --- Okuda's model is explicitly quasi-static, relaxing to force balance between
-growth events. The answer was decisive:
+An independent review this morning found that \textbf{three of the measurements the loop relies on
+are broken}, and you have since found a fourth. Not the simulations --- the \emph{rulers}. A large part of what I reported over the
+last two days was measured with faulty instruments and does not currently stand up.
 
-\begin{quote}
-\textbf{Relaxation destroys our tube.} More relaxation collapses it back toward a sphere. Our
-tube is held open by an explicit outward force; remove the force and the shape energy pulls it
-in. The published tube is an \emph{equilibrium} shape produced by localised proliferation.
-\end{quote}
+\begin{tcolorbox}[colback=bad!4,colframe=bad!55,boxrule=0.7pt,arc=2pt]
+\textbf{The clearest example, and why you were right to stop me.}
 
-The mechanical signature agrees: force and pressure are concentrated entirely in the protrusion,
-the body is idle, and division and migration pile up at the same tip. That is what a forced
-protrusion looks like. A grown one shares load with the body.
+I ran 32 simulations overnight, sweeping five settings, and reported a strong conclusion:
+\emph{``making the chemistry shape the tissue and keeping the tissue intact are mutually
+exclusive.''}
 
-So two mechanisms produce the same picture, and the picture is exactly what cannot tell them
-apart. This is the general statement of why parameter search cannot find a mechanism, and it is
-stronger than the usual one: \emph{the search optimises resemblance, and resemblance is the
-quantity blind to the distinction that matters.}
+Every one of those 32 runs ended with exactly \textbf{1778 cells}. I noticed that, wrote it down,
+and called it ``remarkable''. I never asked the obvious question: \emph{why is it identical every
+time?}
 
-\subsection{The campaign objective: a causal lever-map, not a target}
+The answer is arithmetic. The memory buffer for the mesh holds 3552 points, and the geometry of a
+closed cell sheet fixes the largest possible number of cells at $(3552+4)/2 = 1778$. \textbf{Every
+run hit the wall and stopped.} I was not measuring biology. I was measuring the size of an array.
 
-An earlier draft of this note stated the objective as one question --- \emph{produce a sustained
-tube as a growth-driven quasi-static equilibrium}. That framing is wrong, and the throughput
-arithmetic of \S\ref{sec:weeks} is what exposed it: with a single target the search
-\emph{converges}, freezes every cluster within days, and stops, having established one fact.
-It also wastes most of its own evidence, because a composition that does not make a tube teaches
-nothing about tubes.
+That conclusion is now marked \unsup. It may still turn out to be true --- but it is not measured,
+and I presented it as if it were.
+\end{tcolorbox}
 
-The objective is the one plexus2's Loop~I already names:
-
-\begin{quote}\itshape
-Build the CAUSAL LEVER-MAP of the mechanism space: for every operator, every implementation and
-every routing, what does it do \emph{alone}, and what does it do \emph{in combination} --- since
-mixtures rarely surrender their causal structure to inspection.
-\end{quote}
-
-The product is a map, not a winner. Specific questions become \textbf{queries against it}:
+%======================================================================
+\section{What we believe, and how confident}
 
 \begin{center}\small
-\begin{tabular}{@{}p{3.2cm}p{10.8cm}@{}}
+\begin{tabular}{@{}p{7.6cm} l p{5.6cm}@{}}
 \toprule
-\textbf{query} & \textbf{answered once the relevant cells are covered} \\
+\textbf{Claim} & \textbf{Status} & \textbf{Why}\\
 \midrule
-sustained tube & a tube that survives relaxation, \emph{without} the extrusion forcing node \\
-phase diagram & Okuda's four $(\chi,\gamma)$ morphologies --- thin tube, thick tube, undulation,
-branching --- from \emph{one} composition \\
-necessity & for each observed phenotype, which operators are load-bearing \\
-impossibility & which composition families provably cannot reach a phenotype \\
+The chemistry in the two front-page website movies does nothing to the shape
+& \solid
+& Arithmetic. The switch that lets chemistry drive growth is set to 50; the chemical only reaches
+about 0.4. It never fires. The two movies are one simulation in two colour schemes.\\
+
+Okuda's published settings are not reachable in our system today
+& \solid
+& Three of his values sit outside the ranges our search may use (\S\ref{sec:okuda}).\\
+
+We can still regenerate the website movies from their recipes
+& \weak
+& They agree --- but old and new runs both stopped at the same 1778 ceiling, so the agreement
+means less than it appeared to.\\
+
+Our tube is ``forced'' rather than ``grown''
+& \unsup
+& The test for this was measuring the wrong thing entirely (\S\ref{sec:rulers}).\\
+
+Chemistry-driven shaping destroys the cell sheet
+& \unsup
+& The 1778 problem. Needs re-running with a larger buffer --- that is Phase~1.\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{The cells of the map, and coverage as progress}
+%======================================================================
+\section{The four broken rulers}\label{sec:rulers}
 
-\begin{center}\small
-\begin{tabular}{@{}p{2.2cm}p{11.8cm}@{}}
-\toprule
-\textbf{Solo} & for each operator and each structural implementation, its effect alone \\
-\textbf{Pair} & for each pair, is the joint effect what the two solo effects predict
-(\emph{additive}), or not? \textbf{Interactions are the expensive knowledge} --- they are
-precisely what cannot be read off the code \\
-\textbf{Routing} & morphogen $\to$ growth.\code{gate} vs $\to$ divide.\code{axis} vs $\to$
-extrude.\code{site}: same operators, different mechanism \\
-\textbf{Necessity} & for each observed phenotype, which ablations destroy it \\
-\textbf{Phenotype} & which regions produce which morphology --- labels \emph{discovered} by the
-analysts, never declared in advance \\
-\bottomrule
-\end{tabular}
-\end{center}
+All four are \emph{measurement} faults. The physics may be fine; we simply could not see it.
+The fourth is the camera, and you spotted it by looking at the movies --- it is the ruler the
+automatic eye-check reads, and it is broken in two independent ways.
 
-Progress is then \textbf{coverage}: the fraction of cells carrying enough evidence to state a
-verdict. Every run fills a cell, so no run is wasted, and the campaign has a natural extent ---
-it runs until the levers are characterised. That is a weeks-scale programme rather than a
-days-scale search, and it is what makes the multi-week campaign coherent rather than merely
-long.
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{The ``does the shape survive?'' test was measuring a fresh sphere.}
+The intent: grow the tube, switch off growth and pushing, let it relax, see what survives. A real
+tube survives; an artificially forced one collapses. The code was meant to continue from the end of
+the run --- instead it started a brand-new simulation from the initial sphere, and so measured the
+starting condition every time. It returned essentially the same value (1.014) in 14 of 16 runs.
+\textbf{That value carries full weight in the score that ranks every experiment.}
+\emph{Not yet fixed --- the one open item in Phase~0.}
 
-Two subordinate questions inherit from the record and enter the map as ordinary open cells
-rather than as blockers: whether patterning can be \emph{emergent} (a late round concluded the
-activator--inhibitor system floods the growing domain and cannot maintain a tip-riding peak ---
-an impossibility claim made \emph{before} the precondition checks existed, so it re-enters as
-\textbf{Open}), and whether per-cell three-dimensional volume changes the answer (the monolayer
-implementation, whose first wiring spiked because division still triggered on the wedge volume
-rather than $A\!\cdot\!h$).
+\item \textbf{Two different quantities were both called ``how far it sticks out''.}
+One measured distance from the centre \emph{of the tissue}; the other from the \emph{origin of the
+coordinate system}. The ball drifts sideways as it grows, so the second reads drift as elongation.
+\emph{Fixed this morning.}
 
-\subsection{The metric that makes the objective measurable}
+\item \textbf{A safety check existed, but not where the danger was.}
+We once chased a phantom result for days, caused by pairing mismatched frames. A guard was written
+to catch it. My overnight study used exactly the pattern that guard forbids, in three places, and
+never called the guard. \emph{Fixed this morning.}
 
-The objective above is useless without an observable that separates a forced tube from a grown
-one. No metric in the existing bank does. We therefore define one, and it is cheap:
-
-\paragraph{The quasi-static test.} Take a run's final state; continue the simulation with
-\emph{growth and any driver switched off} and only mechanics and reconnection active; measure
-what fraction of the protrusion survives.
-\[
-Q \;=\; \frac{\text{aspect after relaxation}}{\text{aspect before relaxation}} .
-\]
-A forced tube collapses ($Q \to 0$). An equilibrium tube persists ($Q \to 1$). Alongside it we
-record the pressure ratio between tube and body, which should approach unity for a grown tube and
-is presently around three.
-
-$Q$ is the campaign's primary discriminator. It is defined before the search starts, it is
-falsifiable, and it is the direct operationalisation of the round-41 finding. Authoring it is an
-instance of the discipline this whole document is built around: \emph{when the eye sees a
-distinction no number captures, the missing number is the deliverable.}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{What already exists and transfers}
-\label{sec:have}
-
-A working three-loop discovery system exists --- roughly 1{,}100 lines --- and has run unattended
-for six rounds on embryonic gland branching, producing 1{,}216 archived runs and one conclusion
-that a later, better measurement overturned. It is the substrate for this campaign. This section
-records what transfers unchanged, what must be replaced, and what must be added.
-
-\subsection{Transfers unchanged --- the three structural guarantees}
-
-\paragraph{1. A composition is a typed graph, and its identity excludes parameters.}
-A candidate mechanism is operator nodes plus typed connections between output ports and input
-slots. A morphogen may be routed to a cleft \code{source}, a growth \code{gate}, a chemotaxis
-\code{field} or an anisotropy \code{axis} --- four \emph{different mechanisms}, not four settings.
-Identity is a hash of the structure only:
-
-\begin{lstlisting}
-def comp_hash(composition):
-    # operators + typed connections ONLY -- no parameter values, no seed
-\end{lstlisting}
-
-Therefore \textbf{a change of numbers provably cannot register as a new hypothesis}. This single
-line is the structural fix for what happened over rounds 1--30, and it is why the campaign can be
-trusted to count its own progress honestly.
-
-\paragraph{2. Evidence and interpretation are separate objects.}
-The rule is enforced in code, not in prose:
-\[
-\text{simulation} \;\longrightarrow\; \text{RunRecord} \;\longrightarrow\; \text{knowledge}
-\qquad \text{(never simulation}\longrightarrow\text{knowledge).}
-\]
-A \code{RunRecord} carries the raw facts of one simulation --- composition, parameters, seed,
-backend, initial condition, parent, and the single edit that produced it --- and is
-\emph{immutable}: assigning to a raw fact raises. Measurements attach as \emph{versioned,
-append-only} analyses, so \code{metric\_v2} sits beside \code{metric\_v1} and neither is lost. The
-archive is append-only, and run identity is a content hash of exactly the reproducible inputs, so
-a crashed campaign resumes without duplicating or losing evidence.
-
-This is what let a new observable, in the gland campaign, \textbf{re-score archived runs and
-change a mechanistic conclusion without re-simulating anything}. It is the most valuable property
-the system has.
-
-\paragraph{3. One legal edit at a time, stage-gated.}
-Four moves exist --- add, remove, connect, disconnect --- each returning a new graph together with
-the edit that produced it. Every run records its parent and its mutation, so the archive is a
-causal tree, not a bag of configurations. Stage gating keeps the legal move set small and
-interpretable rather than an enumeration of $2^N$ subsets.
-
-\subsection{Must be replaced}
-
-\begin{center}\small
-\begin{tabular}{@{}p{4.6cm}p{9.9cm}@{}}
-\toprule
-\textbf{Component} & \textbf{Why it must change} \\
-\midrule
-Operator vocabulary & The existing one is phase-field gland vocabulary. Okuda needs its own
-(\S\ref{sec:space}). \\
-Frontier expansion & Breadth-first with a node cap, spending budget evenly on good and hopeless
-branches. Replaced by the control law of \S\ref{sec:control}. \\
-Trajectory storage & Only the final frame is persisted. Fatal here: every decisive observable in
-the tube record is temporal. \\
-Verdict thresholds & Hard-coded constants on a four-sample estimate. Replaced by explicit,
-recorded, interval-based promotion rules. \\
-Impossibility reasoning & Currently an \code{if/elif} chain that guesses a reason from absent
-operators. Replaced by an earned claim (\S\ref{sec:defects}, defect~8). \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Must be added}
-
-The supervisor, the cheap-tier triage, the proximity starvation rule, the watcher, the causal
-interpreter, and the artefact pipeline --- all specified below.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{The Okuda composition space}
-\label{sec:space}
-
-The space is defined by an operator vocabulary with typed ports, a stage gate, and a seed. All
-operators below are already registered and exercised; none is hypothetical.
-
-\subsection{Vocabulary}
-
-\begin{center}\small
-\begin{tabular}{@{}llll@{}}
-\toprule
-\textbf{Stage} & \textbf{Operator} & \textbf{Kind} & \textbf{Ports} \\
-\midrule
-\multirow{3}{*}{1 --- substrate}
- & \op{seed\_mesh\_3d} / \op{load\_mesh\_3d} & structural & --- \\
- & \op{shape\_energy\_3d} \emph{(default $\mid$ monolayer)} & lateral & \code{a0} slot \\
- & \op{reconnect\_t1\_3d} & rewire & --- \\
-\midrule
-\multirow{4}{*}{2 --- growth \& topology}
- & \op{vesicle\_growth} & structural & --- \\
- & \op{morphogen\_growth\_3d} \emph{(conserve\_amount)} & structural & \code{gate} $\leftarrow$ morphogen \\
- & \op{divide\_3d} \emph{(hertwig $\mid$ orient\_iface)} & structural & \code{axis} $\leftarrow$ morphogen \\
- & \op{extrude} \emph{(the forcing term)} & lateral & \code{site} $\leftarrow$ morphogen \\
-\midrule
-\multirow{5}{*}{3 --- patterning \& feedback}
- & \op{cell\_geometry\_3d} & aggregate & $\rightarrow$ geometry \\
- & \op{cell\_adjacency} & rewire & $\rightarrow$ adjacency \\
- & \op{cell\_diffuse} & lateral & needs adjacency \\
- & \op{cell\_react} \emph{(gray\_scott $\mid$ gierer\_meinhardt $\mid$ brusselator)} & lateral & $\rightarrow$ morphogen \\
- & \op{cell\_rd\_seed} \emph{(cone $\mid$ tip $\mid$ spot $\mid$ none)} & structural & $\rightarrow$ morphogen \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Two design choices in that table are load-bearing.
-
-\paragraph{Extrusion is an operator node, not a parameter.}
-The whole round-41 finding is ``ablate the forcing and the tube collapses''. If the forcing lives
-inside a configuration file it can only be turned down; if it is a node in the graph, the
-necessity test \textbf{ablates it automatically}, on every composition, as part of the standard
-protocol. The campaign's central question thereby becomes a routine measurement rather than a
-special experiment.
-
-\paragraph{Three reaction kinetics are three implementations of one contract.}
-\op{cell\_react} already resolves to \code{gray\_scott}, \code{gierer\_meinhardt} and
-\code{brusselator}. Swapping them is an implementation choice under a single biological contract,
-which is what the language claims and here is simply true. The search can therefore ask ``which
-kinetics'' without changing the composition's identity, and ask ``with or without reaction at
-all'' as a genuine structural edit.
-
-\subsection{Seed and legal edits}
-
-The seed is Stage 1 only: a mesh, a shape energy, and reconnection --- a relaxing vesicle that
-does nothing. Every subsequent mechanism is reached by one legal edit. Crucially the search
-visits the degenerate corners on the way (growth with no patterning, patterning with no growth,
-mechanics alone), and those are where impossibility results come from.
-
-\subsection{Phenotype and the metric bank}
-
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Quantity} & \textbf{Reads} & \textbf{Answers} \\
-\midrule
-\code{aspect}, \code{tube\_len}, \code{n\_tubes} & shape & is there a tube? \\
-\textbf{\code{Q} (quasi-static)} & shape after driver-off relaxation & \textbf{is it grown or forced?} \\
-\code{p\_tube/p\_body} & differentiable stress field & is load shared? \\
-\code{hollow} (tube-aware), \code{area\_CV} & mesh integrity, uniformity & is the wall real? \\
-\code{red\_frac}, \code{tip\_act} & activator confinement, activator--radius correlation & does patterning ride the tip? \\
-\code{n\_cells}, \code{shape\_index} & proliferation, cell rounding & is it well-formed? \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Each is computed \emph{per frame}, not only at the end --- see defect~7.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Why searches like ours go into rabbit holes}
-\label{sec:rabbit}
-
-Every defect in \S\ref{sec:defects} is fixable in days. The harder problem is that a search can be
-free of bugs and still waste months. Our own record supplies the diagnosis, and the pathology has
-five separable components --- worth separating because each needs a different countermeasure.
-
-\begin{enumerate}\itemsep3pt
-\item \textbf{Depth-first drift.} Three separate rounds tested, in substance, ``the same thing but
-more'': run longer, activate a bigger patch, make the wall thicker. All three were falsified. Each
-was a locally reasonable next step from the configuration in front of us. None was a new
-hypothesis. A search that always expands its current best node does this forever.
-
-\item \textbf{No terminal-state rule.} Nothing ever said ``this branch is finished''. Rounds
-continued because there was always another knob. Stopping was a human losing patience, which is
-not a criterion.
-
-\item \textbf{Near-duplicate proliferation.} Thirty rounds explored perhaps four genuinely
-distinct ideas. Without a distance between hypotheses, twenty variants of one idea consume twenty
-times the budget of one idea --- and their collective failure is then misread as strong evidence
-against the idea, rather than as one observation repeated.
-
-\item \textbf{The eye and the number disagreeing, undetected.} Two of the most confident
-intermediate conclusions were measurement artefacts: a ``97\% of cells inverted'' result produced
-by pairing each frame's coordinates with a different frame's connectivity, and a ``101 chemical
-spots'' count where the eye saw three, because the threshold sat inside the noise. Both were
-caught by looking at a picture. Neither by a number. In a supervised session a human notices; in
-an unattended campaign nobody does.
-
-\item \textbf{The human as sole goal-holder.} An agent elaborates whatever is in front of it and
-cannot detect its own drift. Every course correction on record --- ``we are meant to be testing
-the growth-driven mechanism, not tuning this extrusion'' --- came from outside the loop.
+\item \textbf{The camera hides the thing we are looking for, and hides growth entirely.}
+\emph{(Your observation, confirmed in the code.)} Two separate faults, both in the movie every
+automatic eye-check reads:
+\begin{itemize}
+\item \textbf{One fixed viewpoint.} The campaign's movies are drawn from a single angle that never
+moves. A tube growing away from that angle sits \emph{behind the body} and is simply not in the
+picture. There is no second view --- no top-down --- to catch it.
+\item \textbf{The zoom follows the object.} The frame is re-fitted to the tissue on \emph{every
+frame}, so a ball that doubles in size is drawn the same size throughout. \textbf{Growth is
+invisible by construction.} Nothing that watches these movies --- human or machine --- can see the
+thing the whole campaign is about.
+\end{itemize}
+Okuda's figures use a fixed frame and a consistent viewpoint, which is exactly why they read
+clearly. \emph{Not fixed --- now part of Phase~0, because it is an instrument, not a nicety.}
 \end{enumerate}
 
-The rest of this document is, in effect, five countermeasures.
+%======================================================================
+\section{What is genuinely working}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{The control law}
-\label{sec:control}
+The corrections should not hide the parts that earned their keep.
 
-This is the core of the specification. The governing idea is that budget must be \emph{removed}
-from unproductive branches automatically, because no one will be watching.
-
-\subsection{One round}
-
-\begin{center}
-\begin{tikzpicture}[
-  b/.style={rounded corners=2pt, draw=cgray, fill=cgray!6, align=center, font=\scriptsize,
-            minimum height=0.85cm, inner sep=4pt, text width=1.85cm},
-  ar/.style={-{Stealth[length=4pt]}, draw=cgray, line width=0.7pt}]
-\node[b,draw=cset,fill=cset!8] (p) at (0,0)    {\textbf{propose}\\$B$ candidates};
-\node[b] (c) at (2.5,0)  {\textbf{critic}\\type + precond};
-\node[b] (t1) at (5.0,0) {\textbf{tier 1}\\cheap smoke};
-\node[b] (r) at (7.5,0)  {\textbf{tier 2}\\full run (L4)};
-\node[b,draw=cwarn,fill=cwarn!10] (k) at (10.0,0) {\textbf{rank +}\\\textbf{truncate}};
-\node[b,draw=cop,fill=cop!8] (f) at (12.5,0) {\textbf{cluster}\\starve/freeze};
-\draw[ar] (p)--(c); \draw[ar] (c)--(t1); \draw[ar] (t1)--(r); \draw[ar] (r)--(k); \draw[ar] (k)--(f);
-\draw[ar] (f) to[out=-90,in=-90] node[below,font=\scriptsize,text=cgray]
-   {budget reallocated; losers dropped, never refined} (p);
-\end{tikzpicture}
-\end{center}
-
-\begin{center}\small
-\begin{tabular}{@{}llp{7.6cm}@{}}
-\toprule
-\textbf{Stage} & \textbf{Keeps} & \textbf{Rule} \\
-\midrule
-Propose  & $B=24$ & One legal edit each, drawn across \emph{distinct} clusters, not all from the
-current best. \\
-Critic   & --- & Free rejection: ill-typed edit, unmet precondition, structural hash already
-evaluated. No simulation. \\
-Tier 1   & $8$ & Small mesh, short horizon, seconds each. A gate, never evidence. \\
-Tier 2   & $8$ & Full run on the partition, full metric bank, per-frame. \\
-Rank     & --- & By measured metrics. Pairwise with a Bradley--Terry--Luce aggregation where a
-scalar order is ill-defined; never win/loss tallies, which carry position bias. \\
-Truncate & $3$ & \textbf{Losers are dropped, not refined.} They stay in the archive as evaluated
-evidence and are never re-expanded. \\
-Starve   & --- & Within-cluster competition; a cluster's members compete against each other, so a
-family of near-identical ideas exhausts one budget, not twenty. \\
-Freeze   & --- & A cluster with $>K=6$ evaluations and no improvement in its best score is frozen;
-its budget is reallocated the same round. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Termination and escalation}
-
-The supervisor owns the campaign configuration --- objective, success criteria, stopping rule,
-budget --- and workers cannot amend it. Each round it computes:
-
-\begin{lstlisting}
-if objective_met(ledger):            terminate("objective")
-if all_clusters_frozen():            escalate()      # widen stage gate, or request an operator
-if dry_rounds >= 2:                  escalate()      # no new cluster AND no best-score gain
-if budget_spent >= budget:           terminate("budget")
-\end{lstlisting}
-
-\emph{Escalate} is the important branch, and it is what a human did by hand last time. It means:
-the current space is exhausted, so either open the next stage gate, or record an
-\textbf{operator request} --- a mechanism the proposer wanted and could not express --- and move
-on. Escalation is logged and is a deliverable (\S\ref{sec:out}).
-
-\subsection{Rules enforced in code, not recommended in prose}
-
-\begin{itemize}\itemsep2pt
-\item \textbf{A change of numbers is never a new hypothesis} --- guaranteed by the structural hash.
-\item \textbf{No manual parameter tweaking outside the loop.} If a configuration needs hand-tuning
-to work, that is evidence of a missing operator, not of a missing afternoon.
-\item \textbf{No silent caps.} Any round that truncates, samples, or drops candidates says so in
-the log with counts. A silent truncation reads afterwards as complete coverage.
-\item \textbf{Structural limitations are recorded once and never retried.}
-\item \textbf{Per-round compute is bounded.} Depth is traded against basin width inside a fixed
-budget, and the trade is recorded. The current driver deepens every four rounds with no ceiling,
-which silently converts a campaign of many cheap experiments into a few enormous ones.
+\begin{itemize}
+\item \textbf{Predictions are written down before runs, and wrong ones are recorded as wrong.}
+Twice in two days I proposed a mechanism and the measurement killed it within the hour. Both sit in
+the record as retractions rather than being quietly edited away. This is the part I would defend
+hardest.
+\item \textbf{The video check found a disagreement --- but I over-claimed who was right.}
+On the first full round the system described each movie in words automatically and compared that
+to the numbers. It \emph{vetoed the two highest-scoring runs}, including one that three separate
+analyses had called a tube. I reported this as ``the numbers were wrong and the picture was
+right''. \textbf{That was too strong.} Given ruler~4 above, the picture may have been hiding a
+tube behind the body, or failing to show growth at all. What the check genuinely established is
+that \emph{the two instruments disagree} --- which is still valuable, and is precisely why it
+exists. Which one to believe is not yet decided, and cannot be until the camera is fixed.
+\item \textbf{The loop refuses to guess.} Asked to score 32 results against predictions written in
+a unit it did not recognise, it declined 32 times rather than inventing 32 confirmations.
 \end{itemize}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{The scientific protocol: hypothesis first}
-\label{sec:protocol}
+%======================================================================
+\section{The team of agents --- what is actually switched on}\label{sec:agents}
 
-The control law of \S\ref{sec:control} says how budget is allocated. This section says what makes
-an allocation an \emph{experiment} rather than a sample. One rule, enforced in code:
+You were told 6 of 12 are implemented or used. I audited it directly against the code rather than
+accept the figure, and it is better than that --- but there are two real gaps, and they are worth
+closing exactly as you say.
 
-\begin{quote}
-\textbf{A candidate is not run until its prediction has been recorded.}
-\end{quote}
-
-Every candidate carries, before it reaches the cluster: a falsifiable \emph{claim}, the single
-\emph{metric} that decides it, an explicit \emph{prediction} on that metric, a \emph{rationale},
-and the Grounder's \emph{citations}. A hypothesis without a prediction is refused at construction.
-
-\subsection{Two intents, and why the mixture matters}
-
-Each batch is allocated between two kinds of edit:
+\textbf{The design calls for 15 roles} (14 automatic, plus a human who patches the substrate from
+outside the loop). \textbf{All 15 are written. 13 actually run.} The two that do not:
 
 \begin{center}\small
-\begin{tabular}{@{}p{2.6cm}p{11.6cm}@{}}
+\begin{tabular}{@{}l p{6.2cm} p{6.4cm}@{}}
 \toprule
-\textbf{Confirmatory} & an edit the current causal map predicts \emph{will} work. Consolidates
-the map. Individually low-information; collectively what makes the map usable. \\
-\textbf{Adversarial} & an edit predicted to \emph{break} the current best explanation.
-High-variance; this is where surprise lives. \\
+\textbf{Role} & \textbf{What it is for} & \textbf{Status}\\
+\midrule
+\textbf{Evolution}
+& Take the round's winner and improve it --- simplify it, combine it with a runner-up, ground it
+in the paper. Without it the loop can only ever \emph{pick} from what it happened to propose; it
+can never \emph{refine}.
+& Written, \textcolor{bad}{\textbf{never called anywhere}}.\\
+\textbf{Referee}
+& Rank a batch by a proper tournament (every candidate against every other, aggregated) rather
+than by sorting on one number. The tournament is what protects against ordering bias.
+& Written, but \textcolor{bad}{\textbf{only ever exercised in its own self-test}}. The live round
+sorts on a single score instead.\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Because the prediction precedes the run, every outcome falls into a $2\times2$:
+The other thirteen --- the one that holds the objective, the one that reads the papers, the one
+that proposes, the peer-reviewer, the type-checker, the second-opinion judge, the duplicate
+detector, the three independent analysts, the eye-check, the one that writes the causal story, the
+pattern-distiller, and the one that certifies the instruments --- all ran on the last round.
+
+Two honest caveats: the eye-check is currently reading a broken camera (ruler~4), and the analysts'
+budget ceiling is not enforced, so a round can overrun its time allowance. Both are on the list.
+
+%======================================================================
+\section{What stands between us and the Okuda figure}\label{sec:okuda}
+
+Comparing his published settings against what our system can express: \textbf{three of his values
+are outside the range our search is allowed to use}, so a faithful reproduction is impossible today
+however long we run.
 
 \begin{center}\small
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}l l l l@{}}
 \toprule
- & \textbf{confirmed} & \textbf{refuted} \\
+\textbf{Okuda's setting} & \textbf{His value} & \textbf{Ours allows} & \textbf{Problem}\\
 \midrule
-\textbf{confirmatory} & consolidates (low information) & \textbf{surprise} (high information) \\
-\textbf{adversarial}  & \textbf{surprise} (high information) & breaks as expected (low information) \\
+Growth-switch sharpness       & 10              & 1--8    & out of range\\
+How far the inhibitor spreads & 10              & 0.1--2  & out of range\\
+Pattern length-scale          & 0.001--0.1      & 1--10   & \textcolor{bad}{not even the same quantity}\\
+Chemistry speed               & 4 powers of ten & 1.2     & far too narrow\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-A batch of pure confirmation ($100/0$) only ever confirms what we already believe: near-zero
-information. A batch of pure falsification ($0/100$) only ever probes the improbable, which mostly
-breaks as expected and never consolidates a working map. The productive operating point is a
-deliberate minority of attacks on the current understanding --- roughly $70/30$, and at times
-$50/50$ when the map is young.
+There is also a subtler gap. In Okuda's model the chemistry responds to the tissue's \emph{shape}
+--- chemical flows between neighbouring cells in proportion to how much wall they share. Ours
+ignores geometry entirely. \emph{One half of the feedback loop is simply missing.}
 
-\subsection{The 70/30 balance is a setpoint, not a quota}
+\textbf{Decision already taken:} calibrate to Okuda's \emph{observations} --- how many spots
+appear, how thick the tube is --- rather than copying his parameter values, which live in a
+differently-scaled model.
 
-This is the part that makes the discipline machine-enforceable. Define the \emph{surprise rate}
-of a round as the fraction of resolved hypotheses whose outcome contradicted its prediction. Then
-the Supervisor closes a loop on it:
+%======================================================================
+\section{The phases}
 
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{surprise} & \textbf{diagnosis} & \textbf{correction} \\
-\midrule
-$< 0.10$ & drifted to $100/0$: confirming what we already believe & push \textbf{adversarial} \\
-$\approx 0.30$ & the productive band & hold $70/30$ \\
-$> 0.50$ & drifted to $0/100$: everything breaks, no map accumulates & push \textbf{confirmatory} \\
-\bottomrule
-\end{tabular}
-\end{center}
+Eight stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
 
-A quota cannot notice that its questions have become trivial; a setpoint on the prediction-error
-rate can. This is the mechanism by which the loop avoids both failure modes the hand-run campaign
-fell into --- a long stretch of confirmatory tuning where nothing surprised us, followed by a
-stretch of wild attempts that mostly broke as expected.
+\begin{phasebox}{Phase 0 --- Fix the broken rulers \hfill \prog\ (2 of 4)}
+\textbf{Goal.} Make the measurements trustworthy. Nothing runs unattended until this lands.
 
-\subsection{The knowledge document}
+\textbf{Why.} Running before this writes uninterpretable results into a permanent record. Four
+rulers were wrong; two are now right.
 
-\code{knowledge.md} is append-only and written in the order the science happened: the hypothesis
-and its grounding, then its prediction, then what occurred. A reader can audit what was believed
-\emph{before} the evidence arrived --- which is the only way to tell a prediction from a
-post-hoc rationalisation. Verdicts move between the four classes of \S\ref{sec:out}; a claim's
-history is extended, never rewritten. Surprises are flagged, because they are the entries a
-returning human should read first.
+\textbf{Remaining.}
+\begin{itemize}
+\item \textbf{The ``does the shape survive?'' test} (\S\ref{sec:rulers}, item~1). Either repair it
+so it continues from the end state, or remove it from the score. A constant carrying full weight is
+worse than no term at all.
+\item \textbf{The camera} (\S\ref{sec:rulers}, item~4). Fix the frame so it does not follow the
+object --- one size, held for the whole run and shared across runs, as in Okuda's figures --- and
+add a second viewpoint so a tube cannot hide behind the body. This was originally scheduled much
+later as a presentation nicety. It is not: it is the ruler the eye-check reads, and until it is
+fixed we cannot say whether the eye-check's vetoes were right.
+\end{itemize}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{The agents}
-\label{sec:agents}
+\textbf{What you get.} A one-line confirmation that the rulers are sound, plus one before/after
+movie so you can see the camera change with your own eyes.
+\end{phasebox}
 
-Two systems published together in \emph{Nature} (July 2026) solve much of the orchestration
-problem for literature-driven hypothesis generation with wet-lab validation: Co-Scientist, a
-supervisor-coordinated coalition with an Elo tournament, a proximity graph and a meta-review that
-appends learned patterns to other agents' prompts; and Robin, which batches and truncates,
-ranks by an LLM-judged pairwise tournament aggregated with a Bradley--Terry--Luce model, and runs
-eight independent analysis trajectories reconciled by consensus.
+\begin{phasebox}{Phase 1 --- Re-measure what Phase 0 invalidated \hfill \todo\ ($\sim$1 hour)}
+\textbf{Goal.} Re-run the 32-simulation study with a buffer ten times larger and the frame-pairing
+guard live.
 
-Our setting differs in one decisive respect. \textbf{Their experiment is scarce and ours is
-cheap.} A wet-lab assay costs weeks, so ranking by argument is rational. Our simulation costs
-seconds and is measured by code. We therefore take their orchestration, diverge on their
-adjudication, and add one agent neither has.
+\textbf{Why.} This is the phase that decides whether my overnight conclusion was real.
 
+\textbf{What it will decide.} One of two outcomes, and \emph{both are good}:
+\begin{itemize}
+\item it survives --- we have a genuine structural result, which is exactly what a paper about the
+method wants; or
+\item it dissolves --- and we avoided publishing an artefact.
+\end{itemize}
 
-\begin{figure}[t]
-\centering
-\hyphenpenalty=10000 \exhyphenpenalty=10000 \tolerance=9999
-\begin{tikzpicture}[
-  every node/.style={font=\scriptsize},
-  ic/.style={draw=cgray, line width=0.55pt},
-  fillc/.style={fill=cset!12},
-  lbl/.style={font=\scriptsize\bfseries, text=black},
-  rol/.style={font=\tiny, text=cgray, align=center, text width=2.75cm},
-  cell/.style={minimum width=3.0cm, minimum height=2.0cm}]
+\textbf{What you get.} The answer in a sentence, plus the corrected table.
+\end{phasebox}
 
-\def\cw{3.05}   \def\ch{2.16}
+\begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \todo\ ($\sim$1 week)}
+\textbf{Goal.} Widen the three out-of-range settings; replace the mislabelled length-scale with the
+quantity Okuda actually varies; add the missing shape-to-chemistry feedback; add a fixture that
+asserts his published constants rather than tuning them.
 
-\newcommand{\icTarget}{\draw[ic,fillc](0,0)circle(3.4mm);\draw[ic](0,0)circle(1.9mm);\fill[cop](0,0)circle(.7mm);}
-\newcommand{\icBook}{\draw[ic,fillc](-3.2mm,-2.4mm)rectangle(3.2mm,2.4mm);\draw[ic](0,-2.4mm)--(0,2.4mm);
-  \draw[cgray,line width=.35pt](-2.4mm,1.1mm)--(-.7mm,1.1mm);\draw[cgray,line width=.35pt](-2.4mm,0)--(-.7mm,0);
-  \draw[cgray,line width=.35pt](.7mm,1.1mm)--(2.4mm,1.1mm);\draw[cgray,line width=.35pt](.7mm,0)--(2.4mm,0);}
-\newcommand{\icBulb}{\draw[ic,fill=cwarn!25](0,.7mm)circle(2.4mm);\draw[ic,fill=cgray!25](-1.2mm,-2mm)rectangle(1.2mm,-1.3mm);
-  \draw[ic](-1mm,-2.7mm)--(1mm,-2.7mm);\draw[cwarn,line width=.35pt](0,3.6mm)--(0,4.5mm);
-  \draw[cwarn,line width=.35pt](2.7mm,2.4mm)--(3.4mm,3.1mm);\draw[cwarn,line width=.35pt](-2.7mm,2.4mm)--(-3.4mm,3.1mm);}
-\newcommand{\icFunnel}{\draw[ic,fillc](-3mm,2.4mm)--(3mm,2.4mm)--(.6mm,-.4mm)--(.6mm,-2.8mm)--(-.6mm,-2.8mm)--(-.6mm,-.4mm)--cycle;
-  \fill[cop](-2mm,3.2mm)circle(.45mm);\fill[cop](0,3.6mm)circle(.45mm);\fill[cop](2mm,3.2mm)circle(.45mm);}
-\newcommand{\icScale}{\draw[ic,line width=.6pt](0,-3mm)--(0,2.6mm);\draw[ic,line width=.6pt](-3.2mm,2.6mm)--(3.2mm,2.6mm);
-  \draw[cgray,line width=.3pt](-3.2mm,2.6mm)--(-3.2mm,1.3mm);\draw[cgray,line width=.3pt](3.2mm,2.6mm)--(3.2mm,1.3mm);
-  \draw[ic,fillc](-4.2mm,1.3mm)--(-2.2mm,1.3mm)--(-3.2mm,-.3mm)--cycle;
-  \draw[ic,fillc](2.2mm,1.3mm)--(4.2mm,1.3mm)--(3.2mm,-.3mm)--cycle;\draw[ic,line width=.6pt](-1.7mm,-3mm)--(1.7mm,-3mm);}
-\newcommand{\icCluster}{\fill[cset](-2mm,1.3mm)circle(.8mm);\fill[cset](-.5mm,2.2mm)circle(.8mm);
-  \fill[cset](-1.5mm,-.2mm)circle(.8mm);\draw[densely dashed,cgray,line width=.35pt](-1.4mm,1.1mm)circle(2.7mm);
-  \fill[cfield](2.4mm,-1.5mm)circle(.8mm);\fill[cfield](3.2mm,.2mm)circle(.8mm);
-  \draw[densely dashed,cgray,line width=.35pt](2.8mm,-.6mm)circle(2mm);}
-\newcommand{\icChart}{\draw[ic,fillc](-3.2mm,-2.6mm)rectangle(3.2mm,2.6mm);
-  \draw[cset,line width=.6pt](-2.2mm,-1.3mm)--(-.7mm,.7mm)--(.7mm,-.5mm)--(2.2mm,1.7mm);
-  \draw[cop,line width=.45pt,densely dotted](-2.2mm,-.3mm)--(-.7mm,1.3mm)--(.7mm,.2mm)--(2.2mm,1.1mm);}
-\newcommand{\icEye}{\draw[ic,fillc](-3.6mm,0)..controls(-1.5mm,2.7mm)and(1.5mm,2.7mm)..(3.6mm,0)
-  ..controls(1.5mm,-2.7mm)and(-1.5mm,-2.7mm)..(-3.6mm,0);\draw[ic,fill=cset!35](0,0)circle(1.4mm);\fill[black](0,0)circle(.55mm);}
-\newcommand{\icSpeech}{\draw[ic,fillc](-3.2mm,-1.3mm)rectangle(3.2mm,2.6mm);
-  \draw[ic,fillc](-1.7mm,-1.3mm)--(-1mm,-3mm)--(-.3mm,-1.3mm);
-  \draw[cgray,line width=.35pt](-2.2mm,1.6mm)--(2.2mm,1.6mm);\draw[cgray,line width=.35pt](-2.2mm,.5mm)--(1.1mm,.5mm);
-  \draw[white,line width=.8pt](-1.65mm,-1.3mm)--(-.35mm,-1.3mm);}
-\newcommand{\icLoop}{\draw[ic,-{Stealth[length=1.4mm]}](0,0)+(30:3mm) arc (30:320:3mm);
-  \draw[cset,line width=.45pt](-1.3mm,0)--(1.3mm,0);\draw[cset,line width=.45pt](-1.3mm,1.1mm)--(.5mm,1.1mm);
-  \draw[cset,line width=.45pt](-1.3mm,-1.1mm)--(.8mm,-1.1mm);}
-\newcommand{\icCaliper}{\draw[ic,fillc](-3.8mm,.8mm)rectangle(3.8mm,2mm);
-  \foreach \x in {-3,-2.2,-1.4,-.6,.2,1,1.8,2.6}{\draw[cgray,line width=.3pt](\x mm,.8mm)--(\x mm,1.4mm);}
-  \draw[ic,fill=cop!25](-3.2mm,-2.4mm)rectangle(-2mm,.8mm);\draw[ic,fill=cop!25](1.3mm,-2.4mm)rectangle(2.5mm,.8mm);}
-\newcommand{\icWrench}{\draw[ic,fill=cgray!18,rotate=-38](-.7mm,-3.2mm)rectangle(.7mm,2mm);
-  \draw[ic,fill=cgray!18,rotate=-38](0,3.1mm)circle(1.8mm);\draw[white,line width=.85pt,rotate=-38](0,4mm)--(0,2.3mm);}
-\newcommand{\icReview}{\draw[ic,fillc](-2.6mm,-3mm)rectangle(2.2mm,2.6mm);
-  \draw[cgray,line width=.35pt](-1.8mm,1.6mm)--(1.4mm,1.6mm);\draw[cgray,line width=.35pt](-1.8mm,.5mm)--(1.4mm,.5mm);
-  \draw[cgray,line width=.35pt](-1.8mm,-.6mm)--(.4mm,-.6mm);
-  \draw[cfield,line width=.9pt](-.6mm,-1.9mm)--(.3mm,-2.8mm)--(2.6mm,-.3mm);}
-\newcommand{\icEvolve}{\draw[ic,-{Stealth[length=1.5mm]}](-3mm,-2.6mm)..controls(-1mm,-2.6mm)and(-.6mm,.4mm)..(.6mm,1.6mm);
-  \draw[ic,-{Stealth[length=1.5mm]}](-1.4mm,-1.2mm)..controls(.4mm,-1.4mm)and(1.6mm,-1.4mm)..(3mm,-2.4mm);
-  \fill[cfield](.9mm,1.9mm)circle(.8mm);\fill[cop](3.3mm,-2.7mm)circle(.8mm);}
-\newcommand{\icGavel}{\draw[ic,fill=cgray!20,rotate=-40](-2.4mm,-.9mm)rectangle(2.4mm,.9mm);
-  \draw[ic,fill=cgray!18,rotate=-40](2.4mm,-1.9mm)rectangle(3.6mm,1.9mm);
-  \draw[ic,line width=.6pt](-3.4mm,-3mm)--(1mm,-3mm);}
+\textbf{Why.} Without this, Track B cannot succeed at any effort level.
 
-\foreach \i/\name/\role/\icon/\kind in {%
-  0/Supervisor/{objective, budget, terminal state}/\icTarget/det,
-  1/Grounder/{plexus2 $\cdot$ okuda $\cdot$ corpus}/\icBook/hyb,
-  2/Proposer/{chooses the edit, predicts}/\icBulb/llm,
-  3/Reflection/{peer review before it runs}/\icReview/llm,
-  4/Critic/{types, preconditions}/\icFunnel/det,
-  5/Referee/{ranks by measuring}/\icScale/det,
-  6/Judge/{2nd opinion, from pictures}/\icGavel/llm,
-  7/Proximity/{near-duplicates starve}/\icCluster/det,
-  8/{Analyst $\times N$}/{independent reads, consensus}/\icChart/llm,
-  9/Watcher/{reads movie; VETOES}/\icEye/llm,
-  10/Interpreter/{this spec $\to$ this phenomenon}/\icSpeech/llm,
-  11/Evolution/{refines the winner}/\icEvolve/llm,
-  12/Meta-review/{patterns $\to$ next prompt}/\icLoop/llm,
-  13/Metrologist/{certifies instrument; retracts}/\icCaliper/det,
-  14/Engineer/{patches substrate, outside}/\icWrench/hum}
-{
-  \pgfmathsetmacro{\col}{mod(\i,5)}
-  \pgfmathsetmacro{\row}{-floor(\i/5)}
-  \begin{scope}[shift={(\col*\cw, \row*\ch)}]
-    \ifthenelse{\equal{\kind}{llm}}{\def\bd{cop}\def\bw{1.0pt}}{%
-      \ifthenelse{\equal{\kind}{hum}}{\def\bd{cfield}\def\bw{1.0pt}}{\def\bd{cgray!45}\def\bw{.5pt}}}
-    \draw[rounded corners=2pt, draw=\bd, line width=\bw] (-1.4,-0.83) rectangle (1.4,0.94);
-    \begin{scope}[shift={(0,0.44)}] \icon \end{scope}
-    \node[lbl] at (0,-0.18) {\name};
-    \node[rol] at (0,-0.56) {\role};
-  \end{scope}
-}
-\end{tikzpicture}
-\caption{The fifteen agents. \textcolor{cop}{\textbf{Red border}} $=$ a genuine language-model
-call (eight: Proposer, Reflection, Judge, Analyst, Watcher, Interpreter, Evolution, Meta-review).
-Grey $=$ deliberately deterministic, following Robin's de-agentification --- the Critic is the
-type guard and so cannot itself be a model, the Referee ranks by measuring, and an LLM
-Metrologist could talk itself into admitting its own evidence.
-\textcolor{cfield}{\textbf{Green}} $=$ the human: the Engineer patches the substrate from
-outside the loop, because an agent able to rewrite the simulator can make any hypothesis true.}
-\label{fig:agents}
-\end{figure}
+\textbf{What you get.} A list of what now matches his paper and what still does not, with reasons.
+\end{phasebox}
 
-\begin{table}[t]\centering\scriptsize
-\begin{tabular}{@{}rlcp{5.6cm}p{4.4cm}@{}}
-\toprule
-\# & \textbf{Agent} & \textbf{LLM} & \textbf{What it does} & \textbf{Where it lands} \\
-\midrule
-1 & Supervisor & --- & holds objective, budget, terminal state; escalates & \code{control.py::Supervisor} \\
-2 & Grounder & part & plexus2 $+$ okuda $+$ corpus; \code{ground} / \code{gate} / \code{understand} / \code{figure\_target} & \code{agents/grounder.py} \\
-3 & Proposer & \textbf{yes} & chooses the edit from a type-filtered menu; commits to a prediction & \code{agents/proposer.py} \\
-4 & Reflection & \textbf{yes} & peer-reviews the batch \emph{before} it costs cluster time & \code{agents/llm\_agents.py::reflect} \\
-5 & Critic & --- & types, preconditions, duplicates --- free rejection & \code{composition\_space.py}, \code{propose\_batch} \\
-6 & Referee & --- & ranks by \emph{measuring}, gate-admissible metrics only & \code{control.py::score\_run}, \code{rank\_btl} \\
-7 & Judge & \textbf{yes} & second opinion from the pictures; disagreement is the signal & \code{llm\_agents.py::judge\_pair} \\
-8 & Proximity & --- & structural distance; near-duplicates starve together & \code{control.py::ProximityIndex} \\
-9 & Analyst $\times N$ & \textbf{yes} & $N$ independent readings $\to$ consensus; disagreement recorded & \code{llm\_agents.py::analyse} \\
-10 & Watcher & \textbf{yes} & captions the movie (VLM) and \textbf{vetoes} promotion & \code{run\_one.py::describe}, \code{llm\_agents.py::watch} \\
-11 & Interpreter & \textbf{yes} & this spec $\to$ this phenomenon, by this route & \code{llm\_agents.py::interpret} \\
-12 & Evolution & \textbf{yes} & refines the winner: simplify / synthesise / ground & \code{llm\_agents.py::evolve} \\
-13 & Meta-review & \textbf{yes} & distils patterns into the Proposer's prompt (capped) & \code{llm\_agents.py::meta\_review} \\
-14 & Metrologist & --- & certifies the instrument; issues \textbf{retractions} & \code{agents/metrologist.py} \\
-15 & Engineer & human & patches the substrate, from outside the loop & --- \\
-\bottomrule
-\end{tabular}
-\caption{The roster in full. Eight genuine language-model calls; five deliberately deterministic;
-one part-deterministic (the Grounder's retrieval is reproducible by construction, so a citation
-can be re-derived); one human. The shared substrate --- the CLI wrapper, the file-based working
-memory (\code{instruction} / \code{memory} / append-only \code{analysis} / \code{user\_input}),
-the wall-clock budget, forced seeds and the causality rule with its control slot --- is
-\code{agents/llm.py}, ported from an earlier exploration loop that had already solved these.}
-\label{tab:agents}
-\end{table}
+\begin{phasebox}{Phase 2b --- Switch on the two agents that never run \hfill \todo\ (1 day)}
+\textbf{Goal.} Put \textbf{Evolution} and the \textbf{Referee} into the live round
+(\S\ref{sec:agents}), and enforce the analysts' time budget.
 
+\textbf{Why.} Without Evolution the loop can only pick among the changes it happened to think of,
+never improve the best one --- which is half of what makes it a search rather than a lottery.
+Without the Referee's tournament, ranking rests on a single number, and that number is the one
+Phase~0 is currently repairing.
 
-\begin{center}\small
-\begin{tabular}{@{}p{2.2cm}p{6.5cm}p{5.6cm}@{}}
-\toprule
-\textbf{Agent} & \textbf{Role} & \textbf{Provenance / divergence} \\
-\midrule
-Supervisor & Holds objective, criteria, stopping rule, budget. Computes round statistics; decides
-allocation, freezing, escalation, termination. Never does the work. & Co-Scientist's Supervisor,
-whose statistics likewise determine whether a terminal state is reached. \\
-Grounder & Holds \code{plexus2.tex} (the language contract), \code{okuda.pdf} (the reference
-model) and \code{okuda\_corpus.md} $+$ \code{papers/} (the literature). Answers mechanism
-questions and attaches citations. & Robin's literature agents. Co-Scientist's ablation showed
-that giving the reviewer search suppressed plausible-but-false hypotheses. \\
-Proposer & Generates a batch of one-edit candidates across distinct clusters. & Co-Scientist's
-generator. \emph{Divergence:} our space is typed and executable, so illegal proposals are
-impossible by construction rather than rejected on review. \\
-Critic & Free pre-compute triage: types, preconditions, duplicates. & Co-Scientist's reflection,
-reduced to what can be decided without simulating. \\
-Referee & Ranks a batch. & Robin's tournament shape and BTL aggregation. \textbf{Divergence: the
-judge is the metric bank, not a debate.} \\
-Proximity & Clusters compositions by structural distance for within-cluster competition. &
-Co-Scientist's proximity graph. Ours is \emph{exact} for identity (the hash) and approximate only
-for similarity. \\
-Analyst $\times N$ & $N$ independent readings of the same trajectory, reconciled by consensus;
-disagreement is itself recorded. & Robin's eight parallel analyses. Aimed squarely at our two
-measurement artefacts. \\
-\textbf{Watcher} & Reads the rendered movie; describes the dynamics; flags divergence between
-picture and score. Blocks promotion on disagreement. & \textbf{Neither system has this.} Both are
-text- and table-bound. Every decisive call in our record came from watching a movie. \\
-Interpreter & Writes the causal description (\S\ref{sec:out}) as a versioned analysis. &
-Co-Scientist's overview synthesis, specialised to mechanism. \\
-Meta-review & Distils recurring patterns and appends them to proposer and critic prompts. &
-Co-Scientist, which calls this feedback propagation without back-propagation --- no fine-tuning. \\
-\textbf{Metrologist} & Owns the validation ladder, the instrument gate and \emph{substrate
-semantics} (units, clocks, per-call vs per-frame). Certifies that evidence may be admitted --- and
-\textbf{retracts knowledge already recorded} when a foundation defect is found. & \textbf{Neither
-system has this.} Their measurement is an external wet-lab assay; ours is code we wrote. \\
-\textbf{Engineer} & Proposes a patch to the substrate when the Metrologist quarantines it. Writes
-to a \emph{different artefact} than the campaign's evidence, and cannot admit its own fix. &
-Deliberately outside the loop (see the boundary below). \\
-\bottomrule
-\end{tabular}
-\end{center}
+\textbf{What you get.} Confirmation that all fourteen automatic roles ran in one round, with the
+round's cost in time and tokens.
+\end{phasebox}
 
-\paragraph{The Grounder, specifically.} It is worth being precise about this agent because it
-is the one whose absence was most expensive last time. The Grounder holds three bodies of text ---
-\code{paper/plexus2.tex} (what the language permits), \code{papers/okuda.pdf} (what the reference
-model actually does), and \code{papers/okuda\_corpus.md} together with the vendored
-\code{papers/} corpus (what the field has already established) --- and it is called at exactly
-three points:
+\begin{phasebox}{Phase 3 --- Measurements that can tell his regimes apart \hfill \todo\ (2 days)}
+\textbf{Goal.} Four measurements: how many spots, how thick the tube, how many branches over time,
+and the shape of the surface. Calibrate against his roughly five spots at 2000 cells, then freeze
+the calibration.
 
-\begin{enumerate}\itemsep2pt
-\item when the \textbf{Proposer} needs a mechanism grounded before proposing it;
-\item when the \textbf{Supervisor} gates a hypothesis, before Discovery is allowed to propose;
-\item when an \textbf{operator request} is filed --- does the literature already name this
-mechanism, and under what conditions does it hold?
+\textbf{Why.} We currently have no measurement that can distinguish a tube from an undulation from
+a branch --- precisely the three outcomes the figure has to show.
+
+\textbf{What you get.} The four numbers, checked against his published figures.
+\end{phasebox}
+
+\begin{phasebox}{Phase 3b --- Point the camera \emph{along the tube} \hfill \todo\ (half a day)}
+\textbf{Goal.} Phase~0 makes the camera honest --- fixed frame, second viewpoint. This phase makes
+it \emph{smart}: lock it to the tube's own axis, one view side-on and one looking straight down the
+tube.
+
+\textbf{Why.} The end-on view \emph{is} the thickness and branch-count measurement, so camera and
+measurement share one axis. It is a refinement, not a repair --- the repair is in Phase~0.
+
+\textbf{What you get.} Movies in which the tube is always in full profile, whichever way it grew.
+\end{phasebox}
+
+\begin{phasebox}{Phase 4 --- The demonstration \hfill \todo\ (one wave, $\sim$1 hour)}
+\textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
+tube, undulation and branching, at his settings.
+
+\textbf{What you get.} \emph{The figure.}
+\end{phasebox}
+
+\begin{phasebox}{Phase 5 --- The method claim \hfill \todo}
+\textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
+predictions and retractions as the evidence.
+
+\textbf{What you get.} The argument that Track A works, resting on Track B.
+\end{phasebox}
+
+%======================================================================
+\section{What I need from you}
+
+Nothing blocking. Two things worth knowing:
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Phase 1 is the interesting one} and it costs about an hour of compute. When it
+finishes I will bring you the answer, not the reasoning --- unless you want the reasoning, in which
+case say so and it becomes the default.
+\item \textbf{Tell me if this note is the right shape.} Too long, too short, wrong order --- it is
+cheap to change, and it is the thing that lets you steer.
 \end{enumerate}
 
-This is the agent that produced the Gierer--Meinhardt unlock by hand last time. The decisive
-question --- \emph{which reaction--diffusion regime does Okuda actually use?} --- was answered by
-reading the paper, not by sweeping parameters, and it redirected the entire campaign. Making that
-a scheduled call rather than a lucky afternoon is the point.
+%======================================================================
+\section*{Appendix --- words I could not avoid}
 
-\paragraph{Two further borrowings worth naming.} Whatever proposes must not be what judges ---
-Robin used different models for generation and adjudication, and the separation is free. And
-Robin found their orchestrator ``almost always called tools in the same order'', so they replaced
-the agentic controller with a deterministic notebook. We follow that: \textbf{the control law of
-\S\ref{sec:control} is a deterministic script}, and language models are called only where
-judgement is genuinely required --- proposing, watching, explaining.
+Only these four. Everything else above is ordinary English.
 
-\paragraph{One thing neither paper needs.} Their measurement is an external assay. Ours is code
-written by the same system being judged, so ``the metric lied'' is a failure mode unique to us,
-and we have suffered it twice. Hence the instrument gate of \S\ref{sec:defects}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Knowledge certification, and who may touch the substrate}
-\label{sec:certify}
-
-\begin{quote}
-\emph{If the foundations are wrong, so is the knowledge.}
-\end{quote}
-
-Every other agent in \S\ref{sec:agents} produces or judges \emph{evidence}. None of them is
-responsible for the thing evidence is measured \emph{with}. That gap is not hypothetical: it is
-how the defect below was found --- by a person reading code, not by any designed role.
-
-\subsection{A worked example of why the role must exist}
-
-\code{divide\_3d} counts \code{min\_cycle} and \code{max\_cycle} in \emph{division-calls}, and
-\code{max\_div} / \code{max\_div\_frac} are \emph{per-call} throttles. The archived configurations
-passed \code{every: 2}, which the engine gated \emph{and} the operator's own private counter gated
---- so the operator body executed once every \textbf{four} frames. Correcting the clock therefore
-multiplied the wall-clock meaning of every per-call quantity by four, and the same recipe that had
-produced a tube of aspect $7.5$ produced one of aspect $3.2$.
-
-Two further consequences, each of which a casual fix would have missed:
-
-\begin{itemize}\itemsep2pt
-\item The hand-tuned values had been adopted as \emph{vocabulary defaults}, on the reasoning that
-``a default composition should start where our evidence is''. After the clock fix that reasoning
-inverted: those defaults now encode a $\theta$ tuned for the wrong clock, so \emph{every}
-composition the loop generates would have started biased --- silently.
-\item Rescaling the obvious knob was not enough. Since
-$\text{cap} = \max(\code{max\_div},\, \code{max\_div\_frac}\cdot n_F)$, the absolute floor
-\emph{dominates} at realistic cell counts, so rescaling only \code{max\_div\_frac} was
-\textbf{entirely masked}. Both had to move.
+\begin{itemize}
+\item \textbf{Cell sheet (or mesh)} --- the model of the tissue: a hollow ball of polygonal cells
+sharing walls, like a football.
+\item \textbf{Operator} --- one mechanism as a reusable building block: ``cells divide'',
+``chemical spreads'', ``surface pulls tight''. A model is a combination of these.
+\item \textbf{The loop} --- the automated cycle: propose a change, predict the outcome, run,
+measure, record whether the prediction held.
+\item \textbf{Phase} --- one of the eight stages above. Our agreed stopping points.
 \end{itemize}
 
-Because the factor is exact, the correction is analytic rather than a re-tuning sweep: rescale the
-per-call quantities and the fix becomes \emph{behaviour-preserving by construction}, verified
-identical to the archived budget at every cell count. Any later change in phenotype is then
-attributable to the change that caused it, rather than to the clock.
-
-\subsection{The Metrologist}
-
-The Metrologist certifies that evidence may be admitted at all. It owns the validation ladder, the
-instrument gate, and --- the part no other role covers --- \emph{substrate semantics}: units,
-clocks, and the distinction between per-call and per-frame quantities. Its distinguishing power is
-that it may act \emph{backwards}:
-
-\begin{quote}
-When a foundation defect is found, the Metrologist issues a \textbf{retraction}: every claim whose
-evidence depends on the defective semantics is moved back to \emph{Open}, with the defect and its
-scope recorded.
-\end{quote}
-
-In an append-only ledger a retraction is a new record, never an edit. The history must show what
-was believed, on what evidence, and why that evidence was later withdrawn --- otherwise a reader
-cannot distinguish a claim that survived scrutiny from one that was quietly repaired.
-
-\subsection{The boundary: who may modify the substrate}
-
-\begin{quote}
-\textbf{No campaign agent may modify the substrate.} An agent that can rewrite the simulator can
-make any hypothesis true.
-\end{quote}
-
-The separation is therefore structural, not procedural:
-
-\begin{center}\small
-\begin{tabular}{@{}p{2.6cm}p{11.6cm}@{}}
-\toprule
-\textbf{Metrologist} & \emph{detects and quarantines.} Halts admission of evidence, marks affected
-claims Open-pending-recheck, and states the scope of the defect. It does not write code. \\
-\textbf{Engineer} & \emph{proposes a patch}, into the substrate --- a \emph{different artefact}
-from the campaign's evidence. It cannot admit its own fix. \\
-\textbf{Supervisor} & \emph{gates resumption.} Evidence admission restarts only after the full
-ladder passes on the patched substrate, and the re-anchoring is recorded explicitly rather than
-absorbed. \\
-\textbf{Human} & approves substrate changes. The campaign runs unattended; the thing it measures
-with does not change unattended. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The underlying principle is the one an experimentalist would recognise: \emph{the instrument must
-not be adjustable by the experiment it is measuring.} Our situation is sharper than either
-published system's, because their measurement is an external wet-lab assay and ours is code
-written by the same project that is being judged.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Which agents are language models, and which must not be}
-\label{sec:whichllm}
-
-Co-Scientist runs six specialised LLM agents under a mechanical supervisor: Generation,
-Reflection (peer review \emph{with search}), Ranking (Elo by simulated scientific debate),
-Proximity, Evolution (refines the top-ranked) and Meta-review (distils patterns and appends them
-to the other agents' prompts --- ``feedback propagation without back-propagation''). Robin uses
-Crow and Falcon for literature and Finch for analysis, ranks with an LLM judge over pairwise
-comparisons aggregated by Bradley--Terry--Luce, and runs \emph{eight independent} Finch
-trajectories on the same data because the analysis ``can vary between runs, even when given
-identical prompts and data''.
-
-We follow that, with two deliberate departures and one addition.
-
-\begin{center}\small
-\begin{tabular}{@{}p{2.4cm}p{1.9cm}p{9.6cm}@{}}
-\toprule
-\textbf{Agent} & \textbf{LLM?} & \textbf{Why} \\
-\midrule
-Proposer     & \textbf{yes} & Chooses which mechanism edit is worth a GPU-hour and commits to a
-prediction. An enumerator cannot do this: if the prediction follows mechanically from the edit's
-sign, the surprise rate measures nothing. \\
-Reflection   & \textbf{yes} & Peer-reviews the batch before it costs cluster time. A type-correct
-proposal can still be a bad experiment. \\
-Analyst $\times N$ & \textbf{yes} & $N$ independent readings of one run, reconciled by consensus;
-disagreement is recorded as a calibration signal. \\
-Watcher      & \textbf{yes} (VLM) & Reads the movie and \emph{vetoes} promotion when the picture
-contradicts the claim. \\
-Interpreter  & \textbf{yes} & Writes the causal account --- this spec, this phenomenon, by this
-route. \\
-Evolution    & \textbf{yes} & Refines the winner (simplify / synthesise / ground). \\
-Meta-review  & \textbf{yes} & Distils recurring patterns into the Proposer's instructions. \\
-Judge        & \textbf{yes} & A \emph{second opinion} on ranking, from the pictures. \\
-\midrule
-Supervisor   & no & Arithmetic on statistics. An LLM here is drift, not judgement. \\
-Critic       & no & The type and precondition guard. It is the thing that stops a language model
-proposing something ill-typed; it cannot itself be one. \\
-Referee      & no & Ranks by \emph{measuring}. \\
-Proximity    & no & Structural distance --- exact, not approximate. \\
-Metrologist  & no & Certifies the instrument. An LLM here could talk itself into admitting its
-own evidence. \\
-Engineer     & human & The substrate boundary. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\paragraph{Departure 1: ranking is measured \emph{and} judged.}
-Both papers rank by argument because a wet-lab assay is scarce. Ours is a simulation scored by
-code, so an opinion about available ground truth is a step backwards --- \emph{except} that the
-instrument gate has now measured a metric scoring $9.30$ on a small bud. So the metric bank ranks
-first, an LLM judge ranks independently from the rendered movie, and \textbf{their disagreement
-is the signal}: it is the eye/number divergence detector. Neither paper needs this, because
-their measurement is external to their system; ours is code we wrote.
-
-\paragraph{Departure 2: pre-registration.}
-Neither system records what was \emph{believed before} the evidence arrived, so a prediction
-cannot be distinguished from a post-hoc rationalisation. Ours refuses to run a candidate whose
-prediction is not already recorded (\S\ref{sec:protocol}).
-
-\paragraph{Addition: the type system is not an agent.}
-Illegal edits, unmet preconditions and dangling slots never reach the Proposer at all --- it
-chooses from a menu the type system has already filtered. The language decides what is
-\emph{possible}; the agent decides what is \emph{worth doing}. Neither can do the other's job.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Running for weeks: where this breaks}
-\label{sec:weeks}
-
-The campaign is meant to run unattended for weeks. That is a different engineering problem from
-running one round, and the arithmetic should be done before the fact rather than discovered.
-
-One run is roughly $250\,$s of engine, $60\,$s of rendering, $60\,$s of captioning and a
-mechanics pass: call it \textbf{7 minutes}. Eight-way on the partition gives $\sim$68 runs per
-hour. A round is a batch of eight plus a proposer call, so $\sim$20 minutes, or $\sim$70 rounds
-per day. Two weeks is then of order $10^3$ rounds and $10^4$ runs.
-
-\begin{center}\small
-\begin{tabular}{@{}p{0.4cm}p{4.0cm}p{9.4cm}@{}}
-\toprule
- & \textbf{Bottleneck} & \textbf{Consequence, and what it forces} \\
-\midrule
-1 & \textbf{The composition space is too small.} & Twelve operators, $\sim$19 legal edits from
-the seed. Distinct \emph{clusters} number in the tens. At eight runs a round the search
-\textbf{exhausts itself and freezes every cluster within days}. A multi-week campaign is
-therefore \emph{not} mechanism search --- it is dominated by parameter fitting and by
-\textbf{operator requests}. Escalation is the main path, not an edge case, and it is the least
-built part of the system. \\
-2 & VLM cost & A $23\,$GB model loaded once per job. Caption per \emph{wave} instead: one load,
-eight captions. Still always-caption, never deferred to an end pass. \\
-3 & Storage & $30$--$50\,$MB per trajectory $\times\,10^4$ runs $\approx 400\,$GB. Retention
-policy: full trajectories for kept and promoted runs, per-frame metric tables (kilobytes) for
-everything else --- so the archive stays re-scorable exactly where re-scoring matters. \\
-4 & The proposer call blocks & Eight GPUs idle for minutes every round. Propose round $N{+}1$
-while $N$ runs. \\
-5 & \textbf{Knowledge growth is unmeasured} & The point of the campaign is that knowledge
-accumulates, and there was no quantity tracking it. See below. \\
-6 & The videos do not accumulate & Each run has its own movie; nothing assembles them into
-something you can watch. See below. \\
-7 & Prompt growth & Meta-review appends forever. The distilled section is capped and rewritten
-in place, so old patterns are dropped rather than accreted. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Knowledge growth, as a measured quantity}
-
-If the campaign's product is knowledge, then its rate is the thing to watch, and it should be
-plotted rather than asserted. Per round we record: distinct clusters discovered and frozen;
-counts moving between Established / Refuted / Structural / Open; the \textbf{surprise rate}
-(\S\ref{sec:protocol}); operator requests filed; and the fraction of runs admitted as evidence
-at all. A campaign whose surprise rate collapses toward zero has stopped learning even while it
-is still burning GPU-hours --- and that, not a wall-clock limit, is the honest signal to
-escalate or stop.
-
-\subsection{The video battery}
-
-Every run already produces a movie, a strip, a caption and a mechanics panel. What was missing
-is that they never assembled. Three artefacts accumulate across the campaign:
-
-\begin{itemize}\itemsep2pt
-\item a \textbf{round montage} --- the batch's final frames side by side, so a round is legible
-at a glance;
-\item a \textbf{progress reel} --- the best run of every round, concatenated in order, so the
-campaign can be \emph{watched} learning;
-\item a \textbf{phase-diagram panel} --- the four Okuda cells (\S\ref{sec:question}) as they
-currently stand, which is simultaneously the scientific target and the talk figure.
-\end{itemize}
-
-The reel is not decoration. The single most expensive failure in this project's history was a
-number disagreeing with a picture, and the cheapest defence has repeatedly been to look.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{What the campaign produces}
-\label{sec:out}
-
-Five artefacts, each a deliverable in its own right.
-
-\subsection{The ledger}
-
-Every claim sorted into \textbf{Established}, \textbf{Refuted}, \textbf{Structural limitation} or
-\textbf{Open}, with its evidence, sample count, confidence interval and the threshold set that
-produced the verdict. A mechanism reaches Established only if it answers what a biology paper
-would ask: remove it --- does the phenotype collapse? Is a minimal recipe containing it
-sufficient? Does it survive repeats and a range of settings?
-
-\subsection{Causal descriptions --- ``this spec gives this phenomenon''}
-
-For every surviving composition the Interpreter writes a structured account, attached to the
-record as a versioned analysis:
-
-\begin{lstlisting}
-{ composition:  <structural hash + operator list + typed connections>,
-  phenotype:    <class, with the metric vector that assigns it>,
-  route:        "growth gated by the activator raises target volume locally;
-                 oriented division builds a wall along the bud axis; T1 lets
-                 the wall cells slide, so the tube extends instead of bulging",
-  necessary:    [ops whose ablation collapses the phenotype],
-  sufficient:   <the minimal sub-composition that still produces it>,
-  falsified:    [alternatives tried and refuted, with run ids],
-  scope:        <substrate, parameter ranges, seeds>,
-  watcher:      <caption of the movie>,  agreement: <caption vs metrics> }
-\end{lstlisting}
-
-This is what makes the operator library reusable rather than merely catalogued, and it is what a
-reader of the eventual paper actually wants. It is generated per composition, continuously, not
-written up afterwards.
-
-\subsection{The operator backlog --- atlas growth}
-
-Every escalation records an \textbf{operator request}: a mechanism the proposer wanted and the
-language could not express. Each is a candidate new operator and each is a talk bullet. Our
-expectation, from the one simulator decomposed in full, is that mechanics \emph{saturate} against
-the existing algebra while topology and numerics contribute genuinely new contracts --- and that
-saturation is itself the hypothesis under test. If genuinely new families keep appearing, the
-language is incomplete; if they stop, the compactness claim is supported.
-
-\subsection{Movies}
-
-Every promoted composition is rendered to the standard of the public gallery, captioned by the
-watcher, and archived beside its record. Captioning is on by default and is never disabled: the
-caption is simultaneously documentation, a semantic regression test, and the watcher's input.
-These are the primary evidence for a talk, and the loop produces them rather than a person
-producing them afterwards.
-
-\subsection{One differentiable figure}
-
-See \S\ref{sec:diff}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Where the differentiable version enters}
-\label{sec:diff}
-
-Mechanism search and parameter fitting must not run simultaneously, or neither conclusion is
-interpretable. The fit is \emph{earned}, and the trigger is explicit:
-
-\begin{quote}
-A composition that is \textbf{Established} but whose residual on a chosen objective persists
-\emph{across the whole parameter basin} is handed to the differentiable fit. A residual that
-survives every setting is evidence about a mechanism; a residual that disappears at some setting
-was never a mechanism question.
-\end{quote}
-
-\paragraph{The objective is local in space and time.} A loss spanning every cell over hundreds of
-frames unrolls, under reverse-mode differentiation, into a graph whose memory scales as cells
-$\times$ steps and rapidly becomes intractable. But the evidence constraining any single operator
-is usually confined to a small, transient region --- the advancing front, the neck, the moment a
-wall forms. So the loss is placed exactly there: a region of interest over a few tens of steps.
-The mechanism is global and shared; the objective is not.
-
-\paragraph{The natural objective here is the stress field.} The tool that computes per-cell force,
-pressure and cortical tension is already torch-differentiable, and the campaign's discriminator
-$Q$ is mechanical. ``Minimise tube pressure while preserving aspect'' is therefore both the
-biological question (is a low-stress tube reachable?) and a well-posed differentiable objective.
-
-\paragraph{Deliverable.} One figure: residual descent, with identifiable parameters distinguished
-from degenerate ones. A degeneracy found is a result --- it says two mechanisms are
-indistinguishable under the current observable, which is a measurement question, and it goes back
-to the observable bank.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Pre-flight: eleven defects that must be closed first}
-\label{sec:defects}
-
-The campaign will emit scientific claims, including claims that something is \emph{impossible}. A
-false impossibility claim is worse than no claim, because it closes a question that should stay
-open. Defects 1--6 come from an adversarial audit of the simulation operators; 7--11 were found
-while writing this document, by reading the loop's own source with the same suspicion.
-
-\paragraph{1. Two operators kept a private clock.} They spaced themselves out while the engine
-\emph{also} spaced them out; the schedules multiplied, so ``every 2 steps'' fired every 4.
-Division across every archived run happened at a fraction of the advertised rate. \emph{Fix:
-the engine owns the clock; baselines re-measured and the re-anchoring stated, not absorbed.}
-
-\paragraph{2. Adding a signalling step silently changed the time-step.} The run script chose the
-time-step from which operators were present --- recipes with a chemical signal ran fifty times
-finer. Since the campaign's most important edit is adding or removing signalling, every
-conclusion about whether signalling matters would have been confounded. \emph{Fix: one time-step
-for the whole search; stability handled inside the operator that needs it.}
-
-\paragraph{3. A silent mismatch produced a result we believed for days.} Positions and
-connectivity were recorded on different strides; the analysis paired coordinates with another
-moment's connectivity and reported cells as inverted. Every physical cure failed --- in hindsight,
-the clue. \emph{Fix: equal length asserted, not clamped.}
-
-\paragraph{4. An operator that does nothing still returns numbers.} If a prerequisite is missing,
-the operator silently no-ops, the run finishes, and a score is produced. Harmless under
-hand-written recipes; under automatic search it is the most dangerous bug possible --- the loop
-records ``this mechanism cannot make tubes'' when the mechanism never ran. \emph{Fix:
-preconditions declared and checked; every operator reports whether it acted; a scheduled operator
-that never acted is an error, not a result.}
-
-\paragraph{5. Some operators advertise capabilities they lack.} One is labelled differentiable and
-discards gradients; another claims three dimensions while its validity check is two-dimensional.
-Labels that lie are worse than absent labels, because the search trusts them. \emph{Fix:
-corrected and mechanically certified.}
-
-\paragraph{6. Measurements can pass while the picture is wrong.} A lumpy blob scored acceptably on
-every number we had, because the scores measured how far things stick out and a blob sticks out.
-\emph{Mitigation: the watcher, plus the instrument gate below.}
-
-\paragraph{7. \textcolor{cop}{The archive stores only the final frame.}} Each run computes several
-recorded frames and persists only the last, so every re-scoring is restricted to end-state
-observables. This contradicts the entire record: the decisive evidence was temporal --- a
-protrusion that peaks mid-run then degrades, a pattern that floods only once growth starts,
-divisions arriving in synchronised waves. Worse, the artefact that cost us days is by construction
-a time-series defect, and an archive of final frames cannot be re-examined for it. \emph{Fix
-before any long run: persist the full trajectory and a per-frame metric table. Storage is cheap;
-re-simulating weeks of cluster time to recover a time course we already computed and discarded is
-not.}
-
-\paragraph{8. \textcolor{cop}{Impossibility is asserted by a hard-coded narrative.}} The strongest
-claim the system makes is currently produced by a low score plus an \code{if/elif} chain guessing
-a reason from absent operators. The reason is a template, not evidence; combined with defect 4
-this is machinery for manufacturing confident false impossibility. \emph{Fix: an impossibility
-claim requires (i) every scheduled operator verified to have acted, (ii) a minimum sample count
-with an explicit interval, (iii) a recorded, bounded falsification attempt --- a deliberate search
-for any setting that does produce the phenotype --- and (iv) a stated scope. Absent any of the
-four, the verdict is Open.}
-
-\paragraph{9. \textcolor{cop}{Four samples cannot support a robustness claim.}} The default basin
-is two seeds by two parameter draws, so a rate is one of $\{0,\frac14,\frac12,\frac34,1\}$, and
-promotion thresholds are hard-coded constants --- Established at $\ge0.6$ (three of four),
-structural below $0.2$ (zero of four), necessary if ablation drops below $0.5$. \emph{Fix: a
-minimum sample count before promotion; a Wilson interval rather than a point rate; thresholds as
-named, recorded campaign parameters so a later re-analysis can vary them.}
-
-\paragraph{10. The search accelerator is dead code in the long-run driver.} Loop~I accepts an
-optional surrogate that ranks candidate edits so the frontier expands best-first; the overnight
-driver never passes it. Every unattended round to date has been uniform breadth-first --- the exact
-opposite of \S\ref{sec:control}.
-
-\paragraph{11. Per-round cost grows without bound.} The driver deepens the search every four
-rounds and densifies the basin every twelve, with no ceiling.
-
-\subsection*{The instrument gate}
-
-Before the first round, the metric bank must correctly separate a set of already-archived runs we
-have labelled by eye --- a clean tube, a capped lobe, a flooded shell, a uniform sphere, a
-cauliflower. If the instrument cannot reproduce our own judgement on known cases, it is not ready
-to judge unknown ones. This is not a formality: three metrics in the existing bank have been
-caught lying, one of which moved a headline number by thirty per cent once corrected.
-
-\subsection*{The validation ladder}
-
-One command, each level independently pass/fail, non-zero exit on any failure.
-
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Level} & \textbf{Checks} & \textbf{Error class caught} \\
-\midrule
-Contract    & every operator declares what it is and does & labels that lie \\
-Unit        & each operator reproduces its previous output & the refactor changed physics \\
-Trajectory  & a run reproduces its recorded history & schedule or ordering drift \\
-Invariants  & closed surface, no tangled or bow-tie faces & silent geometric corruption \\
-Recording   & positions and connectivity are equal length & the phantom-result bug \\
-Metrics     & scores match archived values & the analysis path drifted \\
-Gradients   & derivatives flow and are finite & the fit will fail later \\
-Coverage    & every operator exercised by some configuration & untested code presumed working \\
-Description & the watcher's caption matches expectation & the numbers pass, the picture is wrong \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-One rung deserves comment. A face must not be self-intersecting, and we had checked validity by
-requiring positive area. \emph{A bow-tie has positive area.} The check passed, the mesh was
-tangled, and a quantitative result about cell rearrangement was wrong --- caught by watching a
-movie, not by any number. The lesson generalises well beyond meshes: a numerical invariant is not
-the geometric one you meant.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Operating it}
-
-The partition is cheap enough that wall-clock is not the binding constraint --- attention is. The
-operating rules follow from that.
-
-\begin{itemize}\itemsep2pt
-\item \textbf{Read the ledger, not the runs.} The weekly unit of human attention is the ledger
-delta --- what moved between the four classes --- plus a montage of the week's best and the
-current operator backlog. Individual runs are opened only when the ledger points at one.
-\item \textbf{Verify against the world, never against a submission's reply.} A submission that
-reports failure may have succeeded, and one that appears to time out may already be queued; we
-have created duplicate jobs this way. The queue is the only ground truth. Generalised: an action's
-\emph{reported} outcome is a hint; the world's state is the fact.
-\item \textbf{Every round is restartable.} Evidence is persisted as produced, exceptions caught per
-round, run identity a content hash --- so a crash resumes without duplicating or losing evidence.
-\item \textbf{The configuration is written before the first round}, not discovered during it.
-\end{itemize}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Status and the switch-on gate}
-
-The loop has run on gland branching and produced, unattended, a sequence that included one
-conclusion overturned by a better measurement --- the strongest evidence that the
-evidence/interpretation separation is worth its cost. The Okuda operators exist, have produced a
-tube, and have produced the more interesting negative result that our tube is forced where the
-published one is grown. That is the question the campaign inherits, and \S\ref{sec:question}
-turns it into a measurable one.
-
-The campaign switches on when four things are true:
-
-\begin{enumerate}\itemsep2pt
-\item the eleven defects are closed, each demonstrated by a test that fails loudly;
-\item the archive stores trajectories and per-frame metrics, not final frames;
-\item the metric bank has reproduced our own eye-labels on already-archived runs;
-\item the supervisor's campaign configuration --- objective, criteria, stopping rule, budget --- is
-written down.
-\end{enumerate}
-
-That gate is the point of this document. The system is now capable of running unattended for a
-long time and producing confident, well-formatted, entirely wrong conclusions. The defence is not
-more compute. It is a small number of checks that fail loudly, an archive that keeps raw evidence
-separate from its interpretation, a search that drops its losers instead of lovingly refining
-them, a supervisor that holds the goal nobody else can be trusted to hold --- and the willingness
-to keep looking at the pictures.
-
-\section{First live results (2026-07-30, overnight)}
-\label{sec:live}
-
-Three things were exercised for the first time: the LLM Proposer, the composition mode end to end,
-and the loop pointed at a \emph{second} system (the Turing\,$\times$\,vertex recipe behind the
-site's front-page movies). Each produced defects that only running could find.
-
-\subsection{The composition mode could never have completed a round}
-
-\texttt{proposer.propose()} \emph{rejects} any proposal whose slot 0 is not
-\texttt{intent: "control"}; \texttt{hypothesis.INTENTS} did not contain \texttt{"control"}, so
-\texttt{Hypothesis.\_\_post\_init\_\_} raised on it. Two halves of the same protocol disagreed
-about whether a control exists and both enforced their view with a hard error. A control is now a
-first-class intent, excluded from the surprise rate and the mix --- it asserts nothing about an
-edit --- but a control that \emph{fails} its own prediction raises \textsc{baseline drift}, which
-is louder than a surprise: every other slot is measured as a difference from it.
-
-\subsection{The surprise rate was computed by a regex that could only bias it downwards}
-
-The campaign's one control signal was a first-match regular expression with three defects: an
-\emph{unparseable} prediction returned true and was recorded \texttt{confirmed}; the parser was
-metric-blind, applying the first comparison it found to \texttt{protr\_peak} whatever the clause
-named; and \texttt{REFUTED if \ldots} was read as the assertion. All three push the rate toward
-``nothing was learned''.
-
-The measured cost: the \texttt{vcap} round's five points were posed before the parameter-hypothesis
-fix with the placeholder \texttt{"unknown -- sensitivity sweep"}, which parsed to nothing and so
-resolved \texttt{confirmed}. The persisted surprise rate for the campaign's most informative round
-was \textbf{0.00}. The 0.40 everyone quoted had been computed by hand in a narrative and never
-reached the ledger. \texttt{predict.py} now parses every clause with its metric and returns
-\texttt{inconclusive} rather than guessing; an append-only \texttt{amend()} backfilled the record,
-and the ledger computes 0.40 itself. The same guard later refused to score 32 runs of the
-Turing\,$\times$\,vertex study because \texttt{protr} was not a known metric --- declining 32 times
-instead of inventing 32 confirmations.
-
-\subsection{The supervisor did not survive a restart}
-
-\texttt{round}, \texttt{spent}, \texttt{dry}, \texttt{best}, \texttt{prox} and \texttt{stage\_gate}
-were re-initialised every process; \texttt{supervisor.jsonl} was append-only \emph{output}, never
-read back. For a campaign specified to run for weeks across restarts this disabled every stateful
-control at once: every round is ``round 1'' (five duplicate hypothesis ids were already in the
-ledger), the budget can never be spent so \texttt{terminal()} never fires, dry rounds never
-accumulate so \textbf{escalation was dead at the trigger}, and no proximity cluster is ever frozen.
-State is now checkpointed atomically, and a corrupt checkpoint refuses to start rather than
-silently resetting the counter.
-
-\subsection{The escalation path, and its first entry}
-
-\texttt{terminal()} has always been able to return \texttt{ESCALATE:} and nothing ever read it, so
-escalation could only be reached by a crash-like condition --- never by a campaign exhausting its
-reachable space, which over weeks is the normal ending. The path is now three actions tried in
-order (open a stage gate; file an operator request; declare the region exhausted) and it has
-produced \textbf{OR001}: quasi-static force-balance relaxation to a \emph{residual} rather than a
-fixed step count, plus 3D IH/HI reconnection, with an acceptance test that today's best setting
-fails by roughly $4\times$ on both integrity metrics.
-
-\subsection{Turing $\times$ vertex: a structural limitation, measured}
-
-The two front-page movies are the \emph{same simulation}: their archived diagnostics are identical
-because \texttt{a\_sw = 50} leaves the Hill switch unfired, so the reaction--diffusion is pure
-colouring. Running the loop on the settings found something sharper --- with \texttt{rho = 1.0}
-every cell grows every tick, and the \texttt{conserve\_amount} dilution then drives the activator
-to $2\times10^{-22}$ by frame 400. The coral pattern on the site's front page is a colour map
-stretched over an extinct field.
-
-With the field alive, 32 runs across five knobs give a clean boundary:
-
-\begin{center}
-\begin{tabular}{lrrrrr}
-\toprule
-$\rho$ & 1.0 & 0.5 & 0.2 & 0.05 & 0.0\\
-\midrule
-corr(act,\,radius) & $+0.29$ & $+0.26$ & $+0.28$ & $\mathbf{+0.63}$ & $+0.53$\\
-protr              & 1.03    & 1.05    & 1.06    & 1.17             & 32.7\\
-hollow\_frac       & 0.000   & 0.006   & 0.008   & 0.197            & 0.839\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Eighteen runs keep an intact mesh (\texttt{hollow\_frac} $<0.05$) and reach at most
-\texttt{protr} 1.064; all nine runs with \texttt{corr} $>0.4$ have \texttt{hollow\_frac}
-$\geq 0.197$; \textbf{none achieves both}. On this backend activator-driven shaping and monolayer
-integrity are mutually exclusive. That is a structural limitation, it is first-class, and it
-reaches by measurement the conclusion the previous campaign reached independently on a different
-backend: the gap is representational, not parametric.
-
-\subsection{What the defences caught, and what they cost me}
-
-On the first composition round the Watcher vetoed the two \emph{highest}-scoring runs ---
-\texttt{protr\_peak} 4.03 and 3.20, one of them the control that three Analysts had called a tube
---- because the captions show no tube. The Critic separately refused a third slot as not-evidence
-(reservoir saturated at 15\,002 cells). Two of six slots produced no evidence and both said so
-loudly.
-
-Twice in one night I proposed a mechanism and the measurement refuted it. I argued that the
-per-cell volume cap explained the flat shape; the first test refuted it, but that test ran against
-the extinct field, so its refutation was worthless --- \emph{a refutation obtained under a broken
-instrument is not evidence, and I nearly filed it as one}. I then argued the extinction reached the
-main campaign, submitted the comparison, and measured \texttt{act\_max\_final} $=0.995$ with the
-dilution on: refuted within the hour. The dilution tracks the volume growth ratio, so it only bites
-while cells grow; at $\rho=0$ growth saturates and the dilution stops. I had the sign of the
-feedback backwards.
-
-Both are recorded as retractions rather than quietly edited. The protocol's value is not that it
-prevents wrong ideas --- it is that a wrong idea costs two cluster runs and an hour instead of a
-month.
+\vspace{6pt}
+\hrule
+\vspace{6pt}
+{\small\color{grey}
+Technical detail --- the control law, the agent roles, the operator language, the validation
+ladder and the full external review --- is preserved in \texttt{plexus2\_technical.pdf} (23 pp).
+My working log is \texttt{SESSION\_LOG.md}. You should not need either.}
 
 \end{document}

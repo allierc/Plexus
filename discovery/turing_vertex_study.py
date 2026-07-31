@@ -215,13 +215,20 @@ def run_one(k, frames, movie=False):
         posf = out["sets"]["vertex"]["pos"]
         chemf = out["sets"]["cell"]["state"]["chem"]
         T = posf.shape[0]
-        mtT = hist[min(T - 1, len(hist) - 1)] if hist else mesh0
+        # THE PHANTOM GUARD. `hist[min(t, len(hist)-1)]` is the line that produced the phantom
+        # "97% hollow / global buckling" result: it pairs frame t's coordinates with ANOTHER
+        # frame's connectivity and fabricates inverted cells. run_one.py:check_alignment was
+        # written to forbid exactly this, and this module -- which produced every hollow_frac
+        # behind OR001 -- never called it. Assert, never clamp.
+        from run_one import check_alignment
+        check_alignment(posf, hist, name=k["name"])
+        mtT = hist[T - 1]
         pT = posf[T - 1][:mtT["Nv"]].astype(np.float64)
         aT = chemf[T - 1][:mtT["nF"], 0]
         rec.update(metrics(mtT, pT, aT))
         # a mid-run reading too: a setting that blows up late still says something
         tm = T // 2
-        mtm = hist[min(tm, len(hist) - 1)] if hist else mesh0
+        mtm = hist[tm]
         rec["mid"] = metrics(mtm, posf[tm][:mtm["Nv"]].astype(np.float64),
                              chemf[tm][:mtm["nF"], 0])
         if movie:
@@ -250,8 +257,11 @@ def _render(d, k, hist, posf, chemf, T, mesh0):
         pass
     from run_tyssue_vesicle import _draw, _draw_cross, make_movie_axes, draw_movie_frame
 
+    from run_one import check_alignment
+    check_alignment(posf, hist, name=k["name"] + " (render)")   # the phantom guard, render path
+
     def frame(t):
-        mt = hist[min(t, len(hist) - 1)] if hist else mesh0
+        mt = hist[t]
         return mt, posf[t][:mt["Nv"]].astype(np.float64), chemf[t][:mt["nF"], 0]
 
     aT = frame(T - 1)[2]

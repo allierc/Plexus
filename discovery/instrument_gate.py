@@ -90,6 +90,13 @@ JUDGED = ["ta_aspect_len_over_diam", "ta_tube_len_final", "ta_n_tubes_final",
           "protr_final", "protr_peak", "retention", "n_cells_final"]
 
 
+# Provenance the labels were authored against. A label describes a RENDERED RUN, so it is only
+# valid for the run it was written from. `ref_uniform_inflation` was silently re-run from 41
+# frames to 901 between the gate storing PASS and today; the gate re-read diag.json, scored a
+# DIFFERENT simulation under the same label, and could not tell. Record it, and say so.
+LABELLED_FRAMES = 901
+
+
 def load_scores():
     out = {}
     for row in LABELLED:
@@ -101,6 +108,42 @@ def load_scores():
         except Exception:
             pass
     return out
+
+
+def validity(summary):
+    """The campaign's OWN evidence rule, applied to the gate's own inputs.
+
+    `critic.check_posthoc` refuses a run that saturated its buffer or scheduled an operator that
+    never acted; `control.score_run` gives it -inf. The gate was exempting itself: it calibrated
+    the metric bank on runs the campaign would never score. `ref_uniform_inflation` and
+    `round_21_gs` both terminate at n_cells 15002 against a 30000-vertex reservoir -- for a
+    trivalent mesh V = 2F-4, so 30000 caps F at exactly 15002. Their late frames are a reservoir
+    overflow, not a morphology, and demanding that a metric behave sensibly on them is demanding
+    robustness to a crash.
+    """
+    from critic import check_posthoc
+    return [r.code for r in check_posthoc(summary)]
+
+
+def _separates(vals, ranks):
+    """Criterion 2, which was documented in the module docstring and never implemented.
+
+    Between-class separation must exceed within-class spread, or an 'ordering' is noise that
+    happens to sort. Returns (ok, why); vacuous when no class has two members.
+    """
+    import statistics as st
+    by = {}
+    for v, r in zip(vals, ranks):
+        by.setdefault(r, []).append(v)
+    rk = sorted(by)
+    if len(rk) < 2:
+        return False, "only one class present"
+    spread = max([st.pstdev(by[r]) for r in rk if len(by[r]) > 1] or [0.0])
+    gaps = [st.mean(by[b]) - st.mean(by[a]) for a, b in zip(rk, rk[1:])]
+    worst = min(gaps)
+    if spread == 0.0:
+        return True, f"min gap {worst:+.3f}, no within-class spread to compare (vacuous)"
+    return worst > spread, f"min gap {worst:+.3f} vs within-class spread {spread:.3f}"
 
 
 def score():
@@ -124,11 +167,34 @@ def score():
         cells = "  ".join(f"{float(s.get(m, float('nan'))):>14.3f}" for m in JUDGED)
         print(f"{r['config']:26} {r['eye']:8} {r['rank']:>3}  {cells}")
 
-    print("\n--- admissibility ---")
+    # ------------------------------------------------------------------ provenance
+    drift = [(r["config"], scores[r["config"]].get("frames"))
+             for r in have if scores[r["config"]].get("frames") != LABELLED_FRAMES]
+    if drift:
+        print(f"\n--- PROVENANCE DRIFT (labels were authored at {LABELLED_FRAMES} frames) ---")
+        for c, f in drift:
+            print(f"  {c:26} ran {f} frames -- the label does not describe this run")
+
+    # ------------------------------------------------------------------ validity
+    invalid = {r["config"]: validity(scores[r["config"]]) for r in have}
+    invalid = {c: v for c, v in invalid.items() if v}
+    valid = [r for r in have if r["config"] not in invalid]
+    if invalid:
+        print("\n--- REFUSED BY THE CAMPAIGN'S OWN EVIDENCE RULE (critic.check_posthoc) ---")
+        for c, codes in invalid.items():
+            rk = next(r["rank"] for r in have if r["config"] == c)
+            print(f"  rank {rk}  {c:26} {','.join(codes)}")
+    # Excluding them makes the gate EASIER, and the ones excluded are the low-rank controls --
+    # exactly the cases a metric has to survive. Removing them and declaring PASS is the gate
+    # marking its own homework, so record whether the controls are still present and refuse to
+    # certify if they are not.
+    ctrl_lost = sorted({r["rank"] for r in have if r["config"] in invalid and r["rank"] <= 1})
     verdicts = {}
+
+    print("\n--- admissibility (on VALID runs only) ---")
     for m in JUDGED:
         vals, ranks = [], []
-        for r in have:
+        for r in valid:
             v = scores[r["config"]].get(m)
             if v is None:
                 continue
@@ -152,22 +218,37 @@ def score():
         top_vals = [v for v, rk in zip(vals, ranks) if rk == top]
         low_vals = [v for v, rk in zip(vals, ranks) if rk < top]
         fooled = bool(top_vals and low_vals and max(low_vals) > max(top_vals))
-        ok = tau >= 0.6 and not fooled
+        sep_ok, sep_why = _separates(vals, ranks)                  # 2. SEPARATES (was never run)
+        ok = tau >= 0.6 and not fooled and sep_ok
         verdicts[m] = (ok, f"tau={tau:+.2f}" + (" FOOLED: a lower-ranked run outscores the top"
-                                                if fooled else ""))
+                                                if fooled else "")
+                       + ("" if sep_ok else f" NOT SEPARATED: {sep_why}"))
         print(f"  [{'ADMIT ' if ok else 'REJECT'}] {m:28} {verdicts[m][1]}")
 
     admitted = [m for m, (ok, _) in verdicts.items() if ok]
     print(f"\n  admissible metrics: {admitted or 'NONE'}")
-    passed = len(admitted) >= 1
-    why = ("the bank has at least one metric that reproduces our judgement" if passed
-           else "NO metric reproduces our judgement; do not score the campaign")
+    # A metric bank that orders bud < spike < bigger-spike has NOT been shown to resist a blob.
+    # Passing on a set whose blob and sphere controls were thrown out for invalidity is the gate
+    # certifying itself on the easy half of its own test.
+    certified = bool(admitted) and not ctrl_lost
+    if admitted and ctrl_lost:
+        print(f"\n  BUT the rank-{ctrl_lost} control(s) were refused as invalid, so this set "
+              f"contains no blob/sphere case. The metrics below survived only the "
+              f"bud-vs-spike half of the test.")
+    passed = certified
+    why = ("the bank has at least one metric that reproduces our judgement, controls present"
+           if certified else
+           "NOT CERTIFIED: the low-rank control(s) are invalid runs -- re-run them below "
+           "saturation before trusting any admission" if admitted else
+           "NO metric reproduces our judgement; do not score the campaign")
     print(f"\n  GATE: {'PASS' if passed else 'FAIL'} -- {why}")
     print("=" * 96)
 
-    json.dump({"labelled": LABELLED, "scores": scores,
-               "verdicts": {m: {"admit": ok, "why": why} for m, (ok, why) in verdicts.items()},
-               "admitted": admitted, "passed": bool(passed)},
+    json.dump({"labelled": LABELLED, "labelled_frames": LABELLED_FRAMES, "scores": scores,
+               "invalid": invalid, "provenance_drift": drift, "controls_lost": ctrl_lost,
+               "verdicts": {m: {"admit": ok, "why": w} for m, (ok, w) in verdicts.items()},
+               "admitted": admitted if certified else [], "provisional": admitted,
+               "passed": bool(passed), "why": why},
               open(os.path.join(HERE, "_metrology", "instrument_gate.json"), "w"), indent=1)
     return 0 if passed else 1
 

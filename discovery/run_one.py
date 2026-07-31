@@ -70,6 +70,11 @@ def _lazy_engine():
 # --------------------------------------------------------------------------- D3: assert alignment
 def check_alignment(posf, hist, name=""):
     """The phantom-result guard. Positions and topology MUST be the same length."""
+    if not hist:
+        raise AssertionError(
+            f"[D3] no topology history recorded for {name}: every frame would fall back to the "
+            f"SEED mesh, so late-frame coordinates would be read against frame-0 connectivity. "
+            f"Schedule topo_snapshot_3d every=1; do not fall back.")
     T, H = len(posf), len(hist)
     if T != H:
         raise AssertionError(
@@ -104,9 +109,14 @@ def frame_metrics(frames):
 
 
 def protr_of(pos):
-    """percentile(r,95)/median(r) -- tube_analysis.py:89. NOT tube_len/tube_diam."""
-    r = np.linalg.norm(pos - pos.mean(0), axis=1)
-    return float(np.percentile(r, 95) / (np.median(r) + 1e-9))
+    """percentile(r,95)/median(r) about the TISSUE CENTROID. NOT tube_len/tube_diam.
+
+    The formula now lives in tube_analysis.protrusion_ratio and is shared with `ta_protr`, so the
+    two cannot silently become different quantities again (they did: ta_* measured radius from the
+    world origin, this one from the centroid, and both were called `protr`).
+    """
+    from tube_analysis import protrusion_ratio
+    return protrusion_ratio(np.linalg.norm(pos - pos.mean(0), axis=1))
 
 
 # --------------------------------------------------------------------------- the run
@@ -165,7 +175,8 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # --------------------------------------------------------------- Q: the quasi-static test
     q = None
     if do_q:
-        q = quasi_static_Q(cfg, cfg_path, device, protr_before=fm["protr"][-1], out_dir=out_dir)
+        q = quasi_static_Q(cfg, cfg_path, device, protr_before=fm["protr"][-1], out_dir=out_dir,
+                           Hf=Hf)
 
     # --------------------------------------------------------------- the REAL tube metrics
     # tube_analysis is the archive's own metric bank. Comparing against archived numbers requires
@@ -268,24 +279,40 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
 
 
 # --------------------------------------------------------------------------- Q
-def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, relax_frames=60):
-    """Continue from the end state with growth + driver OFF: mechanics and reconnection only.
+def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, Hf, relax_frames=60):
+    """Continue from the END STATE with growth + driver OFF: mechanics and reconnection only.
 
     A FORCED protrusion collapses (Q -> 0). A GROWN one persists (Q -> 1). This is round 41's
     finding turned into a number, and it is the campaign's primary discriminator.
 
-    NOTE: this requires a checkpoint of the end state. Until `ckpt.save` is wired into the run
-    path, Q is computed by re-running the same composition with the growth/forcing operators
-    removed for the tail -- which is a WEAKER test (it re-grows from the start). Flagged so the
-    ledger never treats a weak Q as a strong one.
+    THE DEFECT THIS REPLACES. The previous version deleted the growth/driver operators from the
+    spec and then called `S.load(spec_q.yaml)` -- which builds a NEW simulation from the seed
+    sphere. It therefore relaxed a fresh sphere for 60 frames and reported its elongation, every
+    time: Q was 1.014 in 14 of the 16 runs that computed it, whose real `protr_final` spanned
+    1.02--2.81. Q carries weight 1.0 in `score_run` and gates `meets_success` at Q >= 2.0, so the
+    campaign's own success criterion was unreachable and every forced-vs-grown verdict on record
+    was drawn over a constant. The end state is now checkpointed and reloaded.
+
+    AND IT IS VERIFIED. The failure above was silent for weeks because nothing ever asked whether
+    the relaxation had started where the run finished. It is asked here, on frame 0, and a
+    mismatch returns None rather than a number.
     """
     import copy
+    import ckpt
     S, engine_run = _lazy_engine()
+
+    ck = os.path.join(out_dir, "ckpt_end.npz")
+    ckpt.save_state(Hf, ck)                                # the end state, positions + topology
+
     c2 = copy.deepcopy(cfg)
     drop = {"morphogen_growth_3d", "vesicle_growth", "rd_interface_tension", "cell_rd_seed",
             "divide_3d"}
-    c2["operators"] = [o for o in c2["operators"] if o["op"] not in drop]
-    c2["schedule"] = [s for s in c2["schedule"] if s not in drop]
+    seeders = {"seed_mesh_3d", "load_mesh_3d"}             # replaced by the end-state checkpoint
+    c2["operators"] = [o for o in c2["operators"] if o["op"] not in drop | seeders]
+    c2["schedule"] = [s for s in c2["schedule"] if s not in drop | seeders]
+    c2["operators"].insert(0, {"op": "load_mesh_3d", "at": "vertex", "cell_set": "cell",
+                               "ckpt": ck, "before_frame": 1})
+    c2["schedule"].insert(0, "load_mesh_3d")
     c2["general"]["n_frames"] = relax_frames
     c2["general"]["record_cap"] = relax_frames + 2
     p2 = os.path.join(out_dir, "spec_q.yaml")
@@ -295,7 +322,16 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, relax_frames=60
         pos = oq["sets"]["vertex"]["pos"]
         m = getattr(Hq.level("vertex"), "_mesh", {}) or {}
         hq = m.get("hist", [])
+        nv0 = hq[0]["Nv"] if hq else pos.shape[1]
         nv = hq[-1]["Nv"] if hq else pos.shape[1]
+        # THE GUARD: frame 0 of the relaxation must BE the end of the run. If the checkpoint did
+        # not take, this is the seed sphere again and Q is meaningless -- say so, never return it.
+        p0 = protr_of(pos[0][:nv0].astype(np.float64))
+        if protr_before > 1.05 and abs(p0 - protr_before) > 0.15 * max(protr_before, 1.0):
+            print(f"  [Q] REFUSED: relaxation started at protr {p0:.3f} but the run ended at "
+                  f"{protr_before:.3f} -- the checkpoint did not take, so this would be the seed "
+                  f"sphere relaxing, not the end state. Recording no Q.", flush=True)
+            return None
         # M4: Q was final/before -- a RATIO, which the instrument gate showed is perfectly
         # ANTI-correlated with elongation (tau=-1.00): a sphere that never moved scores 1.0.
         # Q must be the ABSOLUTE elongation that SURVIVES relaxation, with the pre-relaxation
