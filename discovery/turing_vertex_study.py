@@ -60,6 +60,19 @@ buffer ceiling is a measurement of the buffer. The fixes, all three of them:
 `python turing_vertex_study.py --caps` prints the legacy vs planned cap for the standard sizes,
 and `--selfcheck` runs the whole guard end to end (short runs, no sweep).
 
+THE ONE-VIEWPOINT DEFECT (2026-07-31) -- READ THIS BEFORE TRUSTING ANY PICTURE FROM HERE
+------------------------------------------------------------------------------------------------
+`_render` drew every 3D panel from ONE elevation. `_draw`'s last statement is
+`view_init(elev=18, azim=azim)`, the strip asked for `azim=30` four times, and the movie spun the
+azimuth at that same elevation. Measured on the pre-fix code: strip = 1 distinct (elev, azim),
+movie = 25 azimuths but 1 elevation. A protrusion growing along the camera's line of sight is
+then pure foreshortening -- rendered with a synthetic tube aimed at the side camera, the old
+strip's silhouette elongation went 1.004 -> 1.014, i.e. the tube was invisible; from the added
+near-polar view the same tube reads 1.003 -> 1.557. Every panel now carries SIDE and TOP
+(CAM_SIDE / CAM_TOP, matching run_one.py), and `_cam_assert` refuses a one-elevation artefact.
+The box was already computed once for the whole run and is NOT part of this defect -- it was
+checked, and it is re-read off the axes every draw so it stays that way.
+
 THE MEASUREMENT THAT DECIDES IT
 ------------------------------------------------------------------------------------------------
 `corr_act_rad` -- the Pearson correlation between a cell's activator and its radius. It is the
@@ -141,6 +154,39 @@ INT_KNOBS = {x for x, v in BASE.items() if isinstance(v, int) and not isinstance
 # its proliferation clipped and is telling us about the reservoir. Both readings are recorded.
 SAT_FRAC = 0.98
 OKUDA_N_CELLS = (200, 2000, 4000)     # Okuda et al.'s starting cell counts. We were running 150.
+
+# ================================================================== the two rendering cameras
+# THE SINGLE-VIEWPOINT DEFECT. Every 3D panel this study ever drew sat at ONE elevation: the
+# strip called `_draw(..., azim=30)` four times and the movie spun the azimuth with `_draw`'s
+# hardwired `elev=18`. A protrusion growing along the side camera's line of sight projects to a
+# few pixels of foreshortening and reads as "no tube at all", so the one phenotype the study
+# exists to score is exactly the one a single viewpoint can hide. Measured on the pre-fix code:
+# strip = 1 distinct (elev, azim), movie = 25 azimuths but 1 elevation.
+#
+# Same numbers and same re-aim discipline as run_one.py's CAM_SIDE/CAM_TOP, so the campaign's
+# artefacts and the study's are read the same way. Duplicated rather than imported ON PURPOSE:
+# an edit to run_one.py must not silently re-aim this renderer, and cam_agreement() -- checked in
+# selfcheck() -- fails loudly if the two files ever drift apart.
+CAM_SIDE = dict(elev=18, azim=30)     # _draw's own hardwired elevation, stated explicitly here
+CAM_TOP = dict(elev=88, azim=30)      # near-polar, 70 deg off SIDE: a tube pointing at the side
+#                                       camera is broadside here, so it cannot hide behind the body
+CAMS = (CAM_SIDE, CAM_TOP)
+
+
+def cam_agreement():
+    """Do this renderer and run_one.py's aim at the same two places? Returns (bool, detail).
+
+    The campaign path (run_one.render) and the study path (_render) were fixed on different
+    days, and a camera fixed in one file and not the other is precisely how this study ended up
+    drawing one viewpoint while the campaign drew two. Compared, not assumed.
+    """
+    try:
+        import run_one as _ro
+        mine = [(c["elev"], c["azim"]) for c in CAMS]
+        theirs = [(c["elev"], c["azim"]) for c in (_ro.CAM_SIDE, _ro.CAM_TOP)]
+        return mine == theirs, f"study {mine} vs run_one {theirs}"
+    except Exception as e:      # renamed/removed there -> say so; do not quietly pass
+        return False, f"cannot compare against run_one: {type(e).__name__}: {str(e)[:80]}"
 
 
 # ======================================================================== reservoir arithmetic
@@ -456,7 +502,13 @@ def run_one(k, frames, movie=False):
 
 
 def _render(d, k, hist, posf, chemf, T, mesh0):
-    """A 4-panel strip + a movie, coloured BY ACTIVATOR (this study is about the chemistry)."""
+    """Strip + movie, coloured BY ACTIVATOR, drawn from TWO viewpoints (see CAM_SIDE/CAM_TOP).
+
+    Rows/panels are SIDE (elev 18) and TOP (elev 88) plus the cross-section. One viewpoint was
+    enough to hide a tube growing along the camera axis -- the phenotype `corr_act_rad` exists to
+    score -- so both artefacts now carry both. Both viewpoints share the one fixed box, so they
+    are directly comparable to each other and across frames.
+    """
     import numpy as np
     import matplotlib
     matplotlib.use("Agg")
@@ -467,7 +519,9 @@ def _render(d, k, hist, posf, chemf, T, mesh0):
         matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         pass
-    from run_tyssue_vesicle import _draw, _draw_cross, make_movie_axes, draw_movie_frame
+    # make_movie_axes/draw_movie_frame are deliberately NOT used any more: they only build the
+    # ONE-panel layout, which is the defect. The movie figure is laid out here, as run_one does.
+    from run_tyssue_vesicle import _draw, _draw_cross
 
     from run_one import check_alignment
     check_alignment(posf, hist, name=k["name"] + " (render)")   # the phantom guard, render path
@@ -479,30 +533,93 @@ def _render(d, k, hist, posf, chemf, T, mesh0):
     aT = frame(T - 1)[2]
     lo, hi = float(np.percentile(aT, 5)), float(np.percentile(aT, 99) + 1e-6)
     col = lambda mt, pt, a: np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)     # noqa: E731
+    # ONE box for the whole run (max over sampled frames, not per-frame autofit): run_one.run_box
+    # documents why -- a re-fitted frame renders an inflating sphere at constant apparent size and
+    # hides growth. Unchanged here; `used_box` below re-reads it off the axes to keep it honest.
     Rmax = max(float(np.linalg.norm(frame(t)[1], axis=1).max())
                for t in np.linspace(0, T - 1, 20).astype(int))
     L3, L2 = Rmax * 1.06, Rmax * 2.23
-    fig = plt.figure(figsize=(17.6, 9.0))
+
+    # What was ACTUALLY rendered, read back off the axes after each draw -- not what we meant to
+    # set. This is the instrument that catches the failure mode below (re-aiming too early), and
+    # it is what the `2 elevations` assertion is checked against.
+    used, used_box = set(), set()
+
+    def draw3d(ax, pt, mt, c, cam, azim=None):
+        az = cam["azim"] if azim is None else azim
+        _draw(ax, pt, mt, k["p0"], azim=az, act=c, Lbox=L3)
+        # _draw's LAST statement is view_init(elev=18, azim=azim). Re-aiming BEFORE the call is
+        # a silent no-op that collapses TOP back onto SIDE, so the re-aim must come AFTER it.
+        ax.view_init(elev=cam["elev"], azim=az)
+        used.add((round(float(ax.elev)), round(float(ax.azim))))
+        used_box.add(round(float(ax.get_xlim()[1]), 6))
+
+    # strip: three rows -- 3D side, 3D near-polar, cross-section
+    fig = plt.figure(figsize=(17.6, 13.5))
     fig.patch.set_facecolor("black")
     for i, t in enumerate([int(round(f * (T - 1))) for f in (0.0, 0.33, 0.66, 1.0)]):
         mt, pt, a = frame(t)
         c = col(mt, pt, a)
-        _draw(fig.add_subplot(2, 4, i + 1, projection="3d"), pt, mt, k["p0"], azim=30, act=c, Lbox=L3)
-        _draw_cross(fig.add_subplot(2, 4, 4 + i + 1), pt, mt, k["p0"], act=c, Lbox=L2)
+        draw3d(fig.add_subplot(3, 4, i + 1, projection="3d"), pt, mt, c, CAM_SIDE)
+        draw3d(fig.add_subplot(3, 4, 4 + i + 1, projection="3d"), pt, mt, c, CAM_TOP)
+        _draw_cross(fig.add_subplot(3, 4, 8 + i + 1), pt, mt, k["p0"], act=c, Lbox=L2)
     fig.subplots_adjust(0.006, 0.005, 0.996, 0.996, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(d, "strip.png"), dpi=110, facecolor="black")
     plt.close(fig)
-    figm = plt.figure(figsize=(5.0, 5.2))
+    _cam_assert(used, used_box, k["name"], "strip")
+
+    # movie: the two 3D viewpoints side by side + the cross-section inset (bottom-right)
+    figm = plt.figure(figsize=(10.0, 5.2))
     figm.patch.set_facecolor("black")
-    axm, axin = make_movie_axes(figm)
+    axs = figm.add_subplot(1, 2, 1, projection="3d")
+    axt = figm.add_subplot(1, 2, 2, projection="3d")
+    figm.subplots_adjust(0, 0, 1, 1, wspace=0.0)
+    axin = figm.add_axes([0.83, 0.0, 0.17, 0.34])
+    axin.set_facecolor("none")
+    axin.patch.set_alpha(0.0)
+    used.clear()
+    used_box.clear()
     keep = np.arange(0, T, max(1, T // 150))
     wri = FFMpegWriter(fps=12, metadata={"title": k["name"]})
     with wri.saving(figm, os.path.join(d, "movie.mp4"), dpi=110):
         for j, t in enumerate(keep):
             mt, pt, a = frame(int(t))
-            draw_movie_frame(axm, axin, pt, mt, k["p0"], (2 * j) % 360, col(mt, pt, a), L3, L2)
+            c = col(mt, pt, a)
+            az = (2 * j) % 360        # the turntable is kept, and SHARED by both panels so the
+            #                           two views stay registered frame by frame; what makes them
+            #                           independent viewpoints is the 70 deg of elevation.
+            draw3d(axs, pt, mt, c, CAM_SIDE, azim=az)
+            draw3d(axt, pt, mt, c, CAM_TOP, azim=az)
+            # _draw calls ax.clear(), which drops the label -- re-stamp it every frame.
+            axs.text2D(0.02, 0.96, f"side  elev {CAM_SIDE['elev']}", transform=axs.transAxes,
+                       color="w", fontsize=9)
+            axt.text2D(0.02, 0.96, f"top  elev {CAM_TOP['elev']}", transform=axt.transAxes,
+                       color="w", fontsize=9)
+            _draw_cross(axin, pt, mt, k["p0"], act=c, Lbox=L2, axis=1)
+            axin.axis("off")
             wri.grab_frame()
     plt.close(figm)
+    _cam_assert(used, used_box, k["name"], "movie")
+
+
+def _cam_assert(used, used_box, name, what):
+    """Report the cameras+box READ BACK off the axes, and refuse a one-viewpoint artefact.
+
+    Loud, not silent: the single-viewpoint defect survived because nothing ever stated how many
+    viewpoints an artefact carried, so a renderer that quietly drew one looked exactly like a
+    renderer that drew two. A regression here fails the run (run_one catches, ok=False) instead
+    of shipping a picture that cannot show the phenotype.
+    """
+    elevs = sorted({e for e, _ in used})
+    boxes = sorted(used_box)
+    verdict = ("FIXED for every frame and both views" if len(boxes) == 1
+               else f"{len(boxes)} DIFFERENT boxes -- the frame moved between draws")
+    print(f"[{name}] {what} camera: {len(used)} (elev,azim) pairs rendered, elevations {elevs}, "
+          f"box half-width {boxes}: {verdict}", flush=True)
+    assert len(elevs) >= 2, (f"{what}: SINGLE-VIEWPOINT DEFECT -- only elevations {elevs} were "
+                             f"rendered; a tube along the camera axis can hide in this artefact")
+    assert len(used_box) == 1, (f"{what}: the axis box moved between frames ({sorted(used_box)}) "
+                                f"-- per-frame autofit hides growth")
 
 
 # =============================================================================== the wave
@@ -681,6 +798,21 @@ def selfcheck():
         room.get("cells_end", 0) > sat.get("cells_end", 0),
         f"{sat.get('cells_end')} -> {room.get('cells_end')}")
     chk("spots are reported on a real run", "n_spots" in room, f"n_spots={room.get('n_spots')}")
+
+    print("\n-- 4. the renderer's cameras --")
+    # The single-viewpoint defect, as a check rather than a claim: _cam_assert refuses a
+    # one-elevation artefact, and the two renderers must aim at the same two places.
+    chk("two viewpoints are configured, at different elevations",
+        len({c["elev"] for c in CAMS}) == 2 and len(CAMS) == 2,
+        f"{[(c['elev'], c['azim']) for c in CAMS]}")
+    chk("a one-elevation artefact is refused, not shipped",
+        _raises(lambda: _cam_assert({(18, 30)}, {1.0}, "selfcheck", "strip")))
+    chk("a box that moved between frames is refused",
+        _raises(lambda: _cam_assert({(18, 30), (88, 30)}, {1.0, 2.0}, "selfcheck", "strip")))
+    chk("a genuine two-viewpoint, fixed-box artefact passes",
+        not _raises(lambda: _cam_assert({(18, 30), (88, 30)}, {1.0}, "selfcheck", "strip")))
+    agree, detail = cam_agreement()
+    chk("study and run_one.py aim at the same two cameras", agree, detail)
 
     print(f"\n{'ALL CHECKS PASSED' if not fails else 'FAILURES: ' + ', '.join(fails)}")
     return len(fails)

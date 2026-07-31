@@ -74,13 +74,45 @@ class CampaignConfig:
         "impossibility": "which composition families provably CANNOT reach a phenotype",
     })
     success: dict = field(default_factory=lambda: {
-        # Authored before the search, and REVISED once by the instrument gate (M4): the first
+        # Authored before the search, and REVISED twice. (M4, the instrument gate): the first
         # version used `retention` and a RATIO-valued Q, both of which the gate showed reward
         # STASIS -- a sphere that never moved scored 1.0. Only gate-admissible metrics appear
         # here now (protr_peak tau=+1.00, n_tubes tau=+1.00, protr_final tau=+0.67).
-        "protr_peak": ">= 3.0",              # it elongates at some point
-        "protr_final": ">= 2.0",             # and is still elongated at the end
-        "Q_protr_after_relax": ">= 2.0",     # ABSOLUTE survival, not a ratio
+        #
+        # SECOND REVISION 2026-07-31 -- THE 1.37 IS DERIVED, NOT TUNED. Do not "round it up".
+        # ---------------------------------------------------------------------------------
+        # The defect: 3.0 / 2.0 / 2.0 were authored as an IMPRESSION of "clearly a tube". Nobody
+        # ever asked what the metric reads on a shape of known aspect ratio. The question went
+        # unasked for months because `Q_protr_after_relax` was broken (it returned the constant
+        # 1.014 -- run_one.quasi_static_Q), so the criterion was unreachable BY ACCIDENT and the
+        # accident hid the fact that the numbers were never justified.
+        #
+        # `calibrate_success.py` derives them. protrusion = percentile(r,95)/median(r) is measured
+        # on analytic capsules of KNOWN aspect ratio (no simulator in the loop), against the same
+        # tube_analysis.protrusion_ratio the campaign uses:
+        #       sphere (aspect 1, THE NULL) 1.000    aspect 1.5  1.204    aspect 2  1.378
+        #       aspect 3  1.608     aspect 4  1.721     aspect -> inf  1.900 (the CEILING)
+        # A capsule of aspect A has a parallel-sided barrel (A-1) diameters long; A = 2 is the
+        # first aspect at which a straight tube segment as long as it is wide exists at all, i.e.
+        # where a bump becomes a tube. protrusion(aspect 2) = 1.3784, FLOORED to 1.37 -- floored,
+        # not rounded, because 1.38 sits above 1.3784 and would reject a shape of exactly the
+        # aspect ratio the bar was derived to admit. The acceptance test caught that when the bar
+        # was first written as 1.38; any rounding of a >= bar must go toward the calibration shape.
+        #
+        # The old numbers were not merely strict. For a long cylinder r ~ |z| with z uniform, so
+        # the metric tends to 0.95/0.50 = 1.90: NO CAPSULE OF ANY ASPECT RATIO CAN REACH 2.0. The
+        # only shapes that cleared 2.0 and 3.0 were thin spikes on a body, which over-read the
+        # ceiling -- the runs that scored 5.2 and 8.3 and that every analyst called "spike". So
+        # the old criterion did not ask for a tube, it asked for the artefact.
+        #
+        # One derived number at all three times, not a peak bar above the final bar: a peak bar
+        # above the final bar pays for overshoot-then-collapse, which is the FORCED phenotype the
+        # campaign exists to reject. Forced-vs-grown is discriminated by Q, not by an inflated
+        # peak. The threshold is NECESSARY, not sufficient (a spike also clears it) -- Q and
+        # n_tubes carry the rest. `calibrate_success.py --check` holds this file to the geometry.
+        "protr_peak": ">= 1.37",             # it is a tube (aspect >= 2) at some point
+        "protr_final": ">= 1.37",            # and is still a tube at the end
+        "Q_protr_after_relax": ">= 1.37",    # and STILL a tube with the drive off (absolute, not a ratio)
         "n_tubes": ">= 1",
         "no_extrude": True,                  # achieved WITHOUT the forcing node
     })
@@ -233,12 +265,26 @@ def score_run(summary, cfg: CampaignConfig):
     return 0.5 * pk + 1.0 * q + 0.25 * min(ntb, 2.0)
 
 
+def _bar(cfg: CampaignConfig, key):
+    """The numeric bar for `key`, READ FROM cfg.success rather than repeated here.
+
+    The defect this prevents: this function used to hardcode 3.0 / 2.0 / 2.0 while
+    `cfg.success` carried its own copy of the same three numbers. Two copies of a threshold is
+    one copy too many -- editing the config would have moved the printed criterion and left the
+    enforced one untouched, so the campaign could have reported a criterion it was not applying.
+    The derived values (see CampaignConfig.success) now live in exactly one place.
+    """
+    return float(str(cfg.success[key]).split(">=")[1])
+
+
 def meets_success(summary, cfg: CampaignConfig, has_extrude: bool):
-    ok = (float(summary.get("protr_peak", 0)) >= 3.0
-          and float(summary.get("protr_final", 0)) >= 2.0
+    """Is this run a tube that survived? Every bar is the DERIVED geometric threshold; see
+    CampaignConfig.success and `calibrate_success.py`. Nothing here is a tuned constant."""
+    ok = (float(summary.get("protr_peak", 0)) >= _bar(cfg, "protr_peak")
+          and float(summary.get("protr_final", 0)) >= _bar(cfg, "protr_final")
           and float(summary.get("Q_protr_after_relax",
-                                summary.get("protr_final", 0))) >= 2.0
-          and float(summary.get("ta_n_tubes_final", 0)) >= 1)
+                                summary.get("protr_final", 0))) >= _bar(cfg, "Q_protr_after_relax")
+          and float(summary.get("ta_n_tubes_final", 0)) >= _bar(cfg, "n_tubes"))
     if cfg.success.get("no_extrude") and has_extrude:
         ok = False
     return ok
@@ -533,6 +579,16 @@ if __name__ == "__main__":
         assert rep2["spent"] == sup.spent + len(results)
         print(f"[persist] next round after restart is {rep2['round']} "
               f"(was repeating {sup.round} forever), spent {rep2['spent']}")
+
+        # ------------------------------------------------------- GEOMETRIC SUCCESS THRESHOLD
+        # The defect this guards: the success bars were an IMPRESSION (3.0 / 2.0 / 2.0), never
+        # checked against a shape of known aspect ratio. They sat ABOVE 1.90, which is the value
+        # protrusion tends to for an infinitely long capsule -- so no tube of any aspect ratio
+        # could ever have met them. The bars are now read back and re-derived from geometry on
+        # every run of this file, so they cannot drift back into being taste.
+        import calibrate_success
+        print("\n[success] geometric acceptance test (capsules of known aspect ratio):")
+        calibrate_success.check()
 
         # a corrupt checkpoint must REFUSE to start, not silently reset the counter
         open(os.path.join(d, "state.json"), "w").write("{not json")

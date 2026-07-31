@@ -706,6 +706,95 @@ predictions and retractions as the evidence.
 \end{phasebox}
 
 %======================================================================
+\section{Phase 0 in full --- the checklist}\label{sec:p0list}
+
+Phase~0 began as four items and is now twenty. That growth is not scope creep: every item is
+``make an instrument trustworthy'', and we keep finding broken ones faster than we repair them.
+The rate of discovery is itself the finding --- it says how much of the existing record cannot be
+relied on. This list is the single place Phase~0 is tracked.
+
+\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
+\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
+\newcommand{\ns}{\textcolor{grey}{not started}}
+
+\subsection*{0A --- Measurements that were lying}
+\begin{center}\small
+\begin{tabular}{@{}r p{10.6cm} l@{}}
+\toprule
+& \textbf{Item} & \textbf{State}\\
+\midrule
+1 & Distance measured from the tissue's own centre, not the coordinate origin, so drift is no
+    longer read as elongation & \dn\\
+2 & The frame-pairing guard installed where the danger actually is & \dn\\
+3 & The survive-test continues from the run's end state instead of relaxing a fresh sphere
+    (was returning the same number for everything) & \dn\\
+4 & Camera: one frame size held for the whole run, plus a second viewpoint --- growth was being
+    drawn as shrinkage & \dn\\
+5 & The same camera repair in the \emph{study} renderer, which Phase~1 uses & \fl\\
+6 & Success threshold derived from the geometry of known shapes rather than guessed & \fl\\
+7 & \textbf{Peak and final must be computed over VALID frames only.} Until this lands, the score
+    still rewards a mesh that tears itself apart & \ns\\
+8 & Batch comparisons made at a \emph{common} frame --- two runs that stop being valid at
+    different moments cannot have their ``final'' states compared & \ns\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{0B --- Knowing when a run stopped being real}
+\begin{center}\small
+\begin{tabular}{@{}r p{10.6cm} l@{}}
+\toprule
+9  & The three mesh-failure modes reported separately --- folded, sliver, genuinely broken ---
+     instead of one blended number & \fl\\
+10 & Evidence horizon keyed on an \textbf{absolute count} of genuinely broken cells (bar $\approx$
+     20), not a fraction. A fraction grows more permissive as the tissue grows & \dn\\
+11 & \textbf{Establish whether the ``folded'' test can tell curvature from damage.} It correlates
+     with the tip-cell count at $+0.97$ --- on the run examined it was counting the tube, not
+     damage. Until this is settled, ``folded'' cannot be used for anything & \ns\\
+12 & A run that overruns its cell buffer is refused as evidence & \dn\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{0C --- What the search is allowed to reach}
+\begin{center}\small
+\begin{tabular}{@{}r p{10.6cm} l@{}}
+\toprule
+13 & Remove the silent parameter caps; derive the real stability limit and make breaching it loud
+     & \fl\\
+14 & Widen the ranges so Okuda's three out-of-range values are reachable & \fl\\
+15 & Start from Okuda's cell counts (200 / 2000 / 4000), with the buffer sized for where the run
+     is going & \dn\\
+16 & Write, test and promote the geometry-weighted chemical flow, and make swapping it a legal
+     one-move edit so the loop can ablate it itself & \fl\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{0D --- What gets recorded, named and read}
+\begin{center}\small
+\begin{tabular}{@{}r p{10.6cm} l@{}}
+\toprule
+17 & Per-frame measurements saved in the same format as the mechanical ones & \dn\\
+18 & Trajectory shapes classified automatically --- still-rising, settled, peaked, blown-up, held
+     against a limit & \dn\\
+19 & \textbf{Those shapes put into the record and into what the analysts read.} They are computed
+     but nothing consumes them yet, and the plot of the curves is still read by nobody & \ns\\
+20 & \textbf{Rename to the explicit vocabulary} (elongation / \ldots\_peak / \ldots\_at\_end /
+     \ldots\_unforced), old keys aliased on read & \ns\\
+21 & Every agent call timed, with a per-role breakdown & \dn\\
+22 & Timing survives a crash & \fl\\
+23 & The 33 archived records holding the old constant survive-test value flagged so they cannot be
+     silently re-scored & \fl\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+\textbf{Nine done, seven in flight, seven not started.} Phase~1 does not begin until items 7, 11
+and 19 are closed --- they are the three that would let a bad number back into the record.
+
+%======================================================================
 \section{Phase 0 report --- 31 July, 11:15}\label{sec:p0report}
 
 \emph{This is a phase boundary. Four of the seven items are done and independently checked; three
