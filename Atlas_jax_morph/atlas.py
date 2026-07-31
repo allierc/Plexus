@@ -7,24 +7,29 @@ authority at all over the record. They edit it; the driver decides whether the e
 
 ONE GUARDED TRANSACTION PER CALL
 
-    snapshot -> run the role -> re-read -> three checks -> commit or REVERT
+    check out one entry -> run the role on it -> merge under lock -> two checks -> commit or DROP
 
-    1. BLAST RADIUS.  Only the target mechanism may have changed. An agent that improves a
-       neighbouring entry in passing has destroyed attribution, which is the one thing that
-       makes a 24-mechanism ledger readable.
-    2. RUNG.  A role may only reach its own status. The excavator cannot declare a contract
+    0. ISOLATION, BY CONSTRUCTION.  The agent never sees the master record. It is given
+       `_work/<id>.yaml`, a file containing its one mechanism entry and nothing else. The old
+       rule -- "never edit a neighbouring entry" -- was a request an agent could break by
+       accident; now it cannot reach a neighbour at all. That is also what makes several agents
+       safe to run at once: they edit different files, and the driver merges them one at a time.
+    1. RUNG.  A role may only reach its own status. The excavator cannot declare a contract
        validated; the differ cannot promote. Statuses are earned by artefacts, and each role
        only produces one kind.
-    3. THE TWELVE RULES.  `record.py --validate` must pass. If it does not, the edit is reverted
+    2. THE TWELVE RULES.  The MERGED record must validate. If it does not, the merge is dropped
        and the violations are handed back to the agent, once. A second failure stops the
        mechanism and leaves it for a human -- not silently skipped, listed as BLOCKED.
+
+    An agent that edits the master record anyway has bypassed all of it, so that edit is
+    reverted and the call fails.
 
 Everything a revert touched is logged to `_state/reverts.jsonl` with the agent's own output, so
 a systematic misunderstanding shows up as a pattern rather than as noise.
 
     python atlas.py status
     python atlas.py step  --role excavator --mech division
-    python atlas.py phase --role excavator --all [--limit 4]
+    python atlas.py phase --role excavator --all --jobs 6 [--limit 4]
     python atlas.py step  --role normalizer --mech division --skeptic
     python atlas.py prompt --role excavator --mech division      # print it, call nothing
 """
@@ -34,9 +39,10 @@ import argparse
 import copy
 import json
 import os
-import shutil
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -65,28 +71,6 @@ def _entry(doc, mech_id):
     return None
 
 
-def _blast_radius(before, after, mech_id):
-    """Everything except the target mechanism must be identical."""
-    bad = []
-    b_meta = {k: v for k, v in before.items() if k != "mechanisms"}
-    a_meta = {k: v for k, v in after.items() if k != "mechanisms"}
-    if b_meta != a_meta:
-        changed = [k for k in set(b_meta) | set(a_meta) if b_meta.get(k) != a_meta.get(k)]
-        bad.append(f"repository-level metadata changed: {changed}")
-    b_ids = [m.get("id") for m in before.get("mechanisms") or []]
-    a_ids = [m.get("id") for m in after.get("mechanisms") or []]
-    if b_ids != a_ids:
-        bad.append(f"the mechanism list changed shape or order "
-                   f"({len(b_ids)} -> {len(a_ids)} entries)")
-        return bad
-    for mid in b_ids:
-        if mid == mech_id:
-            continue
-        if _entry(before, mid) != _entry(after, mid):
-            bad.append(f"entry {mid!r} was modified but was not the target")
-    return bad
-
-
 def _rung(before, after, mech_id, role):
     """A role may advance its mechanism to its own rung and no further."""
     ceiling = A.ROLE_MAX_STATUS.get(role)
@@ -111,11 +95,69 @@ def _validate_target(doc, mech_id, baseline):
     return [v for v in record.validate(doc, baseline) if v[1] in (mech_id, "-")]
 
 
+_RECORD_LOCK = threading.Lock()
+_MIRROR = None          # the master record exactly as THIS driver last wrote it
+
+
+def _master_locked():
+    """Read the master under the lock, and restore it if anything but the driver wrote it.
+
+    With several agents in flight the naive check -- "did the file change during my call?" --
+    accuses an innocent agent every time a sibling commits. The mirror distinguishes the two: the
+    driver is the only writer, so any difference from the mirror is somebody else's edit, whoever
+    made it, and it is undone before it can be merged into.
+    """
+    global _MIRROR
+    disk = yaml.safe_load(open(RECORD).read())
+    if _MIRROR is None:
+        _MIRROR = copy.deepcopy(disk)
+        return disk, False
+    if disk != _MIRROR:
+        record.save(_MIRROR, RECORD)
+        return copy.deepcopy(_MIRROR), True
+    return disk, False
+
+
+def _merge(mech_id, new_entry, role, baseline):
+    """Splice one edited entry back into the master record, under the lock.
+
+    Returns (problems, tampered). The master is only written if the merged document passes the
+    rung check and the twelve rules -- so several agents can be in flight at once and the record
+    still never holds an edit nobody checked.
+    """
+    global _MIRROR
+    with _RECORD_LOCK:
+        before, tampered = _master_locked()
+        if _entry(before, mech_id) is None:
+            return [f"the target entry {mech_id!r} is not in the record"], tampered
+        if new_entry.get("id") != mech_id:
+            return ([f"the working copy's id is {new_entry.get('id')!r}, not {mech_id!r}"],
+                    tampered)
+
+        merged = copy.deepcopy(before)
+        for i, m in enumerate(merged["mechanisms"]):
+            if m["id"] == mech_id:
+                merged["mechanisms"][i] = new_entry
+                break
+
+        problems = _rung(before, merged, mech_id, role)
+        problems += [f"{r}: {msg}" for r, mid, msg in
+                     _validate_target(merged, mech_id, baseline)]
+        if problems:
+            return problems, tampered
+        record.save(merged, RECORD)
+        _MIRROR = copy.deepcopy(merged)
+        return [], tampered
+
+
 def guarded(role, mech_id, ledger=None, retry=True, extra=""):
     """Run one role on one mechanism inside the transaction. Returns (committed, report)."""
     baseline = registry_view.load()
-    before_text = open(RECORD).read()
-    before = yaml.safe_load(before_text)
+    with _RECORD_LOCK:
+        _master_locked()                        # sync the mirror before anything runs
+    os.makedirs(os.path.join(CAMPAIGN, "notes"), exist_ok=True)
+    work = A.work_file(mech_id)                 # the agent's isolated copy of this one entry
+    work_before = open(work).read()
 
     prompt = A.PROMPTS[role](mech_id) + extra
     tmin, turns, tools = A.ATLAS_BUDGETS[role]
@@ -127,39 +169,42 @@ def guarded(role, mech_id, ledger=None, retry=True, extra=""):
     if role == "skeptic":                       # writes nothing; its output IS the result
         return _skeptic_verdict(mech_id, ok, out, mins)
 
-    problems = []
+    problems, new_entry = [], None
     if not ok:
         problems.append("the agent call failed or timed out")
     try:
-        after = yaml.safe_load(open(RECORD).read())
+        new_entry = yaml.safe_load(open(work).read())
     except yaml.YAMLError as e:
-        after, _ = before, problems.append(f"the record no longer parses as YAML: {e}")
-
-    if after is not None and after != before:
-        problems += _blast_radius(before, after, mech_id)
-        problems += _rung(before, after, mech_id, role)
-        problems += [f"{r}: {msg}" for r, mid, msg in _validate_target(after, mech_id, baseline)]
-    elif ok and after == before:
-        problems.append("the agent changed nothing -- the record is the product, and a call "
-                        "that produces no record change produced nothing")
+        problems.append(f"the working copy no longer parses as YAML: {e}")
+    if not problems:
+        if open(work).read() == work_before:
+            problems.append("the agent changed nothing -- the record is the product, and a call "
+                            "that produces no record change produced nothing")
+        else:
+            problems, tampered = _merge(mech_id, new_entry, role, baseline)
+            if tampered:
+                # The master is off limits: the driver is its only writer. Whatever was written
+                # there has been undone, and the call fails even if the entry itself was fine.
+                problems.append("atlas_record.yaml was edited outside the driver during this "
+                                "call -- restored, and this call is not trusted")
 
     if problems:
-        with open(RECORD, "w") as f:
-            f.write(before_text)                # REVERT: the record never holds an unchecked edit
         os.makedirs(STATE, exist_ok=True)
-        with open(REVERTS, "a") as f:
-            f.write(json.dumps({"role": role, "mech": mech_id, "minutes": round(mins, 2),
-                                "problems": problems, "agent_tail": out[-1500:]}) + "\n")
+        with _RECORD_LOCK:
+            with open(REVERTS, "a") as f:
+                f.write(json.dumps({"role": role, "mech": mech_id, "minutes": round(mins, 2),
+                                    "problems": problems, "agent_tail": (out or "")[-1500:]})
+                        + "\n")
         print(f"\n  REVERTED  {role}/{mech_id} after {mins:.1f} min:")
         for p in problems:
             print(f"    - {p}")
         if retry:
-            print("  handing the violations back, once.")
-            hand_back = ("\n\n---\nYOUR PREVIOUS ATTEMPT WAS REVERTED. The record has been "
-                         "restored to its state before your edit. These are the reasons:\n"
+            print(f"  handing the violations back to {mech_id}, once.")
+            hand_back = ("\n\n---\nYOUR PREVIOUS ATTEMPT WAS NOT ACCEPTED and the working copy "
+                         "has been restored. These are the reasons:\n"
                          + "\n".join(f"  - {p}" for p in problems)
-                         + "\nFix exactly these and edit again. Do not restate the analysis in "
-                           "prose; the record is the product.")
+                         + "\nFix exactly these and edit the working copy again. Do not restate "
+                           "the analysis in prose; the entry is the product.")
             return guarded(role, mech_id, ledger=ledger, retry=False, extra=hand_back)
         _block(mech_id, role, problems)
         return False, problems
@@ -257,6 +302,7 @@ def main():
     ap.add_argument("--mech")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--jobs", type=int, default=1, help="mechanisms in flight at once")
     ap.add_argument("--skeptic", action="store_true", help="challenge the verdict after the call")
     a = ap.parse_args()
 
@@ -281,13 +327,51 @@ def main():
     if not targets:
         print(f"nothing due at {a.role}")
         return
-    print(f"{a.role}: {len(targets)} mechanisms -- {', '.join(targets)}\n")
-    for mid in targets:
+    print(f"{a.role}: {len(targets)} mechanisms, {a.jobs} at a time -- {', '.join(targets)}\n")
+    t0 = time.time()
+
+    def one(mid):
         ok, _ = guarded(a.role, mid, ledger=ledger)
         if ok and a.skeptic:
             guarded("skeptic", mid, ledger=ledger)
+        return mid, ok
+
+    with ThreadPoolExecutor(max_workers=a.jobs) as pool:
+        results = list(pool.map(one, targets))
+
+    failed = [m for m, ok in results if not ok]
+    print(f"\n{a.role}: {len(results) - len(failed)}/{len(results)} committed in "
+          f"{(time.time() - t0) / 60:.1f} min wall clock"
+          + (f"; NOT committed: {', '.join(failed)}" if failed else ""))
+    merge_notes()
     print()
     status()
+
+
+def merge_notes():
+    """Fold the per-mechanism notes into the append-only log.
+
+    Parallel agents cannot all append to one file without losing each other's writes, so each
+    writes its own note and the driver concatenates. `campaign/analysis.md` stays the single
+    readable history.
+    """
+    notes_dir = os.path.join(CAMPAIGN, "notes")
+    if not os.path.isdir(notes_dir):
+        return
+    log = os.path.join(CAMPAIGN, "analysis.md")
+    have = open(log).read() if os.path.exists(log) else ""
+    added = 0
+    with open(log, "a") as f:
+        for fn in sorted(os.listdir(notes_dir)):
+            if not fn.endswith(".md"):
+                continue
+            body = open(os.path.join(notes_dir, fn), errors="replace").read().strip()
+            if not body or body in have:
+                continue
+            f.write(f"\n\n---\n\n## {os.path.splitext(fn)[0]}\n\n{body}\n")
+            added += 1
+    if added:
+        print(f"merged {added} note(s) into campaign/analysis.md")
 
 
 if __name__ == "__main__":

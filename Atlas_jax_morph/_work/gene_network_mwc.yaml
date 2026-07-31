@@ -1,0 +1,81 @@
+id: gene_network_mwc
+order: 3
+raw_name: GeneNetworkMWC
+raw_kind: step (ODEController)
+code_path: papers/jax-morph/jax_morph/control/ode.py:L364
+paper_section: 'eq. (4), p. 16 (Methods: "Gene Networks"); first stated p. 10 lines 534-536'
+summary: >-
+  A per-cell dynamic controller (ODEController subclass) whose evolving state is a vector of gene
+  concentrations. Over one macro-step it integrates a gene-regulatory ODE with diffrax (Dopri5,
+  adaptive) holding the sensed driver inputs fixed, and writes back the sparse DELTA of each output
+  (and optional latent) gene field. Each gene evolves as saturating production minus first-order
+  decay, but the regulatory drive is a THERMODYNAMIC log-occupancy (MWC / statistical-mechanics)
+  form -- a sum of signed interaction weights times ln(1 + concentration/threshold) -- rather than
+  the linear W*g drive the paper's eq. (4) specifies.
+equations: |-
+  Per cell, for gene i (n_gene = hidden_size + out_size), with fixed driver inputs u (n_in):
+
+    F_i = F0_i
+          + sum_j H_gene_ij * ln(1 + g_j / K_gene_ij)     # gene -> gene log-occupancy drive
+          + sum_k H_in_ik  * ln(1 + u_k / K_in_ik)         # input -> gene log-occupancy drive
+    dg_i/dt = rho_i * sigmoid(F_i)  -  g_i / tau_i          # saturating production minus decay
+
+  where (code, ode.py:449-475):
+    - g_j = max(evolving_j, 0), u_k = max(inputs_k, 0)   (clamped non-negative before occupancy)
+    - rho   = exp(log_rho)   maximum production rate per gene
+    - tau   = exp(log_tau)   lifetime per gene (degradation rate k_i = 1/tau_i)
+    - K_gene= exp(log_K_gene), K_in = exp(log_K_in)   half-occupancy concentration thresholds
+    - sigmoid = jax.nn.sigmoid  (logistic 1/(1+e^-x))
+    - the occupancy ratio g/K is capped at finfo.max before log1p (overflow guard)
+    - DECAY uses the RAW evolving_i (not the clamped g_i); production uses the clamped g_i.
+
+  __call__ integrates dy/dt = vector_field over [0, dt] (Dopri5, PIDController rtol=1e-4 atol=1e-6,
+  dt0=dt), then returns state.deltas(...) = y(dt) - y(0) for the hidden field and each output field.
+
+  PAPER (eq. 4, p. 16 / p. 10) instead specifies a CONNECTIONIST LINEAR drive:
+    dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i
+  with phi a unit-max sigmoid, W_ij linear couplings, b_i basal rate, I_i an input forcing ADDED
+  OUTSIDE the sigmoid, and k_i the degradation rate. The code's GeneNetworkConnectionist
+  (ode.py:202) implements that linear form; GeneNetworkMWC is a distinct thermodynamic variant.
+params:
+  input_specs: 'input_field_binding: static tuple of driver-field specs (sensed chemicals, stress, ...) held fixed during integration; sets n_in and the fields read as forcing u'
+  output_specs: 'output_field_binding: static tuple of observed gene-field specs that are the readout genes (division propensity, secretion / cadherin rates); sets out_size'
+  hidden_size: 'latent_regulator_count: number of hidden-state genes with no external readout that co-evolve and regulate every gene; keyword-only, default 0 (0 = pure-output circuit, no {tag}_hidden field allocated)'
+  log_rho: 'max_production_rate (log-space): rho = exp(log_rho), the saturating ceiling of each gene''s production term rho*sigmoid(F)'
+  log_tau: 'degradation_timescale / molecule_lifetime (log-space): tau = exp(log_tau); linear decay g/tau, i.e. paper rate k = 1/tau'
+  F0: 'basal_activation_bias: per-gene additive drive inside the sigmoid (paper b_i); sets basal expression when all interactions are zero (sigmoid(F0))'
+  H_gene: 'gene_coupling_strength (signed): (n_gene,n_gene) regulatory weights; sign = activating(+)/inhibitory(-), magnitude scales the ln(1+g/K) occupancy; diagonal allows self-regulation'
+  log_K_gene: 'gene_binding_threshold (log-space): K_gene = exp(...), (n_gene,n_gene) half-occupancy concentration for each regulator gene j acting on gene i'
+  H_in: 'input_coupling_strength / field_sensitivity (signed): (n_gene,n_in) weights coupling each sensed driver to each gene through its log-occupancy'
+  log_K_in: 'input_binding_threshold (log-space): K_in = exp(...), (n_gene,n_in) half-occupancy concentration for each driver input k on gene i'
+  tag: 'state_field_namespace: string prefix for the latent state field name ("{tag}_hidden"); default "gene" -- keeps multiple gene circuits'' hidden fields distinct'
+state_io:
+  reads:
+    - 'input_specs (declared via state_reads()): the fixed driver fields u for this macro-step'
+    - 'output_specs (effective, read in __call__ as the ODE initial condition y0 -- current gene concentrations)'
+    - '{tag}_hidden (effective, only when hidden_size>0 -- current latent gene concentrations)'
+  writes:
+    - '{tag}_hidden : StateFieldSpec shape (hidden_size,), only when hidden_size>0 -- sparse DELTA of latent genes'
+    - 'each output_spec : sparse DELTA of that output gene over dt (DYNAMIC step; deltas targeting the same field are summed by the integrator)'
+surprises:
+  - 'PAPER-VS-CODE CONTRADICTION (source wins): the paper (eq. 4, p. 16 and p. 10) only ever states the LINEAR connectionist drive phi(sum_j W_ij g_j + b_i) + I_i - k_i g_i inspired by Hiscock [24]. The MWC log-occupancy drive F_i = F0 + sum H*ln(1+g/K) implemented here is NOT in the paper; it is a code-only thermodynamic (Monod-Wyman-Changeux-style) reparameterization. A reimplementer working from the paper would build the connectionist form (which exists separately as GeneNetworkConnectionist) and never produce this class.'
+  - 'INPUT PLACEMENT differs from the paper even structurally: the paper adds the sensed forcing I_i OUTSIDE the sigmoid (phi(...) + I_i); here every input enters INSIDE the drive via H_in*ln(1+u/K_in) and is passed through the sigmoid. Saturation therefore couples inputs and genes, unlike eq. (4).'
+  - 'Two DIFFERENT sigmoids live in the same file: GeneNetworkMWC uses jax.nn.sigmoid (logistic), but the sibling GeneNetworkConnectionist uses _rescaled_sigmoid (algebraic x/sqrt(1+x^2) rescaled to [0,1]). Reusing the algebraic helper here would silently change dynamics.'
+  - 'Positive parameters (rho, tau, K) are stored in LOG space and exponentiated by _positive_from_log, which CLIPS the log to [log(tiny), log(max) - log(4.0)]. The "- log(4.0)" is a magic headroom constant leaving room for subsequent arithmetic before overflow; passing raw rho/tau/K instead of their logs would be wrong by an exp.'
+  - 'DEFAULT (all params None -> zeros) is NOT a silent circuit: log-zeros give rho=tau=K=1, H=0, F0=0, so production = 1*sigmoid(0) = 0.5 and decay = g, driving every gene to a steady state of 0.5. "Inert" in the docstring means zero-INTERACTION, not zero-dynamics.'
+  - 'Non-negativity is enforced by clamping genes and drivers to >=0 ONLY inside the occupancy terms (ln(1+.) would NaN on negatives). The DECAY term uses the raw (possibly negative) evolving state, not the clamped value -- an intentional asymmetry (raw decay is restorative toward 0) a reimplementer might "fix" and break.'
+  - 'Overflow guard: the ratio g/K is capped at finfo.max via jnp.minimum before log1p, documented (ode.py:465-466) as preventing a mixed-sign interaction row from forming (+inf)+(-inf)=NaN. Easy to omit and get NaNs only on extreme inputs.'
+  - 'The step is DYNAMIC and returns a SPARSE DELTA (y(dt) - y(0)), not a full updated state. Inputs u are held FIXED across the whole diffrax integration (closed over in the ODETerm lambda) -- gene concentrations evolve, sensed drivers do not. Returning a full new state, or letting u evolve, would both be wrong per the macro-step contract.'
+  - 'H_gene is a full (n_gene,n_gene) matrix INCLUDING the diagonal, so a gene may regulate itself through ln(1+g_i/K_gene_ii). n_gene = hidden_size + out_size, and output genes are ordered so the last output is the readout consumed downstream (paper: last output gene = division propensity, last Nc = secretion rates) -- ordering of output_specs is semantically load-bearing, not documented in this class.'
+verdict: null
+of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

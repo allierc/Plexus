@@ -22,22 +22,88 @@ mechanisms:
   raw_name: GeneNetworkConnectionist
   raw_kind: step (ODEController)
   code_path: papers/jax-morph/jax_morph/control/ode.py:L202
-  paper_section: null
-  summary: 'Connectionist gene circuit: sigmoid-saturated production from a linear regulatory drive.'
+  paper_section: p. 10, Materials and Methods, "Genetic regulatory interactions" (dg_i/dt = phi(sum_j
+    W_ij g_j + b_i) + I_i - k_i g_i); model inspired by Hiscock 2019 [ref 24]. Guides do not describe
+    it.
+  summary: A per-cell continuous-time gene regulatory circuit. Each cell holds a vector of gene concentrations
+    (optional hidden/intermediate genes concatenated ahead of the observed output genes); every macro-step
+    it integrates dg/dt = sigmoid(W_gene*g + W_in*u + b) - gamma*g, where u are the cell's fixed sensed
+    inputs, and writes back the resulting per-gene concentration change as a sparse state delta. It is
+    the decision function that turns sensed chemistry/mechanics into gene outputs that downstream steps
+    read to set division/secretion behavior.
+  equations: "CODE (authoritative; ode.py:L261-278 vector_field, integrated by ODEController.__call__\
+    \ L161-199):\n  g            = evolving = concat([hidden, outputs])  # per-cell gene concentrations\
+    \ (n_cells, n_gene)\n  u            = inputs                                 # packed fixed driver\
+    \ fields (n_cells, in_size)\n  drive        = g @ W_gene.T + u @ W_in.T + b\n  dg/dt        = sigma_alg(drive)\
+    \ - gamma * g\n  sigma_alg(x) = 0.5 + 0.5 * x / sqrt(1 + x^2)          # rescaled/algebraic sigmoid\
+    \ (_rescaled_sigmoid),\n                                                        # NOT logistic; range\
+    \ (0,1), sigma_alg(0)=0.5\nn_gene = hidden_size + out_size. Integrated over one macro-step by diffrax\
+    \ Dopri5 (PIDController\nrtol=1e-4, atol=1e-6, dt0=dt) from t=0 to t=dt; the step emits the SPARSE\
+    \ DELTA y(dt)-y(0) per\nhidden/output field (summed in the dynamic phase), never the updated state.\
+    \ The vector field is\nautonomous (t unused) and u is a fixed snapshot for the whole step.\n\nPAPER\
+    \ (p. 10, \"Genetic regulatory interactions\"; inspired by Hiscock 2019 [24]):\n  dg_i/dt = phi( sum_j\
+    \ W_ij g_j + b_i ) + I_i - k_i g_i\ng_i expression level; W_ij regulatory influence of gene j on i;\
+    \ b_i basal transcription; k_i\ndegradation; I_i a forcing signal from ONE sensed input; phi a saturating\
+    \ sigmoid.\n\nCONTRADICTION (source wins): the paper ADDS the sensed input I_i linearly OUTSIDE the\
+    \ sigmoid; the\ncode MIXES inputs through a full trainable matrix W_in INSIDE the sigmoid. The paper's\
+    \ I_i is a\ndirect per-gene additive forcing; the code's W_in is an (n_gene x in_size) learnable coupling.\
+    \ The\ncode therefore saturates the input drive together with the regulatory drive, whereas the paper's\n\
+    input forcing is unsaturated.\n"
   params:
-    input_specs: null
-    output_specs: null
-    hidden_size: null
-    W_gene: null
-    W_in: null
-    b: null
-    gamma: null
-    tag: null
+    input_specs: 'sensor_field_bindings: the fixed per-cell driver fields (u) the circuit senses (e.g.
+      chemical / mechanical inputs). Their flattened widths sum to in_size. Static field-spec tuple; held
+      constant across the macro-step integration.'
+    output_specs: 'output_gene_field_bindings: the observed gene-concentration fields written back to
+      state -- the action-modifying ("red") output genes. Widths sum to out_size. Static field-spec tuple.'
+    hidden_size: 'latent_regulator_count: number of intermediate ("blue") hidden genes carried in a heritable
+      {tag}_hidden field of shape (hidden_size,); 0 gives a pure-output circuit with no hidden field.
+      Static; must be >= 0.'
+    W_gene: 'regulatory_coupling_matrix (n_gene x n_gene): signed excitatory/inhibitory influence W_ij
+      of gene j on gene i, n_gene = hidden_size + out_size. Trainable; None -> zeros, shape-validated.'
+    W_in: 'input_sensitivity_matrix (n_gene x in_size): trainable coupling of each sensed input to each
+      gene, applied INSIDE the sigmoid. Trainable; None -> zeros, shape-validated.'
+    b: 'basal_production_bias (n_gene): per-gene transcription drive absent regulation (bias into the
+      sigmoid). Trainable; None -> zeros, shape-validated.'
+    gamma: 'degradation_rate: scalar or per-gene (n_gene) linear decay rate applied to every evolving
+      gene (including hidden). Default 0.1. Stored verbatim -- NOT passed through _resolve_param, so it
+      is NOT shape-checked or zero-defaulted, unlike W_gene/W_in/b.'
+    tag: 'state_namespace: string prefix for the latent hidden field name ({tag}_hidden), default "gene".
+      Bookkeeping only; no physical role.'
+  state_io:
+    reads:
+    - input_specs -- the driver fields u (declared via ODEController.state_reads()); read as a fixed snapshot.
+    writes:
+    - output_specs -- per-gene concentration increments (the observed output genes).
+    - '{tag}_hidden of shape (hidden_size,) -- emitted ONLY when hidden_size > 0 (heritable latent regulator
+      state).'
+  surprises:
+  - 'Input placement contradicts the paper: code feeds sensed inputs THROUGH the sigmoid via W_in (sigma(W_gene*g
+    + W_in*u + b)); the paper adds a per-gene forcing I_i OUTSIDE the sigmoid. A reimplementer coding
+    from the paper equation would get different saturation and different gradients.'
+  - The sigmoid is the ALGEBRAIC/rescaled sigmoid 0.5 + 0.5*x/sqrt(1+x^2), not the logistic 1/(1+exp(-x)).
+    Notably the sibling GeneNetworkMWC in the SAME file uses jax.nn.sigmoid (logistic) -- the two gene
+    circuits do not share a sigmoid.
+  - Default parameters are NOT a no-op. W_gene/W_in/b default to zeros but gamma defaults to 0.1, so drive=0
+    -> production=sigma_alg(0)=0.5 and dg/dt = 0.5 - 0.1*g, driving every gene to steady state g*=5.0.
+    An "inert" circuit still evolves the state.
+  - gamma is the only regulatory parameter not routed through _resolve_param, so unlike the weight matrices
+    it is never shape-validated and a shape-mismatched gamma would broadcast silently.
+  - The step returns a SPARSE DELTA (integrated endpoint minus start), consistent with the dynamic-phase
+    contract where deltas are summed. Returning a full updated field instead would double-apply the state.
+  - Inputs u are a FIXED quasistatic snapshot for the entire macro-step and the vector field is autonomous
+    (t and the PRNG key are both explicitly discarded). Chemistry is treated as steady-state within a
+    step.
+  - Evolving order is [hidden, outputs] and W_gene is full (n_gene x n_gene), so hidden genes both regulate
+    and are regulated by all genes, and gamma decays hidden genes too. W_gene index meaning depends on
+    this concatenation order.
+  - _rescaled_sigmoid deliberately clips x to the dtype's finite range and rescales x*x to avoid float32
+    overflow/NaN at large |drive|; a naive x/sqrt(1+x^2) can overflow before the ODE solver would otherwise
+    diverge.
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -50,19 +116,88 @@ mechanisms:
   raw_name: NeuralODE
   raw_kind: step (ODEController)
   code_path: papers/jax-morph/jax_morph/control/ode.py:L281
-  paper_section: null
-  summary: Generic neural ODE controller with an MLP per-cell vector field.
+  paper_section: eq. (4), p. 16 (Gene Networks) - describes the ODE-controller FAMILY, not this generic-MLP
+    member; see surprises
+  summary: 'A DYNAMIC controller step. Over one macro-step of duration dt it integrates a per-cell ODE
+    whose right-hand side is a single shared MLP: it packs the cell''s fixed sensed driver inputs u and
+    its evolving state y (optional latent hidden block concatenated with the observed output fields) into
+    one vector, sets dy/dt = MLP([u, y]) (u frozen for the whole step), integrates with an adaptive Dopri5
+    solver from t=0 to t=dt, and writes the CHANGE y(dt)-y(0) back as sparse dt-deltas on the hidden field
+    and each output field. It is the generic, uninterpretable sibling of the paper''s gene-regulatory
+    ODE: the same ODEController integration machinery with the structured sigmoid-linear vector field
+    replaced by a free-form neural network.'
+  equations: "Code (NeuralODE.vector_field + ODEController.__call__):\n  y  = concat(hidden, outputs)\
+    \        # evolving state, width = hidden_size + out_size\n  u  = concat(input_specs fields)     \
+    \ # fixed drivers, width = in_size, held constant over dt\n  dy/dt = MLP( concat(u, y) )         \
+    \ # one shared MLP, applied per cell via vmap; autonomous (t unused)\n  y(dt) = diffrax.diffeqsolve(Dopri5,\
+    \ t0=0, t1=dt, dt0=dt,\n                              PIDController(rtol=1e-4, atol=1e-6), SaveAt(t1=True))\n\
+    \  delta = y(dt) - y(0)                 # returned as sparse per-field increments, NOT the new value\n\
+    MLP shape contract: in_size + hidden_size + out_size  ->  hidden_size + out_size. Paper eq. (4) (the\
+    \ ODEController family this generalizes; implemented literally by GeneNetworkConnectionist, not here):\n\
+    \  dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i\nwhere g_i = expression of gene i, W_ij =\
+    \ regulatory coupling of gene j on i, b_i = basal transcription bias, I_i = sensed input forcing,\
+    \ k_i = degradation rate, phi = saturating sigmoid. NeuralODE keeps the \"phi(...) + I - k g\" scaffolding\
+    \ NOWHERE - it replaces the entire RHS with MLP([u, y]), so there is no explicit W, b, k, degradation,\
+    \ or additive input forcing; those are whatever the network learns."
   params:
-    input_specs: null
-    output_specs: null
-    hidden_size: null
-    mlp: null
-    tag: null
+    input_specs:
+      role: input_field_binding - static tuple of StateFieldSpec naming the sensed driver fields u (chemicals,
+        stress, ...) read each step and held FIXED during integration; sets in_size.
+    output_specs:
+      role: output_field_binding - static tuple of StateFieldSpec naming the observed evolving fields
+        the ODE integrates and writes back as dt-deltas (e.g. gene readouts / division propensity / secretion);
+        sets out_size.
+    hidden_size:
+      role: latent_state_width - width of the unobserved hidden block prepended to the evolving state;
+        0 means a pure-output ODE and NO hidden field is allocated or written. Must be >= 0.
+    mlp:
+      role: vector_field_network - the learnable per-cell derivative map (an eqx.nn.MLP); THIS is where
+        all trainable/optimizable parameters live. Must already be sized in_size+hidden_size+out_size
+        -> hidden_size+out_size; build it with the make_mlp classmethod (defaults width=64, depth=2).
+    tag:
+      role: field_namespace - string prefix for the latent field name f'{tag}_hidden' (default 'ode');
+        lets several controllers coexist without colliding on the hidden-state field. Purely a naming
+        key, not a physical quantity.
+  state_io:
+    reads:
+    - every field in input_specs (the fixed drivers u), by declared spec name
+    - every field in output_specs (current observed evolving state), by declared spec name
+    - f'{tag}_hidden' (latent state) - ONLY when hidden_size > 0
+    writes:
+    - f'{tag}_hidden' with shape (hidden_size,) - ONLY when hidden_size > 0 (heritable latent state)
+    - every field in output_specs - as a per-dt increment (delta), scalar chunk squeezed when spec.shape
+      == ()
+  surprises:
+  - NOT IN THE PAPER. The paper's only ODE controller is the structured gene-regulatory network eq. (4)
+    (sigmoid of a linear regulatory drive + additive input forcing - linear degradation), implemented
+    by GeneNetworkConnectionist. NeuralODE - a free-form MLP vector field - has NO paper counterpart;
+    it is a library generalization of the ODEController contract. A reimplementer who "implements the
+    paper" would build the gene network, not this.
+  - Returns a DELTA, not the integrated state. __call__ returns y(dt) - y(0) as sparse deltas because
+    DYNAMIC steps contribute dt-scaled increments that the engine ACCUMULATES across writers (see core/step.py).
+    Returning solution.ys[-1] directly (the new value) would double-add the old state. dt-scaling is already
+    baked in via the integration window [0, dt].
+  - The driver inputs u are FROZEN for the whole macro-step - the ODETerm closes over the packed inputs
+    once, so mid-step feedback from u is impossible by construction; only the evolving block y changes
+    during integration. The vector field is autonomous (t is deleted/unused).
+  - dt0=dt sets the FIRST solver step to the entire macro-step, then Dopri5 + PIDController (rtol=1e-4,
+    atol=1e-6) adapt sub-steps; the tolerances are hard-coded, not exposed as params, so accuracy is fixed
+    and independent of dt magnitude.
+  - 'Constructor does NO random init and NO parameter allocation of its own: it only stores a pre-built
+    mlp and validates its in/out sizes (raises if the MLP shape != in+hidden+out -> hidden+out). make_mlp
+    defaults (width=64, depth=2, key required) are the only place randomness enters, and they live on
+    the classmethod, not the constructor.'
+  - When hidden_size == 0 no hidden field is read or written and y0 is just the packed outputs; the hidden
+    delta dict is omitted entirely. _pack returns a (n_cells, 0) zero array for an empty spec tuple, so
+    an all-empty output_specs would still run but write nothing meaningful.
+  - 'UNKNOWN I could not establish empirically: whether any oracle script / smoke trajectory actually
+    instantiates NeuralODE (vs the gene-network controllers). Its parameter count and typical field bindings
+    in a real run are undetermined here - I read the class statically only.'
   verdict: null
   of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -198,112 +333,88 @@ mechanisms:
   raw_name: Division
   raw_kind: step (StochasticStep)
   code_path: papers/jax-morph/jax_morph/physics/division.py:L38-L229
-  paper_section: >-
-    guides/extending.md 'Example A - a discrete Bernoulli step' (the MaybeDivide skeleton this class
-    fills out) and guides/optimization/pathwise.md 'Straight-through discrete events such as Division'.
-    The paper PDF could not be rendered in this environment (no poppler/pdftotext), so the anchors are
-    the installed library guides rather than a figure or equation number in the PDF.
-  summary: >-
-    Discrete stochastic macro-step: each alive cell independently divides as a Bernoulli event with
-    probability p = 1 - exp(-division_rate*dt). A committed mother shrinks its radius by the
-    volume-conserving factor 2^(-1/d) and spawns an equal-radius daughter into a free capacity slot,
-    placed just-touching along an orientable direction, with the daughter inheriting every heritable
-    field; lineage is recorded as born/mother and divisions past capacity are capped into a global
-    division_overflow counter rather than crashing.
-  equations: |-
-    Probability (hazard over dt) -- _dist L116-119:
-      lambda_i = clip(division_rate_i, 0, inf)          # a negative rate is floored to 0 (no division)
-      p_i      = 1 - exp(-lambda_i * dt) = -expm1(-lambda_i*dt)
-    Division draw -- sample_trace L135:
-      divided_i = Bernoulli_ST(p_i) * alive_i           # forward: exact 0/1 sample; backward: d/dp = 1
-    Placement direction -- L136-145  (s = orientation_snr, a_i = division_axis, d = n_space_dim):
-      a_hat_i = a_i / (||a_i|| + 1e-12)
-      xi_i    ~ Normal(0, I_d) / sqrt(d)                 # unit-RMS isotropic noise
-      dir_i   = (s*a_hat_i + xi_i) / (||s*a_hat_i + xi_i|| + 1e-12)
-    Volume-conserving radii -- L169,182-183  (m = 2^(-1/d); each daughter's d-volume is half the mother's):
-      committed_i = divide_i AND (a free slot existed)
-      r_mother_i  = r_i * (1 - committed_soft_i*(1 - m))   # = r_i*m for a committed mother
-      r_daughter  = r_i * m                                 # scattered into the free slot
-    Placement -- L181-185  (offset uses the NEW radius r_i*m):
-      offset_i   = (r_i*m) * dir_i
-      x_mother_i = x_i + committed_soft_i * offset_i
-      x_daughter = x_i - offset_i        # centre separation 2*r_i*m = sum of the two daughter radii
-    Slot allocation -- L174-177  (n = capacity):
-      free_idx   = indices of dead (~alive) slots, padded with n
-      new_slot_i = free_idx[cumsum(divide)-1] if divide_i else n     # n = "no slot" -> dropped
-    Overflow -- L204,212-213  (GLOBAL, accumulates across macro-steps):
-      division_overflow += sum(divide) - sum(committed)
-    Lineage -- L202-203:
-      born[new_slot] = 1 ; mother[new_slot] = parent slot index (sentinel -1 elsewhere)
-    Score -- logp L227-228:
-      logp = sum_i bernoulli_logp(divided_i, p_i) * divide_eligible_i   # divide_eligible_i = alive_i at decision
-    The class/module docstring states the same p = 1 - e^{-lambda*dt}; the CODE is authoritative and
-    adds the >=0 clip, the straight-through surrogate, the 1e-12 guards, and the capacity cap, none of
-    which the docstring writes as equations.
+  paper_section: guides/extending.md 'Example A - a discrete Bernoulli step' (the MaybeDivide skeleton
+    this class fills out) and guides/optimization/pathwise.md 'Straight-through discrete events such as
+    Division'. The paper PDF could not be rendered in this environment (no poppler/pdftotext), so the
+    anchors are the installed library guides rather than a figure or equation number in the PDF.
+  summary: 'Discrete stochastic macro-step: each alive cell independently divides as a Bernoulli event
+    with probability p = 1 - exp(-division_rate*dt). A committed mother shrinks its radius by the volume-conserving
+    factor 2^(-1/d) and spawns an equal-radius daughter into a free capacity slot, placed just-touching
+    along an orientable direction, with the daughter inheriting every heritable field; lineage is recorded
+    as born/mother and divisions past capacity are capped into a global division_overflow counter rather
+    than crashing.'
+  equations: "Probability (hazard over dt) -- _dist L116-119:\n  lambda_i = clip(division_rate_i, 0, inf)\
+    \          # a negative rate is floored to 0 (no division)\n  p_i      = 1 - exp(-lambda_i * dt) =\
+    \ -expm1(-lambda_i*dt)\nDivision draw -- sample_trace L135:\n  divided_i = Bernoulli_ST(p_i) * alive_i\
+    \           # forward: exact 0/1 sample; backward: d/dp = 1\nPlacement direction -- L136-145  (s =\
+    \ orientation_snr, a_i = division_axis, d = n_space_dim):\n  a_hat_i = a_i / (||a_i|| + 1e-12)\n \
+    \ xi_i    ~ Normal(0, I_d) / sqrt(d)                 # unit-RMS isotropic noise\n  dir_i   = (s*a_hat_i\
+    \ + xi_i) / (||s*a_hat_i + xi_i|| + 1e-12)\nVolume-conserving radii -- L169,182-183  (m = 2^(-1/d);\
+    \ each daughter's d-volume is half the mother's):\n  committed_i = divide_i AND (a free slot existed)\n\
+    \  r_mother_i  = r_i * (1 - committed_soft_i*(1 - m))   # = r_i*m for a committed mother\n  r_daughter\
+    \  = r_i * m                                 # scattered into the free slot\nPlacement -- L181-185\
+    \  (offset uses the NEW radius r_i*m):\n  offset_i   = (r_i*m) * dir_i\n  x_mother_i = x_i + committed_soft_i\
+    \ * offset_i\n  x_daughter = x_i - offset_i        # centre separation 2*r_i*m = sum of the two daughter\
+    \ radii\nSlot allocation -- L174-177  (n = capacity):\n  free_idx   = indices of dead (~alive) slots,\
+    \ padded with n\n  new_slot_i = free_idx[cumsum(divide)-1] if divide_i else n     # n = \"no slot\"\
+    \ -> dropped\nOverflow -- L204,212-213  (GLOBAL, accumulates across macro-steps):\n  division_overflow\
+    \ += sum(divide) - sum(committed)\nLineage -- L202-203:\n  born[new_slot] = 1 ; mother[new_slot] =\
+    \ parent slot index (sentinel -1 elsewhere)\nScore -- logp L227-228:\n  logp = sum_i bernoulli_logp(divided_i,\
+    \ p_i) * divide_eligible_i   # divide_eligible_i = alive_i at decision\nThe class/module docstring\
+    \ states the same p = 1 - e^{-lambda*dt}; the CODE is authoritative and\nadds the >=0 clip, the straight-through\
+    \ surrogate, the 1e-12 guards, and the capacity cap, none of\nwhich the docstring writes as equations."
   params:
-    n_space_dim: >-
-      spatial_dimension (static int, must be 1/2/3) -- sets the (d,) shape of division_axis and
-      division_dir AND the volume-conservation exponent m = 2^(-1/d); not a mere array-shape knob.
-    orientation_snr: >-
-      division_axis_alignment_strength -- amplitude signal-to-noise ratio of oriented vs unit-RMS
-      isotropic placement (0 -> isotropic; larger -> daughters split more sharply along division_axis).
+    n_space_dim: spatial_dimension (static int, must be 1/2/3) -- sets the (d,) shape of division_axis
+      and division_dir AND the volume-conservation exponent m = 2^(-1/d); not a mere array-shape knob.
+    orientation_snr: division_axis_alignment_strength -- amplitude signal-to-noise ratio of oriented vs
+      unit-RMS isotropic placement (0 -> isotropic; larger -> daughters split more sharply along division_axis).
       Stored as a plain (non-static) field, so an Array value is traced and optimizable.
-    score_by_default: >-
-      gradient_scoring_default -- bookkeeping flag for whether this step's logp is summed when a
-      scoring driver is called with score=None; NOT a physical parameter.
+    score_by_default: gradient_scoring_default -- bookkeeping flag for whether this step's logp is summed
+      when a scoring driver is called with score=None; NOT a physical parameter.
   state_io:
     reads:
-      - division_rate      # per-cell hazard, heritable -- the real division knob, a STATE field not a ctor param
-      - division_axis      # per-cell orientation vector, shape (d,), heritable
+    - division_rate
+    - division_axis
     writes:
-      - position
-      - radius
-      - celltype
-      - alive
-      - division_overflow  # global scope, non-heritable running diagnostic counter
-      - born               # per-cell new-daughter flag
-      - mother             # per-cell parent slot index, dtype int, default -1
+    - position
+    - radius
+    - celltype
+    - alive
+    - division_overflow
+    - born
+    - mother
     trace_writes:
-      - divided            # 0/1 action, soft-valued (carries the straight-through gradient)
-      - divide_eligible    # alive-at-decision mask, consumed by logp
-      - division_dir       # realized placement direction, shape (d,)
+    - divided
+    - divide_eligible
+    - division_dir
     implicit_reads:
-      - alive, radius, position   # read by replay although only division_rate/division_axis are DECLARED reads
-      - every cell-scope field    # the heritable-copy loop reads each spec to fill the daughter slot
+    - alive, radius, position
+    - every cell-scope field
   surprises:
-    - >-
-      The daughter offset uses the NEW (halved) radius r*m, not the mother's pre-division radius, so the
-      two daughters end up exactly touching (centre distance 2*r*m = sum of their radii). Using the old
-      radius would overlap or gap them.
-    - >-
-      m = 2^(-1/d) makes the radius shrink DIMENSION-DEPENDENT: n_space_dim silently sets how much a cell
-      shrinks on division (~0.707 in 2D, ~0.794 in 3D), not just array shapes. A hardcoded 1/2, or a 3D
-      factor used in 2D, breaks volume conservation.
-    - >-
-      Capacity is a hard wall: if more cells divide than there are free slots, the surplus dividers are
-      silently DROPPED (new_slot = capacity, mode='drop') and counted into the GLOBAL, running
-      division_overflow. The step never errors, so a reimplementer who raises on overflow diverges.
-    - >-
-      The mother update is soft/differentiable (committed_soft scales its radius and position delta,
-      carrying d/dp=1 from the straight-through Bernoulli), but the daughter slot is written with HARD
-      scatter values -- the hazard gradient flows through the mother side only.
-    - >-
-      Eligibility is recorded as the trace field divide_eligible (= alive at decision) and logp masks by
-      it; re-reading state.alive at score time would be wrong because a division mutates alive mid-macro-step.
-    - >-
-      Composition order is load-bearing: Division must precede Death, and slots freed by Death are not
-      recycled until the next macro-step, or the per-step death lineage record is corrupted.
-    - >-
-      Only division_rate and division_axis are DECLARED reads, but replay also reads alive, radius,
-      position and EVERY cell-scope field: the daughter inherits heritable fields from the mother and
-      resets the rest to their default (a recycled dead slot may still hold stale values).
-    - >-
-      division_rate is clipped to >= 0, so a negative rate is a silent no-division rather than an error;
-      the real per-cell rate and axis are heritable STATE fields, not constructor arguments (the only
-      constructor 'physics' knob is orientation_snr).
-    - >-
-      A zero division_axis falls back to pure isotropic placement even at high orientation_snr (safe_norm
-      plus the 1e-12 guard make a_hat = 0), so orientation silently no-ops unless an axis is set.
+  - The daughter offset uses the NEW (halved) radius r*m, not the mother's pre-division radius, so the
+    two daughters end up exactly touching (centre distance 2*r*m = sum of their radii). Using the old
+    radius would overlap or gap them.
+  - 'm = 2^(-1/d) makes the radius shrink DIMENSION-DEPENDENT: n_space_dim silently sets how much a cell
+    shrinks on division (~0.707 in 2D, ~0.794 in 3D), not just array shapes. A hardcoded 1/2, or a 3D
+    factor used in 2D, breaks volume conservation.'
+  - 'Capacity is a hard wall: if more cells divide than there are free slots, the surplus dividers are
+    silently DROPPED (new_slot = capacity, mode=''drop'') and counted into the GLOBAL, running division_overflow.
+    The step never errors, so a reimplementer who raises on overflow diverges.'
+  - The mother update is soft/differentiable (committed_soft scales its radius and position delta, carrying
+    d/dp=1 from the straight-through Bernoulli), but the daughter slot is written with HARD scatter values
+    -- the hazard gradient flows through the mother side only.
+  - Eligibility is recorded as the trace field divide_eligible (= alive at decision) and logp masks by
+    it; re-reading state.alive at score time would be wrong because a division mutates alive mid-macro-step.
+  - 'Composition order is load-bearing: Division must precede Death, and slots freed by Death are not
+    recycled until the next macro-step, or the per-step death lineage record is corrupted.'
+  - 'Only division_rate and division_axis are DECLARED reads, but replay also reads alive, radius, position
+    and EVERY cell-scope field: the daughter inherits heritable fields from the mother and resets the
+    rest to their default (a recycled dead slot may still hold stale values).'
+  - division_rate is clipped to >= 0, so a negative rate is a silent no-division rather than an error;
+    the real per-cell rate and axis are heritable STATE fields, not constructor arguments (the only constructor
+    'physics' knob is orientation_snr).
+  - A zero division_axis falls back to pure isotropic placement even at high orientation_snr (safe_norm
+    plus the 1e-12 guard make a_hat = 0), so orientation silently no-ops unless an axis is set.
   verdict: null
   of: null
   why: null

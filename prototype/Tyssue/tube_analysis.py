@@ -154,6 +154,43 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
     area, vf = area.numpy(), vf.numpy()
     a = area[area > 1e-9]; v = np.abs(vf[np.abs(vf) > 1e-9])
     hollow, _, hst = hollow_flags(pt, mt)
+
+    # THE TOTALS, which were being computed and thrown away. Only their COEFFICIENTS OF VARIATION
+    # were kept, so the campaign could see how UNEQUAL the cells were but never how big the tissue
+    # was. Three of the ten premises in discovery/PREMISES.md are therefore unmeasurable from our
+    # own records:
+    #     #1 cells grow by taking material in   -> needs V_total(t_end) > V_total(t_start)
+    #     #3 a cell divides because it got big  -> needs mean cell volume roughly steady
+    #     #7 a sheet does not absorb added area by stretching -> needs area against volume
+    # and so is the question Cedric asked about the transition in mini_grow_divide_bigger.
+    m_size = dict(A_total=round(float(a.sum()), 3), V_total=round(float(v.sum()), 3),
+                  v_cell_mean=round(float(v.mean()), 5), a_cell_mean=round(float(a.mean()), 5))
+    # REDUCED VOLUME, the standard dimensionless measure of EXCESS AREA for a closed shell:
+    #     rv = 6 sqrt(pi) V / A^{3/2},   rv = 1 for a sphere, rv < 1 means more area than a sphere
+    #     of that volume can hold -- i.e. the shell MUST wrinkle, buckle or fold.
+    # This is the criterion that decides whether out-of-plane bumps are a mechanism or a defect,
+    # and it is computed on the ENCLOSED volume of the shell (divergence theorem over the closed
+    # surface), not on the sum of cell volumes, because it is the enclosure that is over-covered.
+    # Fan each face from its own centroid: for half-edge (s,t) of face f the triangle is
+    # (c_f, p_s, p_t). Needs no new vertex array and inherits the half-edges' orientation, so the
+    # signed volume comes out consistently. Dead half-edges (ef >= nF) are dropped.
+    try:
+        live = ef < nF
+        es_, et_, ef_ = es[live], et[live], ef[live]
+        cnt = np.bincount(ef_, minlength=nF).astype(float)
+        cen = np.zeros((nF, 3))
+        np.add.at(cen, ef_, pt[es_])
+        cen /= np.maximum(cnt, 1)[:, None]
+        c = cen[ef_]
+        cr = np.cross(pt[es_] - c, pt[et_] - c)
+        A_enc = 0.5 * float(np.linalg.norm(cr, axis=1).sum())
+        V_enc = abs(float((c * cr).sum()) / 6.0)
+        m_size["A_enclosing"] = round(A_enc, 3)
+        m_size["V_enclosed"] = round(V_enc, 3)
+        if A_enc > 1e-9:
+            m_size["reduced_volume"] = round(6.0 * np.sqrt(np.pi) * V_enc / A_enc ** 1.5, 4)
+    except Exception:
+        pass
     # CELL SHAPE, not cell size. Everything else recorded here is size (area_cv, vol_cv) or
     # tissue-level (protrusion, tube diameter). Nothing measured the SHAPE of a cell -- and
     # `face_polygons_3d` has been computing the shape index, perimeter/sqrt(area), and throwing it
@@ -182,7 +219,7 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
     # from a fifth being destroyed -- and the archive has runs at hollow_frac 0.97. Only `broken`
     # (under-connected, or the ring is not a valid polygon) invalidates the physics; a sliver is
     # usually just a cell that divided last frame.
-    m = dict(cells=int(nF), **m_shape,
+    m = dict(cells=int(nF), **m_shape, **m_size,
              broken_n=int(hst["n_broken"]), broken_frac=round(float(hst["frac_broken"]), 4),
              folded_n=int(hst["n_folded"]), folded_frac=round(float(hst["frac_folded"]), 4),
              sliver_n=int(hst["n_sliver"]), sliver_frac=round(float(hst["frac_sliver"]), 4),
