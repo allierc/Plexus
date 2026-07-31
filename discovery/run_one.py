@@ -500,21 +500,37 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
                   f"movie drawn WITHOUT the divided/broken colours", flush=True)
             return None, None
 
-    def draw3d(ax, pt, mt, a, cam, div=None, brk=None):
+    def classes_of(pt, mt):
+        """Per-cell structural class for the cell-type row. Loud if unavailable."""
+        try:
+            from tube_analysis import cell_classes
+            return cell_classes(pt, mt)
+        except Exception as e:
+            print(f"[{name}] cell-type row unavailable ({type(e).__name__}: {str(e)[:60]})",
+                  flush=True)
+            return None
+
+    def draw3d(ax, pt, mt, a, cam, div=None, brk=None, classes=None):
         _draw(ax, pt, mt, 3.90, azim=cam["azim"], act=col(a), Lbox=L3,
-              divided=div, broken=brk)
+              divided=div, broken=brk, classes=classes)
         # _draw hardwires elev=18 as its last statement; re-aim afterwards to get the 2nd view.
         ax.view_init(elev=cam["elev"], azim=cam["azim"])
 
-    # three rows: 3D side view, 3D top-down view, cross-section
-    fig = plt.figure(figsize=(4.4 * n_strip, 13.5))
+    # FOUR rows: 3D side, 3D top-down, cell TYPE (blue body / amber branch / yellow tip), and the
+    # cross-section. The type row answers a question the activator colouring cannot: is the
+    # protrusion a COHERENT structure, or the same number of raised cells scattered about? With
+    # several seeded spots it also shows at a glance whether every tube is developing alike.
+    fig = plt.figure(figsize=(4.4 * n_strip, 18.0))
     fig.patch.set_facecolor("black")
     for i, t in enumerate([int(round(f * (T - 1))) for f in np.linspace(0, 1, n_strip)]):
         pt, mt, a = fr[t]
         div, brk = faults_of(pt, mt)
-        draw3d(fig.add_subplot(3, n_strip, i + 1, projection="3d"), pt, mt, a, CAM_SIDE, div, brk)
-        draw3d(fig.add_subplot(3, n_strip, n_strip + i + 1, projection="3d"), pt, mt, a, CAM_TOP, div, brk)
-        ax3 = fig.add_subplot(3, n_strip, 2 * n_strip + i + 1)
+        cls = classes_of(pt, mt)
+        draw3d(fig.add_subplot(4, n_strip, i + 1, projection="3d"), pt, mt, a, CAM_SIDE, div, brk)
+        draw3d(fig.add_subplot(4, n_strip, n_strip + i + 1, projection="3d"), pt, mt, a, CAM_TOP, div, brk)
+        axc = fig.add_subplot(4, n_strip, 2 * n_strip + i + 1, projection="3d")
+        draw3d(axc, pt, mt, a, CAM_SIDE, None, brk, classes=cls)
+        ax3 = fig.add_subplot(4, n_strip, 3 * n_strip + i + 1)
         # NO try/except here. Swallowing the error is exactly the silent-no-op pattern this
         # project keeps being bitten by: the first version caught a TypeError from a wrong
         # signature and rendered a blank row that looked deliberate.

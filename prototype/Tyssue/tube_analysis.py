@@ -91,6 +91,26 @@ def tube_diameter(pt, mt, prot_frac=1.3):
                 n_tubes=len(diams), tube_len=round(float(np.median(lens)), 3) if lens else 0.0)
 
 
+def cell_classes(pt, mt):
+    """Per-cell STRUCTURAL class: 0 body, 1 branch, 2 tip, -1 dead.
+
+    The same radial rule `cell_census` uses for its fractions, exposed per cell so a renderer can
+    colour by it. The fractions answered "how much of the tissue is tube"; the labels answer
+    "WHICH cells, and are they next to each other" -- which is the difference between a coherent
+    tube and the same number of stretched cells scattered over the shell.
+    """
+    _, rad, ok = _cell_centroids(pt, mt)
+    cls = np.full(int(mt["nF"]), -1, dtype=int)
+    if ok.sum() < 4:
+        return cls
+    r = rad[ok]
+    body_r = float(np.median(r)); span = max(float(np.percentile(r, 97)) - body_r, 1e-6)
+    cls[ok] = 0
+    cls[ok & (rad > body_r + 0.15 * span)] = 1
+    cls[ok & (rad > body_r + 0.70 * span)] = 2
+    return cls
+
+
 def cell_census(pt, mt, act):
     """Classify cells by STRUCTURE (tip / branch / body, from radial position along a protrusion) and by
     STATE (red = activated vs white), so we can watch the composition over frames. A clean TUBE keeps the
