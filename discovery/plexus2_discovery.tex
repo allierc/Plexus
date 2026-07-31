@@ -242,15 +242,47 @@ specification first, because the definition is the hard part.
 neighbours are not the same event and must never again share an average.
 \item \textbf{Check where the topology changes}, not at render time. By the time you can see it,
 the physics has already run on a broken mesh for hundreds of frames.
-\item \textbf{A broken mesh makes a run \emph{not evidence}} --- the same status as a run that
-overflowed its buffer. Not a poor score: \emph{no} score. Once the mesh is invalid the physics has
-been integrating nonsense, so every number after that moment is meaningless, including the good
-ones.
+\item \textbf{Truncate the run at the breakage; do not throw it away.} My first version of this
+rule said a broken mesh makes the whole run not-evidence. Cedric was right that this is too strong:
+if the mesh fails at frame 380 of 400, the first 379 frames are perfectly good physics. The rule is
+therefore an \textbf{evidence horizon} --- the first frame at which the mesh stops being valid.
+Every measurement is taken over frames \emph{before} that point; ``final'' means the last valid
+frame, not the last frame; and the horizon is recorded alongside the run (``valid to 380 of 400'')
+so a reader can see how much of it counted. A run that breaks at frame 5 tells us nothing about
+shape --- but it is still a real result about \emph{stability}, and it should be recorded as one
+rather than discarded.
+
+An over-strict rule is its own failure mode: a rule that throws away ninety-five percent of a good
+run will quietly stop being applied.
 \item \textbf{Who:} the \textbf{Metrologist} owns the standard, since it owns the validation
 plan and is the only role that can retract things already recorded. The \textbf{Critic} applies it
 --- free, automatic, before anything is scored. Not the eye-check: by the time grey is visible on a
 video, the run is already paid for.
 \end{itemize}
+
+\paragraph{The consequence Cedric's correction exposes --- the score rewards breaking the mesh.}
+This is the part that matters most, and it only became visible once we stopped asking ``is the run
+valid'' and started asking ``valid \emph{until when}''.
+
+The headline measurement, ``how far does it stick out'', is recorded as the \textbf{largest value
+over the whole run}. Nothing restricts that maximum to frames where the mesh was still intact. When
+a mesh tears apart, cells fly outward and that number spikes. \emph{The spike becomes the score.}
+
+So the search is not merely tolerating broken meshes --- \textbf{it is being rewarded for producing
+them}. The most elongated run in the overnight study scored 32.7 with 84\% of its cells broken; the
+elongation \emph{was} the destruction. Any search left running long enough under this rule will
+discover that the cheapest way to score well is to blow the tissue apart, and will report it as the
+best mechanism found.
+
+Truncating at the evidence horizon fixes this at the root: the maximum is taken over valid frames
+only, so destruction earns nothing.
+
+\paragraph{One subtlety that truncation alone does not fix.} If one run is valid to frame 400 and
+another to frame 200, their ``final'' states are at \emph{different moments}, and comparing them
+compares two different times rather than two different mechanisms. A batch comparison must
+therefore be made at a \textbf{common frame} --- the earliest horizon in the batch --- and say so.
+My rho sweep compared final values across runs that almost certainly broke at different times, and
+truncation on its own would not have saved it.
 
 \paragraph{The retroactive part.} If broken cells were present in the archived runs --- and the
 84\% figure says they were in at least one --- then the runs behind the withdrawn conclusion were
