@@ -698,20 +698,43 @@ Not one of the items below is science; each one makes a question \emph{askable}.
 \end{tabular}
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Re-measure what Phase 0 invalidated \hfill \todo\ ($\sim$1 hour)}
-\textbf{Goal.} Re-run the 32-simulation study with a buffer ten times larger and the frame-pairing
-guard live.
+\begin{phasebox}{Phase 1 --- A fresh experiment, on working instruments \hfill \todo\ ($\sim$1 hour, local)}
+\textbf{Not a re-run, and not a comparison.} The earlier overnight study is quarantined, not
+inherited: every one of those runs was measured with at least one instrument since proved wrong,
+and re-running them ``to see if the conclusion survives'' would import the old design and the old
+question. Cedric: \emph{``a new test, not any comparison with the previous overnight run, for which
+I have no confidence anyway.''} Correct --- and I should not have framed it as a comparison.
 
-\textbf{Why.} This is the phase that decides whether my overnight conclusion was real.
-
-\textbf{What it will decide.} One of two outcomes, and \emph{both are good}:
+\textbf{What changes, beyond the instruments}
 \begin{itemize}
-\item it survives --- we have a genuine structural result, which is exactly what a paper about the
-method wants; or
-\item it dissolves --- and we avoided publishing an artefact.
+\item \textbf{Several seed spots, not one.} One protrusion per run is a single sample: you cannot
+tell ``this mechanism makes tubes'' from ``this run made a tube''. Several spots give
+\emph{within-run replication for free} --- the spread across tubes in one run is a direct measure
+of reproducibility --- and it is what Okuda shows.
+\item \textbf{Baseline growth on.} The old recipe ran with the growth floor at zero, so the body
+could not grow at all and a protrusion could only be drawn from existing material. That is not a
+setting, it is unphysiological: cells grow by taking up nutrients. The floor goes above zero and
+the activator supplies \emph{extra} growth on top.
+\item \textbf{Chemistry inside the search.} Every reaction--diffusion operator is stage 3 while the
+gate sits at 2, so the entire Turing half --- the number of spots, the diffusion ratio, the reaction
+speed, and the shape-to-chemistry ablation --- is outside the loop's reach. The stage curriculum
+was written when the objective was ``find a tube''; under ``reproduce the figures'' it is backwards.
+Chemistry is not an advanced topic to unlock later, it is half the model.
+\item \textbf{Buffers sized for the destination}, so nothing stops at a ceiling and reports it as
+biology.
 \end{itemize}
 
-\textbf{What you get.} The answer in a sentence, plus the corrected table.
+\textbf{Runs locally.} Two GPUs; a 260-frame run took 52 seconds on one of them. The cluster is not
+needed and is currently off.
+
+\textbf{The one thing to decide first} --- what the batch is \emph{for}. The map says solo operator
+effects are characterised for \textbf{0 of 8} operators, so the emptiest and cheapest cell to fill
+is ``what does each operator do on its own''. The alternative is to aim straight at the easiest
+morphology to recognise (undulation: many shallow bumps, low elongation). The first builds the map;
+the second buys a scoreboard row. They are both defensible and they are different experiments.
+
+\textbf{What you get.} A batch whose every number was taken with an instrument that has been
+checked --- and, for the first time, an honest reading of what a single operator does.
 \end{phasebox}
 
 \begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \todo\ ($\sim$1 week)}
