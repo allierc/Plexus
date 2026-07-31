@@ -35,3 +35,26 @@ code (github.com/fmottes/jax-morph) to confirm it truly lacks any implicit qs/dy
 distinction informally. (3) The growth example on p. 15 (`R_i(t+dt)=min(R_i+dR, Rmax)`) adds a
 FIXED per-step increment, not an explicitly dt-scaled rate — whether the library's "dynamic dt
 increment" faithfully reproduces that is a per-step question I left for the growth entry.
+
+**Normalizer verdict: `out_of_scope`.** `step_type` is a class-level classification TAG, not a
+forward operator over sets and fields — it declares no physics of its own and only fixes which of
+three fixed macro-step phases a step runs in, how the Model reads its return value, and the
+per-type write-conflict policy. That is engine/scheduling machinery composing the forward
+operators, the same call the campaign already made for `StochasticStep` (order 5, differentiability
+= engine concern). The contract fields are a validator formality (R6/R7 demand a typed,
+writes-non-empty contract); the load-bearing observation is that step_type is a genuine
+TIME-SCALE / integration-phase axis Plexus's IR does not carry — Plexus's own `kind` taxonomy is a
+data-flow-SHAPE axis, orthogonal to it — so the axis is a gap in the meta-layer, not a missing
+operator. **Strongest argument AGAINST:** step_type is not inert plumbing — it materially changes
+what the simulation *computes*. The identical physics tagged `dynamic` (all writers evaluated at
+one frozen post-quasistatic state, summed once — Jacobi) versus `quasistatic` (each step slaved to
+the current updated state — Gauss-Seidel) yield *different trajectories*; a mis-tag silently runs a
+step in no phase at all. Because the tag alters the dynamics and not just the bookkeeping, one
+could argue it is modeling content deserving a first-class place in the algebra (an operator
+attribute, or even a new time-scale `kind`), not dismissal as numerics. I reject this because
+"which integrator composes these operators, in what order, reading which state" is the definition
+of an engine/IR concern: it is a property *of* operators (how they compose in time), not an
+operator that acts on state — and Plexus already locates operator-classification in its `kind`
+meta-layer, exactly where this axis belongs if adopted, never in the forward vocabulary the atlas
+counts. Promoting it as `new` would inflate the yield with framework machinery, which is precisely
+the measurement out_of_scope protects.

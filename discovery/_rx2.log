@@ -1,0 +1,13 @@
+[relax120] comp=RELAX120 region='same ball, relax_iters 120 (was 30)' frames=500 dt=1.0 device=cuda:0
+
+premise check -- relax120 (static, pre-run)
+  [ok  ] P3   a cell divides because it got big
+            growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it
+  [--  ] P2   morphogen sets where/how fast, not whether
+  [--  ] P5   mechanics is fast, biology is slow
+  ALL PREMISES HOLD   (1 pass, 0 declared ablation, 2 n/a)
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === relax120 ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=500
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d

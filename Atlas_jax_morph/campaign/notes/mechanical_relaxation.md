@@ -39,3 +39,23 @@ omits radius/alive/displacement since those are base fields.
 - The "(except ... cell adhesion)" clause: I inferred it points at the solver-path-gradient problem,
   but the paper does not spell out what alternative they used in that case -- an open question for
   whoever excavates the adhesion-learning experiment.
+
+**Normalization (NORMALIZER role).** Verdict: **`new` -> contract `relax`** (kind `lateral`, family
+`mechanics`): drive cell positions to the mechanical equilibrium (force balance `grad_x U = 0`) of a
+supplied interaction -- a QUASISTATIC map to the force-balanced configuration, the tissue-mechanics
+stance that mechanics equilibrates fast relative to growth so the cluster's shape at each morphogenetic
+timepoint IS the equilibrium. Stripping the FIRE/implicit-diff numerics and the pluggable `potential`
+(a separate `attraction_repulsion`/Morse contract) leaves the equilibration OPERATION, and no
+registered contract expresses it: all 42 are single-application Euler maps (emit a velocity/force,
+engine steps once); none runs to a fixed point. This is the quasistatic dual of `brownian_dynamics ->
+agitate`. **Single strongest argument AGAINST:** "relax to equilibrium" may be a *driver/solver* over
+an operator the language already has, not a new operator -- the equilibrium of `attraction_repulsion`
+is just the fixed point of iterating its overdamped motion, and every knob `relax` exposes
+(`max_steps`, `f_tol`, `ridge`) is a numerical tolerance with no physical content (contrast `agitate`,
+which owns the physical `kT`/`gamma`), which reads as `out_of_scope` plumbing. It loses because the
+fixed Lie-Trotter split applies each operator exactly ONCE per macro-step, so the omega-limit of
+iterated composition is NOT expressible by composing registered operators (unlike NoForce = the free
+empty composition); `relax` also performs a real forward transformation (position -> equilibrium, not
+a zero no-op) and is potential-agnostic (the operation, not the force) -- but a verifier could still
+land this at `out_of_scope` if they judge a convergence-gated solver to carry no biology of its own,
+so this is the live fault line for the entry.

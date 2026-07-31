@@ -3,84 +3,193 @@ order: 17
 raw_name: Harmonic
 raw_kind: potential (PairwisePotential)
 code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L375
-paper_section: 'p. 9 (Methods, "Mechanical interactions", eq. Vij); p. 14 (SI, "Mechanical
-  Interactions") -- both define ONLY the Morse potential. Harmonic itself is absent from the
-  paper (library-only pair potential); see surprises.'
-summary: >-
-  A pairwise energy over live cell pairs: a finite-range harmonic spring whose parabola is shifted
+paper_section: p. 9 (Methods, "Mechanical interactions", eq. Vij); p. 14 (SI, "Mechanical Interactions")
+  -- both define ONLY the Morse potential. Harmonic itself is absent from the paper (library-only pair
+  potential); see surprises.
+summary: 'A pairwise energy over live cell pairs: a finite-range harmonic spring whose parabola is shifted
   down so it vanishes at a sigma-relative cutoff. Minimum sits at the contact distance sigma=r_i+r_j,
-  so the interaction is repulsive when cells are compressed (r<sigma) and adhesive when stretched
-  (sigma<r<r_c). It writes no state directly: it supplies total_energy, and forces = -grad(energy)
-  are consumed by the wrapping dynamics/relaxation step, which moves positions.
-equations: |
-  CODE (this class, potentials.py:412-416):
-    sigma = r_i + r_j                                  # contact distance = sum of the two radii
-    r_c   = r_cutoff_frac * sigma                      # cutoff distance (default 2.5 * sigma)
-    U(r)  = 0.5 * k * [ (r - sigma)^2 - (r_c - sigma)^2 ]   for r < r_c
-    U(r)  = 0                                               for r >= r_c   (jnp.where hard truncation)
-    # well depth at contact:  U(sigma) = -0.5*k*(r_c - sigma)^2 = -0.5*k*sigma^2*(r_cutoff_frac-1)^2
-    # radial force:  F(r) = -dU/dr = -k*(r - sigma)  for r < r_c, 0 beyond
-    #   -> jumps by k*(r_c - sigma) at r_c (energy is C0 there, force is discontinuous)
-
-  Reductions (inherited from PairwisePotential, potentials.py:228-240):
-    total_energy = 0.5 * sum over {i,j alive, i != j} U(r_ij)   # neighbor_sum masks self+dead pairs;
-                                                                # 0.5 counts each unordered pair once
-    forces       = -grad_position(total_energy)                 # jax.grad (autodiff, no analytic force)
-    k_ij         = 0.5 * (k_i + k_j)                            # arithmetic-mean mix, only when k is a
-                                                                # per-cell StateFieldSpec; scalar broadcasts
-
-  PAPER (the only mechanical potential the paper defines, eq. Vij, p. 9 / p. 14) -- NOT this class:
-    V_ij(r) = eps_ij * [ (1 - exp(-alpha_ij*(r - sigma_ij)))^2 - 1 ]
-    # Morse well; harmonic is a code-side alternative with the same sigma=r_i+r_j contact convention.
+  so the interaction is repulsive when cells are compressed (r<sigma) and adhesive when stretched (sigma<r<r_c).
+  It writes no state directly: it supplies total_energy, and forces = -grad(energy) are consumed by the
+  wrapping dynamics/relaxation step, which moves positions.'
+equations: "CODE (this class, potentials.py:412-416):\n  sigma = r_i + r_j                           \
+  \       # contact distance = sum of the two radii\n  r_c   = r_cutoff_frac * sigma                 \
+  \     # cutoff distance (default 2.5 * sigma)\n  U(r)  = 0.5 * k * [ (r - sigma)^2 - (r_c - sigma)^2\
+  \ ]   for r < r_c\n  U(r)  = 0                                               for r >= r_c   (jnp.where\
+  \ hard truncation)\n  # well depth at contact:  U(sigma) = -0.5*k*(r_c - sigma)^2 = -0.5*k*sigma^2*(r_cutoff_frac-1)^2\n\
+  \  # radial force:  F(r) = -dU/dr = -k*(r - sigma)  for r < r_c, 0 beyond\n  #   -> jumps by k*(r_c\
+  \ - sigma) at r_c (energy is C0 there, force is discontinuous)\n\nReductions (inherited from PairwisePotential,\
+  \ potentials.py:228-240):\n  total_energy = 0.5 * sum over {i,j alive, i != j} U(r_ij)   # neighbor_sum\
+  \ masks self+dead pairs;\n                                                              # 0.5 counts\
+  \ each unordered pair once\n  forces       = -grad_position(total_energy)                 # jax.grad\
+  \ (autodiff, no analytic force)\n  k_ij         = 0.5 * (k_i + k_j)                            # arithmetic-mean\
+  \ mix, only when k is a\n                                                              # per-cell StateFieldSpec;\
+  \ scalar broadcasts\n\nPAPER (the only mechanical potential the paper defines, eq. Vij, p. 9 / p. 14)\
+  \ -- NOT this class:\n  V_ij(r) = eps_ij * [ (1 - exp(-alpha_ij*(r - sigma_ij)))^2 - 1 ]\n  # Morse\
+  \ well; harmonic is a code-side alternative with the same sigma=r_i+r_j contact convention.\n"
 params:
-  k: 'interaction_stiffness -- spring constant; sets BOTH the repulsion slope and the adhesion
-    (well) depth simultaneously (they are not independently tunable). Shared scalar (default 1.0)
-    or a per-cell StateFieldSpec combined per pair by arithmetic-mean mix.'
-  r_cutoff_frac: 'interaction_range -- cutoff distance as a multiple of the contact distance
-    sigma=r_i+r_j (default 2.5); energy is shifted to 0 and truncated at r_c=r_cutoff_frac*sigma,
-    force vanishes beyond. Constructor requires r_cutoff_frac > 1 (clamp must sit beyond contact).'
+  k: interaction_stiffness -- spring constant; sets BOTH the repulsion slope and the adhesion (well) depth
+    simultaneously (they are not independently tunable). Shared scalar (default 1.0) or a per-cell StateFieldSpec
+    combined per pair by arithmetic-mean mix.
+  r_cutoff_frac: interaction_range -- cutoff distance as a multiple of the contact distance sigma=r_i+r_j
+    (default 2.5); energy is shifted to 0 and truncated at r_c=r_cutoff_frac*sigma, force vanishes beyond.
+    Constructor requires r_cutoff_frac > 1 (clamp must sit beyond contact).
 state_io:
   reads:
-    - position   # r_ij = |x_i - x_j| via pairwise_displacements(state.displacement) + safe_norm
-    - radius     # sigma = radius[:,None] + radius[None,:]  (contact distance per pair)
-    - alive      # neighbor_sum masks dead cells and the self-diagonal out of the energy sum
-    # displacement: static space metric carried on the state (a function, not a mutable field)
-    # + the per-cell coupling field named by `k` IF k is a StateFieldSpec (none by default; k=1.0 scalar)
-  writes: []      # a Potential is a pure energy/force function -- it declares no state_writes;
-                  # the wrapping step (MechanicalRelaxation / BrownianDynamics / ActiveBrownianDynamics2D)
-                  # writes `position`. virial_pressure(state) is also offered (per-cell scalar), unused here.
+  - position
+  - radius
+  - alive
+  writes: []
 surprises:
-  - 'NOT IN THE PAPER. The paper (Methods p. 9 and SI p. 14) defines a single mechanical potential,
-    the Morse well. Harmonic -- and SoftSphere, Hertzian, LennardJones -- are library-only pair
-    potentials added by this implementation. A reimplementer working from the paper alone would
-    implement only Morse and never encounter this class.'
-  - 'The down-shift is the whole point, and easy to drop. A naive "harmonic spring" 0.5*k*(r-sigma)^2
-    has its minimum value 0 at contact and grows without bound (purely repulsive, infinite range).
-    Subtracting (r_c-sigma)^2 makes the well minimum NEGATIVE (=-well depth) at contact and lets the
-    energy hit 0 exactly at r_c, which is what turns it into a finite-range ADHESIVE well (attractive
-    for sigma<r<r_c). Forget the shift and you lose both adhesion and the truncation.'
-  - 'C0-only cutoff: unlike Morse/LJ (C1 _smooth_cutoff) and SoftSphere/Hertzian (compact C1 tail),
-    Harmonic hard-truncates with a bare jnp.where, so the FORCE is discontinuous at r_c -- it jumps
-    from -k*(r_c-sigma) to 0. The docstring calls this harmless because r_c (2.5*sigma) sits well
-    beyond the resting contact distance; a reimplementer who "fixes" it with a smoothing changes the
-    force law.'
-  - 'sigma-relative range. r_cutoff_frac multiplies sigma = r_i + r_j (the per-pair sum of radii),
-    NOT an absolute distance, so the interaction range scales with cell size and stays size-consistent
-    as cells grow. Two combining rules coexist in one potential: sigma uses an ADDITIVE rule (r_i+r_j),
-    while the coupling k uses an arithmetic-MEAN mix (0.5*(k_i+k_j), deliberately not the
-    Lorentz-Berthelot geometric mean -- no sqrt, so the gradient stays finite at zeros/dead cells).'
-  - 'Self and dead-pair terms ARE computed then masked. pair_energy at the r=0 self-diagonal returns a
-    nonzero value (0.5*k*(sigma^2-(r_c-sigma)^2)); correctness depends entirely on neighbor_sum masking
-    self-pairs and dead cells, and on the leading 0.5 in total_energy that avoids double-counting the
-    symmetric (N,N) matrix. Skip either and the energy is wrong without crashing.'
-  - 'Forces are autodiff, not analytic: forces = -jax.grad(total_energy). There is no hand-written
-    force; the jnp.where truncation is differentiated directly (fine because U is a plain polynomial
-    inside the cutoff, so no double-where NaN guard is needed as in the _compact_repulsion helpers).'
-verdict: null
-of: null
-why: null
-contract: null
-status: inspected
+- NOT IN THE PAPER. The paper (Methods p. 9 and SI p. 14) defines a single mechanical potential, the Morse
+  well. Harmonic -- and SoftSphere, Hertzian, LennardJones -- are library-only pair potentials added by
+  this implementation. A reimplementer working from the paper alone would implement only Morse and never
+  encounter this class.
+- The down-shift is the whole point, and easy to drop. A naive "harmonic spring" 0.5*k*(r-sigma)^2 has
+  its minimum value 0 at contact and grows without bound (purely repulsive, infinite range). Subtracting
+  (r_c-sigma)^2 makes the well minimum NEGATIVE (=-well depth) at contact and lets the energy hit 0 exactly
+  at r_c, which is what turns it into a finite-range ADHESIVE well (attractive for sigma<r<r_c). Forget
+  the shift and you lose both adhesion and the truncation.
+- 'C0-only cutoff: unlike Morse/LJ (C1 _smooth_cutoff) and SoftSphere/Hertzian (compact C1 tail), Harmonic
+  hard-truncates with a bare jnp.where, so the FORCE is discontinuous at r_c -- it jumps from -k*(r_c-sigma)
+  to 0. The docstring calls this harmless because r_c (2.5*sigma) sits well beyond the resting contact
+  distance; a reimplementer who "fixes" it with a smoothing changes the force law.'
+- 'sigma-relative range. r_cutoff_frac multiplies sigma = r_i + r_j (the per-pair sum of radii), NOT an
+  absolute distance, so the interaction range scales with cell size and stays size-consistent as cells
+  grow. Two combining rules coexist in one potential: sigma uses an ADDITIVE rule (r_i+r_j), while the
+  coupling k uses an arithmetic-MEAN mix (0.5*(k_i+k_j), deliberately not the Lorentz-Berthelot geometric
+  mean -- no sqrt, so the gradient stays finite at zeros/dead cells).'
+- Self and dead-pair terms ARE computed then masked. pair_energy at the r=0 self-diagonal returns a nonzero
+  value (0.5*k*(sigma^2-(r_c-sigma)^2)); correctness depends entirely on neighbor_sum masking self-pairs
+  and dead cells, and on the leading 0.5 in total_energy that avoids double-counting the symmetric (N,N)
+  matrix. Skip either and the energy is wrong without crashing.
+- 'Forces are autodiff, not analytic: forces = -jax.grad(total_energy). There is no hand-written force;
+  the jnp.where truncation is differentiated directly (fine because U is a plain polynomial inside the
+  cutoff, so no double-where NaN guard is needed as in the _compact_repulsion helpers).'
+verdict: alias
+of: attraction_repulsion
+implementation_of: attraction_repulsion
+why: 'ALIAS of `attraction_repulsion` (implementation_of: attraction_repulsion). Harmonic is a
+
+  conservative radial pair force over live non-self cell pairs: a repulsive core when cells are
+
+  compressed (r < sigma) plus an ADHESIVE tail when they are stretched (sigma < r < r_c), with the
+
+  well minimum -0.5*k*(r_c-sigma)^2 sitting at the contact distance sigma = r_i + r_j. That is
+
+  exactly attraction_repulsion''s biology -- its "long-range pull minus short-range push", a radial
+
+  pair force that is itself the gradient of a radial potential. Harmonic''s shifted-parabola well
+
+  and attraction_repulsion''s two-Gaussian f(r)*(pos_j-pos_i) are two functional SHAPES of the one
+
+  contract; the balance of core-vs-tail sets the phase in both.
+
+
+  SAME CONTRACT AS Morse, DIFFERENT SHAPE. Morse (order 14) already landed alias ->
+
+  attraction_repulsion (implementation_of: attraction_repulsion), and the parent PairwisePotential
+
+  normalizer names the subclasses verbatim: "Morse, SoftSphere, Hertzian, Harmonic and
+
+  LennardJones are interchangeable force-law SHAPES over this one contract ... each concrete
+
+  subclass is implementation_of: attraction_repulsion." Harmonic is that Harmonic. Of the family it
+
+  is a second CORE+TAIL member alongside Morse (SoftSphere/Hertzian are purely repulsive, no
+
+  adhesion), so like Morse it maps onto attraction_repulsion most exactly -- it just swaps the
+
+  Morse exponential well for a truncated, down-shifted harmonic well. This is the
+
+  several-implementations-per-contract pattern the registry exists to hold; finding it is the GOOD
+
+  result, not a missed contract.
+
+
+  NOT `refinement`: no field of attraction_repulsion''s signature is FORCED to change, and every
+
+  Harmonic difference lives below the signature. (1) energy -> autodiff-force (forces =
+
+  -jax.grad(total_energy)) vs attraction_repulsion''s hand-coded velocity law is an implementation
+
+  STRATEGY, not a contract: stillinger_weber is itself an energy-defined interaction in this same
+
+  lateral/interaction family, and attraction_repulsion''s force is already the gradient of a radial
+
+  potential -- "write an energy and differentiate it" does not mint a contract. (2) dense N x N
+
+  all-pairs (half-summed) vs a neighbour graph is a pair-topology / range implementation axis
+
+  already carried inside existing contracts -- squared_law holds BOTH all-pairs and a neighbour
+
+  graph, and attraction_repulsion truncates via its radius_graph map; Harmonic''s own finite range
+
+  is just the shifted, hard-truncated well at r_c = r_cutoff_frac*sigma. (3) the coupling reads
+
+  (a shared scalar k, or a per-cell scalar field symmetrised by the arithmetic-mean mix; additive
+
+  sigma = r_i + r_j) are default-compatible and break no existing user. Notably Harmonic''s single
+
+  stiffness k sets BOTH the repulsion slope AND the adhesion depth at once -- a NARROWER
+
+  parameterization than Morse''s independent epsilon (depth) and alpha (width). A narrower knob set
+
+  and a C0 (force-discontinuous) hard truncation are implementation weaknesses/properties recorded
+
+  in surprises, not a widening of the contract -- they demand LESS of the signature, not more.
+
+
+  NOT `new`: attraction_repulsion already IS the pairwise attraction-repulsion contract; minting a
+
+  second for a different well SHAPE inflates exactly the yield this ledger measures. NOT
+
+  `out_of_scope`: unlike NoForce (the identity element / absence of interaction) Harmonic is a real
+
+  forward interaction with a pair map, radial separation reads, and a force output.
+
+
+  SCOPE / SOURCE notes. NOT IN THE PAPER: the paper (Methods p. 9, SI p. 14) defines only the Morse
+
+  potential; Harmonic is a library-only alternative shape with the same sigma = r_i + r_j contact
+
+  convention -- a reimplementer from the paper alone would never encounter it, but the SOURCE
+
+  carries it and it normalizes to the same contract Morse does. The per-cell VIRIAL PRESSURE the
+
+  base derives from this energy is NOT an output of this interaction contract; it is the separate
+
+  VirialStress entry''s mechanism (it writes a `stress` field), kept out of scope here. Default
+
+  magic constants (k = 1.0, r_cutoff_frac = 2.5, r_cutoff_frac > 1 enforced at construction) are
+
+  code-only numerics absent from the paper.
+
+  '
+contract:
+  name: attraction_repulsion
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - position
+  - radius
+  - alive
+  - coupling field (shared scalar OR per-cell scalar field, e.g. the stiffness k), symmetrised per pair
+    by the arithmetic-mean mix rule
+  writes:
+  - position
+  maps:
+  - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered pair
+    counts once); force on each cell = -grad of the conservative harmonic pair energy by autodiff
+  - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive core (r <
+    sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell adhesion) from a down-shifted
+    harmonic well truncated at r_c = r_cutoff_frac*sigma; a radial pair force integrated overdamped or
+    minimised by the wrapping dynamics step
+status: normalized
 module: null
 test: null
 evidence:

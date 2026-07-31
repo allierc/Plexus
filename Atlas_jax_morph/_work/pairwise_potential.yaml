@@ -77,11 +77,139 @@ surprises:
 - forces() lives on the Potential base (line 84), so PairwisePotential inherits force = -jax.grad(total_energy).
   Any custom energy (not just pairwise) can subclass Potential directly and get forces for free; NoForce
   (line 108) overrides forces to zeros to skip the O(N^2) autodiff entirely.
-verdict: null
-of: null
-why: null
-contract: null
-status: inspected
+verdict: alias
+of: attraction_repulsion
+implementation_of: attraction_repulsion
+why: 'ALIAS of `attraction_repulsion`. PairwisePotential is the ABSTRACT base for the paper''s
+
+  soft-matter pair interactions -- not itself a force law (its pair_energy raises
+
+  NotImplementedError) but the shared machinery every concrete pair potential inherits. It turns
+
+  a subclass''s conservative pair energy U(r; p) into (i) the cluster total interaction energy
+
+  (dense N x N, half-summed over live non-self pairs so each unordered pair counts once) and (ii)
+
+  per-cell forces F_i = -grad_i E by autodiff. That is exactly attraction_repulsion''s biology: a
+
+  pairwise radial cell-cell interaction -- a repulsive core (excluded volume) with an optional
+
+  adhesive tail (cell-cell adhesion) -- whose force is the gradient of a conservative radial
+
+  potential. attraction_repulsion hand-codes its two-Gaussian force f(r)*(pos_j - pos_i);
+
+  PairwisePotential writes the energy and autodiffs it. Same contract, two realizations of the
+
+  one conservative radial pair force.
+
+
+  The concrete members -- Morse (order 14), SoftSphere (15), Hertzian (16), Harmonic,
+
+  LennardJones -- are interchangeable force-law SHAPES over this one contract; each concrete
+
+  subclass is implementation_of: attraction_repulsion (Morse carries BOTH terms and is the
+
+  canonical member; SoftSphere / Hertzian are the purely-repulsive limit). This
+
+  several-implementations-per-contract pattern is the GOOD result the registry exists to hold,
+
+  not a missed contract. Morse''s own entry already records this reading and cites this parent.
+
+
+  NOT `refinement`: no field of attraction_repulsion''s signature is FORCED to change. (1)
+
+  energy -> autodiff-force versus a hand-coded force is an implementation STRATEGY, not a
+
+  contract -- stillinger_weber is itself an energy-defined interaction in this same
+
+  lateral/interaction family, so "write an energy and differentiate it" does not by itself mint
+
+  or widen a contract. (2) The per-cell coupling reads (a shared scalar OR a per-cell scalar
+
+  epsilon / alpha / k symmetrised per pair by the arithmetic-mean mix; the additive contact rule
+
+  sigma = r_i + r_j read from radius) are default-compatible and break no existing user, so they
+
+  are not a costed widening. (3) The dense O(N^2) half-sum versus a neighbour-graph reduction is
+
+  the same range / pair-topology axis squared_law already carries (all_pairs vs the radius_graph
+
+  neighbour list) and on which attraction_repulsion already truncates via its radius_graph map.
+
+
+  NOT `new`: attraction_repulsion already IS the pairwise attraction-repulsion contract; minting
+
+  a second contract for the base machinery would inflate exactly the yield this ledger exists to
+
+  measure.
+
+
+  NOT `out_of_scope`: unlike NoForce (order 12, the identity / ABSENCE of interaction, which
+
+  reads nothing and emits zero), PairwisePotential is the real forward interaction -- it has a
+
+  pair map, reads separations and couplings, and produces the force that drives motion. Its
+
+  abstractness (no own pair_energy) is WHY it is the contract rather than a single
+
+  implementation, not evidence that it is mere plumbing.
+
+
+  SCOPE / SOURCE notes. (a) The per-cell VIRIAL PRESSURE the base also derives from the same
+
+  energy is NOT an output of THIS interaction contract; it is the separate VirialStress entry
+
+  (order 20), which writes a `stress` field -- kept out of scope here, consistent with the Morse
+
+  entry. (b) forces() itself lives on the Potential base (line 84), not on PairwisePotential;
+
+  any custom energy can subclass Potential and inherit -grad forces for free (NoForce overrides
+
+  it to zeros). That inheritance is engine machinery, not a second contract. (c) The coupling
+
+  restriction -- a shared scalar OR a per-cell SCALAR field only; per-type and per-cell ARRAY
+
+  couplings rejected at __check_init__ -- is a real EXPRESSIVENESS limit of this implementation
+
+  against the paper''s type x type cadherin adhesion matrix (Fig. S1); recorded in surprises as
+
+  an implementation weakness, not a contract change (an override of mix() or an external epsilon
+
+  route would supply the matrix). (d) SOURCE vs PAPER (rule 5): the paper (p. 9) says JAX-MD
+
+  performs the mechanics, but the source derives forces by autodiff with NO jax-md dependency
+
+  (surprises). SOURCE WINS; it does not change the verdict -- either way it is the same pairwise
+
+  cell-cell interaction.
+
+  '
+contract:
+  name: attraction_repulsion
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - position
+  - radius
+  - alive
+  - displacement
+  - coupling field (shared scalar OR per-cell scalar field, e.g. epsilon / alpha / k), symmetrised per
+    pair by the arithmetic-mean mix rule
+  writes:
+  - position
+  maps:
+  - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered pair
+    counts once); force on each cell = -grad of a conservative radial pair energy by autodiff, the concrete
+    well SHAPE supplied by a subclass's pair_energy (repulsive core +/- adhesive tail)
+  - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); a per-cell coupling
+    symmetrised per pair by the arithmetic-mean mix; a conservative radial pair force integrated overdamped
+    or minimised by the wrapping motion step
+status: normalized
 module: null
 test: null
 evidence:

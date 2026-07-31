@@ -481,6 +481,23 @@ class MorphogenGrowth3D(Structural):
         m["P0"] = m["P0_init"] * s
         m["V0f"] = m["V0f_init"] * (s ** 3)
         m["V0"] = float(m["V0f"].sum())
+        # THE SHELL RADIUS MUST GROW WITH THE CELLS. shape_energy_3d carries a radial spring,
+        #     E += K_R * sum_i (|x_i| - R0)^2                 (tyssue_ops3d.py:85)
+        # and R0 is set once at seeding (:217). `vesicle_growth` rescales it (:409); this operator
+        # never did. So with K_R = 0.4 the mechanics pinned the shell at the seed radius while the
+        # cells' target volumes grew sixteenfold, and the sheet had nowhere to put the extra area
+        # but through itself. Measured on mini_grow_divide_bigger: rays cast from the tissue
+        # centroid cross the surface exactly once at frame 384 (100% of them) and 13 times at
+        # frame 423. The genus check reported "sphere (as built)" at every one of those frames --
+        # Euler characteristic is combinatorial and cannot see a shell folded through its own
+        # centre, which is why this survived until premise 11 was written.
+        #
+        # The radius of the sphere enclosing the current target volume, NOT the measured mean
+        # radius: R0 must express what the cells are ASKING for. Setting it from |x| would make
+        # the spring chase the shell's own excursions and quietly penalise a growing bud, which is
+        # the one shape this campaign exists to produce.
+        if "R0" in m:
+            m["R0"] = float((3.0 * max(m["V0"], 1e-12) / (4.0 * np.pi)) ** (1.0 / 3.0))
         if self.conserve_amount:
             # conserve molecule AMOUNT: c_j <- c_j * (v_old/v_new) = c_j * (s_prev/s)^3 as v_eq grows ~ s^3.
             # Makes dilution STRUCTURAL (no continuum -c(div.v) term); it is LOAD-BEARING (Okuda's intra-domain

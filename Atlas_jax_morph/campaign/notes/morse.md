@@ -33,3 +33,24 @@ type-aware pairwise matrix. Either the model overrides `mix()` or sources `epsil
 trace in `potentials.py`. Left as an open uncertainty in the entry, not asserted as a contradiction.
 
 **Did NOT run** the oracle (excavation only; evidence left null for the normalizer/harness).
+
+---
+
+**NORMALIZER verdict: `alias` of `attraction_repulsion` (implementation_of: attraction_repulsion).**
+Morse is the pairwise cell-cell interaction the paper actually uses -- repulsive core (excluded
+volume) + adhesive tail (adhesion), minimum `-epsilon` at `sigma = r_i + r_j` -- which IS
+attraction_repulsion's "long-range pull minus short-range push"; the Morse well and the two-Gaussian
+force are two SHAPES of one conservative radial pair force, one written as an energy + autodiff, the
+other hand-coded. The parent `PairwisePotential` already landed `alias -> attraction_repulsion` and
+named Morse as a subclass implementation, so this is the several-implementations-per-contract pattern,
+not a new contract; of all the siblings Morse is the canonical fit (only one with BOTH terms).
+**Strongest argument AGAINST (and why it loses):** Morse is a differentiable conservative ENERGY that
+yields THREE typed outputs (`total_energy`, `forces`, and a per-cell virial STRESS) through an
+end-to-end autodiff pipeline, whereas attraction_repulsion is a hand-coded FORCE law emitting only a
+velocity -- so one could argue "declares a learnable energy AND exposes a stress readout" is a
+distinct contract shape and call this a `refinement` (widen outputs to energy + stress) or even
+`new`. It loses because the energy-vs-force distinction sits BELOW the signature (stillinger_weber is
+already an energy-defined interaction registered in the same lateral/interaction family, so
+autodiffing an energy mints no contract), and the virial stress is the separate VirialStress
+operator's output (it writes a `stress` field), not part of the interaction contract -- no field of
+attraction_repulsion's signature is forced to change.

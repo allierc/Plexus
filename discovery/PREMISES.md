@@ -76,9 +76,12 @@ stress over long times:
   * differential growth in a constrained geometry leaves residual stress for the whole of
     development
 
-Our own runs are an example: in `mini_grow_divide_bigger` the cells are compressed from 3.63 to
-2.45 in volume, against a target that is rising the whole time, before the shell buckles and
-releases it. That is stored stress, and it is the mechanism, not an error.
+*(An earlier version of this section cited one of our own runs as an example of stored stress —
+cells compressed from 3.63 to 2.45 in volume before the shell released. **That was an artefact and
+the example is withdrawn.** The compression came from a radial spring whose target radius was
+frozen at the seed value while the cells grew sixteenfold; with the spring corrected, mean cell
+volume is flat for the whole run and there is no compression at all. The premise stands on the
+laboratory evidence above, not on our simulation.)*
 
 So the premise forbids exactly two things: **inertia**, and **unrelaxed transients** — the
 configuration lagging behind the forces because the solver ran out of iterations.
@@ -89,7 +92,7 @@ solver substeps. One growth or division step must correspond to many mechanical 
 *Check, part B (convergence):* the relaxation must actually reach equilibrium each frame. The
 residual force after relaxation must not grow as the tissue does — `relax_iters` is a constant
 while the system it has to relax keeps getting bigger, so this is a real risk and not a
-hypothetical one. Measured on `mini_grow_divide_bigger`, mean residual force rises 8.4 → 22.9.
+hypothetical one.
 *Caught by part A:* defect D5a. `dt = 0.02` is the mechanics substep and the chemistry was being
 integrated with it too — 300 frames bought 6 units of reaction time instead of ~500. Every "no
 pattern formed" reading in the campaign was an artefact of the clock.

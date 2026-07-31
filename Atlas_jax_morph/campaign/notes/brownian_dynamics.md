@@ -35,3 +35,42 @@ Not established (uncertainty for the next reader):
 - Whether the paper's gradient-descent relaxation used a fixed learning rate (vs. FIRE/other) is
   not stated; I inferred the kT=0 -> lr=dt/gamma correspondence from the source, not the paper.
 - `verdict`/`contract` deliberately left null (normalizer's job); status set to `inspected`.
+
+---
+
+## Normalizer
+
+**Verdict: `new`** -- a motion-family operator `agitate` on the cell set: overdamped,
+temperature-controlled thermal (Brownian) motion of positions, `dx = (F/gamma) dt + sqrt(2 kT dt/gamma) xi`,
+with diffusion `D = kT/gamma` (Einstein / fluctuation-dissipation). The reasoning follows the campaign's
+own StochasticStep split: the base mixin (order 5) is `out_of_scope` because it writes nothing, but a
+concrete subclass with a real state-effect earns a forward contract (cf. `death` -> `new` `apoptose`).
+BrownianDynamics writes POSITION, so it is not plumbing; its trace/replay/logp is the mixin's
+(out_of_scope), and its drift is delegated to the pluggable Morse `potential` (a separate
+cohesion/attraction_repulsion-family contract the engine would integrate). What is left as its own
+primitive is a temperature-driven random walk of cell positions, which no frozen contract provides
+(`diffuse` is a field/grid Laplacian, wrong set; `drag`/`glide`/`sediment` are dissipative/directed, not
+a thermal fluctuation source). Recorded source-vs-paper contradiction (source wins): paper Methods (p. 14)
+= deterministic gradient-descent Morse minimization with no kT/gamma; source = full overdamped Langevin,
+of which the paper's relaxation is the kT=0 special case.
+
+**Single strongest argument against (verified in the frozen source).** Three registered operators
+*already* bolt on an isotropic `noise * randn` and Plexus can therefore jitter cell positions today:
+`drag` (`PARAM_ROLES noise: thermal_noise`, `acc = -k*v + noise*randn`, comment "drag + noise = a
+Brownian/Langevin bath"), `glide` (`noise: translational_noise`, "an active Brownian walker"), and
+`attraction_repulsion` (`noise: exploration_noise`, "exploratory noise on the overdamped velocity"). A
+skeptic reads that as: the language has thermal noise, so this is an alias (and the campaign's `death`
+entry ruled a borrowed noise model an interchangeable IMPLEMENTATION detail, not contract identity).
+My rebuttal is that these are all the *same* ad-hoc modifier -- a bare amplitude times a standard
+normal, off-by-default, bolted onto a PRIMARY deterministic force. None carries a temperature, obeys
+the Einstein relation (amplitude uncoupled from friction), applies the Wiener sqrt(dt) scaling (the
+engine integrates them deterministically, so their diffusion constant is dt-scaling-wrong), or is a
+scorable stochastic process; and none stands alone (drag needs velocity, glide a heading,
+attraction_repulsion neighbors). That *three* operators independently accreted *three different
+role-names* for one jitter is evidence of a MISSING abstraction, not a present one. `agitate` is that
+missing thermostat -- constitutive (with `potential=None` the step is nothing but the bath, the exact
+mechanism the paper names for differential-adhesion sorting, "high-temperature Brownian relaxation",
+p. 19), temperature-parameterized, FDT-calibrated, Wiener-scaled. The closest contract to widen is
+`drag`, and widening dissipative inertial friction (acc = -k*v, an acceleration, the energy-SINK half
+of fluctuation-dissipation) into an overdamped temperature-scaled fluctuation *source* inverts both
+its regime (2nd- to 1st-order) and its sign convention -- violence to its biology, not a widening.

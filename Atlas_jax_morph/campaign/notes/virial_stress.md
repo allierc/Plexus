@@ -32,3 +32,33 @@ gene-network input in the examples).
 but did not run the oracle to diff a reference stress signal -- that is a validation-stage
 question, and I flagged it rather than assuming equivalence. I also did not trace exactly which
 example notebook's gene-input node consumes `stress`, only that nothing inside the package does.
+
+---
+
+## Normalizer: verdict `new` -> contract `mechanosense`
+
+**Verdict: `new`** — a standalone quasistatic MECHANOSENSOR. VirialStress reduces the same
+pairwise potential and same live-non-self neighbour sum as `attraction_repulsion`, but contracts
+it to a per-cell SCALAR observable (the Irving-Kirkwood virial pressure, normalised by `2 d V_i`)
+that it writes to a transient `stress` field and that MOVES NOTHING. No registered contract
+exposes a per-cell mechanical load as a pure-sensing readout for downstream mechanotransduction:
+`active_stress`/`active_force` GENERATE stress/force into the MPM substep, `sense` reads a
+diffusible field and steers heading, `aggregate` reduces children onto a parent. Contract:
+`mechanosense`, `lateral`/`mechanics` (same taxonomy slot as gravity / mpm_anchor / mpm_spin),
+set `cell`; reads position/radius/alive + the potential's coupling field, writes `stress`.
+
+**Single strongest argument against it.** Plexus arguably ALREADY has mechanosensing —
+`cell_grow` carries `stress_gain` (`mechano_inhibition`: "growth slows in deformed tissue"), which
+is exactly the paper's "stress inhibits proliferation." If the language can already gate a cell's
+fate on its local mechanical load, then VirialStress is not new vocabulary but merely the extracted
+"sensor half" of a capability Plexus expresses — pushing toward `out_of_scope` (a redundant
+intermediate) or a `refinement` of `attraction_repulsion`, whose base literally computes
+`virial_pressure` right beside `forces()` and could simply also emit it. The rebuttal I stand on:
+`cell_grow` reads the MPM CONTINUUM deformation gradient F (not a pairwise virial) and FUSES
+sense+respond in one op, so the mechano-SENSE never exists as a reusable, first-class `stress`
+field that any other consumer (a gene network, `cell_divide`, a differentiation switch) can read —
+which is precisely the decoupled contract VirialStress mints and the promoted language lacks. But
+this is the alternative I had to defeat, not a free win: if a later entry shows `cell_grow`'s
+deformation readout and the virial pressure are interchangeable mechanical-load signals, then
+`mechanosense` and that fused reading should be reconciled as one contract with two
+implementations rather than left as separate vocabulary.

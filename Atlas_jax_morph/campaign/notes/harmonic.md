@@ -35,3 +35,22 @@ drives Harmonic (everything uses Morse), so whether this class is exercised down
 `k`-as-a-per-cell-`StateFieldSpec` is a supported mode but I saw no caller use it. `virial_pressure` is
 inherited/available but I did not trace whether any step consumes it for Harmonic. Left `verdict`/`contract`
 for the normalizer per the role rules.
+
+**Normalizer verdict — `alias` of `attraction_repulsion` (implementation_of: attraction_repulsion).**
+Harmonic is a conservative radial pair force with a repulsive core (`r < sigma`) plus an adhesive tail
+(`sigma < r < r_c`) and its well minimum at contact `sigma = r_i + r_j` — the exact biology of
+`attraction_repulsion`'s "long-range pull minus short-range push". It is a second core+tail member of the
+PairwisePotential family alongside Morse (which already landed alias → attraction_repulsion and whose
+normalization the parent quotes as naming Harmonic verbatim), differing only in the well SHAPE (a truncated
+down-shifted parabola vs the Morse exponential) — the several-implementations-per-contract pattern, so
+minting a new contract would inflate the ledger's yield. **Strongest argument against:** attraction_repulsion
+is registered as a *first-derivative, hand-coded velocity law message-passed over a `radius_graph` neighbour
+graph*, whereas Harmonic is an *energy* defined over a *dense N×N all-pairs* matrix and turned into a force
+by `-jax.grad`. If one reads the contract's IDENTITY as "hand-coded force on a sparse graph" rather than "the
+conservative radial pull-minus-push law", then admitting an energy-defined dense-pairs implementation is
+arguably a `refinement` (widen the operator to accept an energy→autodiff realization and an all-pairs
+topology) rather than a free alias. I judge those to be sub-signature implementation axes — stillinger_weber
+is already an energy-defined interaction in this same family, squared_law already carries both all-pairs and
+a graph, and attraction_repulsion's own hand-coded force *is* the gradient of a radial potential — so no
+signature field is forced to change and the alias holds; but the structural gap is real and is the honest
+case for refinement.

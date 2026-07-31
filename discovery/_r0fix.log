@@ -1,0 +1,42 @@
+[mini_grow_divide_bigger] comp=MINI_mini_grow_divide_bigger region='same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing' frames=500 dt=1.0 device=cuda:1
+
+premise check -- mini_grow_divide_bigger (static, pre-run)
+  [ok  ] P3   a cell divides because it got big
+            growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it
+  [--  ] P2   morphogen sets where/how fast, not whether
+  [--  ] P5   mechanics is fast, biology is slow
+  ALL PREMISES HOLD   (1 pass, 0 declared ablation, 2 n/a)
+[engine] 500 sim frames -> recording 501 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === mini_grow_divide_bigger ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=500
+[engine] sets:      vertex(30000)  cell(16000)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   mechanics: shape_energy_3d   topology: reconnect_t1_3d
+[mini_grow_divide_bigger] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[mini_grow_divide_bigger] {"saturated": false, "inert_operators": [], "retention": 0.982, "valid_evidence": true, "protr_final": 1.042, "protr_peak": 1.061, "horizon_frame": 500, "horizon_why": "broken_n never sustained damage to the end (max 0)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.061, "protr_final_untruncated": 1.042, "n_cells_final": 7686, "red_frac_final": 0.0, "act_max_final": 0.0, "frames": 501, "wall_s": 110.3, "ta_hollow_n_peak": 6, "ta_hollow_n_final": 6, "ta_area_cv_final": 0.216, "ta_vol_cv_final": 0.203, "ta_tube_diam_final": 0.0, "ta_n_tubes_final": 0, "ta_tube_len_final": 0.0, "ta_protr_final": 1.042, "ta_red_frac_final": 0.0, "ta_tip_act_final": 0.0, "mech_force_mean": 37.4844, "mech_p_body": 4.1204, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 6.1507, "mech_migration": 0.88928}
+[mini_grow_divide_bigger] D4 ok: all 7 scheduled operators acted ({'seed_mesh_3d': 1, 'reconnect_t1_3d': 118, 'divide_3d': 126} ...)
+[mini_grow_divide_bigger] camera: FIXED Lbox=28.084 for all 501 frames and both views (per-frame autofit would have run 5.507 -> 28.084, x5.10: that rescaling is what hid growth)
+[mini_grow_divide_bigger] artefacts -> log/okuda/mini_grow_divide_bigger/{strip.png,movie.mp4}
+
+premise check -- mini_grow_divide_bigger (post-run)
+  [FAIL] P7   a sheet does not absorb added area by stretching
+            the top 5% of cells reach shape index 4.60 over the final fifth of the run (4.5 is about a
+            2:1 cell). The tissue is accommodating area by THINNING rather than by buckling or dividing;
+            reduced volume 0.969. Either it needs to divide faster or the area is being added too fast.
+  [ok  ] P1   cells grow by taking material in
+            tissue volume 456.1 -> 57496.1 (x126.05)
+  [ok  ] P11  tissue cannot pass through itself
+            at every frame at least 99.0% of rays cross the surface exactly once
+  [ok  ] P3   a cell divides because it got big
+            growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it
+  [ok  ] P3b  mean cell volume holds under proliferation
+            mean cell volume ends at 0.95 of its peak (7.90 -> 7.48)
+  [ok  ] P5b  the mechanical relaxation keeps up with the tissue
+            residual force after relaxation 19.16 -> 33.25 (x1.73) while the tissue grew from 150 to 7686 cells
+  [ok  ] P8   the shape index has a hard geometric floor
+            minimum shape index 3.6560 respects the floor 3.5449
+  [ok  ] P9   a closed epithelium is a sphere with no holes
+            genus 0 at all 40 recorded frames
+  [--  ] P2   morphogen sets where/how fast, not whether
+  [--  ] P4   the chemistry must not be silently extinguished
+  [--  ] P5   mechanics is fast, biology is slow
+  1 PREMISE(S) BROKEN   (7 pass, 0 declared ablation, 3 n/a)

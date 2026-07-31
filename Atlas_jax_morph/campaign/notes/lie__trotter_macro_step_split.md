@@ -36,3 +36,22 @@ API are taken from the guide and from usage inside `_accumulate_dynamic`, not co
 definitions. (c) Did not trace any concrete assembled `Model`/pipeline, so I cannot say which
 specific paper steps land in each phase -- "division is discrete/last" is the CONTRACT's phase
 order, not a verified property of a shipped model.
+
+**NORMALIZE -- verdict `out_of_scope`.** The macro-step split is the INTEGRATOR / composition law
+of the operator algebra, not an operator in it: it has no biological name, its only own write is
+the global time scalar `t <- t + dt`, and it is explicitly numerics (a first-order Lie-Trotter
+operator split). The composition law is part of an algebra's *definition*, not one of its elements;
+Plexus's engine already owns operator scheduling, so the promoted VOCABULARY gains nothing. This
+sits with the sibling engine-machinery verdicts `stochastic_step` and `no_force`; the vestigial
+`contract:` (name `integrate`, aggregate/hierarchy, `writes: [t]`) exists only to satisfy R6/R7,
+as in those precedents. **Strongest argument AGAINST:** the split is not inert plumbing -- the
+Jacobi (not Gauss-Seidel) dynamic phase, the FIXED quasistatic->dynamic->discrete order that
+overrides list order, and the dt-scaled sparse-delta accumulation are load-bearing SEMANTIC choices
+a reimplementer must get exactly right, so one could call this a genuine "integration contract" the
+atlas is missing (and if Plexus's engine composes operators differently, that disagreement is
+exactly the source-vs-language contradiction the exercise prizes). It loses because those choices
+are properties of the ENGINE that runs *any* operator pipeline, not of a forward operator over
+sets/fields: they deserve DOCUMENTING (they are, in the surprises) but counting them as vocabulary
+would inflate the yield with framework machinery -- the same reasoning that put `stochastic_step`
+out of scope. Any genuine engine-composition disagreement should be recorded against the engine,
+not as a new operator.

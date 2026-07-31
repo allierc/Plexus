@@ -3,46 +3,39 @@ order: 18
 raw_name: LennardJones
 raw_kind: potential (PairwisePotential)
 code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L419
-paper_section: p. 9 'Mechanical interactions' (Morse energy Vij, eq. lines 514-520; also
-  Methods p. 14 lines 758-772) - the paper's mechanics are Morse ONLY; LennardJones appears
-  nowhere in the paper.
-summary: 'A pair-interaction ENERGY component (not a step): given cell positions it returns
-  a scalar total interaction energy over live, non-self pairs, from which the wrapping step
-  (MechanicalRelaxation / BrownianDynamics / ActiveBrownianDynamics2D) derives per-cell forces
-  by autodiff. The pair energy is Lennard-Jones in ``r_min`` form: a hard r^-12 repulsive core
-  plus a 2*r^-6 adhesive tail whose minimum is exactly ``-epsilon`` at the contact distance
-  ``sigma = r_i + r_j``, multiplied by a smooth cutoff that truncates the tail between
-  ``r_onset_frac*sigma`` and ``r_cutoff_frac*sigma``. It writes no state itself.'
-equations: |
-  Pair energy (LJ, r_min form), for a pair at separation r with contact distance sigma:
-    x       = safe_divide(sigma, r)              # = sigma/r, but 0 (not inf) at r=0
-    U_lj(r) = epsilon * ( x**12 - 2 * x**6 )     # minimum -epsilon exactly at r = sigma
-    U(r)    = U_lj(r) * S(r; r_on, r_off)        # tail truncated by the smooth cutoff
-  where
-    sigma   = r_i + r_j                          # contact distance = sum of the two radii (per pair)
-    r_on    = r_onset_frac  * sigma              # default 1.5 * sigma
-    r_off   = r_cutoff_frac * sigma              # default 2.5 * sigma
-  Smooth cutoff S (jax-md multiplicative switch, C1), with r2=r^2, ron2=r_on^2, roff2=r_off^2:
-    S(r) = 1                                              for r <= r_on
-    S(r) = (roff2-r2)^2 (roff2 + 2 r2 - 3 ron2)/(roff2-ron2)^3   for r_on < r < r_off
-    S(r) = 0                                              for r >= r_off
-  Aggregation (inherited from PairwisePotential.total_energy):
-    E_total = 0.5 * sum_i sum_{j alive, j != i} U(r_ij)   # each live pair counted once
-    forces  = -grad_positions(E_total)                    # via jax.grad; no analytic force
-  Per-cell virial pressure (inherited, optional consumer):
-    p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij)         # V_i is the d-ball volume of radius r_i
-  CODE vs PAPER: the paper uses the MORSE energy for all mechanics, never Lennard-Jones:
-    V_morse(r) = epsilon * [ (1 - exp(-alpha (r - sigma)))^2 - 1 ]   (paper eq., p. 9 / p. 14)
+paper_section: p. 9 'Mechanical interactions' (Morse energy Vij, eq. lines 514-520; also Methods p. 14
+  lines 758-772) - the paper's mechanics are Morse ONLY; LennardJones appears nowhere in the paper.
+summary: 'A pair-interaction ENERGY component (not a step): given cell positions it returns a scalar total
+  interaction energy over live, non-self pairs, from which the wrapping step (MechanicalRelaxation / BrownianDynamics
+  / ActiveBrownianDynamics2D) derives per-cell forces by autodiff. The pair energy is Lennard-Jones in
+  ``r_min`` form: a hard r^-12 repulsive core plus a 2*r^-6 adhesive tail whose minimum is exactly ``-epsilon``
+  at the contact distance ``sigma = r_i + r_j``, multiplied by a smooth cutoff that truncates the tail
+  between ``r_onset_frac*sigma`` and ``r_cutoff_frac*sigma``. It writes no state itself.'
+equations: "Pair energy (LJ, r_min form), for a pair at separation r with contact distance sigma:\n  x\
+  \       = safe_divide(sigma, r)              # = sigma/r, but 0 (not inf) at r=0\n  U_lj(r) = epsilon\
+  \ * ( x**12 - 2 * x**6 )     # minimum -epsilon exactly at r = sigma\n  U(r)    = U_lj(r) * S(r; r_on,\
+  \ r_off)        # tail truncated by the smooth cutoff\nwhere\n  sigma   = r_i + r_j                \
+  \          # contact distance = sum of the two radii (per pair)\n  r_on    = r_onset_frac  * sigma \
+  \             # default 1.5 * sigma\n  r_off   = r_cutoff_frac * sigma              # default 2.5 *\
+  \ sigma\nSmooth cutoff S (jax-md multiplicative switch, C1), with r2=r^2, ron2=r_on^2, roff2=r_off^2:\n\
+  \  S(r) = 1                                              for r <= r_on\n  S(r) = (roff2-r2)^2 (roff2\
+  \ + 2 r2 - 3 ron2)/(roff2-ron2)^3   for r_on < r < r_off\n  S(r) = 0                               \
+  \               for r >= r_off\nAggregation (inherited from PairwisePotential.total_energy):\n  E_total\
+  \ = 0.5 * sum_i sum_{j alive, j != i} U(r_ij)   # each live pair counted once\n  forces  = -grad_positions(E_total)\
+  \                    # via jax.grad; no analytic force\nPer-cell virial pressure (inherited, optional\
+  \ consumer):\n  p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij)         # V_i is the d-ball volume of\
+  \ radius r_i\nCODE vs PAPER: the paper uses the MORSE energy for all mechanics, never Lennard-Jones:\n\
+  \  V_morse(r) = epsilon * [ (1 - exp(-alpha (r - sigma)))^2 - 1 ]   (paper eq., p. 9 / p. 14)\n"
 params:
-  epsilon: 'well_depth / adhesion_energy_scale - sets BOTH the repulsion strength and the
-    adhesive well depth (the minimum equals -epsilon at contact). A shared scalar OR a per-cell
-    ``StateFieldSpec``; a per-cell epsilon is combined per pair by the ARITHMETIC mean
-    ``0.5*(e_i+e_j)`` (base ``mix``), not a geometric / Lorentz-Berthelot rule. Default 1.0.'
-  r_onset_frac: 'interaction_cutoff_onset - start of the smooth truncation window as a multiple
-    of the contact distance sigma; the tail is untouched (S=1) inside this radius. Default 1.5.'
-  r_cutoff_frac: 'interaction_range / cutoff - end of the smooth truncation window as a multiple
-    of sigma, beyond which the energy is exactly 0. Must satisfy r_onset_frac < r_cutoff_frac
-    (checked at construction). Default 2.5.'
+  epsilon: well_depth / adhesion_energy_scale - sets BOTH the repulsion strength and the adhesive well
+    depth (the minimum equals -epsilon at contact). A shared scalar OR a per-cell ``StateFieldSpec``;
+    a per-cell epsilon is combined per pair by the ARITHMETIC mean ``0.5*(e_i+e_j)`` (base ``mix``), not
+    a geometric / Lorentz-Berthelot rule. Default 1.0.
+  r_onset_frac: interaction_cutoff_onset - start of the smooth truncation window as a multiple of the
+    contact distance sigma; the tail is untouched (S=1) inside this radius. Default 1.5.
+  r_cutoff_frac: interaction_range / cutoff - end of the smooth truncation window as a multiple of sigma,
+    beyond which the energy is exactly 0. Must satisfy r_onset_frac < r_cutoff_frac (checked at construction).
+    Default 2.5.
 state_io:
   reads:
   - position (capacity, n_space_dim) - supplied to total_energy; also state.position for virial
@@ -50,41 +43,128 @@ state_io:
   - alive (capacity,) - masks dead cells and self-pairs in neighbor_sum
   - 'displacement (static, from the state''s space: free_space / periodic) - the pairwise metric'
   - n_space_dim (static) - only for the inherited virial_pressure (d-ball volume)
-  - 'epsilon field - ONLY if epsilon is a StateFieldSpec; then declared via state_reads() so the
-    wrapping step allocates it. With the default scalar epsilon, reads nothing beyond base fields.'
+  - epsilon field - ONLY if epsilon is a StateFieldSpec; then declared via state_reads() so the wrapping
+    step allocates it. With the default scalar epsilon, reads nothing beyond base fields.
   writes:
-  - 'NONE. This is an energy component, not a step: it returns a scalar energy / a force array /
-    a per-cell pressure. The consuming step writes position (relaxation, Brownian) or a pressure
-    field (virial stress); LennardJones declares no state_writes of its own.'
+  - 'NONE. This is an energy component, not a step: it returns a scalar energy / a force array / a per-cell
+    pressure. The consuming step writes position (relaxation, Brownian) or a pressure field (virial stress);
+    LennardJones declares no state_writes of its own.'
 surprises:
-- 'THE PAPER DOES NOT USE LENNARD-JONES. Every mechanical interaction in the paper is the MORSE
-  potential (p. 9 ''Mechanical interactions''; Methods p. 14). ``LennardJones`` is a library-only
-  alternative pair potential, exercised by no paper experiment - a reimplementer targeting the
-  paper would never instantiate this class. Recorded as the source/paper divergence; source wins.'
-- 'It is the ``r_min`` LJ form ``eps*((sigma/r)^12 - 2 (sigma/r)^6)``, NOT the textbook
-  ``4 eps ((sigma/r)^12 - (sigma/r)^6)``. Here sigma is the location of the MINIMUM (= contact
-  distance r_i+r_j) with value -epsilon, NOT the zero-crossing. Coding the standard 4-eps form
-  puts the well at 2^(1/6) sigma with the wrong depth - a silent, plausible-looking error.'
-- 'sigma is per-pair and size-dependent (r_i + r_j), and BOTH cutoff radii are sigma-relative, so
-  the interaction rescales as cells grow. A fixed absolute cutoff would break size-consistency.'
-- 'The smooth cutoff S multiplies the WHOLE energy (core included), not just the r^-6 tail. It is
-  inert on the core only because r_on = 1.5*sigma > sigma keeps S=1 for r < sigma; a reimplementer
-  who lowers r_onset_frac below 1 would start cutting into the repulsive core.'
-- 'Zero-safety: ``x = safe_divide(sigma, r)`` returns 0 (not inf) at r=0, so the self-diagonal and
-  dead-dead padded pairs give U=0 instead of NaN under the always-on jax_debug_nans. A naive
-  sigma/r blows up. _smooth_cutoff and safe_divide similarly guard the sigma=0 dead-pair case.'
-- 'Aggregation carries a 0.5 factor (each pair counted once) and neighbor_sum masks self and dead
-  pairs. Dropping the 0.5 double-counts the energy and hence the forces.'
-- 'No analytic force: forces are ``-jax.grad(total_energy)`` and there is NO jax-md dependency -
-  the energy is hand-written and differentiated. The C1 cutoff keeps the force continuous but with
-  a small slope kink at the window edges.'
-- 'Unlike Morse, LJ has NO width/steepness knob: the 12-6 exponents fix the shape. Only epsilon and
-  the two cutoff fractions are tunable, so it cannot be tuned to reproduce a given Morse alpha.'
-verdict: null
-of: null
-why: null
-contract: null
-status: inspected
+- THE PAPER DOES NOT USE LENNARD-JONES. Every mechanical interaction in the paper is the MORSE potential
+  (p. 9 'Mechanical interactions'; Methods p. 14). ``LennardJones`` is a library-only alternative pair
+  potential, exercised by no paper experiment - a reimplementer targeting the paper would never instantiate
+  this class. Recorded as the source/paper divergence; source wins.
+- It is the ``r_min`` LJ form ``eps*((sigma/r)^12 - 2 (sigma/r)^6)``, NOT the textbook ``4 eps ((sigma/r)^12
+  - (sigma/r)^6)``. Here sigma is the location of the MINIMUM (= contact distance r_i+r_j) with value
+  -epsilon, NOT the zero-crossing. Coding the standard 4-eps form puts the well at 2^(1/6) sigma with
+  the wrong depth - a silent, plausible-looking error.
+- sigma is per-pair and size-dependent (r_i + r_j), and BOTH cutoff radii are sigma-relative, so the interaction
+  rescales as cells grow. A fixed absolute cutoff would break size-consistency.
+- The smooth cutoff S multiplies the WHOLE energy (core included), not just the r^-6 tail. It is inert
+  on the core only because r_on = 1.5*sigma > sigma keeps S=1 for r < sigma; a reimplementer who lowers
+  r_onset_frac below 1 would start cutting into the repulsive core.
+- 'Zero-safety: ``x = safe_divide(sigma, r)`` returns 0 (not inf) at r=0, so the self-diagonal and dead-dead
+  padded pairs give U=0 instead of NaN under the always-on jax_debug_nans. A naive sigma/r blows up. _smooth_cutoff
+  and safe_divide similarly guard the sigma=0 dead-pair case.'
+- Aggregation carries a 0.5 factor (each pair counted once) and neighbor_sum masks self and dead pairs.
+  Dropping the 0.5 double-counts the energy and hence the forces.
+- 'No analytic force: forces are ``-jax.grad(total_energy)`` and there is NO jax-md dependency - the energy
+  is hand-written and differentiated. The C1 cutoff keeps the force continuous but with a small slope
+  kink at the window edges.'
+- 'Unlike Morse, LJ has NO width/steepness knob: the 12-6 exponents fix the shape. Only epsilon and the
+  two cutoff fractions are tunable, so it cannot be tuned to reproduce a given Morse alpha.'
+verdict: alias
+of: attraction_repulsion
+implementation_of: attraction_repulsion
+why: |
+  ALIAS of `attraction_repulsion` (implementation_of: attraction_repulsion). LennardJones is a
+  conservative radial pair force over live non-self cell pairs: a hard repulsive r^-12 core
+  (excluded volume) plus an adhesive 2*r^-6 tail (cell-cell adhesion), the well minimum exactly
+  -epsilon sitting at the contact distance sigma = r_i + r_j, its force = -grad of that radial
+  energy by autodiff. That is exactly attraction_repulsion's biology -- its "long-range pull
+  minus short-range push", a radial pair force that is itself the gradient of a radial potential.
+  The 12-6 r_min well eps*((sigma/r)^12 - 2(sigma/r)^6) and attraction_repulsion's two-Gaussian
+  f(r)*(pos_j - pos_i) are two functional SHAPES of the one contract; the balance of core-vs-tail
+  sets the phase in both.
+
+  SAME CONTRACT AS Morse, DIFFERENT SHAPE. The abstract parent PairwisePotential (order 13)
+  landed alias -> attraction_repulsion (implementation_of: attraction_repulsion) and its why
+  names the members verbatim: "Morse, SoftSphere, Hertzian, Harmonic and LennardJones are
+  interchangeable force-law SHAPES over this one contract ... each concrete subclass is
+  implementation_of: attraction_repulsion." Morse (order 14) and Harmonic (order 17) both
+  reaffirmed that and cited the parent. LennardJones is that LennardJones -- a third CORE+TAIL
+  (adhesive) member alongside Morse and Harmonic (SoftSphere/Hertzian are purely repulsive, no
+  adhesion), so like them it maps onto attraction_repulsion most exactly; it just swaps the Morse
+  exponential well for the classical 12-6 well. This is the several-implementations-per-contract
+  pattern the registry exists to hold; finding it is the GOOD result the ledger measures, not a
+  missed contract. (I depart from the SoftSphere entry, order 15, which minted a NEW contract
+  `adhere` for the purely-repulsive limit; I follow the parent + Morse + Hertzian + Harmonic
+  majority instead, because splitting one member off to a second contract while its siblings stay
+  attraction_repulsion would fracture the one pair-potential family the parent explicitly unified
+  -- either ALL pair potentials are one contract or none are, and the parent chose
+  attraction_repulsion.)
+
+  NOT `refinement`: no field of attraction_repulsion's signature is FORCED to change, and every
+  LennardJones difference lives below the signature. (1) energy -> autodiff-force (forces =
+  -jax.grad(total_energy)) vs attraction_repulsion's hand-coded velocity law is an implementation
+  STRATEGY, not a contract: stillinger_weber is itself an energy-defined interaction in this same
+  lateral/interaction family, and attraction_repulsion's force is already the gradient of a radial
+  potential -- "write an energy and differentiate it" does not mint a contract. (2) the dense
+  O(N^2) half-sum vs a neighbour-graph reduction is the range / pair-topology axis squared_law
+  already carries (all_pairs AND a radius_graph neighbour list) and on which attraction_repulsion
+  already truncates via its radius_graph map; LennardJones's own finite range is just its smooth
+  C1 cutoff on [1.5*sigma, 2.5*sigma]. (3) the coupling reads (a shared scalar epsilon, or a
+  per-cell scalar field symmetrised per pair by the arithmetic-mean mix; additive sigma = r_i + r_j
+  read from radius) are default-compatible and break no existing user. Notably LennardJones is
+  NARROWER than Morse in the axis that matters -- the 12-6 exponents FIX the well shape, so unlike
+  Morse it has NO width/steepness knob (alpha); only epsilon and the two cutoff fractions are
+  tunable. A narrower, less expressive parameterization demands LESS of the signature, not more.
+
+  NOT `new`: attraction_repulsion already IS the pairwise attraction-repulsion contract; minting a
+  second for a different well SHAPE inflates exactly the yield this ledger measures. NOT
+  `out_of_scope`: unlike NoForce (the identity element / absence of interaction) LennardJones is a
+  real forward interaction with a pair map, radial separation reads, and a force output.
+
+  SCOPE / SOURCE notes (rule 5, SOURCE wins). THE PAPER DOES NOT USE LENNARD-JONES: every
+  mechanical interaction in the paper is the ADHESIVE Morse well (Methods p. 9, SI p. 14, Fig. 1d);
+  LennardJones is a code-only library alternative that no paper experiment instantiates -- a
+  reimplementer from the paper alone would never encounter it, but the SOURCE carries it and it
+  normalizes to the same contract Morse does. It is the r_min LJ form (minimum -epsilon at
+  sigma = r_i + r_j), NOT the textbook 4-eps zero-crossing form -- a source-only convention. The
+  per-cell VIRIAL PRESSURE the base derives from this energy is NOT an output of this interaction
+  contract; it is the separate VirialStress entry's mechanism (it writes a `stress` field), kept
+  out of scope here, consistent with Morse/Harmonic/Hertzian. The smooth C1 cutoff multiplying the
+  WHOLE energy, the safe_divide(sigma, r) zero-guard, the 0.5 double-count dedup, the SUM-vs-MEAN
+  combining rules, and the default magic constants (epsilon 1.0, r_onset_frac 1.5, r_cutoff_frac
+  2.5, absent from the paper) are implementation properties of THIS member recorded in surprises,
+  not contract-level distinctions.
+contract:
+  name: attraction_repulsion
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - position
+  - radius
+  - alive
+  - coupling field (shared scalar OR per-cell scalar field, here epsilon = well depth / repulsion
+    strength), symmetrised per pair by the arithmetic-mean mix rule
+  writes:
+  - position
+  maps:
+  - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered
+    pair counts once); force on each cell = -grad of the conservative Lennard-Jones pair energy by
+    autodiff
+  - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive r^-12
+    core (excluded volume) + adhesive 2*r^-6 tail (cell-cell adhesion) in r_min 12-6 form with
+    minimum -epsilon at contact, truncated by a smooth C1 cutoff on [r_onset_frac*sigma,
+    r_cutoff_frac*sigma]; a radial pair force integrated overdamped or minimised by the wrapping
+    motion step
+status: normalized
 module: null
 test: null
 evidence:
