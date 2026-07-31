@@ -1,9 +1,9 @@
 general:
   name: p1_ph_undulation
   seed: 0
-  n_frames: 300
+  n_frames: 500
   dt: 0.02
-  record_cap: 302
+  record_cap: 502
   record_every: 1
   boundary: free
   dim: 3
@@ -45,11 +45,11 @@ operators:
   implementation: graph_laplacian
   d_a: 0.08
   d_h: 0.16
-  chi: 8.0
+  chi: 400.0
 - op: cell_react
   at: cell
   implementation: gray_scott
-  rate: 3.0
+  rate: 150.0
   F: 0.055
   kk: 0.062
 - op: morphogen_growth_3d
@@ -59,7 +59,7 @@ operators:
   a_sw: 0.3
   hill: 4.0
   rho: 0.3
-  vth_frac: 1.5
+  vth_frac: 2.5
   after_frame: 100
   dt: 0.02
   conserve_amount: true
