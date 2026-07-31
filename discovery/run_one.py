@@ -336,16 +336,54 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, Hf, relax_frame
         # ANTI-correlated with elongation (tau=-1.00): a sphere that never moved scores 1.0.
         # Q must be the ABSOLUTE elongation that SURVIVES relaxation, with the pre-relaxation
         # value reported alongside so the drop is still visible.
-        return protr_of(pos[-1][:nv].astype(np.float64))
+        q = protr_of(pos[-1][:nv].astype(np.float64))
+        # PRINT the handover, always. The old Q was a constant 1.014 for weeks precisely because
+        # nobody could see where the relaxation started; a log line is what makes the guard
+        # auditable after the fact instead of only at the moment it fires.
+        print(f"  [Q] continued from the end state: protr {p0:.3f} (run ended {protr_before:.3f}, "
+              f"{hq[0]['nF'] if hq else '?'} cells) -> relaxed {relax_frames} frames -> Q={q:.3f}",
+              flush=True)
+        return q
     except Exception as e:
         print(f"  [Q] failed: {type(e).__name__}: {str(e)[:90]}", flush=True)
         return None
 
 
 # --------------------------------------------------------------------------- artefacts
+# The two camera angles every artefact is drawn from. SIDE is the archive/minisite convention;
+# TOP exists because a single viewpoint cannot be trusted -- see `render`.
+CAM_SIDE = dict(elev=18, azim=30)          # _draw's own default elevation, stated explicitly here
+CAM_TOP = dict(elev=88, azim=30)           # near-polar: a tube pointing at the side camera is
+#                                            side-on here, so it cannot hide behind the body.
+
+
+def run_box(fr, pad=1.12):
+    """ONE half-width for the WHOLE run: max |coordinate| over every frame, plus headroom.
+
+    THE DEFECT THIS REPLACES. The box used to be `lambda pt: |pt|.max() * 1.12`, evaluated
+    INSIDE the per-frame loop -- so every frame was re-fitted to its own extent and the tissue
+    filled the same fraction of the axes from first frame to last. A vesicle that doubles in
+    radius rendered as a ball of constant apparent size: GROWTH, the quantity these runs exist
+    to show, was invisible in every strip and movie in the archive, and the eye had no way to
+    tell an inflating sphere from a static one. Okuda's figures use a fixed frame; so do we.
+
+    Measured on the whole trajectory (not just the last frame) because a run can peak and then
+    retract -- fitting to the end state would clip the peak straight out of the picture.
+    """
+    return float(max(np.abs(pt).max() for pt, _, _ in fr)) * pad
+
+
 def render(name, fr, out_dir, n_strip=8, movie_frames=60):
-    """Strip + movie, matching the minisite convention (black bg, activator LUT)."""
-    from run_tyssue_vesicle import _draw, make_movie_axes
+    """Strip + movie, matching the minisite convention (black bg, activator LUT).
+
+    THREE rows / TWO 3D panels, not one. A protrusion growing along the side camera's view
+    direction projects to a few pixels of foreshortening and reads as "no tube at all" -- the
+    single fixed `azim=30` view could therefore hide the exact phenotype the campaign is
+    scoring. The near-polar TOP view is 70 degrees off the side view, so a tube invisible in one
+    is broadside in the other. Both panels share the same fixed box, so the two views are also
+    directly comparable to each other.
+    """
+    from run_tyssue_vesicle import _draw
     # the minisite / archive convention is 3D shell + a CROSS-SECTION inset taken in the plane
     # of the tubing, so a protrusion reads correctly against the 3D view.
     from run_tyssue_round import _cross_screen, _cross_axis
@@ -360,35 +398,60 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60):
     asamp = np.concatenate([fr[t][2] for t in np.unique(np.linspace(0, T - 1, 12).astype(int))])
     lo, hi = float(np.percentile(asamp, 5)), float(np.percentile(asamp, 99) + 1e-6)
     col = lambda a: np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)
-    lbox = lambda pt: float(np.abs(pt).max()) * 1.12
 
-    # two rows: 3D shell on top, cross-section beneath, as the archive strips are drawn
-    fig = plt.figure(figsize=(4.4 * n_strip, 9.0))
+    # ---- ONE box, computed once, held for every frame of both artefacts and both viewpoints.
+    L3 = run_box(fr)
+    L2 = L3 * 2.05
+    l_first, l_last = np.abs(fr[0][0]).max() * 1.12, np.abs(fr[-1][0]).max() * 1.12
+    print(f"[{name}] camera: FIXED Lbox={L3:.3f} for all {T} frames and both views "
+          f"(per-frame autofit would have run {l_first:.3f} -> {l_last:.3f}, "
+          f"x{l_last / max(l_first, 1e-9):.2f}: that rescaling is what hid growth)", flush=True)
+
+    def draw3d(ax, pt, mt, a, cam):
+        _draw(ax, pt, mt, 3.90, azim=cam["azim"], act=col(a), Lbox=L3)
+        # _draw hardwires elev=18 as its last statement; re-aim afterwards to get the 2nd view.
+        ax.view_init(elev=cam["elev"], azim=cam["azim"])
+
+    # three rows: 3D side view, 3D top-down view, cross-section
+    fig = plt.figure(figsize=(4.4 * n_strip, 13.5))
     fig.patch.set_facecolor("black")
     for i, t in enumerate([int(round(f * (T - 1))) for f in np.linspace(0, 1, n_strip)]):
         pt, mt, a = fr[t]
-        ax = fig.add_subplot(2, n_strip, i + 1, projection="3d")
-        _draw(ax, pt, mt, 3.90, azim=30, act=col(a), Lbox=lbox(pt))
-        ax2 = fig.add_subplot(2, n_strip, n_strip + i + 1)
+        draw3d(fig.add_subplot(3, n_strip, i + 1, projection="3d"), pt, mt, a, CAM_SIDE)
+        draw3d(fig.add_subplot(3, n_strip, n_strip + i + 1, projection="3d"), pt, mt, a, CAM_TOP)
+        ax3 = fig.add_subplot(3, n_strip, 2 * n_strip + i + 1)
         # NO try/except here. Swallowing the error is exactly the silent-no-op pattern this
         # project keeps being bitten by: the first version caught a TypeError from a wrong
         # signature and rendered a blank row that looked deliberate.
-        _cross_screen(ax2, pt, mt, col(a), seed_dir=_cross_axis(pt, None), Lbox=lbox(pt) * 2.05)
+        _cross_screen(ax3, pt, mt, col(a), seed_dir=_cross_axis(pt, None), Lbox=L2)
     fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
 
-    figm = plt.figure(figsize=(5.0, 5.2))
+    # movie: the two 3D viewpoints side by side + the cross-section inset (bottom-right).
+    # Laid out here rather than via make_movie_axes, which only makes the single-view layout.
+    figm = plt.figure(figsize=(10.0, 5.2))
     figm.patch.set_facecolor("black")
-    axm, axin = make_movie_axes(figm)
+    axs = figm.add_subplot(1, 2, 1, projection="3d")
+    axt = figm.add_subplot(1, 2, 2, projection="3d")
+    figm.subplots_adjust(0, 0, 1, 1, wspace=0.0)
+    axin = figm.add_axes([0.83, 0.0, 0.17, 0.34])
+    axin.set_facecolor("none")
+    axin.patch.set_alpha(0.0)
     keep = np.unique(np.linspace(0, T - 1, min(movie_frames, T)).astype(int))
     wri = FFMpegWriter(fps=10, metadata={"title": name})
     with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=85):
         for t in keep:
             pt, mt, a = fr[int(t)]
-            _draw(axm, pt, mt, 3.90, azim=30, act=col(a), Lbox=lbox(pt))
+            draw3d(axs, pt, mt, a, CAM_SIDE)
+            draw3d(axt, pt, mt, a, CAM_TOP)
+            # _draw calls ax.clear(), which drops the label -- re-stamp it every frame.
+            axs.text2D(0.02, 0.96, "side  elev 18", transform=axs.transAxes, color="w",
+                       fontsize=9)
+            axt.text2D(0.02, 0.96, "top  elev 88", transform=axt.transAxes, color="w", fontsize=9)
             _cross_screen(axin, pt, mt, col(a), seed_dir=_cross_axis(pt, None),
-                          Lbox=lbox(pt) * 2.05)      # cross-section, minisite convention
+                          Lbox=L2)              # cross-section, minisite convention
+            axin.axis("off")
             wri.grab_frame()
     plt.close(figm)
     print(f"[{name}] artefacts -> {os.path.relpath(out_dir, ROOT)}/{{strip.png,movie.mp4}}",

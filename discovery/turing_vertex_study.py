@@ -36,6 +36,30 @@ run" but:
     ACROSS THE (a_sw, rho, chi, rate) SETTINGS, WHEN DOES THE PATTERN STOP COLOURING AND START
     DRIVING THE SHAPE -- AND WHAT DOES IT MAKE WHEN IT DOES?
 
+THE 1778 DEFECT (2026-07-31) -- READ THIS BEFORE TRUSTING ANY CELL COUNT HERE
+------------------------------------------------------------------------------------------------
+Every one of the first 32 runs ended at `cells_end = 1778`. Not biology -- arithmetic:
+
+    build() sized the vertex reservoir as int(Nv * 12) with Nv the INITIAL vertex count.
+    A closed trivalent sheet has V = 2F - 4, so n_cells=150 -> Nv=296 -> reservoir 3552.
+    divide_3d refuses a split once `len(pos) + 2 > buf`, so the reservoir is a HARD face cap:
+        F_max = (3552 + 4) // 2 = 1778.
+
+Every run drove into that wall and stopped there. A sweep whose points all end at the same
+buffer ceiling is a measurement of the buffer. The fixes, all three of them:
+
+  * `n_cells` is a first-class knob (`--n-cells`, `--sweep n_cells`, `--okuda`). Okuda's cases
+    start at 200 / 2000 / 4000 cells; we were running 150, so we were not running his system.
+  * the reservoir is sized for WHERE THE RUN IS GOING (`growth_headroom`, or an absolute
+    `max_cells`), never for where it started -- see `reservoir_plan`. The cap is now a number
+    somebody chose and the record prints it.
+  * a run that ENDS AT the cap is marked `saturated` and `valid_evidence: false`, exactly as the
+    main loop does (critic.P2_BUFFER_SATURATED / run_one.py's saturation guard). The study never
+    checked; that is why the wall went unnoticed for 32 runs.
+
+`python turing_vertex_study.py --caps` prints the legacy vs planned cap for the standard sizes,
+and `--selfcheck` runs the whole guard end to end (short runs, no sweep).
+
 THE MEASUREMENT THAT DECIDES IT
 ------------------------------------------------------------------------------------------------
 `corr_act_rad` -- the Pearson correlation between a cell's activator and its radius. It is the
@@ -57,7 +81,11 @@ something. Runs are CPU subprocesses (the box has 64 cores); a wave of 6 x 400 f
 minutes, which is what makes a real hypothesis-first loop affordable here at all.
 
     python turing_vertex_study.py --sweep a_sw --values 50,0.6,0.45,0.30,0.15 --frames 400
+    python turing_vertex_study.py --sweep a_sw --values 0.3 --n-cells 2000          # Okuda's size
+    python turing_vertex_study.py --okuda --frames 400                              # 200/2000/4000
     python turing_vertex_study.py --one '{"name":"x","a_sw":0.3}' --frames 400      # worker
+    python turing_vertex_study.py --caps                                            # the cap table
+    python turing_vertex_study.py --selfcheck                                       # the guards
 """
 from __future__ import annotations
 
@@ -82,6 +110,14 @@ PY = sys.executable
 # archive_rounded.py hard-codes, so `--values` with the default first reproduces the movie.
 BASE = dict(
     n_cells=150, radius=5.0, jitter=0.18, seed=0,
+    # --- reservoir sizing: WHERE THE RUN IS GOING, not where it started (the 1778 defect) ---
+    growth_headroom=12.0,  # face cap = n_cells * this. 12 == the headroom the old int(Nv*12)
+    #                        accidentally gave at n_cells=150 (cap 1778), so the archived waves
+    #                        stay comparable -- but now it is a number somebody CHOSE, it is
+    #                        printed in every record, and hitting it flags the run not-evidence.
+    max_cells=0,           # absolute face cap; 0 = derive from growth_headroom. Use this when
+    #                        the destination is known (e.g. Okuda 2000 -> ~2 spots x a few
+    #                        divisions) and headroom x n_cells would be absurdly large.
     p0=3.5, Lambda=3.0, Gamma=0.4, K_V=2.0, K_A=1.0, K_P=1.0, K_R=0.4,
     relax_iters=30, eta=0.08, cap_frac=0.12,
     # --- Gray-Scott chemistry (the "Turing" half) ---
@@ -94,6 +130,84 @@ BASE = dict(
     # --- division / topology ---
     div_every=4, t1_every=4, max_div=12, max_div_frac=0.03, min_cycle=4, max_cycle=12,
 )
+
+# Knobs whose value must stay an int (build_sphere_mesh(n=200.0) and int-indexed periods break
+# quietly on floats). `--sweep`/`--fix` coerce through BASE's own types, so `--sweep n_cells`
+# works without a special case.
+INT_KNOBS = {x for x, v in BASE.items() if isinstance(v, int) and not isinstance(v, bool)}
+
+# "ends AT the cap". The main loop's guard (run_one.py) uses 0.9 of a soft buffer; here the cap
+# is hard and exact -- divide_3d simply stops -- so a run that reaches 98% of it has already had
+# its proliferation clipped and is telling us about the reservoir. Both readings are recorded.
+SAT_FRAC = 0.98
+OKUDA_N_CELLS = (200, 2000, 4000)     # Okuda et al.'s starting cell counts. We were running 150.
+
+
+# ======================================================================== reservoir arithmetic
+def face_cap_from_vbuf(vbuf):
+    """Faces reachable with `vbuf` vertex slots. THE number the 32-run plateau was made of.
+
+    divide_3d appends exactly 2 vertices + 1 face per division and breaks when
+    `len(pos) + 2 > buf`, so Nv <= vbuf; a closed trivalent sheet has V = 2F - 4, hence
+    F <= (vbuf + 4) / 2. Non-trivalent vertices only make the true cap SMALLER, so this is an
+    upper bound -- which is why the saturation check also watches the raw vertex occupancy.
+    """
+    return (int(vbuf) + 4) // 2
+
+
+def legacy_face_cap(Nv0):
+    """The cap the OLD build() imposed: reservoir int(Nv0*12) sized from the INITIAL mesh.
+
+    Kept (unused by build) so the defect is reproducible arithmetic and not a story: at
+    n_cells=150 the mesh has Nv0=296, so this returns 1778 -- the value all 32 runs reported.
+    """
+    return face_cap_from_vbuf(int(Nv0) * 12)
+
+
+def reservoir_plan(n_cells, growth_headroom=None, max_cells=0, Nv0=None):
+    """Size the buffers for the FINAL cell count, and return the cap explicitly.
+
+    faces_max is the deliberate destination; the vertex reservoir is then exactly the number of
+    vertices that many faces need. The cell reservoir gets a small margin on top: divide_3d
+    inherits the mother's morphogen into a daughter only `if clvl.state.shape[0] >= nF2`, so a
+    cell buffer that is merely equal-and-off-by-one detaches the chemistry from the mesh in
+    SILENCE. The vertex reservoir must be the single binding cap.
+    """
+    n_cells = int(n_cells)
+    hd = float(BASE["growth_headroom"] if growth_headroom is None else growth_headroom)
+    faces_max = int(max_cells) if int(max_cells) > 0 else int(round(n_cells * hd))
+    if faces_max < n_cells:
+        raise ValueError(f"reservoir_plan: cap {faces_max} < n_cells {n_cells} -- the initial "
+                         f"mesh would not fit its own buffer (growth_headroom={hd}, "
+                         f"max_cells={max_cells}). Raise growth_headroom above 1.0.")
+    vbuf = 2 * faces_max - 4
+    if Nv0 is not None and vbuf < int(Nv0):        # non-trivalent seed mesh: keep the seed fitting
+        vbuf = int(Nv0)
+    return dict(n_cells=n_cells, faces_max=faces_max, growth_headroom=round(faces_max / n_cells, 3),
+                vbuf=int(vbuf), cbuf=int(faces_max + 16), face_cap=face_cap_from_vbuf(vbuf))
+
+
+def saturation_report(cells_end, Nv_end, plan, sat_frac=SAT_FRAC):
+    """Did this run END AT its buffer? Same verdict shape the main loop's critic consumes.
+
+    critic.check_posthoc() rejects `{"saturated": True}` as P2_BUFFER_SATURATED -- "evidence
+    about a buffer, not a mechanism". This study produced 32 records that would all have been
+    rejected by that rule and never asked it.
+    """
+    cap = int(plan["face_cap"])
+    fill = float(cells_end) / max(cap, 1)
+    vfill = float(Nv_end) / max(int(plan["vbuf"]), 1) if Nv_end is not None else 0.0
+    cfill = float(cells_end) / max(int(plan["cbuf"]), 1)
+    sat = bool(fill >= sat_frac or vfill >= sat_frac or cfill >= sat_frac)
+    out = dict(face_cap=cap, face_fill=round(fill, 4), vert_fill=round(vfill, 4),
+               saturated=sat, sat_frac=sat_frac)
+    if sat:
+        out["NOT_EVIDENCE"] = (
+            f"SATURATED: ended at {int(cells_end)} cells vs face cap {cap} "
+            f"(fill {fill:.3f}, vertices {vfill:.3f} of {plan['vbuf']}). Division was clipped by "
+            f"the reservoir, so every downstream number describes a buffer, not a mechanism. "
+            f"Raise growth_headroom/max_cells or bound proliferation, then re-run.")
+    return out
 
 
 # =============================================================================== one run
@@ -108,6 +222,10 @@ def build(k, frames, dt=1.0):
 
     verts, es, et, ef, nF = build_sphere_mesh(k["n_cells"], k["radius"], k["jitter"], k["seed"])
     Nv = verts.shape[0]
+    # THE 1778 FIX. Was: {"vertex": {"n": int(Nv*12)}, "cell": {"n": int(nF*12)}} -- a cap set by
+    # the STARTING mesh, which silently pinned all 32 runs at (int(296*12)+4)//2 = 1778 faces.
+    plan = reservoir_plan(k["n_cells"], k.get("growth_headroom"), k.get("max_cells", 0), Nv0=Nv)
+    assert plan["cbuf"] > plan["face_cap"], "cell buffer must not be the binding cap (see plan)"
     ops = [
         {"op": "seed_mesh_3d", "at": "vertex", "n_cells": k["n_cells"], "radius": k["radius"],
          "jitter": k["jitter"], "p0": k["p0"], "seed": k["seed"], "before_frame": 1,
@@ -140,8 +258,8 @@ def build(k, frames, dt=1.0):
     cfg = {"general": {"name": f"tv_{k['name']}", "seed": k["seed"], "n_frames": frames, "dt": dt,
                        "record_cap": frames + 2, "boundary": "free", "dim": 3,
                        "world": [10 * k["radius"]] * 3},
-           "sets": {"vertex": {"n": int(Nv * 12)},
-                    "cell": {"n": int(nF * 12),
+           "sets": {"vertex": {"n": plan["vbuf"]},
+                    "cell": {"n": plan["cbuf"],
                              "state": {"chem": {"width": 2, "integration": "first_order"},
                                        "cen": {"width": 3}, "area": {"width": 1}}}},
            "fields": {}, "operators": ops, "schedule": sched}
@@ -150,7 +268,79 @@ def build(k, frames, dt=1.0):
         path = fh.name
     sim = S.load(path)
     os.unlink(path)
-    return sim, cfg, dict(E_srce=es, E_trgt=et, E_face=ef, nF=nF, Nv=Nv)
+    return sim, cfg, dict(E_srce=es, E_trgt=et, E_face=ef, nF=nF, Nv=Nv, plan=plan)
+
+
+def cell_adjacency_pairs(mt):
+    """(faceA, faceB) for every pair of cells sharing a mesh edge -- the RD graph itself.
+
+    Rebuilt from the SAME half-edge table `tyssue_rd_ops.CellAdjacency` uses, so a spot is
+    counted on exactly the graph the diffusion ran on, not on a geometric stand-in for it.
+    """
+    import numpy as np
+    es = np.asarray(mt["E_srce"], dtype=np.int64).ravel()
+    et = np.asarray(mt["E_trgt"], dtype=np.int64).ravel()
+    ef = np.asarray(mt["E_face"], dtype=np.int64).ravel()
+    if es.size == 0:
+        return np.zeros(0, np.int64), np.zeros(0, np.int64)
+    lo, hi = np.minimum(es, et), np.maximum(es, et)
+    key = lo.astype(np.int64) * (int(hi.max()) + 1) + hi        # undirected edge id
+    o = np.argsort(key, kind="stable")
+    ks, fs = key[o], ef[o]
+    j = np.flatnonzero(ks[:-1] == ks[1:])                       # a manifold edge appears twice
+    A, B = fs[j], fs[j + 1]
+    keep = A != B
+    return A[keep], B[keep]
+
+
+def count_spots(mt, act, live, frac=0.5):
+    """How many DISTINCT chemical spots? (connected components of cells above frac x peak.)
+
+    Cheap, and the quantity Okuda calibrates against (~5 spots at 2000 cells). Deliberately the
+    same threshold `act_frac_high` already uses, so the two numbers describe one set of cells:
+    `act_frac_high` says how MUCH is lit, `n_spots` says in how many PIECES.
+
+    Reported honestly: a flat/zero activator has no spots to count and returns None, not 0 --
+    "no pattern" and "one spot covering everything" are different findings. Singleton components
+    are counted (a one-cell spot is a spot), so `n_spots_ge3` is carried alongside for readers
+    who want the noise-insensitive version.
+
+    WHAT IT IS NOT: an early-frame count is a count of the SEEDS, not of spots. cell_rd_seed
+    scatters `seed_frac` of the cells, so a 10-frame run at n_cells=2000 reports ~78 one- and
+    two-cell components -- correct, and nothing to do with Okuda's ~5 MATURE spots. Compare
+    against Okuda only after the pattern has coarsened, and read `spot_sizes_top` next to it.
+    """
+    import numpy as np
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    a = np.asarray(act, dtype=float)
+    a = np.where(np.isfinite(a), a, 0.0)
+    lv = np.asarray(live, dtype=bool)
+    if lv.sum() < 2:
+        return {"n_spots": None, "spots_undefined_why": "fewer than 2 live cells"}
+    amax = float(a[lv].max())
+    if amax <= 1e-9:
+        return {"n_spots": None, "spots_undefined_why": "activator is zero everywhere"}
+    hot = lv & (a > frac * amax)
+    n = int(hot.sum())
+    if n == 0:
+        return {"n_spots": 0, "spot_cells": 0, "spot_thresh": round(frac * amax, 6)}
+    A, B = cell_adjacency_pairs(mt)
+    idx = np.flatnonzero(hot)
+    remap = np.full(a.shape[0], -1, np.int64)
+    remap[idx] = np.arange(n)
+    m = (A < a.shape[0]) & (B < a.shape[0])
+    A, B = A[m], B[m]
+    m = hot[A] & hot[B]                                          # keep only hot-hot links
+    ga, gb = remap[A[m]], remap[B[m]]
+    g = coo_matrix((np.ones(ga.size), (ga, gb)), shape=(n, n))
+    ncomp, lab = connected_components(g, directed=False)
+    sizes = np.sort(np.bincount(lab, minlength=ncomp))[::-1]
+    return {"n_spots": int(ncomp), "n_spots_ge3": int((sizes >= 3).sum()),
+            "spot_cells": n, "spot_frac": round(n / float(lv.sum()), 4),
+            "spot_sizes_top": [int(s) for s in sizes[:8]],
+            "spot_thresh": round(frac * amax, 6)}
 
 
 def metrics(mt, pos, act):
@@ -186,6 +376,9 @@ def metrics(mt, pos, act):
         act_frac_high=float((a > 0.5 * a.max()).mean()) if a.max() > 1e-9 else 0.0,
         act_nan=bool(not np.isfinite(np.asarray(act[:nF], dtype=float)).all()),
     )
+    # how many DISTINCT spots (Okuda: ~5 at 2000 cells). Full-length arrays -- the counter works
+    # on face indices, not on the `ok`-compressed subset.
+    m.update(count_spots(mt, np.asarray(act[:nF], dtype=float), live))
     # ---- THE metric: does the shape follow the pattern, or merely wear it? ----
     if a.std() > 1e-9 and r.std() > 1e-9:
         m["corr_act_rad"] = float(np.corrcoef(a, r)[0, 1])
@@ -205,9 +398,17 @@ def run_one(k, frames, movie=False):
 
     t0 = time.time()
     sim, cfg, mesh0 = build(k, frames)
+    plan = mesh0["plan"]
     d = os.path.join(OUT, k["name"])
     os.makedirs(d, exist_ok=True)
-    rec = {"name": k["name"], "knobs": {x: k[x] for x in k if x != "name"}, "frames": frames}
+    rec = {"name": k["name"], "knobs": {x: k[x] for x in k if x != "name"}, "frames": frames,
+           "plan": plan}
+    # a run that STARTS at 95% of its cap has nowhere to go and will trip the guard on frame 1;
+    # say so before the hours are spent, not after.
+    tight = "  ⚠ TIGHT: the run starts near its own cap" if plan["growth_headroom"] < 1.2 else ""
+    print(f"[{k['name']}] start {plan['n_cells']} cells -> face cap {plan['face_cap']} "
+          f"(headroom {plan['growth_headroom']}x, vertex reservoir {plan['vbuf']}){tight}",
+          flush=True)
     try:
         Hf, out = engine_run(sim, device="cpu")
         emesh = Hf.level("vertex")._mesh
@@ -233,12 +434,23 @@ def run_one(k, frames, movie=False):
                              chemf[tm][:mtm["nF"], 0])
         if movie:
             _render(d, k, hist, posf, chemf, T, mesh0)
+        # ------------------------------------------------------------ THE SATURATION GUARD
+        # 32 runs ended at exactly 1778 cells and this study reported every one of them as a
+        # measurement. A run that ends AT its face cap is evidence about the reservoir; the main
+        # loop already refuses such runs (critic.P2_BUFFER_SATURATED), so this one does too.
+        rec.update(saturation_report(rec.get("cells_end", 0), mtT["Nv"], plan))
         rec["ok"] = True
     except Exception as e:
         import traceback
         rec.update(ok=False, error=repr(e))
         traceback.print_exc()
+    rec["valid_evidence"] = bool(rec.get("ok") and not rec.get("saturated"))
     rec["secs"] = round(time.time() - t0, 1)
+    if rec.get("saturated"):
+        # first key in the file, and a line in the log nobody can scroll past
+        rec = {"NOT_EVIDENCE": rec.pop("NOT_EVIDENCE"), **rec}
+        print(f"\n[{k['name']}] {'=' * 78}\n[{k['name']}] 🔴 {rec['NOT_EVIDENCE']}\n"
+              f"[{k['name']}] {'=' * 78}\n", flush=True)
     json.dump(rec, open(os.path.join(d, "diag.json"), "w"), indent=1)
     return rec
 
@@ -323,8 +535,10 @@ def wave(points, frames, movie_for=(), jobs=8):
                 recs[nm] = json.load(open(dp))
                 r = recs[nm]
                 c = r.get("corr_act_rad")
-                print(f"  [wave] {nm:22} {'ok' if r.get('ok') else 'FAIL'} "
-                      f"cells={r.get('cells_end','?'):<6} protr={r.get('protr', float('nan')):.3f} "
+                st = "SATURATED" if r.get("saturated") else ("ok" if r.get("ok") else "FAIL")
+                print(f"  [wave] {nm:22} {st:9} "
+                      f"cells={r.get('cells_end','?'):<6}/{r.get('face_cap','?'):<6} "
+                      f"spots={r.get('n_spots')} protr={r.get('protr', float('nan')):.3f} "
                       f"corr={'n/a' if c is None else f'{c:+.3f}'}  {r.get('secs')}s", flush=True)
             else:
                 # A worker that produced no diag at all is NOT a null result -- it is a missing
@@ -333,7 +547,151 @@ def wave(points, frames, movie_for=(), jobs=8):
                             "error": f"worker exited {p.returncode} with no diag.json; "
                                      f"see _turing_vertex/{nm}.log"}
                 print(f"  [wave] {nm:22} NO DIAG (exit {p.returncode})", flush=True)
+    # The wave is where "all 32 runs said 1778" was there to be seen and wasn't. Say it out loud.
+    sat = [n for n, r in recs.items() if r.get("saturated")]
+    if sat:
+        print(f"\n  [wave] 🔴 {len(sat)}/{len(recs)} runs SATURATED their face cap: "
+              f"{', '.join(sorted(sat))}\n  [wave]    Those points are NOT evidence -- they "
+              f"measure the reservoir. Raise growth_headroom/max_cells and re-run before "
+              f"reading anything into them.\n", flush=True)
     return recs
+
+
+def coerce(key, val):
+    """A knob keeps BASE's type. `n_cells=200.0` reaches build_sphere_mesh and breaks quietly."""
+    return int(round(float(val))) if key in INT_KNOBS else float(val)
+
+
+def caps_table(sizes=(150,) + OKUDA_N_CELLS, headroom=None, out=print):
+    """LEGACY vs PLANNED face cap at each starting size -- the 1778 defect, as arithmetic.
+
+    Nv is MEASURED from the actual seed mesh, not assumed from V = 2F - 4, so the legacy column
+    is the cap those runs really had.
+    """
+    from tyssue_ops3d import build_sphere_mesh
+    rows = []
+    out(f"{'n_cells':>8} {'Nv0':>7} {'legacy vbuf':>12} {'LEGACY CAP':>11} "
+        f"{'new vbuf':>9} {'NEW CAP':>8}  headroom")
+    for n in sizes:
+        v, _, _, _, nF = build_sphere_mesh(n, BASE["radius"], BASE["jitter"], BASE["seed"])
+        Nv0 = v.shape[0]
+        pl = reservoir_plan(n, headroom, 0, Nv0=Nv0)
+        out(f"{n:>8} {Nv0:>7} {Nv0 * 12:>12} {legacy_face_cap(Nv0):>11} "
+            f"{pl['vbuf']:>9} {pl['face_cap']:>8}  {pl['growth_headroom']}x")
+        rows.append(dict(Nv0=Nv0, legacy_cap=legacy_face_cap(Nv0), **pl))   # pl carries n_cells
+    return rows
+
+
+def selfcheck():
+    """Every guard in this file, run for real. Returns the number of FAILURES.
+
+    These are the checks that would have caught the 1778 plateau on day one, plus a validation
+    of the spot counter against a field whose component count is known by construction.
+    """
+    import numpy as np
+    fails = []
+
+    def chk(name, cond, detail=""):
+        print(f"  [{'PASS' if cond else 'FAIL'}] {name}" + (f"   {detail}" if detail else ""))
+        if not cond:
+            fails.append(name)
+
+    print("\n-- 1. the defect, as arithmetic --")
+    rows = caps_table(out=lambda s: print("   " + s))
+    r150 = rows[0]
+    chk("legacy cap at n_cells=150 == 1778 (the value all 32 runs reported)",
+        r150["legacy_cap"] == 1778, f"got {r150['legacy_cap']}")
+    chk("legacy cap was set by the START, not the destination",
+        legacy_face_cap(r150["Nv0"]) == face_cap_from_vbuf(r150["Nv0"] * 12))
+    r2000 = [r for r in rows if r["n_cells"] == 2000][0]
+    chk("planned cap at n_cells=2000 is n_cells x headroom",
+        r2000["face_cap"] == 2000 * BASE["growth_headroom"],
+        f"cap {r2000['face_cap']}, vbuf {r2000['vbuf']}")
+    chk("a headroom below 1.0 is refused, not silently clipped",
+        _raises(lambda: reservoir_plan(150, 0.5)))
+    chk("cell buffer is never the binding cap",
+        all(r["cbuf"] > r["face_cap"] for r in rows))
+
+    print("\n-- 2. the spot counter, on fields whose answer is known --")
+    from tyssue_ops3d import build_sphere_mesh
+    v, es, et, ef, nF = build_sphere_mesh(150, 5.0, 0.18, 0)
+    mt = dict(E_srce=es, E_trgt=et, E_face=ef, nF=nF, Nv=v.shape[0])
+    cen = np.zeros((nF, 3))
+    cnt = np.zeros(nF)
+    np.add.at(cen, ef, v[es])
+    np.add.at(cnt, ef, 1.0)
+    cen /= cnt[:, None]
+    live = np.ones(nF, bool)
+    A, B = cell_adjacency_pairs(mt)
+    chk("adjacency is the RD graph: every cell has >= 3 neighbours",
+        np.bincount(np.concatenate([A, B]), minlength=nF).min() >= 3,
+        f"{A.size} shared edges, min degree "
+        f"{int(np.bincount(np.concatenate([A, B]), minlength=nF).min())}")
+    sig = 2.4          # half-max radius sig*sqrt(ln2) = 2.0 -> ~6 cells per blob (spacing ~1.45),
+    #                    while farthest-point seeds on an R=5 sphere sit >= 8 apart: they cannot
+    #                    touch, so the answer really is K and the test is not counting singletons.
+    for K in (1, 2, 4):                       # K well-separated Gaussian blobs -> K components
+        seeds = [0]
+        for _ in range(K - 1):                # farthest-point: guarantees they cannot merge
+            d = np.min([np.linalg.norm(cen - cen[s], axis=1) for s in seeds], axis=0)
+            seeds.append(int(np.argmax(d)))
+        a = np.zeros(nF)
+        for s in seeds:
+            a = np.maximum(a, np.exp(-(np.linalg.norm(cen - cen[s], axis=1) / sig) ** 2))
+        got = count_spots(mt, a, live)
+        chk(f"{K} separated blobs -> n_spots == {K}", got["n_spots"] == K,
+            f"got {got['n_spots']}, sizes {got['spot_sizes_top']}")
+        chk(f"{K} blobs are multi-cell (really components, not singletons)",
+            got["n_spots_ge3"] == K, f"n_spots_ge3={got['n_spots_ge3']}")
+    two_close = np.zeros(nF)
+    nb = int(A[B == 0][0]) if (B == 0).any() else int(B[A == 0][0])
+    for s in (0, nb):                          # two ADJACENT blobs must merge into one spot
+        d = np.linalg.norm(cen - cen[s], axis=1)
+        two_close = np.maximum(two_close, np.exp(-(d / sig) ** 2))
+    chk("two touching blobs -> 1 spot", count_spots(mt, two_close, live)["n_spots"] == 1)
+    chk("uniform field -> 1 spot covering everything",
+        count_spots(mt, np.ones(nF), live)["n_spots"] == 1)
+    chk("zero field -> None, not 0 (no pattern != one spot)",
+        count_spots(mt, np.zeros(nF), live)["n_spots"] is None)
+
+    print("\n-- 3. the saturation guard, on real runs (deliberately under-sized reservoir) --")
+    # Forced proliferation (~20 divisions per frame) so 12 frames is enough to see a wall; the
+    # A/B holds the DYNAMICS fixed and changes only the reservoir, which is the whole point --
+    # a difference in cells_end between these two runs is a difference in buffers, not biology.
+    forced = dict(div_every=1, max_div=20, max_div_frac=0.0, min_cycle=0, max_cycle=1)
+    sat = run_one({**BASE, **forced, "name": "selfcheck_saturated", "growth_headroom": 1.5},
+                  frames=12)
+    chk("under-sized run is flagged saturated", sat.get("saturated") is True,
+        f"cells_end={sat.get('cells_end')} cap={sat.get('face_cap')} "
+        f"fill={sat.get('face_fill')}")
+    chk("saturated run is not evidence", sat.get("valid_evidence") is False)
+    chk("NOT_EVIDENCE is the first key of the record",
+        list(sat)[0] == "NOT_EVIDENCE", f"first key {list(sat)[0]!r}")
+    from critic import check_posthoc
+    rej = check_posthoc({"saturated": sat.get("saturated"),
+                         "n_cells_final": sat.get("cells_end"), "inert_operators": []})
+    chk("critic.check_posthoc rejects it as P2_BUFFER_SATURATED",
+        any(r.code == "P2_BUFFER_SATURATED" for r in rej), str(rej))
+    room = run_one({**BASE, **forced, "name": "selfcheck_headroom", "growth_headroom": 12.0},
+                   frames=12)
+    chk("the SAME dynamics with room is NOT flagged", room.get("saturated") is False,
+        f"cells_end={room.get('cells_end')} cap={room.get('face_cap')} "
+        f"fill={room.get('face_fill')}")
+    chk("more room really did mean more cells (the cap was what stopped it)",
+        room.get("cells_end", 0) > sat.get("cells_end", 0),
+        f"{sat.get('cells_end')} -> {room.get('cells_end')}")
+    chk("spots are reported on a real run", "n_spots" in room, f"n_spots={room.get('n_spots')}")
+
+    print(f"\n{'ALL CHECKS PASSED' if not fails else 'FAILURES: ' + ', '.join(fails)}")
+    return len(fails)
+
+
+def _raises(fn):
+    try:
+        fn()
+    except Exception:
+        return True
+    return False
 
 
 if __name__ == "__main__":
@@ -345,6 +703,19 @@ if __name__ == "__main__":
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--movie", action="store_true")
     ap.add_argument("--tag", default="")
+    # STARTING SIZE IS A FIRST-CLASS KNOB. Okuda's cases start at 200/2000/4000 cells; every run
+    # in this study so far started at 150 and stopped at a buffer, so we were not running his
+    # system at either end. `--okuda` is the three sizes; `--n-cells` sets one.
+    ap.add_argument("--n-cells", dest="n_cells", type=int, default=None,
+                    help=f"starting cell count for every point (Okuda: {OKUDA_N_CELLS})")
+    ap.add_argument("--okuda", action="store_true",
+                    help=f"sweep n_cells over Okuda's {OKUDA_N_CELLS}")
+    ap.add_argument("--headroom", type=float, default=None,
+                    help="face cap = n_cells x this (default %(default)s -> BASE growth_headroom)")
+    ap.add_argument("--max-cells", dest="max_cells", type=int, default=None,
+                    help="absolute face cap, overrides --headroom")
+    ap.add_argument("--caps", action="store_true", help="print the legacy/planned cap table, exit")
+    ap.add_argument("--selfcheck", action="store_true", help="run the guards on short runs, exit")
     # Holding the OTHER knobs is not a convenience, it is the experiment.
     # Sweeping `rho` while `a_sw` sits at its default 50 gives hillv ~ 0 at every point, so the
     # sweep measures "growth rate -> 0" and not "activator-driven bulging" -- two levers changing
@@ -352,30 +723,59 @@ if __name__ == "__main__":
     ap.add_argument("--fix", default="", help="k=v,k=v held constant across the sweep")
     a = ap.parse_args()
 
+    if a.caps:
+        caps_table(headroom=a.headroom)
+        sys.exit(0)
+    if a.selfcheck:
+        sys.exit(1 if selfcheck() else 0)
+
+    # sizing flags apply to every point, sweep or single
+    size = {}
+    if a.n_cells is not None:
+        size["n_cells"] = a.n_cells
+    if a.headroom is not None:
+        size["growth_headroom"] = a.headroom
+    if a.max_cells is not None:
+        size["max_cells"] = a.max_cells
+
     if a.one:
-        k = {**BASE, **json.loads(a.one)}
+        k = {**BASE, **size, **json.loads(a.one)}
         r = run_one(k, a.frames, movie=a.movie)
         print(json.dumps({x: r[x] for x in r if x != "mid"}, indent=1))
-        sys.exit(0 if r.get("ok") else 1)
+        # exit 3, not 0: a saturated run must not read as a clean measurement to a shell script
+        sys.exit(0 if r.get("valid_evidence") else (3 if r.get("saturated") else 1))
 
+    if a.okuda:
+        a.sweep, a.values = "n_cells", ",".join(str(n) for n in OKUDA_N_CELLS)
+        a.tag = a.tag or "okuda"
     if not (a.sweep and a.values):
-        ap.error("give --sweep and --values, or --one")
-    vals = [float(v) for v in a.values.split(",")]
+        ap.error("give --sweep and --values, or --one, or --okuda")
+    if a.sweep not in BASE:
+        ap.error(f"--sweep {a.sweep!r} is not a knob; known: {', '.join(sorted(BASE))}")
+    vals = [coerce(a.sweep, v) for v in a.values.split(",")]
     tag = a.tag or a.sweep
-    fixed = {}
+    fixed = dict(size)
     for kv in filter(None, a.fix.split(",")):
         key, _, val = kv.partition("=")
         key = key.strip()
         if key not in BASE:
             ap.error(f"--fix {key!r} is not a knob; known: {', '.join(sorted(BASE))}")
-        fixed[key] = float(val)
+        fixed[key] = coerce(key, val)
     if a.sweep in fixed:
-        ap.error(f"--fix {a.sweep} contradicts --sweep {a.sweep}")
+        ap.error(f"--fix/{'--n-cells' if a.sweep == 'n_cells' else '--headroom'} contradicts "
+                 f"--sweep {a.sweep}")
     pts = [{**BASE, **fixed, "name": f"{tag}_{i}_{v:g}".replace(".", "p"), a.sweep: v}
            for i, v in enumerate(vals)]
     print(f"[study] sweeping {a.sweep} over {vals}"
           + (f", holding {fixed}" if fixed else "")
           + f", {a.frames} frames, {a.jobs} parallel")
+    for p in pts:                     # the cap of every point, BEFORE the wall is hit, not after
+        pl = reservoir_plan(p["n_cells"], p["growth_headroom"], p["max_cells"])
+        print(f"  [plan] {p['name']:22} {pl['n_cells']:>5} cells -> cap {pl['face_cap']:>6} "
+              f"({pl['growth_headroom']}x, vertex reservoir {pl['vbuf']})")
     recs = wave(pts, a.frames, movie_for={p["name"] for p in pts}, jobs=a.jobs)
     json.dump(recs, open(os.path.join(OUT, f"wave_{tag}.json"), "w"), indent=1)
     print(f"\n[study] wrote {OUT}/wave_{tag}.json")
+    if not any(r.get("valid_evidence") for r in recs.values()):
+        print("[study] 🔴 NO POINT IN THIS WAVE IS VALID EVIDENCE (all saturated or failed).")
+        sys.exit(3)

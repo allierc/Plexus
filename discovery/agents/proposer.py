@@ -31,7 +31,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
 import llm                                                       # noqa: E402
-from llm import CAUSALITY_RULE, budget_note, ensure_files, read_file, run_claude  # noqa: E402
+from llm import CAUSALITY_RULE, budget_note, ensure_files, read_file, run_agent  # noqa: E402
 
 PROPOSAL_FILE = os.path.join(llm.CAMPAIGN, "proposal.json")
 
@@ -65,16 +65,26 @@ def _legal_menu(frontier, cfg, prox, max_per_parent=6):
     return menu
 
 
-def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_min=10):
+def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_min=10,
+            ledger=None):
     """Ask the agent for a batch. Returns (ok, [slot dicts]).
 
     Slot 0 is ALWAYS the parent unchanged -- the CONTROL. That is the one thing the agent is not
     allowed to spend, because without it a difference between candidates cannot be separated
     from seed noise. My first design had no control slot at all.
+
+    `ledger` is the campaign's BudgetLedger (round.py owns it). The proposer's call is the most
+    expensive of the round; it used to call run_claude() directly, so its cost has never once
+    been measured. Note the two SEPARATE roles recorded here: "grounder" (local retrieval, no
+    model) and "proposer" (the model call). Lumping them would hide which one is slow.
     """
     paths = ensure_files(cfg.objective)
     menu = _legal_menu(frontier, cfg, prox)
-    grounding = _ground(cfg)
+    if ledger is not None:
+        with ledger.timed("grounder", kind="local"):
+            grounding = _ground(cfg)
+    else:
+        grounding = _ground(cfg)
 
     prompt = f"""ROUND {round_id}: propose the next batch of {n_slots} experiments.
 {budget_note(timeout_min, "1) proposal.json  2) an entry appended to analysis.md  3) memory.md")}
@@ -137,7 +147,10 @@ RULES
    the assertion before it is what gets checked.
  - Then append one dated entry to {paths['analysis']} and revise {paths['memory']}.
 """
-    ok, out = run_claude(prompt, timeout_min=timeout_min)
+    # allowed_tools is stated explicitly as llm.DEFAULT_TOOLS -- exactly what the bypassing
+    # `run_claude(prompt, timeout_min=...)` call was getting. Measurement-only: no knob moves.
+    ok, out = run_agent("proposer", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=llm.DEFAULT_TOOLS)
     if not os.path.exists(PROPOSAL_FILE):
         return False, []
     try:

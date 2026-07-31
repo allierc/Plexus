@@ -48,13 +48,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import llm                                                              # noqa: E402
-from llm import budget_note, ensure_files, read_file, run_claude        # noqa: E402
+from llm import budget_note, ensure_files, read_file, run_agent         # noqa: E402
 
 CAMP = llm.CAMPAIGN
 
+# EVERY agent call in this file goes through `run_agent(role, ..., ledger=ledger)`, never
+# through `run_claude` directly. That was the defect: run_agent() consulted the BudgetLedger and
+# stopwatch-ed the call, but no call site used it, so a round of ~25 model calls reported
+# `[llm] {'calls': 0, 'round_min': 0.0, 'total_min': 0.0}` and the declared 25-min per-round
+# ceiling had never constrained anything. `ledger` is threaded down from round.py; passing None
+# still works (ad-hoc use) but then the call is simply unaccounted, which run_claude reports.
+#
+# The timeouts and tool sets below are UNCHANGED from the bypassing versions on purpose: this
+# phase is measurement only, and moving a number would destroy the baseline being measured.
+
 
 # ============================================================================ 7. ANALYST x N
-def analyse(run_name, out_dir, n=3, timeout_min=6):
+def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None):
     """N INDEPENDENT readings of the SAME run, reconciled by consensus (Robin's 8x Finch).
 
     The point is not redundancy, it is that a single LLM reading is not reproducible: Robin
@@ -88,7 +98,8 @@ Reply with ONLY this JSON, nothing else:
   "evidence": "<2 sentences citing SPECIFIC numbers or what the caption says>",
   "eye_vs_number": "agree|disagree",
   "concern": "<anything that looks like an artefact rather than physics, or empty>"}}"""
-        ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=["Read"], quiet=True)
+        ok, out = run_agent("analyst", prompt, ledger=ledger, timeout_min=timeout_min,
+                            allowed_tools=["Read"], quiet=True)
         reads.append(_first_json(out) or {"phenotype": "unreadable", "confidence": 0.0})
 
     phen = [r.get("phenotype") for r in reads if r.get("phenotype")]
@@ -103,7 +114,7 @@ Reply with ONLY this JSON, nothing else:
 
 
 # ============================================================================ 8b. WATCHER veto
-def watch(run_name, out_dir, expected_phenotype, timeout_min=5):
+def watch(run_name, out_dir, expected_phenotype, timeout_min=5, ledger=None):
     """Compare what the movie SHOWS against what the composition CLAIMED, and gate promotion.
 
     The Watcher's eye already exists (the VLM captions every run). This is the missing half: the
@@ -126,7 +137,8 @@ Does the description support the claim? Be strict: 'a small bud' does NOT suppor
 
 Reply with ONLY: {{"supports": true|false, "seen": "<what it actually shows, 6 words>",
                   "why": "<one sentence>"}}"""
-    ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=[], quiet=True)
+    ok, out = run_agent("watcher", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=[], quiet=True)
     j = _first_json(out) or {}
     supports = bool(j.get("supports", True))
     return {"watcher_verdict": "supports" if supports else "CONTRADICTS",
@@ -135,7 +147,7 @@ Reply with ONLY: {{"supports": true|false, "seen": "<what it actually shows, 6 w
 
 
 # ============================================================================ 9. INTERPRETER
-def interpret(comp_hash, region, edit, summary, analyst, out_path, timeout_min=8):
+def interpret(comp_hash, region, edit, summary, analyst, out_path, timeout_min=8, ledger=None):
     """The causal description: THIS SPEC GIVES THIS PHENOMENON, BY THIS ROUTE.
 
     This is what makes the operator library reusable rather than merely catalogued, and it is
@@ -164,13 +176,13 @@ APPEND to {out_path} a markdown entry of exactly this shape:
 
 Be honest about uncertainty. If the route is not determined by the evidence, say which
 additional measurement would determine it."""
-    ok, out = run_claude(prompt, timeout_min=timeout_min,
-                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
+    ok, out = run_agent("interpreter", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=["Read", "Edit", "Write"], quiet=True)
     return ok
 
 
 # ============================================================================ 10. META-REVIEW
-def meta_review(round_id, timeout_min=10, max_chars=4000):
+def meta_review(round_id, timeout_min=10, max_chars=4000, ledger=None):
     """Distil recurring patterns and APPEND them to the Proposer's instructions.
 
     Co-Scientist: "feedback applicable to all agents, which is simply appended to their prompts
@@ -202,13 +214,13 @@ ever-growing prompt eventually crowds out the task itself, so old patterns that 
 their place must be DROPPED, not accumulated.
 
 Also append a dated round summary to {paths['memory']}."""
-    ok, out = run_claude(prompt, timeout_min=timeout_min,
-                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
+    ok, out = run_agent("meta_review", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=["Read", "Edit", "Write"], quiet=True)
     return ok
 
 
 # ============================================================================ REFLECTION (new)
-def reflect(slots, timeout_min=8):
+def reflect(slots, timeout_min=8, ledger=None):
     """Peer review BEFORE the batch costs GPU time. Co-Scientist has this; I did not.
 
     My "Critic" only type-checks. Co-Scientist's Reflection agent is a scientific peer reviewer,
@@ -232,13 +244,14 @@ Reply with ONLY:
 {{"batch_ok": true|false,
   "issues": [{{"slot": <int>, "problem": "<...>", "severity": "minor|serious"}}],
   "verdict": "<2 sentences on whether this batch is worth running as proposed>"}}"""
-    ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=["Read"], quiet=True)
+    ok, out = run_agent("reflection", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=["Read"], quiet=True)
     return _first_json(out) or {"batch_ok": True, "issues": [],
                                 "verdict": "reflection unavailable"}
 
 
 # ============================================================================ EVOLUTION (new)
-def evolve(winner_desc, ledger_summary, timeout_min=8):
+def evolve(winner_desc, ledger_summary, timeout_min=8, ledger=None):
     """REFINE the top-ranked rather than only truncating. Co-Scientist has this; I did not.
 
     Batch-and-truncate (Robin) prevents depth-first drift, but truncation ALONE means a winner
@@ -264,12 +277,13 @@ Propose up to THREE refinements, each ONE legal edit, in the spirit of:
 Reply with ONLY:
 {{"refinements": [{{"edit_label": "<...>", "kind": "simplify|synthesise|ground",
                    "claim": "<falsifiable>", "predicted": "<...>", "why": "<...>"}}]}}"""
-    ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=["Read"], quiet=True)
+    ok, out = run_agent("evolution", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=["Read"], quiet=True)
     return (_first_json(out) or {}).get("refinements", [])
 
 
 # ============================================================================ JUDGE (2nd opinion)
-def judge_pair(a, b, timeout_min=4):
+def judge_pair(a, b, timeout_min=4, ledger=None):
     """An LLM judge over a PAIR, from the pictures -- Robin's tournament shape.
 
     Robin ranks by LLM judge because their outcome is not measurable. Ours is, so the METRIC
@@ -290,7 +304,8 @@ has already scored 9.30 on a small bud, so a number that contradicts the picture
 that is wrong.
 
 Reply with ONLY: {{"winner": "A"|"B"|"tie", "why": "<one sentence>"}}"""
-    ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=[], quiet=True)
+    ok, out = run_agent("judge", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=[], quiet=True)
     j = _first_json(out) or {}
     w = j.get("winner", "tie")
     return (1.0 if w == "A" else 0.0 if w == "B" else 0.5), j.get("why", "")
@@ -326,7 +341,7 @@ def _majority(vals):
 
 # ============================================================================ ESCALATION (new)
 def request_operator(ledger_summary, map_summary, frontier_desc, exhausted_why, round_id,
-                     timeout_min=8):
+                     timeout_min=8, ledger=None):
     """Ask what mechanism the language cannot express. The escalation path's only LLM call.
 
     This is invoked when the search has run out of moves that could teach it anything: every
@@ -377,5 +392,6 @@ Reply with ONLY:
   "acceptance_test": "<a concrete test on a SIMPLE geometry that would show the new operator
                        works, with a number in it>",
   "confidence": "high|medium|low"}}"""
-    ok, out = run_claude(prompt, timeout_min=timeout_min, allowed_tools=["Read"], quiet=True)
+    ok, out = run_agent("operator_request", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=["Read"], quiet=True)
     return _first_json(out)

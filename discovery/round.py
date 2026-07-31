@@ -57,6 +57,9 @@ LOG = os.path.join(ROOT, "log", "okuda")
 CAMP = os.path.join(HERE, "campaign")
 FRONTIER = os.path.join(CAMP, "frontier.json")
 MAP = os.path.join(CAMP, "lever_map.jsonl")
+# Per-round agent timing, one JSON line per round, so LLM cost can be tracked ACROSS rounds
+# instead of scrolling past once in a terminal.
+LLM_TIMING = os.path.join(CAMP, "llm_timing.jsonl")
 
 
 # --------------------------------------------------------------------------- frontier
@@ -92,7 +95,7 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     ledger_summary = _ledger_summary(sup, lm)
 
     ok, slots = P.propose(frontier, cfg, sup.prox, ledger_summary, sup.round + 1,
-                          n_slots=n_slots)
+                          n_slots=n_slots, ledger=ledger)
     if not slots:
         print("[round] the Proposer produced no usable proposal -- NOT falling back to random. "
               "A round with no reasoned proposal is a failed round, not a random one.")
@@ -124,7 +127,8 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     for i, why in rejected:
         print(f"  [critic] slot {i} rejected -- {why}")
 
-    review = A.reflect([{k: v for k, v in s.items() if k != "edit"} for _, _, s in out])
+    review = A.reflect([{k: v for k, v in s.items() if k != "edit"} for _, _, s in out],
+                       ledger=ledger)
     print(f"  [reflection] batch_ok={review.get('batch_ok')} :: {review.get('verdict','')[:200]}")
     for iss in review.get("issues", []):
         print(f"     slot {iss.get('slot')}: [{iss.get('severity')}] {iss.get('problem')}")
@@ -191,21 +195,45 @@ def build_theta_batch(base_name, param, values, n_slots, predictions=None, inten
 
 
 # --------------------------------------------------------------------------- the round
+def _finish(ledger, rid, mode, status, code):
+    """Print the per-role agent-time breakdown and persist it. EVERY exit path calls this.
+
+    Reporting only on the happy path is how a round that died early, or one that blew the LLM
+    ceiling, comes to look indistinguishable from a clean one in the log.
+    """
+    print()
+    print(ledger.report("round"))
+    p = ledger.persist(LLM_TIMING, mode=mode, status=status, exit_code=code)
+    print(f"[llm] {ledger.summary()}")
+    if ledger.overruns:
+        print(f"[llm] ROUND EXCEEDED THE {llm.ROUND_LLM_BUDGET_MIN} min LLM CEILING "
+              f"({len(ledger.overruns)} breach(es)) -- this round is NOT a clean round.")
+    if ledger.unmetered:
+        print(f"[llm] {len(ledger.unmetered)} UNMETERED call(s) bypassed run_agent() -- "
+              f"their cost is attributed but not budgeted; fix the call site.")
+    if p:
+        print(f"[llm] timing appended to {p}")
+    return code
+
+
 def run_round(mode="composition", frames=900, batch=8, base=None, param=None, values=None,
               dry=False):
+    # The ledger is created FIRST and every `return` below goes through `_finish`, so even a
+    # round that aborts at the admission gate reports what it spent getting there.
+    ledger = llm.BudgetLedger(path=LLM_TIMING)
+
     cert = Certification(os.path.join(HERE, "_metrology"))
     ok, why = cert.may_admit()
     if not ok:
         print(f"[round] ADMISSION GATE CLOSED -- refusing to run.\n  {why}")
-        return 2
+        return _finish(ledger, None, mode, "admission_gate_closed", 2)
 
     cfg = CampaignConfig(batch=batch, keep_truncate=max(2, batch // 3))
     sup = Supervisor(cfg, CAMP)
-    ledger = llm.BudgetLedger()
-    ledger.new_round()
-    llm.ensure_files(cfg.objective)
     lm = LeverMap(MAP)
     rid = sup.round + 1
+    ledger.new_round(rid)
+    llm.ensure_files(cfg.objective)
 
     print("=" * 96)
     print(f"ROUND {rid}   mode={mode}   campaign={cfg.name}")
@@ -219,8 +247,8 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     if not cands:
         print("[round] no candidates -- escalating")
         print(json.dumps(run_escalation(cfg, sup, lm, rid, "the batch builder produced no "
-                                        "runnable candidate"), indent=1))
-        return 1
+                                        "runnable candidate", ledger=ledger), indent=1))
+        return _finish(ledger, rid, mode, "no_candidates", 1)
 
     # ------------------------------------------------ hypotheses FIRST, then configs
     posed = []
@@ -243,7 +271,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
 
     if dry:
         print("\n[round] --dry: configs + hypotheses written, nothing submitted")
-        return 0
+        return _finish(ledger, rid, mode, "dry", 0)
 
     # ------------------------------------------------ run
     names = [n for n, _, _ in posed]
@@ -253,11 +281,11 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     # blind for a whole wave).
     if cluster.preflight(verbose=True) is False:
         print("[round] preflight FAILED -- not submitting. Fix the job environment first.")
-        return 1
+        return _finish(ledger, rid, mode, "preflight_failed", 1)
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
         print("[round] submission did not land -- aborting rather than scoring nothing")
-        return 1
+        return _finish(ledger, rid, mode, "submit_failed", 1)
     # The return value used to be discarded, so "all six finished" and "we waited 24 h and gave
     # up" were indistinguishable. A killed straggler is recorded and its hypothesis is resolved
     # `inconclusive` below (no diag.json), which keeps a degenerate slot out of the surprise rate
@@ -287,8 +315,8 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
             print(f"  [critic] {nm} is not evidence: {post}")
             continue
         out_dir = os.path.join(LOG, nm)
-        an = A.analyse(nm, out_dir, n=3)
-        wa = A.watch(nm, out_dir, an["analyst_consensus"])
+        an = A.analyse(nm, out_dir, n=3, ledger=ledger)
+        wa = A.watch(nm, out_dir, an["analyst_consensus"], ledger=ledger)
         summ.update({k: v for k, v in an.items() if k != "analyst_reads"})
         summ.update(wa)
         if wa.get("watcher_blocks"):
@@ -307,7 +335,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     if not rows:
         print("[round] no admissible evidence")
         print(json.dumps(sup.observe([]), indent=1))
-        return 1
+        return _finish(ledger, rid, mode, "no_evidence", 1)
 
     # ------------------------------------------------ rank (measure) + judge (2nd opinion)
     rows.sort(key=lambda r: -r[3])
@@ -315,7 +343,7 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
         a, b = rows[0], rows[1]
         w, why_j = A.judge_pair(
             {"name": a[0], "caption": _cap(a[0]), "metrics": _m(a[2])},
-            {"name": b[0], "caption": _cap(b[0]), "metrics": _m(b[2])})
+            {"name": b[0], "caption": _cap(b[0]), "metrics": _m(b[2])}, ledger=ledger)
         agree = (w >= 0.5)
         print(f"  [judge] top pair: {'agrees with' if agree else 'DISAGREES with'} the metric "
               f"ranking -- {why_j[:130]}")
@@ -334,13 +362,13 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     for nm, g, s, sc, oc, h in kept:
         A.interpret(comp_hash(g), g.name_region(), h.edit, s,
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
-                    os.path.join(CAMP, "causal_descriptions.md"))
+                    os.path.join(CAMP, "causal_descriptions.md"), ledger=ledger)
 
     rep = sup.observe([(g, s, h.hid) for _, g, s, _, _, h in rows])
     sup.reg.render_knowledge(os.path.join(CAMP, "knowledge.md"),
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
-    A.meta_review(rid)
+    A.meta_review(rid, ledger=ledger)
     # THE CONTROL IS ALWAYS RETAINED, whatever it scored.
     # `kept` is a RANKING product, and a Watcher veto sets the score to -inf -- so in round 2 the
     # control (the parent, unchanged, protr_peak 4.03) was vetoed, fell out of `kept`, and the
@@ -364,19 +392,19 @@ def run_round(mode="composition", frames=900, batch=8, base=None, param=None, va
     # by a crash-like condition, never by the ordinary course of a campaign exhausting its
     # reachable space, which over weeks is the NORMAL way a mechanism search ends.
     if str(rep.get("reason", "")).startswith("ESCALATE"):
-        print(json.dumps(run_escalation(cfg, sup, lm, rid, rep["reason"]), indent=1))
+        print(json.dumps(run_escalation(cfg, sup, lm, rid, rep["reason"], ledger=ledger),
+                         indent=1))
 
     cov = lm.coverage()["overall"]
     print(f"\n[supervisor] {json.dumps({k: v for k, v in rep.items() if k != 'mix_why'})}")
     print(f"  mix: {rep['mix_why']}")
     print(f"[map] coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
           f"{cov['n_runs']} runs)")
-    print(f"[llm] {ledger.summary()}")
-    return 0
+    return _finish(ledger, rid, mode, "complete", 0)
 
 
 # --------------------------------------------------------------------------- escalation
-def run_escalation(cfg, sup, lm, rid, why):
+def run_escalation(cfg, sup, lm, rid, why, ledger=None):
     """Execute the escalation decision. The branch a human took by hand last time.
 
     Three actions, cheapest first (see escalation.py): open a stage gate, file an operator
@@ -395,7 +423,7 @@ def run_escalation(cfg, sup, lm, rid, why):
         req = A.request_operator(
             _ledger_summary(sup, lm), _map_summary(lm),
             "\n".join(f"  {comp_hash(g)}  {g.name_region()}" for g in frontier[:8]),
-            f"{why}\n{detail}", rid)
+            f"{why}\n{detail}", rid, ledger=ledger)
         if not req or not req.get("why_inexpressible"):
             print("[escalate] the agent produced no usable request -- recording the fact rather "
                   "than inventing one")
