@@ -93,42 +93,48 @@ The answer is arithmetic. The memory buffer for the mesh holds 3552 points, and 
 closed cell sheet fixes the largest possible number of cells at $(3552+4)/2 = 1778$. \textbf{Every
 run hit the wall and stopped.} I was not measuring biology. I was measuring the size of an array.
 
-That conclusion is now marked \unsup. It may still turn out to be true --- but it is not measured,
-and I presented it as if it were.
+That conclusion is now \textbf{withdrawn}. It may still turn out to be true --- but it is not
+measured, and I presented it as if it were.
 \end{tcolorbox}
 
 %======================================================================
-\section{What we believe, and how confident}
+\section{What we believe about the biology}
 
-\begin{center}\small
-\begin{tabular}{@{}p{7.6cm} l p{5.6cm}@{}}
-\toprule
-\textbf{Claim} & \textbf{Status} & \textbf{Why}\\
-\midrule
-The chemistry in the two front-page website movies does nothing to the shape
-& \solid
-& Arithmetic. The switch that lets chemistry drive growth is set to 50; the chemical only reaches
-about 0.4. It never fires. The two movies are one simulation in two colour schemes.\\
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt]
+\begin{center}\large\textbf{Nothing. The register is empty.}\end{center}
 
-Okuda's published settings are not reachable in our system today
-& \solid
-& Three of his values sit outside the ranges our search may use (\S\ref{sec:okuda}).\\
+Every measurement we have was taken with at least one of the four broken rulers in the path. There
+is no scientific claim in this document, and there should not be one until Phase~1 has re-measured
+with instruments that work.
+\end{tcolorbox}
 
-We can still regenerate the website movies from their recipes
-& \weak
-& They agree --- but old and new runs both stopped at the same 1778 ceiling, so the agreement
-means less than it appeared to.\\
+\textbf{An earlier draft of this section had a table grading five claims as ``solid'', ``weak'' or
+``unsupported''. Cedric was right to strike it, and the reason is worth recording.}
 
-Our tube is ``forced'' rather than ``grown''
-& \unsup
-& The test for this was measuring the wrong thing entirely (\S\ref{sec:rulers}).\\
+Grading claims on a confidence scale is the correct move when the instruments are sound and the
+evidence is thin. It is the \emph{wrong} move when the instruments themselves are broken --- then
+the register should be \emph{voided}, not annotated. Grading felt like rigour, but it smuggled the
+conclusions forward: a reader skims ``solid'', carries it, and the broken ruler is forgotten two
+pages later. If we cannot say how wrong a number is, it does not get a grade; it gets deleted.
 
-Chemistry-driven shaping destroys the cell sheet
-& \unsup
-& The 1778 problem. Needs re-running with a larger buffer --- that is Phase~1.\\
-\bottomrule
-\end{tabular}
-\end{center}
+\subsection{What we do know --- about our own code, not about biology}
+
+These are facts established by \emph{reading the source}, not by measuring anything. They are a
+different kind of statement, and they belong in a different list.
+
+\begin{itemize}
+\item \textbf{In the two front-page movies, the chemistry cannot affect the shape.} The switch that
+lets the chemical drive growth is set to 50, and the chemical is a quantity of order 1. The switch
+term is therefore about $10^{-9}$ --- off for any value the chemical could take. Separately, the
+growth setting is at its uniform limit, so every cell grows identically regardless. Both are
+visible in the configuration file; neither needed an experiment.
+\item \textbf{We were never running Okuda's system} (\S\ref{sec:okuda}).
+\item \textbf{The mesh buffer is sized as a multiple of the starting cell count}, so a run that
+begins with 150 cells can never exceed 1778. That is why all 32 runs stopped there.
+\end{itemize}
+
+None of these tells us anything about tubes. They tell us the experiment we thought we were running
+is not the experiment that ran.
 
 %======================================================================
 \section{The four broken rulers}\label{sec:rulers}
@@ -144,7 +150,7 @@ tube survives; an artificially forced one collapses. The code was meant to conti
 the run --- instead it started a brand-new simulation from the initial sphere, and so measured the
 starting condition every time. It returned essentially the same value (1.014) in 14 of 16 runs.
 \textbf{That value carries full weight in the score that ranks every experiment.}
-\emph{Not yet fixed --- the one open item in Phase~0.}
+\emph{Not yet fixed --- one of Phase~0's open items.}
 
 \item \textbf{Two different quantities were both called ``how far it sticks out''.}
 One measured distance from the centre \emph{of the tissue}; the other from the \emph{origin of the
@@ -228,43 +234,109 @@ that proposes, the peer-reviewer, the type-checker, the second-opinion judge, th
 detector, the three independent analysts, the eye-check, the one that writes the causal story, the
 pattern-distiller, and the one that certifies the instruments --- all ran on the last round.
 
-Two honest caveats: the eye-check is currently reading a broken camera (ruler~4), and the analysts'
-budget ceiling is not enforced, so a round can overrun its time allowance. Both are on the list.
+Two honest caveats: the eye-check is currently reading a broken camera (ruler~4), and the time
+budget is not merely unenforced --- it is not even measured.
 
-%======================================================================
-\section{What stands between us and the Okuda figure}\label{sec:okuda}
+\subsection{How long the agents take --- nobody knows, and the arithmetic is alarming}
 
-Comparing his published settings against what our system can express: \textbf{three of his values
-are outside the range our search is allowed to use}, so a faithful reproduction is impossible today
-however long we run.
+You asked whether the time per call is reasonable, and suggested five minutes a round as the
+target. Checking it produced a short answer and a long one.
+
+\textbf{The short answer: we do not measure it.} The last round ended by reporting
+\texttt{calls: 0, minutes: 0.0} --- for a round that made about twenty-five calls. A time ledger
+exists, and no agent is routed through it. So the declared ceiling of 25 minutes has never
+constrained anything, and there is no record of how long any call has ever taken.
+
+\textbf{The long answer: the declared allowances add up to nearly two hours.} These are timeouts
+rather than expected durations, but they are what the system would permit before intervening, on a
+round with five scored runs:
 
 \begin{center}\small
-\begin{tabular}{@{}l l l l@{}}
+\begin{tabular}{@{}l r r r@{}}
 \toprule
-\textbf{Okuda's setting} & \textbf{His value} & \textbf{Ours allows} & \textbf{Problem}\\
+\textbf{Role} & \textbf{Allowance} & \textbf{Calls per round} & \textbf{Worst case}\\
 \midrule
-Growth-switch sharpness       & 10              & 1--8    & out of range\\
-How far the inhibitor spreads & 10              & 0.1--2  & out of range\\
-Pattern length-scale          & 0.001--0.1      & 1--10   & \textcolor{bad}{not even the same quantity}\\
-Chemistry speed               & 4 powers of ten & 1.2     & far too narrow\\
+Reads the papers      & 4 min  & 1  & 4 min\\
+Proposes the batch    & 10 min & 1  & 10 min\\
+Peer-reviews it       & 5 min  & 1  & 5 min\\
+\textbf{Analysts}     & 4 min  & \textbf{15} (3 per run) & \textbf{60 min}\\
+Eye-check             & 3 min  & 5  & 15 min\\
+Second opinion        & 2 min  & 1  & 2 min\\
+Writes the story      & 6 min  & 2  & 12 min\\
+Distils the patterns  & 8 min  & 1  & 8 min\\
+\midrule
+& & \textbf{27 calls} & \textbf{116 min}\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-There is also a subtler gap. In Okuda's model the chemistry responds to the tissue's \emph{shape}
---- chemical flows between neighbouring cells in proportion to how much wall they share. Ours
-ignores geometry entirely. \emph{One half of the feedback loop is simply missing.}
+\textbf{Why five minutes is nonetheless achievable.} Twenty of the twenty-seven calls are the
+per-run ones --- three analysts and an eye-check, for each of five runs --- and they are completely
+independent of one another. They run one after another today for no reason other than that the
+code was written as a loop. Run them together and that whole block costs the time of its slowest
+single call rather than the sum of twenty.
 
-\textbf{Decision already taken:} calibrate to Okuda's \emph{observations} --- how many spots
-appear, how thick the tube is --- rather than copying his parameter values, which live in a
-differently-scaled model.
+Adding the change already on the list --- starting the next round's proposal \emph{while} the
+current simulations are still running, so its ten minutes leave the critical path entirely --- a
+round's unavoidable serial cost is roughly: peer-review, the slowest analyst, the second opinion,
+two stories in parallel, and the distillation. \textbf{About four to five minutes, which is your
+number.}
+
+Two items follow, and they are separated deliberately: \emph{measuring} is cheap and goes into
+Phase~0 with the other instruments; \emph{making it fast} is real work and goes into Phase~2b.
+
+%======================================================================
+\section{What stands between us and the Okuda figure}\label{sec:okuda}
+
+I previously framed this as an exotic parameter-range problem. \textbf{Cedric's reading is closer
+to right: most of the gap is mundane, and it is about the starting conditions.} That matters,
+because mundane gaps get closed in a day.
+
+\subsection{The mundane part --- and it is most of it}
+
+\begin{center}\small
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+\textbf{Starting condition} & \textbf{Okuda} & \textbf{What we ran} & \textbf{Fix}\\
+\midrule
+Number of cells at the start & 200, 2000, 4000 & \textbf{150}          & set the number\\
+Room to grow into            & grows from there & \textbf{capped at 1778} & bigger buffer\\
+Number of spots at the start & $\sim$5 at 2000 cells & never counted   & count them\\
+Size of those spots          & set by his figures & never measured     & measure them\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{We were not running his system.} The overnight study began with 150 cells --- his smallest
+case starts with 200 and his undulation case with 2000. And because the mesh buffer is sized as a
+multiple of the \emph{starting} count, beginning at 150 capped us at 1778 cells. His 4000-cell case
+is not reachable at all today. None of this is subtle physics; it is four numbers.
+
+The same applies to the pattern. Rather than trying to copy his length-scale setting --- which in
+our code is not even the same quantity as his --- \textbf{we match what he reports seeing}: about
+five spots on a 2000-cell ball. Tune our diffusion until we get five spots at 2000 cells, then
+freeze it. That is a calibration against an observation, and it sidesteps the units problem
+entirely.
+
+\subsection{What is left after that}
+
+\begin{itemize}
+\item \textbf{Two ranges are simply too narrow} --- the sharpness of the growth switch (he uses 10,
+we allow up to 8) and how far the inhibitor spreads (he uses 10, we allow up to 2). Widening two
+numbers.
+\item \textbf{One real gap.} In Okuda's model the chemistry responds to the tissue's \emph{shape}:
+chemical flows between neighbouring cells in proportion to how much wall they share. Ours ignores
+geometry entirely, so patterning cannot react to deformation. This probably does not block the
+plain tube, but it is likely to matter for \emph{branching}, where domains split as cells stretch.
+This is the one item that is genuine work rather than a number change.
+\end{itemize}
 
 %======================================================================
 \section{The phases}
 
 Eight stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
 
-\begin{phasebox}{Phase 0 --- Fix the broken rulers \hfill \prog\ (2 of 4)}
+\begin{phasebox}{Phase 0 --- Pre-flight: fix the instruments \hfill \prog\ (2 of 6)}
 \textbf{Goal.} Make the measurements trustworthy. Nothing runs unattended until this lands.
 
 \textbf{Why.} Running before this writes uninterpretable results into a permanent record. Four
@@ -280,6 +352,11 @@ object --- one size, held for the whole run and shared across runs, as in Okuda'
 add a second viewpoint so a tube cannot hide behind the body. This was originally scheduled much
 later as a presentation nicety. It is not: it is the ruler the eye-check reads, and until it is
 fixed we cannot say whether the eye-check's vetoes were right.
+\item \textbf{Start from Okuda's cell counts} (\S\ref{sec:okuda}). Set the starting number to
+his, and size the buffer for where the run is going rather than where it began. Four numbers.
+\item \textbf{Put a stopwatch on every agent call} (\S\ref{sec:agents}). Route them through the
+existing time ledger so the next round reports what it actually cost. Measuring only --- speeding
+it up is Phase~2b.
 \end{itemize}
 
 \textbf{What you get.} A one-line confirmation that the rulers are sound, plus one before/after
@@ -314,15 +391,17 @@ asserts his published constants rather than tuning them.
 
 \begin{phasebox}{Phase 2b --- Switch on the two agents that never run \hfill \todo\ (1 day)}
 \textbf{Goal.} Put \textbf{Evolution} and the \textbf{Referee} into the live round
-(\S\ref{sec:agents}), and enforce the analysts' time budget.
+(\S\ref{sec:agents}); run the twenty per-run calls together instead of one after another; move
+the proposal off the critical path by starting it while the simulations run. Target: \textbf{a
+round costs five minutes of agent time}, measured, not asserted.
 
 \textbf{Why.} Without Evolution the loop can only pick among the changes it happened to think of,
 never improve the best one --- which is half of what makes it a search rather than a lottery.
 Without the Referee's tournament, ranking rests on a single number, and that number is the one
 Phase~0 is currently repairing.
 
-\textbf{What you get.} Confirmation that all fourteen automatic roles ran in one round, with the
-round's cost in time and tokens.
+\textbf{What you get.} Confirmation that all fourteen automatic roles ran in one round, and the
+measured wall-clock against the five-minute target.
 \end{phasebox}
 
 \begin{phasebox}{Phase 3 --- Measurements that can tell his regimes apart \hfill \todo\ (2 days)}
