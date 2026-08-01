@@ -17,6 +17,7 @@ frame 0.
 """
 from __future__ import annotations
 
+import contextlib
 import os
 import math
 import numpy as np
@@ -681,7 +682,24 @@ def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
-        on_frame=None, progress: bool = False) -> tuple[Hierarchy, dict]:
+        on_frame=None, progress: bool = False,
+        grad: bool = False) -> tuple[Hierarchy, dict]:
+    """Forward-simulate `sim`. Returns (Hierarchy, recorded trajectory).
+
+    `grad=True` keeps the autograd tape across the whole rollout, so a loss on the FINAL state
+    differentiates back to the initial state and to any operator parameter stored as a tensor.
+    It is opt-in because the tape costs memory that forward generation has no use for, and
+    generation is what this function is called for 99% of the time.
+
+    The alternative -- which `prototype/inverse_slime/` had to accept and the jax-morph atlas
+    measured the cost of -- is a SECOND differentiable implementation of the same physics, kept in
+    step with this one by hand. One physics, one tape, is worth the argument.
+
+    Two things an inverse caller should know. The recorded trajectory is always detached: it is a
+    side-channel for plotting and scoring, never a path for the gradient, which lives in the
+    returned `H`. And a structural operator must apply its writes FUNCTIONALLY (clone, write,
+    publish) or it severs the tape for everything downstream of it -- see `cell_divide`.
+    """
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
@@ -729,7 +747,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", dynamic_ncols=True, leave=False)
         except ImportError:
             pass
-    with torch.no_grad():
+    # the tape is OFF unless the caller asked for it (see the docstring): generation pays no
+    # memory for a graph it will never traverse, and the inverse half asks explicitly.
+    with (contextlib.nullcontext() if grad else torch.no_grad()):
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
@@ -753,12 +773,15 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             ri = rec_index.get(tick)                 # None on un-recorded ticks (strided long runs)
             if ri is not None:
                 for name, lvl in H.levels.items():
+                    # `.detach()` matters only under grad=True, where these tensors carry a tape:
+                    # the trajectory is a RECORD, never a path for the gradient (which reaches the
+                    # caller through H). Without it, `.numpy()` raises on the first frame.
                     if name in rec_sets:                              # spatial: the pos trajectory
-                        rec_sets[name][ri] = lvl.get("pos").cpu().numpy()
-                    occ_sets[name][ri] = lvl.active.cpu().numpy()
+                        rec_sets[name][ri] = lvl.get("pos").detach().cpu().numpy()
+                    occ_sets[name][ri] = lvl.active.detach().cpu().numpy()
                     if name in rec_state:                            # non-pos recorded state blocks (voltage, ...)
                         for bname, arr in rec_state[name].items():
-                            arr[ri] = lvl.get(bname).cpu().numpy()
+                            arr[ri] = lvl.get(bname).detach().cpu().numpy()
             if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded

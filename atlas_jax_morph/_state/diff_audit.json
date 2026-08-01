@@ -1,0 +1,476 @@
+{
+  "measured": [
+    {
+      "op": "aggregate",
+      "impl": "default",
+      "kind": "aggregate",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {},
+      "fittable": true
+    },
+    {
+      "op": "alignment",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 1.7722722986945882e-06,
+      "params": {
+        "a": "GRAD",
+        "noise": "CONSTANT",
+        "r": "CONSTANT",
+        "softness": "CONSTANT"
+      },
+      "fittable": true
+    },
+    {
+      "op": "broadcast",
+      "impl": "default",
+      "kind": "broadcast",
+      "declared": true,
+      "state": "CONSTANT",
+      "state_grad": 0.0,
+      "params": {
+        "k": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "cell_divide",
+      "impl": "default",
+      "kind": "structural",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "max_occ": "CONSTANT",
+        "offset": "CONSTANT",
+        "rate": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "cell_grow",
+      "impl": "default",
+      "kind": "structural",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "aniso": "CONSTANT",
+        "offset": "CONSTANT",
+        "prestretch": "CONSTANT",
+        "rate": "CONSTANT",
+        "stress_gain": "CONSTANT",
+        "target": "CONSTANT",
+        "tip": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "cohesion",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 7.998597340019842e-10,
+      "params": {
+        "a": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "cruise",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 9.550379753112793,
+      "params": {
+        "chirality": "CONSTANT",
+        "k": "GRAD",
+        "noise": "CONSTANT",
+        "v0": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "decay",
+      "impl": "default",
+      "kind": "field",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "rate": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "diffuse",
+      "impl": "finite_difference",
+      "kind": "field",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "rate": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "diffuse",
+      "impl": "spectral",
+      "kind": "field",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "rate": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "drag",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 25.712230682373047,
+      "params": {
+        "k": "GRAD",
+        "noise": "CONSTANT"
+      },
+      "fittable": true
+    },
+    {
+      "op": "glide",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "CONSTANT",
+      "state_grad": 0.0,
+      "params": {
+        "noise": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "gravity",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "CONSTANT",
+      "state_grad": 0.0,
+      "params": {
+        "g": "CONSTANT",
+        "gx": "ZERO",
+        "gy": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "mls_mpm_mechanics",
+      "impl": "default",
+      "kind": "exchange",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 1826.28955078125,
+      "params": {
+        "a_max": "CONSTANT",
+        "drag": "GRAD",
+        "dx": "GRAD",
+        "inv_dx": "GRAD",
+        "surface_tension": "CONSTANT",
+        "vmax": "CONSTANT",
+        "wall_contact": "CONSTANT",
+        "wall_damp": "CONSTANT"
+      },
+      "fittable": true
+    },
+    {
+      "op": "mpm_anchor",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "ZERO",
+      "state_grad": 0.0,
+      "params": {
+        "k": "ZERO",
+        "ring": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "mpm_spin",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 333150.03125,
+      "params": {
+        "omega": "GRAD",
+        "spin_k": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "mpm_strain",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {},
+      "fittable": true
+    },
+    {
+      "op": "pacemaker",
+      "impl": "default",
+      "kind": "field",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "duration": "CONSTANT",
+        "period": "CONSTANT",
+        "phase": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "radius_graph",
+      "impl": "default",
+      "kind": "rewire",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2811.67822265625,
+      "params": {
+        "r_max": "CONSTANT",
+        "r_min": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "sediment",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "CONSTANT",
+      "state_grad": 0.0,
+      "params": {
+        "g": "CONSTANT",
+        "gx": "ZERO",
+        "gy": "ZERO"
+      },
+      "fittable": false
+    },
+    {
+      "op": "separation",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 2.5744706163957404e-17,
+      "params": {
+        "a": "GRAD"
+      },
+      "fittable": true
+    },
+    {
+      "op": "stillinger_weber",
+      "impl": "autograd",
+      "kind": "lateral",
+      "declared": true,
+      "state": "CONSTANT",
+      "state_grad": 0.0,
+      "params": {
+        "a": "CONSTANT",
+        "cos0": "CONSTANT",
+        "eps": "CONSTANT",
+        "gamma": "CONSTANT",
+        "lam": "CONSTANT"
+      },
+      "fittable": false
+    },
+    {
+      "op": "velocity_align",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 1.7722722986945882e-06,
+      "params": {
+        "a": "GRAD",
+        "noise": "CONSTANT",
+        "r": "CONSTANT",
+        "softness": "CONSTANT"
+      },
+      "fittable": true
+    },
+    {
+      "op": "velocity_cruise",
+      "impl": "default",
+      "kind": "lateral",
+      "declared": true,
+      "state": "GRAD",
+      "state_grad": 9.550379753112793,
+      "params": {
+        "chirality": "CONSTANT",
+        "k": "GRAD",
+        "noise": "CONSTANT",
+        "v0": "GRAD"
+      },
+      "fittable": true
+    }
+  ],
+  "not_exercised": [
+    {
+      "op": "activation_pulse",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "active_force",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "active_stress",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "agent_gather",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "agent_remodel",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "agent_scatter",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "agent_to_mpm",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "apply_material_map",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "attraction_repulsion",
+      "impl": "default",
+      "why": "AttributeError: 'Level' object has no attribute 'type_params'"
+    },
+    {
+      "op": "attractor_flow",
+      "impl": "default",
+      "why": "IndexError: index 2 is out of bounds for dimension 1 with size 2"
+    },
+    {
+      "op": "bounce",
+      "impl": "default",
+      "why": "RuntimeError: The size of tensor a (2) must match the size of tensor b (48) at non-singleton dimension"
+    },
+    {
+      "op": "chemotax",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "deposit",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "flow_align",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "g2p",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "heading_align",
+      "impl": "default",
+      "why": "ValueError: not enough values to unpack (expected 2, got 1)"
+    },
+    {
+      "op": "mpm_gather",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "mpm_grid_update",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "mpm_scatter",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "mpm_to_agent",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "p2g",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "playback",
+      "impl": "default",
+      "why": "KeyError: 'cell'"
+    },
+    {
+      "op": "polarity_align",
+      "impl": "default",
+      "why": "ValueError: not enough values to unpack (expected 2, got 1)"
+    },
+    {
+      "op": "polarity_flow_align",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "pulse_to_active_stress",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "pulse_to_contraction",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "sense",
+      "impl": "default",
+      "why": "KeyError: tensor(1., requires_grad=True)"
+    },
+    {
+      "op": "signal",
+      "impl": "default",
+      "why": "KeyError: 'voltage'"
+    },
+    {
+      "op": "squared_law",
+      "impl": "default",
+      "why": "ValueError: squared_law(law=coulomb) needs per-type property 'charge' on 'cell'; declare it in the s"
+    }
+  ]
+}
