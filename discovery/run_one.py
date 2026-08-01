@@ -300,6 +300,14 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "valid_evidence": bool(not inert and not saturated),
                "protr_final": round(_valid[-1], 3),          # last VALID frame, not last frame
                "protr_peak": round(max(_valid), 3),           # over VALID frames only
+               # THE EXPLICIT VOCABULARY (Phase 0, item 20). `protr` reads as a length and is a
+               # RATIO -- 1.0 is a sphere -- and reading 1.62 as an amount of protrusion is the
+               # mistake the old name invited. Both names are written: the archive is never
+               # rewritten, and 92 references cannot be cut over in one step without a window
+               # where half the code reads a key the other half stopped writing. New readers
+               # take `elongation*`; `vocab.canonical()` resolves either.
+               "elongation_at_end": round(_valid[-1], 3),
+               "elongation_peak": round(max(_valid), 3),
                "horizon_frame": horizon.get("horizon"),
                "horizon_why": horizon.get("why"),
                "first_damage_frame": horizon.get("first_damage"),

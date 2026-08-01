@@ -334,6 +334,7 @@ SETUP = {
     # A quotation is not a citation. The quote was accurate and the mapping was wrong, which is
     # worse than having no quote at all: it made a tenfold error look verified.
     "coupled": dict(
+        section="Coupling patterning and deformation drives undulation, tubulation, and branching",
         n_cells=2000, grows_to=4000, figures=["fig5a", "fig5b", "fig6", "fig7"],
         quote="Coupling patterning and deformation drives undulation, tubulation, and "
               "branching. [...] The initial tissue morphology was simply set to be a spherical "
@@ -342,12 +343,14 @@ SETUP = {
         note="THE campaign case. Tubulation (Fig 5), branching (Fig 6) and undulation (Fig 7) "
              "are one experiment at one starting size; only chi and gamma differ between them."),
     "arrested": dict(
+        section="Turing patterns in 3D cell aggregates",
         n_cells=200, grows_to=200, figures=[],
         quote="we simulated patterning processes while without cell volume growth [...] These "
               "tissues are composed of about 200 cells",
         note="A CONTROL, not a morphology run: patterning on tissue that cannot grow. Useful as "
              "our own no-growth control, never as the starting size for a coupling figure."),
     "uncoupled_growth": dict(
+        section="Patterning hysteresis on deforming tissues",
         n_cells=200, grows_to=800, figures=[],
         quote="cell growth rate was set to be constant [...] the initial tissue morphology was "
               "simply set to be a spherical vesicle of a monolayer cell sheet composed of about "
@@ -355,6 +358,7 @@ SETUP = {
         note="The hysteresis experiment: the tissue grows, but growth is INDEPENDENT of the "
              "morphogen. The other control -- deformation without the coupling."),
     "diagram": dict(
+        section="Difference in time scales between patterning and deformation varies",
         n_cells=2000, grows_to=4000, figures=[],
         quote="The individual tissues in (b) were composed of about 4,000 cells, which were "
               "picked up on the growth process.",
@@ -389,6 +393,130 @@ REGIME = [
     ("k_v >> kappa_s * v_ref**(2/3)", "incompressibility"),
     ("tau_cycle >> eta_c / kappa_s",  "quasi-static: mechanics relaxes between biological events"),
 ]
+
+
+
+# ============================================================================ quote verification
+# THE CHECK THAT WOULD HAVE CAUGHT IT. On 2026-08-01 this agent asserted that Okuda's tubulation
+# figures start at 200 cells, and quoted the paper for it. The quote was verbatim and the mapping
+# was wrong: "about 200 cells" belongs to a control experiment on arrested tissue, eight pages
+# before the coupling experiment that produces Figures 5-7 at 2,000. Every faithful slot would
+# have run a tenth of the paper's initial condition, and the citation would have vouched for it.
+#
+# A QUOTATION IS NOT A CITATION. Checking that a quote is real catches fabrication, which was
+# never the failure mode -- the failure mode is a real sentence lifted out of the experiment it
+# describes. So the quote must also land in the SECTION the entry claims it comes from. That is
+# deterministic: the paper's result headings are distinctive, and a quote either falls between
+# its declared heading and the next one or it does not.
+_PAPER_CACHE = {}
+
+
+def _paper_text():
+    """The paper as one normalised string, for locating quotes. Cached; read-only."""
+    if "t" not in _PAPER_CACHE:
+        import fitz
+        d = fitz.open(os.path.join(PAPERS, "Turing_Vertex.pdf"))
+        _PAPER_CACHE["t"] = re.sub(r"\s+", " ",
+                                   "\n".join(d[i].get_text() for i in range(d.page_count)))
+    return _PAPER_CACHE["t"]
+
+
+SECTION_ORDER = [
+    "Turing patterns in 3D cell aggregates",
+    "Patterning hysteresis on deforming tissues",
+    "Coupling patterning and deformation drives undulation, tubulation, and branching",
+    "Difference in time scales between patterning and deformation varies",
+]
+
+
+def _section_span(t, heading):
+    """(start, end) of a result section: its heading to the next heading, or the end."""
+    i = t.find(heading)
+    if i < 0:
+        return None
+    later = [t.find(h) for h in SECTION_ORDER if t.find(h) > i]
+    return (i, min(later) if later else len(t))
+
+
+def section_of(t, at):
+    """Which result section a character offset falls in. Derived, never declared."""
+    spans = sorted((t.find(h), h) for h in SECTION_ORDER if t.find(h) >= 0)
+    for k, (i, h) in enumerate(spans):
+        j = spans[k + 1][0] if k + 1 < len(spans) else len(t)
+        if i <= at < j:
+            return h, (i, j)
+    return None, None
+
+
+def figures_named_in(t, span):
+    """The figure NUMBERS a section actually refers to. The paper's own cross-references."""
+    return set(re.findall(r"Fig(?:ure|\.)\s*(\d)", t[span[0]:span[1]]))
+
+
+def verify_setup(entries=None):
+    """Every quote must be real, and every figure an entry claims must be named where the quote is.
+
+    THE HUMAN IS OUT OF THIS LOOP. An earlier version had each entry DECLARE the section its
+    quote came from, which only catches a quote/section mismatch -- an entry that is wrong but
+    self-consistent still passes, and someone still has to notice. So the section is now DERIVED
+    from where the quote actually falls, and the entry is held to a claim it cannot fake: if it
+    says it describes Figure 5, the section containing its quote must itself mention Figure 5.
+
+    That is what would have caught 2026-08-01 with nobody reading. The bad entry claimed Figures
+    5a/5b/6 while quoting a sentence from a section whose only cross-references are Figures 3 and
+    4. The paper contradicts the entry, in the paper's own words, arithmetically.
+
+    Entries claiming no figures cannot be checked this way -- the check bites exactly where a
+    claim is made -- so their derived section is reported instead, for a reader to see.
+    """
+    t = _paper_text()
+    bad, seen = [], {}
+    for name, e in (entries or SETUP).items():
+        frags = [re.sub(r"\s+", " ", f.strip()) for f in e["quote"].split("[...]") if f.strip()]
+        locs = []
+        for frag in frags:
+            at = t.find(frag)
+            if at < 0:
+                bad.append(f"{name}: quote fragment is NOT in the paper: {frag[:60]!r}")
+            else:
+                locs.append(at)
+        if not locs:
+            continue
+        sec, span = section_of(t, locs[0])
+        if sec is None:
+            bad.append(f"{name}: quote falls outside every known result section")
+            continue
+        # every fragment must come from the SAME section -- otherwise the quote is a splice
+        for at in locs[1:]:
+            s2, _ = section_of(t, at)
+            if s2 != sec:
+                bad.append(f"{name}: quote is spliced across sections "
+                           f"({sec[:34]!r} and {str(s2)[:34]!r})")
+        named = figures_named_in(t, span)
+        claimed = {re.sub(r"\D", "", f)[:1] for f in e.get("figures", []) if re.sub(r"\D", "", f)}
+        missing = sorted(claimed - named)
+        if missing:
+            bad.append(f"{name}: claims Figure(s) {', '.join(missing)}, but its quote sits in "
+                       f"{sec[:44]!r}, which names only Figure(s) {', '.join(sorted(named))}")
+        if e.get("section") and e["section"] != sec:
+            bad.append(f"{name}: declares section {e['section'][:38]!r} but its quote is in "
+                       f"{sec[:38]!r}")
+        seen[name] = sec
+    return bad
+
+
+def setup_provenance():
+    """Where each entry's quote actually lives, derived. For a reader, and for the note."""
+    t = _paper_text()
+    out = {}
+    for name, e in SETUP.items():
+        frag = re.sub(r"\s+", " ", e["quote"].split("[...]")[0].strip())
+        at = t.find(frag)
+        sec, span = section_of(t, at) if at >= 0 else (None, None)
+        out[name] = {"section": sec, "n_cells": e["n_cells"],
+                     "figures_claimed": e.get("figures", []),
+                     "figures_named_there": sorted(figures_named_in(t, span)) if span else []}
+    return out
 
 
 def buffer_for(target_cells, margin=1.30):
