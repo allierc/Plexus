@@ -521,10 +521,24 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
         # a search that may only ever stand where the paper stands cannot discover that the
         # paper is not the only place to stand. What is NOT optional is the reservoir, and that
         # lives in the translator, where it applies to both shares alike.
-        fid = sl.get("fidelity", "okuda" if i < max(1, int(round(0.7 * len(slots)))) else "free")
-        if fid == "okuda":
-            g = _ground_starting_conditions(g, sl)
-        sl["fidelity"] = fid
+        # THE STARTING CELL COUNT IS NOT AN AXIS OF THE SEARCH, so it is grounded on every slot.
+        #
+        # This line had two defects, both found by reading round 1's own configs. It split the
+        # batch BY SLOT INDEX -- `i < 0.7 * len(slots)` -- and so ignored the `territory` the
+        # Proposer had actually declared: slot 5 said `in_paper` and was denied Okuda's starting
+        # conditions purely for being sixth. And what it varied was `n_cells`, so slots 4 and 5
+        # ran 500 cells against a control at 2000. A difference between them then confounds the
+        # EDIT with a fourfold change in specimen size, which destroys the one property the batch
+        # was designed for: every slot a single edit off one shared control.
+        #
+        # An excursion is free to leave the paper's PARAMETER REGIME -- chi, gamma, the
+        # diffusivities -- which is where "the paper is not the only place to stand" actually
+        # lives. It is not free to change how much tissue it starts with, unless cell count is
+        # itself the variable under test, and then it must be declared as the edit.
+        sl["territory"] = sl.get("territory", "in_paper" if sl.get("intent") == "control"
+                                 else "excursion")
+        sl["fidelity"] = "okuda" if sl["territory"] == "in_paper" else "free"
+        g = _ground_starting_conditions(g, sl)
         adm, rej = C.admit(g, seen if sl.get("intent") != "control" else ())
         if not adm:
             rejected.append((i, f"CRITIC: {rej}"))
