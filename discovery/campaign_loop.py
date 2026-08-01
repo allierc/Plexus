@@ -62,6 +62,15 @@ TERMINAL_EXITS = {
        "campaign/round_records.jsonl and decide; do not retry.",
 }
 
+# A ROUND THAT PRODUCED NO EVIDENCE, as a DECISION. Distinct from exit 1, which is what Python
+# gives an uncaught exception -- and that collision cost a launch: two rounds died on a NameError
+# in Act 1, the driver read the two exit-1s as "no admissible evidence twice in a row" and stopped
+# the campaign with the message "that is a problem with the batch or the instruments, not bad
+# luck". It was neither. A crash is a fact about the CODE and must never be counted as a fact
+# about the SEARCH.
+EMPTY_EXIT = 5
+MAX_CRASHES = 2
+
 
 def _log(rec):
     os.makedirs(CAMP, exist_ok=True)
@@ -163,7 +172,7 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
     print("=" * 96)
     _log({"event": "start", "rounds": n_rounds, "batch": batch, "frames": frames})
 
-    consecutive_empty, done = 0, 0
+    consecutive_empty, done, crashes = 0, 0, 0
     for i in range(n_rounds):
         ok, why = _gates_open()
         if not ok:
@@ -192,18 +201,32 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
             print(f"[loop] STOPPING -- {TERMINAL_EXITS[code]}")
             _log({"event": "stop", "why": TERMINAL_EXITS[code], "rounds_done": done})
             return code
-        if code == 1:
-            # A round returns 1 when it produced no admissible evidence. Once is information;
-            # twice in a row means the loop is generating batches nothing can score, and
-            # continuing would fill a week with unusable runs.
+        if code == EMPTY_EXIT:
+            # NO ADMISSIBLE EVIDENCE, as a decision the round reached. Once is information; twice
+            # in a row means the loop is generating batches nothing can score, and continuing
+            # would fill a week with unusable runs.
             consecutive_empty += 1
+            crashes = 0
             if consecutive_empty >= 2:
                 print("[loop] STOPPING -- two rounds in a row produced no admissible evidence. "
                       "That is a problem with the batch or the instruments, not bad luck.")
                 _log({"event": "stop", "why": "two empty rounds", "rounds_done": done})
-                return 1
+                return EMPTY_EXIT
         elif code == 0:
-            consecutive_empty = 0
+            consecutive_empty, crashes = 0, 0
+        elif code == 1:
+            # AN UNCAUGHT EXCEPTION. A fact about the code, never a fact about the search -- and
+            # reading it as the latter is what stopped a launch with "a problem with the batch or
+            # the instruments" when the truth was a NameError in Act 1. Retried, because a crash
+            # is often a bad slot rather than a bad build; bounded, because retrying a genuine
+            # bug forever is how a week is spent re-raising one exception.
+            crashes += 1
+            print(f"[loop] round {i + 1} CRASHED ({note or 'uncaught exception'}). That is a bug "
+                  f"in the code, not a finding about the batch -- crash {crashes}/{MAX_CRASHES}.")
+            if crashes >= MAX_CRASHES:
+                print("[loop] STOPPING -- the same round keeps crashing. Read the traceback.")
+                _log({"event": "stop", "why": "repeated crash", "rounds_done": done})
+                return 1
         else:
             print(f"[loop] round {i + 1} failed unexpectedly ({code}) -- {note}. Continuing; "
                   f"the round number was claimed before posing, so the next one is not wedged.")
