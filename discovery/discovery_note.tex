@@ -474,6 +474,11 @@ that can never be wrong teaches nothing. ``Invalid'' beats every morphology --- 
 already once reported a crumpled shell as a result. It records the \emph{path} a run takes, not just
 where it ends.
 
+\textbf{It has since become the arbiter} (Phase 4d), replacing the labels a person wrote from the
+movies --- a stronger ground truth, not merely a cheaper one, because it is certified against
+shapes whose answer is known \emph{by construction}. Until 1 August nothing called it: built,
+certified, never asked. Every run now carries its shape and its path beside its numbers.
+
 \textbf{The calibration, and the surprise.} The plan was to tune until we saw Okuda's handful of
 spots on a 2000-cell ball, then freeze. Counting spots over time --- for the first time --- showed
 something else:
@@ -547,27 +552,32 @@ where a limit lies is worth nothing until the boundary it predicts is the one th
 \end{tabular}
 \end{center}
 
-\textbf{Two corrections to what I had told Cedric an hour earlier.} First, \textbf{Okuda's setting
-is reachable}. I had said it was not, and had begun writing that the model might need a different
-kind of solver. That came from a short probe on the wrong side of a boundary I had not yet located.
-Second, \textbf{one number cannot express the limit}, because there are two ways to fail and it
-only knows about one. Running away is the one it forbids. The other is that the chemicals spread so
-readily that the pattern smears out and dies: the simulation stays perfectly well behaved and
-measures nothing. \textbf{Well behaved is not the same as alive.}
+\textbf{One number cannot express the limit, because there are two ways to fail and it knows
+about one.} Running away is the one it forbids. The other is that the chemicals spread so readily
+that the pattern smears out and dies --- the simulation stays perfectly well behaved and measures
+nothing. \textbf{Well behaved is not the same as alive}, and no stability condition sees the
+difference.
 
-\textbf{The rule is now two conditions, and both were measured rather than derived.} The step size
-must be under the limit, \emph{and} the spreading multiplier must stay under three. The second has
-no formula behind it --- it came from watching fourteen settings run. It exists because the
+\textbf{So the rule is now two conditions, and both were measured rather than derived.} The step
+size must be under the limit, \emph{and} the spreading multiplier must stay under three. The second
+has no formula behind it --- it came from watching fourteen settings run. It exists because the
 multiplier scales both chemicals at once, so turning it up flattens the self-reinforcing chemical's
 own peak as fast as it spreads the suppressor, and past about three the peak cannot outrun its own
 spreading.
 
-\textbf{The limit sits below the first failure we saw, which is conservative on purpose.} The
-measurements do not fall either side of a clean line: two settings above it were fine and one below
-it was not, and the odd one out is the case where the suppressor travels furthest --- so something
-beyond the two settings matters, and has not been identified. Until it is, the rule refuses two
-combinations known to be perfectly good. Refusing a good proposal costs a proposal. Admitting a
-divergent one has cost a batch and a conclusion, twice.
+Okuda's own setting for how far the suppressor travels \emph{is} reachable --- it sits in the first
+row of the table above, at a low spreading multiplier.
+
+\textbf{The limit sits below the first failure we saw.} The measurements do not fall either side of
+a clean line --- two settings above it ran fine, one below it did not --- so the rule refuses two
+combinations known to be good.
+
+That is the safe direction, and it is worth being explicit about which one is which. A
+\emph{permissive} rule admits a setting that then fails: the run happens, produces numbers, and
+those numbers are about the solver. That is how thirty-two runs and then twenty-seven more became
+findings before anyone noticed. A \emph{strict} rule refuses a setting that would have been fine,
+and costs one proposal. The old rule was permissive by a factor of fifty; this one errs strict
+until the term that explains the odd case is found.
 
 Checked against all eight settings that were run: every bad one refused, no bad one admitted.
 

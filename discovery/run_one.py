@@ -221,6 +221,37 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     except Exception as e:
         print(f"[{name}] tube_analysis unavailable: {type(e).__name__}: {str(e)[:80]}", flush=True)
 
+    # ------------------------------------------------------------- WHICH OF OKUDA'S SHAPES IS IT
+    # THE ARBITER, as of 2026-08-01. The instrument gate used to certify metrics by making them
+    # reproduce labels a person wrote from the rendered movies, and the eye-check could drop a run
+    # out of the ranking on a caption. Cedric's call: movies inform, they do not decide. So the
+    # ground truth is COMPUTED -- and it is stronger than an eye label, not merely cheaper,
+    # because morphology.classify is certified against shapes whose answer is known BY
+    # CONSTRUCTION (a built sphere is a sphere; a self-intersecting shell gets no label at all).
+    #
+    # The whole PATH is recorded, not just the endpoint: Okuda's tubes begin as bumps, and the
+    # transition is the part that says when the mechanism acted.
+    morph = {}
+    try:
+        import morphology as MP
+        from tube_analysis import _cell_centroids
+        series = []
+        for t in np.unique(np.linspace(0, T - 1, min(40, T)).astype(int)):
+            pos, mt, _ = fr[int(t)]
+            cen, rad, live = _cell_centroids(pos, mt)
+            if live.sum() < 8:
+                continue
+            series.append(MP.classify(cen, rad, live,
+                                      protr=float(np.percentile(rad[live], 95)
+                                                  / (np.median(rad[live]) + 1e-9))))
+        if series:
+            morph = MP.classify_series(series)
+            print(f"[{name}] morphology: {morph.get('morphology')}   path "
+                  f"{' -> '.join(morph.get('path', []))}", flush=True)
+    except Exception as e:
+        # NOT swallowed into a default: a missing label must read as missing, never as "sphere".
+        print(f"[{name}] MORPHOLOGY UNAVAILABLE: {type(e).__name__}: {str(e)[:90]}", flush=True)
+
     # --------------------------------------------------------------- persist
     arch = RunArchive(ARCHIVE)
     graph_struct = disc.get("structure") or {"operators": [], "connections": []}
@@ -320,6 +351,10 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "act_max_final": round(fm["act_max"][-1], 3),
                "frames": T, "wall_s": round(wall, 1)}
     summary.update(tube)                       # the archive's own definitions, for comparison
+    if morph:
+        summary["morphology"] = morph.get("morphology")
+        summary["morphology_path"] = " -> ".join(morph.get("path", []))
+        summary["morphology_why"] = str(morph.get("why", ""))[:200]
     try:
         summary.update(mechanics(name, fr, cfg, out_dir))   # force / stress / tension / migration
     except Exception as e:
