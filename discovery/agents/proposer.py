@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -194,11 +195,41 @@ RULES
    the assertion before it is what gets checked.
  - Write {PROPOSAL_FILE} and NOTHING else. The record is not yours to write.
 """
+    # THE PROPOSAL FILE IS DELETED BEFORE THE CALL, so a stale one cannot be adopted.
+    #
+    # MEASURED on 2026-08-01, on the first live launch of the rebuilt loop. `proposal.json` was
+    # six seconds OLDER than the campaign process that read it. The Proposer tried to Write it,
+    # the harness's read-before-write rule blocked the overwrite, the agent read the existing
+    # file and reported: "proposal.json already holds a complete, valid Round-1 proposal ... so
+    # no rewrite is needed." It then verified that proposal against every rule and adopted it.
+    #
+    # Every step of that is reasonable behaviour, and the round would have run somebody else's
+    # batch. The guard meant to prevent clobbering became a mechanism for inheriting stale work,
+    # which is the same shape as every other defect this campaign has found: a correct-looking
+    # artefact adopted because nothing checked WHEN it was made.
+    #
+    # Detecting it afterwards is not enough -- an mtime comparison would have to guess a
+    # tolerance. Removing the file makes the failure impossible: the agent has nothing to
+    # inherit, and an absent file after the call is an unambiguous refusal.
+    try:
+        os.remove(PROPOSAL_FILE)
+    except FileNotFoundError:
+        pass
+    t_call = time.time()
+
     # allowed_tools is stated explicitly as llm.DEFAULT_TOOLS -- exactly what the bypassing
     # `run_claude(prompt, timeout_min=...)` call was getting. Measurement-only: no knob moves.
     ok, out = run_agent("proposer", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=llm.DEFAULT_TOOLS)
     if not os.path.exists(PROPOSAL_FILE):
+        print("[proposer] no proposal.json was written -- the round has no reasoned batch, and "
+              "a random one is not a substitute")
+        return False, []
+    if os.path.getmtime(PROPOSAL_FILE) < t_call:
+        # belt and braces: the file exists but predates the call, which can only mean something
+        # outside this call created it while the call was running.
+        print(f"[proposer] REFUSING a proposal.json older than the call that asked for it "
+              f"({os.path.getmtime(PROPOSAL_FILE):.0f} < {t_call:.0f})")
         return False, []
     try:
         p = json.load(open(PROPOSAL_FILE))
