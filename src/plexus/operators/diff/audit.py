@@ -162,30 +162,40 @@ def probe(cls, device="cpu"):
     forward differentiable in this knob* (here) from *can the spec express a learnable knob*
     (it cannot, today -- and that is the language change, reported separately).
     """
-    last = None
-    for at, to in (("cell", "chem"), ("chem", "chem"), ("cell", "cell")):
-        H = build_harness(device=device)
-        lvl = H.level("cell")
-        lvl.state = lvl.state.detach().clone().requires_grad_(True)
-        state_leaf = lvl.state
-        params = {"_at": at, "to": to, "from": to}
-        for k in getattr(cls, "REQUIRES_PARAMS", []) or []:
-            params[k] = PARAM_DEFAULTS.get(k, 1.0)
-        try:
-            op = cls(params, device)
-            coerced = float_attrs(op)
-            leaves = {}
-            for k in coerced:                       # past the constructor, into the forward
-                t = torch.tensor(float(getattr(op, k)), device=device, requires_grad=True)
-                setattr(op, k, t)
-                leaves[k] = t
-            out = op(H, None)
+    last, rejects_tensor = None, False
+    for promote in (True, False):
+        for at, to in (("cell", "chem"), ("chem", "chem"), ("cell", "cell")):
+            H = build_harness(device=device)
+            lvl = H.level("cell")
+            lvl.state = lvl.state.detach().clone().requires_grad_(True)
+            state_leaf = lvl.state
+            params = {"_at": at, "to": to, "from": to}
+            for k in getattr(cls, "REQUIRES_PARAMS", []) or []:
+                params[k] = PARAM_DEFAULTS.get(k, 1.0)
+            try:
+                op = cls(params, device)
+                leaves = {}
+                if promote:
+                    for k in float_attrs(op):       # past the constructor, into the forward
+                        t = torch.tensor(float(getattr(op, k)), device=device,
+                                         requires_grad=True)
+                        setattr(op, k, t)
+                        leaves[k] = t
+                out = op(H, None)
+                break
+            except Exception as e:                  # try the next binding before giving up
+                last = e
+                H = None
+        if H is not None:
             break
-        except Exception as e:                      # try the next binding before giving up
-            last = e
-            H = None
+        # It ran with plain floats and RAISED with tensor knobs -- e.g. `torch.full(shape, eps)`,
+        # which will not take a tensor fill value. That is not an unknown: it is the operator
+        # refusing a learnable parameter, and it names exactly what a twin has to change.
+        rejects_tensor = True
     if H is None:
         raise last
+    if rejects_tensor:
+        return {"state": ("n/a", 0.0), "params": {}, "rejects_tensor": True}
 
     # a scalar touching everything the operator produced: a returned delta, or -- for a
     # structural / field / exchange operator that returns {} -- whatever it wrote
@@ -211,18 +221,40 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default=None)
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--candidates", action="store_true",
+                    help="also audit the anti-chamber (candidates/jax_morph_*, atlas_*), which "
+                         "`plexus.operators` deliberately does not auto-import")
+    ap.add_argument("--only-impl", default=None,
+                    help="restrict to implementations whose name contains this substring")
     a = ap.parse_args()
 
     import plexus.operators  # noqa: F401   self-registers the library
+    if a.candidates:
+        # The atlas's specs run on THESE, not on the promoted defaults: `grow_radius` resolves to
+        # jax_morph_saturating_cell_growth, `cell_divide` to implementation `volume_conserving`.
+        # Auditing only `plexus.operators` measures a set the atlas never runs.
+        import importlib
+        import os as _os
+        import plexus.operators.candidates as C
+        for fn in sorted(_os.listdir(_os.path.dirname(C.__file__))):
+            if fn.startswith(("jax_morph_", "atlas_")) and fn.endswith(".py"):
+                importlib.import_module(f"plexus.operators.candidates.{fn[:-3]}")
 
     rows, na = [], []
     for name in sorted(_OP_CONTRACTS):
         for impl, cls in sorted(_OP_CONTRACTS[name].implementations.items()):
+            if a.only_impl and a.only_impl not in impl:
+                continue
             try:
                 r = probe(cls, a.device)
             except Exception as e:
                 na.append({"op": name, "impl": impl,
                            "why": f"{type(e).__name__}: {str(e)[:88]}"})
+                continue
+            if r.get("rejects_tensor"):
+                rows.append({"op": name, "impl": impl, "kind": getattr(cls, "KIND", None),
+                             "declared": bool(cls.DIFFERENTIABLE), "state": "REJECTS-TENSOR",
+                             "state_grad": 0.0, "params": {}, "fittable": False})
                 continue
             pv = r["params"]
             # the operator is usable by an inverse loop if SOME tunable takes a gradient;

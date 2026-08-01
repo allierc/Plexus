@@ -166,12 +166,12 @@ class AdhereHarmonic(Lateral):
         dev = pos.device
         rad = self._read_scalar(lvl, "radius")
         if rad is None:
-            rad = torch.full((N,), self.radius0, device=dev, dtype=pos.dtype)
+            rad = torch.ones(N, device=dev, dtype=pos.dtype) * self.radius0  # ones*p, not full(p): `full` rejects a tensor fill value, blocking a learnable knob
         sigma = rad[:, None] + rad[None, :]                        # [N,N] additive contact rule
 
         kv = self._read_scalar(lvl, self.k_field)                 # per-cell k, if a field was named
         if kv is None:
-            k_ij = torch.full((N, N), self.k, device=dev, dtype=pos.dtype)
+            k_ij = torch.ones(N, N, device=dev, dtype=pos.dtype) * self.k  # ones*p, not full(p): `full` rejects a tensor fill value, blocking a learnable knob
         else:
             k_ij = 0.5 * (kv[:, None] + kv[None, :])               # arithmetic-mean mix (no sqrt: finite grad)
 

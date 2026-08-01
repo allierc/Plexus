@@ -93,7 +93,7 @@ class Apoptose(Structural):
         # per-cell hazard rate: prefer the heritable `death_rate` STATE buffer (the source's
         # DEATH_RATE field), else the scalar `rate` param (0 -> p=0 -> inert no-op).
         rate = getattr(lvl, "death_rate", None)
-        rate = rate if rate is not None else torch.full((buf,), self.rate, device=dev)
+        rate = rate if rate is not None else torch.ones(buf, device=dev) * self.rate  # ones*p, not full(p): `full` rejects a tensor fill value, blocking a learnable knob
         # p = 1 - exp(-clip(rate, 0) * dt). The clip guards a negative controller output: it would
         # otherwise give p < 0 and NaN a score; here it just means "no death" (p = 0).
         p = -torch.expm1(-rate.clamp(min=0.0) * dt)
