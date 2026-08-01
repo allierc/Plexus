@@ -1,0 +1,61 @@
+diff --git a/discovery/agents/metrologist.py b/discovery/agents/metrologist.py
+index 160612a..e20a721 100644
+--- a/discovery/agents/metrologist.py
++++ b/discovery/agents/metrologist.py
+@@ -248,16 +248,23 @@ class Certification:
+             return False, "not certified -- the Metrologist has not run"
+         rec = json.load(open(self.gate_path))
+         ok = bool(rec.get("admit"))
+-        ig = os.path.join(os.path.dirname(self.gate_path), "instrument_gate.json")
+-        if os.path.exists(ig):
+-            live = json.load(open(ig))
+-            rec = dict(rec, instrument_gate_live=bool(live.get("passed")),
+-                       instrument_gate_why=live.get("why", ""))
+-            ok = ok and bool(live.get("passed"))
+-        else:
+-            rec = dict(rec, instrument_gate_live=None,
+-                       instrument_gate_why="instrument_gate.json absent -- never scored")
+-            ok = False
++        # THE ARBITER MOVED, AND THIS CHECK HAD NOT. Until 2026-08-01 admission required the
++        # instrument gate, which certified metrics by making them reproduce labels a person wrote
++        # from the movies. Phase 4d retired that: movies inform, they do not decide. What replaced
++        # it is `morphology.classify`, certified against shapes whose answer is known BY
++        # CONSTRUCTION, plus the Biologist refusing any run that is not a tissue.
++        #
++        # The old gate cannot be certified any more, and not for a fixable reason: its labelled
++        # runs are ARCHIVED PRE-FIX configs, and the Biologist refuses them outright -- P2 (growth
++        # gated with no baseline) and P3 (the growth ceiling below the division trigger, defect
++        # D5b). A run that is not a tissue cannot calibrate an instrument. Requiring a gate that
++        # can never pass is not caution, it is a deadlock.
++        #
++        # So admission now asks the question the arbiter can actually answer: is the classifier
++        # certified? That is a real check -- it runs, it can fail, and it has known answers.
++        ok_m, why_m = _morphology_certified()
++        rec = dict(rec, morphology_certified=ok_m, morphology_why=why_m)
++        ok = ok and ok_m
+         return ok, json.dumps({k: v for k, v in rec.items() if k != "t"})
+ 
+ 
+@@ -290,3 +297,22 @@ if __name__ == "__main__":
+               f"re-scorable without re-running: {r.reanalysable}")
+         assert "R91a48cf669b7789" in cert.retracted_runs()
+         print("\nmetrologist OK")
++
++
++def _morphology_certified():
++    """Run the classifier's own self-test. It has known answers, so it can genuinely fail."""
++    import subprocess
++    import sys as _sys
++    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
++                     "..", "prototype", "Tyssue", "morphology.py")
++    p = os.path.abspath(p)
++    if not os.path.exists(p):
++        return False, f"morphology.py not found at {p}"
++    try:
++        r = subprocess.run([_sys.executable, p], capture_output=True, text=True, timeout=600)
++    except Exception as e:
++        return False, f"could not run the classifier self-test: {type(e).__name__}: {e}"
++    if r.returncode != 0 or "CERTIFIED" not in r.stdout:
++        tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or [""]
++        return False, f"the morphology classifier does not certify: {tail[0][:90]}"
++    return True, "morphology classifier certified against shapes with known answers"
