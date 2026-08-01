@@ -46,7 +46,32 @@ TYSSUE = os.path.abspath(os.path.join(HERE, "..", "prototype", "Tyssue"))
 # config is portable to exactly one of the two. run_one.py resolves this against its own location.
 CKPT = os.path.join("prototype", "Tyssue", "archive", "smoke_hom", "ckpt.npz")
 
-VBUF, CBUF = 30000, 16000
+# THE RESERVOIRS ARE NO LONGER CONSTANTS. They are derived from the cell count the run is aiming
+# at, because a closed sheet is trivalent and Euler fixes V = 2F - 4: a vertex reservoir of size V
+# caps the cells at (V+4)/2 whatever the biology wants. 3552 vertices give exactly 1778 cells --
+# which is what all 32 runs of the overnight study reported as a finding, and what all 27 runs of
+# the weekend battery reported as evidence. Twice in one week, from the same arithmetic.
+#
+# `VBUF, CBUF = 30000, 16000` sat here as a pair of magic numbers. They were generous enough that
+# nobody noticed they were a ceiling (15002 cells) rather than a size -- and they did not help the
+# hand-written configs, which carried their own smaller pair. The destination now sets the size,
+# and `grounder.buffer_for` is the single place that arithmetic lives.
+from agents.grounder import buffer_for, max_cells_for                       # noqa: E402
+
+VBUF_FALLBACK, CBUF_FALLBACK = 30000, 16000    # only when no target can be inferred
+
+
+def _reservoirs(n_cells_seed, frames, growth_headroom=8.0):
+    """How big must the reservoirs be for a run that STARTS at n_cells_seed?
+
+    A growing vesicle roughly doubles every cell cycle, so the destination is the seed times
+    however many doublings the run has time for. `growth_headroom` is deliberately generous: the
+    cost of an oversized reservoir is memory, and the cost of an undersized one is a batch of
+    runs that measure the array. We have now paid the second cost twice.
+    """
+    target = max(int(n_cells_seed) * growth_headroom, 2000)
+    b = buffer_for(target)
+    return b["vertex"], b["cell"]
 DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never composition-dependent
 
 # D5  THE CHEMISTRY RAN 50x TOO SLOW, AND THE CELLS COULD NEVER DIVIDE.
@@ -269,6 +294,17 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
     if not ok:
         raise ValueError(f"refusing to compile a non-runnable composition: {why}")
 
+    # Size the reservoirs from where this run is GOING, not from a constant. A seeding node is
+    # what tells us where it starts; a checkpoint start carries its own count and falls back.
+    seed_cells = None
+    for node in graph.ops:
+        if node["op"] == "seed_mesh_3d":
+            seed_cells = int(_p(graph, node["id"], "n_cells"))
+    if seed_cells is not None:
+        vbuf, cbuf = _reservoirs(seed_cells, frames)
+    else:
+        vbuf, cbuf = VBUF_FALLBACK, CBUF_FALLBACK
+
     ops = []
     for node in graph.ops:
         emit = EMIT.get(node["op"])
@@ -294,8 +330,8 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
                     "dt": DT_GLOBAL, "record_cap": int(frames) + 2,
                     "record_every": int(record_every),
                     "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},
-        "sets": {"vertex": {"n": VBUF},
-                 "cell": {"n": CBUF, "state": {"chem": {"width": 2, "integration": "first_order"},
+        "sets": {"vertex": {"n": vbuf},
+                 "cell": {"n": cbuf, "state": {"chem": {"width": 2, "integration": "first_order"},
                                                "cen": {"width": 3}, "area": {"width": 1}}}},
         "fields": {},
         "operators": ops,

@@ -309,6 +309,101 @@ FIGURES = {
 }
 
 
+# =============================================================================================
+# THE STARTING CONDITIONS. This is the half of the paper the campaign never read.
+# ---------------------------------------------------------------------------------------------
+# FIGURES above says where each experiment ENDS -- the morphology, and the two numbers that select
+# it. Nothing said where one BEGINS, so every batch inherited a starting cell count from whatever
+# default sat in a config file. On 31 July a 27-run battery was launched at 150 cells, hit the
+# mesh-buffer ceiling of 1778 in every single run, and produced no evidence at all. The paper says
+# 200. Nothing in the loop had ever asked it.
+#
+# So these are Okuda's own starting conditions, quoted, with the sentence they come from. They are
+# ADVICE, not a gate: the Proposer takes them for the faithful share of a batch and is free to
+# leave them for the exploratory share (the 70/30 rule). What is NOT optional is `buffer_for()`
+# below -- a run that cannot reach the cell count it is aiming at measures the array, not the
+# tissue, whichever share it belongs to.
+SETUP = {
+    # `n_cells` is where a run STARTS. `grows_to` is where it ENDS, and it is the one the buffer
+    # must be sized from -- sizing from the seed is exactly the mistake that produced 1778. Okuda
+    # is explicit that his largest tissues were "picked up on the growth process", i.e. they are a
+    # destination reached from a smaller seed, not a seeded count.
+    "tubulation": dict(
+        n_cells=200, grows_to=4000, figures=["fig5a", "fig5b", "fig6"],
+        quote="the initial tissue morphology was simply set to be a spherical vesicle of a "
+              "monolayer cell sheet composed of about 200 cells",
+        note="the tubulation and branching cases. Our campaign ran 150."),
+    "undulation": dict(
+        n_cells=2000, grows_to=4000, figures=["fig7"],
+        quote="a spherical vesicle of a monolayer cell sheet composed of about 2,000 cells, "
+              "whose patterns reached steady states",
+        note="the whole-tissue patterning case; this is the ball the ~5-spot count refers to."),
+    "grown": dict(
+        n_cells=4000, grows_to=4000, figures=[],
+        quote="the individual tissues in (b) were composed of about 4,000 cells, which were "
+              "picked up on the growth process",
+        note="a destination, not a start -- the number the buffer has to accommodate."),
+}
+
+# What he reports SEEING, which is what we calibrate against -- his parameter values live in a
+# differently-scaled model and are not transferable (finding F009).
+OBSERVED = {
+    "n_spots_at_2000": 5,
+    "note": "about five activator domains on the 2000-cell ball. Calibrate the chemistry until we "
+            "reproduce this COUNT; never copy chi across the two models.",
+}
+
+# Table 1, normalised. Quoted so a fixture can assert them rather than a person retyping them.
+TABLE1 = {
+    "alpha_hill":  (10.0,  "Hill coefficient in growth rate"),
+    "rho_sw":      (0.5,   "switching concentration for growth rate"),
+    "phi_inhib":   (10.0,  "diffusivity of inhibitor"),
+    "tau_cycle":   (50.0,  "cell cycle, in units of eta_c/kappa_s"),
+    "kappa_s":     (0.2,   "normalised surface energy"),
+    "eta_c":       (0.25,  "normalised cell friction"),
+    "v_ref":       (1.0,   "reference cell volume -- defines the unit of length"),
+    "gamma_range": ((0.01, 100.0), "time characteristics of patterning -- VARIED"),
+    "chi_range":   ((0.001, 0.1),  "spatial characteristics of patterning -- VARIED"),
+}
+
+# Two regime INEQUALITIES, which are what actually define his setting. Worth asserting rather than
+# tuning: they are the reason the model is quasi-static and effectively incompressible.
+REGIME = [
+    ("k_v >> kappa_s * v_ref**(2/3)", "incompressibility"),
+    ("tau_cycle >> eta_c / kappa_s",  "quasi-static: mechanics relaxes between biological events"),
+]
+
+
+def buffer_for(target_cells, margin=1.30):
+    """Reservoir sizes that can actually HOLD `target_cells`. Not advice -- arithmetic.
+
+    A closed epithelial sheet is trivalent, so Euler gives V = 2F - 4 exactly: a vertex reservoir
+    of size V caps the cell count at (V+4)/2 whatever the biology wants. That is why 3552 vertices
+    produced exactly 1778 cells in all 32 runs of the overnight study AND in all 27 of the weekend
+    battery -- twice, in the same week, from the same arithmetic.
+
+    Sizing the buffer from the DESTINATION rather than from the seed is the whole fix. The margin
+    is headroom for the transient over-allocation division needs, not slack for wishful thinking.
+    """
+    n = int(target_cells * margin)
+    return {"cell": n, "vertex": 2 * n + 4}
+
+
+def max_cells_for(vertex_buffer):
+    """The hard ceiling a given vertex reservoir imposes. The inverse of buffer_for."""
+    return (int(vertex_buffer) + 4) // 2
+
+
+def setup(case=None):
+    """Okuda's starting conditions. `case` in {tubulation, undulation, grown}, or all of them."""
+    if case is None:
+        return {"cases": SETUP, "observed": OBSERVED, "table1": TABLE1, "regime": REGIME}
+    s = dict(SETUP[case])
+    s["buffers"] = buffer_for(s["grows_to"])        # from the DESTINATION, never from the seed
+    s["observed"] = OBSERVED
+    return s
+
+
 def figure_target(key, k=3):
     """What must be reproduced, with the paper's own parameters and a checkable criterion.
 

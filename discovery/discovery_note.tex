@@ -7,6 +7,8 @@
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{tcolorbox}
+\usepackage{tikz}
+\usepackage{graphicx}
 \usepackage[hidelinks]{hyperref}
 
 \definecolor{good}{HTML}{1B7F3B}
@@ -42,13 +44,44 @@
 \author{}
 \date{31 July 2026}
 
+
+
+% --- 8-bit agent faces -------------------------------------------------------------------
+% Deliberately blocky: a status list wants an icon you read at a glance, not a portrait.
+% #1 = colour, mouth set by the variant. Drawn on a 7x7 pixel grid, sized to sit inline.
+\newcommand{\pixcell}[3]{\fill[#3] (#1*0.062,#2*0.062) rectangle ++(0.062,0.062);}
+\newcommand{\pixhead}[1]{%
+  \foreach \x in {1,...,5}{\pixcell{\x}{6}{#1!85}\pixcell{\x}{0}{#1!85}}
+  \foreach \y in {1,...,5}{\pixcell{0}{\y}{#1!85}\pixcell{6}{\y}{#1!85}}
+  \foreach \x in {1,...,5}{\foreach \y in {1,...,5}{\pixcell{\x}{\y}{#1!16}}}
+  \pixcell{2}{4}{#1}\pixcell{4}{4}{#1}}
+\newcommand{\facehappy}[1]{\begin{tikzpicture}[baseline=-0.9ex,scale=0.85]\pixhead{#1}%
+  \pixcell{1}{2}{#1}\pixcell{2}{1}{#1}\pixcell{3}{1}{#1}\pixcell{4}{1}{#1}\pixcell{5}{2}{#1}%
+  \end{tikzpicture}}
+\newcommand{\faceflat}[1]{\begin{tikzpicture}[baseline=-0.9ex,scale=0.85]\pixhead{#1}%
+  \pixcell{2}{2}{#1}\pixcell{3}{2}{#1}\pixcell{4}{2}{#1}%
+  \end{tikzpicture}}
+\newcommand{\facesad}[1]{\begin{tikzpicture}[baseline=-0.9ex,scale=0.85]\pixhead{#1}%
+  \pixcell{1}{1}{#1}\pixcell{2}{2}{#1}\pixcell{3}{2}{#1}\pixcell{4}{2}{#1}\pixcell{5}{1}{#1}%
+  \end{tikzpicture}}
+\newcommand{\ON}{\facehappy{good}}
+\newcommand{\IDLE}{\faceflat{warn}}
+\newcommand{\OFF}{\facesad{bad}}
+\newcommand{\HUMAN}{\facehappy{rule}}
+
+% An agent's icon. Uses figures/agents/<name>.png when it exists -- cropped from the sprite
+% sheet, background knocked to white -- and falls back to the 8-bit face until it does, so the
+% table never breaks on a missing file.
+\newcommand{\agenticon}[2]{\IfFileExists{figures/agents/#1.png}%
+  {\raisebox{-1.6mm}{\includegraphics[height=5.4mm]{figures/agents/#1.png}}}%
+  {#2}}
+
 \begin{document}
 \maketitle
 \vspace{-2.2\baselineskip}
 
 \begin{center}\small\color{grey}
-Plain English throughout. Organised by phase, because phases are where we stop and you decide.\\
-The technical specification is preserved separately in \texttt{plexus2\_technical.pdf}.
+Plain English throughout. Organised by phase, because phases are where we stop and you decide.
 \end{center}
 
 \vspace{4pt}
@@ -76,30 +109,9 @@ is what makes the reproduction more than hand-tuning.
 %======================================================================
 \section{Where we actually are}
 
-Track A is further along than Track B, and until this morning I was over-reporting both.
-
-An independent review this morning found that \textbf{three of the measurements the loop relies on
-are broken}, and you have since found a fourth. Not the simulations --- the \emph{rulers}. A large part of what I reported over the
-last two days was measured with faulty instruments and does not currently stand up.
-
-\begin{tcolorbox}[colback=bad!4,colframe=bad!55,boxrule=0.7pt,arc=2pt]
-\textbf{The clearest example, and why you were right to stop me.}
-
-I ran 32 simulations overnight, sweeping five settings, and reported a strong conclusion:
-\emph{``making the chemistry shape the tissue and keeping the tissue intact are mutually
-exclusive.''}
-
-Every one of those 32 runs ended with exactly \textbf{1778 cells}. I noticed that, wrote it down,
-and called it ``remarkable''. I never asked the obvious question: \emph{why is it identical every
-time?}
-
-The answer is arithmetic. The memory buffer for the mesh holds 3552 points, and the geometry of a
-closed cell sheet fixes the largest possible number of cells at $(3552+4)/2 = 1778$. \textbf{Every
-run hit the wall and stopped.} I was not measuring biology. I was measuring the size of an array.
-
-That conclusion is now \textbf{withdrawn}. It may still turn out to be true --- but it is not
-measured, and I presented it as if it were.
-\end{tcolorbox}
+Track A is further along than Track B, and every number taken before 31 July was measured with at
+least one instrument since proved wrong. So the register of results is empty on purpose, and the
+work right now is rebuilding the instruments rather than running experiments.
 
 %======================================================================
 \section{What we believe about the biology}
@@ -112,7 +124,7 @@ with instruments that work. Every number we have was measured with at least one 
 path.
 
 What changed on 31 July is a different thing: the register of \textbf{assumptions} is no longer
-empty. Ten basics about cell tissue are written down in \texttt{discovery/PREMISES.md} --- not a
+empty. Eleven basics about cell tissue are written down in \texttt{discovery/PREMISES.md} --- not a
 literature review, but the minimum a person needs in order to look at one of our runs and say
 ``that cannot be right''. Each is phrased so that a computer can check it against a run, and each
 one now does (Phase~1).
@@ -122,512 +134,162 @@ The distinction matters. A result is something we found out. A premise is someth
 down is not a claim about biology --- it is a way of making our own mistakes visible.
 \end{tcolorbox}
 
-\textbf{Why these ten and not seventy.} Five miners produced 70 candidate premises with full
-sourcing, and three adversarial readers attacked them for truth, checkability and internal
-consistency. Most were cut for being too specific --- true of mouse salivary gland, not true of
-tissue. What survives constrains \emph{any} run we do. Cedric's instruction was the filter:
-\emph{``the corpus should be very concise at the right level of description, the basics not the
-specific.''}
-
-\textbf{Three of the ten state one of today's defects in advance.} Premise~6 (a resting vesicle
-rests) is the collapsing ball. Premise~5 (mechanics is fast, biology is slow) is the chemistry that
-ran fifty times too slow. Premise~3 (a cell divides because it got big) is the growth ceiling that
-sat below the division trigger. They were written before the defects were found, which is the whole
-argument for having them.
-
-\textbf{An earlier draft of this section had a table grading five claims as ``solid'', ``weak'' or
-``unsupported''. Cedric was right to strike it, and the reason is worth recording.}
-
-Grading claims on a confidence scale is the correct move when the instruments are sound and the
-evidence is thin. It is the \emph{wrong} move when the instruments themselves are broken --- then
-the register should be \emph{voided}, not annotated. Grading felt like rigour, but it smuggled the
-conclusions forward: a reader skims ``solid'', carries it, and the broken ruler is forgotten two
-pages later. If we cannot say how wrong a number is, it does not get a grade; it gets deleted.
-
-\subsection{What we do know --- about our own code, not about biology}
-
-These are facts established by \emph{reading the source}, not by measuring anything. They are a
-different kind of statement, and they belong in a different list.
-
-\begin{itemize}
-\item \textbf{In the two front-page movies, the chemistry cannot affect the shape.} The switch that
-lets the chemical drive growth is set to 50, and the chemical is a quantity of order 1. The switch
-term is therefore about $10^{-9}$ --- off for any value the chemical could take. Separately, the
-growth setting is at its uniform limit, so every cell grows identically regardless. Both are
-visible in the configuration file; neither needed an experiment.
-\item \textbf{We were never running Okuda's system} (\S\ref{sec:okuda}).
-\item \textbf{The mesh buffer is sized as a multiple of the starting cell count}, so a run that
-begins with 150 cells can never exceed 1778. That is why all 32 runs stopped there.
-\end{itemize}
-
-None of these tells us anything about tubes. They tell us the experiment we thought we were running
-is not the experiment that ran.
-
 %======================================================================
-\section{What ``success'' means --- corrected}\label{sec:success}
+\section{Two questions instead of one number}
 
-Cedric, 31 July: \emph{``maybe we are all wrong with the threshold to define success \ldots\ it
-is about knowledge and being able to reproduce qualitatively the figures of the paper --- and we
-forget branching and budding.''} He is right, and the contradiction was sitting in a single
-dataclass the whole time. Three fields apart:
-
-\begin{quote}\small
-\textbf{objective:} ``\ldots The product is a MAP, NOT A WINNER. Specific questions --- which
-composition makes a sustained tube, which reproduces Okuda's phase diagram, which mechanism is
-necessary for branching --- are \textbf{queries against that map}.''
-
-\textbf{\code{meets\_success}:} four \emph{tube} metrics, and-ed together.
-\end{quote}
-
-The stated objective is coverage; the coded criterion is a tube detector. Okuda's paper is titled
-for three behaviours --- undulation, tubulation and branching --- and the tubulation figure has two
-regimes. A criterion measuring how far one protrusion sticks out can score \emph{at most one} of
-the four. Worse, it scores \textbf{undulation --- a successful reproduction of Figure 7 --- as the
-least successful thing the campaign can do}, because undulation is by definition many shallow
-bumps rather than one deep protrusion. Branching and budding had no cell at all.
-
-I made this worse rather than catching it: I spent a morning deriving that threshold to three
-significant figures, sharpening a criterion that contradicts the objective printed above it.
-
-\subsection*{Two questions instead of one number}
+Success is not a threshold a single run clears. It is two questions, and they are asked separately
+because they fail separately.
 
 \begin{center}\small
-\begin{tabular}{@{}l p{10.4cm}@{}}
+\begin{tabular}{@{}p{4.3cm} p{10.3cm}@{}}
 \toprule
-\textbf{1. What can we reproduce?} & Each of the paper's morphologies is a row, scored
-qualitatively: not attempted / attempted and failed / partial / reproduced. Today
-\textbf{0 of 4}. Budding is tracked too --- our substrate produces it and no criterion mentioned
-it.\\
-\textbf{2. What do we know?} & Already measured and previously subordinate to the tube gate:
-map coverage \textbf{27\%} (3 of 11 cells can state a verdict) --- and \emph{all} of it is
-routing; \textbf{solo operator effects are 0 of 8}. Nine claims resolved, ten open, surprise
-rate 0.375.\\
+\textbf{1. What can we reproduce?}
+& Each of the paper's morphologies is a row, scored qualitatively: \emph{not attempted / attempted
+and failed / partial / reproduced}. \textbf{Today 0 of 4.} Budding is tracked too --- our substrate
+produces it and no criterion ever mentioned it.\\
+\addlinespace
+\textbf{2. What do we know?}
+& Already measured, and previously subordinate to the tube gate: map coverage \textbf{27\%} (3 of 11
+cells can state a verdict) --- and all of it is routing; solo operator effects are \textbf{0 of 8}.
+Nine claims resolved, ten open, surprise rate \textbf{0.375}.\\
 \bottomrule
 \end{tabular}
 \end{center}
-
-The derived tube threshold is not discarded. It is demoted to what it always was: the test for
-whether a shape is a tube --- the criterion for two rows of the board, not the definition of the
-campaign.
-
-\textbf{This also dissolves a question I had been about to put to Cedric.} The 33 archived records
-carrying the broken survival measurement were a dilemma: quarantine them and a fallback silently
-promotes them to ``success''; leave them and the ledger is poisoned. Under a board neither
-happens --- success is not a boolean a single run can trip, so those runs are evidence whose
-forced-versus-grown status is simply \textbf{unknown}. An honest cell, neither pass nor fail.
-
-%======================================================================
-\section{The four broken rulers}\label{sec:rulers}
-
-All four are \emph{measurement} faults. The physics may be fine; we simply could not see it.
-The fourth is the camera, and you spotted it by looking at the movies --- it is the ruler the
-automatic eye-check reads, and it is broken in two independent ways.
-
-\begin{enumerate}[leftmargin=1.4em]
-\item \textbf{The ``does the shape survive?'' test was measuring a fresh sphere.}
-The intent: grow the tube, switch off growth and pushing, let it relax, see what survives. A real
-tube survives; an artificially forced one collapses. The code was meant to continue from the end of
-the run --- instead it started a brand-new simulation from the initial sphere, and so measured the
-starting condition every time. It returned essentially the same value (1.014) in 14 of 16 runs.
-\textbf{That value carries full weight in the score that ranks every experiment.}
-\emph{Not yet fixed --- one of Phase~0's open items.}
-
-\item \textbf{Two different quantities were both called ``how far it sticks out''.}
-One measured distance from the centre \emph{of the tissue}; the other from the \emph{origin of the
-coordinate system}. The ball drifts sideways as it grows, so the second reads drift as elongation.
-\emph{Fixed this morning.}
-
-\item \textbf{A safety check existed, but not where the danger was.}
-We once chased a phantom result for days, caused by pairing mismatched frames. A guard was written
-to catch it. My overnight study used exactly the pattern that guard forbids, in three places, and
-never called the guard. \emph{Fixed this morning.}
-
-\item \textbf{The camera hides the thing we are looking for, and hides growth entirely.}
-\emph{(Your observation, confirmed in the code.)} Two separate faults, both in the movie every
-automatic eye-check reads:
-\begin{itemize}
-\item \textbf{One fixed viewpoint.} The campaign's movies are drawn from a single angle that never
-moves. A tube growing away from that angle sits \emph{behind the body} and is simply not in the
-picture. There is no second view --- no top-down --- to catch it.
-\item \textbf{The zoom follows the object.} The frame is re-fitted to the tissue on \emph{every
-frame}, so a ball that doubles in size is drawn the same size throughout. \textbf{Growth is
-invisible by construction.} Nothing that watches these movies --- human or machine --- can see the
-thing the whole campaign is about.
-\end{itemize}
-Okuda's figures use a fixed frame and a consistent viewpoint, which is exactly why they read
-clearly. \emph{Not fixed --- now part of Phase~0, because it is an instrument, not a nicety.}
-\end{enumerate}
 
 %======================================================================
 \section{What is genuinely working}
 
-The corrections should not hide the parts that earned their keep.
+Four things have earned their keep, and they are all about catching ourselves rather than about
+tissue.
 
-\begin{itemize}
-\item \textbf{Predictions are written down before runs, and wrong ones are recorded as wrong.}
-Twice in two days I proposed a mechanism and the measurement killed it within the hour. Both sit in
-the record as retractions rather than being quietly edited away. This is the part I would defend
-hardest.
-\item \textbf{The video check found a disagreement --- but I over-claimed who was right.}
-On the first full round the system described each movie in words automatically and compared that
-to the numbers. It \emph{vetoed the two highest-scoring runs}, including one that three separate
-analyses had called a tube. I reported this as ``the numbers were wrong and the picture was
-right''. \textbf{That was too strong.} Given ruler~4 above, the picture may have been hiding a
-tube behind the body, or failing to show growth at all. What the check genuinely established is
-that \emph{the two instruments disagree} --- which is still valuable, and is precisely why it
-exists. Which one to believe is not yet decided, and cannot be until the camera is fixed.
-\item \textbf{The loop refuses to guess.} Asked to score 32 results against predictions written in
-a unit it did not recognise, it declined 32 times rather than inventing 32 confirmations.
-\end{itemize}
+\textbf{Predictions are written before runs, and wrong ones stay wrong.} The findings register now
+holds \textbf{six standing claims and six retracted}, each retraction carrying the reason it was
+believed in the first place. Nothing is quietly edited away.
 
-%======================================================================
-\section{The grey cells --- a broken mesh that nothing stops}\label{sec:phantom}
+\textbf{Instruments are certified against a known answer before they are used.} This already cost
+one of my own: a wavelength measure failed its own calibration --- the ratio it depended on came out
+1.37, 1.79, 1.49 instead of a constant --- and it was demoted to a labelled diagnostic instead of
+being shipped. A metric that fails certification does not get to pass.
 
-You saw grey faces in the videos where cells should be white or red, and read it as the cell
-representation breaking. I went through the code. \textbf{You are right, and the situation is
-worse than not-noticing: it is noticed, blended into an average, and then ignored.}
+\textbf{The premise gate has caught something on its own.} A smoke run was refused before any result
+was read, because the chemistry had been extinguished by growth dilution. That is the first time
+anything in this project stopped a bad run without a human looking at a picture.
 
-\textbf{Why grey.} A cell is drawn as a little block: a coloured top face and darker side walls,
-the sides shaded to 72\% brightness so they only show at the silhouette. An unactivated cell is
-white, so \emph{its side walls are grey}. Seeing grey head-on means you are looking at the side of
-a cell where its top should be --- the cell has folded over, collapsed, or turned inside out.
+\textbf{The loop refuses to guess.} Asked to score 32 results against predictions written in a unit
+it did not recognise, it declined 32 times rather than inventing 32 confirmations.
 
-\paragraph{1. Does the system see it?} \emph{Partly, and in the worst possible way.} There is a
-measurement, and it lumps three completely different problems into one number: caps that have
-folded over; slivers so thin they are barely cells (often harmless --- a cell that just divided);
-and cells with fewer than three neighbours, which is \textbf{genuinely broken topology}, a cell
-that is no longer a cell. All three land in a single figure. A reading of ``20\% flagged'' could
-be twenty percent of mildly bent caps or twenty percent of destroyed cells, and nothing
-distinguishes them.
-
-Worse, a proper validity test \emph{exists in this codebase} and is used by the two-dimensional
-runners --- and was never wired into the three-dimensional path the entire campaign runs on. That
-is now the third time we have found a guard that was written and then not installed where the
-danger was.
-
-\paragraph{2. Does it care?} \textbf{No.} That number is recorded and nothing acts on it. In my
-overnight study one setting flagged \textbf{84\% of cells}. It still produced a protrusion number,
-that number was still scored, still ranked, and still went into my conclusions. Nothing anywhere
-refused it.
-
-\paragraph{3. Does it do anything about it?} \textbf{No.} There is no check when the topology
-actually changes --- not after a cell divides, not after neighbours swap. The validation plan
-specifies exactly these checks. They were never built.
-
-\paragraph{4. What should happen, and who decides?} Both specification and code, and the
-specification first, because the definition is the hard part.
-
-\begin{itemize}
-\item \textbf{Separate the three failure modes.} A folded cap, a fresh sliver and a cell with two
-neighbours are not the same event and must never again share an average.
-\item \textbf{Check where the topology changes}, not at render time. By the time you can see it,
-the physics has already run on a broken mesh for hundreds of frames.
-\item \textbf{Truncate the run at the breakage; do not throw it away.} My first version of this
-rule said a broken mesh makes the whole run not-evidence. Cedric was right that this is too strong:
-if the mesh fails at frame 380 of 400, the first 379 frames are perfectly good physics. The rule is
-therefore an \textbf{evidence horizon} --- the first frame at which the mesh stops being valid.
-Every measurement is taken over frames \emph{before} that point; ``final'' means the last valid
-frame, not the last frame; and the horizon is recorded alongside the run (``valid to 380 of 400'')
-so a reader can see how much of it counted. A run that breaks at frame 5 tells us nothing about
-shape --- but it is still a real result about \emph{stability}, and it should be recorded as one
-rather than discarded.
-
-An over-strict rule is its own failure mode: a rule that throws away ninety-five percent of a good
-run will quietly stop being applied.
-\item \textbf{Who:} the \textbf{Metrologist} owns the standard, since it owns the validation
-plan and is the only role that can retract things already recorded. The \textbf{Critic} applies it
---- free, automatic, before anything is scored. Not the eye-check: by the time grey is visible on a
-video, the run is already paid for.
-\end{itemize}
-
-\paragraph{The consequence Cedric's correction exposes --- the score rewards breaking the mesh.}
-This is the part that matters most, and it only became visible once we stopped asking ``is the run
-valid'' and started asking ``valid \emph{until when}''.
-
-The headline measurement, ``how far does it stick out'', is recorded as the \textbf{largest value
-over the whole run}. Nothing restricts that maximum to frames where the mesh was still intact. When
-a mesh tears apart, cells fly outward and that number spikes. \emph{The spike becomes the score.}
-
-So the search is not merely tolerating broken meshes --- \textbf{it is being rewarded for producing
-them}. The most elongated run in the overnight study scored 32.7 with 84\% of its cells broken; the
-elongation \emph{was} the destruction. Any search left running long enough under this rule will
-discover that the cheapest way to score well is to blow the tissue apart, and will report it as the
-best mechanism found.
-
-Truncating at the evidence horizon fixes this at the root: the maximum is taken over valid frames
-only, so destruction earns nothing.
-
-\paragraph{One subtlety that truncation alone does not fix.} If one run is valid to frame 400 and
-another to frame 200, their ``final'' states are at \emph{different moments}, and comparing them
-compares two different times rather than two different mechanisms. A batch comparison must
-therefore be made at a \textbf{common frame} --- the earliest horizon in the batch --- and say so.
-My rho sweep compared final values across runs that almost certainly broke at different times, and
-truncation on its own would not have saved it.
-
-\paragraph{Done today: the curves are now readable, and they already say a lot.}
-Two changes, both small. The per-frame measurements are now saved in the same format as the
-mechanical ones, so a single loader reads both --- they were in two different formats, which is
-part of why nothing read them. And the \emph{shape} of each curve is now classified
-automatically, by arithmetic rather than judgement, into one of: flat, still-rising, settled,
-peaked-then-declined, blown-up, or \textbf{held against a hard limit}.
-
-That last one is the 1778 case. A settling quantity still wobbles in its last few samples; a
-quantity pinned against a ceiling repeats \emph{identically}, sample after sample. One line of
-arithmetic separates them, and it would have caught the overnight study on its first run.
-
-Applied to all 24 archived runs:
-
-\begin{center}\small
-\begin{tabular}{@{}p{10.2cm} r@{}}
-\toprule
-\textbf{What the trajectories say} & \textbf{Runs}\\
-\midrule
-Cell count \textbf{still rising} at the final frame --- the run was stopped, not finished, so
-its ``final'' value is just where we happened to halt & \textbf{18 / 24}\\
-Mesh quality \textbf{still degrading} at the final frame & 15 / 24\\
-Tube diameter \textbf{peaked mid-run then declined} --- so the recorded final value reports the
-decay rather than the phenomenon & \textbf{10 / 24}\\
-Cell count \textbf{pinned against a hard ceiling} & 4 / 24\\
-Mesh degrades somewhere before the end & 18 / 24\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Two things are worth singling out. The classifier independently flagged one run as pinned --- and
-it is the same run the type-checker had separately rejected for overflowing its buffer. Two
-unrelated detectors agreeing on real data is the best evidence the classifier works. And three
-runs come out as trustworthy for only the first three-to-five percent of their length, while
-sitting in the archive as results.
-
-\textbf{The caveat is load-bearing and I will not bury it:} those percentages rest on the blended
-number, so a run marked ``5\% trustworthy'' may be five percent broken cells or five percent
-harmless slivers. They are a list of runs to \emph{re-examine}, not a verdict on any of them.
-Separating the three failure modes is what turns this from a flag into a measurement.
-
-\paragraph{The retroactive part.} If broken cells were present in the archived runs --- and the
-84\% figure says they were in at least one --- then the runs behind the withdrawn conclusion were
-computed on partly-destroyed meshes. That is a \emph{second, independent} reason Phase~5 must
-re-measure, and because the three failure modes were blended, the recorded numbers cannot tell us
-how bad it was. We have to re-run with them separated.
+\textbf{The standing caveat.} Every defect found so far --- and there have been more than twenty ---
+was found by Cedric looking at a picture. The gate above is the first thing built to change that,
+and it has one catch to its name. That number is the honest measure of Track A.
 
 %======================================================================
-\section{The team of agents --- what is actually switched on}\label{sec:agents}
+\section{The team of agents}\label{sec:agents}
 
-You were told 6 of 12 are implemented or used. I audited it directly against the code rather than
-accept the figure, and it is better than that --- but there are two real gaps, and they are worth
-closing exactly as you say.
+\textbf{Nine agents and five checks.} Seven agents run every round; two are written and never
+called, and one of those two is the reason the weekend batch started at the wrong cell count.
 
-\textbf{The design calls for 15 roles} (14 automatic, plus a human who patches the substrate from
-outside the loop). \textbf{All 15 are written. 13 actually run.} The two that do not:
+\begin{figure}[h]\centering
+%% HELD: the Grounder tile in icons.png was damaged by an edit of mine; awaiting a
+%% regenerated sheet (friendly Grounder + book, biologist Premise gate, ranking Referee).
+%\includegraphics[width=0.86\textwidth]{figures/agents_sheet.png}
+\caption*{\small [figure held --- see note] The team. \textbf{Grounder} and \textbf{Evolution} are written and never called ---
+that is a wiring fault, not a judgement on the role: the Grounder is the only agent that knows what
+the target is, which is exactly why its absence cost us a batch.}
+\end{figure}
 
 \begin{center}\small
-\begin{tabular}{@{}l p{6.2cm} p{6.4cm}@{}}
+\begin{tabular}{@{}l p{6.6cm} l l@{}}
 \toprule
-\textbf{Role} & \textbf{What it is for} & \textbf{Status}\\
+\multicolumn{4}{@{}l}{\textbf{Agents} --- they read evidence and form a judgement}\\
 \midrule
-\textbf{Evolution}
-& Take the round's winner and improve it --- simplify it, combine it with a runner-up, ground it
-in the paper. Without it the loop can only ever \emph{pick} from what it happened to propose; it
-can never \emph{refine}.
-& Written, \textcolor{bad}{\textbf{never called anywhere}}.\\
-\textbf{Referee}
-& Rank a batch by a proper tournament (every candidate against every other, aggregated) rather
-than by sorting on one number. The tournament is what protects against ordering bias.
-& Written, but \textcolor{bad}{\textbf{only ever exercised in its own self-test}}. The live round
-sorts on a single score instead.\\
+Proposer & chooses which mechanism edits to test next; also checks the
+batch against what has already been tried & 10 min $\times$1 & runs\\
+Peer-review & reads the proposed batch before it costs anything & 5 min $\times$1 & runs\\
+Analysts ($\times$3) & read one run each, independently, and say what happened & 4 min $\times$15 & runs\\
+Eye-check & watches the movie; vetoes a number the picture contradicts & 3 min $\times$5 & runs\\
+Judge & second opinion on the top pair & 2 min $\times$1 & runs\\
+Interpreter & writes the causal description into the record & 6 min $\times$2 & runs\\
+Meta-review & distils the round into patterns worth carrying forward & 8 min $\times$1 & runs\\
+\addlinespace
+\textbf{Grounder} & \textbf{reads Okuda's paper and the literature ---
+the only agent that knows what the target actually is} & 4 min $\times$\textcolor{bad}{\textbf{0}}
+& \textcolor{bad}{\textbf{no call site}}\\
+Evolution & refine the round's winner, rather than only picking one
+& 5 min $\times$0 & \textcolor{warn}{never reached}\\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Checks} --- deterministic code that refuses. No judgement, no cost.}\\
+\midrule
+Supervisor & holds the objective and the budget; decides when to stop & --- & runs\\
+Critic & type-checks the batch; rejects a causal claim with no ablation;
+refuses a composition already tried & --- & runs\\
+Premise gate & refuses a recipe that could not be a tissue & --- & runs\\
+Metrologist & certifies instruments; files defects and retractions;
+refuses a duplicate operator request & --- & runs\\
+Referee & rank a batch by tournament, not by sorting on one number
+& --- & \textcolor{warn}{self-test only}\\
+\midrule
+Cedric & looks at the pictures; found every defect so far & --- & outside the loop\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The other thirteen --- the one that holds the objective, the one that reads the papers, the one
-that proposes, the peer-reviewer, the type-checker, the second-opinion judge, the duplicate
-detector, the three independent analysts, the eye-check, the one that writes the causal story, the
-pattern-distiller, and the one that certifies the instruments --- all ran on the last round.
+\textbf{Nine agents, five checks --- not fifteen roles.} The old count inflated the roster by listing
+deterministic code beside things that reason. The two dedup routines were the clearest case: ``has
+this composition been tried'' is ten lines inside the Critic, and ``has this operator been requested
+before'' is a dict scan on the escalation path. Neither is an agent, and neither belongs to the
+Proposer --- they act on different objects at different points in the round.
 
-Two honest caveats: the eye-check is currently reading a broken camera (ruler~4), and the time
-budget is not merely unenforced --- it is not even measured.
+\textbf{On the budget column.} These are what the system would \emph{permit}, not what it takes ---
+timing was only wired on 31 July (nine call sites had been bypassing the stopwatch, and a round once
+reported \code{calls: 0} for a round that made about twenty-five), and no round has run since, so
+there is still no measured baseline. The worst case adds to about two hours, but twenty of the
+twenty-six calls are the per-run ones and are completely independent: run together, with the next
+proposal starting while the current simulations are still going, the unavoidable serial cost is
+\textbf{four to five minutes}. That work is Phase 3(c).
 
-\subsection{How long the agents take --- nobody knows, and the arithmetic is alarming}
+\textbf{On the budget column.} These are what the system would \emph{permit}, not what it takes ---
+timing was only wired on 31 July (nine call sites had been bypassing the stopwatch, and a round once
+reported \code{calls: 0} for a round that made about twenty-five), and no round has run since, so
+there is still no measured baseline. The worst case adds to about two hours, but twenty of the
+twenty-six calls are the per-run ones and are completely independent: run together, with the next
+proposal starting while the current simulations are still going, the unavoidable serial cost is
+\textbf{four to five minutes}. That work is Phase 3(c).
 
-You asked whether the time per call is reasonable, and suggested five minutes a round as the
-target. Checking it produced a short answer and a long one.
+\textbf{The Grounder is the important one, and I had previously reported it as running.} It is the
+only role that reads Okuda's paper and the wider literature --- its own header lists the reference
+model, the literature index and the vendored corpus --- and it has \textbf{no call site anywhere in
+the pipeline}. Every one of its entry points is exercised only by its own smoke test.
 
-\textbf{The short answer: we do not measure it.} The last round ended by reporting
-\texttt{calls: 0, minutes: 0.0} --- for a round that made about twenty-five calls. A time ledger
-exists, and no agent is routed through it. So the declared ceiling of 25 minutes has never
-constrained anything, and there is no record of how long any call has ever taken.
+That is not a cosmetic gap. It is why the weekend batch started at 150 cells when Okuda starts at
+200, 2000 and 4000: \emph{nothing in the loop ever asks the paper anything}. The fix is to give it
+the starting conditions alongside the figure targets it already holds, and to call it when a batch
+is built --- so that the faithful share of each batch inherits Okuda's numbers from the paper rather
+than from a default buried in a config file.
 
-\textbf{The long answer: the declared allowances add up to nearly two hours.} These are timeouts
-rather than expected durations, but they are what the system would permit before intervening, on a
-round with five scored runs:
-
-\begin{center}\small
-\begin{tabular}{@{}l r r r@{}}
-\toprule
-\textbf{Role} & \textbf{Allowance} & \textbf{Calls per round} & \textbf{Worst case}\\
-\midrule
-Reads the papers      & 4 min  & 1  & 4 min\\
-Proposes the batch    & 10 min & 1  & 10 min\\
-Peer-reviews it       & 5 min  & 1  & 5 min\\
-\textbf{Analysts}     & 4 min  & \textbf{15} (3 per run) & \textbf{60 min}\\
-Eye-check             & 3 min  & 5  & 15 min\\
-Second opinion        & 2 min  & 1  & 2 min\\
-Writes the story      & 6 min  & 2  & 12 min\\
-Distils the patterns  & 8 min  & 1  & 8 min\\
-\midrule
-& & \textbf{27 calls} & \textbf{116 min}\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{Why five minutes is nonetheless achievable.} Twenty of the twenty-seven calls are the
-per-run ones --- three analysts and an eye-check, for each of five runs --- and they are completely
-independent of one another. They run one after another today for no reason other than that the
-code was written as a loop. Run them together and that whole block costs the time of its slowest
-single call rather than the sum of twenty.
-
-Adding the change already on the list --- starting the next round's proposal \emph{while} the
-current simulations are still running, so its ten minutes leave the critical path entirely --- a
-round's unavoidable serial cost is roughly: peer-review, the slowest analyst, the second opinion,
-two stories in parallel, and the distillation. \textbf{About four to five minutes, which is your
-number.}
-
-Two items follow, and they are separated deliberately: \emph{measuring} is cheap and goes into
-Phase~0 with the other instruments; \emph{making it fast} is real work and goes into Phase~3.
+\textbf{Evolution} can only ever let the loop \emph{pick} from what it happened to propose, never
+refine it. \textbf{Referee} would rank a batch by tournament instead of by sorting on one number.
+Both are written and idle.
 
 %======================================================================
 \section{What stands between us and the Okuda figure}\label{sec:okuda}
 
-I previously framed this as an exotic parameter-range problem. \textbf{Cedric's reading is closer
-to right: most of the gap is mundane, and it is about the starting conditions.} That matters,
-because mundane gaps get closed in a day.
-
-\subsection{The mundane part --- and it is most of it}
-
-\begin{center}\small
-\begin{tabular}{@{}l l l l@{}}
-\toprule
-\textbf{Starting condition} & \textbf{Okuda} & \textbf{What we ran} & \textbf{Fix}\\
-\midrule
-Number of cells at the start & 200, 2000, 4000 & \textbf{150}          & set the number\\
-Room to grow into            & grows from there & \textbf{capped at 1778} & bigger buffer\\
-Number of spots at the start & $\sim$5 at 2000 cells & never counted   & count them\\
-Size of those spots          & set by his figures & never measured     & measure them\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{We were not running his system.} The overnight study began with 150 cells --- his smallest
-case starts with 200 and his undulation case with 2000. And because the mesh buffer is sized as a
-multiple of the \emph{starting} count, beginning at 150 capped us at 1778 cells. His 4000-cell case
-is not reachable at all today. None of this is subtle physics; it is four numbers.
-
-The same applies to the pattern. Rather than trying to copy his length-scale setting --- which in
-our code is not even the same quantity as his --- \textbf{we match what he reports seeing}: about
-five spots on a 2000-cell ball. Tune our diffusion until we get five spots at 2000 cells, then
-freeze it. That is a calibration against an observation, and it sidesteps the units problem
-entirely.
-
-\subsection{What is left after that --- in full}
-
-Three things remain once the starting conditions are right. Two are numbers; one is not.
-
-\paragraph{(a) How sharply a cell decides to grow.}
-Each cell reads the local chemical concentration and decides how fast to grow. The question is how
-\emph{abruptly} it decides. One number controls that. At the low end the response is gentle and
-proportional: a cell with a little chemical grows a little, a cell with a lot grows a lot, and
-every cell in the tissue is growing to some degree. At the high end it becomes almost a switch:
-below a threshold a cell does nothing at all, above it the cell grows at full rate, and there is
-almost nothing in between.
-
-\textbf{Okuda uses 10. Our search is allowed up to 8.} That sounds like a small shortfall, but the
-behaviour is very nonlinear in this number and the difference is not cosmetic --- it is the
-difference between a bulge and a tube.
-
-Here is why. With a gentle response, the whole ball inflates and the chemical spot merely inflates
-slightly faster than its surroundings: you get a broad, soft swelling with no clear edge. With a
-sharp switch, the tissue divides into two populations --- growing and not growing --- separated by
-a crisp boundary. \emph{That boundary is the neck.} A tube is not simply a region that grew; it is
-a region that grew while the tissue immediately around it stayed put and held the base narrow.
-Without a sharp switch there is nothing to hold the base narrow, and a tube relaxes into a dome.
-
-\textbf{Fix: widen one range.} Half an hour of work.
-
-\paragraph{(b) How far the inhibitor travels compared with the activator.}
-The surface pattern is made by two chemicals. One is self-reinforcing and short-range --- it builds
-up locally and makes more of itself. The other suppresses it and travels further. Wherever the
-first wins locally you get a spot; the second spreads out around that spot and stops another
-forming too close. \textbf{The ratio of the two travel distances sets the spacing of the spots}, and
-therefore how many appear on a ball of a given size.
-
-Okuda's inhibitor spreads with a value of 10 against the activator's 1. \textbf{Our search allows
-at most 2.} With a ratio that low the inhibitor barely outruns the activator, which puts us close
-to the edge of where any pattern forms at all --- and where one does form, it is the wrong pattern:
-many small spots crowded together, or a fine speckle, instead of a few well-separated domains.
-
-This is why we cannot currently produce his roughly five spots on a two-thousand-cell ball. It also
-means \textbf{this is the number we calibrate}, rather than copying: turn it up until we count five
-spots at two thousand cells, then freeze it and never touch it again. Matching a thing he
-\emph{observed} is safe; matching a parameter value across two differently-scaled models is not.
-
-\textbf{Fix: widen one range, then calibrate against a spot count.} Half a day.
-
-\paragraph{(c) The real gap: the tissue's shape does not feed back into the chemistry.}
-The coupling between chemistry and shape is supposed to run in both directions. Ours runs in one.
-
-\emph{Chemistry to shape} works: a cell with a lot of chemical grows, the tissue deforms. That half
-is built and it is what produces the bulges we have seen.
-
-\emph{Shape to chemistry} is absent. Chemical moves between neighbouring cells, and in Okuda's
-model the amount that moves depends on the geometry --- how much wall two cells actually share, and
-how much volume the receiving cell has to dilute it into. Our code does something much cruder: each
-cell simply \textbf{averages its neighbours}, counting each one equally. Two cells sharing a thin
-sliver of wall exchange exactly as much chemical as two sharing a broad face. A cell stretched to
-twice its volume dilutes its contents exactly as if it had not stretched at all.
-
-The consequence is that \textbf{deformation is invisible to the chemistry}. The pattern sits on the
-tissue like a decal: the tissue can bend, stretch and grow underneath it, and the pattern carries on
-as though nothing happened.
-
-\textbf{Why this probably does not block a plain tube.} A tube needs one thing from the chemistry:
-a spot that stays put and stays on. A decal does that perfectly well. So we may get tubes without
-touching this.
-
-\textbf{Why it almost certainly blocks branching.} Branching, in Okuda's account, is a consequence
-of the feedback we are missing. A tube grows; the cells at its tip stretch and their volumes
-change; that dilutes the chemical unevenly across the tip; the single chemical domain splits into
-two; the growth zone splits with it; and the tube forks. \emph{Every step of that chain runs through
-shape affecting chemistry.} With the feedback missing, a tube in our model can grow indefinitely but
-has no mechanism by which it could ever decide to divide. We would not get branching, and --- worse
---- we would not know whether that was a real result or our missing arrow.
-
-\textbf{Fix --- and it belongs in the pre-flight, not later.} Write the flow between two cells so
-it is weighted by their shared wall area and divided by the receiving cell's volume. The mesh
-already knows both quantities; they are simply not being used.
-
-This is a \emph{second implementation of a contract we already have}, not a new concept: same set
-of things it acts on, same kind of operation, same family. So no decision about the language is
-needed --- it is exactly the split between ``what a mechanism is'' and ``how it is realised''
-working as intended, in the same way that three different chemistries already sit behind one
-reaction contract.
-
-\textbf{The payoff is bigger than the fix.} Today the diffusion operator has only one
-implementation, and the code does not even offer swapping it as a move --- so the loop could not
-test this even if it wanted to. Register the geometric version alongside the blind one and mark
-the swap as a real mechanism change, and the necessity experiment becomes a \emph{single legal
-move the loop can propose by itself}: run the same composition with geometry-aware flow and with
-geometry-blind flow, and see which phenotypes survive. That is the ablation that produces the claim
-Okuda never makes --- \emph{branching requires this arrow} --- and it is expressible in the search
-language rather than being something we run by hand.
-
-Then: write it, test it against the case where it must agree with the old one (all walls equal, all
-volumes equal), promote it into the shared codebase with its declarations, and re-run the spot
-calibration --- changing how the chemical spreads changes how far it spreads.
-
-\medskip
-\textbf{In short:} two numbers to widen, one of which we then calibrate against something Okuda
-actually reported --- and one missing arrow, which we can probably reach a tube without, but
-certainly cannot reach branching without.
+Most of the gap is mundane and it is about starting conditions. We were running 150 cells where
+Okuda starts at 200, 2000 and 4000, and because the mesh buffer is sized as a multiple of the
+starting count, beginning at 150 capped every run at 1778 cells --- so his largest case was not
+reachable at all. Two of his settings also sat outside the box our search was allowed to use: how
+sharply a cell switches on its growth (he uses 10, we allowed up to 8) and how much further the
+inhibitor travels than the activator (he uses 10, we allowed 2), and the second is why we could not
+produce his handful of well-separated spots. A third number, his pattern length-scale, is not even
+the same quantity as ours, so the decision taken with Cedric is to calibrate against what he
+\emph{reports seeing} --- the spot count on a ball of a given size --- rather than copy a value
+across two differently-scaled models. All of that is four numbers and a buffer, and it is closed in
+Phase~2. The one genuine gap is that the coupling only runs one way: chemistry deforms the tissue,
+but the tissue's shape never feeds back into the chemistry, because our diffusion averages
+neighbours equally instead of weighting by shared wall area and cell volume. A plain tube probably
+does not need that arrow --- a tube needs a spot that stays put, and a decal does that perfectly
+well. Branching almost certainly does need it, because in Okuda's account a tube forks when the tip
+stretches, dilutes its chemical unevenly, and the domain splits. So without it we would not get
+branching, and --- worse --- we would not know whether that was a real result or our missing arrow.
 
 %======================================================================
 \section{The phases}
@@ -635,275 +297,169 @@ certainly cannot reach branching without.
 Eight stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
 
 \begin{phasebox}{Phase 0 --- Pre-flight: fix the instruments \hfill \prog\ (26 of 28)}
-\textbf{Goal.} Make every measurement trustworthy. Nothing runs unattended until this lands.
-Not one of the items below is science; each one makes a question \emph{askable}.
+\textbf{Goal.} Make every measurement trustworthy. Nothing runs unattended until this lands. Not one
+of the twenty-eight items is science; each one makes a question \emph{askable}.
 
-\textbf{What has to be done}
-\begin{enumerate}[leftmargin=1.5em,itemsep=1pt]
-\item Measure distance from the tissue's own centre, not the coordinate origin.
-\item Install the frame-pairing guard where the danger actually is.
-\item Make the ``does the shape survive?'' test continue from the run's end state.
-\item Hold one frame size for a whole run --- stop drawing growth as shrinkage.
-\item Add a second viewpoint, in \emph{both} renderers, so a tube cannot hide behind the body.
-\item Derive the tube threshold from geometry instead of guessing it.
-\item Take peak and final over \emph{valid} frames only.
-\item Compare a batch at a \emph{common} frame.
-\item Report the three mesh-failure modes separately --- folded, sliver, broken.
-\item Set the evidence horizon on an absolute count of genuinely broken cells.
-\item Establish whether the ``folded'' test can tell curvature from damage.
-\item Refuse a run that overruns its cell buffer.
-\item Remove the silent parameter caps; derive the real stability limit; make breaching it loud.
-\item Widen the ranges so Okuda's three out-of-range values are reachable.
-\item Start from Okuda's cell counts, with the buffer sized for the destination.
-\item Write, test and promote the geometry-weighted chemical flow.
-\item Save the per-frame measurements in one format.
-\item Classify each trajectory's shape automatically.
-\item Put those shapes in front of the Analysts.
-\item Rename to the explicit vocabulary.
-\item Time every agent call.
-\item Make the timing survive a crash.
-\item Quarantine the poisoned survival values.
-\item Make the movie say something true: no accidental grey, division and breakage each their
-      own colour.
-\item Run the engine up on the ground before flying it.
-\end{enumerate}
-\end{phasebox}
+\textbf{The two still open.} Comparing a batch at a \emph{common} frame --- two runs that stop being
+valid at different moments still have their ``final'' states compared. And the rename to the
+explicit vocabulary, which is 129 references and purely mechanical.
 
-\begin{phasebox}{Phase 0 --- what actually happened, point for point}
+\textbf{The repairs worth knowing about}
+
 \footnotesize
-\begin{tabular}{@{}r@{.\ } l p{9.1cm}@{}}
+\begin{tabular}{@{}l p{11.4cm}@{}}
 \toprule
-& \textbf{state} & \textbf{the issue found, and what was interesting}\\
+\textbf{what} & \textbf{what was found}\\
 \midrule
-1 & \dn & Two quantities carried one name. Drift was being read as elongation.\\
-2 & \dn & The guard existed and was never installed here. \emph{Third} time we found that.\\
-3 & \dn & It relaxed a fresh sphere and returned 1.014 for every run. Now real:
-          \textbf{1.415 $\to$ 1.325, so 94\% of the elongation survived the drivers going off} ---
-          the first honest survival number the campaign has produced.\\
-4 & \dn & Growth was drawn as \emph{shrinkage}: apparent size fell to 0.52$\times$ on a run that
-          grew by half.\\
-5 & \dn & Justified itself on its first outing: in the run-up \textbf{the tube is invisible from
-          the side and obvious from the top}. The old camera would have called it a plain sphere.\\
-6 & \dn & \textbf{No capsule of any aspect ratio can reach the old bar of 2.0} (ceiling 1.90). The
-          criterion was not asking for a tube, it was asking for the spike artefact.\\
-7 & \dn & The score \emph{paid} for a mesh tearing itself apart. No threshold fixes it --- damage
-          and the spike are simultaneous --- so the horizon is ``the last frame the mesh was
-          clean''.\\
-8 & \ns & Two runs that stop being valid at different moments still have their ``final'' states
-          compared.\\
-9 & \dn & The blend was counting \emph{cell division}: sliver correlates with the tip count at
-          $+0.94$, while broken stayed at \textbf{0 for 300 frames}.\\
-10 & \dn & A fraction gets more permissive as the tissue grows --- it tolerated 72 broken cells at
-          the start and 119 by the end.\\
-11 & \dn & My curvature explanation was \textbf{refuted}: perfect spheres flag 0\% at every radius.
-          The sliver term was the answer.\\
-12 & \dn & The ceiling was arithmetic, not physics: $(3552{+}4)/2 = 1778$ exactly, and all 32 runs of the overnight study stopped there.\\
-13 & \dn & Removing the caps also deleted the only reaction guard. Moved from a guess before the
-          run to a measurement after it.\\
-14 & \dn & Three of Okuda's published values sat outside the box we were searching, so a faithful run was impossible at any effort.\\
-15 & \dn & We had been starting at 150 cells; his cases start at 200, 2000 and 4000.\\
-16 & \dn & The emitter never passed the implementation through --- the ablation would have
-          reported ``no effect'' \emph{without ever running the new code}.\\
-17 & \dn & A run's two time series were stored in two different formats, so nothing could load both --- and in practice nothing loaded either.\\
-18 & \dn & A single number cannot tell a plateau from a spike at the moment of tearing; both report the same peak, and the campaign ranks on that peak.\\
-19 & \dn & The curve plot was referenced \textbf{nowhere in the codebase}: drawn every run since
-          the beginning, read by nobody.\\
-20 & \ns & 129 references still to change.\\
-21 & \dn & The round reported \code{calls: 0} for a round that made about 25.\\
-22 & \dn & Seven exit paths all did the bookkeeping and there was not one \code{try} block, so any crash mid-round lost the whole round's timing.\\
-23 & \dn & \emph{Open issue:} quarantining a poisoned value flips a run from failure to success,
-          because the fallback substitutes a different measurement.\\
-24 & \dn & The grey was never phantom cells --- it was the shaded \emph{side} of a pale cell. Zero
-          empty rings, zero broken cells. Green now comes from the division event; the first
-          version inferred it from cell area and never once fired.\\
-25 & \dn & Found four things in one run, including two of the above.\\
+survival test & It relaxed a fresh sphere and returned 1.014 for every run. Now real:
+  \textbf{1.415 $\to$ 1.325, so 94\% of the elongation survived the drivers going off} --- the first
+  honest survival number the campaign has produced.\\
+the camera & Growth was drawn as \emph{shrinkage}: apparent size fell to 0.52$\times$ on a run that
+  grew by half. A second viewpoint justified itself immediately --- in one run \textbf{the tube is
+  invisible from the side and obvious from the top}.\\
+the tube bar & \textbf{No capsule of any aspect ratio can reach the old bar of 2.0} (ceiling 1.90).
+  The criterion was not asking for a tube; it was asking for the spike artefact.\\
+damage & The blended damage score was counting \emph{cell division}: sliver correlates with tip
+  count at $+0.94$, while genuinely broken cells stayed at \textbf{0 for 300 frames}.\\
+the 1778 ceiling & Arithmetic, not physics: $(3552{+}4)/2 = 1778$, and all 32 runs of the overnight
+  study stopped there.\\
+the missing arrow & The emitter never passed the implementation through --- the ablation would have
+  reported ``no effect'' \emph{without ever running the new code}.\\
+the curve plot & Drawn every run since the beginning, referenced \textbf{nowhere in the codebase}.\\
+timing & The round reported \code{calls: 0} for a round that made about 25.\\
 \bottomrule
 \end{tabular}
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Teach the loop what a tissue is: the premise gate \hfill \dn\ (31 July)}
-\textbf{Why this became its own phase.} On 31 July we found ten defects in one day. Every single
-one was found by Cedric looking at a picture --- a ball that shrank, a movie where every cell went
-green, a coral that started uniformly red. Not one was found by the loop. And they were all the
-same \emph{kind} of thing: an operator or an instrument not doing what its name says. The loop
-checked that runs finished, that the mesh was valid, that the numbers were finite. It never once
-checked that the thing it had simulated was a tissue.
+\begin{phasebox}{Phase 1 --- Teach the loop what a tissue is: the premise gate \hfill \dn}
+\textbf{Why this became its own phase.} Ten defects were found in one day, every one by Cedric
+looking at a picture, and all of the same kind: an operator or an instrument not doing what its name
+says. The loop checked that runs finished, that the mesh was valid, that the numbers were finite. It
+never once checked that the thing it had simulated was a tissue.
 
-\textbf{The idea.} Write down what we take as known about cell tissue --- ten basics, no more ---
-and then make each one something a computer can \emph{run} and \emph{fail}. A premise nobody can
-run is an opinion, and an opinion catches nothing.
+\textbf{Eleven basics, each one something a computer can run and fail}, in three tiers by cost: read
+the recipe (instant, refuses a hopeless run before a GPU is touched); read the run (free, goes
+loudly into the record); and run a small experiment of its own --- switch everything off and let the
+ball sit for forty frames; it must not change size.
 
-\textbf{Three tiers, because they do not cost the same}
-\begin{itemize}
-\item \textbf{Read the recipe} (instant, no simulation). A recipe that cannot possibly work is now
-refused in milliseconds, before a GPU is touched --- instead of ten minutes later, as a
-plausible-looking null result. Two of today's ten defects are of exactly this kind: a number that
-contradicts another number in the same file.
-\item \textbf{Read the run} (free, after every simulation). Cannot stop anything --- the run
-already happened --- so it goes loudly into the record instead. An analyst who reads a summary
-without being told the chemistry was extinct is interpreting a corpse.
-\item \textbf{Run a small experiment of its own} (a minute). The most valuable one: switch off
-growth, chemistry and division, and let the ball sit for forty frames. It must not change size.
-\end{itemize}
+\textbf{A broken premise must be declared, not silenced.} Switching off growth to ask what a
+protrusion is made of genuinely breaks premise~1, and that is science. So a recipe may waive a
+premise \emph{in writing, with a reason}; an undeclared violation is a hard stop. That is the only
+thing separating ``we tested an idea'' from ``the settings were wrong''.
 
-\textbf{A broken premise must be \emph{declared}, not silenced.} Deliberately switching off growth
-to ask what a protrusion is made of genuinely breaks premise~1 --- and that is science, not a bug.
-The only difference between an ablation and a mistake is whether someone \emph{meant} it. So a
-recipe may waive a premise \emph{in writing, with a reason}; an undeclared violation is a hard
-stop. This is what keeps ``the settings were wrong'' from looking identical to ``we tested an
-idea''.
-
-\textbf{Every check was proved to work before being trusted}, on real cases from this campaign
-whose answer we already knew --- because a check that has never been seen to fail is not a check,
-it is a line of code that says ``fine''. Fifteen out of fifteen:
-
-\begin{center}\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Check} & \textbf{On the known-bad case} & \textbf{On the known-good one} \\
-\midrule
-Cells can reach the size that divides them & correctly \textbf{fails} & passes \\
-The chemistry is not silently extinguished & correctly \textbf{fails} & passes \\
-Cell volume holds up under division        & correctly \textbf{fails} & passes \\
-Cells are not stretched to accommodate area & correctly \textbf{fails} & passes \\
-The measuring stick respects its own floor  & correctly \textbf{fails} & passes \\
-\textbf{A resting ball rests}               & \textbf{5.00 $\to$ 0.69} & holds to 0.1\% \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-That last row is the one to look at. Run against the code as it stood yesterday morning, the ball
-collapses to a seventh of its size in forty frames of ordinary CPU time. \textbf{That single check
-would have caught the worst defect of the campaign on the first day.} It costs about a minute.
-
-\textbf{One premise had to be rewritten, and Cedric is the reason.} It said the tissue is at force
-balance at every instant, and he asked whether that was too strong --- can a tissue not accumulate
-stress for a long time? It can, and the wording was sloppy. Being at force balance is not the same
-as being unstressed: a stretched drumhead is perfectly balanced and stores tension indefinitely.
-Real tissue does the same for hours or days --- cut an epithelium with a laser and it recoils;
-tumour spheroids under confinement build up pressure over days. So the premise now forbids only two
-narrow things --- no inertia, and no lagging behind because the solver ran out of steps --- and a
-new check watches the second, which is the one that can actually go wrong here.
-
-We then \emph{measured} it rather than arguing: the same run with four times the solver effort
-buckles at the same point. So the stress our ball accumulates is real, and it is held at force
-balance, exactly as he suspected.
-
-\textbf{Where it lives.} \texttt{discovery/PREMISES.md} (what we believe) and
-\texttt{discovery/premise\_check.py} (what runs). The gate is wired into every run.
+\textbf{Every check was proved to fail before being trusted.} The one to look at: run against the
+code as it stood that morning, a resting ball collapses \textbf{5.00 $\to$ 0.69} in forty frames.
+That single check, which costs about a minute, would have caught the worst defect of the campaign on
+day one.
 \end{phasebox}
-\begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \prog\ (4 of 6)}
-\textbf{(0) The ball could not get big enough --- and that was not on the list.} It became item
-zero because it was the binding constraint on everything else. A spring in the mechanics was
-holding the shell at the size it was first built at, while the cells inside it grew sixteen-fold.
-The sheet had nowhere to put the extra material and folded through itself. Fixed: the spring's
-target now follows what the cells are actually asking for. Same run before and after --- the ball
-grows smoothly to 5\,240 cells and stays a clean sphere, where before it crumpled.
 
-\textbf{(1) The shape-to-chemistry operator} --- \emph{done}, and this is the piece that closes
-Okuda's loop. Until now the chemistry patterned the shell and the shell deformed, and the shape it
-took never reached back: a bud formed, and nothing about having formed a bud changed where the next
-signal went.
+\begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \dn\ (6 of 6)}
+The box used to describe the work without listing it, so the count had no visible
+denominator. All six, with what each one turned out to be:
 
-Cedric asked the right design question --- \emph{which} shape feature should the chemistry listen
-to: area, curvature, tension, pressure, force? The answer is that this is not a setting, it is the
-hypothesis. So all four are built as alternative \emph{versions of one operator}: swapping
-curvature for tension counts as a new mechanism, turning a dial does not.
+\footnotesize
+\begin{tabular}{@{}r@{.\ }p{5.0cm} l p{6.3cm}@{}}
+\toprule
+& \textbf{item} & \textbf{state} & \textbf{what it turned out to be}\\
+\midrule
+0 & The ball could not get big enough & \dn &
+  \emph{Not on the list.} A spring held the shell at the size it was first built at while the cells
+  inside grew sixteen-fold, so the sheet folded through itself. The spring's target now follows
+  what the cells are asking for: the same run grows smoothly to 5\,240 cells and stays clean.\\
+1 & Widen the out-of-range settings & \dn &
+  Done, and the new bounds are \emph{derived} rather than chosen: growth sharpness to 49.5
+  (Okuda needs 10), inhibitor spread to 12.5 (he needs 10), reaction speed unbounded.\\
+2 & Replace the mislabelled length-scale & \dn &
+  The quantity we called a pattern size is a solver rate. Resolved in Phase 4 by measuring the
+  pattern instead of setting it.\\
+3 & The shape-to-chemistry feedback & \dn &
+  One contract, four implementations --- curvature, tension, apical area, pressure --- because
+  \emph{which} feature the chemistry listens to is the hypothesis, not a dial. Force and size were
+  refused with reasons.\\
+4 & A fixture asserting his published constants & \dn &
+  His Table 1 is now written down in the Grounder, quoted, with the sentence each value comes
+  from --- the Hill coefficient, the two diffusivities, the cell cycle, and the two regime
+  \emph{inequalities} that actually define his setting. Asserting a run against it is Phase 3,
+  because it needs the Grounder wired.\\
+5 & His cell counts, with the buffer sized for the \emph{destination} & \dn &
+  \textbf{The item that voided the weekend batch}, and it is measured rather than argued ---
+  see below.\\
+\bottomrule
+\end{tabular}
+
+\normalsize
+\textbf{Item 5, tested rather than argued.} A closed cell sheet is trivalent, so Euler fixes the
+vertex count at twice the cell count: a reservoir of 3552 vertices caps the tissue at
+$(3552{+}4)/2 = 1778$ cells exactly, whatever the biology wants. The reservoir is now computed from
+the count a run is \emph{aiming at}. The same recipe, run twice, with nothing changed but the seed
+count and the reservoir:
 
 \begin{center}\small
-\begin{tabular}{@{}lp{9.4cm}@{}}
+\begin{tabular}{@{}l r r r l@{}}
 \toprule
-\textbf{curvature}   & how bowed the sheet is here. The feedback Okuda's own framing implies.\\
-\textbf{tension}     & how stretched the cell's cortex is. The best-evidenced feedback in real
-                       tissue --- cells genuinely do signal differently under tension.\\
-\textbf{apical area} & how crowded the cell is.\\
-\textbf{pressure}    & how squeezed it is.\\
+& \textbf{seeds} & \textbf{vertex buffer} & \textbf{cells at end} & \textbf{verdict}\\
 \midrule
-\textbf{force}       & \emph{refused.} At rest the net force on a cell is nearly zero, so what is
-                       left is the solver's own error. An operator listening to it would read
-                       arithmetic noise as biology.\\
-\textbf{size}        & \emph{refused.} Growth already sets size. A loop that tells us nothing the
-                       first arrow did not.\\
+before & 150 & 3\,552  & \textbf{1778} & saturated --- not evidence\\
+after  & 200 & 10\,404 & \textbf{4151} & clean --- valid evidence\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Each feature is put on a common scale before use, because curvature, tension and area are measured
-in different units and the same dial setting would otherwise mean four different things. That is
-the length-scale mistake below, caught before making it a second time rather than after.
+The old configuration stops dead on the rail; the new one grows past Okuda's largest case.
+Elongation is 1.061 against 1.073, so the physics is unchanged --- the run simply gets to happen.
+Sizing the buffer from the seed instead of the destination is what produced 1778 twice in one week.
 
-\textbf{Checking it caught two of my own errors.} The curvature measure was normalised wrongly and
-only \emph{looked} right because my test held the cell count fixed. And my ``bump'' test demanded
-the wrong answer --- pushing a cap of a sphere outward leaves it on a \emph{bigger} sphere, which is
-flatter, so the operator was right to disagree with the test.
+\textbf{One error the check caught on me.} My first version sized the reservoir from the seed
+count, which gave the 200-cell case a ceiling of 264. Okuda is explicit that his largest tissues
+were ``picked up on the growth process'' --- a destination, not a start --- so the two are now
+recorded as separate numbers.
 
-\textbf{(2) The length-scale} --- \emph{decided, and it went somewhere unexpected}: see Phase~4.
-The short version is that the quantity we were treating as a pattern size is a solver setting, and
-the honest replacement is to \emph{measure} the pattern rather than set it.
-
-\textbf{Still to do:} widen the remaining out-of-range settings; the published-constants fixture.
+\textbf{Certification caught two of my own errors} on item 3 --- a curvature normalisation that only
+looked right because the test held cell count fixed, and a test of mine that demanded the wrong
+answer.
 \end{phasebox}
 \begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \prog\ (1 of 3)}
-\textbf{Ablation is now compulsory} --- \emph{done}, and it is the part of this phase that matters.
+\textbf{Ablation is now compulsory} --- \emph{done}, and it is the part that matters. A claim that
+one thing \emph{causes} another needs two experiments and we were enforcing neither: adding a
+mechanism and seeing the shape appear shows it is \emph{sufficient}; taking it away and seeing the
+shape die shows it is \emph{necessary}. Either alone is an opinion.
 
-A claim that one thing \emph{causes} another needs two experiments, and we were enforcing neither.
-Adding a mechanism and seeing the shape appear shows it is \emph{sufficient}. Taking it away and
-seeing the shape die shows it is \emph{necessary}. Either alone is an opinion --- and every ``X
-causes Y'' this campaign has written rests on one of them.
+Every claim must now declare its kind, and the checker throws out a batch that asks for more than it
+tests --- before any simulation starts. Sufficient earns ``is sufficient for''; necessary earns ``is
+required for''; both earn ``causes''; neither earns ``is associated with''. \textbf{The word can no
+longer outrun the experiment.}
 
-The precedent already existed and nobody argued with it: the control run is not left to the
-proposer's judgement, it is \emph{required}, or the proposal is thrown out. Ablation now gets the
-same treatment, for the same reason --- the author does not referee their own work.
+\textbf{Still to do --- and one of the three is now the priority.}
 
-Every claim must say what kind of claim it is, and the checker throws out a batch that asks for
-more than it tests. It costs nothing and runs before any simulation starts.
+\textbf{(a) Wire the Grounder.} It is the only agent that reads the paper, and it has no call site
+anywhere. Until a batch is built by \emph{asking it}, the starting conditions come from whatever
+default sits in a config --- which is how 27 runs were launched at 150 cells against a paper that
+says 200. It needs two things: Okuda's starting conditions added alongside the figure targets it
+already holds, and a call at batch-construction time. The faithful share of a batch then inherits
+his numbers from the paper; the exploratory share is free to leave them, which is the 70/30 split.
 
-\begin{center}\small
-\begin{tabular}{@{}ll@{}}
-\toprule
-\textbf{If the claim is} & \textbf{the write-up may say}\\
-\midrule
-sufficient --- added it, the shape appeared  & ``is sufficient for''\\
-necessary --- removed it, the shape died     & ``is required for''\\
-both                                          & ``causes''\\
-neither                                       & ``is associated with''\\
-\bottomrule
-\end{tabular}
-\end{center}
+Two rules keep that from becoming a straitjacket. The Grounder \emph{advises} --- it supplies
+numbers, it does not forbid others, or the exploratory 30\% would be dead. What is \emph{not}
+optional is the reservoir check: a run that cannot reach the cell count it is aiming at measures
+the array rather than the tissue, whichever share it belongs to.
 
-The word can no longer outrun the experiment.
+\textbf{(b) Evolution and the Referee}, the two idle faces in the list above.
 
-\textbf{Still to do:} the two idle agents --- one to sweep the winner's main setting, one to rank by
-tournament rather than by a single number --- and running the per-round calls together instead of
-one after another, against the five-minute target.
+\textbf{(c) Run the per-run calls together} instead of one after another, against the five-minute
+target.
 \end{phasebox}
+
 \begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \prog\ (built + calibrated)}
-\textbf{The classifier} --- \emph{done}. We had no measurement that could tell a tube from an
-undulation from a branch, which are the three things the figure has to show. Each needs a
-\emph{different} quantity, which is why one number was never going to do it:
+\textbf{The classifier} --- \emph{done}. Sphere, undulation, tube, branched, plus \textbf{invalid}
+(the surface passes through itself, so no shape reading means anything) and \textbf{unclear},
+returned deliberately near a boundary. A classifier that always answers can never be wrong, and one
+that can never be wrong teaches nothing. ``Invalid'' beats every morphology --- this campaign has
+already once reported a crumpled shell as a result. It records the \emph{path} a run takes, not just
+where it ends.
 
-\begin{center}\small
-\begin{tabular}{@{}ll@{}}
-\toprule
-\textbf{sphere}     & nothing sticks out\\
-\textbf{undulation} & \emph{many} bumps, none of them deep\\
-\textbf{tube}       & \emph{few} protrusions, at least one longer than it is wide\\
-\textbf{branched}   & more tips than bases --- something has forked\\
-\textbf{invalid}    & the surface passes through itself; no shape reading means anything\\
-\textbf{unclear}    & deliberately returned near a boundary\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The last two are the important ones. A classifier that always answers can never be wrong, and one
-that can never be wrong teaches nothing. And ``invalid'' beats every morphology --- this campaign
-has already once reported a crumpled shell as a result. It also records the \emph{path} a run takes
-(sphere $\rightarrow$ undulation $\rightarrow$ tube), not just where it ends, because the transition
-is the part that says when the mechanism acted.
-
-\textbf{The calibration, and the surprise.} The plan was to tune the pattern until we saw about five
-spots on a 2000-cell ball, as Okuda reports, then freeze it. Counting the spots over time --- for
-the first time --- showed something else:
+\textbf{The calibration, and the surprise.} The plan was to tune until we saw Okuda's handful of
+spots on a 2000-cell ball, then freeze. Counting spots over time --- for the first time --- showed
+something else:
 
 \begin{center}\small
 \begin{tabular}{@{}lrrrrrr@{}}
@@ -915,79 +471,60 @@ coverage    & 0.06 & 0.14 & 0.37 & 0.49 & 0.52 & 0.53\\
 \end{tabular}
 \end{center}
 
-\textbf{The pattern never settles.} It keeps merging until the whole ball is one connected blotch
-covering half the surface, and then stays there. So ``about five spots'' was a passing moment around
-step 200, not a property of the settings --- and calibrating to it by choosing when to stop would
-have produced a number that looked right and meant nothing.
-
-The cause: the chemistry settings this campaign has always used sit in the wrong regime of the
-reaction. They make mazes, not spots. Nobody had noticed because nothing counted spots --- the old
-pattern gauge was blind by construction, and the colour scale in the movies was rescaled every
+\textbf{The pattern never settles.} It keeps merging until the ball is one connected blotch covering
+half the surface. So ``about five spots'' was a passing moment around step 200, not a property of
+the settings --- and calibrating to it by choosing when to stop would have produced a number that
+looked right and meant nothing. The chemistry this campaign has always used makes \emph{mazes}, not
+spots. Nobody noticed because nothing counted spots, and the movie's colour scale was rescaled every
 frame, so a merging pattern and a stable one looked identical in both the numbers and the pictures.
 
-\textbf{So the calibration became a search for where stable spots actually live}, with stability
-tested by counting at two well-separated times: a pattern still merging is not a spot pattern,
-whatever it looks like when you stop. Twenty settings tested; the winner gives three spots that stay
-three spots, reproducibly across three independent runs, and is now frozen as the default. The old
-value gives one maze.
+The calibration became a search for where stable spots actually live, tested by counting at two
+well-separated times. Twenty settings; the winner gives three spots that stay three spots across
+three independent runs, and is frozen as the default.
 \end{phasebox}
-\begin{phasebox}{Phase 5 --- The experiment, on an apparatus that is finally complete \hfill \todo}
-\textbf{Why this moved to the end.} It used to sit right after the instrument repair, and Cedric
-moved it behind Phases~2--4. He is right, and the reason is the same lesson that cost us 31 July.
-Phase~4 is not a feature phase --- it is an \emph{instrument} phase: ``measurements that can tell
-his regimes apart''. Running the experiment before it means taking a batch with rulers that cannot
-distinguish the answers we are asking for, reading a plausible result off them, and then re-running
-everything once the real rulers exist. That is precisely what happened three times today, and each
-time the batch was thrown away.
 
-The rule that follows is simple enough to state once: \textbf{no experiment until every instrument
-it will be read with exists and has been proved to work.} Phase~2 makes Okuda's settings reachable,
-Phase~3 switches on the agents that would notice a problem, Phase~4 builds the measurements that
-can tell his three morphologies apart. Only then is there any point running the thing.
+\begin{phasebox}{Phase 5 --- The experiment \hfill \textcolor{bad}{\textbf{ATTEMPTED --- VOID}}}
+\textbf{A 27-run batch ran on 31 July and produced no evidence at all.} Four shape features,
+two directions each, three seeds, plus three nulls --- the first batch in the campaign whose every
+instrument had been certified before it ran, and built to satisfy the ablation rule of Phase~3.
 
-\textbf{Not a re-run, and not a comparison.} The earlier overnight study is quarantined, not
-inherited: every one of those runs was measured with at least one instrument since proved wrong,
-and re-running them ``to see if the conclusion survives'' would import the old design and the old
-question. Cedric: \emph{``a new test, not any comparison with the previous overnight run, for which
-I have no confidence anyway.''} Correct --- and I should not have framed it as a comparison.
+\textbf{All 27 runs ended at exactly 1778 cells}, flagged \code{saturated}, \code{valid\_evidence:
+false}. That is the same ceiling that voided the overnight study the day before, in the same
+document, for the same reason. The launcher set no cell count and no buffer, so it inherited the
+default that produces 1778.
 
-\textbf{What changes, beyond the instruments}
-\begin{itemize}
-\item \textbf{Several seed spots, not one.} One protrusion per run is a single sample: you cannot
-tell ``this mechanism makes tubes'' from ``this run made a tube''. Several spots give
-\emph{within-run replication for free} --- the spread across tubes in one run is a direct measure
-of reproducibility --- and it is what Okuda shows.
-\item \textbf{Baseline growth on.} The old recipe ran with the growth floor at zero, so the body
-could not grow at all and a protrusion could only be drawn from existing material. That is not a
-setting, it is unphysiological: cells grow by taking up nutrients. The floor goes above zero and
-the activator supplies \emph{extra} growth on top.
-\item \textbf{Chemistry inside the search.} Every reaction--diffusion operator is stage 3 while the
-gate sits at 2, so the entire Turing half --- the number of spots, the diffusion ratio, the reaction
-speed, and the shape-to-chemistry ablation --- is outside the loop's reach. The stage curriculum
-was written when the objective was ``find a tube''; under ``reproduce the figures'' it is backwards.
-Chemistry is not an advanced topic to unlock later, it is half the model.
-\item \textbf{Buffers sized for the destination}, so nothing stops at a ceiling and reports it as
-biology.
-\end{itemize}
+\textbf{What this says, and it is not that the fix failed.} The flag worked --- every run is
+correctly marked as non-evidence, which is exactly what Phase~0 item~12 was for. What is missing is
+one step earlier: \emph{nothing refused to start}. Detecting a spent batch afterwards and preventing
+it are different jobs, and only the first is built.
 
-\textbf{Runs locally.} Two GPUs; a 260-frame run took 52 seconds on one of them. The cluster is not
-needed and is currently off.
+It also broke this phase's own stated rule --- \emph{no experiment until every instrument it will be
+read with exists and has been proved to work} --- while Phase~0 still had two open items. Stating a
+rule and then not being stopped by it is the same class of problem as the buffer: a check that
+exists in prose but not in code.
 
-\textbf{The one thing to decide first} --- what the batch is \emph{for}. The map says solo operator
-effects are characterised for \textbf{0 of 8} operators, so the emptiest and cheapest cell to fill
-is ``what does each operator do on its own''. The alternative is to aim straight at the easiest
-morphology to recognise (undulation: many shallow bumps, low elongation). The first builds the map;
-the second buys a scoreboard row. They are both defensible and they are different experiments.
+\textbf{Before it is re-run:} a pre-launch gate that refuses any batch whose buffer cannot hold the
+cell count it is aiming at. It is arithmetic, it costs nothing, and it applies to faithful and
+exploratory runs alike.
 
-\textbf{What you get.} A batch whose every number was taken with an instrument that has been
-checked --- and, for the first time, an honest reading of what a single operator does.
+\textbf{What changes otherwise.} Several seed spots rather than one, so a run carries its own
+replication. Baseline growth above zero --- cells grow by taking up nutrients, and a protrusion
+drawn from existing material is an ablation, not a setting. Chemistry brought inside the search: the
+whole Turing half currently sits outside the loop's reach because the stage curriculum was written
+when the objective was ``find a tube''. And the starting conditions taken from the Grounder rather
+than from a default.
+
+\textbf{Runs locally.} Two GPUs; a 260-frame run takes 52 seconds. The cluster is not needed and is
+currently off.
 \end{phasebox}
+
 \begin{phasebox}{Phase 6 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at his settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
+
 \begin{phasebox}{Phase 7 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
@@ -996,171 +533,14 @@ predictions and retractions as the evidence.
 \end{phasebox}
 
 %======================================================================
-\section{Report --- 31 July: ten defects in one day}\label{sec:july31}
+\section{The 31 July lesson, in three lines}
 
-This is the most important page in the document, and not because of the defects.
-
-\subsection{What was wrong}
-
-Every measurement taken before this morning is void. Ten separate faults, found in a single day,
-each one making some earlier number meaningless:
-
-\begin{center}\small
-\begin{tabular}{@{}p{6.2cm}p{8.6cm}@{}}
-\toprule
-\textbf{What was wrong} & \textbf{What it did to the results} \\
-\midrule
-The ball had no resting size &
-  A freshly built vesicle collapsed from radius 5.0 to 1.8 in twenty frames, under nothing at all. \\
-The chemistry ran on the mechanics clock &
-  Three hundred frames bought six units of chemical time instead of five hundred. Every ``no
-  pattern formed'' was a statement about the clock. \\
-Cells could not reach the size that divides them &
-  The ceiling on growth sat \emph{below} the trigger for division, so dividing by growing was
-  arithmetically impossible. Every division came from a stopwatch. \\
-The starting pattern was re-stamped every frame &
-  The chemistry was overwritten with its own initial condition six hundred times, then allowed to
-  advance one step. It never moved. \\
-The pattern gauge could not see the pattern &
-  It measured ``the top half of whatever is there'', so it read the same number for a living
-  pattern and a dead one. It sat at exactly 0.070 for forty consecutive frames. \\
-Every cell turned green at once &
-  Green means ``just divided'', but it was computed in a way that also means ``just created'' ---
-  so the whole tissue flashed green in runs where nothing divided at all. \\
-Tissue size was never recorded &
-  Only how \emph{unequal} the cells were, never how big the tissue was. Three of our ten premises
-  were literally unmeasurable from our own records. \\
-Growth was starving the chemistry &
-  As cells grow, what is inside them is diluted --- correctly. But the pattern is sustained by a
-  self-reinforcing loop, and any steady loss beats it. This is why the coral never worked. \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Who found them}
-
-\begin{tcolorbox}[colback=warn!8,colframe=warn!55,boxrule=0.8pt,arc=2pt]
-\textbf{All ten were found by Cedric, from a picture.} None by the loop.
-
-A ball that shrank to nothing. A movie where every cell went green at one second. A coral that
-began uniformly red. A cross-section that changed character halfway through. Each time, an
-ordinary look at an ordinary output, followed by a question the numbers could not answer.
-\end{tcolorbox}
-
-That is the finding, and it is about the method rather than about tissue. The loop has always been
-able to tell whether a \emph{simulation} succeeded --- did it finish, is the mesh valid, are the
-numbers finite. It has never been able to tell whether the \emph{specimen} was a tissue. Those are
-different questions, and only the second one was ever going to catch a ball that quietly implodes.
-
-Phase~1 is the answer to it: ten premises about tissue, each one executable, each one proved to
-fail on a case where it should. Whether that is enough is the next thing to find out --- and the
-only way to find out is to run Phase~5 and see whether the gate catches anything before Cedric
-does.
-
-\subsection{What came out of it that is worth keeping}
-
-Two results, both accidental, both from chasing a bug:
-
-\textbf{A buckling transition.} A growing ball divides smoothly, then at about 3\,500 cells its
-surface crenellates and stays that way. The numbers say compression then release: through the
-approach the enclosed volume actually \emph{falls} while surface area holds, and the cells are
-squeezed to two-thirds of their target --- then the shell gives way, area doubles, and the pent-up
-volume comes back. Nothing tears at any point, and the surface stays a topological sphere
-throughout. It survives quadrupling the solver effort, so it is physical rather than numerical.
-Kept in \texttt{log/okuda/\_keep\_transition/} with its full record.
-
-\textbf{A new measuring stick} that made the above visible: \emph{reduced volume}, the standard
-dimensionless measure of how much more surface a closed shell carries than a sphere of the same
-volume could hold. One for a sphere, less than one when the shell must wrinkle. Checked against
-known shapes before use --- 0.996 on a sphere, 0.55 on a badly crumpled one.
-
-\section{Phase 0 report --- 31 July, 11:15}\label{sec:p0report}
-
-\emph{This is a phase boundary. Four of the seven items are done and independently checked; three
-have not been started. I have stopped here.}
-
-\textbf{How it was checked.} Three agents made the fixes, each required to demonstrate the defect
-before and its absence after. Then six independent checkers --- two per fix, told to disbelieve by
-default --- re-derived each defect \emph{from the committed code} rather than from the fixing
-agent's account, and re-ran its demonstration. All six confirmed, with high confidence. One of
-their warnings turned out to be a false alarm when I checked it myself.
-
-\subsection{What was repaired}
-
-\textbf{The survive-test now measures the run.} It was returning 1.014 for everything. Continuing
-properly from each run's end state instead of a fresh sphere:
-
-\begin{center}\small
-\begin{tabular}{@{}l r r r@{}}
-\toprule
-run & protrusion at the end & old test & \textbf{new test}\\
-\midrule
-\code{d1x\_nocons} & 1.928 & 1.014 & \textbf{1.596}\\
-\code{r002c\_00}   & 1.703 & 1.014 & \textbf{1.617}\\
-\code{r002c\_02}   & 1.024 & 1.014 & \textbf{1.021}\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-It now separates runs that differ, and agrees with the flat one. (A detail worth recording: a
-checkpoint-based version of this code had already been written and had \emph{never been
-executed} --- a confident docstring over a path nothing ran.)
-
-\textbf{The camera made growth look like shrinkage.} Measuring the apparent size of the tissue
-across the six panels of a strip, on a run whose true extent grew by half:
-
-\begin{center}\small
-\begin{tabular}{@{}l l r@{}}
-\toprule
-& apparent size, first $\to$ last panel & ratio\\
-\midrule
-before & 40492 $\to$ 20988 & \textbf{0.52 --- it looked like it halved}\\
-after  & 19087 $\to$ 21002 & 1.10\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-A growing vesicle was being drawn as a shrinking one, in every movie, for as long as this code has
-existed. One frame size is now held for the whole run, and there is a second viewpoint looking
-down on it so a tube cannot hide behind the body.
-
-\textbf{The 1778 ceiling is confirmed as arithmetic and is now flagged.} The mesh buffer gave a
-hard cap of exactly $(3552{+}4)/2 = 1778$ cells. A run that reaches its cap is now marked
-\emph{not evidence} as the first line of its record, and the worker exits with an error rather
-than reporting a number.
-
-\textbf{The agents are now timed.} Nine call sites bypassed the stopwatch; all are routed through
-it, and a round now reports where its time went, per role.
-
-\subsection{What the checkers found that the fixers had not said}
-
-\begin{itemize}
-\item \textbf{The stored survive-test values are poison.} Thirty-three records across the archive
-carry the old constant. Anything that re-scores from the archive still eats the artefact; they must
-be deleted and recomputed, not trusted.
-\item \textbf{The success criterion is now unreachable \emph{honestly}.} It demands a survival
-score of 2.0; the best real value measured is 1.62. It used to be unreachable by accident, because
-the number was a constant. It now needs a justification or a new threshold --- a real decision, not
-a tuning.
-\item \textbf{A crash mid-round still loses that round's timing} --- the bookkeeping runs on every
-normal exit but there is no protection against an exception.
-\item \textbf{The default growth headroom still hits a wall} at the small starting size. It is now
-\emph{flagged} rather than silent, but Phase~5 must set it explicitly or it will reproduce the
-original artefact in a visible form.
-\item \textbf{The Phase~5 renderer did not get the second viewpoint.} The camera was repaired in
-the campaign's path, not in the study's. It must be fixed before Phase~5 runs, or those movies stay
-half-blind.
-\item Rendering is about twice as slow. Acceptable.
-\end{itemize}
-
-\subsection{Still not started --- the rest of Phase 0}
-
-\begin{enumerate}
-\item Remove the silent parameter caps; derive the real stability limit and make breaching it loud.
-\item Write, test and promote the geometry-weighted chemical flow (\S\ref{sec:okuda}c).
-\item Separate the three mesh-failure modes so the horizon stops being provisional
-(\S\ref{sec:phantom}).
-\end{enumerate}
+Ten defects in one day, every one found by Cedric looking at a picture and none by the loop --- a
+ball that shrank to nothing, a movie where every cell turned green at once, a coral that began
+uniformly red. They were all the same kind: the loop could tell whether a \emph{simulation}
+succeeded and had never been able to tell whether the \emph{specimen} was a tissue. Phase~1 is the
+answer to exactly that, and the only way to find out whether it is enough is to run a batch and see
+whether the gate catches anything before Cedric does.
 
 %======================================================================
 \section{What I need from you}
@@ -1168,9 +548,9 @@ half-blind.
 Nothing blocking. Two things worth knowing:
 
 \begin{enumerate}[leftmargin=1.4em]
-\item \textbf{Phase 1 is the interesting one} and it costs about an hour of compute. When it
-finishes I will bring you the answer, not the reasoning --- unless you want the reasoning, in which
-case say so and it becomes the default.
+\item \textbf{The buffer gate is the one decision worth taking now.} Phase 5 has already been
+spent once on runs that could not have produced evidence. A pre-launch refusal costs nothing and
+would have saved the batch.
 \item \textbf{Tell me if this note is the right shape.} Too long, too short, wrong order --- it is
 cheap to change, and it is the thing that lets you steer.
 \end{enumerate}
@@ -1221,8 +601,7 @@ can already make a tube by pushing; the question is whether the tissue will hold
 \hrule
 \vspace{6pt}
 {\small\color{grey}
-Technical detail --- the control law, the agent roles, the operator language, the validation
-ladder and the full external review --- is preserved in \texttt{plexus2\_technical.pdf} (23 pp).
-My working log is \texttt{SESSION\_LOG.md}. You should not need either.}
+My working log is \texttt{SESSION\_LOG.md}; the findings register is \texttt{findings.py} and the
+premises are \texttt{PREMISES.md}. You should not need any of them.}
 
 \end{document}
