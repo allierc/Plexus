@@ -536,16 +536,52 @@ hand-written configs are stable; the two that are not are the two that break, an
 actually ran went non-finite exactly as predicted.
 \end{itemize}
 
+\textbf{Then it was certified against the engine, and the corrected bound is still wrong.}
+Twenty specs on the cluster, 300 frames each, sweeping across the predicted wall. An argument
+about where a limit lies is worth nothing until the boundary it predicts is the boundary the
+engine has --- and it is not:
+
+\begin{center}\small
+\begin{tabular}{@{}r r r l l@{}}
+\toprule
+\textbf{CFL} & $\chi$ & $d_h$ & \textbf{measured} & \\
+\midrule
+0.10 & 0.01 & \textbf{10} & finite, patterns & \textbf{Okuda's $\varphi = 10$ IS reachable}\\
+0.16 & 0.08 & 2   & finite, patterns & \\
+0.21--0.55 & 1.3 & 0.16--0.42 & finite, patterns & the working band\\
+0.48 & 3 & 0.16 & finite, patterns & \\
+\midrule
+0.50 & 0.05 & 10  & \textcolor{bad}{non-finite} & predicted stable\\
+0.64 & 4 & 0.16   & \textcolor{warn}{finite but INERT} & the activator dies; P4\\
+0.65 & 1.3 & 0.5  & \textcolor{bad}{non-finite} & \\
+0.96 & 6 & 0.16   & \textcolor{warn}{finite but INERT} & every cell activated; P4\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two things follow, and both were wrong in what I told Cedric an hour earlier.
+
+\textbf{Okuda's $\varphi = 10$ is reachable after all.} At $\chi = 0.01$ it runs finite and
+patterns. I had inferred from a short probe that it was not, and said so. The probe was 80 frames
+and tested $\chi = 0.05$, which does fail --- the wall for $d_h = 10$ sits between 0.01 and 0.05,
+and I had generalised from the wrong side of it.
+
+\textbf{One number cannot express this wall.} At $\chi = 1.3$ the chemistry survives to CFL 0.55
+and dies at 0.65; at $\chi = 0.05$ it dies at 0.50. And there is a \emph{second} failure mode the
+CFL says nothing about: at $\chi = 4$ and $\chi = 6$ the run stays perfectly finite and the
+activator goes to zero. A stability bound does not see that, the Biologist does --- P4, ``the
+chemistry was silently extinguished''. \textbf{Finite is not the same as alive}, and a bound that
+only forbids divergence admits a whole region of dead runs.
+
 \textbf{Still to do}
 \begin{itemize}[itemsep=1pt]
-\item \textbf{Reachability.} At the corrected bound, Okuda's $\varphi = 10$ needs $\chi \leq 0.08$.
-Whether his regime is reachable at all with an explicit step is now an open question, and the
-honest answer may be that it needs an implicit one.
-\item \textbf{The reaction has no bound at all}, deliberately --- the candidate was measured and
-refuted. So a composition can still be refused by the diffusion check and diverge through the
-reaction, and only the Biologist will notice.
-\item \textbf{One preset does not compile} (\code{round\_44\_base}), for reasons unrelated to
-stability. \code{validate\_space} sits at 54/56 on it.
+\item \textbf{Replace the single number with the measured region.} The safe band at 300 frames is
+roughly CFL $\leq 0.45$ \emph{and} $\chi \leq 3$, and the second clause is not in any formula.
+\item \textbf{The reaction still has no bound}, deliberately --- the candidate was measured and
+refuted --- so a composition can pass the diffusion check and die through the reaction. Two of the
+twenty did exactly that.
+\item \textbf{Longer runs may move the wall.} 300 frames is where these were judged; a run that
+survives 300 and dies at 900 is still a run the gate let through.
 \end{itemize}
 
 \textbf{Whose job this is.} The \textbf{Critic}. It is deterministic, it runs before any compute,
@@ -554,6 +590,39 @@ integrated'' is the same kind of statement. It is not the Metrologist's, who cer
 \emph{instrument} measures what it claims, and not the Biologist's, who asks whether the
 \emph{specimen} is a tissue. This one is about whether the arithmetic can be performed, which is a
 property of the proposal, and the proposal is what the Critic reads.
+\end{phasebox}
+
+\begin{phasebox}{Phase 4c --- Multi-spot initialisation: several tubes, not one \hfill \prog}
+\textbf{Why.} Cedric: \emph{``did you forget to run multiple tubes from now on, not a single
+one''}. He is right, and the note already said so --- one protrusion per run is a single sample,
+and you cannot tell ``this mechanism makes tubes'' from ``this run made a tube''. Several spots
+give within-run replication for free, and it is what Okuda shows. Every control I built during
+the pre-launch used one spot or none.
+
+\textbf{Measured}, six runs at the stable point, 300 frames:
+
+\begin{center}\small
+\begin{tabular}{@{}r r r l@{}}
+\toprule
+\textbf{seed fraction} & \textbf{act\_max} & \textbf{activated fraction} & \\
+\midrule
+0.02 & 0.423 & 0.40 & \\
+0.06 & 0.501 & 0.37 & three seeds, \textbf{identical to 3 d.p.}\\
+0.15 & 0.598 & 0.12 & \\
+0.30 & \textcolor{bad}{0.000} & 0.10 & the pattern is extinguished (P4)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Two findings, one of them a problem.} Seeding more widely does not give more pattern --- it
+gives \emph{less}, and past 0.15 it gives none at all: a seed covering a third of the shell leaves
+no room for the inhibitor to separate domains, so the whole field decays together. The useful band
+is narrow and sits below 0.15.
+
+And the three seeds are \textbf{bit-identical}. \code{general.seed} does not reach the seeding
+operator, so ``three independent runs'' are one run repeated. Replication was the entire reason for
+running several spots, and it is not currently available --- which means every spread I have quoted
+across seeds in this campaign describes nothing.
 \end{phasebox}
 
 \begin{phasebox}{Phase 5 --- The experiment \hfill \textcolor{bad}{\textbf{ATTEMPTED --- VOID}}}
