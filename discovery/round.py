@@ -389,8 +389,10 @@ def _referee_rank(rows, cfg):
         return sorted(rows, key=lambda r: -r[3])
 
     def compare(a, b):
-        if bool(a[2].get("watcher_blocks")) != bool(b[2].get("watcher_blocks")):
-            return 0.0 if a[2].get("watcher_blocks") else 1.0
+        # The eye-check does not decide the tournament either -- same reason. A run whose
+        # picture disagrees with its numbers is a run to look at, not a run to lose.
+        if bool(a[2].get("premises_broken")) != bool(b[2].get("premises_broken")):
+            return 0.0 if a[2].get("premises_broken") else 1.0
         sa, sb = a[3], b[3]
         if not np.isfinite(sa) and not np.isfinite(sb):
             return 0.5
@@ -736,9 +738,26 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         an, wa = _read_one(nm, out_dir, ledger)
         summ.update({k: v for k, v in an.items() if k != "analyst_reads"})
         summ.update(wa)
+        # THE EYE-CHECK NO LONGER BLOCKS. Its verdict is recorded and carried into the record,
+        # and it stops deciding whether a run may be ranked. Two reasons, and Cedric's call:
+        #
+        #   it is circular as built. `watch()` is handed `analyst_consensus` -- a label derived
+        #   from the same caption it then reads -- so it can catch a summariser drifting from a
+        #   caption and cannot catch numbers disagreeing with reality, which is what it has been
+        #   credited with.
+        #
+        #   the camera was broken for the whole period the veto was trusted: one fixed viewpoint,
+        #   and a zoom that re-fitted to the tissue every frame, so growth was drawn as shrinkage
+        #   and a tube could sit behind the body. A blocker reading a broken instrument is worse
+        #   than no blocker.
+        #
+        # A disagreement between the picture and the numbers is still worth having -- it is the
+        # only thing in the loop that looks at SHAPE rather than at numbers. It is now an
+        # observation, not a verdict.
+        sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
-            print(f"  [watcher] {nm} VETOED -- {wa.get('watcher_why','')[:110]}")
-        sc = score_run(summ, cfg) if not wa.get("watcher_blocks") else -np.inf
+            print(f"  [eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
+                  f"{wa.get('watcher_why','')[:100]}")
         # `predict.score` refuses to guess: a prediction it cannot check resolves `inconclusive`
         # and drops out of the surprise denominator, rather than being recorded as `confirmed`
         # (which is what the old first-match regex did -- see predict.py P1/P2/P3).
