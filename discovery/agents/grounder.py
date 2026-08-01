@@ -622,7 +622,11 @@ def buffer_for(target_cells, margin=1.30):
     is headroom for the transient over-allocation division needs, not slack for wishful thinking.
     """
     n = int(target_cells * margin)
-    return {"cell": n, "vertex": 2 * n + 4}
+    vertex = 2 * n + 4
+    # The cell reservoir must hold what the vertex reservoir ALLOWS, not what we asked for --
+    # otherwise the two disagree by four cells and whichever binds first does so silently. The
+    # Critic checks exactly this, and caught it here.
+    return {"cell": max_cells_for(vertex), "vertex": vertex}
 
 
 def max_cells_for(vertex_buffer):

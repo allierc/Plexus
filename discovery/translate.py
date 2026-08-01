@@ -71,7 +71,7 @@ def _reservoirs(n_cells_seed, frames, growth_headroom=8.0):
     """
     target = max(int(n_cells_seed) * growth_headroom, 2000)
     b = buffer_for(target)
-    return b["vertex"], b["cell"]
+    return b["vertex"], b["cell"], int(target)
 DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never composition-dependent
 
 # D5  THE CHEMISTRY RAN 50x TOO SLOW, AND THE CELLS COULD NEVER DIVIDE.
@@ -301,9 +301,9 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
         if node["op"] == "seed_mesh_3d":
             seed_cells = int(_p(graph, node["id"], "n_cells"))
     if seed_cells is not None:
-        vbuf, cbuf = _reservoirs(seed_cells, frames)
+        vbuf, cbuf, target_cells = _reservoirs(seed_cells, frames)
     else:
-        vbuf, cbuf = VBUF_FALLBACK, CBUF_FALLBACK
+        vbuf, cbuf, target_cells = VBUF_FALLBACK, CBUF_FALLBACK, None
 
     ops = []
     for node in graph.ops:
@@ -330,6 +330,12 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
                     "dt": DT_GLOBAL, "record_cap": int(frames) + 2,
                     "record_every": int(record_every),
                     "boundary": "free", "dim": 3, "world": [16 * 5.0] * 3},
+        # WHERE THIS RUN IS GOING, recorded so it can be CHECKED. A reservoir is only
+        # meaningful against a destination: the weekend battery seeded 150 into a buffer holding
+        # 1778 -- twelve times the seed, generous by any fixed multiple -- and every run still
+        # stopped on it, because the tissue wanted more. No rule of thumb catches that. A run
+        # that states its target can be refused before it burns a GPU; one that does not, cannot.
+        "_run": {"target_cells": target_cells, "seed_cells": seed_cells},
         "sets": {"vertex": {"n": vbuf},
                  "cell": {"n": cbuf, "state": {"chem": {"width": 2, "integration": "first_order"},
                                                "cen": {"width": 3}, "area": {"width": 1}}}},
