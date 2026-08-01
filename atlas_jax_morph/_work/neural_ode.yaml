@@ -1,0 +1,203 @@
+id: neural_ode
+order: 2
+raw_name: NeuralODE
+raw_kind: step (ODEController)
+code_path: papers/jax-morph/jax_morph/control/ode.py:L281
+paper_section: eq. (4), p. 16 (Gene Networks) - describes the ODE-controller FAMILY, not this generic-MLP
+  member; see surprises
+summary: 'A DYNAMIC controller step. Over one macro-step of duration dt it integrates a per-cell ODE whose
+  right-hand side is a single shared MLP: it packs the cell''s fixed sensed driver inputs u and its evolving
+  state y (optional latent hidden block concatenated with the observed output fields) into one vector,
+  sets dy/dt = MLP([u, y]) (u frozen for the whole step), integrates with an adaptive Dopri5 solver from
+  t=0 to t=dt, and writes the CHANGE y(dt)-y(0) back as sparse dt-deltas on the hidden field and each
+  output field. It is the generic, uninterpretable sibling of the paper''s gene-regulatory ODE: the same
+  ODEController integration machinery with the structured sigmoid-linear vector field replaced by a free-form
+  neural network.'
+equations: "Code (NeuralODE.vector_field + ODEController.__call__):\n  y  = concat(hidden, outputs)  \
+  \      # evolving state, width = hidden_size + out_size\n  u  = concat(input_specs fields)      # fixed\
+  \ drivers, width = in_size, held constant over dt\n  dy/dt = MLP( concat(u, y) )          # one shared\
+  \ MLP, applied per cell via vmap; autonomous (t unused)\n  y(dt) = diffrax.diffeqsolve(Dopri5, t0=0,\
+  \ t1=dt, dt0=dt,\n                              PIDController(rtol=1e-4, atol=1e-6), SaveAt(t1=True))\n\
+  \  delta = y(dt) - y(0)                 # returned as sparse per-field increments, NOT the new value\n\
+  MLP shape contract: in_size + hidden_size + out_size  ->  hidden_size + out_size. Paper eq. (4) (the\
+  \ ODEController family this generalizes; implemented literally by GeneNetworkConnectionist, not here):\n\
+  \  dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i\nwhere g_i = expression of gene i, W_ij = regulatory\
+  \ coupling of gene j on i, b_i = basal transcription bias, I_i = sensed input forcing, k_i = degradation\
+  \ rate, phi = saturating sigmoid. NeuralODE keeps the \"phi(...) + I - k g\" scaffolding NOWHERE - it\
+  \ replaces the entire RHS with MLP([u, y]), so there is no explicit W, b, k, degradation, or additive\
+  \ input forcing; those are whatever the network learns."
+params:
+  input_specs:
+    role: input_field_binding - static tuple of StateFieldSpec naming the sensed driver fields u (chemicals,
+      stress, ...) read each step and held FIXED during integration; sets in_size.
+  output_specs:
+    role: output_field_binding - static tuple of StateFieldSpec naming the observed evolving fields the
+      ODE integrates and writes back as dt-deltas (e.g. gene readouts / division propensity / secretion);
+      sets out_size.
+  hidden_size:
+    role: latent_state_width - width of the unobserved hidden block prepended to the evolving state; 0
+      means a pure-output ODE and NO hidden field is allocated or written. Must be >= 0.
+  mlp:
+    role: vector_field_network - the learnable per-cell derivative map (an eqx.nn.MLP); THIS is where
+      all trainable/optimizable parameters live. Must already be sized in_size+hidden_size+out_size ->
+      hidden_size+out_size; build it with the make_mlp classmethod (defaults width=64, depth=2).
+  tag:
+    role: field_namespace - string prefix for the latent field name f'{tag}_hidden' (default 'ode'); lets
+      several controllers coexist without colliding on the hidden-state field. Purely a naming key, not
+      a physical quantity.
+state_io:
+  reads:
+  - every field in input_specs (the fixed drivers u), by declared spec name
+  - every field in output_specs (current observed evolving state), by declared spec name
+  - f'{tag}_hidden' (latent state) - ONLY when hidden_size > 0
+  writes:
+  - f'{tag}_hidden' with shape (hidden_size,) - ONLY when hidden_size > 0 (heritable latent state)
+  - every field in output_specs - as a per-dt increment (delta), scalar chunk squeezed when spec.shape
+    == ()
+surprises:
+- NOT IN THE PAPER. The paper's only ODE controller is the structured gene-regulatory network eq. (4)
+  (sigmoid of a linear regulatory drive + additive input forcing - linear degradation), implemented by
+  GeneNetworkConnectionist. NeuralODE - a free-form MLP vector field - has NO paper counterpart; it is
+  a library generalization of the ODEController contract. A reimplementer who "implements the paper" would
+  build the gene network, not this.
+- Returns a DELTA, not the integrated state. __call__ returns y(dt) - y(0) as sparse deltas because DYNAMIC
+  steps contribute dt-scaled increments that the engine ACCUMULATES across writers (see core/step.py).
+  Returning solution.ys[-1] directly (the new value) would double-add the old state. dt-scaling is already
+  baked in via the integration window [0, dt].
+- The driver inputs u are FROZEN for the whole macro-step - the ODETerm closes over the packed inputs
+  once, so mid-step feedback from u is impossible by construction; only the evolving block y changes during
+  integration. The vector field is autonomous (t is deleted/unused).
+- dt0=dt sets the FIRST solver step to the entire macro-step, then Dopri5 + PIDController (rtol=1e-4,
+  atol=1e-6) adapt sub-steps; the tolerances are hard-coded, not exposed as params, so accuracy is fixed
+  and independent of dt magnitude.
+- 'Constructor does NO random init and NO parameter allocation of its own: it only stores a pre-built
+  mlp and validates its in/out sizes (raises if the MLP shape != in+hidden+out -> hidden+out). make_mlp
+  defaults (width=64, depth=2, key required) are the only place randomness enters, and they live on the
+  classmethod, not the constructor.'
+- When hidden_size == 0 no hidden field is read or written and y0 is just the packed outputs; the hidden
+  delta dict is omitted entirely. _pack returns a (n_cells, 0) zero array for an empty spec tuple, so
+  an all-empty output_specs would still run but write nothing meaningful.
+- 'UNKNOWN I could not establish empirically: whether any oracle script / smoke trajectory actually instantiates
+  NeuralODE (vs the gene-network controllers). Its parameter count and typical field bindings in a real
+  run are undetermined here - I read the class statically only.'
+verdict: new
+of: null
+implementation_of: regulate
+why: 'NEW: no registered Plexus contract integrates a per-cell, sensor-driven, internal regulatory ODE.
+
+  NeuralODE is one of THREE interchangeable vector-field implementations (with
+
+  GeneNetworkConnectionist and GeneNetworkMWC) of a SINGLE contract -- a cell-autonomous controller
+
+  that reads sensed driver fields u (held fixed over the macro-step) plus its own evolving
+
+  gene/latent state y, integrates dy/dt = f(u, y) with an adaptive Dopri5 solver, and writes the
+
+  integrated increment back as a sparse dt-delta. The three differ ONLY in f (sigmoid-linear drive,
+
+  log-occupancy MWC drive, or a free-form MLP), so this is the Morse/SoftSphere/Hertzian pattern:
+
+  implementation_of regulate, NOT a separate contract -- the family yields one new contract with
+
+  three implementations, not three contracts. Closest REGISTERED contracts are decay and pacemaker
+
+  (family fields; autonomous temporal dynamics of a per-cell concentration) and sense (a sensed-field
+
+  to cell transduction). Widening any of them does violence to its biology: decay is single-field
+
+  first-order relaxation with no production, no input coupling and no latent state; pacemaker is an
+
+  autonomous periodic clock with no sensed drive; sense emits a steering heading, not an integrated
+
+  multi-gene internal state. A driven, coupled, latent-carrying regulatory circuit is genuinely absent
+
+  from the promoted language. Classified exchange/cell because it transduces sensed input cell-fields
+
+  into gene-output cell-fields with no neighbour map; placed in the fields family as the nearest home
+
+  for per-cell concentration dynamics, with a dedicated regulation/genetics family FLAGGED (not
+
+  declared, to avoid silent family proliferation). Per rule 5 the SOURCE sets scope: this MLP member
+
+  has NO paper counterpart (the paper''s only ODE controller is the gene network eq. 4), so a
+
+  paper-only reimplementer would never build it -- it is a library generalization, recorded here as
+
+  the black-box implementation of the same biological role.
+
+  '
+contract:
+  name: regulate
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - gene
+  - drive
+  writes:
+  - gene
+  maps: []
+status: validated
+module: src/plexus/operators/candidates/jax_morph_neural_ode.py
+test: tests/test_jax_morph_neural_ode.py
+evidence:
+  oracle_run: diff_neural_ode
+  diff_metric: |
+    D_max = max over cells (N=16), evolving-state components, macro-step dt in {0.5, 1.0, 2.0}, and
+    both circuit shapes (A: hidden=0, out=3; B: hidden=2, out=2) of |y_plexus(dt) - y_ref(dt)|, in
+    gene-concentration units. y_plexus(dt) is the torch operator's macro-step endpoint, obtained by
+    running its returned delta through the REAL engine _integrate (gene += dt*delta); y_ref(dt) is
+    the JAX reference ODEController one-step endpoint y0 + increment. Both sides integrate the
+    BIT-IDENTICAL MLP vector field -- the reference's per-layer weights are exported from JAX and
+    reloaded verbatim into torch, and net-equality is verified to ~1e-12 on a random probe, so the
+    field is provably identical and any endpoint gap is the INTEGRATOR alone -- with adaptive Dopri5
+    at rtol=1e-4/atol=1e-6 from the same g0, u0 over [0, dt]. Computed in float64 so that float32
+    roundoff cannot masquerade as a defect. Driver: atlas_jax_morph/diff_neural_ode.py; artefact
+    log/atlas/neural_ode/diff.json.
+  threshold: |
+    3.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the cross-run comparison from solver
+    physics, not from the observed number. Both sides evaluate the identical vector field, so the
+    only possible disagreement is substep-sequence jitter between two independent adaptive Dopri5
+    controllers (diffrax PIDController vs the operator's hand-rolled I-controller), each bounded by
+    its truncation-from-truth at rtol=1e-4. The reference's own worst-case distance from a
+    machine-accuracy (rtol=1e-10) endpoint is MEASURED at 9.9e-4 (dt=2, config A, summary.json); by
+    the triangle inequality two such rtol=1e-4 integrations agree to within ~2e-3, so 3e-3 (~3x the
+    measured reference truncation) is the tightest bound a correct operator with a legitimately
+    different adaptive integrator can be held to. A tighter 1e-3 would risk a false fail from
+    integrator jitter alone -- the criterion-no-valid-config-can-meet trap. The pre-registered
+    negative control (drop the /dt mean-rate conversion: endpoint = g0 + delta) lands O(0.1) away at
+    dt=2, so 3e-3 still rejects a genuine wiring bug by >30x.
+  value: 2.220446049250313e-16
+  passed: true
+  result: |
+    PASS by ~13 orders of magnitude. D_max = 2.2e-16 (machine epsilon) << threshold 3e-3, so the
+    verdict does NOT hinge on the threshold choice -- it holds under any principled bound down to
+    float64 roundoff. net-equality = 0.0 (the torch MLP reproduces the exported JAX MLP EXACTLY),
+    so the field is bit-identical and the endpoint agreement is the INTEGRATOR. Notably
+    plexus_vs_truth == reference_vs_truth to ~15 digits (dt=2/A: 9.8942968251614e-4 vs
+    9.8942968251636e-4): both adaptive Dopri5 controllers -- diffrax PIDController and the operator's
+    hand-rolled I-controller -- take the SAME accept/reject substep sequence on this field, so they
+    diverge from machine-truth IDENTICALLY and from each other by ~0. The pre-registered negative
+    control (drop the /dt mean-rate conversion) lands 0.408 (A) / 0.252 (B) from the reference at
+    dt=2 -- >100x the threshold -- confirming the metric would catch a genuine wiring error. Driver
+    log/atlas/neural_ode/diff.json; oracle _oracle/runs/diff_neural_ode/ (reference.npz, provenance).
+    CAVEAT (recorded, not a defect): this is an OPERATOR-LEVEL differential, not a run_spec.py
+    trajectory. NeuralODE appears in NO reference composition and a free-form MLP cannot cross the
+    JAX/torch boundary through a YAML spec, so the only faithful way to give both sides the SAME
+    operator is to export the reference's exact weights and reload them verbatim -- which is what was
+    done. The delta is still consumed by the REAL engine _integrate (gene += dt*delta), so the
+    macro-step wiring (velocity-emit, first-order gene block, /dt convention) is exercised end to end.
+state_io_notes:
+  reads:
+  - input_specs sensed driver fields u, held fixed over the macro-step
+  - output_specs current gene/output state read back as the ODE initial condition
+  - tag-prefixed hidden latent field, read only when hidden_size > 0
+  writes:
+  - output_specs fields as per-dt gene-expression increments (delta)
+  - tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0
+signature_note: the normalizer wrote the CONSTRUCTOR arguments (input_specs / output_specs) into the typed
+  signature; the signature names STATE BLOCKS, which are `gene` and `drive`.

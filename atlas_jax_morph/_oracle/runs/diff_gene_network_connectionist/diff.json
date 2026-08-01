@@ -1,0 +1,59 @@
+{
+  "threshold": 0.005,
+  "metric": "max_abs_gene_trajectory_deviation",
+  "value": 6.67572021484375e-06,
+  "passed": true,
+  "trajectory_finite": true,
+  "argmax_frame_cell_gene": [
+    17,
+    0,
+    4
+  ],
+  "argmax_gene_ref_value": 8.366472244262695,
+  "argmax_gene_eng_value": 8.36646556854248,
+  "relative_deviation_at_argmax": 7.9791329272721e-07,
+  "per_frame_max_abs_dev": [
+    0.0,
+    2.6226043701171875e-06,
+    2.9802322387695312e-06,
+    3.2186508178710938e-06,
+    2.9802322387695312e-06,
+    3.814697265625e-06,
+    4.76837158203125e-06,
+    5.245208740234375e-06,
+    5.245208740234375e-06,
+    4.291534423828125e-06,
+    5.7220458984375e-06,
+    3.814697265625e-06,
+    4.291534423828125e-06,
+    4.76837158203125e-06,
+    4.291534423828125e-06,
+    3.814697265625e-06,
+    4.76837158203125e-06,
+    6.67572021484375e-06,
+    5.7220458984375e-06,
+    4.76837158203125e-06,
+    4.76837158203125e-06
+  ],
+  "first_frame_max_abs_dev": 0.0,
+  "final_frame_max_abs_dev": 4.76837158203125e-06,
+  "gene_ref_final_cell0": [
+    7.335581302642822,
+    0.3708856403827667,
+    2.944364547729492,
+    1.3692617416381836,
+    8.794252395629883
+  ],
+  "gene_eng_final_cell0": [
+    7.335582256317139,
+    0.3708856403827667,
+    2.9443652629852295,
+    1.3692620992660522,
+    8.7942476272583
+  ],
+  "n_frames": 21,
+  "n_cells": 6,
+  "n_gene": 5,
+  "engine_trajectory": "/groups/saalfeld/home/allierc/GraphData/graphs_data/atlas/gene_network_connectionist/simulation.zarr",
+  "reference_npz": "/workspace/Plexus/atlas_jax_morph/_oracle/runs/diff_gene_network_connectionist/reference.npz"
+}

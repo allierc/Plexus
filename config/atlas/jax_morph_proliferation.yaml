@@ -1,6 +1,6 @@
 # Phase 5, the FORWARD figure: the authors' proliferation composition, in Plexus.
 #
-# The oracle run this mirrors is `Atlas_jax_morph/_oracle/runs/smoke/` --
+# The oracle run this mirrors is `atlas_jax_morph/_oracle/runs/smoke/` --
 # MechanicalRelaxation(Morse) + SaturatingCellGrowth + Division, 4 founder cells, 40 macro-steps
 # at dt=1.0, capacity 140. Same initial condition, same parameters, same number of frames; the
 # operators are the ones normalized out of their code in Phases 1-3, not a re-implementation

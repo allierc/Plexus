@@ -1,0 +1,296 @@
+id: virial_stress
+order: 20
+raw_name: VirialStress
+raw_kind: step (SimulationStep)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/stress.py:L15-L58
+paper_section: p. 16, Methods "Mechanical Stress" (the sigma_i equation); used in main text "Mechanical
+  Control of Cell Proliferation" p. 7-8 (d_i = g_i(stress, chemicals) * f(r)), fig. 4, fig. S6
+summary: A quasistatic (pure-sensing) step that computes each live cell's Irving-Kirkwood virial pressure
+  from the attached pairwise potential and writes it into the transient per-cell ``stress`` field (heritable=False),
+  recomputed from the live configuration every macro-step. It moves nothing and changes no dynamics; it
+  only exposes local mechanical load so a downstream gene-network / division-control step can sense it.
+  Delegates the actual math to ``PairwisePotential.virial_pressure(state)``.
+equations: "CODE (VirialStress.__call__ -> PairwisePotential.virial_pressure) -- the per-cell\nIrving-Kirkwood\
+  \ virial pressure:\n\n    p_i = -(1 / (2 d V_i)) * sum_{j != i, j alive} r_ij * (dU/dr)(r_ij)\n\nr_ij\
+  \ = ||x_i - x_j||   (safe_norm of the space displacement; self-diagonal r=0 kept finite)\ndU/dr    \
+  \              = jax.grad of pair_energy w.r.t. separation, elementwise --\n                       \
+  \  INCLUDES the smooth-cutoff factor, not just the bare potential core\nd                      = state.n_space_dim\
+  \ (spatial dimension)\nV_i                    = the cell's OWN d-ball volume: 2 R_i (d=1), pi R_i^2\
+  \ (d=2),\n                         4/3 pi R_i^3 (d=3)\n1/2                    = Irving-Kirkwood bond\
+  \ split (each pair's virial shared by its two cells)\nminus sign             = makes repulsion (dU/dr\
+  \ < 0, compression) read p_i > 0, tension < 0\nmasking                = neighbor_sum drops self-pairs\
+  \ and dead-cell sources; a final\n                         ``* alive`` zeroes dead i; safe_divide makes\
+  \ V_i=0 give 0, not inf.\nstate.set('stress', p) writes p of shape (capacity,).\n\nPAPER (p. 16, \"\
+  Mechanical Stress\") -- a DIFFERENT scalar, defined only in 2D:\n\n    sigma_i = sum_j [ F_ij,x * (dx\
+  \ / |dx|) + F_ij,y * (dy / |dy|) ],   d = (dx, dy) = r_j - r_i\n\ni.e. each force COMPONENT times the\
+  \ SIGN of that displacement component (a per-component /\ntaxicab weighting, NOT the Euclidean radial\
+  \ unit vector), summed over x and y. It has NO\nvolume normalization, NO 1/(2 d) factor, and NO 1/2\
+  \ bond split. THE SHIPPED CODE IS THE\nVIRIAL PRESSURE ABOVE, not this expression (see surprises: SOURCE\
+  \ WINS).\n"
+params:
+  potential: interaction_potential -- the ``PairwisePotential`` whose pairwise force law (dU/dr) and per-pair
+    couplings supply the virial; the sole constructor field. It is a structural dependency (the interaction
+    model), not a numeric tunable. Its own parameters (e.g. a traced ``epsilon`` array) are exactly what
+    the written ``stress`` remains differentiable/optimizable through -- the step itself carries no scalar
+    knob.
+state_io:
+  reads:
+  - position
+  - radius
+  - alive
+  - '<potential.state_reads(): any per-cell coupling field the potential sources params from, e.g. a StateFieldSpec
+    epsilon; empty for a plain scalar-parameter potential>'
+  writes:
+  - stress
+surprises:
+- 'SOURCE-vs-PAPER CONTRADICTION (the headline). The code computes the standard Irving-Kirkwood virial
+  pressure; the paper (p. 16) defines a non-standard scalar ``sigma_i = sum_j F_ij,x*sgn(dx) + F_ij,y*sgn(dy)``.
+  They differ three ways: (1) the paper uses a per-component SIGN (taxicab) weighting, the code uses the
+  true Euclidean radial projection r_ij*(dU/dr); (2) the paper has NO volume/dimension normalization,
+  the code divides by 2 d V_i; (3) the paper has no 1/2 bond split. A reimplementer following the paper
+  would get an unnormalized, differently-weighted number, off by roughly a per-cell factor of 2 d V_i.
+  Per the loop rule, SOURCE WINS: the shipped quantity is the virial pressure.'
+- 'Minus-sign / compression convention. p_i = -(...): repulsion (dU/dr < 0) gives p_i > 0. Drop the sign
+  and compression reads negative -- which inverts the mechanosensing signal the trained gene circuit relies
+  on (in the paper stress INHIBITS division; a sign flip would flip the learned rule).'
+- The 1/2 is a bond split, not cosmetic. Each pair's virial is shared between its two cells; omitting
+  it double-counts every cell's pressure by 2x.
+- V_i is the cell's OWN d-ball volume from its radius R_i (dimension-branched 2r / pi r^2 / 4/3 pi r^3),
+  NOT a Voronoi area, NOT the pair contact distance sigma. Using sigma or a fixed area gives wrong per-cell
+  scaling and miscompares cells of different radius.
+- dU/dr is the autodiff derivative of the FULL pair_energy, INCLUDING the multiplicative smooth cutoff.
+  Pairs inside the transition window carry a switch-function term; differentiating only the bare Morse/LJ
+  core is wrong. Beyond r_cutoff both energy and derivative are exactly 0, so far cells contribute 0.
+- 'Masking and NaN guards: neighbor_sum excludes the self-pair (r=0 diagonal) and dead-cell sources; a
+  trailing ``* alive`` zeroes dead i; safe_norm/safe_divide keep value AND gradient finite at r=0 and
+  at V_i=0 (dead cell, radius 0) under the always-on jax_debug_nans. A naive implementation NaNs on the
+  diagonal or on padded dead slots.'
+- Pure sensing, quasistatic, transient. It writes only ``stress`` with heritable=False and is recomputed
+  every macro-step; it does not move cells, add force, or persist across division (a daughter starts at
+  the default, not the mother's value). No step INSIDE the library reads ``stress`` -- the consumer is
+  a control/gene-network input in the examples. A reimplementer might wrongly make it persistent/heritable
+  or expect a mechanical feedback loop.
+- 'Not sure I could establish: whether this hardened reimplementation''s ``virial_pressure`` matches the
+  ORIGINAL jax-morph numeric stress trajectory. The FORM clearly disagrees with the paper text, but I
+  did not run the oracle to compare against a reference stress signal -- that is a validation-stage check,
+  not settled here.'
+verdict: new
+of: null
+why: 'NEW. No registered contract exposes a per-cell MECHANICAL OBSERVABLE (local stress /
+
+  virial pressure) as a pure-sensing quantity for downstream mechanotransduction.
+
+  VirialStress reduces the SAME conservative pair law and the SAME live-non-self
+
+  neighbour sum that attraction_repulsion uses, but contracts it to a per-cell SCALAR
+
+  (the radial virial r_ij . dU/dr, Irving-Kirkwood-normalised by 2 d V_i) that it WRITES
+
+  to `stress` and that MOVES NOTHING. It is a mechanosensor, not a force. Biological name
+
+  `mechanosense`; kind/family `lateral`/`mechanics` (a within-set pairwise-neighbour
+
+  reduction, same taxonomy slot as gravity / mpm_anchor / mpm_spin), set `cell`.
+
+
+  Closest existing contract = attraction_repulsion (lateral/interaction). It is literally
+
+  the same PairwisePotential, same dU/dr, same neighbour reduction -- indeed
+
+  PairwisePotential.virial_pressure sits right beside forces() in the base. Widening
+
+  attraction_repulsion to also emit this scalar does VIOLENCE to its biology: that
+
+  contract''s identity is a conservative radial FORCE that MOVES cells (EMIT=velocity,
+
+  writes position). The virial pressure is a DIFFERENT derived quantity -- a rank-0
+
+  observable (radial force projected on r_ij, summed) versus the rank-1 -grad_i vector --
+
+  with a DIFFERENT output type (a heritable=False state field, not a motion delta) and a
+
+  DIFFERENT role (SENSED, not integrated). Fusing "the force that drives motion" and "the
+
+  load a cell feels" into one signature would force attraction_repulsion''s OUTPUTS/WRITES
+
+  and EMIT to change and break every user who relies on it being a pure motion law. So
+
+  NOT refinement.
+
+
+  NOT alias of `sense` (exchange/fields): sense reads an ambient diffusible FIELD on a
+
+  sensor fan and STEERS heading (output = heading, the Physarum trail rule). This reads no
+
+  field -- it reduces over the pairwise-neighbour map -- and its output is a scalar state
+
+  field, not a steer. Different inputs (neighbours vs field), different output (stress vs
+
+  heading), different map, different kind (lateral vs exchange). sense is
+
+  sensing-for-motion; this is sensing-for-readout.
+
+
+  NOT alias/refinement of cell_grow''s mechano-inhibition. cell_grow (structural/growth)
+
+  ALREADY realises the paper''s "stress inhibits proliferation" via stress_gain
+
+  (mechano_inhibition), but it (i) reads the MPM continuum DEFORMATION GRADIENT F, not a
+
+  pairwise virial, and (ii) FUSES sense+respond inside one growth op. VirialStress is the
+
+  DECOUPLED sensor -- a standalone quasistatic step producing a first-class, reusable
+
+  `stress` field that ANY downstream consumer (a gene network, cell_divide, a
+
+  differentiation switch) can read. Plexus expresses the mechano-RESPONSE but has no
+
+  promoted mechano-SENSE contract; the sensing lives baked into its consumers. That
+
+  absence is exactly what this entry records as new vocabulary.
+
+
+  NOT out_of_scope: this is not plumbing. Mechanotransduction -- a cell reading its local
+
+  compression/tension and gating division on it -- is the biological content of the
+
+  paper''s "Mechanical Control of Cell Proliferation" (Fig. 4, p. 7-8). The step carries a
+
+  sign convention (compression positive) the trained gene circuit depends on and a
+
+  per-cell d-ball volume normalisation that makes the readout size-consistent across
+
+  cells; those are biology, not numerics. Unlike a serializer or a PRNG helper, remove it
+
+  and the mechanosensing loop the paper trains no longer has an input.
+
+
+  SOURCE vs PAPER (rule 5): the code ships the Irving-Kirkwood virial pressure; the paper
+
+  (p. 16) writes a different, unnormalised taxicab scalar sigma_i = sum_j F_ij,x sgn(dx) +
+
+  F_ij,y sgn(dy). SOURCE WINS. Note this is itself the several-implementations-per-contract
+
+  pattern -- the virial pressure and the paper''s sigma_i are two IMPLEMENTATIONS of the one
+
+  mechanosense contract (each a per-cell scalar mechanical load reduced from the pair
+
+  forces), differing only in weighting and normalisation. That there is more than one
+
+  realisation reinforces that mechanosense is a genuine contract, not an idiosyncratic
+
+  one-off.
+
+  '
+contract:
+  name: mechanosense
+  kind: lateral
+  family: mechanics
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - alive
+  - pos
+  - radius
+  writes:
+  - stress
+  maps:
+  - pairwise
+status: validated
+module: src/plexus/operators/candidates/jax_morph_virial_stress.py
+test: tests/test_jax_morph_virial_stress.py
+evidence:
+  oracle_run: diff_virial_stress
+  diff_metric: |
+    stress_rel_err (PRIMARY, one scalar) = max over the 18 LIVE cells i of the per-cell stress
+    discrepancy |stress_plx(0,i) - stress_ref(i)|, divided by peak = max_i |stress_ref(i)| (=
+    25.0608), evaluated on recorded FRAME 0. UNITS: dimensionless, a fraction of the peak reference
+    stress. mechanosense is a PURE SENSOR: it moves nothing and writes only the per-cell `stress`
+    field, so there is no trajectory to integrate -- the observable IS the written scalar on ONE
+    frozen configuration, and every recorded frame's stress is identical (guarded by
+    frames_identical). stress_ref is the jax-morph VirialStress(Morse(epsilon=3.0, alpha=2.8))
+    per-cell Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij), computed
+    by both the VirialStress STEP and PairwisePotential.virial_pressure (they agree bit-for-bit) on
+    a BYTE-IDENTICAL float32 IC: 5 isolated pairs at r = 0.7/1.0/1.3/2.0/3.0 spanning compression /
+    well-min / tension / tapered / beyond-cutoff, one dense 8-cell sunflower cluster (the
+    multi-neighbour sum), and 4 dead padding slots, all at radius 0.5 so sigma = r_i + r_j = 1.0.
+    stress_plx is the same field read from the Plexus engine's recorded `stress` block after the
+    mechanosense operator (potential morse, eps 3.0, alpha 2.8) acts on that IC through
+    plexus.engine. TWO GUARDS accompany the primary: dead_absmax = max over the 4 dead padding slots
+    of |stress| on BOTH sides (must be <= 1e-6; checks the alive/self and V_i=0 safe_divide masks),
+    and frames_identical (all 4 recorded frames' stress == frame 0; checks the sensor truly moves
+    nothing). A SUPPLEMENT re-runs the operator DIRECTLY (no engine) on the other four pair laws
+    (soft_sphere / hertzian / harmonic / lennard_jones) on the same uniform IC AND on a second
+    UNEQUAL-RADII IC for all five laws -- the sigma = r_i + r_j and per-cell d-ball V_i paths the
+    uniform-radius engine run cannot reach. Computed by _oracle/scripts/_compare_virial_stress.py
+    into _oracle/runs/diff_virial_stress/compare.json. evidence.value is the PRIMARY.
+  threshold: 0.0001
+  threshold_why: |
+    1.0e-4 on the peak-normalized relative stress error, PRE-REGISTERED in the scorer
+    (_compare_virial_stress.py:81, `pass_rel_1e-4 = rel <= 1e-4`), with a companion 1e-6 on the
+    dead-slot absolute stress (line 82) and a boolean frames-identical gate (line 72), all decided
+    before the diff was computed. The 1e-4 bar sits ~3 orders ABOVE the float32 round-off floor of
+    two independent numeric stacks (jax jit virial vs torch autograd of dU/dr accumulate to rel
+    7.6e-8 on the Morse primary and <= 3.3e-7 on all 10 supplement law/radii points) yet far BELOW
+    every WRONG implementation the verdict hinges on: the paper's taxicab sigma_i (per-component
+    sign, NO 2 d V_i normalization, NO 1/2 split) differs by a per-cell factor of ~2 d V_i = 4 pi
+    R^2 ~ 3.1 -> O(1) rel; dropping the minus sign FLIPS the reading (rel ~ 2.0); omitting the 1/2
+    bond split DOUBLES it (rel ~ 1.0); using a fixed area or the contact distance sigma for V_i
+    instead of the cell's own d-ball mis-scales per cell by O(1). None of these can slip under 1e-4.
+    Looser would admit a mis-normalized or sign-flipped reimplementation as "agreement"; tighter
+    would fail on float32 reassociation between the two stacks alone.
+  value: 7.610894538878732e-08
+  passed: true
+  plexus_run: log/atlas/virial_stress/
+  scorer: atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
+  acted_ledger: |
+    From log/atlas/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0, kind
+    lateral, structural true -- it ACTED (wrote the stress field) but moved nothing, exactly a pure
+    sensor; seed_state calls 1 / acted 1 (sets the uniform radius 0.5 that V_i and sigma need).
+    inert_operators []; valid_evidence true ("every scheduled operator acted at least once").
+    n_active 18 -> 18 flat; gyration / centroid / extent / nn_distance constant across all 4 frames
+    -- the run is a still life, as a sensor must be, so the metric is well-defined on frame 0.
+  corroborators: |
+    All from _oracle/runs/diff_virial_stress/{compare.json,summary.json}. (1) The PRIMARY engine
+    Morse stress matches the oracle to rel 7.6e-8 (max_abs 1.9e-6 on peak 25.06). (2) Dead-slot
+    stress is EXACTLY 0.0 on BOTH sides -> the alive/self mask and the V_i=0 safe_divide reproduce,
+    no phantom pressure. (3) frames_identical true -> the sensor moved nothing across all frames.
+    (4) Oracle-side internal gates: the VirialStress STEP == PairwisePotential.virial_pressure
+    bit-for-bit (step_eq_virial_pressure true -- the delegation is thin) and is PRNG-key-independent
+    (key_independent true -- a sensor must ignore its key). (5) The reference matches a BY-HAND
+    analytic single-neighbour Morse pressure on the in-window isolated pairs to max|dev| 3.2e-6
+    (r=0.7 -> +11.414 compression, r=1.0 -> 0 at the well minimum, r=1.3 -> -1.706 tension) -> the
+    compression-positive sign convention and the 2 d V_i normalization are correct, not merely
+    self-consistent. (6) SUPPLEMENT: all 10 direct-operator points pass rel <= 1e-4 -- the other
+    four pair laws on the uniform IC (rel <= 1.3e-7) AND all five laws on a SECOND UNEQUAL-RADII IC
+    (rel <= 3.3e-7), exercising the sigma = r_i + r_j and per-cell d-ball V_i paths the equal-radius
+    engine run cannot reach.
+  scope: |
+    This validates the mechanosense IMPLEMENTATION -- the written virial-pressure VALUE -- against
+    the jax-morph reference across five pair laws, equal and unequal radii, live/dead masking, and
+    the sign / 2 d V_i normalization / 1/2 bond-split conventions. It does NOT touch (a) the
+    verdict/dispute axis, or (b) the differentiability claim (d stress / d epsilon finite through
+    the coupling): VALUES, not gradients, are what the differ compares, and the port deliberately
+    detaches the position-gradient path through dU/dr (implementer's note), which is not exercised
+    here. The SOURCE-vs-PAPER contradiction is confirmed as a FORM difference, not resolved
+    numerically: this test scores the code's Irving-Kirkwood virial pressure (SOURCE WINS), not the
+    paper's taxicab sigma_i.
+state_io_notes:
+  reads:
+  - position
+  - the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven; empty
+    for a scalar-parameter potential
+  maps:
+  - pairwise radial reduction over live non-self neighbours -- each cell's local mechanical load = the
+    Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) * sum_j r_ij*(dU/dr)(r_ij), the SAME conservative
+    pair law and neighbour sum attraction_repulsion uses for its force, but contracted to a per-cell SCALAR
+    observable (the radial force projected on r_ij) rather than the -grad_i vector that moves cells
+  - per-cell d-ball volume V_i from radius (2 r | pi r^2 | 4/3 pi r^3); Irving-Kirkwood 1/2 bond split;
+    compression-positive / tension-negative sign convention; transient (heritable=False), recomputed each
+    macro-step; pure sensing -- writes only stress and moves nothing -- for downstream mechanotransduction
+    (e.g. stress-gated division)
+signature_note: the record's `displacement` and a stray prose token were not state blocks; the operator
+  reads pos/radius/alive.

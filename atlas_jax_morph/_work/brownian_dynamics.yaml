@@ -1,0 +1,251 @@
+id: brownian_dynamics
+order: 11
+raw_name: BrownianDynamics
+raw_kind: step (StochasticStep)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/dynamics.py:L36
+paper_section: 'p. 14 (Materials and Methods, ''Mechanical Interactions'': relaxation = gradient-descent
+  energy minimization of the Morse potential); high-temperature ''Brownian relaxation steps'' p. 19 (SI,
+  ''Chemical Regulation of Cellular Adhesion'')'
+summary: 'One Euler-Maruyama step of overdamped Langevin (Brownian) dynamics. It moves cell positions
+  by a dt-scaled displacement = deterministic drift down the potential''s force field plus Gaussian thermal
+  noise, and records that displacement so the same step can be replayed pathwise or scored. It is a DYNAMIC
+  step: it returns a sparse position *delta* (dt-scaled increment) that the model accumulates, not an
+  absolute position. With kT=0 the noise vanishes and it degenerates to a single gradient-descent relaxation
+  step (learning rate dt/gamma); with potential=None the drift vanishes and it is a free Brownian gas
+  (pure noise).'
+equations: "Update (code): dx = mean + std * xi, applied as a delta to position, with\n  mean = dt * F(state)\
+  \ / gamma,  where F = potential.forces(state) = -grad U  (forces already carry the minus sign),\n  std\
+  \  = sqrt(2 * kT * dt / gamma),\n  xi ~ N(0, I) standard normal, shape (capacity, n_space_dim).\ni.e.\
+  \ dx = -(grad U / gamma) * dt + sqrt(2 kT dt / gamma) * xi  (the docstring's Euler-Maruyama form). NOTE\
+  \ the split dt-scaling: drift ~ dt (linear), noise ~ sqrt(dt) (Wiener increment). Score (logp): sum\
+  \ over ALIVE cells and dims of gaussian_logp(dx; mean, std), where\n  gaussian_logp(x, mean, std) =\
+  \ -0.5*((x-mean)/std)^2 - log(std) - 0.5*log(2*pi)\n  (a fully-normalized Gaussian log-density). It\
+  \ scores the recorded realized dx, not xi.\n  If std == 0 (kT == 0, deterministic) the contribution\
+  \ is masked to 0 (degenerate delta,\n  no finite density) instead of dividing by zero.\nSymbols: U =\
+  \ interaction potential energy (Morse etc.); F = per-cell force -grad U;\n  gamma = translational drag;\
+  \ kT = thermal energy (temperature); dt = macro-step size;\n  xi = exogenous standard-normal noise;\
+  \ N = number of live cells; capacity = padded array size.\nPAPER FORM (contrast): the paper writes no\
+  \ Langevin/Euler-Maruyama equation; its relaxation is\n  deterministic 'gradient descent energy minimization\
+  \ of the Morse potential for a fixed number\n  of steps' (p. 14) = the kT=0 special case of the above."
+params:
+  potential: 'interaction_potential -- source of the mechanical drift; its forces(state) = -grad U give
+    the deterministic drift. Pass None -> NoForce (a free Brownian gas: pure noise, no drift).'
+  n_space_dim: spatial_dimension (static) -- sizes the trailing dim of the recorded xi/dx trace arrays
+    at model-build time (before any state exists); _check_dim raises at trace time if it differs from
+    the state's actual position dim.
+  gamma: translational_drag_coefficient (friction). Sets mobility 1/gamma converting force to drift velocity,
+    and appears under the noise sqrt. Plain field (float -> static, jax.Array -> traced/optimizable).
+    Default 1.0.
+  kT: thermal_energy (temperature). Controls translational noise amplitude via std = sqrt(2 kT dt / gamma);
+    kT=0 -> deterministic gradient-descent relaxation. Plain field (optimizable). Default 0.1.
+  tag: trace_namespace (static string) -- prefixes the trace fields {tag}_xi and {tag}_dx so several BrownianDynamics
+    instances coexist in one model. Default 'brownian'.
+  score_by_default: 'scoring_inclusion_flag (static) -- whether default trajectory scoring includes this
+    step''s logp. Defaults to False here (overriding the StochasticStep base default True): the displacement
+    is reparameterized, so its gradient flows pathwise through replay regardless; the score-function term
+    is off by default to avoid double-counting.'
+state_io:
+  reads:
+  - position (POSITION) -- the drift is evaluated at current positions.
+  - potential.state_reads() -- any per-cell field the potential sources couplings from (e.g. radius via
+    sigma = r_i + r_j; a per-cell epsilon StateFieldSpec when adhesion is field-driven). Empty for NoForce.
+  writes:
+  - position (POSITION) -- a DYNAMIC dt-scaled displacement delta, summed across dynamic writers by the
+    model (not an absolute position).
+  trace_writes:
+  - '{tag}_xi -- exogenous standard-normal noise, shape (n_space_dim,), heritable=False, default 0 (ephemeral,
+    reset each macro-step).'
+  - '{tag}_dx -- realized displacement dx, shape (n_space_dim,), heritable=False, default 0. logp scores
+    this field.'
+surprises:
+- 'PAPER vs SOURCE (the key contradiction): the paper''s Methods (p. 14) defines mechanical relaxation
+  as DETERMINISTIC ''gradient descent energy minimization of the Morse potential for a fixed number of
+  steps'' -- no thermal noise, and neither gamma nor kT is written down. Thermal ''Brownian relaxation
+  steps ... temperature is high'' appear only in the SI differential-adhesion experiment (p. 19), again
+  with no equation. The SOURCE implements a full overdamped Langevin step with explicit gamma and kT and
+  a sqrt(2 kT dt / gamma) noise term. SOURCE WINS: the code unifies both regimes under one parameterized
+  step -- kT=0 reduces exactly to one gradient-descent step (dx = -(grad U/gamma)*dt, learning rate dt/gamma),
+  kT>0 is the noisy high-temperature relaxation.'
+- 'Split dt-scaling: drift ~ dt but noise ~ sqrt(dt) (Wiener). A reimplementer who scales the noise by
+  dt (not sqrt(dt)) gets the diffusion constant wrong. This is the Euler-Maruyama discretization, not
+  simple explicit Euler.'
+- forces() already returns -grad U (F = -grad energy), so mean = dt * forces / gamma is the drift down
+  the potential; do NOT add another minus sign.
+- 'Dynamic-delta contract: replay returns state.deltas(position=dx, ...) -- a sparse increment with every
+  untouched field None -- NOT a full updated state. The model sums these across dynamic writers and alive-masks
+  them once.'
+- 'kT=0 guard: logp routes through _gaussian_logp_or_zero, which replaces std with 1.0 before gaussian_logp
+  then masks the result to 0, so a deterministic (std=0) component contributes 0 log-density and never
+  NaNs under jax_debug_nans. A naive gaussian_logp would divide by zero.'
+- score_by_default defaults to False here, overriding the StochasticStep base default (True). Because
+  the Gaussian displacement is reparameterizable, its gradient is carried pathwise through replay; adding
+  the logp (score-function) term by default would double-count. Flipping this adds a spurious REINFORCE-style
+  term to a reparameterized draw.
+- sample_trace returns ONLY the noise xi (shape (capacity, n_space_dim)); it does not sample dx. replay
+  derives dx = mean + std*xi and records BOTH xi and dx, so the recorded dx is by construction the value
+  replay computed (no sampler/replay disagreement). logp then scores the recorded dx, not xi.
+- Trace fields are heritable=False and reset to 0 at the start of every macro-step (ephemeral); a daughter
+  cell created by a division step does not inherit {tag}_xi / {tag}_dx. n_space_dim is a static int that
+  sizes these arrays before any state exists; a mismatch with the state's real dim raises in _check_dim
+  at trace time, not as an obscure broadcast error.
+- 'gamma and kT are plain ''object'' fields, not eqx static: a Python float is static, a jax.Array is
+  traced -- so both are differentiable/optimizable. Only n_space_dim and tag are eqx static.'
+verdict: new
+of: null
+why: 'new -- a motion-family primitive `agitate`: a temperature-controlled thermal (Brownian) random
+
+  walk of cell positions. Earned by stripping away everything the frozen language already owns.
+
+  (1) The Euler-Maruyama scheme, the dt-scaling, the dynamic-delta accumulation, and the whole
+
+  StochasticStep trace/replay/logp machinery are engine plumbing (out_of_scope; the base mixin
+
+  writes nothing). (2) The deterministic drift F/gamma is the pluggable `potential` -- a SEPARATE
+
+  pair-potential contract (soft_sphere / hertzian / the Morse family), integrated by the engine''s
+
+  overdamped mobility 1/gamma. What is left as this step''s own constitutive content is a
+
+  temperature-driven Brownian random walk: amplitude std = sqrt(2 kT dt / gamma), diffusion
+
+  D = kT/gamma (Einstein / fluctuation-dissipation), Wiener sqrt(dt) scaling. With potential=None
+
+  the step IS nothing but this bath -- the exact mechanism the paper names for differential-adhesion
+
+  sorting ("high-temperature Brownian relaxation", p. 19).
+
+  THE STRONGEST OBJECTION, confronted: the frozen baseline ALREADY jitters cell positions. Three
+
+  registered operators each bolt on an isotropic `noise * randn` term -- drag (role `thermal_noise`,
+
+  acc = -k*v + noise*randn, commented "drag + noise = a Brownian/Langevin bath"), glide (role
+
+  `translational_noise`, "glide + noise = an active Brownian walker"), and attraction_repulsion
+
+  (role `exploration_noise`, "exploratory noise on the overdamped velocity"). A skeptic reads that
+
+  as: thermal noise is already in the language, so this is an alias. Rebuttal: those are all the
+
+  SAME uncalibrated modifier -- a bare amplitude times a standard normal, OFF BY DEFAULT, bolted
+
+  onto a PRIMARY deterministic force. None carries a temperature; none obeys the Einstein relation
+
+  (amplitude is a free knob uncoupled from friction); none applies the Wiener sqrt(dt) scaling (the
+
+  engine integrates them deterministically, so their diffusion constant is dt-scaling-wrong); none
+
+  is a scorable stochastic process (raw torch.randn, no trace/replay/logp, not pathwise-
+
+  differentiable); and none can stand alone as a bath (drag needs velocity, glide needs a heading,
+
+  attraction_repulsion needs neighbors). That three operators independently accreted three
+
+  different role-names for the same ad-hoc jitter is itself evidence of a MISSING abstraction, not a
+
+  present one: the language keeps reinventing exploration noise because it has no first-class
+
+  thermostat. `agitate` is that thermostat -- constitutive, temperature-parameterized, FDT-
+
+  calibrated, Wiener-scaled. The closest contract to widen is drag, and widening dissipative inertial
+
+  friction (acc = -k*v, an acceleration, the energy-SINK half of fluctuation-dissipation) into an
+
+  overdamped temperature-scaled fluctuation SOURCE inverts both its regime (2nd-order -> 1st-order)
+
+  and its sign convention (sink -> source) -- violence to its biology, not a signature widening.
+
+  `diffuse` is the wrong set (a grid Laplacian on a concentration field, deterministic spreading),
+
+  not a per-cell stochastic kick. SOURCE vs PAPER (source wins): the paper''s Methods write only
+
+  deterministic gradient-descent Morse minimization (no kT, no gamma); the source''s kT=0 case
+
+  reduces to exactly that, and kT>0 is the noisy regime this contract names.
+
+  '
+contract:
+  name: agitate
+  kind: lateral
+  family: motion
+  set: cell
+  inputs:
+  - kT
+  - gamma
+  - dt
+  - potential
+  outputs:
+  - a
+  reads:
+  - pos
+  - alive
+  writes:
+  - pos
+  maps: []
+status: validated
+module: src/plexus/operators/candidates/jax_morph_brownian_dynamics.py
+test: tests/test_jax_morph_brownian_dynamics.py
+evidence:
+  oracle_run: diff_brownian_dynamics
+  diff_metric: |
+    Relative error in the free-diffusion constant D of the PURE thermal bath, taken as the MAX
+    over three macro-step sizes: metric = max_dt |D_plexus(dt) - D_ref(dt)| / D_ref(dt)
+    (dimensionless). D(dt) = slope(Rg^2 vs t) / (2 * n_dim), where Rg^2(t) = mean over ALIVE cells
+    of |r_i(t) - c(t)|^2 (c = live-cell centroid), least-squares-fit over EVERY recorded frame of a
+    pure-bath rollout -- `agitate` the ONLY operator, no drift (potential absent -> forces()==0, a
+    free Brownian gas). Measured at dt in {1.0, 0.5, 0.25} with total physical time T = n_steps*dt
+    held FIXED at ~40. Measuring at several dt is what makes the test BITE on the one feature that
+    separates `agitate` from the frozen operators' bolt-on noise*randn jitter: D is dt-INVARIANT
+    iff the noise carries the Wiener sqrt(dt) DISPLACEMENT scaling (per-step per-dim variance
+    2 kT dt/gamma over T/dt steps -> dt-free total variance 2 kT T/gamma); a noise scaled by dt
+    instead gives D = dt*kT/gamma and BREAKS the invariance. Oracle: BrownianDynamics(potential=
+    None), N=20000 cells seeded at ONE point, kT=0.1, gamma=1.0, n_dim=2
+    (atlas_jax_morph/_oracle/runs/diff_brownian_dynamics). Plexus:
+    config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml, identical N/kT/gamma/dim and matched IC
+    (Rg is translation-invariant, so the (20,20) world offset from the oracle origin is not a
+    mismatch), `agitate` scheduled ALONE, boundary free (no wall clamp).
+  threshold: |
+    0.03 (3%). Pre-registered as ~3x the reference's per-side finite-sample error on D
+    (rel_sampling_error_per_side = 1/sqrt(2N) = 0.00707 at N=20000; two independent PRNG streams
+    combine to ~1%) and ~1.7x the oracle's own D_hat scatter across the three dt values
+    (D_hat_spread_over_dt / D = 0.0172). A principled sampling band, NOT a number chosen after the
+    result. Not looser: the dt-scaled-noise BUG (emitting the increment as if it scaled with dt --
+    the frozen operators' engine-deterministic jitter) gives D = dt*kT/gamma -> 75% relative error
+    at dt=0.25 (negative control D_naive 0.0250 vs ref 0.100, rel_err 0.75); 3% rejects that
+    decisively and is the tightest band the independent-stream sampling noise actually supports.
+  value: 0.010859
+  passed: true
+  detail: |
+    D_ref(dt) [slope] = {1.0: 0.10009, 0.5: 0.09944, 0.25: 0.10025}; D_plexus(dt) [slope] =
+    {1.0: 0.10030, 0.5: 0.10052, 0.25: 0.10004} -- both match theory D = kT/gamma = 0.1 and each
+    other (all frame-series fits r^2 > 0.9999). Per-dt relative error |D_plexus - D_ref| / D_ref =
+    {1.0: 0.0021, 0.5: 0.0109, 0.25: 0.0021}; MAX = 0.010859 (at dt=0.5) <= threshold 0.03 -> PASS.
+    Plexus D is itself dt-invariant to 0.5% (plexus_D_spread_over_dt / D = 0.0048) -> the Wiener
+    sqrt(dt) scaling survives the engine's pos += dt*v integrator (agitate emits v = sqrt(2kT/
+    (gamma*dt))*xi so dt*v is the sqrt(dt) increment). NEGATIVE CONTROL fires: the dt-scaled-noise
+    bug lands D 0.0250 at dt=0.25, rel_err 0.75, REJECTED -- the metric discriminates the correct
+    scheme from the bolt-on jitter. Acted ledger (log/atlas/brownian_dynamics/diag.json): agitate
+    calls 41, acted 41, moved 2.16, inert_operators [] -> valid_evidence true; gyration grew
+    0.63 -> 4.05 (free spreading). Diff script: _oracle/scripts/diff_brownian_dynamics.py; engine
+    evidence: log/atlas/brownian_dynamics/{diag,metrics,diff}.json.
+state_io_notes:
+  reads:
+  - position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift is
+    evaluated.
+  - alive (ALIVE) -- masks dead/padded cells in both the delta and the score.
+  - potential.state_reads() -- any extra fields the drift potential couples from (empty for a pure bath).
+  writes:
+  - position (POSITION) -- the dynamic thermal displacement delta; the exogenous noise and the realized
+    displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable
+    and scorable.
+  inputs:
+  - kT (thermal_energy / cellular temperature) -- the one knob that turns the bath on; sets std = sqrt(2
+    kT dt / gamma). kT=0 -> no agitation, degenerates to pure relaxation.
+  - gamma (translational_drag) -- mobility 1/gamma; also sits under the noise sqrt, coupling amplitude
+    to friction via the Einstein / fluctuation-dissipation relation D = kT/gamma.
+  - dt (macro-step size, engine-supplied) -- the noise scales as sqrt(dt) (Wiener), NOT dt; the drift
+    scales as dt.
+  - potential (a SEPARATE pluggable pair-potential contract, engine-integrated) -- supplies the deterministic
+    drift F/gamma this walk rides on; pass None for a pure thermal gas.
+  outputs:
+  - a dynamic dt-scaled position delta (a per-cell Gaussian Wiener increment), summed across dynamic writers
+    by the model.

@@ -1,0 +1,284 @@
+id: lennard_jones
+order: 18
+raw_name: LennardJones
+raw_kind: potential (PairwisePotential)
+code_path: papers/jax-morph/jax_morph/physics/mechanics/potentials.py:L419
+paper_section: p. 9 'Mechanical interactions' (Morse energy Vij, eq. lines 514-520; also Methods p. 14
+  lines 758-772) - the paper's mechanics are Morse ONLY; LennardJones appears nowhere in the paper.
+summary: 'A pair-interaction ENERGY component (not a step): given cell positions it returns a scalar total
+  interaction energy over live, non-self pairs, from which the wrapping step (MechanicalRelaxation / BrownianDynamics
+  / ActiveBrownianDynamics2D) derives per-cell forces by autodiff. The pair energy is Lennard-Jones in
+  ``r_min`` form: a hard r^-12 repulsive core plus a 2*r^-6 adhesive tail whose minimum is exactly ``-epsilon``
+  at the contact distance ``sigma = r_i + r_j``, multiplied by a smooth cutoff that truncates the tail
+  between ``r_onset_frac*sigma`` and ``r_cutoff_frac*sigma``. It writes no state itself.'
+equations: "Pair energy (LJ, r_min form), for a pair at separation r with contact distance sigma:\n  x\
+  \       = safe_divide(sigma, r)              # = sigma/r, but 0 (not inf) at r=0\n  U_lj(r) = epsilon\
+  \ * ( x**12 - 2 * x**6 )     # minimum -epsilon exactly at r = sigma\n  U(r)    = U_lj(r) * S(r; r_on,\
+  \ r_off)        # tail truncated by the smooth cutoff\nwhere\n  sigma   = r_i + r_j                \
+  \          # contact distance = sum of the two radii (per pair)\n  r_on    = r_onset_frac  * sigma \
+  \             # default 1.5 * sigma\n  r_off   = r_cutoff_frac * sigma              # default 2.5 *\
+  \ sigma\nSmooth cutoff S (jax-md multiplicative switch, C1), with r2=r^2, ron2=r_on^2, roff2=r_off^2:\n\
+  \  S(r) = 1                                              for r <= r_on\n  S(r) = (roff2-r2)^2 (roff2\
+  \ + 2 r2 - 3 ron2)/(roff2-ron2)^3   for r_on < r < r_off\n  S(r) = 0                               \
+  \               for r >= r_off\nAggregation (inherited from PairwisePotential.total_energy):\n  E_total\
+  \ = 0.5 * sum_i sum_{j alive, j != i} U(r_ij)   # each live pair counted once\n  forces  = -grad_positions(E_total)\
+  \                    # via jax.grad; no analytic force\nPer-cell virial pressure (inherited, optional\
+  \ consumer):\n  p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij)         # V_i is the d-ball volume of\
+  \ radius r_i\nCODE vs PAPER: the paper uses the MORSE energy for all mechanics, never Lennard-Jones:\n\
+  \  V_morse(r) = epsilon * [ (1 - exp(-alpha (r - sigma)))^2 - 1 ]   (paper eq., p. 9 / p. 14)\n"
+params:
+  epsilon: well_depth / adhesion_energy_scale - sets BOTH the repulsion strength and the adhesive well
+    depth (the minimum equals -epsilon at contact). A shared scalar OR a per-cell ``StateFieldSpec``;
+    a per-cell epsilon is combined per pair by the ARITHMETIC mean ``0.5*(e_i+e_j)`` (base ``mix``), not
+    a geometric / Lorentz-Berthelot rule. Default 1.0.
+  r_onset_frac: interaction_cutoff_onset - start of the smooth truncation window as a multiple of the
+    contact distance sigma; the tail is untouched (S=1) inside this radius. Default 1.5.
+  r_cutoff_frac: interaction_range / cutoff - end of the smooth truncation window as a multiple of sigma,
+    beyond which the energy is exactly 0. Must satisfy r_onset_frac < r_cutoff_frac (checked at construction).
+    Default 2.5.
+state_io:
+  reads:
+  - position (capacity, n_space_dim) - supplied to total_energy; also state.position for virial
+  - radius (capacity,) - forms the per-pair contact distance sigma = r_i + r_j
+  - alive (capacity,) - masks dead cells and self-pairs in neighbor_sum
+  - 'displacement (static, from the state''s space: free_space / periodic) - the pairwise metric'
+  - n_space_dim (static) - only for the inherited virial_pressure (d-ball volume)
+  - epsilon field - ONLY if epsilon is a StateFieldSpec; then declared via state_reads() so the wrapping
+    step allocates it. With the default scalar epsilon, reads nothing beyond base fields.
+  writes:
+  - 'NONE. This is an energy component, not a step: it returns a scalar energy / a force array / a per-cell
+    pressure. The consuming step writes position (relaxation, Brownian) or a pressure field (virial stress);
+    LennardJones declares no state_writes of its own.'
+surprises:
+- THE PAPER DOES NOT USE LENNARD-JONES. Every mechanical interaction in the paper is the MORSE potential
+  (p. 9 'Mechanical interactions'; Methods p. 14). ``LennardJones`` is a library-only alternative pair
+  potential, exercised by no paper experiment - a reimplementer targeting the paper would never instantiate
+  this class. Recorded as the source/paper divergence; source wins.
+- It is the ``r_min`` LJ form ``eps*((sigma/r)^12 - 2 (sigma/r)^6)``, NOT the textbook ``4 eps ((sigma/r)^12
+  - (sigma/r)^6)``. Here sigma is the location of the MINIMUM (= contact distance r_i+r_j) with value
+  -epsilon, NOT the zero-crossing. Coding the standard 4-eps form puts the well at 2^(1/6) sigma with
+  the wrong depth - a silent, plausible-looking error.
+- sigma is per-pair and size-dependent (r_i + r_j), and BOTH cutoff radii are sigma-relative, so the interaction
+  rescales as cells grow. A fixed absolute cutoff would break size-consistency.
+- The smooth cutoff S multiplies the WHOLE energy (core included), not just the r^-6 tail. It is inert
+  on the core only because r_on = 1.5*sigma > sigma keeps S=1 for r < sigma; a reimplementer who lowers
+  r_onset_frac below 1 would start cutting into the repulsive core.
+- 'Zero-safety: ``x = safe_divide(sigma, r)`` returns 0 (not inf) at r=0, so the self-diagonal and dead-dead
+  padded pairs give U=0 instead of NaN under the always-on jax_debug_nans. A naive sigma/r blows up. _smooth_cutoff
+  and safe_divide similarly guard the sigma=0 dead-pair case.'
+- Aggregation carries a 0.5 factor (each pair counted once) and neighbor_sum masks self and dead pairs.
+  Dropping the 0.5 double-counts the energy and hence the forces.
+- 'No analytic force: forces are ``-jax.grad(total_energy)`` and there is NO jax-md dependency - the energy
+  is hand-written and differentiated. The C1 cutoff keeps the force continuous but with a small slope
+  kink at the window edges.'
+- 'Unlike Morse, LJ has NO width/steepness knob: the 12-6 exponents fix the shape. Only epsilon and the
+  two cutoff fractions are tunable, so it cannot be tuned to reproduce a given Morse alpha.'
+verdict: new
+of: null
+implementation_of: adhere
+why: "VERDICT new -- contract `adhere`, implementation_of: adhere. LennardJones is the 12-6 SHAPE of a\n\
+  pairwise cell-cell mechanical-interaction contract the frozen 42 do NOT carry: a Lateral force over\n\
+  live non-self cell pairs whose interaction range is set by the two cells' PHYSICAL RADII (contact\n\
+  distance sigma = r_i + r_j, so the excluded-volume core and adhesive well track cell size as cells\n\
+  grow and divide), reading a shared-or-per-cell interaction strength (epsilon), defined by a\nconserved\
+  \ pair ENERGY whose autodiff gives the force. LJ is an ADHESIVE member -- a hard r^-12 core\nminus a\
+  \ 2 r^-6 tail, minimum -epsilon exactly at contact -- so `adhere` names it directly (the\nrepulsion-only\
+  \ SoftSphere / Hertzian are the adhesion-off limit of the SAME signature). The six\nPairwisePotential\
+  \ members (Morse, SoftSphere, Hertzian, Harmonic, LennardJones + the abstract\nparent) share ONE typed\
+  \ signature and differ ONLY in the pair-energy law U(r); they collapse to\nONE contract with several\
+  \ implementations, so soft_sphere / morse / hertzian / harmonic /\nlennard_jones are all implementation_of:\
+  \ adhere. That is ONE new contract for the whole family, not\nsix -- the several-implementations-per-contract\
+  \ result the ledger wants, NOT an inflated `new`\ncount. R4 forbids `of: adhere` (unregistered), so\
+  \ this entry NAMES adhere only as the shared\nimplementation_of; promoting it is a separate step.\n\n\
+  WHY NOT alias -- verified AT THE SOURCE. The nearest registered contract is attraction_repulsion,\n\
+  and its NAME matches the pull-minus-push biology, which is the tempting alias the parent\npairwise_potential\
+  \ + Morse + Hertzian + Harmonic entries all made. But rule 4 pins `of:` to the\nPROMOTED operator, and\
+  \ src/plexus/operators/attraction_repulsion.py factually does not cover LJ:\n  - set=\"particle\", EMIT=\"\
+  velocity\" (lines 28, 30): a hand-coded D'Orsogna self-propelled-particle\n    overdamped VELOCITY law,\
+  \ not a cell energy differentiated into a force.\n  - REQUIRES_PARAMS=[\"sigma\"], self.sigma=float(params[\"\
+  sigma\"]) (lines 32, 43): a single GLOBAL\n    scalar interaction length -- a free tuning knob, NOT\
+  \ a per-pair contact distance.\n  - REQUIRES_TYPE_PROPS=[\"p\"], p indexed by node_type (lines 33, 61):\
+  \ per-TYPE coupling, not a\n    per-cell / shared scalar.\n  - forward() reads pos / occ / edge_index\
+  \ / node_type and NEVER reads radius (lines 52-61); it is\n    O(E) message passing on a neighbour graph,\
+  \ with no energy, no virial, and no size-consistent\n    contact distance.\nSo attraction_repulsion\
+  \ does NOT \"already IS\" this contract; asserting alias flatters the language\nby hiding a missing\
+  \ capability -- the exact failure record.py names for `alias`. The alias-majority\nsiblings are the\
+  \ mis-normalization (their own skeptics flagged refinement / new); I decline to\npropagate a false alias\
+  \ for family cosmetics.\n\nWHY NOT refinement -- the honest closest alternative. One could keep a single\
+  \ interaction contract\nand WIDEN attraction_repulsion to host LJ, paying the cost openly (cell_divide\
+  \ / cell_grow set the\nprecedent that growing the declared read set is a costed widening). I reject\
+  \ it because the widening\nis NOT bounded to a field or two: hosting LJ changes set (particle -> cell),\
+  \ changes emit (a\nvelocity law -> an energy whose grad is the force), re-sources the interaction range\
+  \ from a free\nglobal knob to a physical consequence of cell size (sigma = r_i + r_j read from radius),\
+  \ swaps\nper-type programming for a per-cell coupling, and grows an energy output. That DELETES the\n\
+  fixed-width, type-programmed D'Orsogna self-propelled-particle pattern-forming model that IS\nattraction_repulsion\
+  \ and breaks every existing user of its global sigma / per-type p. Widening that\ndoes violence to the\
+  \ contract's biology is exactly what the record distinguishes from a refinement\n-> `new`, and beyond\
+  \ even a bounded refinement.\n\nWHY NOT new-per-shape / out_of_scope. Minting a SEPARATE contract for\
+  \ the 12-6 shape (vs Morse's\nexponential well or the harmonic core) would inflate exactly the yield\
+  \ this ledger measures; LJ\ndiffers from its siblings ONLY in U(r), an implementation detail below the\
+  \ signature. And unlike\nNoForce (the identity element / absence of interaction), LJ is a real forward\
+  \ interaction with a\npair map, radius-coupled separation reads, and a force output, so it is not out_of_scope.\
+  \ The\nregistered near-misses beyond attraction_repulsion all lose their biology if widened: `separation`\n\
+  is a mean-aggregated 1/|d|^2 boids steering nudge (no cell radius, no compact support, no energy);\n\
+  `cohesion` is attraction-only steering; `squared_law` is a size-blind inverse-square with no soft\n\
+  core -- turning any of them into a size-coupled, energy-defined hard-matter potential converts a\nsteering\
+  \ heuristic into cell mechanics.\n\nI ALIGN WITH soft_sphere (order 15, new -> adhere, which survived\
+  \ its skeptic dispute), not the\nalias majority: LJ has the IDENTICAL signature to SoftSphere and, being\
+  \ adhesive, fits `adhere` even\nmore naturally than the repulsion-only SoftSphere does. Splitting the\
+  \ family across alias /\nrefinement / new fractures the one pair-potential family -- either the whole\
+  \ family is `adhere` or\nattraction_repulsion must widen, and it cannot widen without deleting the D'Orsogna\
+  \ model.\n\nSCOPE / SOURCE. Rule 5, SOURCE wins: the paper's mechanics are Morse ONLY (p. 9 / p. 14\
+  \ / Fig. 1d);\nLennardJones appears in NO paper experiment -- it is a code-only library alternative,\
+  \ and a\nreimplementer targeting the paper would never instantiate it. Recorded as the source/paper\n\
+  divergence. The per-cell VIRIAL PRESSURE the base also derives from this energy is NOT an output of\n\
+  this interaction contract; it is the separate VirialStress entry's mechanism (it writes a `stress`\n\
+  field), kept out of scope here, consistent with Morse / Hertzian / SoftSphere. The r_min 12-6 form\n\
+  (well at contact, not the textbook 4-eps zero-crossing form), the whole-energy smooth C1 cutoff on\n\
+  [1.5, 2.5]*sigma, the SUM-vs-MEAN combining rules, the safe_divide zero guards, and the 0.5\npair-double-count\
+  \ factor are implementation properties of THIS member recorded in surprises, not\ncontract-level distinctions.\n"
+contract:
+  name: adhere
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - cell
+  reads:
+  - pos
+  - radius
+  - alive
+  - epsilon
+  writes:
+  - pos
+  maps:
+  - pairwise
+  - contact
+status: validated
+module: src/plexus/operators/candidates/jax_morph_lennard_jones.py
+test: tests/test_jax_morph_lennard_jones.py
+evidence:
+  oracle_run: diff_lennard_jones
+  diff_metric: |
+    D_pos = max over ALL 101 frames (t = 0..100) and ALL 12 live cells of the per-cell
+    Euclidean position discrepancy ||x_plx(t,i) - x_ref(t,i)||_2, divided by the contact
+    distance sigma = r_i + r_j = 1.0 (uniform radius 0.5). UNITS: fractions of sigma (one cell
+    diameter). x_ref is the jax-morph BrownianDynamics(LennardJones(epsilon=1.0), gamma=1.0,
+    kT=0.0) trajectory -- the reference's OWN overdamped Euler at zero temperature, whose update
+    is exactly dx = dt*F/gamma = dt*(-grad U). x_plx is the Plexus adhere/lennard_jones operator
+    under the engine's overdamped Euler, on a BYTE-IDENTICAL initial condition (SIX well-separated
+    dumbbell pairs -- centres 5 apart, > 2.5*sigma so no cross-pair force -- at initial separations
+    [1.15, 1.25, 1.35, 1.50, 1.70, 2.60]*sigma, radius 0.5, + 4 dead padding slots parked at the
+    origin), same dt = 0.01, same 100 steps, aligned cell-for-cell and frame-for-frame
+    (lennard_jones is gated after_frame:1 so frame 0 is the pristine IC and frame t is the IC after
+    t overdamped steps). Because kT = 0 makes the reference deterministic (verified identical across
+    two PRNG keys) and its Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE
+    function of the force law, so D_pos isolates the LJ r_min 12-6 force F = -grad
+    eps((sigma/r)^12 - 2(sigma/r)^6) -- its ADHESIVE tail, equilibrium AT contact, and sigma-relative
+    smooth C1 cutoff -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
+    Computed by _oracle/scripts/_analyze_lennard_jones.py into log/atlas/lennard_jones/diff.json.
+  threshold: 0.001
+  threshold_why: |
+    1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_lennard_jones.py:83, THRESHOLD = 1.0e-3)
+    before the diff was computed. It is ~500x below one cell radius (0.5 sigma) and ~3 orders under
+    the real dynamics the test must resolve (max live displacement 0.350 sigma; five dumbbells relax
+    monotonically from separations 1.15..1.70 sigma down to contact 1.0, the sixth at 2.60 sigma
+    stays frozen beyond the cutoff). A genuine force-law error CANNOT slip under it: the NEGATIVE
+    CONTROL -- the purely-repulsive SoftSphere (LJ with the adhesive tail DELETED), which leaves
+    every pair frozen -- diverges the trajectory by 0.350 sigma (350x the bar); coding the textbook
+    4-eps form eps(4((sigma/r)^12 - (sigma/r)^6)) instead of the r_min form puts the well at
+    2^(1/6) sigma with the wrong depth, dropping the 0.5 aggregation factor doubles the force, and
+    using sigma = mean instead of sum halves the contact distance -- all diverge by O(sigma),
+    hundreds of times the bar. Yet 1e-3 is NOT a bit-identity gate: across this same pair-potential
+    family the identical scorer admits ordinary float32-level agreement (soft_sphere D_pos 2.7e-6,
+    harmonic 7.9e-6, hertzian force-err 1.9e-6, all non-zero), so passing does not require exact
+    arithmetic. THIS member happened to land the strongest possible pass -- D_pos = 0.0, the two
+    float32 stacks (jax jit-scan vs torch autograd) byte-equal over all 101x12 live positions --
+    which is verified REAL, not an aliasing artifact: the two arrays are distinct objects, diverge
+    from the SoftSphere reference by 0.350 sigma, and the cells genuinely moved 0.350 sigma. Looser
+    would admit an adhesion-off / 4-eps / dropped-prefactor reimplementation as "agreement"; tighter
+    is moot here (the result is exactly 0) but for the family would fail on float32 reassociation.
+  value: 0.0
+  passed: true
+  plexus_run: log/atlas/lennard_jones/
+  scorer: atlas_jax_morph/_oracle/scripts/_analyze_lennard_jones.py
+  acted_ledger: |
+    adhere: calls 100 / acted 47, moved 2.679448 (cumulative max-cell displacement), kind lateral,
+    structural false; inert_operators []; unverifiable_operators []; valid_evidence true ("every
+    scheduled operator acted at least once"). The one scheduled operator moved cells on every frame
+    of the ACTIVE phase -- adhere registers as acted on 47 frames and then falls below the move
+    threshold once the five tail pairs reach contact (~frame 42; gyration plateaus 8.5795 -> 8.5678,
+    nn-distance 1.5917 -> 1.2667 and both flatline thereafter), exactly the overdamped fixed point,
+    NOT a still life. Frame-0 == pristine IC on both sides (residual 0.0/0.0).
+  corroborators: |
+    All from log/atlas/lennard_jones/diff.json unless noted. (1) Frame 0 == pristine IC on BOTH
+    sides (residual 0.0/0.0) -- the aligned convention is real; and the whole float32 trajectory is
+    BYTE-EQUAL (np.array_equal True over 101x16x2), so D_pos = 0.0 is exact, not rounded. (2)
+    Deliberately MISALIGNED comparison x_plx(t) vs x_ref(t-1) scores 0.0268 sigma (27x the bar and
+    infinitely larger than D_pos) -> the frame alignment is genuinely correct, not an accidental
+    match to a shifted trajectory. (3) Per-pair separation trajectory agrees to 0.0 sigma: the five
+    tail pairs reach contact 1.0 and the beyond-cutoff pair stays frozen at 2.60 on BOTH sides. (4)
+    NEGATIVE CONTROL fires: the adhesion-off SoftSphere on the SAME IC leaves every pair frozen and
+    the Plexus LJ trajectory diverges from it by 0.350 sigma (350x the bar; ratio softsphere/lj is
+    unbounded since lj-diff is 0), so PASS resolves the adhesive tail, not just a shared core -- and
+    proves the two arrays are distinct trajectories, not aliased. (5) Every DEAD padding slot never
+    moved on either side (0.0/0.0): the alive/self mask and the sigma=0 safe_divide/cutoff guards
+    reproduce, no phantom pull. (6) Single-step IC force residual 9.4e-05 (eps/sigma units) is an
+    ORACLE-INTERNAL float32 reassociation, NOT a Plexus<->reference force error: the recovered
+    Plexus step plx[1]-plx[0] and the reference step ref[1]-ref[0] both differ from the standalone
+    LennardJones.forces(IC) by the SAME 9.4e-07, i.e. they equal each other exactly. (7) Oracle
+    self-guard carried through (diff_lennard_jones/summary.json): the 2-cell radial scan matches the
+    analytic r_min force 12 eps(x^12 - x^6)/r to 4.6e-06, force is exactly -0.0 at contact and
+    beyond 2.6 sigma, BrownianDynamics(kT=0) is deterministic across two PRNG keys, and its first
+    Euler step equals dt*forces bit-for-bit. Oracle provenance: real jax-morph 0.4.0 / jax 0.11.0
+    in the isolated venv (git ace08b8).
+  scope: |
+    UNIFORM-radius test: reference and spec both use radius 0.5, so the candidate exercises the
+    contact distance sigma = r_i + r_j at EQUAL radii; the headline SUM-vs-mean size-consistency
+    (heterogeneous r_i != r_j) is NOT exercised here (a mean-instead-of-sum contact rule would
+    diverge by O(sigma) under two distinct radii -- the extending experiment, already carried on the
+    hertzian twin which DID use heterogeneous radius + per-cell epsilon). Nor is per-cell epsilon
+    exercised: the probe _probe_eps confirmed the per-cell arithmetic-mean mix equals the shared
+    scalar at equal epsilon, but the trajectory uses a shared epsilon=1.0. The r_cutoff at 2.5 sigma
+    sits beyond the resting contact, so the C1 truncation WINDOW [1.5, 2.5]*sigma is swept by the
+    relaxing pairs (the adhesive tail is exercised through the cutoff ramp) and the one beyond-cutoff
+    pair confirms exactly-zero force past 2.5 sigma. What it does NOT touch: the per-cell VIRIAL
+    pressure the base derives from the same energy (a separate VirialStress mechanism, out of scope).
+    This validates the IMPLEMENTATION reproduces the reference LJ force and its overdamped dynamics
+    (to byte equality); it does not by itself decide the verdict/dispute (new -> adhere), which rests
+    on the signature argument in `why`.
+state_io_notes:
+  reads:
+  - position
+  - 'epsilon (shared scalar OR per-cell scalar StateFieldSpec interaction strength; the field is read
+
+    only when epsilon is a per-cell spec, else it is a shared scalar), symmetrised per pair by the
+
+    arithmetic-mean mix rule 0.5*(e_i + e_j)
+
+    '
+  writes:
+  - position
+  maps:
+  - 'pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each
+
+    unordered pair counts once); force on each cell = -grad of the conservative pair energy by
+
+    autodiff, integrated overdamped / minimised by a wrapping motion or relaxation step
+
+    '
+  - 'contact distance sigma = r_i + r_j (ADDITIVE, size-consistent as cells grow and divide); the
+
+    LennardJones member is the r_min 12-6 form U = epsilon*((sigma/r)^12 - 2 (sigma/r)^6), minimum
+
+    -epsilon exactly at contact, its adhesive tail truncated by a sigma-relative smooth C1 cutoff on
+
+    [r_onset_frac, r_cutoff_frac]*sigma (default 1.5-2.5); adhesive members (Morse, Harmonic,
+
+    LennardJones) carry the tail, repulsion-only members (SoftSphere, Hertzian) switch it off -- same
+
+    signature
+
+    '
