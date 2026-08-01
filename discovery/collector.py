@@ -90,6 +90,7 @@ def collect_run(name, hyp=None, summary=None):
             "hid": getattr(hyp, "hid", MISSING),
             "edit": getattr(hyp, "edit", MISSING),
             "intent": getattr(hyp, "intent", MISSING),
+            "track": getattr(hyp, "track", MISSING),
             "predicted": getattr(hyp, "predicted", MISSING),
             "rationale": (getattr(hyp, "rationale", "") or "")[:300] or MISSING,
         })
@@ -176,10 +177,11 @@ def render(rec):
           f"{R['n_refused']} refused — {len(intents) - n_adv} confirmatory / {n_adv} adversarial",
           ""]
 
-    L += ["| Slot | Run | Edit | Intent | Prediction | Specimen | Phenotype | Outcome |",
-          "| ---: | --- | ---- | ------ | ---------- | -------- | --------- | ------- |"]
+    L += ["| Slot | Run | Edit | Track | Intent | Prediction | Specimen | Phenotype | Outcome |",
+          "| ---: | --- | ---- | ----- | ------ | ---------- | -------- | --------- | ------- |"]
     for i, r in enumerate(runs):
-        L.append(f"| {i} | `{r['run']}` | {_cell(r.get('edit'))} | {r.get('intent', MISSING)} "
+        L.append(f"| {i} | `{r['run']}` | {_cell(r.get('edit'))} | {r.get('track', '-')} "
+                 f"| {r.get('intent', MISSING)} "
                  f"| {_cell(r.get('predicted'))} | **{r['specimen']}** "
                  f"| {r['analyst_consensus']} | {r.get('outcome', '—')} |")
     L.append("")

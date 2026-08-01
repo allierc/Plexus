@@ -77,6 +77,10 @@ AGENT_BUDGETS = {
     # budget on purpose: an archivist that goes reading logs is re-deriving arithmetic it was
     # given, and will re-derive it differently every time.
     "archivist":     ( 6,    6,  ["Read"]),
+    # The DIAGNOSTICIAN is handed a table of measured failure signatures and asked to name the
+    # cause. Like the Archivist it must not go reading logs -- that is re-deriving arithmetic it
+    # was given, and it will re-derive it differently every time.
+    "diagnostician": ( 6,    6,  ["Read"]),
     # The escalation path's only LLM call. It had no row, so its budget projection silently fell
     # back to DEFAULT_TIMEOUT_MIN -- listed here so the cost table really is complete.
     "operator_request": (8,  8,  ["Read"]),
