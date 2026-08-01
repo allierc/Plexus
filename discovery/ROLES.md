@@ -62,9 +62,16 @@ stability, admissible ranges, numerical sanity.
 **Refuses**, with a reason code. Cannot be argued with.
 **Sends to:** Proposer, Biologist
 
-### Biologist — check — BUILT
+### Biologist (static + probe) — check — BUILT
 **Asks:** could this be a tissue?
-Against the premises in `PREMISES.md`, which it reads rather than restates.
+Against the premises in `PREMISES.md`, which it reads rather than restates. **It runs in two
+places, and the split is by what it can read:**
+
+| tier | reads | when |
+|---|---|---|
+| **static** | the spec alone | **here, Act 1** — a composition that cannot work is refused in milliseconds instead of after ten minutes of simulation and a plausible-looking null |
+| **probe** | nothing — runs its own 40-frame mechanics-only simulation, cached by composition | **here, Act 1** — cheap, and it would have caught the vesicle collapse on day one |
+| **passive** | the finished run's recorded series | **Act 2**, after the batch — see below |
 **Verdict is categorical, never prose** — the grade in the document decides it:
 
 | verdict | when |
@@ -83,6 +90,17 @@ produces prose instead of a decision drifts into what Judge and Referee became.)
 ## Act 2 — Measure
 
 The batch runs. This is the only expensive step in the loop.
+
+### Biologist (passive) — check — BUILT
+**Asks:** was this run a tissue?
+The same premises, now against what the run actually recorded — dilution extinguishing the
+chemistry, a sheet absorbing area by stretching, a surface passing through itself.
+
+**It runs AFTER the batch and BEFORE the Analysts, and the order is the point.** Run it after the
+analysis and an Analyst has already read a specimen whose chemistry was extinct and named a
+phenotype from it — which is exactly what happened on `r002c_00`, where five premises broke, the
+activator had decayed to NaN, and the reading went ahead anyway. Nothing can un-name a phenotype.
+**Sends to:** Analysts, Collector
 
 ### Metrologist — check — BUILT
 **Asks:** which metrics are admissible?

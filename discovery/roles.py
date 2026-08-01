@@ -48,6 +48,10 @@ class Role:
     def __init__(self, name, kind, status, act, asks, sends):
         self.name, self.kind, self.status, self.act = name, kind, status, act
         self.asks, self.sends = asks, sends
+        # "Biologist (passive)" and "Biologist (static + probe)" are ONE role that runs in two
+        # acts, not two roles. The parenthetical says WHEN, and identity ignores it -- otherwise
+        # the roster count grows every time a role is given a second moment in the loop.
+        self.base = re.sub(r"\s*\(.*\)\s*$", "", name).strip()
 
     def __repr__(self):
         return f"{self.name} ({self.kind}, {self.status})"
@@ -125,7 +129,7 @@ def check(roles=None):
     roles = roles or read()
     gone = dropped()
     bad = []
-    named = {r.name for r in roles.values()}
+    named = {r.name for r in roles.values()} | {r.base for r in roles.values()}
 
     for key, name in sorted(CODE_ROLES.items()):
         if name in gone:
@@ -140,8 +144,8 @@ def check(roles=None):
         # let three roles sit in the roster for weeks without ever being called.
         if r.kind != "agent" or r.status != "BUILT":
             continue
-        if name not in CODE_ROLES.values():
-            bad.append(f"ROLES.md says the agent {name!r} is BUILT and no call site uses it")
+        if r.base not in CODE_ROLES.values():
+            bad.append(f"ROLES.md says the agent {r.base!r} is BUILT and no call site uses it")
     # a hand-off must land on somebody
     for a, b in edges(roles):
         if b not in named and b != "every agent's prompt":
@@ -150,15 +154,17 @@ def check(roles=None):
 
 
 def _print(roles):
-    print(f"{'role':16}{'kind':8}{'status':10}{'act':10}sends to")
+    print(f"{'role':26}{'kind':7}{'status':10}{'act':8}sends to")
     print("-" * 92)
     for r in roles.values():
-        print(f"{r.name:16}{r.kind:8}{r.status:10}{r.act or '':10}{', '.join(r.sends)}")
-    n_agent = sum(1 for r in roles.values() if r.kind == "agent")
-    n_code = sum(1 for r in roles.values() if r.kind in ("check", "code"))
-    print(f"\n  {len(roles)} roles: {n_agent} agents, {n_code} deterministic. "
+        print(f"{r.name:26}{r.kind:7}{r.status:10}{r.act or '':8}{', '.join(r.sends)}")
+    bases = {r.base: r for r in roles.values()}
+    n_agent = sum(1 for r in bases.values() if r.kind == "agent")
+    n_code = sum(1 for r in bases.values() if r.kind in ("check", "code"))
+    print(f"\n  {len(bases)} roles ({len(roles)} appearances): {n_agent} agents, "
+          f"{n_code} deterministic. "
           f"dropped: {', '.join(sorted(dropped())) or 'none'}")
-    todo = [r.name for r in roles.values() if r.status == "TO BUILD"]
+    todo = sorted({r.base for r in roles.values() if r.status == "TO BUILD"})
     print(f"  TO BUILD ({len(todo)}): {', '.join(todo)}")
 
 
