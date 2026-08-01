@@ -103,8 +103,20 @@ DEFAULT_TOOLS = ["Read", "Edit", "Write", "Grep", "Glob"]
 #   ENFORCE_AGENT_BUDGETS = False -> unspecified max_turns falls back to LEGACY_MAX_TURNS,
 #                                    i.e. exactly what the bypassed calls were getting.
 # Flip it to True only in a later phase, deliberately, with the baseline already recorded.
+# TURNS CAPPED AT 16, on measured evidence rather than caution (Cedric, 2026-08-01).
+# Every call the ledger has ever recorded, by agent:
+#     proposer   12, 10, 10        analyst   8, 7, 7, 7, 7, 7
+#     reflection  1,  1,  1        judge     1        grounder  0 (local, not an LLM call)
+# The busiest call in the campaign used 12 turns against a limit of 60, so the old ceiling has
+# never once bound. 16 sits above everything observed with four turns of headroom.
+#
+# A cap is a RUNAWAY GUARD, not a budget, and the distinction matters: it only ever bites by
+# truncating work already paid for, which costs the tokens and returns nothing. That is why this
+# is set above the maximum seen and not near the mean -- and why the previous loop this was
+# ported from ran at 500. The lever on cost is the NUMBER of calls; a call carries a fixed
+# overhead of about 29k cache-creation tokens before it does any work at all.
 ENFORCE_AGENT_BUDGETS = False
-LEGACY_MAX_TURNS = 60
+LEGACY_MAX_TURNS = 16
 
 # Calls that reached run_claude() WITHOUT going through run_agent(), i.e. calls nobody is
 # timing. This is the defect that produced `[llm] {'calls': 0, ...}` for a round of ~25 model

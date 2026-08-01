@@ -2,6 +2,109 @@
 
 _Revisable. The agent's current model of the problem: what is established, what is open, what to try next._
 
+## PROPOSAL ISSUED — 2026-08-01 R4 — OPEN parent 3 (uniform-inflation, mechanical-growth family)
+
+**Counter reset AGAIN** (header "round 3, 0 runs, coverage 0%, phenotypes {}", solo-effects table
+EMPTY); real record = this file + analysis.md + instruction.md. Do NOT re-derive from the header.
+
+**Why pivot:** parent 2 (RD Okuda route) is now FULLY PROPOSED — the pivot + R2 batches between them
+cover ALL FOUR valid single-op edits (+shape_energy_3d:default, −reconnect_t1_3d, −morphogen_growth_3d,
+−cell_diffuse). But NO results have landed (persistent 0 runs), so parent 2 can't be built on yet.
+Rather than re-propose it a 3rd time, expand coverage into an UNMAPPED family.
+
+**Decision:** open **parent 3 = uniform inflation** = divide_3d + reconnect_t1_3d + seed_mesh_3d +
+shape_energy_3d + vesicle_growth — the pure MECHANICAL-growth route (growth+division, NO
+reaction-diffusion). It is the COMPLEMENT to parent 2's RD route: parent2-vs-parent3 = does a grown
+morphology need Turing RD (χ) or just mechanical growth? Chose parent 3 over parent 0 (mechanics-only
+minimal) because parent 3's growth driver is already ACTIVE → each edit has a live morphology to
+modulate (parent 0 without growth = static mesh, low info). Central falsifiable Q: can any single edit
+break the family's "no patterning" label into a patterned protrusion?
+
+**Batch (4 slots, explore, 2 conf / 1 adv = 67/33; 2 in_paper / 1 excursion):** s0 CONTROL parent 3
+(protr_peak 1.0–1.8, ta_n_tubes_final ≤0, uniform ball) · **s1 =shape_energy_3d:monolayer** (ADV/in_paper
+— SWAP shape energy to monolayer impl, bet it BUCKLES the inflating shell into undulation, Okuda Fig 7;
+protr_peak ≥2.0 & ta_n_tubes_final ≥1; REFUTED <2.0 = type "no patterning" label confirmed) · s2
+−vesicle_growth (CONF/in_paper — remove growth driver, family's FIRST solo effect; predict collapse
+protr_peak ≤1.5; REFUTED >1.5 = division alone drives shape) · s3 −reconnect_t1_3d (CONF/excursion —
+remove T1 relief under isotropic growth, a regime Okuda never isolates; bet inert → protr_peak 1.0–1.8
+near control; REFUTED ≥2.0 = suppressed T1 stores stress → buckles = hidden anti-buckling regulator, the
+γ/deformation-rate axis).
+
+**SAFETY:** avoided known-invalid +vesicle_growth:uniform_ramp (double-stacks growth → buffer saturation,
+R2 hit n_cells 15002). Parent-3 CONTROL has growth+division together → residual saturation risk (though
+lower than parent 2's TRIPLE-growth stack); if the control saturates it's still a finding and the two
+removal slots (s2,s3) stay safe. Standing guards on results: reject forced-drainage "tubes" via
+body-shrink/Q_drop; check the cell-count budget for the growth+division control; ignore watcher
+CONTRADICTS + rejected aspect/tube_len/retention metrics; hunt a p_ratio~1 persistent bulge (first GROWN
+regime → seed-robustness next round). Next-round hook: if s1 buckles, robustness-test it; then start the
+parent-2 (RD) vs parent-3 (mechanical) contrast as the first structural cut on "is RD necessary for
+Okuda morphology?".
+
+---
+
+## PROPOSAL ISSUED — 2026-08-01 R2 — parent 2, close the χ (diffusion) axis
+
+**Counter reset again** (header "round 1, 0 runs, coverage 0%, phenotypes {}"); real record = this
+file + instruction.md. Do NOT re-derive from the header.
+
+**Map state:** parent 1 (round-33 forced recipe) mapped — growth-FED FORCED extrusion, extrude +
+morphogen_growth_3d JOINTLY necessary (R2 surprise 0.33), no p_ratio~1 grown regime. Prize = **parent 2
+= reaction-diffusion "growth-driven monolayer (Okuda route)"** (path to a GROWN morphology + (chi,gamma)
+diagram). parent 2 has EXACTLY four VALID single-op edits: +shape_energy_3d:default, −reconnect_t1_3d,
+−cell_diffuse, −morphogen_growth_3d. INVALID (never repropose): +vesicle_growth:uniform_ramp (buffer
+saturates), −cell_geometry_3d / −cell_adjacency (load-bearing plumbing → crash).
+
+**The prior 2026-08-01 PIVOT batch (still on disk / in flight) tested three of them —
++shape_energy_3d:default, −reconnect_t1_3d (γ/topology), −morphogen_growth_3d — but LEFT −cell_diffuse
+(the χ / reaction-diffusion axis) untested.** cell_diffuse is a physics DRIVER (the D in Turing RD), not
+bookkeeping → should run, not crash.
+
+**THIS R2 batch (4 slots, explore, 2 conf / 1 adv = 67/33; 2 in_paper / 1 excursion), single-op, no
+params — differs from the pivot by ONE edit (γ jam test → χ diffusion knockout):** s0 CONTROL parent 2
+(protr_peak 1.0–4.0) · **s2 −cell_diffuse** (ADV/EXCURSION — the χ axis; bet diffusion NOT load-bearing,
+protr_peak >=2.0; REFUTED <2.0 → genuine Turing deformation) · s1 +shape_energy_3d:default (CONF/in_paper
+— the "growth-driven emergent TARGET mechanism"; re-confirm prize, protr_peak >=2.0 & ta_n_tubes_final
+>=1) · s3 −morphogen_growth_3d (CONF/in_paper — does R2 growth-necessity GENERALISE? predict collapse
+protr_peak <=1.5; REFUTED >=2.0 → family-specific. NB pivot bet the OPPOSITE (>=2.0 redundant) → if both
+run, a robustness read on the most uncertain edit).
+
+**Over pivot + R2 the union covers ALL FOUR valid parent-2 edits.** Next-round hook: −cell_diffuse (χ)
+vs the pivot's −reconnect_t1_3d (γ) is the first cut at Okuda's (chi,gamma) plane. When results land:
+hunt a p_ratio~1 persistent bulge (first GROWN regime → seed-robustness next round); reject forced-
+drainage "tubes" via body-shrink/Q_drop; ignore watcher CONTRADICTS + rejected aspect/tube_len/retention.
+
+---
+
+## PROPOSAL ISSUED (this batch) — 2026-08-01 — PIVOT to parent 2 (Okuda RD family)
+
+**Run-counter reset again** (evidence header: "round 0, 0 runs, coverage 0%"); the true record is
+here + instruction.md through round 2. Do NOT re-derive from the header — use this file.
+
+**Decision:** parent 1 (round-33 forced recipe) is mapped enough — growth-FED FORCED extrusion,
+extrude + morphogen_growth_3d JOINTLY necessary (each knockout → sphere; R2 surprise 0.33), no
+p_ratio~1 grown regime. Pivoted budget to the UNMAPPED **parent 2 = reaction-diffusion
+"growth-driven monolayer (Okuda route)"** — the closest structure to Okuda's Turing-on-a-deforming-
+sheet and the real path to a GROWN morphology + (chi,gamma) diagram. It had NO baseline; this batch
+establishes it.
+
+**Batch (4 slots, explore, 2 conf / 1 adv, 2 in_paper / 1 excursion), all single-op edits on
+parent 2, no parameters:** s0 CONTROL (baseline, protr_peak 1.0–4.0) · s1 +shape_energy_3d:default
+(conf/in_paper — type system calls this the "growth-driven emergent TARGET mechanism"; protr_peak
+>=2.0 & ta_n_tubes_final >=1) · s2 −reconnect_t1_3d (conf/in_paper — deformation/topology axis, jam
+hyp protr_peak <=1.5) · s3 −morphogen_growth_3d (adv/EXCURSION — does R2 morphogen-necessity
+GENERALISE, or is growth REDUNDANT here given divide_3d + RD coupling? bet redundant, protr_peak
+>=2.0; refuted <2.0 → universally necessary).
+
+**AVOIDED known-invalid edits on parent 2:** +vesicle_growth:uniform_ramp (buffer saturates),
+−cell_geometry_3d / −cell_adjacency (load-bearing plumbing → crash, no diag.json). These stay off
+the table for every family.
+
+**When results land:** hunt a p_ratio~1 persistent bulge (first GROWN regime → seed-robustness next
+round); reject forced-drainage "tubes" via body-shrink/Q_drop; ignore watcher CONTRADICTS + rejected
+aspect/tube_len/retention. If s1 opens the target mechanism, next map its (chi,gamma)-analog routing.
+
+---
+
 ## META-REVIEW after Round 2 — 2026-07-30
 
 **Recurring patterns a proposer must carry forward (full detail in instruction.md LEARNED PATTERNS):**

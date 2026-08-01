@@ -1,80 +1,58 @@
 {
-  "reasoning": "Round 1 was a legitimate Loop-II vcap sweep whose real result was that divide_3d makes FORCED extrusions on this base (mech_p_ratio 1.8-42.9, visible body drainage in all 5 slots), non-monotone in vcap, with no growth-driven (p_ratio~1) regime anywhere -- and the solo lever-map is still empty (all 8 operators read 'insufficient'). Round 2 therefore spends its budget BUILDING the causal lever-map by knockout on the round-33 recipe rather than tuning: three single-operator removals (-extrude, -morphogen_growth_3d, -cell_geometry_3d) each give one clean lever reading, and two additions (Hertwig long-axis division; uniform vesicle_growth) hunt for the p_ratio~1 grown morphology Okuda's phase diagram actually targets. The sharpest pair is the dissociation between -extrude and -morphogen_growth_3d: if the protrusion is FORCED rather than GROWN, knocking out growth should leave protr_peak roughly unchanged while knocking out extrude should collapse it. Mix is 3 confirmatory / 2 adversarial, leaning adversarial per the supervisor's standing steer after R1's 92/8 drift; no parameter is changed and every non-control slot changes exactly one operator.",
+  "reasoning": "Two prior batches (pivot + R2) already proposed ALL FOUR valid single-op edits on parent 2 (the reaction-diffusion Okuda route), but no results have landed (header still shows round 3 / 0 runs / 0% coverage), so building further on parent 2 is blocked until data returns. To grow the map independent of that, this batch opens the UNMAPPED parent-3 family = 'uniform inflation' (vesicle_growth + divide_3d + shape_energy_3d + reconnect_t1_3d), the pure MECHANICAL-growth route that COMPLEMENTS parent 2's RD route: together they answer whether a grown morphology needs Turing reaction-diffusion (chi) or just mechanical growth+division. The central falsifiable question is whether ANY single edit breaks 'uniform inflation (no patterning)' into a patterned protrusion. s1 swaps shape_energy to the monolayer implementation (the shell-buckling / undulation route, Okuda Fig 7) betting AGAINST the type system's 'no patterning' label; s2 removes the growth driver to confirm vesicle_growth is necessary for the inflation and to record the family's first solo effect; s3 removes topology relief (reconnect_t1_3d) to test whether T1 transitions matter under isotropic growth. Baseline buffer-saturation risk (growth+division stack) is noted but lower than parent 2's triple-growth stack that saturated in R2, and two of three edits remove ops so they stay safe even if the control saturates.",
   "mode": "explore",
   "slots": [
     {
-      "parent_index": 0,
+      "parent_index": 3,
       "edit": null,
       "intent": "control",
-      "claim": "the round-33 recipe, unchanged -- the causal baseline every knockout is read against",
+      "territory": "in_paper",
+      "claim": "the parent, unchanged -- uniform inflation gives a smooth near-spherical body with no patterned protrusion",
       "metric": "protr_peak",
-      "predicted": "protr_peak 1.7-4.0",
-      "why": "control"
+      "predicted": "protr_peak 1.0-1.8 and ta_n_tubes_final <= 0",
+      "why": "control -- establishes the parent-3 baseline (this family has no recorded baseline yet). Headroom left because protr_peak is noisy at the top and R2's control drifted off its own prediction."
     },
     {
-      "parent_index": 0,
+      "parent_index": 3,
       "edit": {
-        "edit": ["remove_op", "extrude0"],
-        "label": "-extrude",
-        "yields": "growth-driven mid-surface"
+        "edit": ["set_impl", "shape_energy_3d0", "monolayer"],
+        "label": "=shape_energy_3d:monolayer",
+        "yields": "uniform inflation (no patterning)"
       },
-      "intent": "confirmatory",
-      "claim": "extrude supplies the protrusion force; removing it collapses the forced protrusion",
+      "intent": "adversarial",
+      "territory": "in_paper",
+      "claim": "swapping shape_energy_3d to the monolayer implementation buckles the uniformly-inflating shell into protrusions (undulation), contradicting the type system's 'no patterning' label",
       "metric": "protr_peak",
-      "predicted": "protr_peak <= 1.5",
-      "why": "R1 read every protrusion as FORCED (p_ratio 1.8-42.9, body drainage) and extrude is the prime suspect. This is the highest-value lever-map entry: if it collapses, extrude is the forcing op and any residual bulge is the campaign's first candidate GROWN mid-surface. REFUTED if protr_peak >= 2.0 -- then the force lives in divide_3d/morphogen, not extrude."
+      "predicted": "protr_peak >= 2.0 and ta_n_tubes_final >= 1",
+      "why": "Okuda Fig 7 undulation (chi=0.1, gamma=100) is a monolayer-shell buckling phenotype; a monolayer surface energy under active growth is the classic buckling condition. The type system predicts NO patterning here, so a >=2.0 protrusion would be a genuine surprise and the single most valuable read in this family. REFUTED if protr_peak < 2.0 (monolayer energy insufficient to pattern isotropic growth; type label confirmed)."
     },
     {
-      "parent_index": 0,
+      "parent_index": 3,
       "edit": {
-        "edit": ["remove_op", "morphogen_growth_3d0"],
-        "label": "-morphogen_growth_3d",
+        "edit": ["remove_op", "vesicle_growth0"],
+        "label": "-vesicle_growth",
         "yields": "mechanics-only (no growth)"
       },
       "intent": "confirmatory",
-      "claim": "growth is not what drives the round-33 protrusion; mechanics-only leaves peak height essentially intact",
+      "territory": "in_paper",
+      "claim": "removing vesicle_growth removes the driver of the inflation, collapsing the body to a static mechanical mesh with no protrusion",
       "metric": "protr_peak",
-      "predicted": "protr_peak >= 2.0",
-      "why": "The mirror of the -extrude knockout and the direct test of R1's 'forced, never grown' verdict: if height is set by mechanics, removing the morphogen growth field should not collapse it. REFUTED if protr_peak <= 1.5 -- growth was load-bearing after all and the forced reading is wrong."
+      "predicted": "protr_peak <= 1.5",
+      "why": "Maps the solo necessity of the growth driver in this family (the solo-effects table is empty). Safe edit -- a removal that drops the family into the known mechanics-only region. REFUTED if protr_peak > 1.5 (division alone sustains shape change without vesicle growth)."
     },
     {
-      "parent_index": 0,
+      "parent_index": 3,
       "edit": {
-        "edit": ["remove_op", "cell_geometry_3d0"],
-        "label": "-cell_geometry_3d",
-        "yields": "driven + forced (round-33 recipe)"
-      },
-      "intent": "adversarial",
-      "claim": "cell_geometry_3d is inert per-frame bookkeeping, not a driver; its removal does not change protrusion height",
-      "metric": "protr_peak",
-      "predicted": "protr_peak >= 2.0",
-      "why": "Genuinely uncalled: cell_geometry_3d either is passive shape bookkeeping (my bet) or is the geometric substrate every mechanical op reads, in which case its knockout silently destroys the tube. With all solo effects 'insufficient' this is a foundational lever-map entry. REFUTED if protr_peak <= 1.5 or ta_n_tubes_final == 0."
-    },
-    {
-      "parent_index": 0,
-      "edit": {
-        "edit": ["add_op", "divide_3d", "hertwig"],
-        "label": "+divide_3d:hertwig",
-        "yields": "driven + forced (round-33 recipe)"
+        "edit": ["remove_op", "reconnect_t1_3d0"],
+        "label": "-reconnect_t1_3d",
+        "yields": "uniform inflation (no patterning)"
       },
       "intent": "confirmatory",
-      "claim": "adding Hertwig-rule (long-axis) oriented division feeds cells into the elongating protrusion and sustains at least one tube",
-      "metric": "ta_n_tubes_final",
-      "predicted": "ta_n_tubes_final >= 1",
-      "why": "Division along the cell long axis is a canonical tube-elongation mechanism; cells born in an elongating protrusion should extend it rather than widen the body. REFUTED if ta_n_tubes_final == 0 or protr_final < control protr_final."
-    },
-    {
-      "parent_index": 0,
-      "edit": {
-        "edit": ["add_op", "vesicle_growth", "uniform_ramp"],
-        "label": "+vesicle_growth:uniform_ramp",
-        "yields": "driven + forced (round-33 recipe)"
-      },
-      "intent": "adversarial",
-      "claim": "a uniform volume ramp channels into a grown bulge that still registers elevated protr_peak, rather than merely inflating the sphere",
+      "territory": "excursion",
+      "claim": "removing T1 topology relief leaves the isotropic-growth shape essentially unchanged -- reconnect_t1_3d is remodeling plumbing, not a shape driver under uniform growth",
       "metric": "protr_peak",
-      "predicted": "protr_peak >= 2.0",
-      "why": "R1 found NO grown (p_ratio~1) regime anywhere on this substrate; uniform growth is the most direct way to add mass without a forcing extrusion. Whether it forms a tube or just swells the body is exactly the uncalled question the map needs. REFUTED if protr_peak < 1.5 -- uniform growth only inflates and the grown-tube regime is still unfound."
+      "predicted": "protr_peak 1.0-1.8",
+      "why": "Excursion: Okuda never isolates growth WITHOUT topology relief. Confirmatory bet that isotropic inflation needs no T1 remodeling, so protr_peak stays near control. REFUTED if protr_peak >= 2.0 -- suppressed T1 transitions store growth stress that buckles the shell into protrusions, making reconnect_t1_3d a hidden anti-buckling regulator (Okuda's gamma / deformation-rate axis)."
     }
   ]
 }
