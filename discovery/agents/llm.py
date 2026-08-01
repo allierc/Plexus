@@ -46,6 +46,10 @@ USER_INPUT = os.path.join(CAMPAIGN, "user_input.md")
 
 DEFAULT_TIMEOUT_MIN = 12
 
+# Every LLM call ever made, one JSON line each: tokens, turns, seconds, dollars.
+USAGE_LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "_metrology", "llm_usage.jsonl")
+
 # ---------------------------------------------------------------------------------------------
 # PER-AGENT BUDGETS.  (minutes, max_turns, tools)
 #
@@ -177,18 +181,33 @@ class BudgetLedger:
         r["kind"] = kind
         return r
 
-    def record(self, agent, minutes, ok=True, kind="llm", note=""):
+    def record(self, agent, minutes, ok=True, kind="llm", note="", usage=None):
+        usage = usage or {}
         for d in (self.round, self.total):
             r = self._row(d, agent, kind)
             r["calls"] += 1
             r["minutes"] += minutes
             r["ok" if ok else "failed"] += 1
+            for k in ("input_tokens", "output_tokens", "cache_creation", "cache_read",
+                      "num_turns", "cost_usd"):
+                if usage.get(k) is not None:
+                    r[k] = r.get(k, 0) + usage[k]
         if kind == "llm":
             self.round_spent += minutes
             self.total_spent += minutes
         self.calls += 1
-        self.events.append({"agent": agent, "min": round(minutes, 3), "ok": bool(ok),
-                            "kind": kind, "note": note})
+        ev = {"agent": agent, "min": round(minutes, 3), "ok": bool(ok),
+              "kind": kind, "note": note, **usage}
+        self.events.append(ev)
+        # APPEND-ONLY, ON EVERY CALL. A crash mid-round must not erase what the round already
+        # spent -- that is how a campaign comes to believe it was free.
+        try:
+            os.makedirs(os.path.dirname(USAGE_LOG), exist_ok=True)
+            with open(USAGE_LOG, "a") as fh:
+                fh.write(json.dumps({"t": time.time(), "round": getattr(self, "round_id", None),
+                                     **ev}) + "\n")
+        except Exception as e:
+            print(f"[ledger] could not append usage: {type(e).__name__}: {e}", flush=True)
 
     def record_skip(self, agent, why):
         for d in (self.round, self.total):
@@ -231,16 +250,22 @@ class BudgetLedger:
 
     # ------------------------------------------------------------------ reporting
     def summary(self):
-        """Backwards-compatible grand total, plus the fields the old one could not tell you.
-
-        Two decimals, not one: the old `round(x, 1)` printed a real 0.04 min as `0.0`, i.e. it
-        could report "free" for work that happened. Sub-minute resolution is the whole point.
-        """
-        return {"calls": self.calls, "round_min": round(self.round_spent, 2),
+        """One line a round can print. Now carries what it COST, not just how long it took."""
+        tot = {k: 0 for k in ("input_tokens", "output_tokens", "cache_creation", "cache_read",
+                              "num_turns", "cost_usd")}
+        for e in self.events:
+            for k in tot:
+                if e.get(k) is not None:
+                    tot[k] += e[k]
+        return {"calls": self.calls,
+                "round_min": round(self.round_spent, 2),
                 "total_min": round(self.total_spent, 2),
-                "wall_min": round((time.time() - self.t_round0) / 60.0, 2),
-                "roles": len(self.round),
-                "budget_exceeded": bool(self.overruns),
+                "turns": tot["num_turns"],
+                "tok_in": tot["input_tokens"], "tok_out": tot["output_tokens"],
+                "cache_new": tot["cache_creation"], "cache_hit": tot["cache_read"],
+                "usd": round(tot["cost_usd"], 3),
+                "roles": len({e["agent"] for e in self.events}),
+                "budget_exceeded": bool(getattr(self, "_over", False)),
                 "unmetered": len(self.unmetered)}
 
     def breakdown(self, scope="round"):
@@ -348,7 +373,8 @@ def run_agent(agent, prompt, ledger=None, **over):
         # RECORD IN `finally`: a call that raises still SPENT the wall-clock, and a crash that
         # erased its own cost is how a round comes to believe it was free.
         if ledger is not None:
-            ledger.record(agent, (time.time() - t0) / 60.0, ok=ok)
+            ledger.record(agent, (time.time() - t0) / 60.0, ok=ok,
+                          usage=last_usage())
     return ok, out
 
 
@@ -380,6 +406,62 @@ def _catch_bypass(timeout_min):
 
 
 # --------------------------------------------------------------------------- the CLI
+
+# ============================================================================ usage accounting
+# WHAT A CALL ACTUALLY COSTS. Measured, not assumed -- and the first measurement was a surprise
+# worth writing down: a call that returns the single word "ok" reports 2,993 input tokens and
+# 28,868 cache-creation tokens. The fixed overhead of starting an agent dwarfs the task. On a
+# WARM cache the same call costs about a tenth of that, so the lever is the NUMBER of calls and
+# how close together they run -- not the timeout, and not the turn cap.
+_LAST_USAGE = {}
+
+
+def _absorb_event(line, quiet):
+    """Parse one stream-json line. Returns text worth keeping, and records the result event.
+
+    Anything unparseable is passed through rather than dropped: a crash in the CLI arrives as
+    plain text on stdout, and swallowing it would turn a loud failure into a silent empty answer.
+    """
+    raw = line.strip()
+    if not raw:
+        return ""
+    try:
+        ev = json.loads(raw)
+    except Exception:
+        if not quiet:
+            print(line, end="", flush=True)
+        return line
+    kind = ev.get("type")
+    if kind == "result":
+        u = ev.get("usage", {}) or {}
+        _LAST_USAGE.update(
+            num_turns=ev.get("num_turns"),
+            duration_ms=ev.get("duration_ms"),
+            duration_api_ms=ev.get("duration_api_ms"),
+            cost_usd=ev.get("total_cost_usd"),
+            input_tokens=u.get("input_tokens"),
+            output_tokens=u.get("output_tokens"),
+            cache_creation=u.get("cache_creation_input_tokens"),
+            cache_read=u.get("cache_read_input_tokens"),
+            stop_reason=ev.get("stop_reason"),
+            is_error=ev.get("is_error"),
+            session_id=ev.get("session_id"),
+        )
+        return ev.get("result", "") or ""
+    if kind == "assistant" and not quiet:
+        for blk in (ev.get("message", {}) or {}).get("content", []) or []:
+            if blk.get("type") == "text" and blk.get("text", "").strip():
+                print(blk["text"][:400], flush=True)
+            elif blk.get("type") == "tool_use":
+                print(f"  [tool] {blk.get('name')}", flush=True)
+    return ""
+
+
+def last_usage():
+    """Usage of the most recent run_claude call. Empty if the result event never arrived."""
+    return dict(_LAST_USAGE)
+
+
 def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=None,
                max_turns=60, quiet=False):
     """Run the Claude CLI as a subprocess. Returns (ok, text).
@@ -394,9 +476,15 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     if _METER_DEPTH == 0:
         _catch_bypass(timeout_min)
     allowed_tools = allowed_tools or DEFAULT_TOOLS
-    cmd = ["claude", "-p", prompt, "--output-format", "text",
+    # stream-json, NOT text. `text` gives no usage at all, and `json` buffers everything to the
+    # end -- which would break the timeout below, since it fires while reading lines. stream-json
+    # keeps the line-by-line stream AND ends with a `result` event carrying tokens, turns,
+    # duration and cost. That event is the whole point: until now the ledger measured minutes,
+    # and minutes are not what a subscription is spent in.
+    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--max-turns", str(max_turns), "--allowedTools", *allowed_tools]
     lines, t0 = [], time.time()
+    _LAST_USAGE.clear()
     try:
         proc = subprocess.Popen(cmd, cwd=cwd or ROOT, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -404,9 +492,9 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
         return False, "claude CLI not found on PATH"
     try:
         for line in proc.stdout:
-            if not quiet:
-                print(line, end="", flush=True)
-            lines.append(line)
+            text = _absorb_event(line, quiet)          # parses usage; returns human-readable text
+            if text:
+                lines.append(text)
             if time.time() - t0 > timeout_min * 60:
                 proc.kill()
                 lines.append(f"\n[llm] TIMEOUT after {timeout_min} min -- killed\n")

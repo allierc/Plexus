@@ -320,7 +320,8 @@ OPERATORS = {
     "seed_mesh_3d": dict(
         stage=1, role="substrate", outputs=[], slots=[], needs=[],
         impls=["fibonacci_sphere", "checkpoint"], impl_structural=False,
-        params={"n_cells": (150, 2000, 500), "vseed_cv": (0.0, 0.5, 0.15)}),
+        params={"n_cells": (150, 4000, 500),          # 4000 = Okuda's largest case (grounder.SETUP)
+                "vseed_cv": (0.0, 0.5, 0.15)}),
     "shape_energy_3d": dict(
         stage=1, role="mechanics", outputs=["geometry"], slots=[], needs=[],
         impls=["default", "monolayer"], impl_structural=True,       # mid-surface vs true 3D volume
