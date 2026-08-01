@@ -1099,18 +1099,69 @@ $K=8$, so we cannot claim the $K=8$ answer has converged either.
 
 That is precisely the failure this note predicted --- ``optimising against that sample's luck'' ---
 caught by measurement rather than by argument, and it would have been invisible to anyone who ran
-one fit and believed it.
+one fit and believed it. \emph{It is also not the end of the story:}
+\S\ref{sec:p6verdict} runs the same grid four times longer and finds the drift was the step
+budget, not the estimator. The paragraph above is kept as it stood, because the intermediate
+reading was the honest one on the evidence then available.
 
-\textbf{What it does and does not settle.} It does \emph{not} yet convict the estimator. The drift
-is a bias in \emph{the answer after a fixed 20-step budget}, and a noisy gradient with a truncated
-Adam run lags its target for reasons that have nothing to do with the estimator being biased.
-Separating the two needs each $K$ run to convergence rather than to a step count, which is cheap
-and is the next experiment. So the reference's trace/replay/score contract moves from
-\emph{required} to \emph{still open} --- weaker than the note previously assumed, and the honest
-position.
+\subsection{Resolved: it was the budget, not the estimator}\label{sec:p6verdict}
 
-\textbf{For Figure 5 the operational conclusion is already usable}: fit with $K$ seeds averaged
-per step, never one, and treat any single-seed number as a draw rather than an answer.
+The 20-step drift had two possible causes and that sweep could not separate them. A \emph{biased}
+estimator points somewhere other than downhill and no step budget fixes it --- the trace contract
+would then be required. A \emph{truncated} budget means the estimator is fine but a noisier
+gradient converges more slowly, so at a fixed 20 steps the low-$K$ runs simply had not arrived.
+
+The discriminator is to run the same grid four times longer and Polyak-average the tail. 32 more
+jobs on \code{gpu\_l4}, 80 steps, mean of the last 30:
+
+\begin{center}
+\small
+\begin{tabular}{@{}r r r r r r@{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{20 steps} (final value)} & \multicolumn{2}{c}{\textbf{80 steps}
+(tail-30 mean)}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+$K$ & mean & $\sigma$ & mean & $\sigma$\\
+\midrule
+1 & 1.2072 & 0.0763 & 1.1007 & 0.0798\\
+2 & 1.2606 & 0.0548 & 1.1738 & 0.0442\\
+4 & 1.2589 & 0.0405 & 1.1409 & 0.0213\\
+8 & 1.2885 & 0.0220 & 1.1454 & 0.0188\\
+\midrule
+\multicolumn{1}{@{}l}{drift $K{=}1\!\to\!8$} & \multicolumn{2}{c}{$+0.081$, \ $t = 2.90$}
+ & \multicolumn{2}{c}{$+0.045$, \ $t = \mathbf{1.54}$}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\includegraphics[width=0.72\textwidth]{_state/phase6_verdict.png}
+\end{center}
+
+\textbf{The drift collapsed}, from $t = 2.90$ to $t = 1.54$, and at 80 steps every $K \geq 2$
+agrees within error ($1.174$, $1.141$, $1.145$) where the 20-step curve was still climbing.
+
+\textbf{And the mechanism is identifiable, not merely inferred.} Reading the trajectories directly:
+in every $K{=}8$ run the parameter rises past its target, peaks at \textbf{step 22--26}
+(median 24.5), and settles back. \emph{A 20-step budget stops on the rising edge of Adam's
+overshoot} --- it samples a transient rather than an optimum. That is also why the apparent bias
+was $K$-dependent: mid-climb, a noisier gradient has climbed less far, so low $K$ reads low. The
+statistical result and the mechanical explanation agree.
+
+\textbf{So: truncation, not bias.} The straight-through gradient through a discrete division is a
+sound estimator --- noisy, converging at the ordinary $1/\sqrt{K}$ rate ($\sigma \propto K^{-0.73}$
+here), and unbiased as far as this can measure. \textbf{Figure~5 is an engineering problem}, and
+the reference's trace/replay/score contract is an optimisation rather than a prerequisite. That is
+the opposite of what this note assumed two sections ago, and the reason to have measured it.
+
+\textbf{What is still not proven.} $t = 1.54$ is not significance, but it is not a strong null
+either: $K{=}1$ still sits $0.045$ below $K{=}8$, and with $n = 8$ the power to detect a residual
+bias that size is poor. What the data support is that any remaining bias is small compared with the
+one truncation produced. And this is one parameter, one target, one model --- not a general result
+about straight-through estimators.
+
+\textbf{The operational rule survives either way}: average $K$ seeds per step, never one, and run
+past the overshoot rather than to a step count.
 
 \subsection{And it optimises}
 
