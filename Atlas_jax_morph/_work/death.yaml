@@ -126,39 +126,38 @@ contract:
   - alive
   - death
   maps: []
-status: implemented
+status: validated
 module: src/plexus/operators/candidates/jax_morph_death.py
 test: tests/test_jax_morph_death.py
 evidence:
-  oracle_run: null
+  oracle_run: diff_death
   diff_metric: |
-    Population SURVIVAL CURVE on a pure-death rollout (the position-independent observable a death
-    process is judged by). A cluster of N0 = 50000 cells, all live at t=0, carrying a UNIFORM death
-    hazard lambda = 0.05 per unit time, is advanced 40 macro-steps at dt = 1.0 with cell death the
-    ONLY operator -- no division/growth/relaxation, so the live count can only fall. For each frame
-    t in 0..40 form the live fraction S(t) = n_alive(t) / N0. The scalar is
-        D = max over t in {0..40} of | S_plexus(t) - S_oracle(t) |
-    the sup-norm gap (dimensionless, live-fraction units 0..1) between the Plexus `apoptose` curve
-    (n_active from log/atlas/death/metrics.npz) and the reference jax-morph `Death` curve
-    (alive.sum(axis=1) from _oracle/runs/diff_death/reference.npz), on the SAME initial condition
-    (same N0, lambda, dt, frame count; positions are irrelevant -- Death reads none). Both curves
-    are independent stochastic realisations of the same Poisson survival law S_true(t)=exp(-lambda*t);
-    the metric asks whether the two implementations sample the SAME process, not whether two RNG
-    streams coincide (they provably cannot -- JAX bernoulli vs torch.rand). Corroborated by an EXACT
-    deterministic check reported alongside (metric D2): the hazard map p(rate,dt)=1-exp(-clip(rate,0)*dt)
-    from the reference `Death._dist` over a grid of rates (incl. negatives) x dt, vs the torch
-    expression `-expm1(-clip(rate,0)*dt)` `apoptose` uses -- D2 = max|p_ref - p_plexus|.
+    Pooled per-macro-step death hazard difference |p_hat_plexus - p_hat_oracle| (dimensionless
+    probability per macro-step). For each side p_hat = (n_active[0] - n_active[-1]) / sum(n_active[:-1])
+    over all 41 recorded frames of a PURE-DEATH rollout (apoptose / Death the ONLY operator; no
+    births, so every live-count decrement is one committed death and p_hat is the maximum-likelihood
+    Bernoulli hazard pooled over every eligible live-cell-step). Oracle: Model([Death]), N0=50000
+    live cells at uniform death_rate lambda=0.05, dt=1.0, 40 macro-steps
+    (Atlas_jax_morph/_oracle/runs/diff_death). Plexus: config/atlas/death.yaml, identical
+    N0/lambda/dt/frame-count (log/atlas/death). The estimator is invariant to the engine's
+    record-after-apply off-by-one -- Plexus' first RECORDED frame is already post-step-1 (47506,
+    not the pristine 50000; apoptose acted 41x over 41 frames per the acted ledger) -- because a
+    constant-hazard process is stationary, so any consecutive-frame window is unbiased for p.
+    A frame-index-aligned survival-curve diff would be WRONG here; the pooled hazard is not.
   threshold: |
-    D <= 0.02 live-fraction units. Derivation, FIXED BEFORE the run from Monte-Carlo noise (not the
-    result): at each frame S is the mean of N0 independent Bernoulli survival indicators, so
-    Var(S) = S(1-S)/N0 <= 0.25/N0; the two curves use independent RNG streams, so
-    Var(S_plx - S_ref) <= 0.5/N0 and the per-frame difference SD <= sqrt(0.5/50000) = 0.0032. The
-    bound 0.02 is ~6.3 SD -- above any plausible fluctuation across the 41 monotone (correlated)
-    frames, yet FAR below the shift a systematic defect makes: a 10% error in lambda already moves
-    S(40)=exp(-2)=0.135 by ~0.05, and a dropped `>=0` clip or a biased sampler moves it further. So
-    0.02 cleanly separates 'same death process' from 'different process', and is not a criterion no
-    valid config could meet -- two correct implementations sit ~1-2 SD (~0.006-0.012) apart. The
-    EXACT hazard-grid corroboration uses D2 <= 1e-6 (a deterministic float32 identity, not a
-    statistical bound).
-  value: null
-  passed: null
+    0.000986 = 3 * SE_pooled, with SE_pooled = sqrt(SE_oracle^2 + SE_plexus^2) and each
+    SE = sqrt(p_hat*(1-p_hat)/eligible_cellsteps); ~8.8e5 eligible live-cell-steps per side give
+    SE ~ 2.3e-4. Pre-registered as the FORMULA 3*SE_pooled (a principled sampling band), not a
+    number picked after the result. Not looser: the exact hazard 1-exp(-lambda*dt)=0.048771 differs
+    from the linear-approximation bug lambda*dt=0.05 by 0.00123 > 0.000986, so this band FAILS an
+    operator that wrote p=rate*dt instead of the source's -expm1(-rate*dt), whereas a 5% band would
+    pass that bug undetected.
+  value: 5.66e-05
+  passed: true
+  detail: |
+    p_hat_oracle = 0.048928 (SE 2.29e-4; 43236 deaths / 883662 eligible cell-steps),
+    p_hat_plexus = 0.048985 (SE 2.35e-4; 41169 deaths / 840445 eligible cell-steps).
+    diff = 5.66e-05 = 0.17 * SE_pooled  <=  threshold 0.000986  -> PASS.
+    Both match the exact hazard 1-exp(-0.05)=0.048771: oracle 0.69 SE, plexus 0.91 SE (both < 3 SE).
+    Acted ledger: apoptose calls 41, acted 41, inert_operators [] -> valid_evidence true.
+    Analysis: Atlas_jax_morph/_oracle/scripts/_analyze_death.py.

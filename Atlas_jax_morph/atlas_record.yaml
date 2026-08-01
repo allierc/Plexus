@@ -167,14 +167,106 @@ mechanisms:
     writes:
     - gene
     maps: []
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_gene_network_connectionist.py
   test: tests/test_jax_morph_gene_network_connectionist.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_gene_network_connectionist
+    diff_metric: 'max over {frame 0..20, cell 0..5, gene 0..4} of |G_eng - G_ref|, in float32 gene-concentration
+
+      units. G_ref = the reference GeneNetworkConnectionist Dopri5 trajectory
+
+      (_oracle/runs/diff_gene_network_connectionist/reference.npz[''gene'']; diffrax PIDController
+
+      rtol=1e-4 atol=1e-6). G_eng = the Plexus ENGINE''s recorded per-cell `gene` block from
+
+      graphs_data/atlas/gene_network_connectionist/simulation.zarr, where regulate:connectionist
+
+      self-solves each macro-step with fixed-step RK4 (substeps=64) and returns (g(dt)-g0)/dt so the
+
+      engine''s g += dt*delta recovers g(dt). Both sides integrate the byte-identical vector field
+
+      dg/dt = sigma_alg(g @ W_gene^T + u @ W_in^T + b) - gamma*g, with sigma_alg(x) = 0.5 + 0.5*x/
+
+      sqrt(1+x^2), from an identical seeded g0 (5-vector), a frozen u (2-vector) and identical params,
+
+      all emitted by ONE generator (_gen_gene_network_connectionist.py) so the two sides cannot drift
+
+      apart. Arrays are 21 frames x 6 cells x 5 genes; frame k = g(k*dt); this is a full end-to-end
+
+      run_spec.py engine trajectory, NOT an operator-level probe. Driver
+
+      Atlas_jax_morph/diff_gene_network_connectionist.py; artefact
+
+      _oracle/runs/diff_gene_network_connectionist/diff.json.
+
+      '
+    threshold: '5.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the run from integrator physics,
+      not
+
+      from the observed number. Both sides integrate the identical vector field from an identical IC,
+
+      so the only admissible disagreement is the integrator gap (fixed-step RK4-64 vs adaptive Dopri5
+
+      rtol=1e-4) plus cross-backend float32 rounding. The reference rtol=1e-4 over the O(8.8) gene
+
+      magnitudes bounds per-step truncation at ~1e-3 and it does NOT amplify: at large drive the
+
+      algebraic sigmoid saturates (sigma''->0), the Jacobian tends to -diag(gamma), a contraction that
+
+      damps error toward g* ~ sigma/gamma ~ 10. 5e-3 gives ~5x margin over that a-priori ceiling yet
+
+      stays ~2 orders below the O(0.5-1) divergence any real mechanism error makes within a few frames
+
+      (logistic instead of the algebraic sigmoid; input added OUTSIDE the sigmoid per the paper vs
+
+      inside via W_in; a decay sign flip). A tighter 1e-3 would risk a false fail from the honest
+
+      integrator gap -- the criterion-no-valid-config-can-meet trap. It certifies formula-identity,
+
+      not a fitted tolerance.
+
+      '
+    value: 6.67572021484375e-06
+    passed: true
+    result: 'PASS by ~3 orders of magnitude. max|dev| = 6.68e-6 (float32 rounding, not Dopri5 truncation)
+      <<
+
+      threshold 5e-3, so the verdict does not hinge on the threshold choice. The signature confirms it
+
+      is integrator/rounding-limited, not a reaction-law error: frame-0 deviation is EXACTLY 0 (the
+
+      shared seeded IC), grows MONOTONE to 4.8e-6 by the final frame, and the max sits at frame 17,
+
+      cell 0, gene 4 -- the largest gene (~8.4), where float32 rounding is largest (relative 8.0e-7).
+
+      Final cell-0 genes agree component-wise to ~1e-6 (ref [7.3356, 0.3709, 2.9444, 1.3693, 8.7943]
+
+      vs eng [7.3356, 0.3709, 2.9444, 1.3693, 8.7942]). INDEPENDENTLY reproduced by this differ in
+
+      pure numpy (oracle venv, no torch): a fine RK4(4096) reproduces reference.npz to 3.1e-6 (the
+
+      reference IS a genuine integration of the stated field), and an RK4-64 engine-replica matches the
+
+      reference to 3.1e-6 in float64 -- corroborating the torch number. The pre-registered
+
+      discriminators, run in that same numpy harness, blow past the threshold: the WRONG logistic
+
+      sigmoid lands 1.31 from the reference and the paper''s input-OUTSIDE-sigmoid form lands 2.38
+
+      (~2.5 orders over 5e-3), so the metric genuinely catches the SOURCE-WINS mechanism choices.
+
+      Acted ledger checked FIRST (log/atlas/gene_network_connectionist/diag.json): regulate 20/20
+
+      calls acted, moved 0.823 (the ODE really evolved the gene block), seed_state 1/1,
+
+      inert_operators [], valid_evidence true -- the metric is on a live operator, not an inert one.
+
+      Score driver _oracle/runs/diff_gene_network_connectionist/diff.json; engine evidence
+
+      log/atlas/gene_network_connectionist/.
+
+      '
   state_io_notes:
     reads:
     - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
@@ -794,14 +886,88 @@ mechanisms:
     writes:
     - gene
     maps: []
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_odecontroller.py
   test: tests/test_jax_morph_odecontroller.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_odecontroller
+    diff_metric: 'D_inf -- the sup-norm (max absolute difference) between the Plexus engine''s recorded
+      per-cell
+
+      gene trajectory and the jax-morph GeneNetworkConnectionist reference trajectory y_uniform,
+
+      taken over ALL 22 recorded frames (tick 0 = the seeded initial condition, ticks 1..21 = the
+
+      21 integrated macro-steps), all 4 live cells, and all 3 gene components
+
+      [gene_hidden, g_out0, g_out1]. Both trajectories are produced on the SAME initial condition
+
+      (every gene 0), the SAME frozen drive u = [0.8, 0.3], the SAME 3-gene connectionist circuit
+
+      (W_gene, W_in, b; gamma = 1.0), the SAME dt = 1.0 and 21 macro-steps. Units: gene
+
+      concentration (dimensionless; the circuit''s fixed points here are O(0.3-0.85)). The engine
+
+      gene trajectory is out["sets"]["cell"]["state"]["gene"] from the engine run of
+
+      config/atlas/odecontroller.yaml; the reference is reference.npz:y_uniform. Reported in
+
+      evidence.value. Corroborated (not the primary number) by D_inf on a DISTINCT-drive run (a
+
+      different frozen u per cell) vs reference.npz:y_distinct, which further checks that the
+
+      operator leaks NO cell-to-cell coupling -- the maps=[] intracellular identity on which the
+
+      `new`-over-`signal` verdict rests.
+
+      '
+    threshold: '2e-4. Both sides integrate the IDENTICAL right-hand side with an adaptive Dopri5 controlled
+      to
+
+      rtol = 1e-4, atol = 1e-6 (reference: diffrax.PIDController; operator: a hand-rolled
+
+      Dormand-Prince 5(4) with the same tolerances), so two faithful integrations of the same ODE
+
+      can sit apart by at most ~2*(rtol*|y| + atol) ~ 2e-4 on these O(1) gene values -- the a-priori
+
+      bound on two independent rtol=1e-4 solvers, hence a bar a CORRECT integrator is guaranteed to
+
+      meet (it is not tuned to the observed number). It is not looser (e.g. 1e-2) because the
+
+      failure modes this test exists to catch -- the wrong saturation (logistic vs the algebraic
+
+      0.5 + 0.5 x/sqrt(1 + x^2)), the paper''s additive forcing OUTSIDE the sigmoid instead of the
+
+      code''s W_in@u INSIDE it, or a mis-scaled / omitted inc-over-dt increment (a double
+
+      integration) -- each shift the O(1) fixed points by >= 1e-2, i.e. >= 50x this bar, so 2e-4
+
+      cleanly separates "the same circuit solved to solver tolerance" from "a different circuit".
+
+      '
+    value: 2.44e-06
+    passed: true
+    value_note: '2.44e-06 is the PRIMARY D_inf on the uniform run (the spec config/atlas/odecontroller.yaml
+
+      that run_spec.py executes). The DISTINCT-drive corroboration run (per-cell u, stepped through
+
+      the engine''s own gene += dt*delta) gives D_inf 2.56e-06 vs reference.npz:y_distinct, so BOTH
+
+      the uniform and the four-distinct-drive trajectories reproduce the reference to ~2.5e-06 --
+
+      ~80x under the 2e-4 bar. Per-frame error peaks at 2.44e-06 mid-trajectory and decays to 0 as
+
+      the circuit reaches its fixed point (two accurate adaptive Dopri5 integrations of a contracting
+
+      ODE, NOT accumulating disagreement). Full breakdown in
+
+      _oracle/runs/diff_odecontroller/diff.json. Engine evidence: log/atlas/odecontroller/ (acted
+
+      ledger: regulate acted 19/21 -- the last two near-fixed-point ticks emit a delta below the
+
+      float32 ledger threshold; genuine convergence, not a no-op; valid_evidence true).
+
+      '
   disputed:
     by: skeptic
     was: new
@@ -1114,14 +1280,66 @@ mechanisms:
     - alive
     - death
     maps: []
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_death.py
   test: tests/test_jax_morph_death.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_death
+    diff_metric: 'Pooled per-macro-step death hazard difference |p_hat_plexus - p_hat_oracle| (dimensionless
+
+      probability per macro-step). For each side p_hat = (n_active[0] - n_active[-1]) / sum(n_active[:-1])
+
+      over all 41 recorded frames of a PURE-DEATH rollout (apoptose / Death the ONLY operator; no
+
+      births, so every live-count decrement is one committed death and p_hat is the maximum-likelihood
+
+      Bernoulli hazard pooled over every eligible live-cell-step). Oracle: Model([Death]), N0=50000
+
+      live cells at uniform death_rate lambda=0.05, dt=1.0, 40 macro-steps
+
+      (Atlas_jax_morph/_oracle/runs/diff_death). Plexus: config/atlas/death.yaml, identical
+
+      N0/lambda/dt/frame-count (log/atlas/death). The estimator is invariant to the engine''s
+
+      record-after-apply off-by-one -- Plexus'' first RECORDED frame is already post-step-1 (47506,
+
+      not the pristine 50000; apoptose acted 41x over 41 frames per the acted ledger) -- because a
+
+      constant-hazard process is stationary, so any consecutive-frame window is unbiased for p.
+
+      A frame-index-aligned survival-curve diff would be WRONG here; the pooled hazard is not.
+
+      '
+    threshold: '0.000986 = 3 * SE_pooled, with SE_pooled = sqrt(SE_oracle^2 + SE_plexus^2) and each
+
+      SE = sqrt(p_hat*(1-p_hat)/eligible_cellsteps); ~8.8e5 eligible live-cell-steps per side give
+
+      SE ~ 2.3e-4. Pre-registered as the FORMULA 3*SE_pooled (a principled sampling band), not a
+
+      number picked after the result. Not looser: the exact hazard 1-exp(-lambda*dt)=0.048771 differs
+
+      from the linear-approximation bug lambda*dt=0.05 by 0.00123 > 0.000986, so this band FAILS an
+
+      operator that wrote p=rate*dt instead of the source''s -expm1(-rate*dt), whereas a 5% band would
+
+      pass that bug undetected.
+
+      '
+    value: 5.66e-05
+    passed: true
+    detail: 'p_hat_oracle = 0.048928 (SE 2.29e-4; 43236 deaths / 883662 eligible cell-steps),
+
+      p_hat_plexus = 0.048985 (SE 2.35e-4; 41169 deaths / 840445 eligible cell-steps).
+
+      diff = 5.66e-05 = 0.17 * SE_pooled  <=  threshold 0.000986  -> PASS.
+
+      Both match the exact hazard 1-exp(-0.05)=0.048771: oracle 0.69 SE, plexus 0.91 SE (both < 3 SE).
+
+      Acted ledger: apoptose calls 41, acted 41, inert_operators [] -> valid_evidence true.
+
+      Analysis: Atlas_jax_morph/_oracle/scripts/_analyze_death.py.
+
+      '
 - id: free_screened_diffusion
   order: 7
   raw_name: FreeScreenedDiffusion
@@ -1286,14 +1504,97 @@ mechanisms:
     - chemical
     maps:
     - pairwise
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_free_screened_diffusion.py
   test: tests/test_jax_morph_free_screened_diffusion.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_free_screened_diffusion
+    diff_metric: 'D_max = max over all four fixed configs (C_anchor = 2-D disk, the anchor''s 4 founders;
+      C2 = 2-D
+
+      disk adversarial; C3 = 3-D sphere adversarial; C1 = 1-D segment adversarial), over all array
+
+      slots (live AND dead), and over all field species, of the RELATIVE error
+
+      |c_plx - c_ref| / max(|c_ref|, 1e-6). Here c is the steady-state per-cell chemical concentration
+
+      (dimensionless field units) written by ONE quasistatic solve on an IDENTICAL matched state
+
+      (pos, radius, alive, secretion_rate). c_ref is the jax reference FreeScreenedDiffusion field
+
+      (float32); c_plx is the torch MorphogenFreeSpace field (float32) run on the SAME saved state.
+
+      There is no integrator, no trajectory and no dt (dt/key asserted inert on both sides -- the
+
+      field is a t=infinity constraint solve), so the number is pure algorithm agreement. The 1e-6
+
+      floor makes the ratio relative where the field is resolvable and floored-absolute where it is
+
+      ~0, so a near-zero true value cannot manufacture a spurious infinite ratio. Gated additionally
+
+      on all-finite and every DEAD slot being exactly 0.0 on the Plexus side (the twice-applied alive
+
+      mask). Scored on the saved fields in _oracle/runs/diff_free_screened_diffusion (diff.json) with
+
+      no re-simulation, so oracle and Plexus cannot drift apart.
+
+      '
+    threshold: '1.0e-3 (relative), fixed BEFORE the run. float32 carries ~7 significant digits (eps ~1.2e-7);
+      a
+
+      dense all-pairs Green''s-function superposition -- plus, in 2-D, a truncated Abramowitz-and-Stegun
+
+      Bessel K0/K1 series -- evaluated across two INDEPENDENT numeric stacks (jax jsp.i0/i1 vs torch
+
+      special.i0/i1) accumulates to an expected faithful-port floor of ~1e-5..1e-4, so 1e-3 sits about
+
+      one order above that yet about three orders BELOW the O(1) divergence any STRUCTURAL error would
+
+      produce (a dropped self/diagonal term, a wrong alive mask, a transposed source-radius axis, a
+
+      mis-ported Bessel coefficient, or the paper''s graph-Laplacian boundary condition in place of the
+
+      free-space kernel). A tighter 1e-6 is below the two-library float32 floor and no faithful port
+
+      could meet it (the criterion-no-valid-config-can-meet trap); a looser 1e-1 would stop
+
+      distinguishing a faithful port from a ~10% kernel-form error. Passing certifies the free-space
+
+      method reproduces the SAME field; it cannot pass a graph-Laplacian re-implementation.
+
+      '
+    value: 2.508004115497897e-07
+    passed: true
+    result: 'PASS by ~4 orders of magnitude: D_max = 2.51e-07 (max_abs 3.58e-07) << threshold 1.0e-3,
+      so the
+
+      verdict does not hinge on the threshold choice. Per config: C_anchor 6.7e-08, C2 2.51e-07 (the
+
+      worst; argmax at the FAR-field cell where c is LARGEST, 1.426 -- float32 accumulation, not a
+
+      near-floor artefact), C3 1.16e-07 (this config includes the deliberately-unfloored K=0 unscreened
+
+      3-D branch), C1 9.7e-08. All fields finite; every dead slot exactly 0.0 on both sides (the S=99
+
+      source parked on a DEAD slot emits nothing). The ported A&S Bessel K0/K1, the r_eff=max(r,a)
+
+      self/near clamp, the per-species vmap-vs-loop, and the twice-applied alive mask all reproduce to
+
+      float32 rounding. The engine leg (log/atlas/free_screened_diffusion, diag.json) confirms the
+
+      operator ACTS: `morphogen` writes the `chemical` block from zero on the matched 4-founder geometry
+
+      (acted 1/5, inert_operators []); run_spec''s position-only metrics are field-invariant here because
+
+      the solve moves no cell, so the field itself is scored by this isolated differ. This certifies the
+
+      FREE-SPACE Green''s-function form as a faithful implementation of the `morphogen` contract to
+
+      float32 across 1-D/2-D/3-D. It does NOT (and cannot) certify the paper''s graph-Laplacian sibling
+
+      -- the recorded source-wins contradiction stands.
+
+      '
   state_io_notes:
     reads:
     - secretion_rate (per-cell source rate S, the source_name field -- the only declared read)
@@ -1474,14 +1775,125 @@ mechanisms:
     - volume_conservation
     - placement
     - lineage
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_division.py
   test: tests/test_jax_morph_division.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_division
+    diff_metric: '|p_hat_plexus - p_hat_oracle|, the absolute difference in the POOLED per-macro-step
+      division
+
+      hazard (dimensionless probability per alive cell per macro-step). For each engine
+
+      p_hat = (committed divisions) / (eligible alive-cell-steps), pooled over M=48 independent
+
+      seeds x 40 macro-steps at dt=1.0, division_rate=0.08 on the 4 anchor founders. With NO death
+
+      and division_overflow==0 on every seed (verified; CAP=512 >> mean+4SD so the count never hits
+
+      an array bound), each committed division is exactly one live-count increment, so p_hat is the
+
+      maximum-likelihood Bernoulli hazard pooled over every eligible cell-step and is INVARIANT to
+
+      the PRNG stream and to the 40-vs-41 recorded-frame convention -- the realization-independent
+
+      invariant to diff a stochastic operator on, unlike the raw final count. Oracle:
+
+      Model([MechanicalRelaxation(Morse), SaturatingCellGrowth, Division(n_space_dim=2)]) -- the
+
+      authors'' own anchor proliferation composition -- p_hat from the pooled count trajectory over
+
+      48 jax PRNG keys (_oracle/runs/diff_division: reference.npz + summary.json; script
+
+      _oracle/scripts/division.py). Plexus: config/atlas/division.yaml run through the engine with
+
+      cell_divide''s occupancy tapped before/after every call to count (elig = live cells at the
+
+      decision, committed = daughters woken that call); measured on the division-ONLY reduction,
+
+      PROVEN count-neutral at seed 0 (full composition and division-only both give 124) because only
+
+      cell_divide draws H.rng in this spec, so dropping relax/grow_radius leaves the division RNG
+
+      stream bit-identical (log/atlas/division/diff_plexus_summary.json; script
+
+      _oracle/scripts/division_plexus.py). The hazard is a per-cell-step rate, so relax and growth --
+
+      which move cells and grow radii but neither add nor remove cells -- cannot perturb it; both
+
+      sides measure the SAME hazard map. Scope: this differ tests the HAZARD map (the one the open
+
+      124-vs-82 discrepancy is about); volume_conservation/placement are corroborated separately by
+
+      the anchor gyration (below), not by this count-based scalar.
+
+      '
+    threshold: '3 * SE_pooled = 0.005225, with SE_pooled = sqrt(SE_oracle^2 + SE_plexus^2) and each
+
+      SE = sqrt(p_hat*(1-p_hat)/eligible_cellsteps) (~46000-48000 eligible cell-steps per side ->
+
+      SE ~ 1.22e-3, SE_pooled 1.74e-3). Pre-registered as the FORMULA 3*SE_pooled -- the standard
+
+      sampling band for "the two engines draw from the same Bernoulli p" -- not a number picked after
+
+      the result. At this M it resolves any hazard divergence >~6.7% relative, which catches every
+
+      GROSS port defect that would produce a systematically different cell count: a doubled rate sits
+
+      40 SE_pooled out, and a wrong dt, a draw applied to dead-or-already-divided slots, or a
+
+      mis-scoped eligibility mask each shift p_hat by tens of percent. A tighter band (1 SE) would
+
+      flag ordinary Monte-Carlo scatter between two INDEPENDENT PRNG stacks (jax vs torch) as
+
+      disagreement -- the very confound that made the raw 124-vs-82 single count misleading. HONEST
+
+      LIMIT: at M=48 this band does NOT resolve the O((lambda*dt)^2/2) ~ 0.003 gap between the exact
+
+      hazard 1-exp(-lambda*dt) and its linear approximation lambda*dt; that specific subtlety is
+
+      excluded on independent grounds -- the equations block shows BOTH engines carry the source''s
+
+      -expm1 law, and both pooled estimates independently match the analytic hazard 0.076884 to under
+
+      one SE (a criterion the count-alone number cannot, which is why the triangulation is recorded).
+
+      '
+    value: 0.00109115
+    passed: true
+    detail: 'p_hat_oracle = 0.077787 (SE 1.22e-3; 3734 divisions / 48003 eligible cell-steps),
+
+      p_hat_plexus = 0.076696 (SE 1.24e-3; 3528 divisions / 46000 eligible cell-steps).
+
+      |diff| = 0.00109 = 0.63 * SE_pooled  <=  threshold 0.005225  -> PASS.
+
+      Triangulation: both match the exact hazard 1-exp(-0.08*1.0)=0.076884 -- oracle +0.74 SE,
+
+      plexus -0.15 SE (both < 1 SE) -- so the two engines agree with theory AND with each other.
+
+      RESOLVES the known open discrepancy: the flagged 124-vs-82 final-count gap is RNG realization
+
+      noise, NOT a wrong contract. The oracle final-count distribution (mean 81.8, SD 43.6, min 18,
+
+      max 234 over 48 seeds) contains BOTH the smoke count 82 (z=+0.005) and the Plexus/anchor count
+
+      124 (z=+0.97) as ordinary draws; Plexus seed 0 gives exactly 124 (the anchor''s flagged value)
+
+      and oracle seed 0 gives 82 (smoke) purely because the jax and torch PRNG streams differ. This
+
+      is a Galton-Watson count whose SD (~44) is comparable to its mean (~82), so a single seed can
+
+      never separate a wrong hazard from noise -- the pooled hazard can, and it agrees. The
+
+      volume-conservation/placement maps (not exercised by the count-based hazard) are corroborated
+
+      by the anchor gyration agreeing to ~9% (Plexus 3.52 vs reference 3.23). Acted ledger
+
+      (log/atlas/division/diag.json): cell_divide calls 41 / acted 33, grow_radius 41/41, relax
+
+      41/33, seed_state 1/1, inert_operators [] -> valid_evidence true.
+
+      '
   state_io_notes:
     reads:
     - position
@@ -1638,14 +2050,58 @@ mechanisms:
     - growth_law
     - realization
     - rate
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
   test: tests/test_jax_morph_saturating_cell_growth.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_saturating_cell_growth
+    diff_metric: "D_max = the maximum absolute per-cell radius deviation between the Plexus grow_radius\n\
+      trajectory and the jax-morph SaturatingCellGrowth reference, over EVERY recorded frame\n(t = 0..20:\
+      \ the seeded IC plus 20 macro-steps at dt = 2.0) and EVERY live cell, in\ndimensionless simulation-length\
+      \ (radius) units. Reported as value = max(D_max_A, D_max_B):\n  D_max_A -- the 4-cell engine run\
+      \ of config/atlas/saturating_cell_growth.yaml exactly as\n    run_spec runs it (r0 = 0.30, growth_rate\
+      \ = 0.40, max_radius = 0.6), diffed against\n    oracle scenario A over the 4 live cells (acted\
+      \ ledger: grow_radius acted 13/20 calls,\n    the later 7 emitting a sub-float delta once radius\
+      \ has reached R -- correct saturation).\n  D_max_B -- a heterogeneous 6x6 (r0 x growth_rate) grid\
+      \ of 36 cells rolled 20 steps through\n    the real engine first-order integration radius += dt*delta,\
+      \ diffed against oracle\n    scenario B; it spans k = 0 (byte no-op), small-k near-linear growth,\
+      \ large-k near-instant\n    saturation (where forward Euler at dt = 2 would overshoot), r0 == R\
+      \ (dr ~ 0), and r0 > R\n    (relaxation DOWN to R -- the no-clamp claim; last radius reaches R =\
+      \ 0.6 from above).\nGrowth is ISOLATED (no relaxation, no division) so both sides keep the same\
+      \ cells in the same\narray slots and align cell-for-cell, frame-for-frame. The oracle is diff_saturating_cell_growth\n\
+      (reference.npz), whose own float32-vs-float64-analytic error is 9.5e-8, confirming the reference\n\
+      is the exact von-Bertalanffy flow, not forward Euler and not a min-clamp. A negative control\nthat\
+      \ drops the /dt mean-rate convention (radius += dt*dr) scores 0.55, ~5e4x above threshold,\nso the\
+      \ metric provably catches a wiring defect precisely because dt = 2 (not 1) makes the\nconvention\
+      \ observable.\n"
+    threshold: 1.0e-05
+    threshold_why: '1e-5 sits ~100x above float32 round-off (the reference''s own float32-vs-analytic
+      error is
+
+      9.5e-8) yet ~5e4x below the negative-control wiring-defect signal (0.55), so it separates
+
+      bit-level agreement from any real trajectory disagreement -- a wrong growth law, a dropped
+
+      dt-scaling, a forward-Euler overshoot, or a min-clamp -- without flagging float32 noise. It
+
+      was fixed in the diff script before the run, not chosen after seeing value = 0.
+
+      '
+    value: 0.0
+    passed: true
+    passed_note: 'value = 0.0 EXACTLY: the Plexus engine and the jax-morph reference produce bit-identical
+
+      float32 radius trajectories over all 20 frames in both scenarios (D_max_A = 0.0, D_max_B = 0.0).
+
+      Corroborating checks all clean -- frame0_is_ic_residual = 0.0 (frame 0 is the pure seeded IC),
+
+      k0_noop_drift = 0.0 (the k = 0 column never moves), aboveR_last_min = 0.6 = R (no clamp; cells
+
+      above R relax down to R). The grow_radius contract reproduces SaturatingCellGrowth''s per-cell
+
+      radius ODE to the last bit.
+
+      '
   state_io_notes:
     maps:
     - growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)),
@@ -1811,14 +2267,100 @@ mechanisms:
     writes:
     - heading
     maps: []
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_active_brownian_dynamics2_d.py
   test: tests/test_jax_morph_active_brownian_dynamics2_d.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_active_brownian_dynamics2_d
+    diff_metric: 'D_C = max over t = 1..40 of | C_plexus(t) - C_oracle(t) |, where
+
+      C(t) = < e(t) . e(0) > is the ensemble orientational autocorrelation of the per-cell
+
+      heading unit vector e = (cos theta, sin theta), averaged over all N = 20000 cells and
+
+      computed on the heading trajectory (Plexus: tapped once per macro-step from cell.heading;
+
+      oracle: reconstructed from active_heading in reference.npz). Dimensionless (a cosine,
+
+      in [-1, 1]); scored over the 40 post-IC macro-frames t = 1..40 at dt = 1.0. Frame t = 0 is
+
+      excluded because C(0) = 1 identically on both sides (the shared pristine initial-heading
+
+      distribution), so it carries no discriminating information. C(t) is the single observable
+
+      the rotational-diffusion leg controls: it decays as exp(-D_r t), setting the walker''s
+
+      persistence length and its ballistic -> diffusive crossover. The comparison is
+
+      DISTRIBUTIONAL (JAX and torch draw independent rotational-noise streams, so no pathwise
+
+      seed-0-vs-seed-0 match exists); the N-cell ensemble average of C(t) is the
+
+      realization-independent invariant that is compared.
+
+      '
+    threshold: '0.05. The two runs draw INDEPENDENT rotational-noise streams (JAX vs torch), so the test
+      is
+
+      distributional: each C(t) is a finite-sample (N = 20000) estimate of the same theoretical
+
+      exp(-D_r t), with per-frame sampling SD ~ 1/sqrt(N) ~ 0.007. 0.05 is ~7x that noise floor,
+
+      so it is not tripped by RNG. It is also TIGHT: the maximum over t = 1..40 of
+
+      | exp(-0.1 t) - exp(-0.1(1+d) t) | first crosses 0.05 at an effective-rate error d ~ 15%, so
+
+      0.05 REJECTS any run whose D_r (hence the sqrt(2 D_r dt) noise-scaling constant -- e.g. a
+
+      dropped factor of 2, which would double D_r) is off by more than ~15%, while admitting the
+
+      ~1% agreement two correct finite-sample ABPs actually reach. Written into the plexus diff
+
+      script BEFORE the plexus side was ever run.
+
+      '
+    value: 0.00929193
+    passed: true
+    detail: 'D_C = 0.00929193 at argmax frame t = 27, well under the 0.05 band -- the two independent-RNG
+
+      ABPs agree to ~1% of the autocorrelation amplitude. Corroborating invariants: effective
+
+      rotational-diffusion rate D_r_eff = 0.09926 (Plexus) vs 0.10060 (oracle), both within ~1.3% of
+
+      the input D_r = 0.1, so the sqrt(2 D_r dt) noise-scaling constant is reproduced exactly (a
+
+      dropped factor of 2 would have put D_r_eff near 0.2 and D_C far over 0.05). Per-step
+
+      heading-increment variance Var(dtheta) = 0.19989 (Plexus) vs 0.19985 (oracle) vs theory
+
+      2 D_r dt = 0.2; mean dtheta = -6.3e-4 ~ 0 (zero-drift, as scored). C(t) at t = 5/10/20/40:
+
+      Plexus 0.607/0.369/0.136/0.020 vs oracle 0.604/0.367/0.138/0.013.
+
+
+      ACTED-LEDGER RECONCILIATION (read before the metric). run_spec''s structural ledger (diag.json)
+
+      flags reorient INERT -- calls 40, acted 0, valid_evidence:false -- which is a KNOWN instrument
+
+      blind-spot, NOT a no-op. run_spec fingerprints only the engine-integrated `state` block, and
+
+      reorient (EMIT=None, like the entire polarity family) WRITES the auxiliary `heading` buffer in
+
+      place and returns {}, a write that ledger cannot see. The HONEST ledger is the companion diff
+
+      script''s heading tap: reorient acted on 40/40 calls, Var(dtheta) > 0, and the heading
+
+      autocorrelation decorrelates 1.0 -> 0.020 over the run -- a genuinely inert reorient would leave
+
+      C(t) == 1 for every t. glide (which run_spec CAN see) acted 41/41, moving positions at speed
+
+      0.3, so the run is a real spreading ABP cloud (gyration 0.30 -> 7.48). Oracle:
+
+      _oracle/runs/diff_active_brownian_dynamics2_d (reference.npz + summary.json). Plexus:
+
+      log/atlas/active_brownian_dynamics2_d (run_spec evidence) + its companion diff_plexus_summary.json.
+
+      '
 - id: brownian_dynamics
   order: 11
   raw_name: BrownianDynamics
@@ -2004,14 +2546,89 @@ mechanisms:
     writes:
     - pos
     maps: []
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_brownian_dynamics.py
   test: tests/test_jax_morph_brownian_dynamics.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_brownian_dynamics
+    diff_metric: 'Relative error in the free-diffusion constant D of the PURE thermal bath, taken as the
+      MAX
+
+      over three macro-step sizes: metric = max_dt |D_plexus(dt) - D_ref(dt)| / D_ref(dt)
+
+      (dimensionless). D(dt) = slope(Rg^2 vs t) / (2 * n_dim), where Rg^2(t) = mean over ALIVE cells
+
+      of |r_i(t) - c(t)|^2 (c = live-cell centroid), least-squares-fit over EVERY recorded frame of a
+
+      pure-bath rollout -- `agitate` the ONLY operator, no drift (potential absent -> forces()==0, a
+
+      free Brownian gas). Measured at dt in {1.0, 0.5, 0.25} with total physical time T = n_steps*dt
+
+      held FIXED at ~40. Measuring at several dt is what makes the test BITE on the one feature that
+
+      separates `agitate` from the frozen operators'' bolt-on noise*randn jitter: D is dt-INVARIANT
+
+      iff the noise carries the Wiener sqrt(dt) DISPLACEMENT scaling (per-step per-dim variance
+
+      2 kT dt/gamma over T/dt steps -> dt-free total variance 2 kT T/gamma); a noise scaled by dt
+
+      instead gives D = dt*kT/gamma and BREAKS the invariance. Oracle: BrownianDynamics(potential=
+
+      None), N=20000 cells seeded at ONE point, kT=0.1, gamma=1.0, n_dim=2
+
+      (Atlas_jax_morph/_oracle/runs/diff_brownian_dynamics). Plexus:
+
+      config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml, identical N/kT/gamma/dim and matched IC
+
+      (Rg is translation-invariant, so the (20,20) world offset from the oracle origin is not a
+
+      mismatch), `agitate` scheduled ALONE, boundary free (no wall clamp).
+
+      '
+    threshold: '0.03 (3%). Pre-registered as ~3x the reference''s per-side finite-sample error on D
+
+      (rel_sampling_error_per_side = 1/sqrt(2N) = 0.00707 at N=20000; two independent PRNG streams
+
+      combine to ~1%) and ~1.7x the oracle''s own D_hat scatter across the three dt values
+
+      (D_hat_spread_over_dt / D = 0.0172). A principled sampling band, NOT a number chosen after the
+
+      result. Not looser: the dt-scaled-noise BUG (emitting the increment as if it scaled with dt --
+
+      the frozen operators'' engine-deterministic jitter) gives D = dt*kT/gamma -> 75% relative error
+
+      at dt=0.25 (negative control D_naive 0.0250 vs ref 0.100, rel_err 0.75); 3% rejects that
+
+      decisively and is the tightest band the independent-stream sampling noise actually supports.
+
+      '
+    value: 0.010859
+    passed: true
+    detail: 'D_ref(dt) [slope] = {1.0: 0.10009, 0.5: 0.09944, 0.25: 0.10025}; D_plexus(dt) [slope] =
+
+      {1.0: 0.10030, 0.5: 0.10052, 0.25: 0.10004} -- both match theory D = kT/gamma = 0.1 and each
+
+      other (all frame-series fits r^2 > 0.9999). Per-dt relative error |D_plexus - D_ref| / D_ref =
+
+      {1.0: 0.0021, 0.5: 0.0109, 0.25: 0.0021}; MAX = 0.010859 (at dt=0.5) <= threshold 0.03 -> PASS.
+
+      Plexus D is itself dt-invariant to 0.5% (plexus_D_spread_over_dt / D = 0.0048) -> the Wiener
+
+      sqrt(dt) scaling survives the engine''s pos += dt*v integrator (agitate emits v = sqrt(2kT/
+
+      (gamma*dt))*xi so dt*v is the sqrt(dt) increment). NEGATIVE CONTROL fires: the dt-scaled-noise
+
+      bug lands D 0.0250 at dt=0.25, rel_err 0.75, REJECTED -- the metric discriminates the correct
+
+      scheme from the bolt-on jitter. Acted ledger (log/atlas/brownian_dynamics/diag.json): agitate
+
+      calls 41, acted 41, moved 2.16, inert_operators [] -> valid_evidence true; gyration grew
+
+      0.63 -> 4.05 (free spreading). Diff script: _oracle/scripts/diff_brownian_dynamics.py; engine
+
+      evidence: log/atlas/brownian_dynamics/{diag,metrics,diff}.json.
+
+      '
   state_io_notes:
     reads:
     - position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift
@@ -2808,14 +3425,108 @@ mechanisms:
     maps:
     - pairwise
     - PURELY
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_soft_sphere.py
   test: tests/test_jax_morph_soft_sphere.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_soft_sphere
+    diff_metric: 'D_pos = max over ALL 61 frames (t = 0..60) and ALL 19 live cells of the per-cell
+
+      Euclidean position discrepancy ||x_plx(t,i) - x_ref(t,i)||_2, divided by the contact
+
+      distance sigma = r_i + r_j = 1.0. UNITS: fractions of sigma (one cell diameter).
+
+      x_ref is the jax-morph BrownianDynamics(SoftSphere(epsilon=1.0), gamma=1.0, kT=0.0)
+
+      trajectory -- the reference''s OWN overdamped Euler at zero temperature, whose update is
+
+      exactly dx = dt*F/gamma = dt*(-grad U). x_plx is the Plexus adhere/soft_sphere operator
+
+      under the engine''s overdamped Euler, on a BYTE-IDENTICAL initial condition (a 19-cell
+
+      mutually-overlapping sunflower at radius 0.5 + 5 dead padding slots), same dt = 0.2, same
+
+      60 steps, aligned cell-for-cell and frame-for-frame (soft_sphere is gated after_frame:1 so
+
+      frame 0 is the pristine IC and frame t is the IC after t overdamped steps). Because kT = 0
+
+      makes the reference deterministic (verified identical across two PRNG keys) and its
+
+      Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE function of the
+
+      force law, so D_pos isolates the SoftSphere force F = -grad (eps/2)(1 - r/sigma)^2.
+
+      Computed by _oracle/scripts/_analyze_soft_sphere.py into log/atlas/soft_sphere/diff.json.
+
+      '
+    threshold: 0.001
+    threshold_why: '1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_soft_sphere.py:77) before the
+      diff was
+
+      computed. It is ~500x below one cell radius (0.5 sigma) and ~3 orders under the real dynamics
+
+      the test must resolve (max live displacement 0.669 sigma; gyration grows 1.29 -> 1.68 sigma),
+
+      so a genuine force-law error CANNOT slip under it: dropping either 1/2 doubles the force, and
+
+      using sigma = mean instead of sum halves the contact distance -- both diverge by O(sigma),
+
+      ~1000x the bar. Yet it sits ABOVE the float32 round-off floor of two independent numeric
+
+      stacks (jax jit-scan vs torch autograd accumulate to ~2.7e-6 sigma over 60 steps), so it is
+
+      not so tight that only bit-identical arithmetic could pass. Looser would admit a halved-force
+
+      or mean-sigma reimplementation as "agreement"; tighter would fail on float32 reassociation
+
+      alone.
+
+      '
+    value: 2.6973983046972182e-06
+    passed: true
+    plexus_run: log/atlas/soft_sphere/
+    scorer: Atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py
+    acted_ledger: 'adhere: calls 60 / acted 60, max|delta| 0.37996304 (== oracle force_ic_max 0.37996307
+      to
+
+      ~3e-8); inert_operators []; valid_evidence true. The one scheduled operator moved cells every
+
+      frame -- this is a run, not a still life.
+
+      '
+    corroborators: 'All from log/atlas/soft_sphere/diff.json. (1) Frame 0 == pristine IC on BOTH sides
+      (residual
+
+      0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
+
+      x_plx(t) vs x_ref(t-1) scores 0.0788 sigma, ~29000x D_pos -> the frame alignment is genuinely
+
+      correct, not an accidental match to a shifted trajectory. (3) Single-step IC force residual
+
+      max_i ||(x_plx(1)-x_plx(0))/dt - F_ref(IC)|| / (eps/sigma) = 6.1e-06 (raw force law before any
+
+      compounding). (4) Radius-of-gyration trajectory relative error 1.40e-07 (1.68175 vs 1.68175),
+
+      over a cluster that genuinely MOVED (0.669 sigma). (5) Every DEAD padding slot never moved on
+
+      either side (0.0 / 0.0): the alive/self mask and the sigma = 0 safe_divide reproduce, no
+
+      phantom repulsion. (6) D_pos does NOT amplify -- it plateaus at ~2.7e-6 by frame 41 (argframe
+
+      41) and holds to frame 60, as expected of a contractive overdamped gradient flow.
+
+      '
+    scope: 'UNIFORM-radius test: the reference and spec both use radius 0.5, so the candidate exercises
+
+      sigma = r_i + r_j at EQUAL radii. The headline SUM-vs-mean size-consistency (heterogeneous
+
+      r_i != r_j) is NOT yet exercised. Next experiment to extend it: seed two distinct per-cell
+
+      radii on both sides and re-diff -- a mean-instead-of-sum contact rule would then diverge by
+
+      O(sigma). This validates the IMPLEMENTATION; it does not touch the verdict/dispute axis.
+
+      '
   disputed:
     by: skeptic
     was: new
@@ -3053,14 +3764,158 @@ mechanisms:
     maps:
     - pairwise
     - contact
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_hertzian.py
   test: tests/test_jax_morph_hertzian.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_hertzian
+    diff_metric: 'force_field_rel_err (PRIMARY, one scalar) = max over the 7 live cells i and both spatial
+
+      components c of the per-component force discrepancy |F_plx(i,c) - F_ref(i,c)|, divided by
+
+      max_{i,c} |F_ref(i,c)| (= 0.8651). UNITS: dimensionless, a fraction of the peak reference
+
+      force. Computed on a SINGLE forward() call (no integration, no compounding) on ONE fixed
+
+      HETEROGENEOUS 7-cell overlapping cluster -- per-cell radius 0.40..0.70 (so the contact
+
+      distance sigma = r_i + r_j VARIES per pair) and per-cell epsilon 1.0..3.0 (so the coupling is
+
+      the per-pair arithmetic-mean mix) -- the two combining rules that distinguish `adhere` from
+
+      `attraction_repulsion`. F_ref is jax-morph Hertzian(epsilon).forces(state) (autodiff of
+
+      E = 0.5*sum_{i!=j alive} (2/5) eps (1-r/sigma)^(5/2)); F_plx is the Plexus adhere:hertzian
+
+      operator''s emitted velocity at mobility=1 (= its autodiff force) on a BYTE-IDENTICAL IC (the
+
+      same POS7 translated by +[20,20], radius/epsilon registered as per-cell buffers), diffed over
+
+      the 7 live cells only (dead padding masked). A SECONDARY scalar guards the engine composition:
+
+      traj_pos_max_abs = max over all 41 frames (t = 0..40) and all 7 live cells of the centroid-
+
+      aligned per-cell position discrepancy |x_plx(t,i) - x_ref(t,i)| (world units), where x_ref is
+
+      the reference BrownianDynamics(Hertzian(epsilon=2.0), gamma=1, kT=0) overdamped-Euler
+
+      trajectory (uniform radius 0.5, dt=0.1) and x_plx is the same spec run through plexus.engine
+
+      (adhere gated after_frame:1 so recorded frame 0 is the pristine shared IC and frame t is the
+
+      IC after t overdamped steps). Computed by Atlas_jax_morph/diff_hertzian.py into
+
+      log/atlas/hertzian/diff.json. evidence.value is the PRIMARY.
+
+      '
+    threshold: 0.0001
+    threshold_why: 'Two thresholds, BOTH PRE-REGISTERED in the scorer before any diff was computed
+
+      (diff_hertzian.py:38-39): THRESHOLD_FORCE = 1.0e-4 on the primary relative force error,
+
+      THRESHOLD_TRAJ = 1.0e-3 (world units) on the secondary trajectory; passed = (force <= 1e-4)
+
+      AND (traj <= 1e-3). The 1e-4 force bar is chosen to sit in the gap between the numeric floor
+
+      and the nearest WRONG implementation. The nearest neighbour -- SoftSphere (exponent 2 instead
+
+      of Hertzian''s 5/2), the wrong-exponent defect the verdict hinges on -- is measured by the two
+
+      negative controls at 0.52 (reference SoftSphere.forces vs Hertzian.forces) and 0.37 (Plexus F
+
+      vs the SoftSphere reference), i.e. ~5000x the bar; dropping the 2/5 prefactor or using
+
+      sigma = mean instead of sum would diverge by a comparable O(1) fraction. So no
+
+      wrong-exponent / wrong-prefactor / wrong-sigma-rule reimplementation can slip under 1e-4. Yet
+
+      the two independent autodiff stacks (jax reverse-mode vs torch autograd, float32) agree to
+
+      1.9e-6 -- ~50x UNDER the bar -- so 1e-4 is not so tight that only bit-identical arithmetic
+
+      passes. The 1e-3 trajectory bar sits ~1000x under the real dynamics it must resolve (the
+
+      cluster relaxes: max cell move 0.70 world units, gyration 0.799 -> 0.984, nn-distance
+
+      0.668 -> 0.977) and ~150x above the float32 accumulation floor (traj error 6.3e-6 over 40
+
+      steps). Looser on either bar would admit a materially wrong force law as "agreement";
+
+      tighter would fail on float32 reassociation alone.
+
+      '
+    value: 1.894631743528317e-06
+    passed: true
+    plexus_run: log/atlas/hertzian/
+    scorer: Atlas_jax_morph/diff_hertzian.py
+    acted_ledger: 'adhere: calls 40 / acted 40, moved 0.69977516 (max live-cell displacement, == the oracle''s
+      own
+
+      relaxation: gyration 0.799 -> 0.984 on both sides); inert_operators []; unverifiable_operators
+
+      []; valid_evidence true. The one scheduled operator moved cells every frame -- this is a run,
+
+      not a still life. (The PRIMARY force-field metric is a direct forward() call, not gated by the
+
+      schedule; the ledger validates the SECONDARY trajectory run.)
+
+      '
+    corroborators: 'All from log/atlas/hertzian/diff.json unless noted. (1) Peak force magnitudes agree
+
+      independently of the rel-err normalization: |F_ref|_max 0.86514318 vs |F_plx|_max 0.86514449
+
+      (~1.3e-6). (2) Newton''s third law holds on BOTH sides -- the summed internal force is ~0
+
+      (ref 6.7e-8, plexus 3.7e-8): a momentum-conserving pair force, no phantom net drift. (3) The
+
+      NEGATIVE CONTROLS FIRE: the neighbouring SoftSphere (exponent 2) misses Hertzian by 0.52
+
+      (reference-internal) and the Plexus force differs from the SoftSphere reference by 0.37 --
+
+      ~5000x the 1e-4 bar -- so PASS is discriminating, not a trivially-satisfiable bound. (4)
+
+      SECONDARY trajectory: traj_pos_max_abs 6.26e-6 over 40 overdamped steps that genuinely moved
+
+      0.70 world units; frame-0 IC residual 8.9e-7 (the shared IC is real) and final-frame residual
+
+      6.26e-6 == the max (no runaway amplification -- a contractive gradient flow). (5) ORACLE
+
+      SELF-CHECK (diff_hertzian/summary.json): the reference is the real Hertzian law, not a
+
+      mis-configured oracle -- the 2-cell radial scan matches the analytic
+
+      f(r) = (eps/sigma)(1-r/sigma)^1.5 to 8.8e-8, BrownianDynamics(kT=0) is deterministic across
+
+      two PRNG keys (0.0), and its first Euler step equals dt*forces to 2.5e-8. Oracle provenance:
+
+      real jax-morph 0.4.0 / jax 0.11.0 in the isolated venv (git ace08b8).
+
+      '
+    scope: 'STRONGER than the soft_sphere twin on the disputed axis. The PRIMARY (H) scenario uses
+
+      HETEROGENEOUS radius (0.40..0.70) so sigma = r_i + r_j varies per pair, AND per-cell epsilon
+
+      (1.0..3.0) combined by the per-pair arithmetic-mean mix -- exactly the two combining rules
+
+      (additive sigma, mean epsilon, per-cell coupling) that distinguish `adhere` from
+
+      attraction_repulsion''s fixed GLOBAL sigma and per-TYPE params. So unlike soft_sphere''s
+
+      uniform-radius test, this differential DOES exercise the size-consistency and per-cell coupling
+
+      the verdict turns on. What it does NOT touch: (a) an adhesive tail -- Hertzian has none by
+
+      construction (purely repulsive), so this is a property of the member, not a gap in the test;
+
+      (b) the per-cell VIRIAL pressure the base derives from the same energy -- out of scope, a
+
+      separate VirialStress mechanism. This validates the IMPLEMENTATION reproduces the reference
+
+      force and its overdamped dynamics; it does not by itself decide the verdict/dispute (new ->
+
+      adhere), which rests on the signature argument in `why`.
+
+      '
   disputed:
     by: skeptic
     was: alias
@@ -3297,14 +4152,131 @@ mechanisms:
     maps:
     - pairwise
     - repulsive
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_harmonic.py
   test: tests/test_jax_morph_harmonic.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_harmonic
+    diff_metric: 'D_pos = max over ALL 161 frames (t = 0..160) and ALL 19 live cells of the per-cell
+
+      Euclidean position discrepancy ||x_plx(t,i) - x_ref(t,i)||_2, divided by the contact
+
+      distance sigma = r_i + r_j = 1.0 (radius 0.5 each). UNITS: fractions of sigma (one cell
+
+      diameter). x_ref is the jax-morph BrownianDynamics(Harmonic(k=1.0, r_cutoff_frac=2.5),
+
+      gamma=1.0, kT=0.0) trajectory -- the reference''s OWN overdamped Euler at zero temperature,
+
+      whose update is exactly dx = dt*F/gamma = dt*(-grad U). x_plx is the Plexus adhere/harmonic
+
+      operator under the engine''s overdamped Euler, on a BYTE-IDENTICAL initial condition (a
+
+      19-cell mutually-overlapping sunflower at radius 0.5 + 5 dead padding slots), same dt = 0.03,
+
+      same 160 steps, aligned cell-for-cell and frame-for-frame (harmonic is gated after_frame:1 so
+
+      frame 0 is the pristine IC and frame t is the IC after t overdamped steps). Because kT = 0
+
+      makes the reference deterministic (verified identical across two PRNG keys) and its
+
+      Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE function of the
+
+      force law, so D_pos isolates the Harmonic force INCLUDING its adhesive tail and hard C0 cutoff
+
+      -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
+
+      Computed by _oracle/scripts/_analyze_harmonic.py into log/atlas/harmonic/diff.json.
+
+      '
+    threshold: 0.001
+    threshold_why: '1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_harmonic.py:98) before the diff
+      was
+
+      computed. It is ~500x below one cell radius (0.5 sigma) and ~5 orders under the real dynamics
+
+      the test must resolve (max live displacement 1.40 sigma; adhesion CONTRACTS the cluster,
+
+      gyration 1.540 -> 0.638 sigma). A genuine force-law error CANNOT slip under it: the NEGATIVE
+
+      CONTROL -- a purely-repulsive SoftSphere with the matched repulsive core (k = eps = 1, same
+
+      sigma), i.e. Harmonic with the adhesive tail DELETED -- diverges the trajectory by 1.480 sigma
+
+      (1480x the bar) and REVERSES the sign of the size change (gyration EXPANDS to 1.678 vs the
+
+      adhesive CONTRACTION to 0.638), so dropping the down-shift/adhesion alone blows the metric by
+
+      three orders. Yet 1e-3 sits ~130x ABOVE the float32 round-off floor of two independent numeric
+
+      stacks (jax jit-scan vs torch autograd accumulate to D_pos 7.9e-6 sigma over 160 steps,
+
+      plateauing by argframe 143), so it is not so tight that only bit-identical arithmetic could
+
+      pass. Looser would admit an adhesion-off or mis-shifted reimplementation as "agreement";
+
+      tighter would fail on float32 reassociation alone.
+
+      '
+    value: 7.864199877963372e-06
+    passed: true
+    plexus_run: log/atlas/harmonic/
+    scorer: Atlas_jax_morph/_oracle/scripts/_analyze_harmonic.py
+    acted_ledger: 'adhere: calls 160 / acted 160, moved 8.451 (cumulative), kind lateral; inert_operators
+      [];
+
+      valid_evidence true ("every scheduled operator acted at least once"). The one scheduled
+
+      operator moved cells on every frame -- this is a run, not a still life. Reference IC force
+
+      magnitude peaks at 6.96 (k*sigma units) and the single-step recovered Plexus force matches it
+
+      to a residual of 4.0e-05 (raw force law, pre-compounding).
+
+      '
+    corroborators: 'All from log/atlas/harmonic/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
+
+      0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
+
+      x_plx(t) vs x_ref(t-1) scores 0.260 sigma, ~33000x D_pos -> the frame alignment is genuinely
+
+      correct, not an accidental match to a shifted trajectory. (3) Single-step IC force residual
+
+      max_i ||(x_plx(1)-x_plx(0))/dt - F_ref(IC)|| / (k*sigma) = 4.0e-05 (raw force law before any
+
+      compounding). (4) Radius-of-gyration trajectory relative error 2.5e-07 AND correct SHAPE:
+
+      the ADHESIVE tail CONTRACTS the cluster 1.540 -> 0.638 on both sides (Plexus 1.5399366 ->
+
+      0.6381025 vs ref 1.5399366 -> 0.6381026), over a cluster that genuinely MOVED (1.40 sigma).
+
+      (5) Every DEAD padding slot never moved on either side (0.0 / 0.0): the alive/self mask and
+
+      the sigma safe-divide reproduce, no phantom pull. (6) NEGATIVE CONTROL: the matched
+
+      purely-repulsive SoftSphere diverges by 1.480 sigma and EXPANDS to gyration 1.678 (opposite
+
+      direction), IC force differing by 102% -- so the metric resolves the adhesive tail, not just
+
+      the shared core. (7) Oracle self-guard carried through: the 2-cell force scan matches the
+
+      analytic F = k*(sigma - r)|_{r<r_c} to 6.0e-08.
+
+      '
+    scope: 'UNIFORM-radius test: reference and spec both use radius 0.5, so the candidate exercises
+
+      sigma = r_i + r_j at EQUAL radii; the SUM-vs-mean size-consistency (heterogeneous r_i != r_j)
+
+      is not yet exercised (a mean-instead-of-sum contact rule would diverge by O(sigma) under two
+
+      distinct radii -- the extending experiment). r_cutoff_frac = 2.5 sits well beyond the resting
+
+      contact, so the C0 force discontinuity at r_c is never crossed in this trajectory; the tail is
+
+      exercised as adhesion, not at the truncation edge. This validates the IMPLEMENTATION of the
+
+      force law; it does not touch the verdict/dispute axis (new -> adhere).
+
+      '
   disputed:
     by: skeptic
     was: alias
@@ -3523,14 +4495,180 @@ mechanisms:
     maps:
     - pairwise
     - contact
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_lennard_jones.py
   test: tests/test_jax_morph_lennard_jones.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_lennard_jones
+    diff_metric: 'D_pos = max over ALL 101 frames (t = 0..100) and ALL 12 live cells of the per-cell
+
+      Euclidean position discrepancy ||x_plx(t,i) - x_ref(t,i)||_2, divided by the contact
+
+      distance sigma = r_i + r_j = 1.0 (uniform radius 0.5). UNITS: fractions of sigma (one cell
+
+      diameter). x_ref is the jax-morph BrownianDynamics(LennardJones(epsilon=1.0), gamma=1.0,
+
+      kT=0.0) trajectory -- the reference''s OWN overdamped Euler at zero temperature, whose update
+
+      is exactly dx = dt*F/gamma = dt*(-grad U). x_plx is the Plexus adhere/lennard_jones operator
+
+      under the engine''s overdamped Euler, on a BYTE-IDENTICAL initial condition (SIX well-separated
+
+      dumbbell pairs -- centres 5 apart, > 2.5*sigma so no cross-pair force -- at initial separations
+
+      [1.15, 1.25, 1.35, 1.50, 1.70, 2.60]*sigma, radius 0.5, + 4 dead padding slots parked at the
+
+      origin), same dt = 0.01, same 100 steps, aligned cell-for-cell and frame-for-frame
+
+      (lennard_jones is gated after_frame:1 so frame 0 is the pristine IC and frame t is the IC after
+
+      t overdamped steps). Because kT = 0 makes the reference deterministic (verified identical across
+
+      two PRNG keys) and its Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE
+
+      function of the force law, so D_pos isolates the LJ r_min 12-6 force F = -grad
+
+      eps((sigma/r)^12 - 2(sigma/r)^6) -- its ADHESIVE tail, equilibrium AT contact, and sigma-relative
+
+      smooth C1 cutoff -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
+
+      Computed by _oracle/scripts/_analyze_lennard_jones.py into log/atlas/lennard_jones/diff.json.
+
+      '
+    threshold: 0.001
+    threshold_why: '1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_lennard_jones.py:83, THRESHOLD
+      = 1.0e-3)
+
+      before the diff was computed. It is ~500x below one cell radius (0.5 sigma) and ~3 orders under
+
+      the real dynamics the test must resolve (max live displacement 0.350 sigma; five dumbbells relax
+
+      monotonically from separations 1.15..1.70 sigma down to contact 1.0, the sixth at 2.60 sigma
+
+      stays frozen beyond the cutoff). A genuine force-law error CANNOT slip under it: the NEGATIVE
+
+      CONTROL -- the purely-repulsive SoftSphere (LJ with the adhesive tail DELETED), which leaves
+
+      every pair frozen -- diverges the trajectory by 0.350 sigma (350x the bar); coding the textbook
+
+      4-eps form eps(4((sigma/r)^12 - (sigma/r)^6)) instead of the r_min form puts the well at
+
+      2^(1/6) sigma with the wrong depth, dropping the 0.5 aggregation factor doubles the force, and
+
+      using sigma = mean instead of sum halves the contact distance -- all diverge by O(sigma),
+
+      hundreds of times the bar. Yet 1e-3 is NOT a bit-identity gate: across this same pair-potential
+
+      family the identical scorer admits ordinary float32-level agreement (soft_sphere D_pos 2.7e-6,
+
+      harmonic 7.9e-6, hertzian force-err 1.9e-6, all non-zero), so passing does not require exact
+
+      arithmetic. THIS member happened to land the strongest possible pass -- D_pos = 0.0, the two
+
+      float32 stacks (jax jit-scan vs torch autograd) byte-equal over all 101x12 live positions --
+
+      which is verified REAL, not an aliasing artifact: the two arrays are distinct objects, diverge
+
+      from the SoftSphere reference by 0.350 sigma, and the cells genuinely moved 0.350 sigma. Looser
+
+      would admit an adhesion-off / 4-eps / dropped-prefactor reimplementation as "agreement"; tighter
+
+      is moot here (the result is exactly 0) but for the family would fail on float32 reassociation.
+
+      '
+    value: 0.0
+    passed: true
+    plexus_run: log/atlas/lennard_jones/
+    scorer: Atlas_jax_morph/_oracle/scripts/_analyze_lennard_jones.py
+    acted_ledger: 'adhere: calls 100 / acted 47, moved 2.679448 (cumulative max-cell displacement), kind
+      lateral,
+
+      structural false; inert_operators []; unverifiable_operators []; valid_evidence true ("every
+
+      scheduled operator acted at least once"). The one scheduled operator moved cells on every frame
+
+      of the ACTIVE phase -- adhere registers as acted on 47 frames and then falls below the move
+
+      threshold once the five tail pairs reach contact (~frame 42; gyration plateaus 8.5795 -> 8.5678,
+
+      nn-distance 1.5917 -> 1.2667 and both flatline thereafter), exactly the overdamped fixed point,
+
+      NOT a still life. Frame-0 == pristine IC on both sides (residual 0.0/0.0).
+
+      '
+    corroborators: 'All from log/atlas/lennard_jones/diff.json unless noted. (1) Frame 0 == pristine IC
+      on BOTH
+
+      sides (residual 0.0/0.0) -- the aligned convention is real; and the whole float32 trajectory is
+
+      BYTE-EQUAL (np.array_equal True over 101x16x2), so D_pos = 0.0 is exact, not rounded. (2)
+
+      Deliberately MISALIGNED comparison x_plx(t) vs x_ref(t-1) scores 0.0268 sigma (27x the bar and
+
+      infinitely larger than D_pos) -> the frame alignment is genuinely correct, not an accidental
+
+      match to a shifted trajectory. (3) Per-pair separation trajectory agrees to 0.0 sigma: the five
+
+      tail pairs reach contact 1.0 and the beyond-cutoff pair stays frozen at 2.60 on BOTH sides. (4)
+
+      NEGATIVE CONTROL fires: the adhesion-off SoftSphere on the SAME IC leaves every pair frozen and
+
+      the Plexus LJ trajectory diverges from it by 0.350 sigma (350x the bar; ratio softsphere/lj is
+
+      unbounded since lj-diff is 0), so PASS resolves the adhesive tail, not just a shared core -- and
+
+      proves the two arrays are distinct trajectories, not aliased. (5) Every DEAD padding slot never
+
+      moved on either side (0.0/0.0): the alive/self mask and the sigma=0 safe_divide/cutoff guards
+
+      reproduce, no phantom pull. (6) Single-step IC force residual 9.4e-05 (eps/sigma units) is an
+
+      ORACLE-INTERNAL float32 reassociation, NOT a Plexus<->reference force error: the recovered
+
+      Plexus step plx[1]-plx[0] and the reference step ref[1]-ref[0] both differ from the standalone
+
+      LennardJones.forces(IC) by the SAME 9.4e-07, i.e. they equal each other exactly. (7) Oracle
+
+      self-guard carried through (diff_lennard_jones/summary.json): the 2-cell radial scan matches the
+
+      analytic r_min force 12 eps(x^12 - x^6)/r to 4.6e-06, force is exactly -0.0 at contact and
+
+      beyond 2.6 sigma, BrownianDynamics(kT=0) is deterministic across two PRNG keys, and its first
+
+      Euler step equals dt*forces bit-for-bit. Oracle provenance: real jax-morph 0.4.0 / jax 0.11.0
+
+      in the isolated venv (git ace08b8).
+
+      '
+    scope: 'UNIFORM-radius test: reference and spec both use radius 0.5, so the candidate exercises the
+
+      contact distance sigma = r_i + r_j at EQUAL radii; the headline SUM-vs-mean size-consistency
+
+      (heterogeneous r_i != r_j) is NOT exercised here (a mean-instead-of-sum contact rule would
+
+      diverge by O(sigma) under two distinct radii -- the extending experiment, already carried on the
+
+      hertzian twin which DID use heterogeneous radius + per-cell epsilon). Nor is per-cell epsilon
+
+      exercised: the probe _probe_eps confirmed the per-cell arithmetic-mean mix equals the shared
+
+      scalar at equal epsilon, but the trajectory uses a shared epsilon=1.0. The r_cutoff at 2.5 sigma
+
+      sits beyond the resting contact, so the C1 truncation WINDOW [1.5, 2.5]*sigma is swept by the
+
+      relaxing pairs (the adhesive tail is exercised through the cutoff ramp) and the one beyond-cutoff
+
+      pair confirms exactly-zero force past 2.5 sigma. What it does NOT touch: the per-cell VIRIAL
+
+      pressure the base derives from the same energy (a separate VirialStress mechanism, out of scope).
+
+      This validates the IMPLEMENTATION reproduces the reference LJ force and its overdamped dynamics
+
+      (to byte equality); it does not by itself decide the verdict/dispute (new -> adhere), which rests
+
+      on the signature argument in `why`.
+
+      '
   state_io_notes:
     reads:
     - position
@@ -3768,14 +4906,82 @@ mechanisms:
     writes:
     - pos
     maps: []
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_mechanical_relaxation.py
   test: tests/test_jax_morph_mechanical_relaxation.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_mechanical_relaxation
+    diff_metric: 'D_eq = max over the 4 LIVE cells i of ||x*_plx,i - x*_ref,i||_2 / sigma at the RELAXED
+
+      EQUILIBRIUM (frame 1, the single quasistatic macro-step). sigma = r_i + r_j = 1.0, so D_eq is
+
+      in units of contact distance (dimensionless). x*_plx,i is the Plexus engine''s frame-1 cell
+
+      position AFTER the `relax` operator''s quasistatic emit v = (x*-x0)/dt has been integrated by
+
+      the REAL engine (pos += dt*v, dt = 1.0, so the emit lands x* exactly); x*_ref,i is the jax-morph
+
+      MechanicalRelaxation(Morse) FIRE-to-f_tol equilibrium x*. Both sides share a BYTE-IDENTICAL
+
+      float32 IC -- a rigid 4-cell diamond compressed to 0.85 sigma, buffer 8 with 4 dead padding
+
+      slots parked at the origin (so the dead-pair mask and the sigma=0 safe-norm guards are
+
+      exercised). Corroborated by a gauge-free force-balance cross-check (the operator''s OWN Morse
+
+      energy autodiffed at each side''s equilibrium -> |grad U|_inf), a rigid-gauge-removed (Kabsch)
+
+      D_eq, fixed-point idempotence of the post-frame-1 plateau, frame-0 == IC on both sides, and
+
+      dead-slot immobility. Oracle: Atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation
+
+      (reference.npz + summary.json). Plexus: config/atlas/mechanical_relaxation.yaml ->
+
+      log/atlas/mechanical_relaxation. Analysis: _oracle/scripts/_analyze_mechanical_relaxation.py ->
+
+      log/atlas/mechanical_relaxation/diff.json.
+
+      '
+    threshold: '1.0e-3 (sigma), pre-registered in _analyze_mechanical_relaxation.py before the diff was
+
+      computed. It is BRACKETED on both sides. ABOVE: it sits >100x over the ~8e-6 sigma two-solver
+
+      float32 equilibrium shell -- a force residual f_tol = 2e-4 maps through the local Morse
+
+      curvature kappa to a position offset f_tol/kappa ~ 4e-6 sigma per side, so two INDEPENDENT
+
+      JAX-vs-torch FIRE solvers each stopped inside the tolerance can differ by at most ~2 shells,
+
+      and 1e-3 does not false-fail on legitimate float32 roundoff. BELOW: it sits >100x under the
+
+      0.1135-sigma relaxation displacement the metric must resolve (the distance the equilibrium sits
+
+      from the compressed IC), so any operator that fails to reach the same equilibrium basin -- a
+
+      DYNAMIC force/displacement emit, a missing 1/dt quasistatic factor, or a fixed-step descent that
+
+      stops short -- lands O(0.1 sigma) away and fails decisively. A looser band (e.g. 1e-2) would
+
+      begin to admit off-equilibrium creeps whose force residual is 5-50x f_tol.
+
+      '
+    value: 1.91e-06
+    passed: true
+    detail: "D_eq = 1.91e-06 sigma (per-cell {0, 0, 1.9e-6, 0}: only one cell differs, by ~2 float32 ulp)\n\
+      << threshold 1.0e-3 -> PASS with a ~500x margin, and ~6e4x under the 0.1135-sigma relaxation\ndisplacement\
+      \ it must resolve. Every corroborator is clean:\n  - force cross-check: |grad U|_inf at the PLEXUS\
+      \ equilibrium = 1.90e-4 <= 5*f_tol (1.0e-3),\n    matching the reference 1.35e-4 (and the oracle's\
+      \ own residual_at_xstar 1.34e-4) -- BOTH\n    sides are genuine force balances of the SAME Morse\
+      \ energy, gauge-independently;\n  - gauge-removed Kabsch D_eq = 1.43e-6 ~ raw D_eq -> no global\
+      \ rigid drift inflates it;\n  - fixed-point plateau = 0.0 on BOTH sides (the equilibrium held exactly\
+      \ over frames 2-6) --\n    the quasistatic no-op the operator must also exhibit once relaxed;\n\
+      \  - frame 0 == pristine IC on both sides (resid 0.0); dead slots immobile on both (0.0);\n  - misaligned\
+      \ x_plx(eq) vs IC = 0.1135 = relaxation_displacement -> the equilibrium is\n    genuinely reached,\
+      \ not an accidental IC match.\nSummary observables agree: gyration ref-equilibrium 0.6858 == plexus\
+      \ final 0.68575;\nmean_nn ref 0.9698 == plexus 0.9698. Acted ledger\n(log/atlas/mechanical_relaxation/diag.json):\
+      \ relax calls 6 / acted 1 / moved 0.1123 (== the\nrelaxation displacement; it acts once then idempotently\
+      \ emits ~0 on the held equilibrium),\nseed_state acted, inert_operators [], valid_evidence true\
+      \ -> the scheduled solver genuinely\nacted.\n"
   state_io_notes:
     reads:
     - position
@@ -3984,14 +5190,152 @@ mechanisms:
     - stress
     maps:
     - pairwise
-  status: implemented
+  status: validated
   module: src/plexus/operators/candidates/jax_morph_virial_stress.py
   test: tests/test_jax_morph_virial_stress.py
   evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    oracle_run: diff_virial_stress
+    diff_metric: 'stress_rel_err (PRIMARY, one scalar) = max over the 18 LIVE cells i of the per-cell
+      stress
+
+      discrepancy |stress_plx(0,i) - stress_ref(i)|, divided by peak = max_i |stress_ref(i)| (=
+
+      25.0608), evaluated on recorded FRAME 0. UNITS: dimensionless, a fraction of the peak reference
+
+      stress. mechanosense is a PURE SENSOR: it moves nothing and writes only the per-cell `stress`
+
+      field, so there is no trajectory to integrate -- the observable IS the written scalar on ONE
+
+      frozen configuration, and every recorded frame''s stress is identical (guarded by
+
+      frames_identical). stress_ref is the jax-morph VirialStress(Morse(epsilon=3.0, alpha=2.8))
+
+      per-cell Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij), computed
+
+      by both the VirialStress STEP and PairwisePotential.virial_pressure (they agree bit-for-bit) on
+
+      a BYTE-IDENTICAL float32 IC: 5 isolated pairs at r = 0.7/1.0/1.3/2.0/3.0 spanning compression /
+
+      well-min / tension / tapered / beyond-cutoff, one dense 8-cell sunflower cluster (the
+
+      multi-neighbour sum), and 4 dead padding slots, all at radius 0.5 so sigma = r_i + r_j = 1.0.
+
+      stress_plx is the same field read from the Plexus engine''s recorded `stress` block after the
+
+      mechanosense operator (potential morse, eps 3.0, alpha 2.8) acts on that IC through
+
+      plexus.engine. TWO GUARDS accompany the primary: dead_absmax = max over the 4 dead padding slots
+
+      of |stress| on BOTH sides (must be <= 1e-6; checks the alive/self and V_i=0 safe_divide masks),
+
+      and frames_identical (all 4 recorded frames'' stress == frame 0; checks the sensor truly moves
+
+      nothing). A SUPPLEMENT re-runs the operator DIRECTLY (no engine) on the other four pair laws
+
+      (soft_sphere / hertzian / harmonic / lennard_jones) on the same uniform IC AND on a second
+
+      UNEQUAL-RADII IC for all five laws -- the sigma = r_i + r_j and per-cell d-ball V_i paths the
+
+      uniform-radius engine run cannot reach. Computed by _oracle/scripts/_compare_virial_stress.py
+
+      into _oracle/runs/diff_virial_stress/compare.json. evidence.value is the PRIMARY.
+
+      '
+    threshold: 0.0001
+    threshold_why: '1.0e-4 on the peak-normalized relative stress error, PRE-REGISTERED in the scorer
+
+      (_compare_virial_stress.py:81, `pass_rel_1e-4 = rel <= 1e-4`), with a companion 1e-6 on the
+
+      dead-slot absolute stress (line 82) and a boolean frames-identical gate (line 72), all decided
+
+      before the diff was computed. The 1e-4 bar sits ~3 orders ABOVE the float32 round-off floor of
+
+      two independent numeric stacks (jax jit virial vs torch autograd of dU/dr accumulate to rel
+
+      7.6e-8 on the Morse primary and <= 3.3e-7 on all 10 supplement law/radii points) yet far BELOW
+
+      every WRONG implementation the verdict hinges on: the paper''s taxicab sigma_i (per-component
+
+      sign, NO 2 d V_i normalization, NO 1/2 split) differs by a per-cell factor of ~2 d V_i = 4 pi
+
+      R^2 ~ 3.1 -> O(1) rel; dropping the minus sign FLIPS the reading (rel ~ 2.0); omitting the 1/2
+
+      bond split DOUBLES it (rel ~ 1.0); using a fixed area or the contact distance sigma for V_i
+
+      instead of the cell''s own d-ball mis-scales per cell by O(1). None of these can slip under 1e-4.
+
+      Looser would admit a mis-normalized or sign-flipped reimplementation as "agreement"; tighter
+
+      would fail on float32 reassociation between the two stacks alone.
+
+      '
+    value: 7.610894538878732e-08
+    passed: true
+    plexus_run: log/atlas/virial_stress/
+    scorer: Atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
+    acted_ledger: 'From log/atlas/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0,
+      kind
+
+      lateral, structural true -- it ACTED (wrote the stress field) but moved nothing, exactly a pure
+
+      sensor; seed_state calls 1 / acted 1 (sets the uniform radius 0.5 that V_i and sigma need).
+
+      inert_operators []; valid_evidence true ("every scheduled operator acted at least once").
+
+      n_active 18 -> 18 flat; gyration / centroid / extent / nn_distance constant across all 4 frames
+
+      -- the run is a still life, as a sensor must be, so the metric is well-defined on frame 0.
+
+      '
+    corroborators: 'All from _oracle/runs/diff_virial_stress/{compare.json,summary.json}. (1) The PRIMARY
+      engine
+
+      Morse stress matches the oracle to rel 7.6e-8 (max_abs 1.9e-6 on peak 25.06). (2) Dead-slot
+
+      stress is EXACTLY 0.0 on BOTH sides -> the alive/self mask and the V_i=0 safe_divide reproduce,
+
+      no phantom pressure. (3) frames_identical true -> the sensor moved nothing across all frames.
+
+      (4) Oracle-side internal gates: the VirialStress STEP == PairwisePotential.virial_pressure
+
+      bit-for-bit (step_eq_virial_pressure true -- the delegation is thin) and is PRNG-key-independent
+
+      (key_independent true -- a sensor must ignore its key). (5) The reference matches a BY-HAND
+
+      analytic single-neighbour Morse pressure on the in-window isolated pairs to max|dev| 3.2e-6
+
+      (r=0.7 -> +11.414 compression, r=1.0 -> 0 at the well minimum, r=1.3 -> -1.706 tension) -> the
+
+      compression-positive sign convention and the 2 d V_i normalization are correct, not merely
+
+      self-consistent. (6) SUPPLEMENT: all 10 direct-operator points pass rel <= 1e-4 -- the other
+
+      four pair laws on the uniform IC (rel <= 1.3e-7) AND all five laws on a SECOND UNEQUAL-RADII IC
+
+      (rel <= 3.3e-7), exercising the sigma = r_i + r_j and per-cell d-ball V_i paths the equal-radius
+
+      engine run cannot reach.
+
+      '
+    scope: 'This validates the mechanosense IMPLEMENTATION -- the written virial-pressure VALUE -- against
+
+      the jax-morph reference across five pair laws, equal and unequal radii, live/dead masking, and
+
+      the sign / 2 d V_i normalization / 1/2 bond-split conventions. It does NOT touch (a) the
+
+      verdict/dispute axis, or (b) the differentiability claim (d stress / d epsilon finite through
+
+      the coupling): VALUES, not gradients, are what the differ compares, and the port deliberately
+
+      detaches the position-gradient path through dU/dr (implementer''s note), which is not exercised
+
+      here. The SOURCE-vs-PAPER contradiction is confirmed as a FORM difference, not resolved
+
+      numerically: this test scores the code''s Irving-Kirkwood virial pressure (SOURCE WINS), not the
+
+      paper''s taxicab sigma_i.
+
+      '
   state_io_notes:
     reads:
     - position

@@ -1,0 +1,41 @@
+# Differential test for `agitate` -- the PURE Brownian bath, Plexus side (dt = 1.0).
+#
+# The oracle this mirrors is `_oracle/runs/diff_brownian_dynamics/`: BrownianDynamics(potential=
+# None) -- a free Brownian gas, forces()==0 -- of N cells all seeded at ONE point in free space,
+# kT=0.1, gamma=1.0, measured by the free-diffusion constant D = Rg(T)^2 / (2*n_dim*T).
+#
+# `agitate` is scheduled ALONE: no drift operator, so ONLY the thermal leg runs (the drift F/gamma
+# is a SEPARATE pluggable pair-potential contract by the normalized decomposition). The set is
+# pos-only -> first-order overdamped integration x += dt*v, and `agitate` emits the velocity
+# v = sqrt(2 kT / (gamma dt)) * xi so that dt*v = sqrt(2 kT dt/gamma)*xi is the Wiener increment.
+#
+# boundary: free -- the reference has no box; positions must NOT be clamped or the diffusion is
+# throttled at the wall. All N cells start at the world centre (20,20); Rg is translation-invariant
+# so the offset from the oracle's origin is not a mismatch.
+general:
+  name: brownian_dynamics
+  seed: 0
+  n_frames: 40
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 20000
+    buffer: 20000
+    start: [[20.0, 20.0]]      # every cell at one point (tiled to n): the matched initial condition
+    state:
+      pos: { width: 2 }
+
+fields: {}
+
+operators:
+  - { op: agitate, at: cell, kT: 0.1, gamma: 1.0 }
+
+schedule: [agitate]
+
+plotting:
+  background: black
+  point_size: 3.0

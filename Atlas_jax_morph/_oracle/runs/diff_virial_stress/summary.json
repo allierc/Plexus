@@ -1,0 +1,65 @@
+{
+  "role": "oracle",
+  "operator": "mechanosense / VirialStress",
+  "model": "VirialStress(Morse(epsilon=3.0, alpha=2.8))",
+  "N": 18,
+  "CAP": 22,
+  "n_dead": 4,
+  "r0": 0.5,
+  "sigma": 1.0,
+  "eps": 3.0,
+  "alpha": 2.8,
+  "key_independent": true,
+  "step_eq_virial_pressure": true,
+  "ref_vs_analytic_morse_max_dev": 3.2285383522179245e-06,
+  "stress_morse_live_min": -1.705552101135254,
+  "stress_morse_live_max": 25.060768127441406,
+  "stress_morse_live_absmax": 25.060768127441406,
+  "stress_morse_n_positive": 10,
+  "stress_morse_n_negative": 4,
+  "stress_morse_n_zero": 4,
+  "dead_slots_stress_absmax": 0.0,
+  "pair_stress": {
+    "r=0.7": [
+      11.414106369018555,
+      11.414106369018555
+    ],
+    "r=1.0": [
+      -0.0,
+      -0.0
+    ],
+    "r=1.3": [
+      -1.705552101135254,
+      -1.705552101135254
+    ],
+    "r=2.0": [
+      -0.6949243545532227,
+      -0.6949243545532227
+    ],
+    "r=3.0": [
+      -0.0,
+      -0.0
+    ]
+  },
+  "analytic_in_window": {
+    "r=0.7": 11.414103140480202,
+    "r=1.0": -0.0,
+    "r=1.3": -1.705552178723046
+  },
+  "other_laws_live_absmax": {
+    "morse": 25.060768127441406,
+    "soft_sphere": 0.22448883950710297,
+    "hertzian": 0.10924379527568817,
+    "harmonic": 2.2689647674560547,
+    "lennard_jones": 423.6285095214844
+  },
+  "vr_N": 6,
+  "vr_stress_morse": [
+    4.216634273529053,
+    11.712871551513672,
+    -0.8687350153923035,
+    -2.6605007648468018,
+    4.392329216003418,
+    6.324954509735107
+  ]
+}

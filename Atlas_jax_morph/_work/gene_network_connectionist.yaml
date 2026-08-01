@@ -151,50 +151,54 @@ test: tests/test_jax_morph_gene_network_connectionist.py
 evidence:
   oracle_run: diff_gene_network_connectionist
   diff_metric: |
-    Max absolute deviation between the Plexus regulate:connectionist gene trajectory and the
-    reference GeneNetworkConnectionist gene trajectory, in float32 gene-concentration units, taken
-    over EVERY recorded frame, cell, and gene of a run that shares an IDENTICAL initial gene state
-    g0, an IDENTICAL frozen driver input u, and IDENTICAL parameters (W_gene, W_in, b, gamma):
-
-      Metric = max over {frame k in 0..20, cell i in 0..5, gene j in 0..4} of
-               abs( G_eng[k,i,j] - G_ref[k,i,j] )
-
-      G_ref : the reference's OWN trajectory g(0), g(dt), ..., g(20 dt) integrated by its shipped
-              ODEController with adaptive diffrax Dopri5 (PIDController rtol=1e-4, atol=1e-6), read
-              from _oracle/runs/diff_gene_network_connectionist/reference.npz key 'gene' (21,6,5).
-      G_eng : the Plexus engine's recorded 'gene' block over the same 21 frames, from
-              graphs_data/atlas/gene_network_connectionist/simulation.zarr. The
-              regulate:connectionist operator SELF-SOLVES each macro-step with fixed-step RK4
-              (substeps=64) and returns (g(dt)-g0)/dt, so the engine step g += dt*delta recovers
-              g(dt); seed_state@frame0 + regulate@frames>=1 make recorded frame k = g(k dt),
-              aligned to G_ref (spec n_frames=20 records 21 frames, matching the oracle).
-
-    Both sides integrate the IDENTICAL closed-form vector field
-    dg/dt = sigma_alg(g@W_gene^T + u@W_in^T + b) - gamma*g (verified byte-identical to the
-    reference ode.py:277-278) from the identical initial condition; the only admissible source of
-    disagreement is the integrator (adaptive Dopri5 vs fixed RK4-64) plus cross-backend float32
-    rounding. The 20 compounding macro-steps over 6 cells exercise the recurrent gene->gene
-    coupling, the W_in input term inside the sigmoid, the algebraic sigmoid, and per-gene decay --
-    a wrong reaction law diverges by O(1) within a few frames. Scored by
-    Atlas_jax_morph/diff_gene_network_connectionist.py (mode score) -> diff.json.
+    max over {frame 0..20, cell 0..5, gene 0..4} of |G_eng - G_ref|, in float32 gene-concentration
+    units. G_ref = the reference GeneNetworkConnectionist Dopri5 trajectory
+    (_oracle/runs/diff_gene_network_connectionist/reference.npz['gene']; diffrax PIDController
+    rtol=1e-4 atol=1e-6). G_eng = the Plexus ENGINE's recorded per-cell `gene` block from
+    graphs_data/atlas/gene_network_connectionist/simulation.zarr, where regulate:connectionist
+    self-solves each macro-step with fixed-step RK4 (substeps=64) and returns (g(dt)-g0)/dt so the
+    engine's g += dt*delta recovers g(dt). Both sides integrate the byte-identical vector field
+    dg/dt = sigma_alg(g @ W_gene^T + u @ W_in^T + b) - gamma*g, with sigma_alg(x) = 0.5 + 0.5*x/
+    sqrt(1+x^2), from an identical seeded g0 (5-vector), a frozen u (2-vector) and identical params,
+    all emitted by ONE generator (_gen_gene_network_connectionist.py) so the two sides cannot drift
+    apart. Arrays are 21 frames x 6 cells x 5 genes; frame k = g(k*dt); this is a full end-to-end
+    run_spec.py engine trajectory, NOT an operator-level probe. Driver
+    Atlas_jax_morph/diff_gene_network_connectionist.py; artefact
+    _oracle/runs/diff_gene_network_connectionist/diff.json.
   threshold: |
-    5.0e-3 (absolute). The reference integrates with adaptive Dopri5 at rtol=1e-4, atol=1e-6; over
-    gene magnitudes reaching ~8.8 (summary.json) this holds each step to a local integration error
-    ~ rtol*abs(g) + atol ~ 9e-4, while our operator integrates the SAME vector field with a far
-    finer fixed RK4 (h = dt/64, truncation ~1e-7), so the two trajectories can differ only by the
-    reference's own integration tolerance. That gap does NOT amplify: at large drive the algebraic
-    sigmoid saturates (sigma' -> 0) so the Jacobian -> -diag(gamma), a contraction that damps error
-    toward the high steady state g* ~ sigma/gamma ~ 10, and the endpoint deviation therefore stays
-    a few*1e-3. 5e-3 sits ~5x above that a-priori integrator-gap ceiling yet ~2 orders of magnitude
-    below the O(0.5-1) trajectory divergence any genuine mechanism error would produce within the
-    first few frames -- a logistic instead of the algebraic sigmoid, the sensed input added OUTSIDE
-    the sigmoid (the paper form) instead of inside via W_in, a spurious cross-cell coupling that
-    scales the drive by N=6, or a decay-sign flip. A tighter bound (1e-4) would flag only the
-    Dopri5-vs-RK4 numerical gap, not a mechanism error; a looser one (1e-1) would pass a wrong
-    sigmoid family in some regimes. It certifies integrator-limited agreement on an identical
-    vector field, not a fitted tolerance.
-  value: 6.676e-06
+    5.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the run from integrator physics, not
+    from the observed number. Both sides integrate the identical vector field from an identical IC,
+    so the only admissible disagreement is the integrator gap (fixed-step RK4-64 vs adaptive Dopri5
+    rtol=1e-4) plus cross-backend float32 rounding. The reference rtol=1e-4 over the O(8.8) gene
+    magnitudes bounds per-step truncation at ~1e-3 and it does NOT amplify: at large drive the
+    algebraic sigmoid saturates (sigma'->0), the Jacobian tends to -diag(gamma), a contraction that
+    damps error toward g* ~ sigma/gamma ~ 10. 5e-3 gives ~5x margin over that a-priori ceiling yet
+    stays ~2 orders below the O(0.5-1) divergence any real mechanism error makes within a few frames
+    (logistic instead of the algebraic sigmoid; input added OUTSIDE the sigmoid per the paper vs
+    inside via W_in; a decay sign flip). A tighter 1e-3 would risk a false fail from the honest
+    integrator gap -- the criterion-no-valid-config-can-meet trap. It certifies formula-identity,
+    not a fitted tolerance.
+  value: 6.67572021484375e-06
   passed: true
+  result: |
+    PASS by ~3 orders of magnitude. max|dev| = 6.68e-6 (float32 rounding, not Dopri5 truncation) <<
+    threshold 5e-3, so the verdict does not hinge on the threshold choice. The signature confirms it
+    is integrator/rounding-limited, not a reaction-law error: frame-0 deviation is EXACTLY 0 (the
+    shared seeded IC), grows MONOTONE to 4.8e-6 by the final frame, and the max sits at frame 17,
+    cell 0, gene 4 -- the largest gene (~8.4), where float32 rounding is largest (relative 8.0e-7).
+    Final cell-0 genes agree component-wise to ~1e-6 (ref [7.3356, 0.3709, 2.9444, 1.3693, 8.7943]
+    vs eng [7.3356, 0.3709, 2.9444, 1.3693, 8.7942]). INDEPENDENTLY reproduced by this differ in
+    pure numpy (oracle venv, no torch): a fine RK4(4096) reproduces reference.npz to 3.1e-6 (the
+    reference IS a genuine integration of the stated field), and an RK4-64 engine-replica matches the
+    reference to 3.1e-6 in float64 -- corroborating the torch number. The pre-registered
+    discriminators, run in that same numpy harness, blow past the threshold: the WRONG logistic
+    sigmoid lands 1.31 from the reference and the paper's input-OUTSIDE-sigmoid form lands 2.38
+    (~2.5 orders over 5e-3), so the metric genuinely catches the SOURCE-WINS mechanism choices.
+    Acted ledger checked FIRST (log/atlas/gene_network_connectionist/diag.json): regulate 20/20
+    calls acted, moved 0.823 (the ODE really evolved the gene block), seed_state 1/1,
+    inert_operators [], valid_evidence true -- the metric is on a live operator, not an inert one.
+    Score driver _oracle/runs/diff_gene_network_connectionist/diff.json; engine evidence
+    log/atlas/gene_network_connectionist/.
 state_io_notes:
   reads:
   - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)

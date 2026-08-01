@@ -404,7 +404,7 @@ test of one property statable without the reference: a conservation law, a sign,
 symmetry. Nothing enters the validated library at this stage.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4 --- Differential validation \hfill \fl}
+\begin{phasebox}{Phase 4 --- Differential validation \hfill \done\ (107 min, 14 of 16)}
 Metric and threshold first; then the same initial condition through both implementations; then
 subtract. \textbf{A failure here is the most informative outcome available} --- it is the
 reproduction telling us the contract is wrong, which is the whole reason for choosing a target
@@ -687,6 +687,57 @@ Phase 4 is now running that comparison properly for every mechanism, metric and 
 down first.
 
 %======================================================================
+\section{Phase 4 --- what the reference says about our operators}\label{sec:p4}
+
+Sixteen differential tests, each one required to write down its metric and its threshold
+\emph{before} running anything. Fourteen passed; two ran out of time twice and are being retried
+with a bigger budget rather than quietly dropped.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}l l l r@{}}
+\toprule
+\textbf{mechanism} & \textbf{contract} & \textbf{what was compared} & \textbf{disagreement}\\
+\midrule
+NeuralODE & regulate & integrated gene state, 3 step sizes & $2{\cdot}10^{-16}$\\
+GeneNetworkMWC & regulate & the vector field itself & $9{\cdot}10^{-7}$\\
+Death & apoptose & pooled death hazard & $6{\cdot}10^{-5}$\\
+FreeScreenedDiffusion & morphogen & steady-state concentration & $3{\cdot}10^{-7}$\\
+Division & cell\_divide & pooled division hazard, 48 seeds & $1.1{\cdot}10^{-3}$\\
+SaturatingCellGrowth & grow\_radius & radius increment & \textbf{0}\\
+ActiveBrownianDynamics2D & reorient & orientational autocorrelation, 20k cells & $9{\cdot}10^{-3}$\\
+BrownianDynamics & agitate & displacement statistics & $1.1{\cdot}10^{-2}$\\
+SoftSphere / Hertzian & adhere & pair force law & $\sim\!2{\cdot}10^{-6}$\\
+Harmonic / LennardJones & adhere & pair force law & $8{\cdot}10^{-6}$ / \textbf{0}\\
+MechanicalRelaxation & relax & relaxed configuration & $2{\cdot}10^{-6}$\\
+VirialStress & mechanosense & per-cell virial pressure & $8{\cdot}10^{-8}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Every one of those is below a threshold written down first}, and the thresholds were
+argued from numerics rather than chosen to fit: the division test's bar is three pooled standard
+errors of a Bernoulli rate, the active-Brownian test's bar is the finite-sample spread of an
+autocorrelation over 20{,}000 cells.
+
+\subsection{And it explains the number that did not match}
+
+The forward figure reached 124 cells against the reference's 82, and I said that was the most
+useful number the atlas had produced. It was --- because the differential test dissolved it.
+
+The division differ refused to compare cell counts at all. Two engines drawing from
+\emph{independent} random streams produce different realisations of the same process, so a raw
+count compares luck. It compared the \textbf{pooled hazard} instead --- committed divisions per
+eligible cell-step, over 48 seeds and 40 macro-steps, about 47{,}000 cell-steps a side --- and
+found the two engines agree to $1.1{\cdot}10^{-3}$ against a three-sigma bar of
+$5.2{\cdot}10^{-3}$.
+
+\emph{The mechanism is right; the trajectory was never going to be identical.} That distinction
+is the whole difference between validating a contract and matching a picture, and I would not
+have drawn it unprompted --- the agent did, and was right to refuse the question I had implicitly
+asked.
+
+%======================================================================
 \section{Phase 6 is already possible --- the gradient survives}\label{sec:grad}
 
 You asked for Figure~5 by differentiability, and called it an expected feature of Plexus~2 rather
@@ -728,6 +779,37 @@ gradient to an operator parameter & \textcolor{bad}{no path --- parameters are f
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection{And it optimises}
+
+With the tunable stored as a tensor rather than a float --- the torch form of the reference's own
+rule, ``store as an array anything you want to learn'' --- the loop closes. A target mean cell
+radius, a squared-error loss on the final state, twelve Adam steps, each one a full differentiable
+rollout of the real engine with growth, adhesion and division events:
+
+\begin{center}
+\small
+\begin{tabular}{@{}r r r r@{}}
+\toprule
+step & \code{max\_radius} & mean radius & loss\\
+\midrule
+0 & 0.600 & 0.527 & $1.1{\cdot}10^{-2}$\\
+3 & 0.458 & 0.413 & $5.5{\cdot}10^{-5}$\\
+7 & 0.404 & 0.367 & $2.8{\cdot}10^{-3}$\\
+11 & 0.471 & 0.423 & $\mathbf{8.6{\cdot}10^{-6}}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three orders of magnitude, and the overshoot-and-return in the middle is Adam's momentum, not
+noise. \textbf{Inverse design through the Plexus engine works today}, for a continuous parameter.
+
+\textbf{What Figure 5 still needs}, stated precisely so it is not a surprise later: the division
+\emph{draw} is discrete, and a gradient through one sampled rollout optimises against that
+sample's luck. The reference's answer is exactly the mechanism this atlas catalogued and set aside
+as ``not biology'' --- record the sampled action, replay it, score it, and take a score-function
+gradient over recorded histories. That contract is the largest single thing the language is
+missing, and it is now specified, in our own record, by the repository that has it.
 
 \textbf{And here the two halves of the atlas meet.} Phase~2 classified jax-morph's four
 architectural mechanisms --- the operator split, the time-scale taxonomy, the declared dataflow,

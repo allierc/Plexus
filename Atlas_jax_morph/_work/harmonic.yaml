@@ -197,9 +197,111 @@ contract:
   outputs:
   - cell
   reads:
-  - position
-  - radius
   - alive
+  - pos
+  - radius
+  writes:
+  - pos
+  maps:
+  - pairwise
+  - repulsive
+status: validated
+module: src/plexus/operators/candidates/jax_morph_harmonic.py
+test: tests/test_jax_morph_harmonic.py
+evidence:
+  oracle_run: diff_harmonic
+  diff_metric: |
+    D_pos = max over ALL 161 frames (t = 0..160) and ALL 19 live cells of the per-cell
+    Euclidean position discrepancy ||x_plx(t,i) - x_ref(t,i)||_2, divided by the contact
+    distance sigma = r_i + r_j = 1.0 (radius 0.5 each). UNITS: fractions of sigma (one cell
+    diameter). x_ref is the jax-morph BrownianDynamics(Harmonic(k=1.0, r_cutoff_frac=2.5),
+    gamma=1.0, kT=0.0) trajectory -- the reference's OWN overdamped Euler at zero temperature,
+    whose update is exactly dx = dt*F/gamma = dt*(-grad U). x_plx is the Plexus adhere/harmonic
+    operator under the engine's overdamped Euler, on a BYTE-IDENTICAL initial condition (a
+    19-cell mutually-overlapping sunflower at radius 0.5 + 5 dead padding slots), same dt = 0.03,
+    same 160 steps, aligned cell-for-cell and frame-for-frame (harmonic is gated after_frame:1 so
+    frame 0 is the pristine IC and frame t is the IC after t overdamped steps). Because kT = 0
+    makes the reference deterministic (verified identical across two PRNG keys) and its
+    Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE function of the
+    force law, so D_pos isolates the Harmonic force INCLUDING its adhesive tail and hard C0 cutoff
+    -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
+    Computed by _oracle/scripts/_analyze_harmonic.py into log/atlas/harmonic/diff.json.
+  threshold: 0.001
+  threshold_why: |
+    1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_harmonic.py:98) before the diff was
+    computed. It is ~500x below one cell radius (0.5 sigma) and ~5 orders under the real dynamics
+    the test must resolve (max live displacement 1.40 sigma; adhesion CONTRACTS the cluster,
+    gyration 1.540 -> 0.638 sigma). A genuine force-law error CANNOT slip under it: the NEGATIVE
+    CONTROL -- a purely-repulsive SoftSphere with the matched repulsive core (k = eps = 1, same
+    sigma), i.e. Harmonic with the adhesive tail DELETED -- diverges the trajectory by 1.480 sigma
+    (1480x the bar) and REVERSES the sign of the size change (gyration EXPANDS to 1.678 vs the
+    adhesive CONTRACTION to 0.638), so dropping the down-shift/adhesion alone blows the metric by
+    three orders. Yet 1e-3 sits ~130x ABOVE the float32 round-off floor of two independent numeric
+    stacks (jax jit-scan vs torch autograd accumulate to D_pos 7.9e-6 sigma over 160 steps,
+    plateauing by argframe 143), so it is not so tight that only bit-identical arithmetic could
+    pass. Looser would admit an adhesion-off or mis-shifted reimplementation as "agreement";
+    tighter would fail on float32 reassociation alone.
+  value: 7.864199877963372e-06
+  passed: true
+  plexus_run: log/atlas/harmonic/
+  scorer: Atlas_jax_morph/_oracle/scripts/_analyze_harmonic.py
+  acted_ledger: |
+    adhere: calls 160 / acted 160, moved 8.451 (cumulative), kind lateral; inert_operators [];
+    valid_evidence true ("every scheduled operator acted at least once"). The one scheduled
+    operator moved cells on every frame -- this is a run, not a still life. Reference IC force
+    magnitude peaks at 6.96 (k*sigma units) and the single-step recovered Plexus force matches it
+    to a residual of 4.0e-05 (raw force law, pre-compounding).
+  corroborators: |
+    All from log/atlas/harmonic/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
+    0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
+    x_plx(t) vs x_ref(t-1) scores 0.260 sigma, ~33000x D_pos -> the frame alignment is genuinely
+    correct, not an accidental match to a shifted trajectory. (3) Single-step IC force residual
+    max_i ||(x_plx(1)-x_plx(0))/dt - F_ref(IC)|| / (k*sigma) = 4.0e-05 (raw force law before any
+    compounding). (4) Radius-of-gyration trajectory relative error 2.5e-07 AND correct SHAPE:
+    the ADHESIVE tail CONTRACTS the cluster 1.540 -> 0.638 on both sides (Plexus 1.5399366 ->
+    0.6381025 vs ref 1.5399366 -> 0.6381026), over a cluster that genuinely MOVED (1.40 sigma).
+    (5) Every DEAD padding slot never moved on either side (0.0 / 0.0): the alive/self mask and
+    the sigma safe-divide reproduce, no phantom pull. (6) NEGATIVE CONTROL: the matched
+    purely-repulsive SoftSphere diverges by 1.480 sigma and EXPANDS to gyration 1.678 (opposite
+    direction), IC force differing by 102% -- so the metric resolves the adhesive tail, not just
+    the shared core. (7) Oracle self-guard carried through: the 2-cell force scan matches the
+    analytic F = k*(sigma - r)|_{r<r_c} to 6.0e-08.
+  scope: |
+    UNIFORM-radius test: reference and spec both use radius 0.5, so the candidate exercises
+    sigma = r_i + r_j at EQUAL radii; the SUM-vs-mean size-consistency (heterogeneous r_i != r_j)
+    is not yet exercised (a mean-instead-of-sum contact rule would diverge by O(sigma) under two
+    distinct radii -- the extending experiment). r_cutoff_frac = 2.5 sits well beyond the resting
+    contact, so the C0 force discontinuity at r_c is never crossed in this trajectory; the tail is
+    exercised as adhesion, not at the truncation edge. This validates the IMPLEMENTATION of the
+    force law; it does not touch the verdict/dispute axis (new -> adhere).
+disputed:
+  by: skeptic
+  was: alias
+  claimed: new
+  evidence: 'Sibling SoftSphere (_work/soft_sphere.yaml:90-113) landed new -> `adhere`, explicitly rejecting
+
+    attraction_repulsion for lacking ''a cell''s physical radius, size-consistent contact distance,
+
+    energy/virial, per-cell coupling''. Harmonic (potentials.py:407-416, base 228-266) reads
+
+    radius->sigma=r_i+r_j, per-cell mix k, energy/virial -- same adhesive family as Morse. Alias
+
+    silently loses these; entry never addresses adhere.
+
+    '
+  what_would_settle_it: 'Reconcile the family''s conflicting record verdicts (Morse alias->attraction_repulsion
+    vs
+
+    SoftSphere new->adhere): confirm attraction_repulsion.py:28-64 has no `radius` read and a fixed
+
+    global sigma + per-type p; if so, Harmonic''s size-consistent per-pair contact and per-cell
+
+    coupling force it under `adhere`, matching Morse''s true sibling home, not attraction_repulsion.
+
+    '
+state_io_notes:
+  reads:
+  - position
   - 'coupling field (shared scalar OR per-cell scalar field, here the stiffness k), symmetrised per
 
     pair by the arithmetic-mean mix rule 0.5*(k_i+k_j)
@@ -228,36 +330,4 @@ contract:
     adhesion-OFF, purely-repulsive shape of the same contract)
 
     '
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_harmonic.py
-test: tests/test_jax_morph_harmonic.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
-disputed:
-  by: skeptic
-  was: alias
-  claimed: new
-  evidence: 'Sibling SoftSphere (_work/soft_sphere.yaml:90-113) landed new -> `adhere`, explicitly rejecting
-
-    attraction_repulsion for lacking ''a cell''s physical radius, size-consistent contact distance,
-
-    energy/virial, per-cell coupling''. Harmonic (potentials.py:407-416, base 228-266) reads
-
-    radius->sigma=r_i+r_j, per-cell mix k, energy/virial -- same adhesive family as Morse. Alias
-
-    silently loses these; entry never addresses adhere.
-
-    '
-  what_would_settle_it: 'Reconcile the family''s conflicting record verdicts (Morse alias->attraction_repulsion
-    vs
-
-    SoftSphere new->adhere): confirm attraction_repulsion.py:28-64 has no `radius` read and a fixed
-
-    global sigma + per-type p; if so, Harmonic''s size-consistent per-pair contact and per-cell
-
-    coupling force it under `adhere`, matching Morse''s true sibling home, not attraction_repulsion.
-
-    '
+signature_note: '`coupling` is a parameter, not a state block.'

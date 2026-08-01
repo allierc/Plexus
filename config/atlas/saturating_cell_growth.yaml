@@ -1,0 +1,46 @@
+# Differential for grow_radius (SaturatingCellGrowth), ISOLATED -- Scenario A (uniform IC).
+#
+# The oracle run this mirrors is Atlas_jax_morph/_oracle/runs/diff_saturating_cell_growth/
+# (scenario A): jax-morph SaturatingCellGrowth run ALONE (no relaxation, no division) on 4 cells
+# with radius 0.30 and growth_rate 0.40, max_radius 0.6, 20 macro-steps at dt = 2.0. Growth is
+# isolated so the two sides keep the SAME cells in the SAME slots and the radius trajectories align
+# frame-for-frame; division is deliberately absent (its hazard p = 1-exp(-division_rate*dt) never
+# reads radius, so it -- not growth -- is what makes the anchor's cell counts diverge, 124 vs 82).
+#
+# dt = 2.0 (not 1) makes the mean-rate convention observable: grow_radius returns delta = dr/dt and
+# the engine's first-order step recovers radius += dt*delta = dr, matching the reference which ADDS
+# dr once. seed_state seeds frame 0 (before_frame:1); grow_radius acts on frames 1..20
+# (after_frame:1) so recorded frame 0 = the pure IC and frames 1..20 = the 20 growth steps, exactly
+# aligning with the reference s_0..s_20.
+general:
+  name: saturating_cell_growth
+  seed: 0
+  n_frames: 20
+  dt: 2.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 4
+    buffer: 8                       # 4 live; dead slots 4..7 held at 0 (occ=0 -> grow no-op), diffed only over live cells
+    start: [[20.0, 20.0], [21.0, 20.0], [20.0, 21.0], [21.0, 21.0]]
+    state:
+      pos: { width: 2 }
+      radius: { width: 1, integration: first_order, boundary: free, record: true }
+      growth_rate: { width: 1, integration: none, boundary: free, record: false }
+
+fields: {}
+
+operators:
+  # 0: initial condition -- radius 0.30, per-cell growth rate 0.40 (a cell with radius 0 cannot grow).
+  - { op: seed_state, at: cell, before_frame: 1, values: { radius: 0.30, growth_rate: 0.40 } }
+  # A: the saturating (von Bertalanffy) per-cell radius ODE, exact flow, EMIT=velocity on `radius`.
+  - { op: grow_radius, at: cell, after_frame: 1, max_radius: 0.6 }
+
+schedule: [seed_state, grow_radius]
+
+plotting:
+  background: black
+  point_size: 6.0

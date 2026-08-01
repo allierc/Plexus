@@ -137,3 +137,39 @@ full padded capacity and masked by `occ` -- the reference's alive-masking.
   Verified against the documented integration contract (base.py:524) and the sibling velocity
   operators (glide/sediment/attraction_repulsion), but not exercised end-to-end through
   `engine.run` here.
+
+---
+
+## Differential test (differ)
+
+**VALIDATED.** `agitate` reproduces the reference free-diffusion constant.
+
+Metric (pre-registered before running): relative error in the free-diffusion constant D of the
+PURE thermal bath, MAX over three macro-step sizes --
+`metric = max_dt |D_plexus(dt) - D_ref(dt)| / D_ref(dt)`, with
+`D(dt) = slope(Rg^2 vs t) / (2*n_dim)`, `Rg^2(t) = mean_alive |r_i - c|^2` fit over every frame of
+a pure-bath rollout (`agitate` alone, no drift = the reference `BrownianDynamics(potential=None)`
+free Brownian gas). Measured at `dt in {1.0, 0.5, 0.25}` at fixed total time T~40, because D is
+dt-INVARIANT only if the noise carries the Wiener sqrt(dt) displacement scaling -- the ONE feature
+separating `agitate` from the frozen operators' bolt-on `noise*randn` jitter.
+
+Threshold (pre-registered): **0.03** = ~3x the reference per-side finite-sample error
+(1/sqrt(2N)=0.0071 at N=20000) and ~1.7x the oracle's own cross-dt D_hat scatter (0.017). Not
+looser: the dt-scaled-noise bug gives D=dt*kT/gamma -> 75% error (negative control, rejected).
+
+Result: **value = 0.010859** (max, at dt=0.5) <= 0.03 -> **PASS**.
+- D_ref [slope]    = {1.0: 0.10009, 0.5: 0.09944, 0.25: 0.10025}
+- D_plexus [slope] = {1.0: 0.10030, 0.5: 0.10052, 0.25: 0.10004}   (all fits r^2 > 0.9999)
+- per-dt rel err   = {1.0: 0.0021, 0.5: 0.0109, 0.25: 0.0021}; both match theory D=kT/gamma=0.1.
+- Plexus D dt-invariant to 0.5% -> the sqrt(dt) scaling survives `pos += dt*v` (`agitate` emits
+  v = sqrt(2kT/(gamma*dt))*xi).
+- Negative control: dt-scaled bug D=0.0250 at dt=0.25, rel_err 0.75, REJECTED -- the metric bites.
+- Acted ledger: agitate calls 41, acted 41, moved 2.16, inert_operators [] -> valid_evidence true;
+  gyration 0.63 -> 4.05 (free spreading, no wall clamp). Same IC as oracle (all cells at one point;
+  Rg is translation-invariant, so the (20,20) offset is not a mismatch).
+
+Paths:
+- oracle:  Atlas_jax_morph/_oracle/runs/diff_brownian_dynamics/ (script _oracle/scripts/diff_brownian_dynamics.py)
+- plexus:  log/atlas/brownian_dynamics/{diag,metrics,diff}.json (specs config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml)
+
+Verdict: `new` -> `agitate` (motion family, cell set), **status: validated**.

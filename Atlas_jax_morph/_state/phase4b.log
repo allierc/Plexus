@@ -1,0 +1,42 @@
+Restored. The differential test for `gene_network_connectionist` is complete. Here's the summary.
+
+## DIFFER verdict: PASS → `status: validated`
+
+**What I found.** A prior DIFFER pass had run the full differential test (artefacts dated Jul 31 21:58) and written the note's PASS section — but its record edit never landed: both the working copy and the merged `atlas_record.yaml` still had `status: implemented` with all `evidence` fields `null`. My job was to verify the result is genuine and get the evidence into the record.
+
+**Verification (this environment has no torch/jax, so I couldn't re-execute the engine — I verified what's on disk and re-derived the numerics independently in pure numpy via the oracle venv):**
+
+- **Artefacts real & consistent** — oracle `reference.npz` [21,6,5] with a genuine provenance (jax 0.11.0, diffrax 0.7.2, jax-morph @ ace08b8); engine `diag.json` acted ledger clean (`regulate` 20/20 acted, `moved 0.823`, `seed_state` 1/1, `inert_operators: []`, `valid_evidence: true`); IC matched to float32 between `spec_run.yaml` and the oracle `summary.json`.
+- **Independent numpy re-derivation** — a fine RK4(4096) reproduces `reference.npz` to **3.09e-6** (the reference *is* a genuine integration of `dg/dt = sigma_alg(g·Wgᵀ + u·Wᵢₙᵀ + b) − γg`), and an RK4-64 engine-replica matches it to **3.09e-6** in float64, corroborating the torch run's **6.68e-6**.
+- **Discrimination** — the pre-registered wrong mechanisms diverge far past the 5e-3 threshold: logistic-instead-of-algebraic sigmoid → **1.31**, paper's input-*outside*-sigmoid → **2.38** (~2.5 orders over). The threshold catches exactly the SOURCE-WINS choices; it's principled, not fitted.
+
+**Record change** (`_work/gene_network_connectionist.yaml`): `status → validated`; `evidence` filled — `oracle_run: diff_gene_network_connectionist`, precise `diff_metric` (max-abs gene deviation over 21×6×5, full engine trajectory vs reference Dopri5), `threshold: 5.0e-3` with rationale, `value: 6.67572e-06`, `passed: true`, `result` prose.
+
+**Validation:** simulated the driver's merge + real `record.validate` against the frozen baseline → **0 violations** for this entry and 0 for the whole record. R5 clean (`regulate` confirmed absent from the registered baseline → the `new` verdict holds). Note appended; oracle venv restored to its prior state.
+
+The verdict stands: **`new`, `implementation_of: regulate`** — the connectionist linear-drive field is a faithful `regulate` implementation to float32, and with `mwc` and `neural_ode` differing only in the drive law, the ODEController entries collapse to one contract, which is the convergence result the ledger exists to record.
+  committed  differ/gene_network_connectionist  (8.1 min)
+The differential test is complete and recorded. Summary of what I did as DIFFER:
+
+## Result: `regulate` is **`validated`** — it reproduces the reference to solver tolerance
+
+**Order followed (metric fixed before running):**
+1. Wrote `evidence.diff_metric` and `evidence.threshold` into the record *first*, on principled grounds — not tuned to any observed number.
+2. Re-ran the oracle fresh → `_oracle/runs/diff_odecontroller/reference.npz` (deterministic-at-fixed-key check passed).
+3. Ran the spec through the engine → `log/atlas/odecontroller/`; checked the **acted ledger** before any metric (`regulate` acted 19/21, `seed_state` acted, `inert_operators: []`, `valid_evidence: true`).
+4. Computed the metric with `_compare_odecontroller.py` (the operator *as the engine runs it*, via the real `engine.run` and `_integrate`).
+5. Filled `oracle_run`/`value`/`passed`, set `status: validated`.
+
+**The numbers:**
+| | value | vs threshold 2e-4 |
+|---|---|---|
+| D_max uniform (primary) | 2.44e-6 | ~80× under |
+| D_max distinct (corroboration) | 2.56e-6 | ~80× under |
+| engine frame-0 IC max\|gene\| | 0.0 | IC aligned exactly |
+
+**Why the threshold is 2e-4 and not looser:** both sides integrate the *identical* RHS with adaptive Dopri5 at rtol=1e-4/atol=1e-6, so the a-priori bound on two faithful integrations of the same ODE on these O(1) genes is ~2·(rtol·|y|+atol) ≈ 2e-4 — a bar a correct integrator is *guaranteed* to meet. It's ≥50× tighter than the O(≥1e-2) fixed-point shifts the discriminating failure modes (wrong sigmoid, paper's additive-outside forcing, a mis-scaled inc/dt increment) would produce.
+
+**Bonus — the verdict is now behaviorally measured, not just structural:** the distinct-drive run (four cells, four different frozen `u`, each matched to 2.56e-6 with zero cross-cell leakage) is a direct behavioral test of the `maps=[]` intracellular identity on which `new`-over-`signal` rests. Since `seed_state` can't express a per-cell drive, I stepped it through the engine's own `gene += dt*delta`.
+
+**Validation:** merging the working copy into an in-memory copy of `atlas_record.yaml` and running `record.validate` gives **0 violations** (R10 satisfied — oracle_run dir exists, metric/threshold/passed all set, passed≠false). The note at `campaign/notes/odecontroller.md` carries both runs' paths, the numbers, and the scope of what is and isn't validated (the `mwc`/`neural_ode` siblings are separate entries).
+  committed  differ/odecontroller  (12.3 min)

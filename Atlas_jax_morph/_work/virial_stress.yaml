@@ -192,14 +192,97 @@ contract:
   outputs:
   - cell
   reads:
-  - position
-  - radius
   - alive
-  - displacement
-  - the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven; empty
-    for a scalar-parameter potential
+  - pos
+  - radius
   writes:
   - stress
+  maps:
+  - pairwise
+status: validated
+module: src/plexus/operators/candidates/jax_morph_virial_stress.py
+test: tests/test_jax_morph_virial_stress.py
+evidence:
+  oracle_run: diff_virial_stress
+  diff_metric: |
+    stress_rel_err (PRIMARY, one scalar) = max over the 18 LIVE cells i of the per-cell stress
+    discrepancy |stress_plx(0,i) - stress_ref(i)|, divided by peak = max_i |stress_ref(i)| (=
+    25.0608), evaluated on recorded FRAME 0. UNITS: dimensionless, a fraction of the peak reference
+    stress. mechanosense is a PURE SENSOR: it moves nothing and writes only the per-cell `stress`
+    field, so there is no trajectory to integrate -- the observable IS the written scalar on ONE
+    frozen configuration, and every recorded frame's stress is identical (guarded by
+    frames_identical). stress_ref is the jax-morph VirialStress(Morse(epsilon=3.0, alpha=2.8))
+    per-cell Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) sum_j r_ij (dU/dr)(r_ij), computed
+    by both the VirialStress STEP and PairwisePotential.virial_pressure (they agree bit-for-bit) on
+    a BYTE-IDENTICAL float32 IC: 5 isolated pairs at r = 0.7/1.0/1.3/2.0/3.0 spanning compression /
+    well-min / tension / tapered / beyond-cutoff, one dense 8-cell sunflower cluster (the
+    multi-neighbour sum), and 4 dead padding slots, all at radius 0.5 so sigma = r_i + r_j = 1.0.
+    stress_plx is the same field read from the Plexus engine's recorded `stress` block after the
+    mechanosense operator (potential morse, eps 3.0, alpha 2.8) acts on that IC through
+    plexus.engine. TWO GUARDS accompany the primary: dead_absmax = max over the 4 dead padding slots
+    of |stress| on BOTH sides (must be <= 1e-6; checks the alive/self and V_i=0 safe_divide masks),
+    and frames_identical (all 4 recorded frames' stress == frame 0; checks the sensor truly moves
+    nothing). A SUPPLEMENT re-runs the operator DIRECTLY (no engine) on the other four pair laws
+    (soft_sphere / hertzian / harmonic / lennard_jones) on the same uniform IC AND on a second
+    UNEQUAL-RADII IC for all five laws -- the sigma = r_i + r_j and per-cell d-ball V_i paths the
+    uniform-radius engine run cannot reach. Computed by _oracle/scripts/_compare_virial_stress.py
+    into _oracle/runs/diff_virial_stress/compare.json. evidence.value is the PRIMARY.
+  threshold: 0.0001
+  threshold_why: |
+    1.0e-4 on the peak-normalized relative stress error, PRE-REGISTERED in the scorer
+    (_compare_virial_stress.py:81, `pass_rel_1e-4 = rel <= 1e-4`), with a companion 1e-6 on the
+    dead-slot absolute stress (line 82) and a boolean frames-identical gate (line 72), all decided
+    before the diff was computed. The 1e-4 bar sits ~3 orders ABOVE the float32 round-off floor of
+    two independent numeric stacks (jax jit virial vs torch autograd of dU/dr accumulate to rel
+    7.6e-8 on the Morse primary and <= 3.3e-7 on all 10 supplement law/radii points) yet far BELOW
+    every WRONG implementation the verdict hinges on: the paper's taxicab sigma_i (per-component
+    sign, NO 2 d V_i normalization, NO 1/2 split) differs by a per-cell factor of ~2 d V_i = 4 pi
+    R^2 ~ 3.1 -> O(1) rel; dropping the minus sign FLIPS the reading (rel ~ 2.0); omitting the 1/2
+    bond split DOUBLES it (rel ~ 1.0); using a fixed area or the contact distance sigma for V_i
+    instead of the cell's own d-ball mis-scales per cell by O(1). None of these can slip under 1e-4.
+    Looser would admit a mis-normalized or sign-flipped reimplementation as "agreement"; tighter
+    would fail on float32 reassociation between the two stacks alone.
+  value: 7.610894538878732e-08
+  passed: true
+  plexus_run: log/atlas/virial_stress/
+  scorer: Atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
+  acted_ledger: |
+    From log/atlas/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0, kind
+    lateral, structural true -- it ACTED (wrote the stress field) but moved nothing, exactly a pure
+    sensor; seed_state calls 1 / acted 1 (sets the uniform radius 0.5 that V_i and sigma need).
+    inert_operators []; valid_evidence true ("every scheduled operator acted at least once").
+    n_active 18 -> 18 flat; gyration / centroid / extent / nn_distance constant across all 4 frames
+    -- the run is a still life, as a sensor must be, so the metric is well-defined on frame 0.
+  corroborators: |
+    All from _oracle/runs/diff_virial_stress/{compare.json,summary.json}. (1) The PRIMARY engine
+    Morse stress matches the oracle to rel 7.6e-8 (max_abs 1.9e-6 on peak 25.06). (2) Dead-slot
+    stress is EXACTLY 0.0 on BOTH sides -> the alive/self mask and the V_i=0 safe_divide reproduce,
+    no phantom pressure. (3) frames_identical true -> the sensor moved nothing across all frames.
+    (4) Oracle-side internal gates: the VirialStress STEP == PairwisePotential.virial_pressure
+    bit-for-bit (step_eq_virial_pressure true -- the delegation is thin) and is PRNG-key-independent
+    (key_independent true -- a sensor must ignore its key). (5) The reference matches a BY-HAND
+    analytic single-neighbour Morse pressure on the in-window isolated pairs to max|dev| 3.2e-6
+    (r=0.7 -> +11.414 compression, r=1.0 -> 0 at the well minimum, r=1.3 -> -1.706 tension) -> the
+    compression-positive sign convention and the 2 d V_i normalization are correct, not merely
+    self-consistent. (6) SUPPLEMENT: all 10 direct-operator points pass rel <= 1e-4 -- the other
+    four pair laws on the uniform IC (rel <= 1.3e-7) AND all five laws on a SECOND UNEQUAL-RADII IC
+    (rel <= 3.3e-7), exercising the sigma = r_i + r_j and per-cell d-ball V_i paths the equal-radius
+    engine run cannot reach.
+  scope: |
+    This validates the mechanosense IMPLEMENTATION -- the written virial-pressure VALUE -- against
+    the jax-morph reference across five pair laws, equal and unequal radii, live/dead masking, and
+    the sign / 2 d V_i normalization / 1/2 bond-split conventions. It does NOT touch (a) the
+    verdict/dispute axis, or (b) the differentiability claim (d stress / d epsilon finite through
+    the coupling): VALUES, not gradients, are what the differ compares, and the port deliberately
+    detaches the position-gradient path through dU/dr (implementer's note), which is not exercised
+    here. The SOURCE-vs-PAPER contradiction is confirmed as a FORM difference, not resolved
+    numerically: this test scores the code's Irving-Kirkwood virial pressure (SOURCE WINS), not the
+    paper's taxicab sigma_i.
+state_io_notes:
+  reads:
+  - position
+  - the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven; empty
+    for a scalar-parameter potential
   maps:
   - pairwise radial reduction over live non-self neighbours -- each cell's local mechanical load = the
     Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) * sum_j r_ij*(dU/dr)(r_ij), the SAME conservative
@@ -209,11 +292,5 @@ contract:
     compression-positive / tension-negative sign convention; transient (heritable=False), recomputed each
     macro-step; pure sensing -- writes only stress and moves nothing -- for downstream mechanotransduction
     (e.g. stress-gated division)
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_virial_stress.py
-test: tests/test_jax_morph_virial_stress.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+signature_note: the record's `displacement` and a stray prose token were not state blocks; the operator
+  reads pos/radius/alive.

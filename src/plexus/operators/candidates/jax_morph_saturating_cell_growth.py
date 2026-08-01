@@ -97,11 +97,24 @@ class GrowRadius(Lateral):
                  "saturating von Bertalanffy flow (source wins, see surprises); translated from "
                  "papers/jax-morph/jax_morph/physics/growth.py:23 (SaturatingCellGrowth.__call__).")
 
+
+    # LEARNABLE TUNABLES. A parameter kept as a Python float is a CONSTANT in the autograd graph,
+    # so `d(loss)/d(param)` does not exist -- measured, not assumed (grad_probe.py step 2). Passing
+    # a tensor keeps it on the tape. This mirrors the reference's own rule: "store as a jax.Array
+    # anything you want to learn or vary without recompiling". Forward runs are unaffected: a
+    # float stays a float.
+    @staticmethod
+    def _tunable(v, device):
+        import torch as _t
+        if isinstance(v, _t.Tensor):
+            return v.to(device)
+        return float(v)
+
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
-        self.max_radius = float(params.get("max_radius", 1.0))       # R: asymptotic target size
-        if self.max_radius <= 0.0:                                   # R divides the exponent; a target size must be positive
+        self.max_radius = self._tunable(params.get("max_radius", 1.0), device)   # R: asymptotic target size
+        if float(self.max_radius) <= 0.0:                            # R divides the exponent; a target size must be positive
             raise ValueError(f"grow_radius: max_radius must be > 0, got {self.max_radius}")
         self.rate = float(params.get("rate", 0.0))                  # uniform fallback k if no per-cell growth_rate (0 -> no-op)
         self.radius_block = str(params.get("radius", "radius"))     # the size state block this grows

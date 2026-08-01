@@ -1,0 +1,76 @@
+{
+  "primary_engine_morse": {
+    "max_abs": 1.9073486328125e-06,
+    "peak_ref": 25.060768127441406,
+    "rel": 7.610894538878732e-08,
+    "dead_absmax_plexus": 0.0,
+    "dead_absmax_ref": 0.0,
+    "frames_identical": true,
+    "pass_rel_1e-4": true,
+    "pass_dead_1e-6": true
+  },
+  "supp_uniform_laws": {
+    "morse": {
+      "max_abs": 1.9073486328125e-06,
+      "peak_ref": 25.060768127441406,
+      "rel": 7.610894538878732e-08,
+      "pass_rel_1e-4": true
+    },
+    "soft_sphere": {
+      "max_abs": 2.9802322387695312e-08,
+      "peak_ref": 0.22448883950710297,
+      "rel": 1.327563653192316e-07,
+      "pass_rel_1e-4": true
+    },
+    "hertzian": {
+      "max_abs": 7.450580596923828e-09,
+      "peak_ref": 0.10924379527568817,
+      "rel": 6.820140748608657e-08,
+      "pass_rel_1e-4": true
+    },
+    "harmonic": {
+      "max_abs": 2.384185791015625e-07,
+      "peak_ref": 2.2689647674560547,
+      "rel": 1.0507813189575241e-07,
+      "pass_rel_1e-4": true
+    },
+    "lennard_jones": {
+      "max_abs": 6.103515625e-05,
+      "peak_ref": 423.6285095214844,
+      "rel": 1.4407707431906114e-07,
+      "pass_rel_1e-4": true
+    }
+  },
+  "supp_unequal_radii_laws": {
+    "morse": {
+      "max_abs": 3.814697265625e-06,
+      "peak_ref": 11.712871551513672,
+      "rel": 3.256842055210638e-07,
+      "pass_rel_1e-4": true
+    },
+    "soft_sphere": {
+      "max_abs": 0.0,
+      "peak_ref": 0.16578638553619385,
+      "rel": 0.0,
+      "pass_rel_1e-4": true
+    },
+    "hertzian": {
+      "max_abs": 0.0,
+      "peak_ref": 0.08289319276809692,
+      "rel": 0.0,
+      "pass_rel_1e-4": true
+    },
+    "harmonic": {
+      "max_abs": 0.0,
+      "peak_ref": 0.12931333482265472,
+      "rel": 0.0,
+      "pass_rel_1e-4": true
+    },
+    "lennard_jones": {
+      "max_abs": 6.103515625e-05,
+      "peak_ref": 275.3446044921875,
+      "rel": 2.216682486390678e-07,
+      "pass_rel_1e-4": true
+    }
+  }
+}

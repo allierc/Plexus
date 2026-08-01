@@ -121,3 +121,72 @@ calculus, not measured against jax-morph. The differential test against the orac
 next step; a passing property test is NOT that. The family-wide reconciliation (pull the abstract
 parent + Morse + Harmonic toward `adhere`, and reconsider whether `adhere` is the right name for a
 purely-repulsive member) remains flagged for the analysis phase — not settled here.
+
+---
+
+## Differential test (DIFFER) — `adhere:hertzian` VALIDATED
+
+**Setup.** Hertzian is a pure FORCE law (a pair energy autodiffed to a force), so the differential
+isolates the force. TWO comparisons on initial conditions the Plexus side reproduces bit-for-bit,
+plus a negative control. The PRIMARY exercises exactly the two combining rules the verdict hinges
+on — that soft_sphere's uniform test could NOT.
+
+- **PRIMARY — heterogeneous force FIELD (`force_field_rel_err`).** One fixed 7-cell overlapping
+  cluster (11 overlapping pairs) with UNEQUAL radii 0.40..0.70 (so `sigma = r_i + r_j` varies per
+  pair — the size-consistency) and PER-CELL epsilon 1.0..3.0 (so the coupling is the per-pair
+  arithmetic-mean mix). `F_ref = jax-morph Hertzian(epsilon).forces` (autodiff of
+  `E = 0.5 sum (2/5) eps (1-r/sigma)^(5/2)`); `F_plx` = the Plexus `adhere:hertzian.forward()`
+  emitted velocity at mobility=1 (= its autodiff force), radii/epsilon registered as per-cell
+  buffers, IC = the same POS7 translated by +[20,20]. Metric = `max_{7 cells, both components}
+  |F_plx - F_ref| / max|F_ref|`. One forward() call, NO integrator confound.
+- **SECONDARY — deterministic overdamped trajectory (`traj_pos_max_abs`).** `config/atlas/hertzian.yaml`
+  (uniform radius 0.5, epsilon 2.0, dt 0.1, 40 frames) run through `plexus.engine`, centroid-aligned
+  and diffed per-cell per-frame vs the reference `BrownianDynamics(Hertzian, kT=0, gamma=1)` history
+  (kT=0 → `dx = dt*forces` deterministic). `adhere` gated `after_frame:1` so frame 0 = shared IC.
+- **NEGATIVE CONTROL.** SoftSphere (exponent 2) vs Hertzian (exponent 5/2) on the SAME state — the
+  wrong-exponent defect the verdict hinges on — in two forms (reference-internal, and Plexus-vs-
+  SoftSphere-reference). Both must land >> the bar, proving the metric resolves the neighbour.
+
+**Numbers.**
+- Primary `force_field_rel_err = 1.89e-06` (threshold 1e-4, PRE-REGISTERED at diff_hertzian.py:38).
+  **PASS.** Peak force magnitudes agree independently: `|F_ref|_max 0.86514318` vs
+  `|F_plx|_max 0.86514449` (~1.3e-6).
+- Secondary `traj_pos_max_abs = 6.26e-06` (threshold 1e-3, diff_hertzian.py:39). **PASS.** Frame-0
+  IC residual 8.9e-7 (shared IC real); final-frame residual == the max (no runaway amplification —
+  contractive gradient flow). The cluster genuinely relaxed: max cell move 0.70 world units,
+  gyration 0.799 → 0.984, nn-distance 0.668 → 0.977.
+- Negative controls FIRE: reference SoftSphere-vs-Hertzian `0.521`, Plexus-vs-SoftSphere reference
+  `0.369` — ~5000x the 1e-4 bar. So PASS is discriminating, not a trivially-met bound; a
+  wrong-exponent / dropped-2/5-prefactor / mean-instead-of-sum-sigma reimplementation would be
+  rejected by O(1).
+- Newton's third law holds both sides: summed internal force ~0 (ref 6.7e-8, plexus 3.7e-8).
+- Acted ledger: `adhere` calls 40 / acted 40, moved 0.69977516 (== the oracle's own relaxation),
+  inert_operators [] → valid_evidence true. (The PRIMARY is a direct forward() call, not gated;
+  the ledger validates the SECONDARY trajectory run.)
+
+**Oracle self-check pinned first (the reference is the real law, not a mis-configured oracle).**
+2-cell radial scan matches the analytic `f(r) = (eps/sigma)(1-r/sigma)^1.5` to 8.8e-8;
+`BrownianDynamics(kT=0)` is deterministic across two PRNG keys (0.0); first Euler step equals
+`dt*forces` to 2.5e-8. Oracle provenance: real jax-morph 0.4.0 / jax 0.11.0, isolated venv
+(git ace08b8). The two independent autodiff stacks (jax reverse-mode vs torch autograd, float32)
+agree to 1.9e-6 — ~50x under the force bar, so 1e-4 is not so tight only bit-identical arithmetic
+passes.
+
+**What this certifies (and its scope) — STRONGER than the soft_sphere twin on the disputed axis.**
+Reproduces the Hertzian contact force to float32 AND, crucially, exercises the HETEROGENEOUS
+`sigma = r_i + r_j` (per-cell radius 0.40..0.70) and the per-cell arithmetic-mean epsilon mix — the
+two combining rules (additive sigma, mean epsilon, per-cell coupling) that distinguish `adhere` from
+`attraction_repulsion`'s fixed GLOBAL sigma + per-TYPE params. So where soft_sphere left
+size-consistency untested, this differential exercises it directly. NOT touched: the adhesive tail
+(Hertzian has none by construction — a member property, not a gap) and the per-cell virial pressure
+(out of scope — separate VirialStress mechanism). This validates the IMPLEMENTATION; it does not by
+itself decide the verdict/dispute (`new → adhere`), which rests on the signature argument in `why`.
+Re-ran the scorer this pass — numbers reproduce exactly; `status: implemented → validated`.
+
+**Paths.**
+- Oracle: `Atlas_jax_morph/_oracle/runs/diff_hertzian/` (reference.npz + summary.json + reference.png);
+  script `Atlas_jax_morph/_oracle/scripts/hertzian.py`.
+- Plexus: `config/atlas/hertzian.yaml` → `log/atlas/hertzian/` (diag.json, metrics.json, metrics.npz,
+  strip.png, movie.mp4).
+- Scorer: `Atlas_jax_morph/diff_hertzian.py` → `log/atlas/hertzian/diff.json`
+  (thresholds PRE-REGISTERED at lines 38-39).

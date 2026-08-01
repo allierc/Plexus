@@ -1,0 +1,77 @@
+# Differential for adhere:harmonic (jax-morph Harmonic), ISOLATED.
+#
+# The oracle run this mirrors is Atlas_jax_morph/_oracle/runs/diff_harmonic/:
+# jax-morph BrownianDynamics(Harmonic(k=1.0, r_cutoff_frac=2.5), gamma=1.0, kT=0.0) run ALONE (no
+# growth, no division) on a fixed 19-cell Vogel sunflower cluster, uniform radius 0.5
+# (sigma = r_i + r_j = 1.0), scale 0.5 so nearest neighbours OVERLAP (repulsive core, r < sigma)
+# while the many second/third neighbours sit in the adhesive band sigma < r < r_c = 2.5 -- BOTH
+# regimes present. 160 macro-steps at dt = 0.03. Harmonic is a POTENTIAL (it writes no state; its
+# whole contract is the force F = -grad U, f(r) = k*(sigma - r) truncated at r_c), so it is
+# isolated from every other mechanism and driven by the reference's OWN overdamped Langevin step at
+# kT = 0, whose update dx = dt*forces/gamma is exactly the Plexus engine's overdamped Euler of the
+# operator's emitted velocity: pos += dt * mobility * F, with mobility == 1/gamma == 1. The
+# trajectory is therefore a pure function of the force law (repulsive core + ADHESIVE TAIL + hard
+# C0 cutoff), and a per-cell position diff isolates it. Under adhesion the cluster CONTRACTS to a
+# bounded equilibrium (gyration 1.54 -> 0.64), the opposite of the purely-repulsive soft_sphere.
+#
+# The `start:` positions are the oracle's live-cell coordinates VERBATIM (6-decimal, printed by
+# _oracle/scripts/harmonic.py) so the two sides share a BYTE-IDENTICAL float32 IC. n = 19 live +
+# 5 dead padding slots (buffer 24) put the dead slots at the origin (state zeros), matching the
+# oracle, so the dead-pair mask and the sigma = 0 safe_divide are exercised. harmonic is gated
+# after_frame:1 so recorded frame 0 = the pristine IC and frame t = the IC after t overdamped
+# steps, aligning cell-for-cell and frame-for-frame with the reference history s_0..s_160.
+general:
+  name: harmonic
+  seed: 0
+  n_frames: 160
+  dt: 0.03
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 19
+    buffer: 24                     # 19 live + 5 dead padding slots (occ=0, parked at origin)
+    # the oracle's 19 live founders (6-decimal, byte-identical to reference.npz p0[:19])
+    start:
+    - [20.353553, 20.000000]
+    - [19.548456, 20.413652]
+    - [20.069116, 19.212458]
+    - [20.569142, 20.742346]
+    - [18.955554, 19.815252]
+    - [20.989391, 19.370631]
+    - [19.669068, 21.231050]
+    - [19.368877, 18.784811]
+    - [21.369284, 20.500060]
+    - [18.575488, 20.588018]
+    - [20.686709, 18.532543]
+    - [20.507460, 21.617864]
+    - [18.470508, 19.113628]
+    - [21.794268, 19.605535]
+    - [18.904986, 21.557544]
+    - [19.747026, 18.047821]
+    - [21.553009, 21.308878]
+    - [17.910136, 20.086422]
+    - [21.524395, 18.483023]
+    # a set that declares `state:` gets ONLY these blocks; pos + vel makes it a 2nd-order set so
+    # EMIT="velocity" is overdamped (v := delta; pos += dt*v), matching BrownianDynamics.
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }
+
+fields: {}
+
+operators:
+  # the finite-range shifted-harmonic contact force (repulsive core + adhesive tail), autodiffed to
+  # an overdamped velocity. k 1.0 shared scalar; uniform radius 0.5 (the operator's scalar-radius
+  # fallback -> sigma = 1.0); r_cutoff_frac 2.5 (r_c = 2.5); mobility 1.0 == 1/gamma. after_frame:1
+  # so frame 0 = pristine IC (see header).
+  - { op: adhere, implementation: harmonic, at: cell, after_frame: 1,
+      k: 1.0, r_cutoff_frac: 2.5, radius: 0.5, mobility: 1.0 }
+
+schedule: [adhere]
+
+plotting:
+  background: black
+  point_size: 6.0

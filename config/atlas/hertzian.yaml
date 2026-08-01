@@ -1,0 +1,47 @@
+# Differential for adhere:hertzian (jax-morph Hertzian), ISOLATED -- Scenario U (uniform trajectory).
+#
+# The oracle run this mirrors is Atlas_jax_morph/_oracle/runs/diff_hertzian/ (scenario U): jax-morph
+# BrownianDynamics(Hertzian(epsilon=2.0), kT=0, gamma=1) run on a 7-cell overlapping cluster with
+# UNIFORM radius 0.5, 40 macro-steps at dt=0.1. kT=0 makes it deterministic overdamped forward Euler
+# Dx = dt*forces -- byte-identical to the Plexus engine's EMIT=velocity path v=out; x += dt*v at
+# mobility=1. The cluster relaxes from overlapping to just-touching, sweeping the force curve.
+#
+# Same geometry as the oracle, translated by +[20,20] (forces and centroid-aligned trajectories are
+# translation-invariant, so every metric compared across the two is offset-independent). Uniform
+# radius is used here so the comparison is robust to where a spec keeps `radius`: the operator's
+# `radius` param sets sigma = 2*0.5 = 1.0 for every pair, matching the oracle's uniform radius. The
+# heterogeneous size-consistency (sigma = r_i + r_j) and per-cell epsilon are tested in the
+# force-field scenario H of diff_hertzian.py (direct operator call, radii as a per-cell buffer).
+general:
+  name: hertzian
+  seed: 0
+  n_frames: 40
+  dt: 0.1
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 7
+    buffer: 16                     # 7 live; dead slots held at occ=0 (emit nothing), diffed only over live cells
+    start: [[20.0, 20.0], [20.9, 20.1], [20.45, 20.8], [19.4, 20.5],
+            [20.3, 19.3], [21.2, 20.7], [19.7, 19.5]]
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }            # present but inert: EMIT=velocity overwrites v=out each tick (overdamped)
+
+fields: {}
+
+operators:
+  # the Hertzian contact force, overdamped: velocity = mobility * (-grad E), engine-integrated x += dt*v.
+  # epsilon 2.0 shared scalar; radius 0.5 uniform (sigma = r_i + r_j = 1.0); mobility 1.0 (gamma=1).
+  # after_frame:1 -- the engine integrates THEN records, so gating adhere off on tick 0 makes recorded
+  # frame 0 the pure IC and frames 1..40 the 40 overdamped steps, aligning with the oracle s_0..s_40.
+  - { op: adhere, implementation: hertzian, at: cell, after_frame: 1, epsilon: 2.0, radius: 0.5, mobility: 1.0 }
+
+schedule: [adhere]
+
+plotting:
+  background: black
+  point_size: 8.0

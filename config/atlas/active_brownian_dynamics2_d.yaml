@@ -1,0 +1,58 @@
+# Differential test for `reorient` -- the rotational-diffusion leg of jax-morph's
+# ActiveBrownianDynamics2D, run in the Plexus engine as the ISOLATED free active-Brownian gas.
+#
+# The oracle this mirrors is `Atlas_jax_morph/_oracle/runs/diff_active_brownian_dynamics2_d/`:
+#   ActiveBrownianDynamics2D(None, n_space_dim=2, kT=0.0, rot_diffusion=0.1), active_speed=0.3,
+#   N=20000 cells, 40 macro-steps at dt=1.0, uniform initial headings.
+# Here the SAME free ABP is built from primitives: `reorient` rotationally diffuses the heading
+# (the leg under test), `glide` self-propels each cell along it (vel = move_speed * heading, the
+# engine integrates pos += dt*vel). No potential (NoForce), no translational noise (glide.noise=0).
+#
+# `reorient` is gated `after_frame: 1` so tick 0 records the PRISTINE initial heading and tick t
+# records exactly t rotational-diffusion steps -- frame-aligned to the oracle's s_0..s_40 history.
+# The differential metric (heading orientational autocorrelation) is scored by the companion
+# script _oracle/scripts/active_brownian_dynamics2_d_plexus.py, which taps the heading each frame.
+#
+# NOTE on the acted ledger: `reorient` WRITES the `heading` buffer in place and returns {} (its
+# EMIT is None, exactly like the polarity family). run_spec's ledger fingerprints only the
+# integrated `state` block for structural ops, so it cannot see a heading-buffer write and will
+# flag `reorient` INERT -- a KNOWN instrument blind-spot for heading-steerers, NOT a no-op. Its
+# action is proven directly by the companion script's heading tap (Var(dtheta) > 0, headings
+# demonstrably rotate) and downstream by `glide`: the trajectories decorrelate (a D_r=0 control
+# stays ballistic). `glide` moves positions, so the run itself is a real spreading ABP cloud.
+general:
+  name: active_brownian_dynamics2_d
+  seed: 0
+  n_frames: 40
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 20000
+    buffer: 20000
+    # a POINT start (all cells at the world centre, 1e-3 jitter, uniform headings): the cloud
+    # spreads by the persistent random walk, so the strip/gyration show the ballistic->diffusive
+    # crossover the rotational-diffusion leg controls. Positions are dynamically irrelevant
+    # (NoForce), but a point start makes that spreading legible.
+    spawn: point
+    types:
+      # one type; move_speed is glide's self-propulsion speed v0 (matched to the oracle 0.3)
+      a: { fraction: 1.0, move_speed: 0.3 }
+
+fields: {}
+
+operators:
+  # THE LEG UNDER TEST: single-body rotational diffusion of the heading, dtheta = sqrt(2 D_r dt)*xi.
+  # after_frame 1 -> frame 0 is the pristine IC, frame t is exactly t reorients (oracle-aligned).
+  - { op: reorient, at: cell, rot_diffusion: 0.1, after_frame: 1 }
+  # self-propulsion along the (rotating) heading: vel = move_speed * heading; the engine integrates.
+  - { op: glide, at: cell }
+
+schedule: [reorient, glide]
+
+plotting:
+  background: black
+  point_size: 3.0

@@ -1,0 +1,67 @@
+# Differential test for mechanosense (jax-morph VirialStress / PairwisePotential.virial_pressure).
+#
+# mechanosense is a PURE SENSOR: it MOVES NOTHING and writes only the per-cell `stress` field, so
+# there is no trajectory to diff -- the observable IS the written scalar, on ONE frozen config.
+# The oracle it mirrors is `_oracle/runs/diff_virial_stress/` (VirialStress(Morse(3.0, 2.8)) on the
+# same byte-identical float32 IC). Because nothing moves, every recorded frame's stress is identical;
+# the metric reads frame 0. seed_state sets the uniform radius (0.5 -> sigma = r_i + r_j = 1.0) that
+# V_i and the pair-law contact distance need; mechanosense then reduces the Morse pair law to each
+# cell's virial pressure.
+#
+# The IC (LIVE cells, pasted from the oracle's start block): 5 isolated pairs at r =
+# 0.7/1.0/1.3/2.0/3.0 (compression / well-min / tension / tapered / beyond-cutoff) + one dense
+# 8-cell cluster (the multi-neighbour sum) + 4 dead padding slots (buffer 22 vs n 18 -> masking).
+general:
+  name: virial_stress
+  seed: 0
+  n_frames: 4
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 18
+    buffer: 22                 # 18 live + 4 dormant (dead) slots -> exercises the dead-source / dead-receiver mask
+    start:
+    - [2.000000, 1.650000]
+    - [2.000000, 2.350000]
+    - [8.000000, 1.500000]
+    - [8.000000, 2.500000]
+    - [14.000000, 1.350000]
+    - [14.000000, 2.650000]
+    - [20.000000, 1.000000]
+    - [20.000000, 3.000000]
+    - [26.000000, 0.500000]
+    - [26.000000, 3.500000]
+    - [14.318198, 14.000000]
+    - [13.593610, 14.372286]
+    - [14.062204, 13.291212]
+    - [14.512228, 14.668111]
+    - [13.059998, 13.833727]
+    - [14.890452, 13.433568]
+    - [13.702161, 15.107945]
+    - [13.431989, 12.906330]
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }
+      radius: { width: 1 }
+      stress: { width: 1 }     # the per-cell virial pressure mechanosense writes (recorded -> trajectory)
+
+fields: {}
+
+operators:
+  # 0: initial condition. Non-spatial blocks start at zero; a cell with radius 0 has V_i = 0 and
+  #    sigma = 0, so seed the uniform radius the paper's mechanics uses.
+  - { op: seed_state, at: cell, before_frame: 1, values: { radius: 0.5 } }
+  # S: the SENSOR. Reduce the Morse pair law (paper / anchor params) to each cell's virial pressure,
+  #    written into `stress`. Moves nothing.
+  - { op: mechanosense, at: cell, potential: morse, epsilon: 3.0, alpha: 2.8,
+      r_onset_frac: 1.5, r_cutoff_frac: 2.5 }
+
+schedule: [seed_state, mechanosense]
+
+plotting:
+  background: black
+  point_size: 6.0

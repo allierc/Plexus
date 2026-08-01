@@ -130,3 +130,49 @@ from the Plexus env, and no oracle/smoke scenario is known to exercise Saturatin
 there is no paired trajectory to diff -- `evidence`/`status: validated` untouched. Curator decision:
 whether `grow_radius` promotes as a widened second implementation of `cell_grow` (a kind-widening of
 the growth contract) or as its own contract.
+
+## saturating_cell_growth (DIFFER, status -> validated)
+
+**PASS, exactly.** `value = max(D_max_A, D_max_B) = 0.0` vs `threshold = 1.0e-5`. The Plexus
+`grow_radius` operator and the jax-morph `SaturatingCellGrowth` reference produce **bit-identical
+float32 radius trajectories** over all 20 macro-steps in both scenarios (`D_max_A = 0.0`,
+`D_max_B = 0.0`). Reproduced from scratch in the Plexus torch env.
+
+**Metric.** `D_max` = max absolute per-cell radius deviation over every recorded frame (t=0..20,
+dt=2.0) and every live cell, in radius units, reported as `max(D_max_A, D_max_B)`:
+- `D_max_A` -- the 4-cell engine run of `config/atlas/saturating_cell_growth.yaml` exactly as
+  `run_spec` runs it (r0=0.30, k=0.40, R=0.6) vs oracle scenario A.
+- `D_max_B` -- a 6x6 (r0 x k) 36-cell grid rolled through the real engine `radius += dt*delta` vs
+  oracle scenario B; spans k=0 no-op, small-k near-linear, large-k saturation (Euler would
+  overshoot at dt=2), r0==R, and r0>R (relaxation DOWN to R -- the no-clamp claim).
+
+**Why isolated.** Growth is run ALONE (no relaxation, no division) so both sides keep the same
+cells in the same array slots and align cell-for-cell, frame-for-frame. Division's hazard
+p=1-exp(-division_rate*dt) never reads radius (`division.py _dist`), so division -- not growth --
+is what makes the anchor's counts diverge (124 vs 82); isolating growth is the faithful test of
+THIS operator's contract, the per-cell radius ODE. The KNOWN OPEN 124-vs-82 discrepancy is NOT a
+growth defect and stays with division, unexplained by this operator.
+
+**Threshold justification (fixed before the run).** 1e-5 sits ~100x above float32 round-off (the
+reference's own float32-vs-float64-analytic error is 9.5e-8) yet ~5e4x below the negative-control
+signal (0.55), so it separates bit-level agreement from any real disagreement -- wrong law,
+dropped dt-scaling, Euler overshoot, or a min-clamp.
+
+**Discriminating controls (all clean).** Negative control (drop the `/dt` mean-rate convention,
+`radius += dt*dr`) scores 0.55, ~5e4x above threshold -- the metric provably catches a wiring
+defect precisely because dt=2 makes the convention observable. `frame0_is_ic_residual = 0.0`
+(frame 0 is the pure seeded IC), `k0_noop_drift = 0.0`, `aboveR_last_min = 0.6 = R` (no clamp).
+Acted ledger valid: `grow_radius` acted 13/20 calls (the later 7 emit a sub-float delta once
+radius has reached R -- correct saturation), `seed_state` 1/1.
+
+**Paths.**
+- oracle run: `Atlas_jax_morph/_oracle/runs/diff_saturating_cell_growth/` (reference.npz, summary.json)
+- oracle script: `Atlas_jax_morph/_oracle/scripts/saturating_cell_growth.py`
+- engine spec A: `config/atlas/saturating_cell_growth.yaml` -> evidence `log/atlas/saturating_cell_growth/`
+- grid spec B: `Atlas_jax_morph/saturating_cell_growth_gridB.yaml`
+- diff driver: `Atlas_jax_morph/diff_saturating_cell_growth.py` -> `log/atlas/saturating_cell_growth/diff.json`
+
+**Verdict unchanged.** The differential does not touch the `refinement`-of-`cell_grow` verdict --
+either reading is still cell growth toward a maximum size. What it establishes is that the
+`grow_radius` contract, as implemented and as the engine runs it, reproduces the source's
+saturating von-Bertalanffy per-cell radius flow to the last bit. `status: validated`.

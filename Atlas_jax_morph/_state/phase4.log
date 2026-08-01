@@ -76,3 +76,329 @@ Error: Reached max turns (40)
     - the agent call failed or timed out
   BLOCKED   odecontroller -- twice reverted at differ. Left for a human, not skipped.
 Done. The differential test is complete and the entry validates.
+
+  REVERTED  differ/gene_network_connectionist after 13.0 min:
+    - the agent call failed or timed out
+  BLOCKED   gene_network_connectionist -- twice reverted at differ. Left for a human, not skipped.
+Error: Reached max turns (40)
+  REVERTED  differ/death after 14.7 min:
+    - the agent call failed or timed out
+  handing the violations back to death, once.
+Zero violations across the entire merged record (and zero for my entry); `morphogen` is confirmed absent from the promoted registry, so the `new` verdict is legitimate. The differential test is complete.
+
+  REVERTED  differ/free_screened_diffusion after 14.8 min:
+    - the agent call failed or timed out
+  handing the violations back to free_screened_diffusion, once.
+Error: Reached max turns (40)
+  REVERTED  differ/saturating_cell_growth after 15.5 min:
+    - the agent call failed or timed out
+  handing the violations back to saturating_cell_growth, once.
+The `death` entry is complete and validated. Summary of what I did (the prior attempt's oracle + Plexus runs were already on disk; only the record edit had failed):
+
+**Verdict: PASS → `status: validated`.**
+
+Because death is a discrete Bernoulli event and JAX vs torch use different RNG streams (no bit-for-bit diff possible), and the paper/anchor ship no death config, I used the mechanism-defining, realization-independent scalar — the **pooled per-macro-step death hazard**:
+
+| side | p̂ | deaths / eligible cell-steps | vs exact 0.048771 |
+|---|---|---|---|
+| oracle (`Model([Death])`) | 0.048928 | 43236 / 883662 | 0.69 SE |
+| Plexus (`apoptose`) | 0.048985 | 41169 / 840445 | 0.91 SE |
+
+- **diff_metric** `|p̂_plexus − p̂_oracle| = 5.66e-05`
+- **threshold** `3·SE_pooled = 9.86e-04` (pre-registered as the *formula*; justified because it's tighter than the 0.00123 gap between the exact hazard `1−exp(−λdt)` and the linear-approx bug `λdt`, so a `p=rate·dt` operator would fail) → **0.17 SE, PASS**.
+
+Two methodological points captured in the record:
+1. **Matched IC** (N0=50000, λ=0.05, dt=1.0, 40 steps, death-only) — required, otherwise the comparison is meaningless.
+2. Plexus records *after* applying each op (first frame 47506, not 50000; acted ledger: apoptose 41/41, `valid_evidence: true`), so a frame-aligned survival diff would be off-by-one — the pooled hazard is stationary and sidesteps it.
+
+Files touched:
+- `Atlas_jax_morph/_work/death.yaml` — `status: validated`, evidence block filled (verified against all 12 `record.py` rules).
+- `Atlas_jax_morph/campaign/notes/death.md` — appended the DIFFER section (numbers, both run paths, verdict).
+- `Atlas_jax_morph/_oracle/scripts/_analyze_death.py` — the numpy-only differential computation (no jax import; recorded as provenance).
+  committed  differ/death  (8.3 min)
+Zero violations across the whole spliced record and zero touching this entry. The record passes all twelve rules.
+
+## Done — entry completed and validated
+
+The prior agent call timed out **after** producing all the differential-test artifacts but **before** writing them into the record, and the working copy was reverted to all-null evidence. I verified the on-disk artifacts are real, re-ran the differential to confirm the number reproduces live, and filled in the record entry (the product).
+
+**What I verified rather than trusted:**
+- Re-ran the torch-side score `diff_free_screened_diffusion.py` against the jax reference — reproduced exactly: **value = 2.508e-07 < threshold 1.0e-3 → PASS** (all four 1-D/2-D/3-D configs, all cells, dead slots exactly 0.0 both sides).
+- Confirmed the oracle run (`_oracle/runs/diff_free_screened_diffusion/`) and the engine leg (`log/atlas/free_screened_diffusion/diag.json`: `morphogen` acted 1/5, `inert_operators []`, `valid_evidence true`) exist and are internally consistent (diff.json's `c_ref` values match summary.json).
+- Ran record.py's own `validate()` on the spliced record: **0 violations**, R10 satisfied.
+
+**What I changed** in `_work/free_screened_diffusion.yaml` (nothing else):
+- `evidence.oracle_run: diff_free_screened_diffusion`
+- `evidence.diff_metric:` the sup-norm relative field error `max |c_plx − c_ref| / max(|c_ref|, 1e-6)` over 4 configs × all slots × all species (defined before the run in the score script).
+- `evidence.threshold: 1.0e-3` with the pre-registered justification (float32 two-library port floor ~1e-5..1e-4; below any O(1) structural error; 1e-6 unmeetable, 1e-1 non-discriminating).
+- `evidence.value: 2.508004115497897e-07`, `passed: true`, plus a `result:` summary.
+- `status: implemented → validated`.
+
+The verdict is unchanged: `new`, `implementation_of: morphogen`. The reproduction certifies the **free-space Green's-function** form to float32 across 1-D/2-D/3-D; it does not (and cannot) certify the paper's graph-Laplacian sibling — the recorded source-wins contradiction stands. The note's DIFFER section already carries the numbers, paths, and verdict.
+  committed  differ/free_screened_diffusion  (6.7 min)
+Done. As DIFFER, I completed the differential test and recorded the verdict.
+
+## Outcome: **PASS — `status: validated`**
+
+The prior attempt had already built the full pipeline; it only failed at the harness level when writing the record. I reproduced the differential from scratch in the Plexus torch env to confirm the artifacts are real, then wrote the evidence.
+
+**The result:** `value = max(D_max_A, D_max_B) = 0.0` vs `threshold = 1.0e-5`. The Plexus `grow_radius` operator and the jax-morph `SaturatingCellGrowth` reference produce **bit-identical float32 radius trajectories** across all 20 macro-steps, in both the 4-cell engine run and the 36-cell (r0×k) grid.
+
+**Why this is a real test, not a rubber stamp:**
+- **Isolated growth** (no relaxation/division) keeps both sides on the *same* per-cell IC in the *same* slots, so radius aligns cell-for-cell, frame-for-frame — the only way to diff this contract faithfully. (The known 124-vs-82 count discrepancy lives with division, which never reads radius; it is not a growth defect.)
+- **Threshold fixed before the run**: 1e-5 sits ~100× above float32 round-off (reference's own float32-vs-analytic error is 9.5e-8) and ~5×10⁴× below the negative control.
+- **Negative control discriminates**: dropping the `/dt` mean-rate convention scores 0.55 — the metric provably catches a wiring defect, made observable by choosing dt=2 (not 1).
+- **Corroborating checks clean**: frame-0 = seeded IC (0.0), k=0 no-op drift (0.0), and cells above R relax *down* to R = 0.6 (no clamp — the source-vs-paper contradiction confirmed on the code's side).
+- **Acted ledger valid**: `grow_radius` acted 13/20 (the later 7 emit sub-float deltas once radius reaches R — correct saturation).
+
+I filled `evidence` (oracle_run, diff_metric, threshold+why, value, passed), flipped `status: implemented → validated`, and appended the DIFFER section to the note. I verified the working copy is valid YAML and ran `record.validate()` with the entry spliced into `atlas_record.yaml`: **0 violations**. The `refinement`-of-`cell_grow` verdict is untouched — the diff establishes that the contract reproduces the source's saturating von-Bertalanffy radius flow to the last bit.
+  committed  differ/saturating_cell_growth  (4.6 min)
+Error: Reached max turns (40)
+  REVERTED  differ/division after 22.5 min:
+    - the agent call failed or timed out
+  handing the violations back to division, once.
+Done. The DIFFER work was already computed on disk (the prior attempt died on a harness timeout, not a science failure), so I reconstructed the record from the existing, internally-consistent artifacts rather than re-running the 518 s oracle.
+
+**What I filled in** (`_work/division.yaml`, the product):
+
+- **`evidence.diff_metric`** — `|p_hat_plexus − p_hat_oracle|`, the pooled per-macro-step Bernoulli division hazard `committed / eligible_cell_steps`, measured identically on both engines over M=48 seeds × 40 steps (rate 0.08, dt 1.0, 4 founders; no death, `division_overflow==0` on every seed, so each live-count increment is one committed division). This is realization-independent — the right invariant, unlike the raw count that mixes jax-vs-torch PRNG streams.
+- **`evidence.threshold`** — `3·SE_pooled = 0.005225`, pre-registered as a formula, with an explicit honest note that at M=48 it resolves gross hazard errors (a doubled rate is 40 SE out) but *not* the O((λdt)²/2)≈0.003 exact-vs-linear subtlety — which is excluded independently because both engines carry the source's `−expm1` law and both match theory to <1 SE.
+- **`evidence.value` / `passed`** — `0.00109 = 0.63·SE_pooled ≤ 0.005225` → **PASS**. Status bumped `implemented → validated`.
+
+**The verdict on the known open discrepancy:** the flagged 124-vs-82 count gap is **RNG realization noise, not a wrong contract**. `p_hat_oracle = 0.0778` and `p_hat_plexus = 0.0767` agree to 0.63 combined SE and both match the analytic hazard 0.076884 (+0.74 / −0.15 SE). The oracle final-count distribution (mean 81.8, SD 43.6 — a Galton-Watson count whose SD ≈ its mean) contains *both* 82 (z=+0.005) and 124 (z=+0.97) as ordinary draws; Plexus seed 0 gives exactly the anchor's 124, oracle seed 0 gives smoke's 82.
+
+**Verification:**
+- Working copy parses as valid YAML; all four R10 evidence fields non-empty, `passed: true`, `oracle_run: diff_division` (dir exists).
+- Ran the real validator on a driver-style merge (my entry spliced into `atlas_record.yaml`): **0 violations** across all 12 rules.
+- Note `campaign/notes/division.md` appended with the numbers, both run paths, the acted ledger, and the resolution.
+  committed  differ/division  (6.1 min)
+Error: Reached max turns (40)
+  REVERTED  differ/brownian_dynamics after 17.2 min:
+    - the agent call failed or timed out
+  handing the violations back to brownian_dynamics, once.
+Error: Reached max turns (40)
+  REVERTED  differ/active_brownian_dynamics2_d after 19.5 min:
+    - the agent call failed or timed out
+  handing the violations back to active_brownian_dynamics2_d, once.
+The DIFFER pass is complete. Everything is consistent, the merged record validates with **zero violations**, and the blast radius is confined to `soft_sphere`.
+
+  REVERTED  differ/soft_sphere after 20.8 min:
+    - the agent call failed or timed out
+  handing the violations back to soft_sphere, once.
+Done. The prior attempt had actually completed all the science — oracle run, three-dt Plexus specs, engine run, and the diff computation — but the harness call timed out before the entry itself was written, so the working copy was restored to `evidence: null`. I finalized exactly that.
+
+**What I did** (the entry is the product, so this is bookkeeping, not new analysis):
+
+1. **Filled the evidence block** in `_work/brownian_dynamics.yaml` to match the validated-sibling schema (`oracle_run`, `diff_metric`, `threshold`, `value`, `passed`, `detail`), and flipped `status: implemented → validated`.
+2. **Appended the DIFFER section** to `campaign/notes/brownian_dynamics.md` with numbers, both runs' paths, and the verdict.
+
+**The differential result** (`agitate` = the pure Brownian thermal bath, `potential=None`):
+
+- **Metric** (pre-registered): `max_dt |D_plexus(dt) − D_ref(dt)| / D_ref(dt)`, where `D = slope(Rg² vs t)/(2·n_dim)`, measured at `dt ∈ {1.0, 0.5, 0.25}` at fixed T≈40. Diffing at several dt is what makes the test *bite* on the Wiener `sqrt(dt)` scaling — the one feature separating `agitate` from the frozen operators' bolt-on `noise*randn` jitter.
+- **Threshold** (pre-registered): **0.03** = ~3× the reference per-side sampling error (1/√2N = 0.0071 at N=20000) and ~1.7× the oracle's cross-dt D scatter. Tight enough that the dt-scaled-noise **negative control** (D = dt·kT/γ → 75% error) is decisively rejected.
+- **Value = 0.0109** (max, at dt=0.5) ≤ 0.03 → **PASS**. D_plexus and D_ref both land on theory D=kT/γ=0.1; Plexus D is itself dt-invariant to 0.5%, confirming the `sqrt(dt)` scaling survives the engine's `pos += dt*v` integrator.
+
+**Verification passed:** working copy parses as valid YAML; R9 (module `jax_morph_brownian_dynamics.py` registers `agitate`) and R10 (all four evidence keys non-empty, `passed=True`, oracle-run dir present) are both satisfied. Acted ledger clean: `agitate` acted 41/41, `inert_operators []`, gyration 0.63→4.05.
+
+Verdict stands: **`new` → `agitate`** (motion family, cell set), now `validated`.
+  committed  differ/brownian_dynamics  (5.0 min)
+Done. The prior attempt had built the oracle run, the spec, the candidate operator, and the differential script — but the DIFFER step (running the Plexus engine and recording the result) never completed because the agent call timed out. I finished exactly that.
+
+## What I did
+
+**Followed the order of operations:**
+
+1. **Recorded metric + threshold first** (into `evidence.diff_metric` / `evidence.threshold`), before the Plexus side ran. Both were pre-registered in the diff script before any Plexus run:
+   - **Metric:** `D_C = max over t=1..40 of |C_plexus(t) − C_oracle(t)|`, where `C(t)=⟨e(t)·e(0)⟩` is the ensemble orientational autocorrelation of the heading unit vector over N=20000 cells — the one observable the rotational-diffusion leg controls (decays as `exp(−D_r t)`). Distributional comparison (independent RNG streams).
+   - **Threshold 0.05:** ~7× the `1/√N ≈ 0.007` sampling floor, yet tight enough to reject a ≳15% error in effective `D_r` (i.e. the `sqrt(2 D_r dt)` scaling constant).
+
+2. **Ran the Plexus engine** (`run_spec.py`, 1.8s) → `log/atlas/active_brownian_dynamics2_d/`. Checked the acted ledger: run_spec flags `reorient` **INERT** — the documented heading-buffer blind-spot (it fingerprints only the integrated `state` block; `reorient` writes `heading` in place and returns `{}`, like the whole polarity family). `glide` acted 41/41 (real spreading cloud, gyration 0.30→7.48).
+
+3. **Ran the companion diff script** — the honest ledger via a direct heading tap: **`reorient` acted 40/40 calls**, `Var(dtheta)`>0, `C(t)` decorrelates 1.0→0.020 (a truly inert reorient leaves `C≡1`).
+
+4. **Computed the metric:** **D_C = 0.00929 at frame 27 << 0.05 → PASS.** Corroborating: `D_r_eff` 0.09926 (Plexus) vs 0.10060 (oracle) vs input 0.1; `Var(dtheta)` 0.19989 vs 0.19985 vs theory 0.2.
+
+5. **Filled evidence** (`oracle_run`, `value: 0.00929193`, `passed: true`, plus a `detail` block reconciling the INERT flag) and set **`status: validated`**.
+
+**Verified:** the working copy parses, and `record.py --validate` fires **0 mechanism-level violations** (only the document-header R0 fields, which live in `atlas_record.yaml` and are supplied on merge). The DIFFER section is appended to the note with both runs' paths and the verdict.
+
+The `reorient` contract reproduces the reference's rotational-diffusion leg to ~1%.
+  committed  differ/active_brownian_dynamics2_d  (6.1 min)
+Error: Reached max turns (40)
+  REVERTED  differ/hertzian after 17.6 min:
+    - the agent call failed or timed out
+  handing the violations back to hertzian, once.
+The record is complete and the working copy is valid YAML — every prose field is in a `|` block scalar (so colons, pipes, `->`, brackets are all literal), indentation is uniform (keys at 2 spaces, block content at 4), and the only plain scalars are safe (`oracle_run: diff_soft_sphere`, `threshold: 0.001`, `value:` a dotted float, `passed: true`, two path strings with no colon-space).
+
+## Done — `soft_sphere` DIFFER pass written into the record
+
+The previous attempt did all the real work (oracle run, engine run, scoring) but timed out before writing the evidence into the entry, so the working copy still read `status: implemented` with a null `evidence` block. I verified every artifact is present, correctly time-ordered, and mutually consistent, then committed the result to the record.
+
+**What I verified before writing (no re-simulation needed — artifacts were valid):**
+- **Oracle run** `_oracle/runs/diff_soft_sphere/` — `reference.npz` + `summary.json`, from `BrownianDynamics(SoftSphere(epsilon=1.0), gamma=1.0, kT=0.0)`; deterministic across two PRNG keys (kT=0 truly removes noise).
+- **Plexus run** `log/atlas/soft_sphere/` — same byte-identical IC, dt=0.2, 60 steps. **Acted ledger checked first:** `adhere` 60 calls / 60 acted, `inert_operators: []`, `valid_evidence: true`. Not a still life.
+- **Module** registers `"adhere"` (`@register_operator("adhere"…, implementation="soft_sphere")`); test file present; `oracle_run` resolves to an existing dir (R10 satisfied).
+
+**The metric and verdict now in the entry:**
+- `diff_metric`: `D_pos = max over 61 frames × 19 live cells of ‖x_plx − x_ref‖₂ / σ`, σ = r_i+r_j = 1.0 — isolates the pure force law because kT=0 makes the trajectory a deterministic function of `F = −grad (ε/2)(1−r/σ)²`.
+- `threshold`: **1.0e-3 σ, pre-registered** in the scorer before scoring. Chosen because a real force-law error (dropped ½ → force doubled; mean-σ instead of sum → σ halved) diverges by O(σ) ≈ 1000× the bar, while the float32 floor of two independent stacks is ~2.7e-6 σ — so it can't be met by a wrong law nor missed by round-off.
+- **`value = 2.697e-06 σ` → `passed: true` → `status: validated`.**
+
+Corroborators recorded too: frame-0 == IC on both sides (0.0/0.0); misaligned control 0.0788 σ (~29000× larger, so alignment is real); single-step IC force residual 6.1e-6; gyration rel-err 1.4e-7 over a cluster that moved 0.669 σ; dead slots immobile on both sides; D_pos plateaus at frame 41 (no amplification).
+
+I also flagged the honest **scope** limit in the entry: this is a **uniform-radius** test, so the headline σ = r_i + r_j **sum-vs-mean** size-consistency is not yet exercised — the next experiment is two distinct per-cell radii on both sides.
+
+I did **not** touch the verdict/contract/dispute axis (`new` → `implementation_of: adhere`) — that's the normalizer's obligation, not the differ's. The note already carries the matching DIFFER writeup and both run paths.
+  committed  differ/soft_sphere  (4.9 min)
+Done. The differential test was already run and passed on disk from the prior attempt; that attempt timed out before writing the results into the record. I verified reproducibility, then transcribed the outcome.
+
+**What I did**
+- Re-ran the scorer `diff_hertzian.py` — reproduced exactly: **PASS**.
+- Filled the `evidence` block in `_work/hertzian.yaml` and set `status: validated`.
+- Confirmed the acted ledger (`adhere` 40/40 acted, `valid_evidence: true`) — a real run, not a still life.
+- Appended the DIFFER section to `campaign/notes/hertzian.md`.
+- Verified valid YAML and ran `record.py --validate` on a simulated merge: **0 violations** (hertzian moves implemented→validated, 9→10).
+
+**The result — `adhere:hertzian` VALIDATED**
+- **Primary** `force_field_rel_err = 1.89e-6` vs threshold **1e-4** (pre-registered at `diff_hertzian.py:38`, before any diff). Measured on a heterogeneous 7-cell cluster — radius 0.40–0.70 and per-cell ε 1.0–3.0.
+- **Secondary** `traj_pos_max_abs = 6.26e-6` vs threshold **1e-3** — the overdamped kT=0 trajectory over 40 steps.
+- **Negative controls fire**: SoftSphere (wrong exponent 2 vs 5/2) misses by 0.52 / 0.37 — ~5000× the bar, so the pass is discriminating.
+- Newton's third law ~0 both sides; oracle self-check (scan vs analytic 8.8e-8, kT=0 key-determinism 0.0) confirms the reference is the real Hertzian law.
+
+**One thing worth flagging for the analysis phase:** unlike its twin soft_sphere (uniform-radius test that left `sigma = r_i + r_j` size-consistency unexercised), this hertzian differential's PRIMARY scenario uses heterogeneous radii *and* per-cell epsilon — so it directly exercises the additive-sigma + arithmetic-mean-epsilon combining rules that are exactly the axis distinguishing `adhere` from `attraction_repulsion`. The validation strengthens the `new → adhere` case empirically, though the verdict itself still rests on the signature argument in `why`.
+  committed  differ/hertzian  (7.6 min)
+The DIFFER pass is complete. Every artifact is in place and the merged record validates with **0 violations**.
+
+  REVERTED  differ/harmonic after 16.4 min:
+    - the agent call failed or timed out
+  handing the violations back to harmonic, once.
+Error: Reached max turns (40)
+  REVERTED  differ/lennard_jones after 17.8 min:
+    - the agent call failed or timed out
+  handing the violations back to lennard_jones, once.
+The note file already records the complete result (it was written in the prior attempt); the only thing that hadn't landed was the record entry's evidence block — which is exactly what the timed-out agent call had been trying to write. That's now done directly.
+
+## What I did
+
+The prior attempt had already produced and left on disk a complete, passing differential test — it only failed to write the result back into the record because the agent call timed out. I did that write-back directly (no subagents), after re-verifying the evidence is real and current:
+
+**Re-verified (didn't just trust the files):**
+- Re-ran the scorer `_oracle/scripts/_analyze_harmonic.py` → reproduces **PASS, D_pos = 7.864e-06 vs threshold 1.0e-03** (~130× above the float32 floor, ~1000× below the real dynamics).
+- Threshold `1.0e-3` is **pre-registered** in the scorer at line 98 — decided before the diff, as the order-of-operations demands.
+- Acted ledger valid: `adhere` acted 160/160, `valid_evidence: true`.
+- The negative control (adhesion-off SoftSphere on the matched core) diverges by **1.480 σ = 1480× the bar** and reverses the gyration sign (expands 1.678 vs the adhesive contraction 0.638) — so the metric genuinely resolves the adhesive tail, the one feature separating Harmonic from the already-validated soft_sphere/hertzian.
+
+**Wrote into `_work/harmonic.yaml`:**
+- `status: implemented → validated`
+- Full `evidence` block: `oracle_run: diff_harmonic`, precise `diff_metric` (D_pos over 161 frames × 19 live cells, in units of σ), `threshold: 0.001` + `threshold_why`, `value: 7.864199877963372e-06`, `passed: true`, `plexus_run`, `scorer`, `acted_ledger`, `corroborators`, `scope`.
+
+**Validated the working copy the way the driver will:**
+- Parses as valid YAML.
+- Simulated the driver merge in-memory and ran the real `record.validate(...)`: **0 violations for harmonic, 0 total** — R10 (oracle_run dir exists, all four fields non-empty, `passed` not false) is satisfied.
+
+The verdict itself (`new → adhere`, resolving the skeptic's dispute on the source) was unchanged — my role was only to decide whether the operator reproduces the reference's behaviour. It does: the force law reproduces to float32, adhesion contracts the cluster on both sides, and the test isolates the force law (fixed cell count/radii), so the known 124-vs-82 anchor gap can't enter and lives in division/growth, not `adhere`.
+  committed  differ/harmonic  (4.9 min)
+Error: Reached max turns (40)
+  REVERTED  differ/virial_stress after 16.3 min:
+    - the agent call failed or timed out
+  handing the violations back to virial_stress, once.
+[budget] OVER CEILING at differ: round LLM budget would be exceeded (366.3+12 > 360.0 min) -- running anyway; the round is flagged budget_exceeded
+Error: Reached max turns (40)
+  REVERTED  differ/mechanical_relaxation after 22.7 min:
+    - the agent call failed or timed out
+  handing the violations back to mechanical_relaxation, once.
+[budget] OVER CEILING at differ: round LLM budget would be exceeded (389.0+12 > 360.0 min) -- running anyway; the round is flagged budget_exceeded
+The DIFFER task is complete. Here's what I found and recorded.
+
+## Result: `adhere/lennard_jones` — VALIDATED, `D_pos = 0.0` (byte-equal)
+
+The full differential pipeline already existed on disk (oracle run, config spec, plexus run, `diff.json`). My job was to verify the reported pass is *real* and fill in the evidence block. The previous attempt timed out; I did the verification directly.
+
+**The one thing that had to be checked before recording:** `diff.json` reported `D_pos = 0.0` alongside a `9.4e-5` "force residual" — logically tense, since a nonzero first-step force error should produce a nonzero frame-1 position diff. I loaded the raw arrays in the Plexus env and confirmed:
+- The Plexus and jax-morph float32 trajectories are **byte-equal** over all 101×16×2 positions (`np.array_equal → True`).
+- **Not aliasing**: distinct objects, they diverge from the SoftSphere negative control by 0.350σ, and the cells genuinely moved 0.350σ.
+- The `9.4e-5` is an **oracle-internal** float32 reassociation, not a Plexus↔reference error: `plx[1]-plx[0]` and `ref[1]-ref[0]` both differ from the standalone `forces(IC)` by the *same* `9.4e-7` — i.e. they equal each other exactly.
+
+**Acted ledger (checked first, per the DIFFER contract):** `adhere` acted 47/100 frames — the whole active relaxation phase — then fell below the move threshold once the five tail pairs reached contact (~frame 42; gyration and nn-distance plateau). `valid_evidence: true`, no inert operators. A real run, not a still life.
+
+**Discriminating power:** threshold `1e-3` pre-registered at `_analyze_lennard_jones.py:83`. The adhesion-off SoftSphere negative control diverges 0.350σ (350× the bar); a 4-eps textbook form, dropped 0.5 factor, or mean-instead-of-sum σ would each diverge O(σ). The family scorers (soft_sphere 2.7e-6, harmonic 7.9e-6, hertzian 1.9e-6, all nonzero) prove `1e-3` is not a bit-identity gate — LJ simply landed the strongest possible pass.
+
+**Written to the record:** `_work/lennard_jones.yaml` — `status: validated`, and a full evidence block (`oracle_run: diff_lennard_jones`, `diff_metric`, `threshold: 0.001` + `threshold_why`, `value: 0.0`, `passed: true`, `plexus_run`, `scorer`, `acted_ledger`, `corroborators`, `scope`). YAML re-parsed clean. The verdict (`new → implementation_of: adhere`) is untouched — this validates the implementation, not the language decision.
+
+**Note:** appended a DIFFER section to `campaign/notes/lennard_jones.md` correcting the earlier "evidence stays null" claim (the oracle runs jax-morph in its own isolated venv), with the numbers and both run paths.
+
+Scope honestly bounded: uniform radius + shared epsilon, so the SUM-vs-mean size-consistency and per-cell coupling that distinguish `adhere` from `attraction_repulsion` are exercised on the hertzian twin, not here.
+  committed  differ/lennard_jones  (7.5 min)
+Done. The prior attempt had already completed all the heavy work (oracle run, engine run, torch comparison) and it **passed**; the timeout just prevented the evidence from being written back. I restored the reverted artifacts and filled in the record.
+
+**What I did:**
+
+1. **Restored the missing `config/atlas/virial_stress.yaml`** verbatim from the recorded `spec_run.yaml` (it had been reverted along with the working copy).
+
+2. **Filled the evidence block** in `_work/virial_stress.yaml` and set `status: validated`:
+   - `oracle_run: diff_virial_stress`
+   - `diff_metric`: peak-normalized relative stress error over the 18 live cells on frame 0 (a pure sensor has no trajectory — the observable *is* the written scalar), plus a dead-slot |stress| guard and a frames-identical guard; supplement over 5 laws × equal/unequal radii.
+   - `threshold: 0.0001` (pre-registered in the scorer at `_compare_virial_stress.py:81`), with `threshold_why` showing it sits ~3 orders above the float32 floor yet below every wrong form (taxicab σ_i off by ~2dVᵢ, sign-flip, dropped ½ split, wrong Vᵢ).
+   - `value: 7.610894538878732e-08`, `passed: true`, plus `acted_ledger`, `corroborators`, `scope`.
+
+3. **Appended the Differ section** to `campaign/notes/virial_stress.md` with the numbers, both run paths, and the verdict.
+
+**Result — the test passes cleanly:**
+- Primary engine Morse stress: **rel 7.6e-8** (≪ 1e-4 bar), max_abs 1.9e-6 on peak 25.06.
+- Dead slots 0.0 both sides; `frames_identical true`; acted ledger clean (`valid_evidence true`).
+- Oracle internal gates: STEP == `virial_pressure` bit-for-bit, PRNG-key-independent; by-hand analytic Morse match to 3.2e-6 (confirms the compression-positive sign + 2dVᵢ normalization).
+- Supplement: all 10 law/radii points pass (rel ≤ 3.3e-7).
+
+**Verification:** the working copy parses as valid YAML, and `record.py` validation against the merged record returns **zero violations for `virial_stress`** (the 4 remaining violations are pre-existing on other entries). The SOURCE-vs-PAPER contradiction stands as a confirmed *form* difference — the test scores the code's Irving-Kirkwood virial pressure (source wins), not the paper's taxicab σ_i.
+  committed  differ/virial_stress  (6.0 min)
+Done. The previous attempt had actually executed the entire differential — oracle, spec, engine run, and analysis were all on disk — but timed out before writing the result back into the record. I verified that work and completed the record.
+
+**What was already on disk (verified, not rebuilt):**
+- Oracle `_oracle/runs/diff_mechanical_relaxation/` — `MechanicalRelaxation(Morse ε3.0 α2.8)`, FIRE to `f_tol=2e-4`, rigid 4-cell diamond, converged (`residual 1.34e-4`).
+- Plexus `config/atlas/mechanical_relaxation.yaml` → `log/atlas/mechanical_relaxation/` (byte-identical IC, buffer 8 with 4 dead slots). Acted ledger valid: `relax` acted (moved 0.1123 = the relaxation displacement), `seed_state` acted, `inert_operators []`.
+- Analysis → `diff.json`.
+
+**Result:** `D_eq = 1.91e-6 σ ≪ 1.0e-3 σ` threshold → **PASS** (~500× margin). Force cross-check confirms the Plexus equilibrium is a genuine force balance (`|∇U|∞ = 1.90e-4 ≤ 5·f_tol`, matching reference 1.35e-4); gauge-removed Kabsch, fixed-point plateau, frame-0==IC, and dead-slot immobility all clean. The forward FIRE-to-tolerance solver + the quasistatic `(x*−x0)/dt` emit reproduce the reference equilibrium to float32 solver noise.
+
+**What I completed:**
+1. Filled `evidence` in the working copy — `oracle_run`, pre-registered `diff_metric` and `threshold` (with the two-sided bracket justifying 1e-3), `value: 1.91e-06`, `passed: true`, plus a `detail` block — all as valid YAML block scalars, and set `status: validated`.
+2. Verified: YAML parses; all R10 keys populated; and an in-memory merge into the full record runs `record.validate` with **0 violations** (none touching this entry).
+3. Appended the DIFFER section (numbers, both run paths, the forward-only scope caveat) to `campaign/notes/mechanical_relaxation.md`.
+
+The implicit-diff backward remains out of scope for this forward differential (`DIFFERENTIABLE=False`), as the Normalizer already flagged — recorded, not papered over.
+  committed  differ/mechanical_relaxation  (6.5 min)
+
+differ: 14/16 committed in 107.3 min wall clock; NOT committed: gene_network_connectionist, odecontroller
+merged 15 note(s) into campaign/analysis.md
+
+fmottes/jax-morph @ ace08b87   24 mechanisms
+
+    1  GeneNetworkConnectionist                     implemented new          regulate  BLOCKED
+    2  NeuralODE                                    validated   new          regulate
+    3  GeneNetworkMWC                               validated   new          regulate
+    4  ODEController                                implemented new          regulate  BLOCKED
+    5  StochasticStep                               normalized  out_of_scope sample_score
+    6  Death                                        validated   new          apoptose
+    7  FreeScreenedDiffusion                        validated   new          morphogen
+    8  Division                                     validated   refinement   cell_divide
+    9  SaturatingCellGrowth                         validated   refinement   grow_radius
+   10  ActiveBrownianDynamics2D                     validated   new          reorient
+   11  BrownianDynamics                             validated   new          agitate
+   12  NoForce                                      normalized  out_of_scope no_interaction
+   13  PairwisePotential                            normalized  alias        attraction_repulsion
+   14  Morse                                        normalized  alias        attraction_repulsion  disputed
+   15  SoftSphere                                   validated   new          adhere  disputed
+   16  Hertzian                                     validated   new          adhere  disputed
+   17  Harmonic                                     validated   new          adhere  disputed
+   18  LennardJones                                 validated   new          adhere
+   19  MechanicalRelaxation                         validated   new          relax
+   20  VirialStress                                 validated   new          mechanosense
+   21  Lie-Trotter macro-step split                 normalized  out_of_scope integrate
+   22  step type: quasistatic / dynamic / discrete  normalized  out_of_scope timescale
+   23  declared field dataflow validation           normalized  out_of_scope couple
+   24  stochastic trace / replay / score            normalized  out_of_scope sample_score
+
+  {'candidate': 0, 'inspected': 0, 'normalized': 8, 'implemented': 2, 'validated': 14, 'promoted': 0}
+  {'alias': 2, 'refinement': 2, 'new': 14, 'out_of_scope': 6}
+  0 validator violations · 2 blocked
+  due at curator: 14  (neural_ode, gene_network_mwc, death, free_screened_diffusion, division, saturating_cell_growth...)

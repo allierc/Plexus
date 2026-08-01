@@ -135,46 +135,48 @@ contract:
   - growth_law
   - realization
   - rate
-status: implemented
+status: validated
 module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
 test: tests/test_jax_morph_saturating_cell_growth.py
 evidence:
-  oracle_run: null
+  oracle_run: diff_saturating_cell_growth
   diff_metric: |
-    D_max = max over recorded frames t in {0..T} (T = 20 growth steps), live cells i, and both
-    scenarios below, of |radius_plexus[t,i] - radius_ref[t,i]|, in radius length-units. Both
-    trajectories start from the IDENTICAL per-cell initial condition (radius r0, growth_rate k)
-    and evolve under ONLY the growth operator -- NO relaxation, NO division -- so cells hold
-    fixed array slots and the two radius arrays align cell-for-cell, frame-for-frame; dt = 2.0.
-    The reference side is jax-morph SaturatingCellGrowth run alone via jxm.simulate (its s_0..s_T
-    radius history). The Plexus side is grow_radius run alone through the REAL engine
-    integration (radius += dt*delta). Scenario A (PRIMARY, via run_spec.py, the mandated evidence
-    folder log/atlas/saturating_cell_growth/): a UNIFORM IC (every cell r0 = 0.30, k = 0.40,
-    max_radius R = 0.60); the recorded `radius` block is diffed against the matched reference.
-    Scenario B (DISCRIMINATING, a hand-built Hierarchy rolled one macro-step at a time so each
-    cell can carry its own (r0,k)): a 6x6 grid of r0 in {0.05,0.25,0.45,0.59,0.60,0.75} x k in
-    {0.0,0.05,0.15,0.40,1.00,2.50} -- spanning k = 0 (byte no-op), small-k near-linear growth,
-    large-k near-instant saturation (where forward Euler would OVERSHOOT at dt = 2), r0 == R
-    (dr ~ 0) and r0 > R (relaxation DOWN to R, exercising the no-clamp claim). dt = 2.0 (not 1)
-    makes the mean-rate convention observable: the reference ADDS dr = (R-r)(1-exp(-k*dt/R)) once
-    per step, Plexus returns delta = dr/dt and the engine recovers radius += dt*(dr/dt) = dr; at
-    dt = 1 the /dt and *dt would cancel and hide a convention bug. evidence.value = max of the two
-    per-scenario D_max. A negative control (drop the /dt so the engine applies dt*dr) is reported
-    to confirm the metric would catch a wiring defect.
-  threshold: 1.0e-5
-  threshold_rationale: |
-    Both sides evaluate the IDENTICAL elementary closed form dr = (R-r)(1-exp(-k*dt/R)) in
-    float32 (the reference stores float32 -- radius_max_last 0.59999996 in the smoke summary --
-    and the torch engine is float32); the only disagreement sources are (a) float32 exp() differing
-    between XLA and torch by ~1 ULP and (b) Plexus's extra dr/dt then dt*delta round-trip (~1 ULP).
-    The radius map r_{t+1} = R + (r_t-R)exp(-k*dt/R) is a CONTRACTION toward R, so per-frame roundoff
-    is damped, not amplified, and total error stays at a few x 1e-7 on radii ~O(0.6). 1e-5 sits ~30x
-    above that float32 noise floor yet ~1e4x below the O(0.1-1) error a wrong dt-convention (negative
-    control) or a forward-Euler discretization produces at dt = 2 -- so it cannot be met by any
-    incorrect implementation. A looser threshold (e.g. 1e-3) would fail to separate the exact
-    von-Bertalanffy flow from a same-family-but-wrong law and is rejected.
-  value: null
-  passed: null
+    D_max = the maximum absolute per-cell radius deviation between the Plexus grow_radius
+    trajectory and the jax-morph SaturatingCellGrowth reference, over EVERY recorded frame
+    (t = 0..20: the seeded IC plus 20 macro-steps at dt = 2.0) and EVERY live cell, in
+    dimensionless simulation-length (radius) units. Reported as value = max(D_max_A, D_max_B):
+      D_max_A -- the 4-cell engine run of config/atlas/saturating_cell_growth.yaml exactly as
+        run_spec runs it (r0 = 0.30, growth_rate = 0.40, max_radius = 0.6), diffed against
+        oracle scenario A over the 4 live cells (acted ledger: grow_radius acted 13/20 calls,
+        the later 7 emitting a sub-float delta once radius has reached R -- correct saturation).
+      D_max_B -- a heterogeneous 6x6 (r0 x growth_rate) grid of 36 cells rolled 20 steps through
+        the real engine first-order integration radius += dt*delta, diffed against oracle
+        scenario B; it spans k = 0 (byte no-op), small-k near-linear growth, large-k near-instant
+        saturation (where forward Euler at dt = 2 would overshoot), r0 == R (dr ~ 0), and r0 > R
+        (relaxation DOWN to R -- the no-clamp claim; last radius reaches R = 0.6 from above).
+    Growth is ISOLATED (no relaxation, no division) so both sides keep the same cells in the same
+    array slots and align cell-for-cell, frame-for-frame. The oracle is diff_saturating_cell_growth
+    (reference.npz), whose own float32-vs-float64-analytic error is 9.5e-8, confirming the reference
+    is the exact von-Bertalanffy flow, not forward Euler and not a min-clamp. A negative control
+    that drops the /dt mean-rate convention (radius += dt*dr) scores 0.55, ~5e4x above threshold,
+    so the metric provably catches a wiring defect precisely because dt = 2 (not 1) makes the
+    convention observable.
+  threshold: 1.0e-05
+  threshold_why: |
+    1e-5 sits ~100x above float32 round-off (the reference's own float32-vs-analytic error is
+    9.5e-8) yet ~5e4x below the negative-control wiring-defect signal (0.55), so it separates
+    bit-level agreement from any real trajectory disagreement -- a wrong growth law, a dropped
+    dt-scaling, a forward-Euler overshoot, or a min-clamp -- without flagging float32 noise. It
+    was fixed in the diff script before the run, not chosen after seeing value = 0.
+  value: 0.0
+  passed: true
+  passed_note: |
+    value = 0.0 EXACTLY: the Plexus engine and the jax-morph reference produce bit-identical
+    float32 radius trajectories over all 20 frames in both scenarios (D_max_A = 0.0, D_max_B = 0.0).
+    Corroborating checks all clean -- frame0_is_ic_residual = 0.0 (frame 0 is the pure seeded IC),
+    k0_noop_drift = 0.0 (the k = 0 column never moves), aboveR_last_min = 0.6 = R (no clamp; cells
+    above R relax down to R). The grow_radius contract reproduces SaturatingCellGrowth's per-cell
+    radius ODE to the last bit.
 state_io_notes:
   maps:
   - growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)),

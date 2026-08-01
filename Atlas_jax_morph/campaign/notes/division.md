@@ -99,3 +99,41 @@ lineage (`born=1`, `mother=parent`, defaults elsewhere) with live-count growth; 
 GLOBAL accumulation; the large-`orientation_snr` limit aligning the split with the axis; the
 isotropic fallback; and the `at:` mask gating who divides. No oracle run -- jax is deliberately
 absent from this env -- so `evidence.oracle_run` stays null for the differ/curator.
+
+
+## Division -- validated (differential test)
+
+**Status `validated`. The flagged 124-vs-82 open discrepancy is RNG realization noise, not a wrong
+contract.** A single-seed count cannot separate a wrong hazard from noise: jax and torch PRNG streams
+differ, so seed-0-vs-seed-0 matches only the deterministic initial POSITIONS, never the stochastic
+division draws. So the differ replaces the one-sample count with a realization-INDEPENDENT invariant
+-- the **pooled per-macro-step Bernoulli hazard** `p_hat = committed_divisions / eligible_cell_steps`
+-- measured identically on both engines over M=48 seeds x 40 macro-steps at `division_rate=0.08`,
+`dt=1.0` on the 4 anchor founders (no death, `division_overflow==0` on every seed with `CAP=512`, so
+every live-count increment is one committed division).
+
+- **metric** `|p_hat_plexus - p_hat_oracle|` (dimensionless probability per alive cell per macro-step).
+- **threshold** `3*SE_pooled = 0.005225` (formula pre-registered; `SE_pooled = sqrt(SE_o^2+SE_p^2)`,
+  each `SE = sqrt(p(1-p)/eligible)`). Resolves any hazard divergence >~6.7% rel -- a doubled rate is
+  40 SE out -- while not flagging Monte-Carlo scatter between two independent PRNG stacks as
+  disagreement. Honest limit: at M=48 it does NOT resolve the O((lambda*dt)^2/2)~0.003 exact-vs-linear
+  hazard gap; that is excluded independently (both engines carry the source's `-expm1` law and both
+  match the analytic hazard `1-exp(-0.08)=0.076884` to under one SE).
+- **result** `|diff| = 0.00109 = 0.63*SE_pooled <= 0.005225` -> **PASS**.
+  - `p_hat_oracle = 0.077787` (SE 1.22e-3; 3734 / 48003), vs theory +0.74 SE.
+  - `p_hat_plexus = 0.076696` (SE 1.24e-3; 3528 / 46000), vs theory -0.15 SE.
+  - Both engines agree with theory AND with each other (triangulation).
+- **discrepancy resolved** The oracle final-count distribution (mean 81.8, SD 43.6, min 18, max 234
+  over 48 seeds -- a Galton-Watson count whose SD ~ its mean) contains BOTH smoke's 82 (z=+0.005) and
+  the anchor/Plexus 124 (z=+0.97) as ordinary draws. Plexus seed 0 gives exactly 124 (the flagged
+  value); oracle seed 0 gives 82 (smoke) -- same hazard, different PRNG stream. Volume-conservation /
+  placement (not exercised by the count-based hazard) corroborated by the anchor gyration agreeing to
+  ~9% (Plexus 3.52 vs reference 3.23).
+
+Runs: oracle `Atlas_jax_morph/_oracle/runs/diff_division/` (script `_oracle/scripts/division.py`);
+Plexus engine evidence `log/atlas/division/` (`diag.json` acted ledger: `cell_divide` 41 calls /
+acted 33, `grow_radius` 41/41, `relax` 41/33, `seed_state` 1/1, `inert_operators []` ->
+`valid_evidence true`) plus the pooled-hazard summary `log/atlas/division/diff_plexus_summary.json`
+(script `_oracle/scripts/division_plexus.py`, which also proves the division-only reduction is
+count-neutral at seed 0: full and division-only both give 124, since only `cell_divide` draws
+`H.rng` in this spec). Spec `config/atlas/division.yaml`.

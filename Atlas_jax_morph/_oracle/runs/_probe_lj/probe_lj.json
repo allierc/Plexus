@@ -1,0 +1,55 @@
+{
+  "x64_enabled": false,
+  "dtype_forces": "float32",
+  "scan_ref_vs_analytic_max_below_ron": 1.9073486328125e-05,
+  "force_at_contact": -0.0,
+  "force_at_1p25_sigma": -1.8568755388259888,
+  "force_beyond_cutoff_2p6": -0.0,
+  "softsphere_force_at_1p25_sigma": -0.0,
+  "bd_kT0_deterministic_across_keys": 0.0,
+  "bd_first_step_vs_dt_forces_max": 2.384185791015625e-07,
+  "IC_scale_0.58": {
+    "ic_min_nn": 0.8966999963923281,
+    "ic_median_nn": 0.963861595344997,
+    "ic_max_nn": 1.0181183314340239,
+    "ic_force_max": 25.411184310913086,
+    "traj_min_separation_ever": 0.2685997784137726,
+    "any_nan": false,
+    "gyration_first": 1.7863261699676514,
+    "gyration_last": 2055017.125,
+    "max_cell_displacement": 6333952.0
+  },
+  "IC_scale_0.62": {
+    "ic_min_nn": 0.9585409963194075,
+    "ic_median_nn": 1.0303349906962311,
+    "ic_max_nn": 1.0883339706381467,
+    "ic_force_max": 7.103736877441406,
+    "traj_min_separation_ever": 0.5055359601974487,
+    "any_nan": false,
+    "gyration_first": 1.9095211029052734,
+    "gyration_last": 544.5291137695312,
+    "max_cell_displacement": 1675.861083984375
+  },
+  "IC_scale_0.66": {
+    "ic_min_nn": 1.0203826776753906,
+    "ic_median_nn": 1.09680785941431,
+    "ic_max_nn": 1.1585485420369754,
+    "ic_force_max": 3.8768670558929443,
+    "traj_min_separation_ever": 0.33963823318481445,
+    "any_nan": false,
+    "gyration_first": 2.0327165126800537,
+    "gyration_last": 97790.4453125,
+    "max_cell_displacement": 299452.59375
+  },
+  "IC_scale_0.7": {
+    "ic_min_nn": 1.0822240801386729,
+    "ic_median_nn": 1.1632803351987009,
+    "ic_max_nn": 1.2287641109635339,
+    "ic_force_max": 2.983011484146118,
+    "traj_min_separation_ever": 0.27676624059677124,
+    "any_nan": false,
+    "gyration_first": 2.1559109687805176,
+    "gyration_last": 1392142.375,
+    "max_cell_displacement": 4290871.5
+  }
+}

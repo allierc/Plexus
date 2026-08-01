@@ -135,56 +135,45 @@ test: tests/test_jax_morph_odecontroller.py
 evidence:
   oracle_run: diff_odecontroller
   diff_metric: |
-    D_max -- the maximum ABSOLUTE deviation, in dimensionless gene-concentration units, over
-    every recorded frame (the seeded initial condition + all 21 macro-steps = 22 frames), every
-    LIVE cell (the reference alive mask; 4 live of 8 capacity), and every evolving gene component
-    (the hidden latent gene concatenated with the two output genes, reference declaration order
-    [gene_hidden, g_out0, g_out1] -- packing order is load-bearing), between the per-frame `gene`
-    block the Plexus engine records while running the `regulate` operator (implementation
-    ode_generic, the ODEController BASE integration machinery) and the jax-morph
-    GeneNetworkConnectionist reference trajectory y_uniform. Both sides start from the IDENTICAL
-    initial condition (all genes 0), the IDENTICAL frozen per-cell drive u = [0.8, 0.3], and the
-    IDENTICAL 3-gene circuit (W_gene 3x3, W_in 3x2, b, gamma=1.0, algebraic sigmoid); both
-    integrate the same autonomous ODE dg/dt = sigma(g@W_gene^T + u@W_in^T + b) - gamma*g over each
-    dt=1.0 macro-step with an error-controlled adaptive Dopri5 solver at rtol=1e-4, atol=1e-6. The
-    Plexus operator SELF-SOLVES the whole step and returns the mean-rate delta (y_end-g0)/dt; the
-    engine's first-order integration (gene += dt*delta) recovers the endpoint y(dt), so D_max
-    scores the operator AS THE ENGINE RUNS IT (float32 both sides). Frame 0 is asserted to be the
-    initial condition on both sides (engine IC max|gene| = 0), fixing the alignment
-    engine_frame_k == reference s_k.
-    evidence.value = max(D_max over that uniform engine trajectory, D_max_distinct), where
-    D_max_distinct is the SAME diff for a corroborating run that gives each of the 4 cells a
-    DIFFERENT frozen drive (the reference u_distinct) through the real operator + real engine
-    integration: because the operator carries maps=[] (no cell-to-cell edge), the four per-cell
-    trajectories must each match the reference independently -- any leaked coupling would show
-    here but is invisible in the shared-drive uniform run. This directly exercises the
-    intracellular / maps=[] identity that separates `regulate` from `signal`.
-    oracle_run holds reference.npz + summary.json; the engine evidence folder is
-    log/atlas/odecontroller/ (acted ledger: regulate acted 19/21 calls -- the last frames sit on
-    the fixed point where the delta rounds to 0 -- seed_state 1/1, inert_operators [],
-    valid_evidence true). The scalar is computed by Atlas_jax_morph/diff_odecontroller.py ->
-    _oracle/runs/diff_odecontroller/diff.json.
+    D_inf -- the sup-norm (max absolute difference) between the Plexus engine's recorded per-cell
+    gene trajectory and the jax-morph GeneNetworkConnectionist reference trajectory y_uniform,
+    taken over ALL 22 recorded frames (tick 0 = the seeded initial condition, ticks 1..21 = the
+    21 integrated macro-steps), all 4 live cells, and all 3 gene components
+    [gene_hidden, g_out0, g_out1]. Both trajectories are produced on the SAME initial condition
+    (every gene 0), the SAME frozen drive u = [0.8, 0.3], the SAME 3-gene connectionist circuit
+    (W_gene, W_in, b; gamma = 1.0), the SAME dt = 1.0 and 21 macro-steps. Units: gene
+    concentration (dimensionless; the circuit's fixed points here are O(0.3-0.85)). The engine
+    gene trajectory is out["sets"]["cell"]["state"]["gene"] from the engine run of
+    config/atlas/odecontroller.yaml; the reference is reference.npz:y_uniform. Reported in
+    evidence.value. Corroborated (not the primary number) by D_inf on a DISTINCT-drive run (a
+    different frozen u per cell) vs reference.npz:y_distinct, which further checks that the
+    operator leaks NO cell-to-cell coupling -- the maps=[] intracellular identity on which the
+    `new`-over-`signal` verdict rests.
   threshold: |
-    D_max <= 5.0e-3 (absolute, gene-concentration units). Both sides integrate the SAME
-    autonomous ODE with an error-controlled adaptive Dopri5 at rtol=1e-4, atol=1e-6, differing
-    ONLY in the step-size CONTROLLER (the reference diffrax PIDController vs the operator's
-    elementary I-controller safety*err^-0.2) and the float32 backend (torch vs JAX). Two such
-    integrations have a global error of a few*rtol each (~1e-4 for O(1) states), so their
-    difference is bounded by the sum ~1e-3, and the contractive circuit (gamma=1.0, |W| O(1))
-    does not amplify it across the 21 steps -- once the trajectory reaches its O(1) fixed point a
-    single full-dt Dopri5 step passes the error test on both sides and the two become
-    bit-identical, so the difference lives only in the ~5 transient frames. 5e-3 is a few times
-    that summed global-error bound with float32 margin, yet still 10x below the >=0.05 deviation
-    any STRUCTURAL/biology error produces: the logistic vs algebraic sigmoid moves the fixed point
-    by ~0.05-0.1; the paper's additive-outside-sigmoid forcing vs the code's W_in@u INSIDE it
-    shifts the trajectory by O(0.1); returning the integrated value instead of the mean-rate delta
-    double-applies and diverges by O(1); dropping the occupancy mask or mis-ordering
-    hidden/outputs moves components by O(0.1). The band between a correct adaptive integration
-    (~1e-4) and any wiring/biology bug (>=0.05) is empty and 5e-3 sits in it. A looser bound
-    (1e-1) would pass a wrong-sigmoid circuit in some regimes; a tighter one (1e-5) risks flaking
-    on the legitimate cross-controller/float32 difference rather than on a defect.
-  value: 2.562999725341797e-06
+    2e-4. Both sides integrate the IDENTICAL right-hand side with an adaptive Dopri5 controlled to
+    rtol = 1e-4, atol = 1e-6 (reference: diffrax.PIDController; operator: a hand-rolled
+    Dormand-Prince 5(4) with the same tolerances), so two faithful integrations of the same ODE
+    can sit apart by at most ~2*(rtol*|y| + atol) ~ 2e-4 on these O(1) gene values -- the a-priori
+    bound on two independent rtol=1e-4 solvers, hence a bar a CORRECT integrator is guaranteed to
+    meet (it is not tuned to the observed number). It is not looser (e.g. 1e-2) because the
+    failure modes this test exists to catch -- the wrong saturation (logistic vs the algebraic
+    0.5 + 0.5 x/sqrt(1 + x^2)), the paper's additive forcing OUTSIDE the sigmoid instead of the
+    code's W_in@u INSIDE it, or a mis-scaled / omitted inc-over-dt increment (a double
+    integration) -- each shift the O(1) fixed points by >= 1e-2, i.e. >= 50x this bar, so 2e-4
+    cleanly separates "the same circuit solved to solver tolerance" from "a different circuit".
+  value: 2.44e-06
   passed: true
+  value_note: |
+    2.44e-06 is the PRIMARY D_inf on the uniform run (the spec config/atlas/odecontroller.yaml
+    that run_spec.py executes). The DISTINCT-drive corroboration run (per-cell u, stepped through
+    the engine's own gene += dt*delta) gives D_inf 2.56e-06 vs reference.npz:y_distinct, so BOTH
+    the uniform and the four-distinct-drive trajectories reproduce the reference to ~2.5e-06 --
+    ~80x under the 2e-4 bar. Per-frame error peaks at 2.44e-06 mid-trajectory and decays to 0 as
+    the circuit reaches its fixed point (two accurate adaptive Dopri5 integrations of a contracting
+    ODE, NOT accumulating disagreement). Full breakdown in
+    _oracle/runs/diff_odecontroller/diff.json. Engine evidence: log/atlas/odecontroller/ (acted
+    ledger: regulate acted 19/21 -- the last two near-fixed-point ticks emit a delta below the
+    float32 ledger threshold; genuine convergence, not a no-op; valid_evidence true).
 disputed:
   by: skeptic
   was: new

@@ -128,7 +128,7 @@
       "class": "new",
       "contract": "regulate",
       "of": null,
-      "status": "normalized"
+      "status": "implemented"
     },
     {
       "n": 2,
@@ -137,7 +137,7 @@
       "class": "implementation",
       "contract": "regulate",
       "of": "gene_network_connectionist",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 3,
@@ -146,7 +146,7 @@
       "class": "implementation",
       "contract": "regulate",
       "of": "gene_network_connectionist",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 4,
@@ -155,7 +155,7 @@
       "class": "implementation",
       "contract": "regulate",
       "of": "gene_network_connectionist",
-      "status": "normalized"
+      "status": "implemented"
     },
     {
       "n": 5,
@@ -173,7 +173,7 @@
       "class": "new",
       "contract": "apoptose",
       "of": null,
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 7,
@@ -182,7 +182,7 @@
       "class": "new",
       "contract": "morphogen",
       "of": null,
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 8,
@@ -191,16 +191,16 @@
       "class": "refinement",
       "contract": "cell_divide",
       "of": "cell_divide",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 9,
       "id": "saturating_cell_growth",
       "raw_name": "SaturatingCellGrowth",
       "class": "refinement",
-      "contract": "cell_grow",
+      "contract": "grow_radius",
       "of": "cell_grow",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 10,
@@ -209,7 +209,7 @@
       "class": "new",
       "contract": "reorient",
       "of": null,
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 11,
@@ -218,7 +218,7 @@
       "class": "new",
       "contract": "agitate",
       "of": null,
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 12,
@@ -254,7 +254,7 @@
       "class": "new",
       "contract": "adhere",
       "of": null,
-      "status": "inspected"
+      "status": "validated"
     },
     {
       "n": 16,
@@ -263,7 +263,7 @@
       "class": "implementation",
       "contract": "adhere",
       "of": "soft_sphere",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 17,
@@ -272,7 +272,7 @@
       "class": "implementation",
       "contract": "adhere",
       "of": "soft_sphere",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 18,
@@ -281,7 +281,7 @@
       "class": "implementation",
       "contract": "adhere",
       "of": "soft_sphere",
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 19,
@@ -290,7 +290,7 @@
       "class": "new",
       "contract": "relax",
       "of": null,
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 20,
@@ -299,7 +299,7 @@
       "class": "new",
       "contract": "mechanosense",
       "of": null,
-      "status": "normalized"
+      "status": "validated"
     },
     {
       "n": 21,
