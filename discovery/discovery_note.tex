@@ -619,10 +619,37 @@ gives \emph{less}, and past 0.15 it gives none at all: a seed covering a third o
 no room for the inhibitor to separate domains, so the whole field decays together. The useful band
 is narrow and sits below 0.15.
 
-And the three seeds are \textbf{bit-identical}. \code{general.seed} does not reach the seeding
-operator, so ``three independent runs'' are one run repeated. Replication was the entire reason for
-running several spots, and it is not currently available --- which means every spread I have quoted
-across seeds in this campaign describes nothing.
+\textbf{And the three seeds were bit-identical} --- 0.501, 0.501, 0.501. \code{general.seed} was
+written into every spec and read by \emph{nothing}: both stochastic operators take a \code{seed}
+(the mesh jitter, and which cells are nucleated) and the translator passed neither. ``Three
+independent runs'' were one run repeated, so every spread this campaign has quoted across seeds
+described the floating-point reproducibility of a single trajectory.
+
+\textbf{Fixed, and the fix follows the working specs rather than my first idea.} I offset the two
+operators' seeds, reasoning that jitter and nucleation are independent draws. True, and beside the
+point: \code{archive\_rounded.py}, \code{archive\_vh\_rd\_coral.py} and \code{run\_tyssue\_fig5.py}
+all pass \emph{one shared} SEED to both, and a composition that reproduces an archived run has to
+draw the numbers that run drew. Departing from the convention would have made every reproduction
+check compare two different experiments. A spec that declares a seed no operator consumes is now
+refused outright.
+
+\textbf{Replication, measured for the first time} --- three seeds, 300 frames, same composition:
+
+\begin{center}\small
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+& \textbf{act\_max} & \textbf{activated fraction} & \textbf{elongation}\\
+\midrule
+before & 0.501,\ 0.501,\ 0.501 & 0.374 $\times$3 & 1.006 $\times$3\\
+after  & 0.501,\ 0.447,\ 0.483 & 0.407,\ 0.379,\ 0.374 & 1.006,\ 1.006,\ 1.005\\
+\midrule
+       & sd \textbf{0.022} & sd \textbf{0.015} & sd 0.0005\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+That last row is what a difference between two compositions now has to beat to mean anything. It
+did not exist yesterday, and every claim made without it was comparing single samples.
 \end{phasebox}
 
 \begin{phasebox}{Phase 5 --- The experiment \hfill \textcolor{bad}{\textbf{ATTEMPTED --- VOID}}}
