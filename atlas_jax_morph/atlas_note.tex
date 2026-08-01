@@ -1001,29 +1001,54 @@ running 32 fits at once, which is what \code{gpu\_l4} is for. \code{cluster6.py}
 ground truth, ssh wall-timeout, completion only on positive evidence --- under its own job-name
 prefix so the two campaigns' queues cannot alias.
 
-\textbf{Where it stands (in flight).} 32 jobs, $K \in \{1,2,4,8\}$ $\times$ 8 replicates, 24
-frames, 20 Adam steps. $K=1$ and $K=2$ are complete:
+\textbf{The answer.} 32 jobs, $K \in \{1,2,4,8\}$ $\times$ 8 replicates, 24 frames, 20 Adam
+steps, fitting \code{grow\_radius.max\_radius}. All 32 landed.
+
+\begin{center}
+\includegraphics[width=\textwidth]{_state/phase6_variance.png}
+\end{center}
 
 \begin{center}
 \small
-\begin{tabular}{@{}r r r r l@{}}
+\begin{tabular}{@{}r r r r r@{}}
 \toprule
-$K$ & $n$ & mean & $\sigma$ & \\
+$K$ & $n$ & mean & s.e.m. & $\sigma$\\
 \midrule
-1 & 8 & 1.2072 & 0.0763 & \\
-2 & 8 & 1.2606 & 0.0548 & ratio 0.72, against $1/\sqrt{2} = 0.707$\\
-4 & \multicolumn{3}{l}{\emph{running}} & \\
-8 & \multicolumn{3}{l}{\emph{running}} & \\
+1 & 8 & 1.2072 & 0.0270 & 0.0763\\
+2 & 8 & 1.2606 & 0.0194 & 0.0548\\
+4 & 8 & 1.2589 & 0.0143 & 0.0405\\
+8 & 8 & \textbf{1.2885} & 0.0078 & \textbf{0.0220}\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Two seeds' worth of averaging shrinks the spread by very nearly the Monte-Carlo factor, which is
-what an unbiased-but-noisy estimator does and \emph{not} what a biased one does. That is
-encouraging and it is not yet a result: two points define no trend, and the means drift slightly
-upward ($1.2072 \to 1.2606$), which would be the signature of a small low-$K$ bias if it persists.
-\textbf{$K=4$ and $K=8$ decide it}, and they are the two that matter --- the conclusion will be
-recorded here whichever way it falls.
+\textbf{Precision: fixable, exactly as hoped.} $\sigma \propto K^{-0.58}$, against the $K^{-0.5}$ a
+plain Monte-Carlo average would give --- and with $n=8$ the standard error on an estimated
+standard deviation is about 27\%, so $-0.58$ and $-0.50$ are the same number. Averaging seeds buys
+precision at the ordinary rate. \textbf{The straight-through gradient through a discrete division
+behaves like a noisy estimator, not a broken one}, which is the good half of the result and was
+not guaranteed.
+
+\textbf{Correctness: the centre moves, and that is the finding.} The right-hand panel is the one
+to read. A $K=1$ fit lands at $1.2072$ and a $K=8$ fit at $1.2885$ --- a difference of $+0.081$
+against a combined standard error of $0.028$, $t = 2.90$. \textbf{A single-seed fit is not merely
+imprecise; it is systematically wrong}, by about 6\%. And the sequence is still climbing at
+$K=8$, so we cannot claim the $K=8$ answer has converged either.
+
+That is precisely the failure this note predicted --- ``optimising against that sample's luck'' ---
+caught by measurement rather than by argument, and it would have been invisible to anyone who ran
+one fit and believed it.
+
+\textbf{What it does and does not settle.} It does \emph{not} yet convict the estimator. The drift
+is a bias in \emph{the answer after a fixed 20-step budget}, and a noisy gradient with a truncated
+Adam run lags its target for reasons that have nothing to do with the estimator being biased.
+Separating the two needs each $K$ run to convergence rather than to a step count, which is cheap
+and is the next experiment. So the reference's trace/replay/score contract moves from
+\emph{required} to \emph{still open} --- weaker than the note previously assumed, and the honest
+position.
+
+\textbf{For Figure 5 the operational conclusion is already usable}: fit with $K$ seeds averaged
+per step, never one, and treat any single-seed number as a draw rather than an answer.
 
 \subsection{And it optimises}
 
