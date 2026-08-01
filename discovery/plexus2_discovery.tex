@@ -792,72 +792,144 @@ balance, exactly as he suspected.
 \textbf{Where it lives.} \texttt{discovery/PREMISES.md} (what we believe) and
 \texttt{discovery/premise\_check.py} (what runs). The gate is wired into every run.
 \end{phasebox}
-\begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \todo}
-\textbf{Goal.} Widen the three out-of-range settings; replace the mislabelled length-scale with the
-quantity Okuda actually varies; add the missing shape-to-chemistry feedback; add a fixture that
-asserts his published constants rather than tuning them.
+\begin{phasebox}{Phase 2 --- Make Okuda's settings reachable \hfill \prog\ (4 of 6)}
+\textbf{(0) The ball could not get big enough --- and that was not on the list.} It became item
+zero because it was the binding constraint on everything else. A spring in the mechanics was
+holding the shell at the size it was first built at, while the cells inside it grew sixteen-fold.
+The sheet had nowhere to put the extra material and folded through itself. Fixed: the spring's
+target now follows what the cells are actually asking for. Same run before and after --- the ball
+grows smoothly to 5\,240 cells and stays a clean sphere, where before it crumpled.
 
-\textbf{Why.} Without this, Track B cannot succeed at any effort level.
+\textbf{(1) The shape-to-chemistry operator} --- \emph{done}, and this is the piece that closes
+Okuda's loop. Until now the chemistry patterned the shell and the shell deformed, and the shape it
+took never reached back: a bud formed, and nothing about having formed a bud changed where the next
+signal went.
 
-\textbf{What you get.} A list of what now matches his paper and what still does not, with reasons.
-\end{phasebox}
-\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \todo}
-\textbf{Goal.} Put \textbf{Evolution} and the \textbf{Referee} into the live round
-(\S\ref{sec:agents}); run the twenty per-run calls together instead of one after another; move
-the proposal off the critical path by starting it while the simulations run. Target: \textbf{a
-round costs five minutes of agent time}, measured, not asserted.
-
-\textbf{Why.} Without Evolution the loop can only pick among the changes it happened to think of,
-never improve the best one --- which is half of what makes it a search rather than a lottery.
-Without the Referee's tournament, ranking rests on a single number, and that number is the one
-Phase~0 is currently repairing.
-
-\textbf{Also: make ablation compulsory, and make quantification somebody's job.} A causal claim
-needs two things and we currently enforce neither. \emph{Ablation} answers ``is this mechanism
-necessary'' --- run the identical model with the mechanism removed and see whether the phenotype
-dies. \emph{A sweep of the operator's main parameter} answers ``how much does it matter'' --- a
-dose--response curve instead of an assertion. Either alone is an opinion.
-
-The precedent for enforcing it already exists: the control is not left to the proposer's taste, it
-is \emph{mandated} --- slot~0, or the proposal is rejected. Ablation gets the same treatment. The
-duties split across agents that already exist:
+Cedric asked the right design question --- \emph{which} shape feature should the chemistry listen
+to: area, curvature, tension, pressure, force? The answer is that this is not a setting, it is the
+hypothesis. So all four are built as alternative \emph{versions of one operator}: swapping
+curvature for tension counts as a new mechanism, turning a dial does not.
 
 \begin{center}\small
-\begin{tabular}{@{}l p{9.4cm}@{}}
+\begin{tabular}{@{}lp{9.4cm}@{}}
 \toprule
-\textbf{Agent} & \textbf{New duty}\\
+\textbf{curvature}   & how bowed the sheet is here. The feedback Okuda's own framing implies.\\
+\textbf{tension}     & how stretched the cell's cortex is. The best-evidenced feedback in real
+                       tissue --- cells genuinely do signal differently under tension.\\
+\textbf{apical area} & how crowded the cell is.\\
+\textbf{pressure}    & how squeezed it is.\\
 \midrule
-Proposer     & Must \emph{offer} the with/without pair for any mechanism it makes a causal claim
-               about --- an obligation, like the control slot, not a preference.\\
-Critic       & \textbf{Rejects the batch} if a causal claim arrives without its ablation. A
-               deterministic check, free, before any compute is spent.\\
-Reflection   & Judges whether it is the \emph{right} ablation --- are you removing the thing your
-               claim is actually about? That needs taste, so it needs a model.\\
-Evolution    & Owns \emph{quantification}: sweep the winner's main parameter to get the curve.
-               This also switches on one of the two idle agents.\\
-Interpreter  & \textbf{May not write ``causes''} without both. Only the additive direction ran?
-               Then the word is ``sufficient''.\\
-Metrologist  & Owns the standard, and retracts recorded claims that fail it.\\
+\textbf{force}       & \emph{refused.} At rest the net force on a cell is nearly zero, so what is
+                       left is the solver's own error. An operator listening to it would read
+                       arithmetic noise as biology.\\
+\textbf{size}        & \emph{refused.} Growth already sets size. A loop that tells us nothing the
+                       first arrow did not.\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Two deliberate exclusions: the Proposer must not be its own enforcer (the author does not referee),
-and the Supervisor does not own this --- it holds the objective, not the method.
+Each feature is put on a common scale before use, because curvature, tension and area are measured
+in different units and the same dial setting would otherwise mean four different things. That is
+the length-scale mistake below, caught before making it a second time rather than after.
 
-\textbf{What you get.} Confirmation that all fourteen automatic roles ran in one round, the
-measured wall-clock against the five-minute target, and a batch that was rejected for asserting
-cause without testing necessity.
+\textbf{Checking it caught two of my own errors.} The curvature measure was normalised wrongly and
+only \emph{looked} right because my test held the cell count fixed. And my ``bump'' test demanded
+the wrong answer --- pushing a cap of a sphere outward leaves it on a \emph{bigger} sphere, which is
+flatter, so the operator was right to disagree with the test.
+
+\textbf{(2) The length-scale} --- \emph{decided, and it went somewhere unexpected}: see Phase~4.
+The short version is that the quantity we were treating as a pattern size is a solver setting, and
+the honest replacement is to \emph{measure} the pattern rather than set it.
+
+\textbf{Still to do:} widen the remaining out-of-range settings; the published-constants fixture.
 \end{phasebox}
-\begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \todo}
-\textbf{Goal.} Four measurements: how many spots, how thick the tube, how many branches over time,
-and the shape of the surface. Calibrate against his roughly five spots at 2000 cells, then freeze
-the calibration.
+\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \prog\ (1 of 3)}
+\textbf{Ablation is now compulsory} --- \emph{done}, and it is the part of this phase that matters.
 
-\textbf{Why.} We currently have no measurement that can distinguish a tube from an undulation from
-a branch --- precisely the three outcomes the figure has to show.
+A claim that one thing \emph{causes} another needs two experiments, and we were enforcing neither.
+Adding a mechanism and seeing the shape appear shows it is \emph{sufficient}. Taking it away and
+seeing the shape die shows it is \emph{necessary}. Either alone is an opinion --- and every ``X
+causes Y'' this campaign has written rests on one of them.
 
-\textbf{What you get.} The four numbers, checked against his published figures.
+The precedent already existed and nobody argued with it: the control run is not left to the
+proposer's judgement, it is \emph{required}, or the proposal is thrown out. Ablation now gets the
+same treatment, for the same reason --- the author does not referee their own work.
+
+Every claim must say what kind of claim it is, and the checker throws out a batch that asks for
+more than it tests. It costs nothing and runs before any simulation starts.
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{If the claim is} & \textbf{the write-up may say}\\
+\midrule
+sufficient --- added it, the shape appeared  & ``is sufficient for''\\
+necessary --- removed it, the shape died     & ``is required for''\\
+both                                          & ``causes''\\
+neither                                       & ``is associated with''\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The word can no longer outrun the experiment.
+
+\textbf{Still to do:} the two idle agents --- one to sweep the winner's main setting, one to rank by
+tournament rather than by a single number --- and running the per-round calls together instead of
+one after another, against the five-minute target.
+\end{phasebox}
+\begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \prog\ (built + calibrated)}
+\textbf{The classifier} --- \emph{done}. We had no measurement that could tell a tube from an
+undulation from a branch, which are the three things the figure has to show. Each needs a
+\emph{different} quantity, which is why one number was never going to do it:
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{sphere}     & nothing sticks out\\
+\textbf{undulation} & \emph{many} bumps, none of them deep\\
+\textbf{tube}       & \emph{few} protrusions, at least one longer than it is wide\\
+\textbf{branched}   & more tips than bases --- something has forked\\
+\textbf{invalid}    & the surface passes through itself; no shape reading means anything\\
+\textbf{unclear}    & deliberately returned near a boundary\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last two are the important ones. A classifier that always answers can never be wrong, and one
+that can never be wrong teaches nothing. And ``invalid'' beats every morphology --- this campaign
+has already once reported a crumpled shell as a result. It also records the \emph{path} a run takes
+(sphere $\rightarrow$ undulation $\rightarrow$ tube), not just where it ends, because the transition
+is the part that says when the mechanism acted.
+
+\textbf{The calibration, and the surprise.} The plan was to tune the pattern until we saw about five
+spots on a 2000-cell ball, as Okuda reports, then freeze it. Counting the spots over time --- for
+the first time --- showed something else:
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+step        & 0 & 50 & 100 & \textbf{200} & 400 & 3000\\
+spots       & 104 & 62 & 19 & \textbf{7} & 1 & 1\\
+coverage    & 0.06 & 0.14 & 0.37 & 0.49 & 0.52 & 0.53\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The pattern never settles.} It keeps merging until the whole ball is one connected blotch
+covering half the surface, and then stays there. So ``about five spots'' was a passing moment around
+step 200, not a property of the settings --- and calibrating to it by choosing when to stop would
+have produced a number that looked right and meant nothing.
+
+The cause: the chemistry settings this campaign has always used sit in the wrong regime of the
+reaction. They make mazes, not spots. Nobody had noticed because nothing counted spots --- the old
+pattern gauge was blind by construction, and the colour scale in the movies was rescaled every
+frame, so a merging pattern and a stable one looked identical in both the numbers and the pictures.
+
+\textbf{So the calibration became a search for where stable spots actually live}, with stability
+tested by counting at two well-separated times: a pattern still merging is not a spot pattern,
+whatever it looks like when you stop. Twenty settings tested; the winner gives three spots that stay
+three spots, reproducibly across three independent runs, and is now frozen as the default. The old
+value gives one maze.
 \end{phasebox}
 \begin{phasebox}{Phase 5 --- The experiment, on an apparatus that is finally complete \hfill \todo}
 \textbf{Why this moved to the end.} It used to sit right after the instrument repair, and Cedric

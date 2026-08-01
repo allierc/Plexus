@@ -123,6 +123,15 @@ def _cell_adjacency(es, et, ef, nF):
     return np.asarray(src, np.int64), np.asarray(dst, np.int64)
 
 
+def _np(x):
+    """Mesh arrays are torch tensors ON THE GPU in a real run and numpy in the self-test. Assuming
+    numpy crashed the first end-to-end launch on cuda -- `can't convert cuda:0 device type tensor
+    to numpy` -- after the CPU tests had all passed."""
+    if hasattr(x, "detach"):
+        return x.detach().cpu().numpy()
+    return np.asarray(x)
+
+
 def _standardise(phi, alive):
     """Median-centred, MAD-scaled, clipped. See the module docstring: without this, `beta` means a
     different physical quantity in each implementation and the sweep axis is meaningless."""
@@ -170,11 +179,11 @@ class _ShapeToChemBase(Lateral):
         if self.beta == 0.0:
             return {self.at: torch.zeros_like(chem)}   # the NULL, and it must remain runnable
         nF = int(m["nF"])
-        es = np.asarray(m["E_srce"]); et = np.asarray(m["E_trgt"]); ef = np.asarray(m["E_face"])
+        es = _np(m["E_srce"]); et = _np(m["E_trgt"]); ef = _np(m["E_face"])
         live = ef < nF
         es, et, ef = es[live], et[live], ef[live]
         pt = vlvl.get("pos")[:int(m["Nv"])].detach().cpu().numpy().astype(np.float64)
-        alive = (m["alive"][:nF].detach().cpu().numpy() if "alive" in m else np.ones(nF))
+        alive = _np(m["alive"])[:nF] if "alive" in m else np.ones(nF)
         phi = self._feature(pt, m, es, et, ef, nF)
         if phi is None:                                # precondition absent: no-op, never a guess
             return {self.at: torch.zeros_like(chem)}
@@ -271,7 +280,7 @@ class ShapeToChemTension(_ShapeToChemBase):
         _, perim, _, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
                                           torch.as_tensor(et), torch.as_tensor(ef), nF)
         P = perim.numpy()
-        P0 = np.asarray(m["P0"][:nF].detach().cpu().numpy(), float)
+        P0 = np.asarray(_np(m["P0"])[:nF], float)
         mech = m.get("mech", {}) or {}
         kP = float(mech.get("K_P", 1.0)); Gam = float(mech.get("Gam", mech.get("Gamma", 0.0)))
         Lam = float(mech.get("Lam", mech.get("Lambda", 0.0)))
@@ -294,7 +303,7 @@ class ShapeToChemApicalArea(_ShapeToChemBase):
                                          torch.as_tensor(et), torch.as_tensor(ef), nF)
         a = area.numpy()
         if "A0" in m:                                   # strain, not size: a uniformly scaled
-            A0 = np.asarray(m["A0"][:nF].detach().cpu().numpy(), float)   # tissue is not stretched
+            A0 = np.asarray(_np(m["A0"])[:nF], float)      # tissue is not stretched
             return a / np.maximum(A0, 1e-12) - 1.0
         return a
 
@@ -317,7 +326,7 @@ class ShapeToChemPressure(_ShapeToChemBase):
             return None
         _, _, _, vf = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
                                        torch.as_tensor(et), torch.as_tensor(ef), nF)
-        V0 = np.asarray(m["V0f"][:nF].detach().cpu().numpy(), float)
+        V0 = np.asarray(_np(m["V0f"])[:nF], float)
         mech = m.get("mech", {}) or {}
         kV = float(mech.get("K_V", 1.0))
         return 2.0 * kV * (V0 - vf.numpy())

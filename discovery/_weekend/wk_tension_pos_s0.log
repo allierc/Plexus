@@ -1,0 +1,22 @@
+[wk_tension_pos_s0] comp=WK_wk_tension_pos_s0 region='shape->chemistry feedback' frames=400 dt=1.0 device=cuda:1
+
+premise check -- wk_tension_pos_s0 (static, pre-run)
+  [ok  ] P2   morphogen sets where/how fast, not whether
+            gated growth with a baseline floor rho=0.35
+  [ok  ] P3   a cell divides because it got big
+            growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it
+  [ok  ] P5   mechanics is fast, biology is slow
+            the reaction advances 1 time units per frame
+  ALL PREMISES HOLD   (3 pass, 0 declared ablation, 0 n/a)
+[engine] 400 sim frames -> recording 401 set frames (stride 1), fields every 2 steps (<= 256)
+[engine] === wk_tension_pos_s0 ===  dim=3  world=[50, 50, 50]  boundary=free  dt=1  frames=400
+[engine] sets:      vertex(3552)  cell(1800)
+[engine] fields:    —
+[engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react, shape_to_chem   mechanics: shape_energy_3d
+[wk_tension_pos_s0] tube_analysis unavailable: ValueError: could not convert string to float: 'sphere'
+[wk_tension_pos_s0] 🔴 SATURATED: 1778 cells vs buffer 1800. This run is NOT evidence -- raise the buffer or bound proliferation.
+[wk_tension_pos_s0] ⚠ no evidence horizon (no metrics.npz (tube_analysis did not run)) -- peak/final are taken over ALL 401 frames, which is the un-truncated behaviour
+[wk_tension_pos_s0] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[wk_tension_pos_s0] {"saturated": true, "inert_operators": [], "retention": 0.968, "valid_evidence": false, "protr_final": 1.036, "protr_peak": 1.07, "horizon_frame": null, "horizon_why": "no metrics.npz (tube_analysis did not run)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.07, "protr_final_untruncated": 1.036, "n_cells_final": 1778, "red_frac_final": 0.294, "act_max_final": 0.856, "frames": 401, "wall_s": 157.7, "mech_force_mean": 28.6097, "mech_p_body": 3.5514, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 6.1883, "mech_migration": 0.51683}
+[wk_tension_pos_s0] D4 ok: all 12 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_rd_seed': 3, 'cell_adjacency': 74} ...)
+[wk_tension_pos_s0] camera: FIXED Lbox=17.971 for all 401 frames and both views (per-frame autofit would have run 5.345 -> 17.904, x3.35: that rescaling is what hid growth)

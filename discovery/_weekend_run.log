@@ -1,0 +1,8 @@
+[weekend] 27 runs: 4 features x 2 signs x 3 seeds, plus 3 nulls
+
+  [start cuda:0] wk_null_s0
+  [start cuda:0] wk_curvature_pos_s0
+  [start cuda:0] wk_curvature_neg_s0
+  [start cuda:1] wk_tension_pos_s0
+  [start cuda:1] wk_tension_neg_s0
+  [start cuda:1] wk_apical_area_pos_s0
