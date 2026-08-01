@@ -64,6 +64,26 @@ CAMP = llm.CAMPAIGN
 
 
 # ============================================================================ 7. ANALYST x N
+
+# ============================================================================ BREVITY
+# WALL CLOCK IS GENERATION. Measured 2026-08-01 across every call the ledger holds: the token
+# RATE is near-identical for every agent (64-77 tok/s), so an agent is slow exactly in proportion
+# to how much it writes. A proposer turn emits ~2100 output tokens and takes 28 s; an analyst
+# turn emits ~470 and takes 7. There is nothing else to reclaim -- the API is 95-99% of wall time,
+# so no queueing or tool overhead is hiding in there.
+#
+# The prompts already said "two sentences" in the places that had a limit. What had none were the
+# LISTS: the reviewer emitted six issues of 38-64 words each. So the limits below are on the
+# things that grow without bound, and they are limits on PROSE, not on content -- a flag with its
+# reason in twenty words is worth the same as the same flag in sixty, and arrives four times
+# sooner. What must never be shortened is a NUMBER: a threshold, a metric name, a citation.
+BREVITY = """BREVITY (this is a budget, not a style note -- wall clock is generation):
+- Do not restate the evidence you were given. Assume the reader has it open.
+- No preamble, no summary of what you are about to do, no closing remarks.
+- Every free-text field has a word limit below. Exceeding it is a failure, not a flourish.
+- Never shorten a NUMBER, a metric name, or a citation to save words. Cut the prose around them."""
+
+
 def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None, parallel=True):
     """N INDEPENDENT readings of the SAME run, reconciled by consensus (Robin's 8x Finch).
 
@@ -279,7 +299,7 @@ def reflect(slots, timeout_min=8, ledger=None):
     experiment, and this is the only agent whose job is to say so before it runs.
     """
     prompt = f"""REFLECTION. Peer-review a proposed batch BEFORE it costs cluster time.
-{budget_note(timeout_min, "1) the JSON review")}
+{budget_note(timeout_min, "1) the JSON review")}\n{BREVITY}
 proposed slots:
 {json.dumps(slots, indent=1)[:5000]}
 
@@ -292,8 +312,11 @@ For each slot judge, as a reviewer would:
 
 Reply with ONLY:
 {{"batch_ok": true|false,
-  "issues": [{{"slot": <int>, "problem": "<...>", "severity": "minor|serious"}}],
-  "verdict": "<2 sentences on whether this batch is worth running as proposed>"}}"""
+  "issues": [{{"slot": <int>, "problem": "<the flaw, <=25 words>", "severity": "minor|serious"}}],
+  "verdict": "<<=40 words on whether this batch is worth running as proposed>"}}
+
+AT MOST THREE ISSUES, the three that would most change what is learned. A fourth costs a minute
+of wall clock and changes nothing -- if everything is flagged, nothing is."""
     ok, out = run_agent("reflection", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read"], quiet=True)
     return _first_json(out) or {"batch_ok": True, "issues": [],
