@@ -97,12 +97,15 @@ def check_memory(path=MEMORY):
 
 
 def prompt_block():
-    """What the Proposer is told. Read from the templates so there is ONE definition."""
-    a = open(os.path.join(CAMP, "TEMPLATE_analysis.md")).read()
+    """What the META-REVIEW is told about memory.md. One definition, read from the template.
+
+    It used to also hand over the analysis.md template, because the Proposer wrote both files.
+    It does not any more: `collector.py` renders analysis.md from the files on disk, so its shape
+    is enforced by code rather than requested of a model, which is the stronger of the two.
+    """
     m = open(os.path.join(CAMP, "TEMPLATE_memory.md")).read()
-    return (f"THE TWO FILES HAVE A FIXED SHAPE. Keep it exactly; it is checked.\n\n"
-            f"--- analysis.md: APPEND one entry, never touch an earlier one ---\n{a}\n"
-            f"--- memory.md: REWRITE these sections in place, add no new ones ---\n{m}")
+    return (f"memory.md HAS A FIXED SHAPE. Keep it exactly; `templates.py` checks it.\n"
+            f"--- REWRITE these sections in place, add no new ones ---\n{m}")
 
 
 if __name__ == "__main__":

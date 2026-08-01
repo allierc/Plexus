@@ -633,6 +633,47 @@ def check(cfg, series=None, probe=False, device="cpu", mech=None):
     return res
 
 
+# The four values the rest of the loop is allowed to see, in order of severity. A role that
+# produces PROSE where a decision is expected drifts into what the Judge and the Referee became,
+# so this is the Biologist's whole output and the prose is an appendix beneath it (ROLES.md).
+SPECIMEN = ("invalid", "ambiguous", "valid (declared)", "valid", "unchecked")
+
+
+def specimen_verdict(res):
+    """valid | ambiguous | valid (declared) | invalid | unchecked -- decided by the DOCUMENT.
+
+    The grade in PREMISES.md does the deciding, not this file and not a judgement:
+
+        a `certain` premise broken     -> invalid     (textbook, no serious dissent)
+        a `usual` premise broken       -> ambiguous   (true unless the tissue is doing something
+                                                       special -- and then you must say so)
+        a check that ERRORED           -> ambiguous   (a crash is not evidence of invalidity)
+        broken but waived in the spec  -> valid (declared)   -- a deliberate ablation is science
+        everything applicable holds    -> valid
+
+    `res` may be R objects or the dicts from diag.json; both are read the same way.
+    """
+    def get(r, k, d=None):
+        return getattr(r, k, None) if not isinstance(r, dict) else r.get(k, d)
+
+    seen = [r for r in res if get(r, "status") != "na"]
+    if not seen:
+        return "unchecked"
+    worst = "valid"
+    for r in seen:
+        st, pid = get(r, "status"), get(r, "id") or get(r, "pid")
+        if st == "ablation":
+            worst = worst if worst in ("invalid", "ambiguous") else "valid (declared)"
+        elif st == "error":
+            worst = "invalid" if worst == "invalid" else "ambiguous"
+        elif st == "fail":
+            grade = (get(r, "grade") or (doc_for(pid) or {}).get("grade"))
+            if grade == "certain":
+                return "invalid"                    # nothing outranks it; stop looking
+            worst = "ambiguous"
+    return worst
+
+
 def verdict(res, run=""):
     """The Biologist's finding, in the form another agent can be handed.
 
@@ -646,6 +687,7 @@ def verdict(res, run=""):
     broken = [r for r in res if r.status in ("fail", "error")]
     return {
         "run": run,
+        "specimen": specimen_verdict(res),          # THE output; everything below is detail
         "specimen_ok": not broken,
         "n_checked": sum(1 for r in res if r.status != "na"),
         "broken": [r.as_dict() for r in broken],
@@ -661,8 +703,10 @@ def brief(res, run=""):
     """The same finding as a few lines of prose, for pasting into another agent's prompt."""
     v = verdict(res, run)
     if v["specimen_ok"]:
-        return f"BIOLOGIST: all {v['n_checked']} applicable premises hold on this run."
-    out = [f"BIOLOGIST: {v['headline']}.",
+        return (f"BIOLOGIST verdict: SPECIMEN {v['specimen'].upper()} "
+                f"-- all {v['n_checked']} applicable premises hold on this run.")
+    out = [f"BIOLOGIST verdict: SPECIMEN {v['specimen'].upper()}.",
+           f"({v['headline']}.)",
            "A broken premise means the numbers below describe the CONFIGURATION, not a tissue.",
            "Weigh your reading accordingly, and say so in your verdict."]
     for b in v["broken"]:

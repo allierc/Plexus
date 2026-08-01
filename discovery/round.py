@@ -60,6 +60,8 @@ import llm                                                                # noqa
 import llm_agents as A                                                    # noqa: E402
 import proposer as P                                                      # noqa: E402
 from metrologist import Certification                                     # noqa: E402
+import archivist as ARCH                                                  # noqa: E402
+import collector as COL                                                   # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 LOG = os.path.join(ROOT, "log", "okuda")
@@ -72,7 +74,19 @@ LLM_TIMING = os.path.join(CAMP, "llm_timing.jsonl")
 
 
 # --------------------------------------------------------------------------- frontier
-def load_frontier():
+def load_frontier(ledger=None):
+    """Where the search breeds from. On a COLD campaign, the Archivist chooses it from the log.
+
+    THE BUG THIS CLOSES IS NOT IN A ROUND, IT IS IN WHERE ROUNDS BEGIN. Every campaign started
+    from a seed sphere plus the hand-written reference recipes and threw away sixty-odd finished
+    runs sitting in log/okuda with their specs and their measured results. The best thing the
+    project ever ran was never the thing the next campaign started from -- it was re-derived,
+    badly, every time.
+
+    So: an existing frontier is used as-is; an ABSENT one is not defaulted, it is CHOSEN, by the
+    one role whose job is the whole history. If the Archivist cannot name a starting run, the old
+    seed-plus-recipes fallback stands -- and the record says it was a fallback.
+    """
     if os.path.exists(FRONTIER):
         import composition_space as CS
         raw = json.load(open(FRONTIER))
@@ -80,7 +94,34 @@ def load_frontier():
                for r in raw]
         if out:
             return out
+
+    print("[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.")
+    try:
+        pick = ARCH.cold_start(ledger=ledger)
+        print(f"  [archivist] start from {pick['start'] or 'nothing usable'} -- {pick.get('why','')[:160]}")
+        graphs = [g for g in (_graph_from_run(nm) for nm in pick.get("start", [])) if g]
+        if graphs:
+            save_frontier(graphs)
+            return graphs
+        print("  [archivist] named no usable run -- falling back to seed + reference recipes")
+    except Exception as e:
+        print(f"  [archivist] cold start FAILED ({type(e).__name__}: {str(e)[:90]}) "
+              f"-- falling back to seed + reference recipes")
     return [seed("substrate")] + list(reference_recipes().values())
+
+
+def _graph_from_run(name):
+    """Rebuild the composition a finished run was launched with, from its own spec on disk."""
+    import composition_space as CS
+    p = os.path.join(LOG, name, "composition.json")
+    if os.path.exists(p):
+        try:
+            r = json.load(open(p))
+            return CS.CompositionGraph(ops=r["ops"], conns=r["conns"], params=r["params"])
+        except Exception:
+            pass
+    print(f"  [archivist] {name}: no composition.json -- its spec cannot be rebuilt as a graph")
+    return None
 
 
 def save_frontier(graphs):
@@ -304,6 +345,34 @@ def quarantine_scan(archive=None, log_root=None, ledger_path=None, verbose=True)
 
 # --------------------------------------------------------------------------- LOOP I batch
 
+def _steer_for(sup):
+    """The Supervisor's own words about what the next batch should be, or None.
+
+    It has always produced this -- "surprise 0.00: the batch is confirming what we already
+    believe, near-zero information. Push adversarial" -- and it has always gone to a terminal.
+    """
+    try:
+        st = json.load(open(os.path.join(CAMP, "state.json")))
+    except Exception:
+        return None
+    bits = [st.get("mix_why"), st.get("reason")]
+    return " | ".join(b for b in bits if b) or None
+
+
+def _paper_setup():
+    """What the Grounder says the starting conditions are, in the paper's own words."""
+    try:
+        from agents.grounder import SETUP, setup
+        s = setup("coupled")
+        return (f"Okuda's coupling experiment (Figs 5-7, one experiment, {s['n_cells']} cells; "
+                f"chi and gamma are what separate tubulation / branching / undulation):\n"
+                f"  \u201c{s['quote'][:220]}\u2026\u201d\n"
+                f"  Other cases available by naming `okuda_case`: "
+                f"{', '.join(k for k in SETUP if k != 'coupled')}")
+    except Exception as e:
+        return f"(grounder unavailable: {type(e).__name__}: {str(e)[:80]})"
+
+
 def _ground_starting_conditions(g, sl):
     """Set this slot's starting cell count from the PAPER rather than from a config default.
 
@@ -353,7 +422,7 @@ def _read_one(nm, out_dir, ledger):
     an optimisation, it would be a different experiment.
     """
     from concurrent.futures import ThreadPoolExecutor
-    an = A.analyse(nm, out_dir, n=3, ledger=ledger, parallel=True)
+    an = A.analyse(nm, out_dir, ledger=ledger, parallel=True)
     wa = A.watch(nm, out_dir, an["analyst_consensus"], ledger=ledger)
     return an, wa
 
@@ -383,13 +452,22 @@ def _read_batch(posed_rows, ledger):
 
 def build_composition_batch(sup, cfg, n_slots, ledger):
     """Proposer(LLM) -> Critic -> Reflection(LLM). Returns [(graph, label, hyp_fields)]."""
-    frontier = load_frontier()
+    frontier = load_frontier(ledger=ledger)
     seen = seen_hashes(sup)
     lm = LeverMap(MAP)
     ledger_summary = _ledger_summary(sup, lm)
 
+    # THE THREE RETURN PATHS, which is what Act 1 was missing. Every one of these was produced
+    # correctly by some role and reached nobody: the Supervisor's steer went to a terminal, the
+    # Critic's refusals went nowhere, and the Grounder wrote into a config the Proposer never
+    # reads. Handed over here, in the words their authors used.
+    steer = _steer_for(sup)
+    refusals = _refusal_summary(sup)
+    setup = _paper_setup()
+    hist = ARCH.table()
     ok, slots = P.propose(frontier, cfg, sup.prox, ledger_summary, sup.round + 1,
-                          n_slots=n_slots, ledger=ledger)
+                          n_slots=n_slots, ledger=ledger, steer=steer, refusals=refusals,
+                          setup=setup, history=hist)
     if not slots:
         print("[round] the Proposer produced no usable proposal -- NOT falling back to random. "
               "A round with no reasoned proposal is a failed round, not a random one.")
@@ -686,12 +764,17 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     from caption_wave import caption_wave
     caption_wave(names)
 
-    # ------------------------------------------------ analyse + watch + score
-    rows = []
+    # ---------------------------------------------------------------- ACT 2: measure, then read
+    # `refused` is the other half of the round and used to exist only as terminal output. A round
+    # that posed eight and admitted one must say so WITH THE REASONS, because "0 runs, coverage
+    # 0%" is what the Proposer was handed, and from it drew the only sane conclusion available:
+    # that the ledger was broken.
+    rows, refused = [], []
     for nm, g, h in posed:
         d = os.path.join(LOG, nm, "diag.json")
         if not os.path.exists(d):
             sup.reg.resolve(h.hid, {}, "inconclusive", note="no diag.json")
+            refused.append((nm, "no diag.json -- the run produced no record at all"))
             continue
         # THE ONLY DOOR the poisoned Q can come through in a round: a run's own diag.json. A
         # re-run of round N re-reads log/okuda/rNNNc_*/diag.json, and 14 of those on disk hold
@@ -702,6 +785,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         if post:
             sup.reg.resolve(h.hid, summ, "inconclusive", note=f"NOT EVIDENCE: {post}")
             print(f"  [critic] {nm} is not evidence: {post}")
+            refused.append((nm, f"critic post-hoc: {post}"))
             continue
         out_dir = os.path.join(LOG, nm)
         an, wa = _read_one(nm, out_dir, ledger)
@@ -743,9 +827,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         rows.append((nm, g, summ, sc, outcome, h))
 
     if not rows:
-        print("[round] no admissible evidence")
-        print(json.dumps(sup.observe([]), indent=1))
-        return bk.finish(rid, "no_evidence", 1)
+        return _abort(bk, sup, rid, mode, refused, posed, ledger)
 
     # ------------------------------------------------------------------------- rank (measure)
     # RANKED BY THE ADMITTED NUMBER. The Referee's tournament and the Judge's second opinion were
@@ -763,7 +845,14 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
               f"phen={s.get('analyst_consensus','?'):9} watcher={s.get('watcher_verdict','?'):10}"
               f" [{oc}]" + ("  SURPRISE" if h.is_surprise else ""))
 
-    # ------------------------------------------------ interpret + ledger + meta-review
+    # ---------------------------------------------------------------- ACT 3: COLLECT, then decide
+    # THE COLLECTOR RUNS FIRST, and it is code. Everything downstream reads the RECORD rather than
+    # rummaging for its own inputs -- which is the whole repair: a finding that is not collected
+    # into a visible record disappears, and its disappearance is silent.
+    record = COL.collect_round(rid, mode, rows, refused=refused, posed=posed)
+    for hole in COL.holes(record):
+        print(f"  [collector] HOLE: {hole}")
+
     for nm, g, s, sc, oc, h in kept:
         A.interpret(comp_hash(g), g.name_region(), h.edit, s,
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
@@ -783,6 +872,16 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
     A.meta_review(rid, ledger=ledger, runs=[nm for nm, _, _, _, _, _ in rows])
+
+    # THE ARCHIVIST, over the whole history rather than this batch. It advises; the Supervisor
+    # decides. Its recommendation is recorded either way, so an override is visible.
+    arch = ARCH.decide(reason=f"end of round {rid}", ledger=ledger)
+    print(f"  [archivist] {arch['decision']}"
+          + (f" -> {arch.get('target')}" if arch.get("target") else "")
+          + f" -- {arch.get('why','')[:120]}")
+    record["archivist"] = arch
+    record["steer"] = rep.get("mix_why", COL.MISSING)
+    COL.write(record)
     # THE CONTROL IS ALWAYS RETAINED, whatever it scored.
     # `kept` is a RANKING product, and a Watcher veto sets the score to -inf -- so in round 2 the
     # control (the parent, unchanged, protr_peak 4.03) was vetoed, fell out of `kept`, and the
@@ -815,6 +914,55 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     print(f"[map] coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
           f"{cov['n_runs']} runs)")
     return bk.finish(rid, "complete", 0)
+
+
+# --------------------------------------------------------------------------- the abort path
+def _abort(bk, sup, rid, mode, refused, posed, ledger):
+    """A round that produced no evidence. It does NOT advance to Act 3 (ROLES.md).
+
+    THREE THINGS, and each of them was got wrong before:
+
+      IT IS NOT A ROUND. The counter does not advance and no coverage denominator grows. Counting
+      it as one is exactly how a log came to tell the Proposer `coverage 0%` for a round in which
+      eight simulations had died of diverged chemistry -- and the Proposer, handed an insane
+      input, correctly concluded that the ledger was broken and fell back on its own prose memory.
+
+      IT ROUTES BACK THROUGH THE ARCHIVIST, not straight back to the Proposer. Re-proposing inside
+      the envelope the Critic just refused is how "route back to Act 1" becomes a week-long loop.
+      The Archivist can move the frontier instead of retrying it.
+
+      TWO IN A ROW STOPS THE CAMPAIGN. A second abort means the refusal reasons were not
+      actionable, and that is a fact about US rather than about the search. Nothing downstream can
+      discover that on its own, so the loop must say it and stop.
+    """
+    print(f"\n[round {rid}] ABORTED -- no admissible evidence from {len(posed)} posed run(s).")
+    for nm, why in refused:
+        print(f"    refused  {nm}: {why}")
+
+    rec = COL.collect_round(rid, mode, [], refused=refused, posed=posed, aborted=True)
+    arch = ARCH.decide(reason=f"round {rid} produced NO evidence -- "
+                              f"{len(refused)} refusal(s): "
+                              + "; ".join(w for _, w in refused[:4]), ledger=ledger)
+    rec["archivist"] = arch
+    rec["steer"] = (f"ABORT. Archivist says {arch['decision']}"
+                    + (f" to {arch.get('target')}" if arch.get("target") else "")
+                    + f": {arch.get('why','')}")
+    COL.write(rec)
+    print(f"  [archivist] {arch['decision']} -- {arch.get('why','')[:140]}")
+
+    # The counter is rolled back: a round that produced nothing did not happen, scientifically.
+    # The COMPUTE is still spent and still recorded -- that is what round_records.jsonl is for.
+    sup.round = rid - 1
+    sup._save()
+
+    n_row = ARCH._aborts_in_a_row(ARCH.history())
+    if n_row >= 2:
+        print(f"\n[round] {n_row} ABORTED ROUNDS IN A ROW -- STOPPING THE CAMPAIGN.")
+        print("  The refusal reasons are not actionable. That is a fact about the design of the")
+        print("  search space or the envelope, not about the biology, and no agent in this loop")
+        print("  can discover it. Read campaign/round_records.jsonl and decide.")
+        return bk.finish(rid, "aborted_twice_stopped", 3)
+    return bk.finish(rid, "aborted_no_evidence", 1)
 
 
 # --------------------------------------------------------------------------- escalation

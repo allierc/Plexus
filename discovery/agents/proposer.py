@@ -68,8 +68,19 @@ def _legal_menu(frontier, cfg, prox, max_per_parent=6):
     return menu
 
 
+def _block(title, body):
+    """A prompt section that DISAPPEARS when empty, rather than saying 'none' in ten lines.
+
+    Every one of these carries a finding from another role that previously reached nobody. The
+    campaign's defining failure was not bad judgement, it was correct judgement with no recipient.
+    """
+    if not body:
+        return ""
+    return f"\n{title.upper()}\n{str(body).strip()}\n"
+
+
 def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_min=10,
-            ledger=None):
+            ledger=None, steer=None, refusals=None, setup=None, history=None):
     """Ask the agent for a batch. Returns (ok, [slot dicts]).
 
     Slot 0 is ALWAYS the parent unchanged -- the CONTROL. That is the one thing the agent is not
@@ -90,19 +101,15 @@ def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_mi
         grounding = _ground(cfg)
 
     prompt = f"""ROUND {round_id}: propose the next batch of {n_slots} experiments.
-{budget_note(timeout_min, "1) proposal.json  2) an entry appended to analysis.md  3) memory.md")}
+{budget_note(timeout_min, "1) proposal.json -- nothing else")}
 {BREVITY}
 
-THE TWO FILES ARE APPENDED TO, NOT REWRITTEN. Add your round's entry; leave every earlier entry
-untouched. Re-emitting a file that is already 13 kB costs more wall clock than the thinking did,
-and the campaign's whole record is in those files -- rewriting one risks losing it to save nothing.
-  analysis.md  APPEND one entry in the template shape below. Never touch an earlier entry.
-  memory.md    REWRITE the named sections in place. Add no new section. It is a STATE
-               document, not a log -- a line belongs there only if a LATER round needs it and
-               could not re-derive it. It has been used as a log and reached 1904 words across
-               six appended "PROPOSAL ISSUED" blocks; that is the failure this shape prevents.
+YOU WRITE NO RECORD. You used to append to analysis.md and rewrite memory.md, and that put the
+agent under evaluation in charge of its own record -- which is how "parent 2 is fully PROPOSED"
+came to be logged as coverage: territory counted because it had been PROPOSED, never because
+anything had been MEASURED. The Collector now writes analysis.md from the files on disk, and the
+Meta-review writes memory.md. READ them. Do not edit them. Emit proposal.json and stop.
 
-{TEMPLATES}
 Read these, in this order:
   instructions : {paths['instruction']}
   memory       : {paths['memory']}
@@ -110,9 +117,15 @@ Read these, in this order:
 
 EVIDENCE SO FAR
 {ledger_summary}
-
-WHAT THE REFERENCE MODEL SAYS (from the Grounder)
-{grounding}
+{_block("WHAT THE SUPERVISOR IS STEERING TOWARD -- this is an instruction, not context", steer)}
+{_block("WHAT WAS REFUSED LAST ROUND, and why. An empty map beside a non-zero attempt count is "
+        "NOT a reset counter: it means the compositions proposed so far CANNOT BE SIMULATED. "
+        "A parent is explored when its edits produced EVIDENCE, never when they were merely "
+        "proposed", refusals)}
+{_block("THE ARCHIVIST, over the whole history. A branch with evidence but no sound specimens "
+        "has been measured and has told us nothing about tissue", history)}
+WHAT THE PAPER SAYS (from the Grounder, who read it and checked its own quotes)
+{setup or grounding}
 
 LEGAL MOVES (you may ONLY choose from these; the type system has already removed everything
 ill-typed, everything with an unmet precondition, and everything with a dangling slot)
@@ -179,7 +192,7 @@ RULES
    A prediction with no checkable clause is scored `inconclusive`: it buys a GPU-hour and
    contributes nothing to the map. You may add a `REFUTED if ...` sentence; it is recorded but
    the assertion before it is what gets checked.
- - Then append one dated entry to {paths['analysis']} and revise {paths['memory']}.
+ - Write {PROPOSAL_FILE} and NOTHING else. The record is not yours to write.
 """
     # allowed_tools is stated explicitly as llm.DEFAULT_TOOLS -- exactly what the bypassing
     # `run_claude(prompt, timeout_min=...)` call was getting. Measurement-only: no knob moves.

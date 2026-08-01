@@ -39,7 +39,7 @@ STATUSES = ("BUILT", "TO BUILD", "DROPPED")
 # is the claim being tested against it, and a mismatch either way is the finding.
 CODE_ROLES = {
     "grounder": "Grounder", "proposer": "Proposer", "reflection": "Peer-review",
-    "analyst": "Analysts", "watcher": "Eye-check", "interpreter": "Interpreter",
+    "reader": "Reader", "watcher": "Eye-check", "interpreter": "Interpreter",
     "meta_review": "Meta-review",
 }
 
@@ -88,7 +88,7 @@ def read(path=ROLES_MD):
                 raise SystemExit(f"{name}: kind {kind!r} is not one of {KINDS}")
             if status not in STATUSES:
                 raise SystemExit(f"{name}: status {status!r} is not one of {STATUSES}")
-            cur, buf = (name.replace(" ×3", ""), kind, status), []
+            cur, buf = (re.sub(r"\s*×\d+$", "", name), kind, status), []
             continue
         if cur is not None:
             buf.append(line)
@@ -116,7 +116,7 @@ def edges(roles=None):
     out = []
     for r in roles.values():
         for dest in r.sends:
-            key = dest.replace(" ×3", "")
+            key = re.sub(r"\s*×\d+$", "", dest)
             if key in roles or key.lower() in ("every agent's prompt",):
                 out.append((r.name, key))
             else:
