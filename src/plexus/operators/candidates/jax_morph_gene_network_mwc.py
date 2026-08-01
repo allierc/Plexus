@@ -83,7 +83,7 @@ class RegulateMWC(Exchange):
     # applied independently per cell (the reference's vmap).
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
-    READS = ["gene", "sensed"]           # own gene concentrations + the fixed sensed driver block
+    READS = ["gene", "drive"]           # own gene concentrations + the fixed sensed driver block
     WRITES = ["gene"]                    # dg/dt on the gene block
     MAPS = []                            # intracellular: no edge-set, no gather/scatter
     SUPPORTED_DIMS = [2, 3]              # gene state is scalar-per-gene; spatial dimension is irrelevant

@@ -13,7 +13,7 @@
       "set": "cell",
       "reads": [
         "gene",
-        "sensed_input_fields"
+        "drive"
       ],
       "writes": [
         "gene"
@@ -34,16 +34,14 @@
       "also_registered": [
         "regulate"
       ],
+      "probed_implementation": "connectionist",
       "implementation": [
         "connectionist"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "5 passed in 5.86s",
-      "signature_mismatch": [
-        "reads: record ['gene_state', 'sensed_input_fields'] vs code ['gene', 'sensed_input_fields']",
-        "writes: record ['gene_state'] vs code ['gene']"
-      ]
+      "test_note": "5 passed in 6.56s",
+      "signature_mismatch": []
     },
     {
       "id": "neural_ode",
@@ -80,16 +78,14 @@
       "also_registered": [
         "regulate"
       ],
+      "probed_implementation": "neural_ode",
       "implementation": [
         "neural_ode"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 6.14s",
-      "signature_mismatch": [
-        "reads: record ['input_specs', 'output_specs', 'tag-prefixed'] vs code ['drive', 'gene']",
-        "writes: record ['output_specs', 'tag-prefixed'] vs code ['gene']"
-      ]
+      "test_note": "8 passed in 5.95s",
+      "signature_mismatch": []
     },
     {
       "id": "gene_network_mwc",
@@ -104,7 +100,7 @@
       "set": "cell",
       "reads": [
         "gene",
-        "sensed"
+        "drive"
       ],
       "writes": [
         "gene"
@@ -127,16 +123,14 @@
       "also_registered": [
         "regulate"
       ],
+      "probed_implementation": "mwc",
       "implementation": [
         "mwc"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "6 passed in 5.92s",
-      "signature_mismatch": [
-        "reads: record ['gene_state', 'sensed_input_fields'] vs code ['gene', 'sensed']",
-        "writes: record ['gene_state'] vs code ['gene']"
-      ]
+      "test_note": "6 passed in 6.34s",
+      "signature_mismatch": []
     },
     {
       "id": "odecontroller",
@@ -173,16 +167,14 @@
       "also_registered": [
         "regulate"
       ],
+      "probed_implementation": "ode_generic",
       "implementation": [
-        "connectionist"
+        "ode_generic"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "5 passed in 6.28s",
-      "signature_mismatch": [
-        "reads: record ['driver_inputs', 'gene_state', 'hidden_state'] vs code ['drive', 'gene']",
-        "writes: record ['gene_state', 'hidden_state'] vs code ['gene']"
-      ]
+      "test_note": "5 passed in 5.75s",
+      "signature_mismatch": []
     },
     {
       "id": "death",
@@ -211,12 +203,13 @@
       "also_registered": [
         "apoptose"
       ],
+      "probed_implementation": "default",
       "implementation": [
         "default"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "6 passed in 5.80s",
+      "test_note": "6 passed in 6.20s",
       "signature_mismatch": []
     },
     {
@@ -255,12 +248,13 @@
       "also_registered": [
         "morphogen"
       ],
+      "probed_implementation": "free_space_greens_function",
       "implementation": [
         "free_space_greens_function"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "7 passed in 6.13s",
+      "test_note": "7 passed in 5.49s",
       "signature_mismatch": []
     },
     {
@@ -274,65 +268,79 @@
       "kind": "structural",
       "family": "growth",
       "set": "cell",
-      "reads": [],
-      "writes": [],
+      "reads": [
+        "division_rate",
+        "division_axis",
+        "radius",
+        "pos",
+        "alive"
+      ],
+      "writes": [
+        "pos",
+        "radius",
+        "alive",
+        "celltype",
+        "born",
+        "mother",
+        "division_overflow"
+      ],
       "maps": [],
       "param_roles": {
-        "rate": "division_rate",
-        "max_occ": "homeostatic_ceiling"
+        "orientation_snr": "division_axis_alignment_strength",
+        "rate": "fallback_division_hazard_rate",
+        "radius": "fallback_cell_radius"
       },
-      "reference": "Okuda, S. et al. (2015). Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech. Model. Mechanobiol. 12:627-644.",
+      "reference": "Deshpande, Mottes et al. (2025), Nat. Comput. Sci., p.2 (half-volume daughters, uniform division plane); papers/jax-morph/jax_morph/physics/division.py:116 (Division._dist), :121 (sample_trace) & :148 (Division.replay).",
       "error": null,
       "also_registered": [],
+      "probed_implementation": "volume_conserving",
       "implementation": [
         "default",
         "volume_conserving"
       ],
       "preexisting": true,
       "test_ok": true,
-      "test_note": "10 passed in 5.56s",
-      "signature_mismatch": [
-        "reads: record ['alive', 'division_axis', 'division_rate', 'position', 'radius'] vs code []",
-        "writes: record ['alive', 'born', 'celltype', 'division_overflow', 'mother', 'position', 'radius'] vs code []"
-      ]
+      "test_note": "10 passed in 6.15s",
+      "signature_mismatch": []
     },
     {
       "id": "saturating_cell_growth",
-      "contract": "cell_grow",
+      "contract": "grow_radius",
       "module": "src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py",
-      "claimed_kind": "field",
+      "claimed_kind": "lateral",
       "claimed_family": "growth",
       "imports": true,
       "registered": true,
-      "kind": "structural",
+      "kind": "lateral",
       "family": "growth",
       "set": "cell",
-      "reads": [],
-      "writes": [],
+      "reads": [
+        "radius",
+        "growth_rate"
+      ],
+      "writes": [
+        "radius"
+      ],
       "maps": [],
       "param_roles": {
-        "rate": "growth_rate",
-        "target": "size_inhibition",
-        "aniso": "growth_anisotropy",
-        "tip": "tip_localization",
-        "stress_gain": "mechano_inhibition"
+        "max_radius": "asymptotic_target_size",
+        "rate": "uniform_fallback_growth_rate",
+        "radius": "size_state_block",
+        "growth_rate": "rate_state_block"
       },
-      "reference": "Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 12:627-644.",
+      "reference": "Deshpande, Mottes et al. (2025), Nat. Comput. Sci., Methods 'Cell Growth' (p. 9, restated p. 14) -- paper states constant-rate + min-clamp, CODE is the saturating von Bertalanffy flow (source wins, see surprises); translated from papers/jax-morph/jax_morph/physics/growth.py:23 (SaturatingCellGrowth.__call__).",
       "error": null,
       "also_registered": [
         "grow_radius"
       ],
+      "probed_implementation": "default",
       "implementation": [
         "default"
       ],
-      "preexisting": true,
+      "preexisting": false,
       "test_ok": true,
-      "test_note": "9 passed in 6.18s",
-      "signature_mismatch": [
-        "kind: record 'field' vs code 'structural'",
-        "reads: record ['growth_rate', 'radius'] vs code []",
-        "writes: record ['radius'] vs code []"
-      ]
+      "test_note": "9 passed in 5.55s",
+      "signature_mismatch": []
     },
     {
       "id": "active_brownian_dynamics2_d",
@@ -360,12 +368,13 @@
       "also_registered": [
         "reorient"
       ],
+      "probed_implementation": "default",
       "implementation": [
         "default"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "6 passed in 5.69s",
+      "test_note": "6 passed in 6.26s",
       "signature_mismatch": []
     },
     {
@@ -397,16 +406,14 @@
       "also_registered": [
         "agitate"
       ],
+      "probed_implementation": "default",
       "implementation": [
         "default"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 6.22s",
-      "signature_mismatch": [
-        "reads: record ['alive', 'position', 'potential.state_reads'] vs code ['alive', 'pos']",
-        "writes: record ['position'] vs code ['pos']"
-      ]
+      "test_note": "8 passed in 5.49s",
+      "signature_mismatch": []
     },
     {
       "id": "soft_sphere",
@@ -420,12 +427,13 @@
       "family": "interaction",
       "set": "cell",
       "reads": [
-        "position",
+        "pos",
         "radius",
-        "epsilon"
+        "epsilon",
+        "alive"
       ],
       "writes": [
-        "position"
+        "pos"
       ],
       "maps": [],
       "param_roles": {
@@ -439,15 +447,14 @@
       "also_registered": [
         "adhere"
       ],
+      "probed_implementation": "soft_sphere",
       "implementation": [
         "soft_sphere"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 5.72s",
-      "signature_mismatch": [
-        "reads: record ['alive', 'epsilon', 'position', 'radius'] vs code ['epsilon', 'position', 'radius']"
-      ]
+      "test_note": "8 passed in 6.28s",
+      "signature_mismatch": []
     },
     {
       "id": "hertzian",
@@ -461,12 +468,12 @@
       "family": "interaction",
       "set": "cell",
       "reads": [
-        "position",
+        "pos",
         "radius",
         "epsilon"
       ],
       "writes": [
-        "position"
+        "pos"
       ],
       "maps": [],
       "param_roles": {
@@ -480,12 +487,13 @@
       "also_registered": [
         "adhere"
       ],
+      "probed_implementation": "hertzian",
       "implementation": [
         "hertzian"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 6.39s",
+      "test_note": "8 passed in 5.64s",
       "signature_mismatch": []
     },
     {
@@ -520,16 +528,14 @@
       "also_registered": [
         "adhere"
       ],
+      "probed_implementation": "harmonic",
       "implementation": [
         "harmonic"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 5.87s",
-      "signature_mismatch": [
-        "reads: record ['alive', 'coupling', 'position', 'radius'] vs code ['alive', 'pos', 'radius']",
-        "writes: record ['position'] vs code ['pos']"
-      ]
+      "test_note": "8 passed in 6.08s",
+      "signature_mismatch": []
     },
     {
       "id": "lennard_jones",
@@ -543,12 +549,13 @@
       "family": "interaction",
       "set": "cell",
       "reads": [
-        "position",
+        "pos",
         "radius",
-        "epsilon"
+        "epsilon",
+        "alive"
       ],
       "writes": [
-        "position"
+        "pos"
       ],
       "maps": [],
       "param_roles": {
@@ -564,15 +571,14 @@
       "also_registered": [
         "adhere"
       ],
+      "probed_implementation": "lennard_jones",
       "implementation": [
         "lennard_jones"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "11 passed in 6.19s",
-      "signature_mismatch": [
-        "reads: record ['alive', 'epsilon', 'position', 'radius'] vs code ['epsilon', 'position', 'radius']"
-      ]
+      "test_note": "11 passed in 5.38s",
+      "signature_mismatch": []
     },
     {
       "id": "mechanical_relaxation",
@@ -586,12 +592,12 @@
       "family": "mechanics",
       "set": "cell",
       "reads": [
-        "position",
+        "pos",
         "radius",
         "alive"
       ],
       "writes": [
-        "position"
+        "pos"
       ],
       "maps": [],
       "param_roles": {
@@ -607,15 +613,14 @@
       "also_registered": [
         "relax"
       ],
+      "probed_implementation": "default",
       "implementation": [
         "default"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "7 passed in 5.87s",
-      "signature_mismatch": [
-        "reads: record ['<potential.state_reads', 'alive', 'position', 'radius'] vs code ['alive', 'position', 'radius']"
-      ]
+      "test_note": "7 passed in 6.60s",
+      "signature_mismatch": []
     },
     {
       "id": "virial_stress",
@@ -652,15 +657,14 @@
       "also_registered": [
         "mechanosense"
       ],
+      "probed_implementation": "default",
       "implementation": [
         "default"
       ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "7 passed in 6.08s",
-      "signature_mismatch": [
-        "reads: record ['alive', 'displacement', 'position', 'radius', 'the'] vs code ['alive', 'pos', 'radius']"
-      ]
+      "test_note": "7 passed in 5.56s",
+      "signature_mismatch": []
     }
   ],
   "collisions": {},
@@ -678,6 +682,6 @@
       "lennard_jones"
     ]
   },
-  "import_all": "ValueError: operator 'regulate' already has implementation 'connectionist' (RegulateConnectionist)",
-  "clean": 4
+  "import_all": true,
+  "clean": 16
 }

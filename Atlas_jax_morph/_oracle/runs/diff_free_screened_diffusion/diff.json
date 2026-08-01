@@ -1,0 +1,70 @@
+{
+  "operator": "morphogen:free_space_greens_function",
+  "reference_run": "diff_free_screened_diffusion",
+  "metric": "max relative error |c_plx - c_ref| / max(|c_ref|, 1e-6) over all cells/species/configs",
+  "floor": 1e-06,
+  "threshold": 0.001,
+  "value": 2.508004115497897e-07,
+  "max_abs_err_overall": 3.5762786865234375e-07,
+  "all_finite": true,
+  "dead_slot_leaks": [],
+  "passed": true,
+  "per_config": {
+    "C_anchor": {
+      "n_space_dim": 2,
+      "n_live": 4,
+      "n_species": 1,
+      "max_abs_err": 2.9802322387695312e-08,
+      "max_rel_err": 6.724982881678443e-08,
+      "argmax_rel_cell": 0,
+      "argmax_rel_species": 0,
+      "c_ref_at_argmax": 0.443158358335495,
+      "c_plx_at_argmax": 0.4431583881378174,
+      "c_ref_live_max": 0.443158358335495,
+      "dead_slots_field_max_abs_plexus": 0.0,
+      "finite": true
+    },
+    "C2": {
+      "n_space_dim": 2,
+      "n_live": 9,
+      "n_species": 2,
+      "max_abs_err": 3.5762786865234375e-07,
+      "max_rel_err": 2.508004115497897e-07,
+      "argmax_rel_cell": 2,
+      "argmax_rel_species": 0,
+      "c_ref_at_argmax": 1.4259461164474487,
+      "c_plx_at_argmax": 1.42594575881958,
+      "c_ref_live_max": 1.4259461164474487,
+      "dead_slots_field_max_abs_plexus": 0.0,
+      "finite": true
+    },
+    "C3": {
+      "n_space_dim": 3,
+      "n_live": 9,
+      "n_species": 2,
+      "max_abs_err": 1.1920928955078125e-07,
+      "max_rel_err": 1.1570708835506593e-07,
+      "argmax_rel_cell": 3,
+      "argmax_rel_species": 0,
+      "c_ref_at_argmax": 1.0302678346633911,
+      "c_plx_at_argmax": 1.0302679538726807,
+      "c_ref_live_max": 4.2201128005981445,
+      "dead_slots_field_max_abs_plexus": 0.0,
+      "finite": true
+    },
+    "C1": {
+      "n_space_dim": 1,
+      "n_live": 6,
+      "n_species": 1,
+      "max_abs_err": 1.1920928955078125e-07,
+      "max_rel_err": 9.67111901672979e-08,
+      "argmax_rel_cell": 3,
+      "argmax_rel_species": 0,
+      "c_ref_at_argmax": 1.232631802558899,
+      "c_plx_at_argmax": 1.2326319217681885,
+      "c_ref_live_max": 2.0901269912719727,
+      "dead_slots_field_max_abs_plexus": 0.0,
+      "finite": true
+    }
+  }
+}

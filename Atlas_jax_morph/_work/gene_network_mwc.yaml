@@ -95,13 +95,13 @@ surprises:
   ln(1+g_i/K_gene_ii). n_gene = hidden_size + out_size, and output genes are ordered so the last output
   is the readout consumed downstream (paper: last output gene = division propensity, last Nc = secretion
   rates) -- ordering of output_specs is semantically load-bearing, not documented in this class.'
-- 'IMPLEMENTATION vs ORACLE (Plexus torch operator, not a source surprise, flagged for the differ):
-  the torch operator returns the vector field dg/dt on the cell gene block (EMIT=velocity, INTEGRAND=gene)
+- 'IMPLEMENTATION vs ORACLE (Plexus torch operator, not a source surprise, flagged for the differ): the
+  torch operator returns the vector field dg/dt on the cell gene block (EMIT=velocity, INTEGRAND=gene)
   and the ENGINE integrates it one explicit-Euler step per tick, whereas the reference self-solves with
-  an adaptive Dopri5 sub-solve over the same dt and returns y(dt)-y0. That is an Axis-A integration
-  difference, NOT a difference in the vector field f, and it WILL show up in a trajectory differ; to
-  compare the biology alone, evaluate vector_field(evolving, inputs) at t=0 against the reference
-  vector_field on matched state.'
+  an adaptive Dopri5 sub-solve over the same dt and returns y(dt)-y0. That is an Axis-A integration difference,
+  NOT a difference in the vector field f, and it WILL show up in a trajectory differ; to compare the biology
+  alone, evaluate vector_field(evolving, inputs) at t=0 against the reference vector_field on matched
+  state.'
 verdict: new
 of: null
 implementation_of: regulate
@@ -167,21 +167,60 @@ contract:
   set: cell
   inputs:
   - cell
-  - sensed_input_fields
+  - drive
   outputs:
   - cell
+  reads:
+  - gene
+  - drive
+  writes:
+  - gene
+  maps: []
+status: validated
+module: src/plexus/operators/candidates/jax_morph_gene_network_mwc.py
+test: tests/test_jax_morph_gene_network_mwc.py
+evidence:
+  oracle_run: diff_gene_network_mwc
+  diff_metric: |
+    value = max(metric_P, metric_A), gated on both adversarial dg batches being all-finite.
+    The comparison is on the per-cell vector field f (the contract's only distinguishing content),
+    NOT on a raw integrated trajectory, because f is shared by the three ODEController siblings and
+    a trajectory diff would conflate f with the Axis-A integrator (engine explicit-Euler vs the
+    reference's adaptive Dopri5).
+      metric_P (trajectory, matched integrator): max over all (frame, cell, gene) of
+        |g_engine - g_ref|, where BOTH sides integrate the SAME MWC field
+        dg/dt = rho*sigmoid(F0 + sum_j H_gene*ln(1+g_j/K_gene) + sum_k H_in*ln(1+u_k/K_in)) - g/tau
+        by ONE explicit-Euler step per macro-step (dt=1.0, 24 macro-steps) from an IDENTICAL g0,
+        fixed drivers u0 and parameter set (float32). Units: gene concentration (dimensionless).
+      metric_A (vector field, adversarial): max over two batches of |dg/dt_torch - dg/dt_jax|
+        evaluated DIRECTLY at t=0 (no integration): (i) the main params on 6 corner-case cell
+        states (negatives, zeros, near-zero, large positives, mixed signs) with matching drivers
+        including a negative driver; (ii) an EXTREME param set (log_K at the float32 underflow clip
+        so K~1.2e-38 and g/K overflows, plus mixed-sign large H) that forces the overflow guard and
+        the (+inf)+(-inf)=NaN it prevents. Units: gene concentration per unit time.
+    Computed by diff_gene_network_mwc.py score reading _oracle/runs/diff_gene_network_mwc/reference.npz.
+    Measured: metric_P = 1.19e-07; metric_A = 9.54e-07 (main 4.77e-07, extreme 9.54e-07);
+    both adversarial dg all-finite; value = 9.54e-07.
+  metric_P_trajectory_max_abs: 1.1920928955078125e-07
+  metric_A_vectorfield_max_abs: 9.5367431640625e-07
+  diagnostic_dopri_vs_euler_one_step_gap: 0.48236727714538574
+  threshold: |
+    1.0e-4. It sits ~2 orders above the float32 accumulation floor for these O(0.1-1) magnitudes
+    (the measured agreement is ~1e-6) yet ~4 orders BELOW both the vector-field scale (max|dg|~5-7)
+    and, decisively, the reference's own Dopri5-vs-Euler one-macro-step integration gap (0.482):
+    passing certifies the torch operator and the reference share the SAME vector field f while
+    staying immune to the integrator difference a raw trajectory diff would mis-score. A looser 1e-2
+    would still pass but would stop distinguishing f-agreement from a small drive-law error; a
+    tighter 1e-8 is below float32 rounding and unmeetable by any correct implementation. Fixed
+    before the run (diff_gene_network_mwc.py THRESHOLD constant), not after seeing the number.
+  value: 9.5367431640625e-07
+  passed: true
+state_io_notes:
   reads:
   - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
   - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics, held fixed over
     dt)
   writes:
   - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
-  maps: []
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_gene_network_mwc.py
-test: tests/test_jax_morph_gene_network_mwc.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+  inputs:
+  - sensed_input_fields

@@ -80,8 +80,8 @@ class CellDivideVolumeConserving(Structural):
     # each cell draws in isolation (the slot allocation is bookkeeping, not a cell-to-cell coupling).
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
-    READS = ["division_rate", "division_axis", "radius", "position", "alive"]
-    WRITES = ["position", "radius", "alive", "celltype", "born", "mother", "division_overflow"]
+    READS = ["division_rate", "division_axis", "radius", "pos", "alive"]
+    WRITES = ["pos", "radius", "alive", "celltype", "born", "mother", "division_overflow"]
     MAPS = []
     SUPPORTED_DIMS = [2, 3]                            # m = 2^(-1/d) reads the world dim; jax-morph also allows 1D
     REQUIRES_PARAMS = []                              # no required params — `rate` falls back to per-cell division_rate else 0 (inert)
@@ -100,6 +100,33 @@ class CellDivideVolumeConserving(Structural):
         self.orientation_snr = float(params.get("orientation_snr", 0.0))  # 0 -> isotropic; the sole physics knob
         self.radius0 = float(params.get("radius", 1.0))         # fill for a missing `radius` buffer (birth size)
 
+    @staticmethod
+    def _block(lvl, name):
+        """The per-cell vector for `name`, wherever the spec chose to keep it.
+
+        A spec may declare `radius` / `division_rate` as STATE BLOCKS (so the engine records them
+        and an upstream operator can integrate them) or leave them as Level buffers. This
+        operator originally read buffers only -- so in a spec whose `radius` was a state block it
+        silently read a buffer it had itself created, at the constructor default, and
+        `division_rate` fell back to 0. The run completed, the movie looked fine, and the cells
+        never divided: 4 cells after 40 frames against the reference's 82. Nothing raised.
+        `grow_radius` used the state block at the same time, so the two operators of this same
+        atlas disagreed about where a cell's radius lives.
+        """
+        if name in lvl.state_schema:
+            a, b = lvl.state_schema[name]
+            return lvl.state[:, a:b].reshape(-1) if b - a == 1 else lvl.state[:, a:b]
+        return getattr(lvl, name, None)
+
+    @staticmethod
+    def _set_block_on(lvl, st, name, idx, value):
+        """Write into the CLONE `st` when the block is state; buffers are written directly."""
+        if name in lvl.state_schema:
+            a, b = lvl.state_schema[name]
+            st[idx, a:b] = value.reshape(-1, b - a) if value.dim() else value
+        else:
+            getattr(lvl, name)[idx] = value
+
     def forward(self, H, mask=None):
         lvl = H.level(self.at); dev = lvl.state.device
         dt = float(getattr(H.config, "dt", 1.0))
@@ -113,7 +140,7 @@ class CellDivideVolumeConserving(Structural):
         # radius: the heritable per-cell size the split halves; division_rate/division_axis are the
         # heritable drivers (like apoptose's death_rate). born/mother are the per-step lineage record;
         # division_overflow is a GLOBAL running counter (NOT reset each step).
-        if getattr(lvl, "radius", None) is None:
+        if "radius" not in lvl.state_schema and getattr(lvl, "radius", None) is None:
             lvl.register_buffer("radius", torch.full((buf,), self.radius0, device=dev))
         if getattr(lvl, "born", None) is None:
             lvl.register_buffer("born", torch.zeros(buf, device=dev))
@@ -132,7 +159,7 @@ class CellDivideVolumeConserving(Structural):
             return {}
 
         # --- per-cell Bernoulli hazard p = 1 - exp(-clip(rate,0)*dt) -------------------------- #
-        rate = getattr(lvl, "division_rate", None)
+        rate = self._block(lvl, "division_rate")
         rate = rate if rate is not None else torch.full((buf,), self.rate, device=dev)
         elig = live
         if mask is not None:
@@ -154,9 +181,17 @@ class CellDivideVolumeConserving(Structural):
         parents = movers[:cap]
         slots = free[:cap]
 
-        # capture the mother's PRE-division radius and position (writes below must not read them back)
-        pos = lvl.state[:, px0:px1]
-        r_old = lvl.radius[parents].clone()                                # [cap]
+        # FUNCTIONAL UPDATE, not in-place. Every write below lands on a CLONE of the state,
+        # which is then assigned back. In-place writes are cheaper and, in a forward-only run,
+        # invisible -- but they make the rollout non-differentiable: autograd refuses a tensor
+        # that was mutated after being read ("modified by an inplace operation ... version 4;
+        # expected version 3"). The reference has this discipline for free because JAX has no
+        # in-place at all; torch lets us skip it, and the inverse half of Plexus is what pays.
+        # Measured with grad_probe.py: with this clone, a gradient survives 20 frames INCLUDING
+        # division events; without it, the tape dies at the first division.
+        st = lvl.state.clone()
+        pos = st[:, px0:px1]
+        r_old = self._block(lvl, "radius")[parents].clone()                # [cap]
         x_old = pos[parents].clone()                                       # [cap, d]
 
         # --- oriented placement direction: normalize(snr * a_hat + unit-RMS isotropic noise) --- #
@@ -174,24 +209,32 @@ class CellDivideVolumeConserving(Structural):
         # --- inherit every heritable per-cell buffer into the daughter slots ------------------- #
         # (celltype, division_rate, division_axis, radius, node_type, ...). born/mother are the
         # lineage record we set explicitly below, so skip them here.
-        lvl.state[slots] = lvl.state[parents].clone()
+        st[slots] = st[parents].clone()
         for name, b in lvl.per_node_buffers():
             if name in ("born", "mother"):
                 continue
             b[slots] = b[parents].clone()
 
         # --- volume-conserving radii: both daughters -> r*m (each half the mother's d-volume) --- #
-        lvl.radius[parents] = r_old * m
-        lvl.radius[slots] = r_old * m
+        self._set_block_on(lvl, st, "radius", parents, r_old * m)
+        self._set_block_on(lvl, st, "radius", slots, r_old * m)
 
         # --- symmetric just-touching placement: mother -> x+offset, daughter -> x-offset ------- #
         pos[parents] = x_old + offset
         pos[slots] = x_old - offset
 
         # --- wake the daughter slot and record lineage ----------------------------------------- #
-        lvl.occ[slots] = 1.0
+        # occ is CLONED before the write. `grow_radius` multiplies its delta by
+        # `lvl.occ[:, None]`, so the live mask is on the autograd tape; mutating it in
+        # place invalidates that multiply and the whole rollout stops being
+        # differentiable. Found by grad_probe.py, not by any forward run -- a forward run
+        # cannot tell the two apart.
+        occ = lvl.occ.clone()
+        occ[slots] = 1.0
+        lvl.occ = occ
         if hasattr(lvl, "birth"):
             lvl.birth[slots] = 1.0                                         # Plexus occupancy baseline (mass-trigger; harmless here)
         lvl.born[slots] = 1.0
         lvl.mother[slots] = parents
+        lvl.state = st                 # publish the clone: the functional update, completed
         return {}

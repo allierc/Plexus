@@ -124,21 +124,67 @@ contract:
   outputs:
   - cell
   reads:
-  - driver_inputs
-  - gene_state
-  - hidden_state
+  - drive
+  - gene
   writes:
-  - gene_state
-  - hidden_state
+  - gene
   maps: []
-status: implemented
+status: validated
 module: src/plexus/operators/candidates/jax_morph_odecontroller.py
 test: tests/test_jax_morph_odecontroller.py
 evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+  oracle_run: diff_odecontroller
+  diff_metric: |
+    D_max -- the maximum ABSOLUTE deviation, in dimensionless gene-concentration units, over
+    every recorded frame (the seeded initial condition + all 21 macro-steps = 22 frames), every
+    LIVE cell (the reference alive mask; 4 live of 8 capacity), and every evolving gene component
+    (the hidden latent gene concatenated with the two output genes, reference declaration order
+    [gene_hidden, g_out0, g_out1] -- packing order is load-bearing), between the per-frame `gene`
+    block the Plexus engine records while running the `regulate` operator (implementation
+    ode_generic, the ODEController BASE integration machinery) and the jax-morph
+    GeneNetworkConnectionist reference trajectory y_uniform. Both sides start from the IDENTICAL
+    initial condition (all genes 0), the IDENTICAL frozen per-cell drive u = [0.8, 0.3], and the
+    IDENTICAL 3-gene circuit (W_gene 3x3, W_in 3x2, b, gamma=1.0, algebraic sigmoid); both
+    integrate the same autonomous ODE dg/dt = sigma(g@W_gene^T + u@W_in^T + b) - gamma*g over each
+    dt=1.0 macro-step with an error-controlled adaptive Dopri5 solver at rtol=1e-4, atol=1e-6. The
+    Plexus operator SELF-SOLVES the whole step and returns the mean-rate delta (y_end-g0)/dt; the
+    engine's first-order integration (gene += dt*delta) recovers the endpoint y(dt), so D_max
+    scores the operator AS THE ENGINE RUNS IT (float32 both sides). Frame 0 is asserted to be the
+    initial condition on both sides (engine IC max|gene| = 0), fixing the alignment
+    engine_frame_k == reference s_k.
+    evidence.value = max(D_max over that uniform engine trajectory, D_max_distinct), where
+    D_max_distinct is the SAME diff for a corroborating run that gives each of the 4 cells a
+    DIFFERENT frozen drive (the reference u_distinct) through the real operator + real engine
+    integration: because the operator carries maps=[] (no cell-to-cell edge), the four per-cell
+    trajectories must each match the reference independently -- any leaked coupling would show
+    here but is invisible in the shared-drive uniform run. This directly exercises the
+    intracellular / maps=[] identity that separates `regulate` from `signal`.
+    oracle_run holds reference.npz + summary.json; the engine evidence folder is
+    log/atlas/odecontroller/ (acted ledger: regulate acted 19/21 calls -- the last frames sit on
+    the fixed point where the delta rounds to 0 -- seed_state 1/1, inert_operators [],
+    valid_evidence true). The scalar is computed by Atlas_jax_morph/diff_odecontroller.py ->
+    _oracle/runs/diff_odecontroller/diff.json.
+  threshold: |
+    D_max <= 5.0e-3 (absolute, gene-concentration units). Both sides integrate the SAME
+    autonomous ODE with an error-controlled adaptive Dopri5 at rtol=1e-4, atol=1e-6, differing
+    ONLY in the step-size CONTROLLER (the reference diffrax PIDController vs the operator's
+    elementary I-controller safety*err^-0.2) and the float32 backend (torch vs JAX). Two such
+    integrations have a global error of a few*rtol each (~1e-4 for O(1) states), so their
+    difference is bounded by the sum ~1e-3, and the contractive circuit (gamma=1.0, |W| O(1))
+    does not amplify it across the 21 steps -- once the trajectory reaches its O(1) fixed point a
+    single full-dt Dopri5 step passes the error test on both sides and the two become
+    bit-identical, so the difference lives only in the ~5 transient frames. 5e-3 is a few times
+    that summed global-error bound with float32 margin, yet still 10x below the >=0.05 deviation
+    any STRUCTURAL/biology error produces: the logistic vs algebraic sigmoid moves the fixed point
+    by ~0.05-0.1; the paper's additive-outside-sigmoid forcing vs the code's W_in@u INSIDE it
+    shifts the trajectory by O(0.1); returning the integrated value instead of the mean-rate delta
+    double-applies and diverges by O(1); dropping the occupancy mask or mis-ordering
+    hidden/outputs moves components by O(0.1). The band between a correct adaptive integration
+    (~1e-4) and any wiring/biology bug (>=0.05) is empty and 5e-3 sits in it. A looser bound
+    (1e-1) would pass a wrong-sigmoid circuit in some regimes; a tighter one (1e-5) risks flaking
+    on the legitimate cross-controller/float32 difference rather than on a defect.
+  value: 2.562999725341797e-06
+  passed: true
 disputed:
   by: skeptic
   was: new
@@ -150,3 +196,13 @@ disputed:
     self-loop synapse-set + input pseudo-nodes and self-integration? If it widens to a maps=[], field-forced,
     self-solved cell ODE without breaking its connectome/engine-integration identity → refinement of signal;
     if that mismatch forces a distinct operator → new stands.
+state_io_notes:
+  reads:
+  - driver_inputs
+  - gene_state
+  - hidden_state
+  writes:
+  - gene_state
+  - hidden_state
+signature_note: the hidden latents are part of the `gene` block, not a second state block; the record
+  listed a `hidden` block the code does not have.

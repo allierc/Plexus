@@ -214,8 +214,8 @@ class Relax(Lateral):
     # writes the pos delta. Dense pairwise energy -- no named gather map.
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
-    READS = ["position", "radius", "alive"]      # + `epsilon_field` when the coupling is per-cell
-    WRITES = ["position"]
+    READS = ["pos", "radius", "alive"]      # + `epsilon_field` when the coupling is per-cell
+    WRITES = ["pos"]
     MAPS = []
     SUPPORTED_DIMS = [2, 3]                       # energy + minimum_image are dimension-generic (D = pos.shape[-1])
     # This IMPLEMENTATION is forward-only: gradients do NOT flow through the FIRE path, and the

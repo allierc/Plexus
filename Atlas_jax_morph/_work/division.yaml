@@ -148,16 +148,61 @@ contract:
   - division_rate
   - division_axis
   - radius
-  - position
+  - pos
   - alive
   writes:
-  - position
+  - pos
   - radius
   - alive
   - celltype
   - born
   - mother
   - division_overflow
+  maps:
+  - hazard
+  - volume_conservation
+  - placement
+  - lineage
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_division.py
+test: tests/test_jax_morph_division.py
+evidence:
+  oracle_run: null
+  diff_metric: |
+    Pooled per-macro-step division hazard p_hat, measured identically on the oracle (jax-morph
+    Division composition) and on Plexus (cell_divide:volume_conserving), on the SAME initial
+    condition (the anchor's 4 founders, division_rate=0.08, dt=1.0), over M independent RNG seeds
+    per side. At each macro-step a run exposes n_elig = live cells eligible at the decision and
+    d = committed divisions that step (= the live-count increase, since this regime has no death
+    and division_overflow stays 0). Pool over every step and every seed:
+      p_hat = sum(d) / sum(n_elig).
+    This is a direct estimate of the Bernoulli parameter the operator draws, and it factors out
+    BOTH the initial condition and the number of macro-steps -- so it isolates the division
+    mechanism from the engine's frame convention (Plexus runs the schedule 41 times, ticks 0..40;
+    the oracle takes 40 transitions) and from branching-process sampling noise. Primary scalar =
+    |p_hat_plexus - p_hat_oracle|; both are also compared to the closed form
+    p_theory = 1 - exp(-0.08*1.0) = 0.076884.
+    Reported alongside (context, NOT the pass criterion): the final live-count distribution
+    mean +/- SD over seeds for each side, locating the smoke run's 82 and the flagged Plexus 124
+    in SD units -- the direct test of whether the 124-vs-82 single-seed gap is seed noise.
+  threshold: |
+    PASS iff |p_hat_plexus - p_hat_oracle| < 0.004. With M >= 48 seeds the pooled eligible
+    cell-steps are ~5e4 per side, so SE(p_hat) ~ sqrt(p(1-p)/E) ~ 0.0012 and SE of the difference
+    ~ 0.0017; 0.004 ~ 2.3*SE_diff is the tightest band a faithful, identical hazard (true
+    difference 0) clears with ~95% confidence. It is deliberately tight: a reimplementer who
+    doubled or halved the per-step rate shifts p_hat by ~0.037 (>9x the band), and even the common
+    linearization p ~ rate*dt instead of 1-exp(-rate*dt) shifts it by rate^2*dt^2/2 ~ 0.0032, near
+    the band -- a looser threshold (e.g. 0.02) would pass that bug and defeat the test. The
+    single-seed count comparison that flagged this entry (124 vs 82) is NOT usable as a threshold:
+    for a 4-founder discrete-birth process at p=0.077 over 40 steps the final count has SD ~ 35,
+    so 82 and 124 sit 0.1 and 1.3 SD from the mean -- one draw each, not a discrepancy.
+  value: null
+  passed: null
+state_io_notes:
+  reads:
+  - position
+  writes:
+  - position
   maps:
   - hazard = per-cell Bernoulli event with probability p = 1 - exp(-clip(division_rate,0,inf)*dt) on a
     fixed capacity buffer; a committed divider wakes one free slot, the daughter inherits every heritable
@@ -171,11 +216,3 @@ contract:
     or a zero division_axis falls back to isotropic placement
   - lineage = a born flag plus the mother parent-slot index recorded on the woken slot (sentinel -1 elsewhere),
     reconstructing clonal ancestry that the registered birth flag alone cannot
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_division.py
-test: tests/test_jax_morph_division.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null

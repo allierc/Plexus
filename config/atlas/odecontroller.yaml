@@ -1,0 +1,56 @@
+# regulate -- ODEController BASE (integration machinery), `ode_generic` implementation.
+#
+# Differential vs the jax-morph reference GeneNetworkConnectionist trajectory in
+# _oracle/runs/diff_odecontroller/ (reference.npz : y_uniform [22, 8, 3]). SAME initial
+# condition (all genes 0), SAME frozen per-cell drive u = [0.8, 0.3], SAME 3-gene circuit
+# (hidden_size=1 -> gene = [gene_hidden, g_out0, g_out1], reference declaration order,
+# load-bearing), SAME dt=1.0 and 21 macro-steps.
+#
+# The point of THIS entry is the integration MACHINERY: the operator self-solves each
+# macro-step with an adaptive Dopri5 (rtol=1e-4, atol=1e-6 -- the reference diffrax defaults)
+# and returns the mean-rate delta (y_end - g0)/dt; the engine's first-order integration
+# (gene += dt*delta) turns it back into the endpoint y(dt). So the recorded gene trajectory
+# is the operator AS THE ENGINE RUNS IT.
+#
+# regulate is gated `after_frame: 1` so tick 0 records the seeded INITIAL condition (genes 0)
+# and ticks 1..21 record the 21 integrated steps -> engine frames 0..21 align exactly to the
+# reference s_0..s_21.
+general:
+  name: odecontroller
+  seed: 0
+  n_frames: 21
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 4
+    buffer: 8                       # match the reference capacity (dead slots 4..7 held at 0 both sides)
+    start: [[20.0, 20.0], [21.0, 20.0], [20.0, 21.0], [21.0, 21.0]]
+    state:
+      pos: { width: 2 }
+      gene: { width: 3, integration: first_order, boundary: free, record: true }
+      drive: { width: 2, integration: none, boundary: free, record: false }
+
+fields: {}
+
+operators:
+  # 0: initial condition -- genes at 0 (y0 = concat(hidden, outputs)), frozen drive u.
+  - { op: seed_state, at: cell, before_frame: 1,
+      values: { gene: [0.0, 0.0, 0.0], drive: [0.8, 0.3] } }
+  # A: the connectionist gene-regulatory ODE on the base ODEController machinery
+  #    (implementation=ode_generic): dg/dt = sigma(g@W_gene^T + u@W_in^T + b) - gamma*g,
+  #    algebraic sigmoid, u frozen. EMIT=velocity, INTEGRAND=gene, self-solved adaptive Dopri5.
+  - { op: regulate, implementation: ode_generic, at: cell, after_frame: 1,
+      state: gene, inputs: drive, hidden_size: 1, gamma: 1.0,
+      W_gene: [[0.0, 0.8, -0.5], [-0.6, 0.0, 0.7], [0.4, -0.3, 0.0]],
+      W_in: [[1.2, 0.0], [0.0, -0.9], [0.5, 0.5]],
+      b: [0.1, -0.2, 0.0] }
+
+schedule: [seed_state, regulate]
+
+plotting:
+  background: black
+  point_size: 6.0

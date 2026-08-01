@@ -152,6 +152,65 @@ contract:
   outputs:
   - cell
   reads:
+  - secretion_rate
+  - pos
+  - radius
+  - alive
+  writes:
+  - chemical
+  maps:
+  - pairwise
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_free_screened_diffusion.py
+test: tests/test_jax_morph_free_screened_diffusion.py
+evidence:
+  oracle_run: null
+  diff_metric: |
+    ISOLATED QUASISTATIC FIELD DIFF. `morphogen` is a pure state->field map: dt and key are
+    ignored and the `chemical` block is OVERWRITTEN with the t=infinity solution, so -- unlike the
+    ODEController siblings -- there is NO integrator to conflate and NO trajectory to score. The
+    reference `FreeScreenedDiffusion.__call__` (jax) and the Plexus `MorphogenFreeSpace.forward`
+    (torch) are evaluated on ONE identical fixed state and their written concentration fields
+    compared directly. Both run in float32 (matching the torch engine; the reference is NOT run in
+    x64), so the comparison measures the algorithm, not a dtype gap.
+
+    value = max over all configs, all cells i (live AND dead), all species k of the RELATIVE error
+        rel_ik = |c_plx[i,k] - c_ref[i,k]| / max(|c_ref[i,k]|, FLOOR),   FLOOR = 1e-6,
+    i.e. relative where the reference field is resolvable, floored-absolute where it is ~0 so a
+    near-zero true value cannot manufacture a spurious infinite ratio. Units: dimensionless
+    (concentration ratio). Max ABSOLUTE error and the field magnitude scale are reported alongside.
+
+    Configs (fixed BEFORE the run in _oracle/scripts/free_screened_diffusion.py), each covering a
+    kernel regime the CODE has and the paper's graph-Laplacian method does NOT:
+      C_anchor (2-D disk): the anchor's 4 founders, uniform radius 0.5, uniform unit secretion,
+        D=K=1 -- the exact geometry the ENGINE run seeds (log/atlas/free_screened_diffusion).
+      C2 (2-D disk, adversarial): 12 slots / 9 live, per-cell varied radius, an OVERLAPPING pair
+        (r<a, exercising the r_eff=max(r,a) self/near clamp), 2 species with per-species (D,K),
+        secretion including zeros and a nonzero on a DEAD slot (source-mask test).
+      C3 (3-D sphere, adversarial): 12 slots / 9 live, one species UNSCREENED (K=0, kappa=0, the
+        deliberately-unfloored exact branch) + one screened, an overlapping pair, dead slots.
+      C1 (1-D segment, adversarial): 8 slots / 6 live, D=1, K=0.7.
+    GATED on: every config finite on both sides, AND every DEAD slot exactly 0.0 on both sides
+    (the twice-applied alive mask). Computed by diff_free_screened_diffusion.py reading
+    _oracle/runs/diff_free_screened_diffusion/reference.npz.
+  threshold: |
+    1.0e-3 (relative). float32 carries ~7 significant digits (eps ~1.2e-7); the field is a dense
+    all-pairs superposition over N sources PLUS, in 2-D, a truncated Abramowitz-Stegun Bessel
+    series (K0/K1), evaluated by two INDEPENDENT numeric stacks (jax vs torch), so the expected
+    faithful-port floor is ~1e-5..1e-4 relative (accumulated float32 rounding across libraries and
+    the ported i0/i1). 1.0e-3 sits ~1 order above that expected floor (headroom for the two-library
+    accumulation) yet ~3 orders BELOW the O(1) relative divergence any STRUCTURAL error would
+    produce -- a dropped self-term, a wrong alive-mask, a transposed source radius, a mis-ported
+    Bessel coefficient, or the paper's graph-Laplacian solve (a different boundary condition
+    entirely, which this test CANNOT pass). Passing certifies the two numerical methods compute the
+    SAME free-space Green's-function field to float32 precision. A tighter 1e-6 is below the
+    float32 two-library floor and unmeetable by any correct port; a looser 1e-1 would stop
+    distinguishing a faithful port from a ~10% kernel-form error. Fixed before the run (THRESHOLD
+    constant in diff_free_screened_diffusion.py).
+  value: null
+  passed: null
+state_io_notes:
+  reads:
   - secretion_rate (per-cell source rate S, the source_name field -- the only declared read)
   - pos (cell centers; pairwise distances r_ij drive the kernel -- read but NOT declared in state_reads)
   - radius (per-SOURCE finite size a, giving r_eff = max(r, a) and the 3-D (1 + kappa*a) term -- undeclared)
@@ -162,11 +221,5 @@ contract:
   maps:
   - pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij, a_j)
     S_j)
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_free_screened_diffusion.py
-test: tests/test_jax_morph_free_screened_diffusion.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+signature_note: '`chemical` is this operator''s own state block, not the engine''s `chem`; record_clean.py''s
+  alias table over-reached and is corrected here.'

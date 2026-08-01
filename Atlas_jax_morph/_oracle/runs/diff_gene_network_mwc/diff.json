@@ -1,0 +1,43 @@
+{
+  "threshold": 0.0001,
+  "metric_P_trajectory_max_abs": 1.1920928955078125e-07,
+  "metric_A_vectorfield_max_abs": 9.5367431640625e-07,
+  "metric_A_main_params_max_abs": 4.76837158203125e-07,
+  "metric_A_extreme_params_max_abs": 9.5367431640625e-07,
+  "adversarial_dg_finite": true,
+  "value": 9.5367431640625e-07,
+  "passed": true,
+  "diagnostic_dopri_vs_euler_one_step": 0.48236727714538574,
+  "diagnostic_dopri_delta": [
+    [
+      0.1516929566860199,
+      -0.906792163848877,
+      0.10181194543838501,
+      -1.2717714309692383
+    ]
+  ],
+  "diagnostic_euler_delta": [
+    [
+      0.2281711846590042,
+      -1.2969694137573242,
+      0.1083822250366211,
+      -1.754138708114624
+    ]
+  ],
+  "engine_trajectory": "/groups/saalfeld/home/allierc/GraphData/graphs_data/atlas/gene_network_mwc/simulation.zarr",
+  "engine_G_last_cell0": [
+    0.2863544523715973,
+    0.281643807888031,
+    0.7745213508605957,
+    0.48053035140037537
+  ],
+  "ref_G_last_cell0": [
+    0.2863544821739197,
+    0.281643807888031,
+    0.7745214700698853,
+    0.48053038120269775
+  ],
+  "n_frames": 24,
+  "n_gene": 4,
+  "n_in": 2
+}

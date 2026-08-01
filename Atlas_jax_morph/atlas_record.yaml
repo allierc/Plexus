@@ -158,14 +158,14 @@ mechanisms:
     set: cell
     inputs:
     - cell
-    - sensed_input_fields
+    - drive
     outputs:
     - cell
     reads:
-    - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
-    - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)
+    - gene
+    - drive
     writes:
-    - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+    - gene
     maps: []
   status: implemented
   module: src/plexus/operators/candidates/jax_morph_gene_network_connectionist.py
@@ -175,6 +175,14 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  state_io_notes:
+    reads:
+    - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
+    - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)
+    writes:
+    - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+    inputs:
+    - sensed_input_fields
 - id: neural_ode
   order: 2
   raw_name: NeuralODE
@@ -313,21 +321,114 @@ mechanisms:
     outputs:
     - cell
     reads:
+    - gene
+    - drive
+    writes:
+    - gene
+    maps: []
+  status: validated
+  module: src/plexus/operators/candidates/jax_morph_neural_ode.py
+  test: tests/test_jax_morph_neural_ode.py
+  evidence:
+    oracle_run: diff_neural_ode
+    diff_metric: 'D_max = max over cells (N=16), evolving-state components, macro-step dt in {0.5, 1.0,
+      2.0}, and
+
+      both circuit shapes (A: hidden=0, out=3; B: hidden=2, out=2) of |y_plexus(dt) - y_ref(dt)|, in
+
+      gene-concentration units. y_plexus(dt) is the torch operator''s macro-step endpoint, obtained by
+
+      running its returned delta through the REAL engine _integrate (gene += dt*delta); y_ref(dt) is
+
+      the JAX reference ODEController one-step endpoint y0 + increment. Both sides integrate the
+
+      BIT-IDENTICAL MLP vector field -- the reference''s per-layer weights are exported from JAX and
+
+      reloaded verbatim into torch, and net-equality is verified to ~1e-12 on a random probe, so the
+
+      field is provably identical and any endpoint gap is the INTEGRATOR alone -- with adaptive Dopri5
+
+      at rtol=1e-4/atol=1e-6 from the same g0, u0 over [0, dt]. Computed in float64 so that float32
+
+      roundoff cannot masquerade as a defect. Driver: Atlas_jax_morph/diff_neural_ode.py; artefact
+
+      log/atlas/neural_ode/diff.json.
+
+      '
+    threshold: '3.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the cross-run comparison from
+      solver
+
+      physics, not from the observed number. Both sides evaluate the identical vector field, so the
+
+      only possible disagreement is substep-sequence jitter between two independent adaptive Dopri5
+
+      controllers (diffrax PIDController vs the operator''s hand-rolled I-controller), each bounded by
+
+      its truncation-from-truth at rtol=1e-4. The reference''s own worst-case distance from a
+
+      machine-accuracy (rtol=1e-10) endpoint is MEASURED at 9.9e-4 (dt=2, config A, summary.json); by
+
+      the triangle inequality two such rtol=1e-4 integrations agree to within ~2e-3, so 3e-3 (~3x the
+
+      measured reference truncation) is the tightest bound a correct operator with a legitimately
+
+      different adaptive integrator can be held to. A tighter 1e-3 would risk a false fail from
+
+      integrator jitter alone -- the criterion-no-valid-config-can-meet trap. The pre-registered
+
+      negative control (drop the /dt mean-rate conversion: endpoint = g0 + delta) lands O(0.1) away at
+
+      dt=2, so 3e-3 still rejects a genuine wiring bug by >30x.
+
+      '
+    value: 2.220446049250313e-16
+    passed: true
+    result: 'PASS by ~13 orders of magnitude. D_max = 2.2e-16 (machine epsilon) << threshold 3e-3, so
+      the
+
+      verdict does NOT hinge on the threshold choice -- it holds under any principled bound down to
+
+      float64 roundoff. net-equality = 0.0 (the torch MLP reproduces the exported JAX MLP EXACTLY),
+
+      so the field is bit-identical and the endpoint agreement is the INTEGRATOR. Notably
+
+      plexus_vs_truth == reference_vs_truth to ~15 digits (dt=2/A: 9.8942968251614e-4 vs
+
+      9.8942968251636e-4): both adaptive Dopri5 controllers -- diffrax PIDController and the operator''s
+
+      hand-rolled I-controller -- take the SAME accept/reject substep sequence on this field, so they
+
+      diverge from machine-truth IDENTICALLY and from each other by ~0. The pre-registered negative
+
+      control (drop the /dt mean-rate conversion) lands 0.408 (A) / 0.252 (B) from the reference at
+
+      dt=2 -- >100x the threshold -- confirming the metric would catch a genuine wiring error. Driver
+
+      log/atlas/neural_ode/diff.json; oracle _oracle/runs/diff_neural_ode/ (reference.npz, provenance).
+
+      CAVEAT (recorded, not a defect): this is an OPERATOR-LEVEL differential, not a run_spec.py
+
+      trajectory. NeuralODE appears in NO reference composition and a free-form MLP cannot cross the
+
+      JAX/torch boundary through a YAML spec, so the only faithful way to give both sides the SAME
+
+      operator is to export the reference''s exact weights and reload them verbatim -- which is what was
+
+      done. The delta is still consumed by the REAL engine _integrate (gene += dt*delta), so the
+
+      macro-step wiring (velocity-emit, first-order gene block, /dt convention) is exercised end to end.
+
+      '
+  state_io_notes:
+    reads:
     - input_specs sensed driver fields u, held fixed over the macro-step
     - output_specs current gene/output state read back as the ODE initial condition
     - tag-prefixed hidden latent field, read only when hidden_size > 0
     writes:
     - output_specs fields as per-dt gene-expression increments (delta)
     - tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0
-    maps: []
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_neural_ode.py
-  test: tests/test_jax_morph_neural_ode.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+  signature_note: the normalizer wrote the CONSTRUCTOR arguments (input_specs / output_specs) into the
+    typed signature; the signature names STATE BLOCKS, which are `gene` and `drive`.
 - id: gene_network_mwc
   order: 3
   raw_name: GeneNetworkMWC
@@ -498,24 +599,68 @@ mechanisms:
     set: cell
     inputs:
     - cell
-    - sensed_input_fields
+    - drive
     outputs:
     - cell
+    reads:
+    - gene
+    - drive
+    writes:
+    - gene
+    maps: []
+  status: validated
+  module: src/plexus/operators/candidates/jax_morph_gene_network_mwc.py
+  test: tests/test_jax_morph_gene_network_mwc.py
+  evidence:
+    oracle_run: diff_gene_network_mwc
+    diff_metric: "value = max(metric_P, metric_A), gated on both adversarial dg batches being all-finite.\n\
+      The comparison is on the per-cell vector field f (the contract's only distinguishing content),\n\
+      NOT on a raw integrated trajectory, because f is shared by the three ODEController siblings and\n\
+      a trajectory diff would conflate f with the Axis-A integrator (engine explicit-Euler vs the\nreference's\
+      \ adaptive Dopri5).\n  metric_P (trajectory, matched integrator): max over all (frame, cell, gene)\
+      \ of\n    |g_engine - g_ref|, where BOTH sides integrate the SAME MWC field\n    dg/dt = rho*sigmoid(F0\
+      \ + sum_j H_gene*ln(1+g_j/K_gene) + sum_k H_in*ln(1+u_k/K_in)) - g/tau\n    by ONE explicit-Euler\
+      \ step per macro-step (dt=1.0, 24 macro-steps) from an IDENTICAL g0,\n    fixed drivers u0 and parameter\
+      \ set (float32). Units: gene concentration (dimensionless).\n  metric_A (vector field, adversarial):\
+      \ max over two batches of |dg/dt_torch - dg/dt_jax|\n    evaluated DIRECTLY at t=0 (no integration):\
+      \ (i) the main params on 6 corner-case cell\n    states (negatives, zeros, near-zero, large positives,\
+      \ mixed signs) with matching drivers\n    including a negative driver; (ii) an EXTREME param set\
+      \ (log_K at the float32 underflow clip\n    so K~1.2e-38 and g/K overflows, plus mixed-sign large\
+      \ H) that forces the overflow guard and\n    the (+inf)+(-inf)=NaN it prevents. Units: gene concentration\
+      \ per unit time.\nComputed by diff_gene_network_mwc.py score reading _oracle/runs/diff_gene_network_mwc/reference.npz.\n\
+      Measured: metric_P = 1.19e-07; metric_A = 9.54e-07 (main 4.77e-07, extreme 9.54e-07);\nboth adversarial\
+      \ dg all-finite; value = 9.54e-07.\n"
+    metric_P_trajectory_max_abs: 1.1920928955078125e-07
+    metric_A_vectorfield_max_abs: 9.5367431640625e-07
+    diagnostic_dopri_vs_euler_one_step_gap: 0.48236727714538574
+    threshold: '1.0e-4. It sits ~2 orders above the float32 accumulation floor for these O(0.1-1) magnitudes
+
+      (the measured agreement is ~1e-6) yet ~4 orders BELOW both the vector-field scale (max|dg|~5-7)
+
+      and, decisively, the reference''s own Dopri5-vs-Euler one-macro-step integration gap (0.482):
+
+      passing certifies the torch operator and the reference share the SAME vector field f while
+
+      staying immune to the integrator difference a raw trajectory diff would mis-score. A looser 1e-2
+
+      would still pass but would stop distinguishing f-agreement from a small drive-law error; a
+
+      tighter 1e-8 is below float32 rounding and unmeetable by any correct implementation. Fixed
+
+      before the run (diff_gene_network_mwc.py THRESHOLD constant), not after seeing the number.
+
+      '
+    value: 9.5367431640625e-07
+    passed: true
+  state_io_notes:
     reads:
     - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
     - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics, held fixed
       over dt)
     writes:
     - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
-    maps: []
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_gene_network_mwc.py
-  test: tests/test_jax_morph_gene_network_mwc.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+    inputs:
+    - sensed_input_fields
 - id: odecontroller
   order: 4
   raw_name: ODEController
@@ -644,12 +789,10 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - driver_inputs
-    - gene_state
-    - hidden_state
+    - drive
+    - gene
     writes:
-    - gene_state
-    - hidden_state
+    - gene
     maps: []
   status: implemented
   module: src/plexus/operators/candidates/jax_morph_odecontroller.py
@@ -670,6 +813,16 @@ mechanisms:
       \ per-cell self-loop synapse-set + input pseudo-nodes and self-integration? If it widens to a maps=[],\
       \ field-forced, self-solved cell ODE without breaking its connectome/engine-integration identity\
       \ \u2192 refinement of signal; if that mismatch forces a distinct operator \u2192 new stands."
+  state_io_notes:
+    reads:
+    - driver_inputs
+    - gene_state
+    - hidden_state
+    writes:
+    - gene_state
+    - hidden_state
+  signature_note: the hidden latents are part of the `gene` block, not a second state block; the record
+    listed a `hidden` block the code does not have.
 - id: stochastic_step
   order: 5
   raw_name: StochasticStep
@@ -1125,6 +1278,24 @@ mechanisms:
     outputs:
     - cell
     reads:
+    - secretion_rate
+    - pos
+    - radius
+    - alive
+    writes:
+    - chemical
+    maps:
+    - pairwise
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_free_screened_diffusion.py
+  test: tests/test_jax_morph_free_screened_diffusion.py
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    reads:
     - secretion_rate (per-cell source rate S, the source_name field -- the only declared read)
     - pos (cell centers; pairwise distances r_ij drive the kernel -- read but NOT declared in state_reads)
     - radius (per-SOURCE finite size a, giving r_eff = max(r, a) and the 3-D (1 + kappa*a) term -- undeclared)
@@ -1135,14 +1306,8 @@ mechanisms:
     maps:
     - pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij,
       a_j) S_j)
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_free_screened_diffusion.py
-  test: tests/test_jax_morph_free_screened_diffusion.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+  signature_note: '`chemical` is this operator''s own state block, not the engine''s `chem`; record_clean.py''s
+    alias table over-reached and is corrected here.'
 - id: division
   order: 8
   raw_name: Division
@@ -1294,16 +1459,34 @@ mechanisms:
     - division_rate
     - division_axis
     - radius
-    - position
+    - pos
     - alive
     writes:
-    - position
+    - pos
     - radius
     - alive
     - celltype
     - born
     - mother
     - division_overflow
+    maps:
+    - hazard
+    - volume_conservation
+    - placement
+    - lineage
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_division.py
+  test: tests/test_jax_morph_division.py
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    reads:
+    - position
+    writes:
+    - position
     maps:
     - hazard = per-cell Bernoulli event with probability p = 1 - exp(-clip(division_rate,0,inf)*dt) on
       a fixed capacity buffer; a committed divider wakes one free slot, the daughter inherits every heritable
@@ -1317,14 +1500,6 @@ mechanisms:
       of radii); orientation_snr=0 or a zero division_axis falls back to isotropic placement
     - lineage = a born flag plus the mother parent-slot index recorded on the woken slot (sentinel -1
       elsewhere), reconstructing clonal ancestry that the registered birth flag alone cannot
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_division.py
-  test: tests/test_jax_morph_division.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
 - id: saturating_cell_growth
   order: 9
   raw_name: SaturatingCellGrowth
@@ -1446,8 +1621,8 @@ mechanisms:
     \ not a normalization choice, and it does not change the verdict --\neither reading is still cell\
     \ growth toward a maximum size.\n"
   contract:
-    name: cell_grow
-    kind: field
+    name: grow_radius
+    kind: lateral
     family: growth
     set: cell
     inputs:
@@ -1460,6 +1635,19 @@ mechanisms:
     writes:
     - radius
     maps:
+    - growth_law
+    - realization
+    - rate
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
+  test: tests/test_jax_morph_saturating_cell_growth.py
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    maps:
     - growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)),
       the closed-form integral of dr/dt = k*(1 - r/R); saturating, monotone, unconditionally stable for
       any dt, no min/clamp
@@ -1469,14 +1657,16 @@ mechanisms:
     - rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step
       by an upstream controller so gradients flow through it; the sole constructor param is max_radius
       (a traced, optimizable target)
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
-  test: tests/test_jax_morph_saturating_cell_growth.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+  implementation_blocked: 'This is a REFINEMENT of `cell_grow` that cannot be registered as an implementation
+    of it: the shipped `cell_grow` is kind=structural (returns {}, advances a rest volume) and this one
+    is kind=lateral (returns a radius delta), and the registry forbids implementations of one contract
+    from differing in kind -- correctly, since kind is biology. It is therefore parked under the distinct
+    name `grow_radius`. Promoting it means deciding whether `cell_grow` should become lateral, which breaks
+    every existing user of it. That is a language decision, not a code fix.'
+  collision_note: registered as `grow_radius`, not `cell_grow` -- see implementation_blocked. The ledger
+    still counts it as a refinement of cell_grow, not as new vocabulary.
+  signature_note: kind is `lateral` (it returns a radius delta the engine integrates), not `field`. This
+    is the very difference that blocks registering it as an implementation of `cell_grow`.
 - id: active_brownian_dynamics2_d
   order: 10
   raw_name: ActiveBrownianDynamics2D
@@ -1802,6 +1992,37 @@ mechanisms:
     family: motion
     set: cell
     inputs:
+    - kT
+    - gamma
+    - dt
+    - potential
+    outputs:
+    - a
+    reads:
+    - pos
+    - alive
+    writes:
+    - pos
+    maps: []
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_brownian_dynamics.py
+  test: tests/test_jax_morph_brownian_dynamics.py
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    reads:
+    - position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift
+      is evaluated.
+    - alive (ALIVE) -- masks dead/padded cells in both the delta and the score.
+    - potential.state_reads() -- any extra fields the drift potential couples from (empty for a pure bath).
+    writes:
+    - position (POSITION) -- the dynamic thermal displacement delta; the exogenous noise and the realized
+      displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable
+      and scorable.
+    inputs:
     - kT (thermal_energy / cellular temperature) -- the one knob that turns the bath on; sets std = sqrt(2
       kT dt / gamma). kT=0 -> no agitation, degenerates to pure relaxation.
     - gamma (translational_drag) -- mobility 1/gamma; also sits under the noise sqrt, coupling amplitude
@@ -1813,24 +2034,6 @@ mechanisms:
     outputs:
     - a dynamic dt-scaled position delta (a per-cell Gaussian Wiener increment), summed across dynamic
       writers by the model.
-    reads:
-    - position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift
-      is evaluated.
-    - alive (ALIVE) -- masks dead/padded cells in both the delta and the score.
-    - potential.state_reads() -- any extra fields the drift potential couples from (empty for a pure bath).
-    writes:
-    - position (POSITION) -- the dynamic thermal displacement delta; the exogenous noise and the realized
-      displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable
-      and scorable.
-    maps: []
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_brownian_dynamics.py
-  test: tests/test_jax_morph_brownian_dynamics.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
 - id: no_force
   order: 12
   raw_name: NoForce
@@ -1943,7 +2146,7 @@ mechanisms:
     - cell
     reads: []
     writes:
-    - position
+    - pos
     maps: []
   status: normalized
   module: null
@@ -1979,6 +2182,9 @@ mechanisms:
     body never runs and positions pass through unchanged. ``relax_equilibrium`` also has an explicit ``if
     potential is None`` short-circuit, but the step stores an actual ``NoForce()`` (not None) and relies
     on the loop''s immediate convergence instead.'
+  state_io_notes:
+    writes:
+    - position
 - id: pairwise_potential
   order: 13
   raw_name: PairwisePotential
@@ -2178,10 +2384,27 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
     - alive
     - displacement
+    - coupling
+    writes:
+    - pos
+    maps:
+    - pairwise
+    - contact
+  status: normalized
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    reads:
+    - position
     - coupling field (shared scalar OR per-cell scalar field, e.g. epsilon / alpha / k), symmetrised per
       pair by the arithmetic-mean mix rule
     writes:
@@ -2193,14 +2416,6 @@ mechanisms:
     - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); a per-cell coupling
       symmetrised per pair by the arithmetic-mean mix; a conservative radial pair force integrated overdamped
       or minimised by the wrapping motion step
-  status: normalized
-  module: null
-  test: null
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
 - id: morse
   order: 14
   raw_name: Morse
@@ -2388,18 +2603,15 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
     - alive
-    - coupling field (shared scalar OR per-cell scalar field, e.g. epsilon / alpha), symmetrised per pair
-      by the arithmetic-mean mix rule
+    - coupling
     writes:
-    - position
+    - pos
     maps:
-    - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered
-      pair counts once); force on each cell = -grad of the conservative Morse pair energy by autodiff
-    - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive core (excluded
-      volume) + adhesive tail (cell-cell adhesion); a radial pair force integrated overdamped or minimised
+    - pairwise
+    - contact
   status: normalized
   module: null
   test: null
@@ -2421,6 +2633,18 @@ mechanisms:
       scalar sigma (attraction_repulsion.py:43,32). If so, its declared signature must widen (+radius
       read, sigma -> per-pair additive r_i+r_j) to host Morse's size-consistent contact distance, which
       is refinement, not alias.
+  state_io_notes:
+    reads:
+    - position
+    - coupling field (shared scalar OR per-cell scalar field, e.g. epsilon / alpha), symmetrised per pair
+      by the arithmetic-mean mix rule
+    writes:
+    - position
+    maps:
+    - pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered
+      pair counts once); force on each cell = -grad of the conservative Morse pair energy by autodiff
+    - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive core (excluded
+      volume) + adhesive tail (cell-cell adhesion); a radial pair force integrated overdamped or minimised
 - id: soft_sphere
   order: 15
   raw_name: SoftSphere
@@ -2575,22 +2799,15 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
     - alive
-    - epsilon (per-cell OR shared interaction strength; SoftSphere reads it only when it is a per-cell
-      field)
+    - epsilon
     writes:
-    - position
+    - pos
     maps:
-    - pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each unordered
-      pair counts once); force on each cell = -grad of the conservative SoftSphere pair energy by autodiff;
-      size-consistent contact distance sigma = r_i + r_j read from the physical radius (tracks cell growth/division)
-    - PURELY REPULSIVE compact soft core U = (epsilon/2)(1 - r/sigma)^2 with support exactly [0, sigma)
-      -- no adhesive tail and no cutoff parameter (self-truncating at contact), C1 (force vanishes at
-      contact); a radial pair force integrated overdamped or minimised by the wrapping motion step. This
-      is the adhesion-OFF shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive
-      tail)
+    - pairwise
+    - PURELY
   status: implemented
   module: src/plexus/operators/candidates/jax_morph_soft_sphere.py
   test: tests/test_jax_morph_soft_sphere.py
@@ -2612,6 +2829,22 @@ mechanisms:
       the parent PairwisePotential and twins Morse/Harmonic normalize to `alias of attraction_repulsion`,
       SoftSphere (differing only in pair_energy U(r)) must take the same registered target, not a minted
       `adhere`.'
+  state_io_notes:
+    reads:
+    - position
+    - epsilon (per-cell OR shared interaction strength; SoftSphere reads it only when it is a per-cell
+      field)
+    writes:
+    - position
+    maps:
+    - pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each unordered
+      pair counts once); force on each cell = -grad of the conservative SoftSphere pair energy by autodiff;
+      size-consistent contact distance sigma = r_i + r_j read from the physical radius (tracks cell growth/division)
+    - PURELY REPULSIVE compact soft core U = (epsilon/2)(1 - r/sigma)^2 with support exactly [0, sigma)
+      -- no adhesive tail and no cutoff parameter (self-truncating at contact), C1 (force vanishes at
+      contact); a radial pair force integrated overdamped or minimised by the wrapping motion step. This
+      is the adhesion-OFF shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive
+      tail)
 - id: hertzian
   order: 16
   raw_name: Hertzian
@@ -2812,20 +3045,14 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
-    - epsilon (per-cell OR shared contact stiffness; read via state_reads only when it is a per-cell field,
-      otherwise a shared scalar)
+    - epsilon
     writes:
-    - position
+    - pos
     maps:
-    - pairwise radial contact interaction over live non-self cell pairs (dense N x N, half-summed so each
-      unordered pair counts once); force on each cell = -grad of the conservative Hertzian pair energy
-      by autodiff
-    - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); PURELY REPULSIVE compact
-      soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail
-      and no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact);
-      a radial pair force integrated overdamped or minimised by the wrapping motion step
+    - pairwise
+    - contact
   status: implemented
   module: src/plexus/operators/candidates/jax_morph_hertzian.py
   test: tests/test_jax_morph_hertzian.py
@@ -2847,6 +3074,21 @@ mechanisms:
       \ (REQUIRES_PARAMS=['sigma'], REQUIRES_TYPE_PROPS=['p'], no state.radius read in forward()) cannot\
       \ express sigma=r_i+r_j nor a per-cell epsilon \u2014 so it cannot reproduce Hertzian without deleting\
       \ its fixed-width per-type D'Orsogna contract; reconcile with soft_sphere's new/adhere twin verdict."
+  state_io_notes:
+    reads:
+    - position
+    - epsilon (per-cell OR shared contact stiffness; read via state_reads only when it is a per-cell field,
+      otherwise a shared scalar)
+    writes:
+    - position
+    maps:
+    - pairwise radial contact interaction over live non-self cell pairs (dense N x N, half-summed so each
+      unordered pair counts once); force on each cell = -grad of the conservative Hertzian pair energy
+      by autodiff
+    - contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); PURELY REPULSIVE compact
+      soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail
+      and no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact);
+      a radial pair force integrated overdamped or minimised by the wrapping motion step
 - id: harmonic
   order: 17
   raw_name: Harmonic
@@ -3047,37 +3289,14 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
-    - radius
     - alive
-    - 'coupling field (shared scalar OR per-cell scalar field, here the stiffness k), symmetrised per
-
-      pair by the arithmetic-mean mix rule 0.5*(k_i+k_j)
-
-      '
+    - pos
+    - radius
     writes:
-    - position
+    - pos
     maps:
-    - 'pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered
-
-      pair counts once); force on each cell = -grad of the conservative harmonic pair energy by
-
-      autodiff; size-consistent contact distance sigma = r_i + r_j read from the physical radius
-
-      (tracks cell growth/division)
-
-      '
-    - 'repulsive core (r < sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell
-
-      adhesion) from a down-shifted harmonic well hard-truncated at r_c = r_cutoff_frac*sigma; a
-
-      radial pair force integrated overdamped or minimised by the wrapping dynamics step. This is the
-
-      adhesion-ON shape of `adhere` (Morse/LennardJones share it; SoftSphere/Hertzian are the
-
-      adhesion-OFF, purely-repulsive shape of the same contract)
-
-      '
+    - pairwise
+    - repulsive
   status: implemented
   module: src/plexus/operators/candidates/jax_morph_harmonic.py
   test: tests/test_jax_morph_harmonic.py
@@ -3111,6 +3330,38 @@ mechanisms:
       coupling force it under `adhere`, matching Morse''s true sibling home, not attraction_repulsion.
 
       '
+  state_io_notes:
+    reads:
+    - position
+    - 'coupling field (shared scalar OR per-cell scalar field, here the stiffness k), symmetrised per
+
+      pair by the arithmetic-mean mix rule 0.5*(k_i+k_j)
+
+      '
+    writes:
+    - position
+    maps:
+    - 'pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered
+
+      pair counts once); force on each cell = -grad of the conservative harmonic pair energy by
+
+      autodiff; size-consistent contact distance sigma = r_i + r_j read from the physical radius
+
+      (tracks cell growth/division)
+
+      '
+    - 'repulsive core (r < sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell
+
+      adhesion) from a down-shifted harmonic well hard-truncated at r_c = r_cutoff_frac*sigma; a
+
+      radial pair force integrated overdamped or minimised by the wrapping dynamics step. This is the
+
+      adhesion-ON shape of `adhere` (Morse/LennardJones share it; SoftSphere/Hertzian are the
+
+      adhesion-OFF, purely-repulsive shape of the same contract)
+
+      '
+  signature_note: '`coupling` is a parameter, not a state block.'
 - id: lennard_jones
   order: 18
   raw_name: LennardJones
@@ -3263,9 +3514,26 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
     - alive
+    - epsilon
+    writes:
+    - pos
+    maps:
+    - pairwise
+    - contact
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_lennard_jones.py
+  test: tests/test_jax_morph_lennard_jones.py
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    reads:
+    - position
     - 'epsilon (shared scalar OR per-cell scalar StateFieldSpec interaction strength; the field is read
 
       only when epsilon is a per-cell spec, else it is a shared scalar), symmetrised per pair by the
@@ -3296,14 +3564,6 @@ mechanisms:
       signature
 
       '
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_lennard_jones.py
-  test: tests/test_jax_morph_lennard_jones.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
 - id: mechanical_relaxation
   order: 19
   raw_name: MechanicalRelaxation
@@ -3502,13 +3762,11 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
     - alive
-    - '<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g.
-      a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>'
     writes:
-    - position
+    - pos
     maps: []
   status: implemented
   module: src/plexus/operators/candidates/jax_morph_mechanical_relaxation.py
@@ -3518,6 +3776,13 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  state_io_notes:
+    reads:
+    - position
+    - '<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g.
+      a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>'
+    writes:
+    - position
 - id: virial_stress
   order: 20
   raw_name: VirialStress
@@ -3712,14 +3977,26 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
-    - radius
     - alive
-    - displacement
-    - the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven;
-      empty for a scalar-parameter potential
+    - pos
+    - radius
     writes:
     - stress
+    maps:
+    - pairwise
+  status: implemented
+  module: src/plexus/operators/candidates/jax_morph_virial_stress.py
+  test: tests/test_jax_morph_virial_stress.py
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+  state_io_notes:
+    reads:
+    - position
+    - the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven;
+      empty for a scalar-parameter potential
     maps:
     - pairwise radial reduction over live non-self neighbours -- each cell's local mechanical load = the
       Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) * sum_j r_ij*(dU/dr)(r_ij), the SAME conservative
@@ -3730,14 +4007,8 @@ mechanisms:
       compression-positive / tension-negative sign convention; transient (heritable=False), recomputed
       each macro-step; pure sensing -- writes only stress and moves nothing -- for downstream mechanotransduction
       (e.g. stress-gated division)
-  status: implemented
-  module: src/plexus/operators/candidates/jax_morph_virial_stress.py
-  test: tests/test_jax_morph_virial_stress.py
-  evidence:
-    oracle_run: null
-    diff_metric: null
-    threshold: null
-    passed: null
+  signature_note: the record's `displacement` and a stray prose token were not state blocks; the operator
+    reads pos/radius/alive.
 - id: lie__trotter_macro_step_split
   order: 21
   raw_name: Lie-Trotter macro-step split
@@ -4337,7 +4608,7 @@ mechanisms:
     outputs:
     - cell
     reads:
-    - position
+    - pos
     - radius
     - celltype
     - alive
@@ -4353,6 +4624,9 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  state_io_notes:
+    reads:
+    - position
 - id: stochastic_trace___replay___score
   order: 24
   raw_name: stochastic trace / replay / score

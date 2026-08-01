@@ -51,6 +51,25 @@ LOG_DIR = os.path.join(PLEXUS, "log", "atlas")
 # ------------------------------------------------------------------------------------------- #
 #  the acted ledger
 # ------------------------------------------------------------------------------------------- #
+def load_atlas_candidates():
+    """Import the atlas's anti-chamber modules so a spec can name them.
+
+    `plexus.operators` deliberately does not auto-import `candidates/` -- several names there
+    collide and some carry prototype-local imports. The atlas's own modules are checked to
+    co-exist (`verify_impl.py`'s import-all-together), so the runner may load them; this is what
+    lets an operator be RUN, and therefore tested against the oracle, before anyone decides
+    whether to promote it.
+    """
+    import importlib
+    import plexus.operators.candidates as C
+    loaded = []
+    for fn in sorted(os.listdir(os.path.dirname(C.__file__))):
+        if fn.startswith(("jax_morph_", "atlas_")) and fn.endswith(".py"):
+            importlib.import_module(f"plexus.operators.candidates.{fn[:-3]}")
+            loaded.append(fn[:-3])
+    return loaded
+
+
 def _edge_sig(lvl):
     """A cheap fingerprint of a set's relation, so a rewire operator's work is visible."""
     e = getattr(lvl, "edge_index", None)
@@ -92,6 +111,11 @@ def install_acted_ledger():
                 # only see deltas would have condemned every rewire in the library.
                 before_n = {n: int(l.active.sum()) for n, l in H.levels.items()}
                 before_e = {n: _edge_sig(l) for n, l in H.levels.items()}
+                # A structural operator returns no delta and writes the state directly. Without
+                # this fingerprint the seeding operator that sets every initial condition in the
+                # run reported `acted 0` -- indistinguishable from doing nothing at all.
+                before_s = {n: float(l.state.abs().sum()) for n, l in H.levels.items()} \
+                    if rec["structural"] else None
                 out = super().forward(H, mask)
                 rec["calls"] += 1
                 moved = 0.0
@@ -100,7 +124,10 @@ def install_acted_ledger():
                         moved = max(moved, float(d.abs().max()))
                 after_n = {n: int(l.active.sum()) for n, l in H.levels.items()}
                 after_e = {n: _edge_sig(l) for n, l in H.levels.items()}
-                if moved > 0 or before_n != after_n or before_e != after_e:
+                after_s = {n: float(l.state.abs().sum()) for n, l in H.levels.items()} \
+                    if rec["structural"] else None
+                if (moved > 0 or before_n != after_n or before_e != after_e
+                        or (before_s is not None and before_s != after_s)):
                     rec["acted"] += 1
                     rec["moved"] = max(rec["moved"], moved)
                 return out
@@ -216,6 +243,7 @@ def main():
 
     ledger = install_acted_ledger()               # BEFORE the engine builds anything
     import plexus.operators  # noqa: F401
+    load_atlas_candidates()                       # the anti-chamber, without promoting anything
     from plexus.generators.graph_data_generator import data_generate
     from plexus.schema import load
 

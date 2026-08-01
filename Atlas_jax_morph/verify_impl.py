@@ -61,7 +61,13 @@ try:
     name = {name!r}
     if name in R._OP_CONTRACTS:
         c = R._OP_CONTRACTS[name]
-        cls = c.get()
+        # Probe THE IMPLEMENTATION THIS MODULE REGISTERED, not the contract's default. Reading
+        # the default reported the shipped `cell_divide` class for a module that had correctly
+        # added a second implementation beside it -- so a refinement looked like it declared
+        # nothing at all.
+        mine = [k for k, v in c.implementations.items() if v.__module__ == {module!r}]
+        cls = c.get(mine[0]) if mine else c.get()
+        out["probed_implementation"] = mine[0] if mine else c.default
         out["implementation"] = sorted(c.implementations)
         out.update(registered=(name in added or name in before), kind=c.kind, family=c.family,
                    set=c.set,

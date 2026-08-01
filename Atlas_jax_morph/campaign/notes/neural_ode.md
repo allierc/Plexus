@@ -85,3 +85,39 @@ smoke trajectory is known to instantiate NeuralODE (vs the gene-network controll
 paired scenario to diff against yet. Both this and the oracle use adaptive Dopri5 at the same rtol,
 so tolerance-level agreement is expected once a scenario exists, but that is the validator's evidence
 to produce. `status` advanced only to `implemented`; `evidence`/`status: validated` untouched.
+
+## Differential validation (differ)
+
+**Verdict: `validated`. D_max = 2.22e-16 (machine epsilon) vs threshold 3e-3 -> PASS by ~13 orders
+of magnitude.**
+
+The implementer's "no scenario to diff against" concern is real but resolvable: NeuralODE's entire
+behaviour IS its MLP vector field, and an MLP cannot cross the JAX/torch boundary through a YAML
+spec, so a `run_spec.py` trajectory would compare two DIFFERENT (independently-initialised) fields
+and measure nothing. The faithful test is at the OPERATOR level: build the MLP once in JAX, integrate
+the reference `ODEController.__call__` over one macro-step on a fixed per-cell IC, export the exact
+per-layer weights + the reference endpoint, then reload those weights VERBATIM into the torch
+operator and drive it from the same `g0/u/dt` through the REAL engine `_integrate` (`gene += dt*delta`).
+
+Pre-registered metric (written to the record BEFORE the cross-run comparison):
+`D_max = max over cells (N=16), evolving components, dt in {0.5,1,2}, and both circuit shapes
+(A hidden=0/out=3, B hidden=2/out=2) of |y_plexus(dt) - y_ref(dt)|`; threshold **3.0e-3** = ~3x the
+reference's own MEASURED truncation-from-truth (9.9e-4 at dt=2), the tightest bound two independent
+adaptive Dopri5 controllers of an identical field can be held to (a tighter 1e-3 risks a false fail
+from integrator jitter alone).
+
+Result:
+- **D_max (plexus vs reference) = 2.220446e-16** — machine epsilon; verdict does not hinge on the threshold.
+- **net-equality (torch MLP vs exported JAX MLP) = 0.0** — bit-identical field, so the endpoint match is the INTEGRATOR.
+- `plexus_vs_truth == reference_vs_truth` to ~15 digits (dt=2/A: 9.8942968251614e-4 vs 9.8942968251636e-4) — both controllers take the SAME accept/reject substep sequence; they diverge from machine-truth identically and from each other by ~0.
+- **negative control** (drop the /dt mean-rate conversion, endpoint = g0 + delta) at dt=2: A=0.408, B=0.252 — >100x the threshold, so the metric would catch a genuine wiring bug.
+- Determinism of the reference confirmed in the oracle (fixed key gives fixed endpoint) before anything was recorded.
+
+Runs:
+- oracle (JAX reference): `Atlas_jax_morph/_oracle/runs/diff_neural_ode/` (reference.npz + summary.json + _provenance.json); built by `_oracle/scripts/neural_ode.py`.
+- plexus differential driver: `Atlas_jax_morph/diff_neural_ode.py` -> artefact `log/atlas/neural_ode/diff.json`.
+
+Caveat recorded (not a defect): this is an operator-level differential, not a `run_spec.py`
+trajectory, and NeuralODE appears in no reference composition and no paper equation — so the delta
+was exercised through the real engine `_integrate`, but there is no morphogenesis trajectory to
+compare. The `regulate` contract's black-box implementation reproduces the reference exactly.
