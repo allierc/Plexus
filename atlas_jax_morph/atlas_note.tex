@@ -851,8 +851,8 @@ actually is, \S\ref{sec:p4} settles.
 
 \textbf{What it took to get even this far} is itself a finding. The first run produced
 \emph{zero} divisions in 40 frames, silently: \code{cell\_divide} read the division rate as a
-Level buffer while the spec --- and the growth operator standing next to it --- kept it as a state
-block. So it read its own default of zero, and the run completed, and the movie looked plausible.
+per-node buffer on the set, while the spec --- and the growth operator standing next to it --- kept
+it as a state block. So it read its own default of zero, and the run completed, and the movie looked plausible.
 Two operators from the same atlas disagreed about where a cell's radius lives. Nothing raised.
 That is the class of defect this whole apparatus exists to catch, and it was caught by the acted
 ledger asking one question: \emph{did this operator ever do anything?}

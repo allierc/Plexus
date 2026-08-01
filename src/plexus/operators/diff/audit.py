@@ -46,7 +46,7 @@ BLOCKS = {"pos": 2, "vel": 2, "radius": 1, "growth_rate": 1, "division_rate": 1,
           "gene": 3, "drive": 2, "chemical": 1, "secretion_rate": 1, "stress": 1,
           "heading": 1, "speed": 1, "s": 1, "age": 1, "mass": 1, "chem": 1, "a0": 1}
 
-# per-node buffers operators read off the Level besides `state` (REQUIRES_BUFFERS and friends)
+# per-node buffers operators read off the set besides `state` (REQUIRES_BUFFERS and friends)
 BUFFERS = {"heading": 1, "speed": 1, "cohesion": 1, "separation": 1, "div_rate": 1,
            "mass": 1, "mu": 1, "la": 1, "p_vol": 1, "omega": 1, "youngs": 1,
            "growth_rate": 1, "remodel": 1, "alignment": 1}
