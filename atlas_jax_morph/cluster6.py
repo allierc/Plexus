@@ -42,6 +42,25 @@ import cluster as C  # noqa: E402  the hardened primitives; see the module docst
 C.PREFIX = "at6_"
 LOGDIR = os.path.join(PLEXUS, "log", "atlas", "_cluster6")
 RUNS = os.path.join(PLEXUS, "log", "atlas", "_phase6")
+TAG = ""
+
+
+def use_tag(tag):
+    """Point one sweep's artefacts at their own directories and job-name prefix.
+
+    The 20-step sweep is a RESULT, not scratch: a convergence rerun that wrote into the same
+    place would silently overwrite the very numbers it is being compared against.
+    """
+    global LOGDIR, RUNS, TAG
+    if not tag:
+        return
+    TAG = tag
+    LOGDIR = os.path.join(PLEXUS, "log", "atlas", f"_cluster6_{tag}")
+    RUNS = os.path.join(PLEXUS, "log", "atlas", f"_phase6_{tag}")
+    C.PREFIX = f"at6{tag[0]}_"
+    C.LOGDIR = LOGDIR
+
+
 C.LOGDIR = LOGDIR
 
 
@@ -97,8 +116,14 @@ def submit(ks, replicates, frames, steps, params):
     return ids
 
 
-def collect():
-    """Gather the finished fits into one file, and report the spread that is the whole point."""
+def collect(tail=0):
+    """Gather the finished fits, and report the spread that is the whole point.
+
+    `tail` turns on Polyak averaging: the mean of the parameter over the last `tail` Adam steps
+    rather than its last value. With a noisy gradient the iterate never settles -- it random-walks
+    around the optimum -- so the final value is one draw from that walk and the tail mean is the
+    estimate. It is also what makes "did it converge, or did we just stop?" answerable.
+    """
     import statistics
     rows = []
     if os.path.isdir(RUNS):
@@ -108,6 +133,11 @@ def collect():
                     rows.append(json.load(f))
     by_k = {}
     for r in rows:
+        if tail and r.get("history"):
+            key = list(r["final"])[0]
+            hist = [h["params"][key] for h in r["history"]][-tail:]
+            r["final"] = {key: statistics.fmean(hist)}
+            r["tail"] = tail
         by_k.setdefault(r["K"], []).append(r)
     print(f"{'K':>3}  {'n':>3}  {'mean':>10}  {'stdev':>10}  {'spread':>10}   fitted values")
     print("-" * 84)
@@ -123,7 +153,7 @@ def collect():
     if not rows:
         print("  (no finished fits yet)")
         return summary
-    out = os.path.join(HERE, "_state", "phase6_variance.json")
+    out = os.path.join(HERE, "_state", f"phase6_variance{'_' + TAG if TAG else ''}.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w") as f:
         json.dump({"summary": summary, "runs": rows}, f, indent=2)
@@ -143,7 +173,11 @@ def main():
     ap.add_argument("--steps", type=int, default=20)
     ap.add_argument("--params", nargs="+", default=["max_radius"])
     ap.add_argument("--poll", type=int, default=60)
+    ap.add_argument("--tag", default=None, help="name this sweep; keeps its artefacts separate")
+    ap.add_argument("--tail", type=int, default=0,
+                    help="Polyak-average the last N steps instead of taking the final value")
     a = ap.parse_args()
+    use_tag(a.tag)
 
     if a.cmd == "submit":
         if not C.preflight(verbose=True):
@@ -156,7 +190,7 @@ def main():
     elif a.cmd == "kill":
         C.kill()
     elif a.cmd == "collect":
-        collect()
+        collect(tail=a.tail)
     return 0
 
 

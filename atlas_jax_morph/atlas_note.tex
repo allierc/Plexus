@@ -183,7 +183,7 @@ recorded signature, pass a test, and co-exist in one registry}.
 them, two aliases of things we already had, two refinements, six entries with no biology to
 extract. And the forward composition RUNS: the authors' proliferation model, rebuilt from those
 operators, grows a jammed cluster from 4 cells to 124 --- against their 82. That last disagreement
-is the most useful number the atlas has produced, and \S8 is about it.
+is the most useful number the atlas has produced, and \S\ref{sec:fwd} is about it.
 
 \begin{center}
 \includegraphics[width=0.62\textwidth]{_state/saturation.png}\\
@@ -191,6 +191,68 @@ is the most useful number the atlas has produced, and \S8 is about it.
 mechanism is new vocabulary; the steps are what actually happened. One repository cannot show
 saturation --- the second and third can.}
 \end{center}
+
+%======================================================================
+\section{Did we reproduce the paper? --- the short answer}\label{sec:short}
+
+Three questions deserve answering before any of the machinery below, in plain English.
+
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.8pt,arc=2pt]
+\textbf{Did we reproduce it?} \emph{Partly, and the part we did is the harder one to fake.} Their
+\textbf{forward model} --- the proliferating cell cluster their library ships as its worked
+example --- runs inside Plexus out of operators translated from their code, and every one of its
+mechanisms has been checked against their own running implementation. Their \textbf{Figure 5} ---
+engineered morphogenesis, where a gene network is \emph{optimised} until the cluster
+self-organises into a specified shape --- is \textbf{not} reproduced yet. That is Phase 6, and it
+is in progress.
+\end{tcolorbox}
+
+\textbf{What is the same.}
+
+\begin{itemize}
+\item \textbf{Every mechanism, to a number.} Sixteen differential tests against the authors' code
+running in its own interpreter, each with its metric and threshold written down \emph{before} the
+run. Disagreements from $2{\cdot}10^{-16}$ to $1{\cdot}10^{-2}$, every one under a bar argued from
+numerics rather than chosen to fit.
+\item \textbf{The morphology.} Both engines jam into a round, confluent cluster of uniformly-sized
+cells (\S\ref{sec:fwd}).
+\item \textbf{The size.} Radius of gyration $0.651 \to 3.228$ against $0.686 \to 3.518$ --- 9\%
+over the whole run, on the observable that is robust to the random seed.
+\item \textbf{The division mechanism.} Pooled division hazard agrees to $1.1{\cdot}10^{-3}$
+against a three-sigma bar of $5.2{\cdot}10^{-3}$, over 48 seeds and $\sim$47{,}000 cell-steps a
+side.
+\item \textbf{The architecture, unexpectedly.} jax-morph is itself built from composable physics
+steps that declare which state they read and write and compose by operator splitting. Two groups
+arrived at nearly the same decomposition from opposite directions.
+\end{itemize}
+
+\textbf{What is different.}
+
+\begin{itemize}
+\item \textbf{The cell count: 82 against 124.} Two engines drawing from independent random streams
+produce different realisations of the same process, so this compares luck, not mechanism --- which
+is why the differ refused to compare counts at all and compared the hazard instead. It is the
+figure's subject, not its failure.
+\item \textbf{Four places where their code contradicts their paper}, and we follow the code. Their
+growth law is a saturating von Bertalanffy flow, not the paper's constant increment with a
+\code{min} clamp. Their gene network mixes the sensed input \emph{inside} the sigmoid through a
+trainable matrix, not added outside it. Their Morse potential carries a smooth cutoff the paper's
+equation does not have. Their stress is an Irving--Kirkwood virial, not the paper's taxicab sum.
+\textbf{Recording those contradictions is among the most valuable things this reproduction
+produced}, and none of them is visible without the code.
+\item \textbf{Two mechanisms exist in the code and nowhere in the paper}: cell death, and
+self-propelled (active Brownian) motion. The library ships capability the publication does not
+claim.
+\item \textbf{One operator is deliberately less capable than theirs.} Their mechanical relaxation
+differentiates the \emph{equilibrium} by the implicit function theorem; ours equilibrates
+faithfully but forward-only, and says so (\code{DIFFERENTIABLE = False}).
+\item \textbf{And Figure 5 itself}, which is the honest headline of this list.
+\end{itemize}
+
+\textbf{What it cost the language} --- the measurement the atlas exists to make --- is eight
+genuinely new contracts out of 24 mechanisms, with six further implementations of those same
+eight, two aliases, two refinements, and six entries that model no biology at all. A yield of 0.44
+new contracts per scored mechanism, on the first repository.
 
 %======================================================================
 \section{Why a target with code changes everything}
@@ -436,7 +498,7 @@ be new. They were added by hand, and the record says they were added by hand.\\
 14 & \dn & Blast radius, rung, twelve rules; revert with the agent's own words logged; two
 failures mark the mechanism \emph{blocked} rather than skipping it. A call that changes nothing
 counts as a failure.\\
-15 & \dn & The excavator on \code{Division}, committed on the first attempt. See \S7.\\
+15 & \dn & The excavator on \code{Division}, committed on the first attempt. See \S\ref{sec:p0report}.\\
 16 & \dn & Found \emph{by} item 15: the agent could not open the PDF (no \code{pdftotext} in this
 image), so it anchored its citations to the library's guides and said so. PyMuPDF was already
 installed; the paper is now plain text with page markers, and \code{paper.py -{}-grep} finds a
