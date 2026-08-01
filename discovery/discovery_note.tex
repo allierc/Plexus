@@ -235,21 +235,32 @@ Cedric & looks at the pictures; found every defect so far & --- & outside the lo
 \end{tabular}
 \end{center}
 
-\textbf{On the budget column.} These are what the system would \emph{permit}, not what it takes ---
-timing was only wired on 31 July (nine call sites had been bypassing the stopwatch, and a round once
-reported \code{calls: 0} for a round that made about twenty-five), and no round has run since, so
-there is still no measured baseline. The worst case adds to about two hours, but twenty of the
-twenty-six calls are the per-run ones and are completely independent: run together, with the next
-proposal starting while the current simulations are still going, the unavoidable serial cost is
-\textbf{four to five minutes}. That work is Phase 3(c).
+\textbf{What an agent actually costs --- measured, at last.} The budget column is an
+\emph{allowance}, and until 1 August nothing recorded what was spent: nine call sites bypassed the
+stopwatch, and a round once reported \code{calls: 0} for a round that made about twenty-five. Every
+call now records tokens, turns, seconds and dollars. Six real analyst calls on two runs:
 
-\textbf{On the budget column.} These are what the system would \emph{permit}, not what it takes ---
-timing was only wired on 31 July (nine call sites had been bypassing the stopwatch, and a round once
-reported \code{calls: 0} for a round that made about twenty-five), and no round has run since, so
-there is still no measured baseline. The worst case adds to about two hours, but twenty of the
-twenty-six calls are the per-run ones and are completely independent: run together, with the next
-proposal starting while the current simulations are still going, the unavoidable serial cost is
-\textbf{four to five minutes}. That work is Phase 3(c).
+\begin{center}\small
+\begin{tabular}{@{}l r l@{}}
+\toprule
+per analyst call      & \textbf{\$0.41}      & 6 calls, \$2.47 total\\
+turns used            & \textbf{7.2}         & against a cap of 60 --- the cap never binds\\
+wall clock            & \textbf{21 s}        & three analysts in parallel, 64\,s per run\\
+cache hits            & 305\,k vs 172\,k new & 64\% --- why a call is \$0.41 and not \$3\\
+\midrule
+a five-run round      & \textbf{$\approx$\$11} & 26 calls: 15 analysts, 5 eye-checks, 6 others\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three things follow, and they contradict what I told Cedric before measuring. \textbf{Turns are not
+the lever}: 7.2 used of 60 allowed, so the cap has never once bound, and tightening it would only
+truncate work already paid for. \textbf{Nor are the timeouts}: the allowance for the analyst block
+is four minutes a call and it takes twenty-one seconds, so the ``116 minutes worst case'' was an
+arithmetic ceiling nothing approaches. \textbf{The lever is the number of calls}, because a call
+carries a fixed cost before it does any work --- a call returning the single word ``ok'' still
+reports 2,993 input and 28,868 cache-creation tokens. Fifteen analyst calls is the largest line on
+the board, and two analysts instead of three is a real third off the bill.
 
 %======================================================================
 \section{What stands between us and the Okuda figure}\label{sec:okuda}
@@ -277,13 +288,22 @@ branching, and --- worse --- we would not know whether that was a real result or
 
 Eight stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
 
-\begin{phasebox}{Phase 0 --- Pre-flight: fix the instruments \hfill \prog\ (26 of 28)}
+\begin{phasebox}{Phase 0 --- Pre-flight: fix the instruments \hfill \dn\ (28 of 28)}
 \textbf{Goal.} Make every measurement trustworthy. Nothing runs unattended until this lands. Not one
 of the twenty-eight items is science; each one makes a question \emph{askable}.
 
-\textbf{The two still open.} Comparing a batch at a \emph{common} frame --- two runs that stop being
-valid at different moments still have their ``final'' states compared. And the rename to the
-explicit vocabulary, which is 129 references and purely mechanical.
+\textbf{The last two, closed.} \emph{Comparing a batch at a common frame} --- the per-run evidence
+horizon was right and did not make a BATCH comparable. If one run tears at frame 300 and another
+holds to 700, comparing their ``final'' states puts a torn mesh beside a healthy one and reports
+the difference as biology: both operands valid, the comparison wrong, which is the shape of every
+error that has cost this campaign a batch. A batch is now read at one frame, the earliest horizon
+in it, and the tool reports what that costs --- how much of each run is discarded, and a warning
+when one run's early death is being imposed on everyone. \emph{The explicit vocabulary} ---
+\code{elongation}, \code{elongation\_peak}, \code{elongation\_at\_end}, \code{elongation\_unforced}.
+Writers emit both names, readers resolve either, the archive is never rewritten: cutting 92
+references over in one step leaves a window where a key is written by half the code and read by the
+other half, and since an absent metric reads as ``not measured'', the bug would surface as a round
+that quietly learns nothing.
 
 \textbf{The repairs worth knowing about}
 
@@ -410,7 +430,7 @@ chemistry clock, previously exempt and unchecked, gained a test of its own: both
 by exactly $1/\mathrm{dt}$ \emph{and} their ratio must be unchanged, since that ratio is what sets
 the Turing wavelength. \textbf{61 of 61.}
 \end{phasebox}
-\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \prog\ (2 of 3)}
+\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \dn\ (3 of 3)}
 \textbf{Ablation is now compulsory} --- \emph{done}, and it is the part that matters. A claim that
 one thing \emph{causes} another needs two experiments and we were enforcing neither: adding a
 mechanism and seeing the shape appear shows it is \emph{sufficient}; taking it away and seeing the
@@ -448,13 +468,21 @@ slot either declares which of Okuda's experiments it is, or it gets the coupling
 Still open here: asserting a run against his published constants. The values are written down;
 nothing yet checks a run against them.
 
-\textbf{(b) Evolution and the Referee}, the two idle faces in the list above.
+\textbf{(b) Evolution and the Referee} --- \emph{done}. \code{rank\_btl} had been written and
+self-tested since the loop was built and had never ranked a real batch; the round sorted on
+whichever scalar the instrument gate happened to admit. A tournament decides now. Verified on a
+synthetic batch: a vetoed run holding the highest score drops from first to last. Evolution runs
+too, refining the winner rather than the loop only ever \emph{picking} from what the enumerator
+offered.
 
-\textbf{(c) Run the per-run calls together} instead of one after another, against the five-minute
-target.
+\textbf{(c) The per-run calls run together} --- \emph{done, and measured}. Three analysts read one
+run concurrently, and runs are read concurrently across a batch. They are independent by design:
+three readings exist because one is not reproducible, and no analyst's prompt depends on another's
+answer. The eye-check still runs \emph{after}, because it is handed their consensus and is not
+independent --- parallelising a dependency is not an optimisation, it is a different experiment.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \prog\ (built + calibrated)}
+\begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \dn}
 \textbf{The classifier} --- \emph{done}. Sphere, undulation, tube, branched, plus \textbf{invalid}
 (the surface passes through itself, so no shape reading means anything) and \textbf{unclear},
 returned deliberately near a boundary. A classifier that always answers can never be wrong, and one
