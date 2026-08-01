@@ -961,6 +961,70 @@ opinion}: promote the \code{\_tunable} helper --- today a one-off inside one atl
 onto the operator base class, which converts constructor-blocked into learnable without touching
 any physics.
 
+\subsection{Done --- and the question that replaces it}\label{sec:p6tunable}
+
+That step is taken. \code{Operator.tunable()} now lives on the base class: a tensor handed in by a
+spec passes through untouched, anything else is coerced to a float exactly as before. Applied to
+the \code{adhere} family's fifteen knobs, the independent route re-certifies
+\textbf{learnable 4 $\to$ 8} and constructor-blocked 4 $\to$ 1. All 141 tests still pass, which is
+the point: the values are identical, only the \emph{type} survives.
+
+So the blocker is no longer mechanical, and the real question is the one this note has carried
+since the first gradient probe. \textbf{The division draw is discrete}, so a straight-through
+gradient taken through one sampled rollout is a gradient through that sample's \emph{luck}.
+Optimising against it may be optimising noise --- and that is a measurable claim, not a
+philosophical one.
+
+\subsection{The variance sweep, on L4}\label{sec:p6var}
+
+Fit the same target $K$ times over, averaging the loss over $K$ independent seeds per Adam step,
+across independent replicates with disjoint seed bases, and look at the spread of the answer.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l p{11.4cm}@{}}
+\toprule
+$\sigma$ shrinks with $K$ & the estimator is noisy but \textbf{consistent}; the fix is simply more
+seeds, and Figure~5 is an engineering problem.\\
+$\sigma$ does not shrink & the pathwise gradient is \textbf{biased}, and the reference's
+trace/replay/score contract is required rather than a nicety.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Why the cluster, with numbers rather than preference.} A 40-frame differentiable rollout
+takes 52.9\,s on the devcontainer's CPU and 32.5\,s on an A6000 --- only $1.6\times$, because 146
+cells is not enough work to hide Python and kernel-launch overhead. Per-run acceleration is
+therefore nearly pointless, while the replicates are completely independent: wall-clock comes from
+running 32 fits at once, which is what \code{gpu\_l4} is for. \code{cluster6.py} reuses
+\code{discovery/cluster.py}'s hardened primitives --- detached submission, job IDs as the only
+ground truth, ssh wall-timeout, completion only on positive evidence --- under its own job-name
+prefix so the two campaigns' queues cannot alias.
+
+\textbf{Where it stands (in flight).} 32 jobs, $K \in \{1,2,4,8\}$ $\times$ 8 replicates, 24
+frames, 20 Adam steps. $K=1$ and $K=2$ are complete:
+
+\begin{center}
+\small
+\begin{tabular}{@{}r r r r l@{}}
+\toprule
+$K$ & $n$ & mean & $\sigma$ & \\
+\midrule
+1 & 8 & 1.2072 & 0.0763 & \\
+2 & 8 & 1.2606 & 0.0548 & ratio 0.72, against $1/\sqrt{2} = 0.707$\\
+4 & \multicolumn{3}{l}{\emph{running}} & \\
+8 & \multicolumn{3}{l}{\emph{running}} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two seeds' worth of averaging shrinks the spread by very nearly the Monte-Carlo factor, which is
+what an unbiased-but-noisy estimator does and \emph{not} what a biased one does. That is
+encouraging and it is not yet a result: two points define no trend, and the means drift slightly
+upward ($1.2072 \to 1.2606$), which would be the signature of a small low-$K$ bias if it persists.
+\textbf{$K=4$ and $K=8$ decide it}, and they are the two that matter --- the conclusion will be
+recorded here whichever way it falls.
+
 \subsection{And it optimises}
 
 With the tunable stored as a tensor rather than a float --- the torch form of the reference's own

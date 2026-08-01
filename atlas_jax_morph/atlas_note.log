@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 10:23
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 10:55
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -784,7 +784,7 @@ LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
 
 
 [2]
-<_state/saturation.png, id=138, 404.712pt x 260.172pt>
+<_state/saturation.png, id=146, 404.712pt x 260.172pt>
 File: _state/saturation.png Graphic file (type png)
 <use _state/saturation.png>
 Package pdftex.def Info: _state/saturation.png  used on input line 189.
@@ -792,7 +792,7 @@ Package pdftex.def Info: _state/saturation.png  used on input line 189.
 
 
 [3 <./_state/saturation.png>]
-<_oracle/runs/smoke/reference.png, id=145, 1107.9547pt x 224.59293pt>
+<_oracle/runs/smoke/reference.png, id=153, 1107.9547pt x 224.59293pt>
 File: _oracle/runs/smoke/reference.png Graphic file (type png)
 <use _oracle/runs/smoke/reference.png>
 Package pdftex.def Info: _oracle/runs/smoke/reference.png  used on input line 2
@@ -877,7 +877,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 681--682
 
 
 [15]
-<_state/phase5_forward.png, id=249, 1019.007pt x 650.43pt>
+<_state/phase5_forward.png, id=257, 1019.007pt x 650.43pt>
 File: _state/phase5_forward.png Graphic file (type png)
 <use _state/phase5_forward.png>
 Package pdftex.def Info: _state/phase5_forward.png  used on input line 756.
@@ -910,19 +910,21 @@ Overfull \hbox (49.55377pt too wide) in paragraph at lines 947--958
 
 [20]
 
-[21] (./atlas_note.aux)
+[21]
+
+[22] (./atlas_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `atlas_note.out' has not changed.
-(rerunfilecheck)             Checksum: 9CA201B086B54B606FBE331F7C27C8F3;6980.
+(rerunfilecheck)             Checksum: 73D9CE0E8445771CFB81619F3ABA4E34;7461.
  ) 
 Here is how much of TeX's memory you used:
- 23978 strings out of 475102
- 451358 string characters out of 5764878
- 870098 words of memory out of 5000000
- 46503 multiletter control sequences out of 15000+600000
+ 23985 strings out of 475102
+ 451455 string characters out of 5764878
+ 870231 words of memory out of 5000000
+ 46507 multiletter control sequences out of 15000+600000
  584569 words of font info for 101 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,650b,611s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -959,10 +961,10 @@ xmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/publ
 ic/cm-super/sftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900
 .pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/tex
 mf/fonts/type1/public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (21 pages, 1102015 bytes).
+Output written on atlas_note.pdf (22 pages, 1108521 bytes).
 PDF statistics:
- 476 PDF objects out of 1000 (max. 8388607)
- 364 compressed objects within 4 object streams
- 89 named destinations out of 1000 (max. 500000)
- 236 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 489 PDF objects out of 1000 (max. 8388607)
+ 376 compressed objects within 4 object streams
+ 92 named destinations out of 1000 (max. 500000)
+ 252 words of extra memory for PDF output out of 10000 (max. 10000000)
 
