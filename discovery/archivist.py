@@ -282,9 +282,14 @@ def survey_log(log_dir=None, min_protr=None):
             "broken": j.get("premises_broken") or [],
             "horizon": s.get("horizon_frame"),
             "spec_path": sy,
+            **_chemistry(d),
             **_mechanics(d, s),
         })
-    out.sort(key=lambda r: -r["protr_peak"])
+    # PATTERNED FIRST, then sound, then elongation. Ranking on elongation alone is what left the
+    # cold start with nothing to say: every run on disk sits at protr_peak ~1.1, and the ones that
+    # differ meaningfully differ in whether their chemistry is alive.
+    out.sort(key=lambda r: (-(r.get("patterned") or 0.0), not r.get("chem_ok"),
+                            r["specimen"] != "valid", -r["protr_peak"]))
     if min_protr is not None:
         out = [r for r in out if r["protr_peak"] >= min_protr]
     return out
@@ -292,6 +297,50 @@ def survey_log(log_dir=None, min_protr=None):
 
 def _num(v):
     return round(float(v), 3) if isinstance(v, (int, float)) else None
+
+
+def _chemistry(run_dir):
+    """DID THE CHEMISTRY WORK? The question the cold start was not asking, and the only one that
+    separates a usable starting point from a dead one.
+
+    It ranked on protr_peak and n_protruding, which are zero for every run on disk, so it
+    correctly reported that nothing had ever protruded and then had nothing left to rank by. It
+    fell back to the reference recipes -- and okuda_route carries gierer_meinhardt, whose
+    activator runs away uniformly to 1.4e6 and takes the run with it. Hours were spent there.
+
+    A run with a LIVE TURING PATTERN and no protrusion is a far better place to start than a
+    recipe whose chemistry explodes: the pattern is the hard part, and the protrusion is what the
+    campaign is for.
+
+        patterned   max spatial spread of the activator. A Turing pattern REQUIRES this > 0;
+                    a uniform field is a well-mixed ODE and can never make a shape.
+        chem_ok     did it stay finite for the whole run
+    """
+    out = {"patterned": None, "chem_ok": None, "act_peak": None}
+    p = os.path.join(run_dir, "metrics.json")
+    if not os.path.exists(p):
+        return out
+    try:
+        import numpy as np
+        s = json.load(open(p)).get("series") or []
+        if not s:
+            return out
+        g = lambda e, k: (e.get(k) if isinstance(e.get(k), (int, float)) else float("nan"))
+        mx = np.array([g(e, "act_max") for e in s])
+        mn = np.array([g(e, "act_min") for e in s])
+        me = np.array([g(e, "act_mean") for e in s])
+        fin = np.isfinite(mx) & np.isfinite(mn)
+        out["chem_ok"] = bool(np.isfinite(me).all())
+        # A SPREAD MEASURED ON A DIVERGING FIELD IS NOT A PATTERN. cfl_c000p050_d010p000 reports
+        # 7.2e20 because it exploded, and sorting on that put the worst run on disk at the top of
+        # the list of good starting points. The spread only counts where the chemistry stayed
+        # finite for the whole run.
+        out["patterned"] = (float(np.nanmax(mx[fin] - mn[fin]))
+                            if (fin.any() and out["chem_ok"]) else 0.0)
+        out["act_peak"] = float(np.nanmax(me[np.isfinite(me)])) if np.isfinite(me).any() else None
+    except Exception:
+        pass
+    return out
 
 
 def _mechanics(run_dir, summary):
@@ -342,20 +391,25 @@ def log_table(rows=None, top=18):
     if not rows:
         return "log/okuda holds no finished run with a composition and an admitted number."
     L = [f"{len(rows)} finished run(s) on disk with a composition and a measured protr_peak.",
-         "Sorted by protr_peak. `specimen` is the Biologist's verdict on the run that produced it.",
+         "Sorted by PATTERN first, then soundness, then elongation.",
          "",
-         f"{'run':26}{'comp':10}{'protr_peak':>11}{'cells':>7}{'f_end':>8}{'relaxed':>9}"
+         f"{'run':26}{'pattern':>9}{'chem':>6}{'protr_peak':>11}{'cells':>7}{'relaxed':>9}"
          f"{'protrud':>8}  specimen"]
     for r in rows[:top]:
-        L.append(f"{r['run'][:25]:26}{str(r['comp'])[:9]:10}"
+        L.append(f"{r['run'][:25]:26}{_fmt(r.get('patterned')):>9}"
+                 f"{('ok' if r.get('chem_ok') else 'NaN'):>6}"
                  f"{r['protr_peak']:>11.2f}{(r['n_cells_final'] or 0):>7.0f}"
-                 f"{_fmt(r.get('f_end')):>8}"
                  f"{('yes' if r.get('relaxed') else ('no' if r.get('relaxed') is not None else '—')):>9}"
                  f"{(r.get('n_protruding_max') if r.get('n_protruding_max') is not None else '—'):>8}"
                  f"  {r['specimen']}"
                  + (f"  [{', '.join(r['broken'][:3])}]" if r["broken"] else ""))
     sound = [r for r in rows if r["specimen"] in ("valid", "valid (declared)")]
-    L += ["", f"{len(sound)} of {len(rows)} were run on a specimen the Biologist passed.",
+    npat = sum(1 for r in rows if (r.get("patterned") or 0) > 0.01 and r.get("chem_ok"))
+    L += ["", f"{npat} of {len(rows)} have a LIVE SPATIAL PATTERN with finite chemistry -- the "
+              f"first thing to require of a starting point, because a uniform field is a "
+              f"well-mixed ODE and can never make a shape. `pattern` is the peak spread of the "
+              f"activator across the surface.",
+          f"{len(sound)} of {len(rows)} were run on a specimen the Biologist passed.",
           "From mechanics.npz: `f_end` is the mean residual force over the last fifth of the "
           "run, `relaxed` says whether it had STOPPED MOVING by then (a run still relaxing is a "
           "snapshot of something in motion -- breeding from it breeds from a transient), and "
@@ -391,18 +445,17 @@ def cold_start(ledger=None, timeout_min=6, log_dir=None):
     # FROM, and an Archivist asked to pick the best of sixty failures will pick one. Arithmetic
     # decides this, not the model: if nothing ever protruded, no run on disk is a starting point
     # for a campaign whose objective is a tube.
-    protruded = [r for r in rows if (r.get("n_protruding_max") or 0) > 0]
-    if not protruded:
+    patterned = [r for r in rows if (r.get("patterned") or 0) > 0.01 and r.get("chem_ok")]
+    if not patterned:
         return _record({
             "stage": "cold_start", "start": [], "asked": False,
             "n_on_disk": len(rows), "n_sound": len(sound), "n_protruded": 0,
-            "why": f"NOTHING ON DISK EVER PROTRUDED. Across all {len(rows)} finished runs, "
-                   f"n_protruding never exceeded 0 and protr_peak never exceeded "
-                   f"{max(r['protr_peak'] for r in rows):.2f}. Every one of them is a sphere. "
-                   f"There is no measured starting point for a campaign whose objective is a "
-                   f"tube, so the frontier falls back to the reference recipes -- and that is a "
-                   f"CHOICE recorded here, not a default nobody noticed."})
+            "why": f"NO RUN ON DISK HAS A LIVE SPATIAL PATTERN. Across all {len(rows)} finished "
+                   f"runs the activator never varied across the surface, so none of them is a "
+                   f"Turing system that could make a shape. The frontier falls back to the "
+                   f"reference recipes -- a CHOICE recorded here, not a default nobody noticed."})
     tab = log_table(rows)
+    rows = patterned + [r for r in rows if r not in patterned]
 
     from llm import run_agent, budget_note
     prompt = f"""ARCHIVIST, COLD START. A new campaign is beginning. Choose where it starts.
