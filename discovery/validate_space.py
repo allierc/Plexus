@@ -138,8 +138,20 @@ def main():
     # `ckpt`: PORTABILITY. make() bakes an absolute /workspace path; a tracked config must run
     # both in the devcontainer and on the cluster, which mount the same export at different
     # prefixes, so we emit a repo-relative path resolved by run_one against its own location.
+    # `vth_frac`: THE D5b FIX. The archived recipes cap a cell's target volume at 1.5x while
+    # divide_3d fires at 2.0x -- the ceiling sits BELOW the trigger, so volume-triggered division
+    # was arithmetically impossible and every division ever seen came from the max_cycle timeout.
+    # The ceiling is now derived from the trigger (2.0 x 1.25 = 2.5). The space is right and the
+    # archive is wrong, so this divergence is deliberate. Listed rather than back-fitted into the
+    # archived recipes: rewriting history to make a test pass is how a reference stops being one.
     DELIBERATE = {"dt", "every", "max_cycle", "max_div", "record_every",
-                  "min_cycle", "max_div_frac", "ckpt"}
+                  "min_cycle", "max_div_frac", "ckpt", "vth_frac",
+                  # `chi`/`rate`: THE D5a FIX, guarded by V11 below exactly as V10 guards the
+                  # divide clock. Both are rescaled by 1/dt because cell_react and cell_diffuse
+                  # EMIT=velocity into `chem`, so the engine was integrating the chemistry with
+                  # the MECHANICS substep -- 300 frames bought 6 units of reaction time instead
+                  # of ~500. Exempt here, verified there; an exemption nobody checks is a hole.
+                  "chi", "rate"}
     if have_make:
         for name in TRUSTED:
             if name not in specs or name not in presets:
@@ -253,6 +265,43 @@ def main():
                   "round 41 by hand == one automatic necessity test here")
         else:
             check("V7 ablate extrude", False, "reference recipe has no extrude node")
+
+    # ---------------------------------------------------------------- V11 chemistry clock
+    print("\nV11 CHEMISTRY CLOCK -- is the RD rescaling exactly 1/dt, and is the RATIO intact?")
+    from translate import RD_PER_FRAME
+    if have_make:
+        for name in TRUSTED:
+            if name not in specs or name not in presets:
+                continue
+            try:
+                _, hand = rtr.make(presets[name])
+                hb = {o["op"]: o for o in hand["operators"]}
+                sb = {o["op"]: o for o in specs[name]["operators"]}
+                bad = []
+                for op, key in (("cell_diffuse", "chi"), ("cell_react", "rate")):
+                    if op not in hb or op not in sb or hb[op].get(key) is None:
+                        continue
+                    want = hb[op][key] * RD_PER_FRAME
+                    got = sb[op].get(key)
+                    if got is None or abs(got - want) > 1e-6 * max(1.0, abs(want)):
+                        bad.append(f"{op}.{key} {got} != {hb[op][key]}x{RD_PER_FRAME}")
+                # THE INVARIANT THAT MATTERS: the Turing wavelength is set by the RATIO of
+                # diffusion to reaction, so rescaling both by the same factor must leave it
+                # alone. If only one moved, the clock fix would have silently retuned the
+                # pattern -- a far worse bug than the one it repaired.
+                if ("cell_diffuse" in hb and "cell_react" in hb
+                        and hb["cell_diffuse"].get("chi") and hb["cell_react"].get("rate")
+                        and sb.get("cell_react", {}).get("rate")):
+                    r_hand = hb["cell_diffuse"]["chi"] / hb["cell_react"]["rate"]
+                    r_spec = sb["cell_diffuse"]["chi"] / sb["cell_react"]["rate"]
+                    if abs(r_hand - r_spec) > 1e-6 * max(1.0, r_hand):
+                        bad.append(f"ratio changed {r_hand:.4f} -> {r_spec:.4f}")
+                if "cell_diffuse" in hb or "cell_react" in hb:
+                    check(f"V11 {name}", not bad,
+                          "; ".join(bad) if bad else
+                          f"both x{RD_PER_FRAME:.0f}, wavelength ratio unchanged")
+            except Exception as e:
+                check(f"V11 {name}", False, f"{type(e).__name__}: {str(e)[:70]}")
 
     # ---------------------------------------------------------------- V8 coverage
     print("\nV8 COVERAGE -- every vocabulary operator exercised?")

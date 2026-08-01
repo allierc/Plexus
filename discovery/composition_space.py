@@ -952,6 +952,14 @@ def reference_recipes():
     # NO morphogen -> divide_3d.axis here: `hertwig` splits on the cell's OWN longest axis and
     # exposes no `axis` slot. The earlier version made that connection anyway; it compiled and
     # was SILENTLY IGNORED. Caught by the consolidated Critic rule R4_SLOT_NOT_ON_IMPL.
+    #
+    # THE SECOND HALF OF OKUDA'S COUPLING. Chemistry deforms the tissue and the tissue's shape
+    # feeds back into the chemistry -- his flux is weighted by shared wall area and cell volume.
+    # This recipe carried only the first arrow, because until Phase 2 no operator expressed the
+    # second: a recipe named for his route was missing the half that makes it his. `curvature` is
+    # the implementation his own framing implies; the other three are the alternative hypotheses,
+    # and swapping them is a legal one-edit move rather than a dial.
+    h, _ = h.apply(("add_op", "shape_to_chem", "curvature"))
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.
