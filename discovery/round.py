@@ -294,6 +294,32 @@ def quarantine_scan(archive=None, log_root=None, ledger_path=None, verbose=True)
 
 
 # --------------------------------------------------------------------------- LOOP I batch
+
+def _ground_starting_conditions(g, sl):
+    """Set this slot's starting cell count from the PAPER rather than from a config default.
+
+    Which of Okuda's cases applies depends on what the slot is for: his tubulation and branching
+    figures start at 200 cells, his undulation figure at 2000. The slot says which phenotype it
+    is chasing; absent that, tubulation is the campaign's standing target.
+
+    Returns the graph unchanged if the composition has no seeding node -- a checkpoint start
+    carries its own count and must not be overwritten.
+    """
+    from agents.grounder import setup
+    claim = f"{sl.get('claim', '')} {sl.get('why', '')}".lower()
+    case = "undulation" if ("undulation" in claim or "spot" in claim) else "tubulation"
+    spec = setup(case)
+    seeder = next((o for o in g.ops if o["op"] == "seed_mesh_3d"), None)
+    if seeder is None:
+        return g
+    key = f"{seeder['id']}.n_cells"
+    if g.params.get(key) == spec["n_cells"]:
+        return g
+    sl["grounded"] = (f"n_cells {spec['n_cells']} ({case}) -- Okuda: "
+                      f"\u201c{spec['quote'][:70]}\u2026\u201d")
+    return g.with_params({**g.params, key: spec["n_cells"]})
+
+
 def build_composition_batch(sup, cfg, n_slots, ledger):
     """Proposer(LLM) -> Critic -> Reflection(LLM). Returns [(graph, label, hyp_fields)]."""
     frontier = load_frontier()
@@ -326,6 +352,20 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                 rejected.append((i, f"edit not applicable: {ex}"))
                 continue
             lbl = sl.get("label") or str(e)
+        # THE GROUNDER SPEAKS HERE, and until now it never did. It is the only agent that reads
+        # Okuda's paper, it had no call site anywhere in the pipeline, and the consequence was
+        # measured rather than argued: a 27-run batch was launched at 150 cells against a paper
+        # that says 200, and every run stopped dead on the mesh reservoir.
+        #
+        # It ADVISES, it does not gate. The faithful share of a batch inherits his starting
+        # conditions; the exploratory share is free to leave them, which is the 70/30 split --
+        # a search that may only ever stand where the paper stands cannot discover that the
+        # paper is not the only place to stand. What is NOT optional is the reservoir, and that
+        # lives in the translator, where it applies to both shares alike.
+        fid = sl.get("fidelity", "okuda" if i < max(1, int(round(0.7 * len(slots)))) else "free")
+        if fid == "okuda":
+            g = _ground_starting_conditions(g, sl)
+        sl["fidelity"] = fid
         adm, rej = C.admit(g, seen if sl.get("intent") != "control" else ())
         if not adm:
             rejected.append((i, f"CRITIC: {rej}"))

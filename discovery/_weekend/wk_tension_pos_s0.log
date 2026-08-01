@@ -20,3 +20,31 @@ premise check -- wk_tension_pos_s0 (static, pre-run)
 [wk_tension_pos_s0] {"saturated": true, "inert_operators": [], "retention": 0.968, "valid_evidence": false, "protr_final": 1.036, "protr_peak": 1.07, "horizon_frame": null, "horizon_why": "no metrics.npz (tube_analysis did not run)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.07, "protr_final_untruncated": 1.036, "n_cells_final": 1778, "red_frac_final": 0.294, "act_max_final": 0.856, "frames": 401, "wall_s": 157.7, "mech_force_mean": 28.6097, "mech_p_body": 3.5514, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 6.1883, "mech_migration": 0.51683}
 [wk_tension_pos_s0] D4 ok: all 12 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_rd_seed': 3, 'cell_adjacency': 74} ...)
 [wk_tension_pos_s0] camera: FIXED Lbox=17.971 for all 401 frames and both views (per-frame autofit would have run 5.345 -> 17.904, x3.35: that rescaling is what hid growth)
+[wk_tension_pos_s0] artefacts -> log/okuda/wk_tension_pos_s0/{strip.png,movie.mp4}
+
+premise check -- wk_tension_pos_s0 (post-run)
+  [ok  ] P1   cells grow by taking material in
+            tissue volume 427.7 -> 14413.5 (x33.70)
+  [ok  ] P11  tissue cannot pass through itself
+            at every frame at least 100.0% of rays cross the surface exactly once
+  [ok  ] P12  a concentration is non-negative and finite
+            the activator stays non-negative throughout (minimum 1.9e-05)
+  [ok  ] P2   morphogen sets where/how fast, not whether
+            gated growth with a baseline floor rho=0.35
+  [ok  ] P3   a cell divides because it got big
+            growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it
+  [ok  ] P3b  mean cell volume holds under proliferation
+            mean cell volume ends at 1.00 of its peak (8.11 -> 8.11)
+  [ok  ] P4   the chemistry must not be silently extinguished
+            activator ends at 0.83 of its peak (1.033 -> 0.856)
+  [ok  ] P5   mechanics is fast, biology is slow
+            the reaction advances 1 time units per frame
+  [ok  ] P5b  the mechanical relaxation keeps up with the tissue
+            residual force after relaxation 16.69 -> 27.84 (x1.67) while the tissue grew from 150 to 1778 cells
+  [ok  ] P7   a sheet does not absorb added area by stretching
+            the stretched tail stays at shape index 4.10 over the final fifth; reduced volume 0.991
+  [ok  ] P8   the shape index has a hard geometric floor
+            minimum shape index 3.6490 respects the floor 3.5449
+  [ok  ] P9   a closed epithelium is a sphere with no holes
+            genus 0 at all 40 recorded frames
+  ALL PREMISES HOLD   (12 pass, 0 declared ablation, 0 n/a)

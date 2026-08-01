@@ -1,5 +1,17 @@
 #!/usr/bin/env python
-"""premise_check -- run the tissue premises against a spec and a run, and fail when one is broken.
+"""biologist -- run the tissue premises against a spec and a run, and fail when one is broken.
+
+NAMED FOR THE JOB, NOT THE MECHANISM. It was `premise_check`, which describes how it works
+rather than what it is for, and it sat in the roster as "the premise gate" beside things that
+reason. The pair that makes the roster legible is:
+
+    Metrologist  -- does the INSTRUMENT work?
+    Biologist    -- is the SPECIMEN a tissue?
+
+That is exactly the distinction the campaign discovered it was missing: the loop could always
+tell whether a SIMULATION succeeded -- did it finish, is the mesh valid, are the numbers finite
+-- and had never once been able to tell whether the thing it simulated was a tissue.
+(PREMISES.md keeps its name: it holds the premises, and this is the agent that checks them.)
 
 WHY THIS PHASE EXISTS
 ================================================================================================
@@ -47,10 +59,10 @@ runs from this campaign whose answer we already know -- mini_coral (chemistry de
 mini_coral_nodilute (alive), mini_grow_divide (ceiling below trigger) against
 mini_grow_divide_bigger (above). Same discipline metric_author applies to metrics.
 
-    python premise_check.py --certify                 # prove the checks catch what they claim
-    python premise_check.py <run_name>                # static + passive on a finished run
-    python premise_check.py <run_name> --probe        # ... and run the probes too
-    python premise_check.py --spec <config_name>      # static only, before running anything
+    python biologist.py --certify                 # prove the checks catch what they claim
+    python biologist.py <run_name>                # static + passive on a finished run
+    python biologist.py <run_name> --probe        # ... and run the probes too
+    python biologist.py --spec <config_name>      # static only, before running anything
 """
 from __future__ import annotations
 

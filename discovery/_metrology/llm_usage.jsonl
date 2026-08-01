@@ -1,0 +1,1 @@
+{"t": 1785591806.758033, "round": null, "agent": "judge", "min": 0.058, "ok": true, "kind": "llm", "note": "", "num_turns": 1, "duration_ms": 3005, "duration_api_ms": 2340, "cost_usd": 0.320915, "input_tokens": 2997, "output_tokens": 4, "cache_creation": 30583, "cache_read": 0, "stop_reason": "end_turn", "is_error": false, "session_id": "4b86f89e-7635-411e-9fb9-10412456294f"}

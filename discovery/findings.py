@@ -242,7 +242,7 @@ def seed():
                  "run finish, is the mesh valid, are the numbers finite -- passed on all ten.",
         cause="The loop validates the SIMULATION and has never validated the SPECIMEN. Those are "
               "different questions and only the second catches a ball that quietly implodes.",
-        changed="premise_check.py: eleven premises about tissue, executable, gated into every run, "
+        changed="biologist.py: eleven premises about tissue, executable, gated into every run, "
                 "each certified against a case whose answer was already known.",
         tags=["standing", "method"])
 

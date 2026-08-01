@@ -152,7 +152,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # growth ceiling below the division trigger, or chemistry on the mechanics clock, makes every
     # downstream number a statement about the configuration rather than about the tissue.
     # A deliberate violation is legal -- declare it in the spec under _premises.waive.
-    import premise_check as _pc
+    import biologist as _pc
     _static = _pc.check(cfg)
     if _pc.report(_static, f"{name} (static, pre-run)"):
         raise SystemExit(f"[{name}] refusing to run: a premise is broken before the simulation "

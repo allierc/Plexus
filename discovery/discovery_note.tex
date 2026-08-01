@@ -187,9 +187,9 @@ and it has one catch to its name. That number is the honest measure of Track A.
 \section{The team of agents}\label{sec:agents}
 
 Nine agents read evidence and form a judgement; five checks are deterministic code that simply
-refuses. Seven of the nine run every round, and the two that never run are the interesting ones ---
-the Grounder is the only agent that knows what the target is, and its absence is why a 27-run batch
-started at 150 cells against a paper that says 200. Wiring it is Phase 3(a).
+refuses. Eight of the nine now run every round --- the Grounder was wired this session, and until
+then nothing in the loop had ever asked the paper anything, which is why a 27-run batch started at
+150 cells against a paper that says 200. Evolution alone is still written and never called.
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.88\textwidth]{figures/agents_sheet.png}
@@ -410,7 +410,7 @@ chemistry clock, previously exempt and unchecked, gained a test of its own: both
 by exactly $1/\mathrm{dt}$ \emph{and} their ratio must be unchanged, since that ratio is what sets
 the Turing wavelength. \textbf{61 of 61.}
 \end{phasebox}
-\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \prog\ (1 of 3)}
+\begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \prog\ (2 of 3)}
 \textbf{Ablation is now compulsory} --- \emph{done}, and it is the part that matters. A claim that
 one thing \emph{causes} another needs two experiments and we were enforcing neither: adding a
 mechanism and seeing the shape appear shows it is \emph{sufficient}; taking it away and seeing the
@@ -423,17 +423,21 @@ longer outrun the experiment.}
 
 \textbf{Still to do --- and one of the three is now the priority.}
 
-\textbf{(a) Wire the Grounder.} It is the only agent that reads the paper, and it has no call site
-anywhere. Until a batch is built by \emph{asking it}, the starting conditions come from whatever
-default sits in a config --- which is how 27 runs were launched at 150 cells against a paper that
-says 200. It needs two things: Okuda's starting conditions added alongside the figure targets it
-already holds, and a call at batch-construction time. The faithful share of a batch then inherits
-his numbers from the paper; the exploratory share is free to leave them, which is the 70/30 split.
+\textbf{(a) Wire the Grounder} --- \emph{done}. It is the only agent that reads the paper and it
+had no call site anywhere; every entry point was exercised only by its own smoke test. Batch
+construction now asks it, and it answers with Okuda's own numbers: 200 cells for the tubulation
+and branching figures, 2000 for undulation, each carrying the sentence it came from. It arrives as
+a \emph{parameter}, so composition identity is unchanged --- setting the starting size is a retune,
+not a new mechanism, and the search cannot mistake one for the other.
 
-Two rules keep that from becoming a straitjacket. The Grounder \emph{advises} --- it supplies
-numbers, it does not forbid others, or the exploratory 30\% would be dead. What is \emph{not}
-optional is the reservoir check: a run that cannot reach the cell count it is aiming at measures
-the array rather than the tissue, whichever share it belongs to.
+Two rules keep it from becoming a straitjacket. The Grounder \emph{advises}: the faithful share of
+a batch inherits his numbers, the exploratory share is free to leave them --- a search that may
+only ever stand where the paper stands cannot discover that the paper is not the only place to
+stand. What is \emph{not} optional is the reservoir, and that lives in the translator where it
+applies to both shares alike.
+
+Still open here: asserting a run against his published constants. The values are written down;
+nothing yet checks a run against them.
 
 \textbf{(b) Evolution and the Referee}, the two idle faces in the list above.
 

@@ -32,7 +32,7 @@ WHAT IS DIFFERENT FROM EVERY PREVIOUS BATCH
 Every instrument it will be read with exists and has been certified against a case whose answer
 was already known:
 
-    premise_check      12 premises, 15/15 certified, gating every run
+    biologist      12 premises, 15/15 certified, gating every run
     morphology         sphere/undulation/tube/branched/invalid, certified on built shapes
     pattern_scale      n_spots exact at 3/5/12, spacing within 13% of R sqrt(4pi/k)
     reduced_volume     0.996 on a sphere, 0.55 on a crumple
