@@ -1327,3 +1327,49 @@ METHOD NOTE (Cedric). All three defects are "does this operator do what its name
 three were found by a human looking at a picture. This is the fourth time. The parameter-stability
 map I built by hand while fixing D1 is exactly what the loop should be producing on its own -- it
 goes in as a Phase 1 operator sweep result, not as constants I picked.
+
+## 2026-07-31 late — Phases 2, 3, 4 and the weekend battery
+
+PHASE 2 (4 of 6).
+  R0 frozen at the seed radius while cell targets grew 16x -- the binding constraint on
+  reachability, and the root cause of the retracted buckling transition (F004/F005/F006). Fixed:
+  R0 follows the enclosing sphere of the current TARGET volume, deliberately not the measured mean
+  radius, which would make the spring chase the shell's own excursions and penalise a bud.
+  Verified: rays cross exactly once at every frame where they previously crossed 13-17 times.
+
+  shape_to_chem: the missing arrow. ONE contract, FOUR implementations (curvature, tension,
+  apical_area, pressure), because WHICH feature the chemistry listens to is the hypothesis, not a
+  parameter -- comp_hash includes implementation and excludes theta. `force` and `size` refused,
+  with reasons in the docstring. Feature standardised before beta touches it (the F009 lesson
+  applied pre-emptively). Certification caught two of my errors: the curvature normalisation
+  (2R/L^2, only looked like 1/R because the test held cell count fixed) and my own bump test
+  (scaling a cap outward makes it FLATTER). Two blow-ups fixed end-to-end; premise 12 (a
+  concentration is non-negative) came out of the second.
+
+PHASE 3 (1 of 3). Ablation compulsory: claim_kind on every hypothesis, critic.check_batch rejects
+  A1_NO_ABLATION before any compute, allowed_verb stops the write-up outrunning the experiment.
+
+PHASE 4 (built + calibrated).
+  morphology classifier: sphere/undulation/tube/branched/invalid/unclear, certified on built
+  shapes. `invalid` beats every morphology. Records the run's PATH, not just its end.
+  pattern_scale: n_spots exact at 3/5/12, spot_spacing within 13% of R sqrt(4pi/k).
+
+  THE CALIBRATION WENT SOMEWHERE ELSE (F011/F012). Counting spots over time showed the pattern
+  never settles -- 104 -> 62 -> 19 -> 7 -> ONE domain at 53% coverage, stable from step 400 to
+  3000. The campaign's chemistry has always been in the LABYRINTH regime. "Five spots" was a
+  moment during coarsening. Swept Pearson's diagram for STABLE spots (count at 1500 vs 3000):
+  F 0.046 / kk 0.062 gives three spots on all three seeds. Frozen.
+
+  Also retracted F010: the autocorrelation wavelength failed its own certification (the ratio
+  true-lambda / first-minimum came out 1.37, 1.79, 1.49 -- not a constant). Kept as a labelled
+  diagnostic, not shipped as comparable.
+
+WEEKEND BATTERY: 27 runs, 4 features x 2 signs x 3 seeds + 3 nulls, both GPUs. The null is the
+subtractive direction, so the batch satisfies the ablation rule it was built alongside. First
+batch in the campaign whose every instrument was certified against a known answer BEFORE it ran.
+The gate already earned itself: a smoke run was refused for P4 (chemistry extinguished by growth
+dilution) before any result was read.
+
+OPEN FOR MONDAY: P5b fails even at relax_iters 60 -- the residual force still climbs as the tissue
+grows. Recorded as a verdict rather than chased. Phase 2 still needs the widened settings and the
+published-constants fixture; Phase 3 still needs Evolution, the Referee and the parallel calls.
