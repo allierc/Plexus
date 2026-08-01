@@ -117,7 +117,47 @@ def run_round(batch, frames, mode="composition", timeout_min=180):
         return 1, round((time.time() - t0) / 60, 1), f"{type(e).__name__}: {e}"
 
 
+def _already_running():
+    """Refuse to start beside another campaign. Two loops share campaign/ and the round counter.
+
+    MEASURED, not hypothetical: two were launched by accident on 1 August and both claimed the
+    same round number within a minute of each other. `pose()` refuses to overwrite a hypothesis
+    id, so the second would have died on `R2.0.xxxxxx already posed` -- but only after submitting
+    its jobs, so both batches would have run and one would have had nowhere to record itself.
+    """
+    import subprocess as _sp
+    me = os.getpid()
+    try:
+        out = _sp.run(["pgrep", "-f", "campaign_loop.py"], capture_output=True, text=True).stdout
+    except Exception:
+        return None
+    others = [int(x) for x in out.split() if x.strip().isdigit() and int(x) not in (me, os.getppid())]
+    # a pgrep hit can be this process's own shell wrapper; check it is really a running loop
+    live = []
+    for pid in others:
+        try:
+            cmd = open(f"/proc/{pid}/cmdline").read().replace(chr(0), " ")
+        except Exception:
+            continue
+        # argv[0] must BE a python, and campaign_loop.py must be its script -- not merely a
+        # string somewhere in the line. A shell wrapper whose command text happens to mention
+        # both is not a running campaign, and treating it as one makes the guard refuse forever.
+        argv = [a for a in cmd.split(" ") if a]
+        if len(argv) >= 2 and "python" in os.path.basename(argv[0]) \
+                and os.path.basename(argv[1]) == "campaign_loop.py":
+            live.append((pid, cmd.strip()))
+    return live or None
+
+
 def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
+    other = _already_running()
+    if other:
+        print("[campaign] REFUSING TO START -- another campaign loop is already running:")
+        for pid, cmd in other:
+            print(f"    pid {pid}: {cmd[:110]}")
+        print("  Two loops share campaign/ and the round counter; the second would submit its")
+        print("  jobs and then die with 'already posed', having nowhere to record them.")
+        raise SystemExit(4)
     print("=" * 96)
     print(f"CAMPAIGN LOOP -- up to {n_rounds} rounds of {batch}, starting {time.strftime('%H:%M')}")
     print("=" * 96)
