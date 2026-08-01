@@ -143,6 +143,7 @@ def _emit_seed(g, n, ga):
     # the D3 alignment assertion fires. (Found by that assertion on the first real run.)
     return {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
             "n_cells": int(_p(g, n["id"], "n_cells")),
+            "seed": SEED_SENTINEL,          # filled from general.seed -- see _seed_the_run
             "vseed_cv": float(_p(g, n["id"], "vseed_cv"))}
 
 
@@ -371,6 +372,47 @@ def _assert_rd_stable(ops, dt, name=""):
             f"help. (working reference: coral_fixed_ball sits at 0.21)")
 
 
+
+# ============================================================================ RUN-TO-RUN SEEDING
+# THE DEFECT: `general.seed` was written into every spec and read by NOTHING. Both stochastic
+# operators take a `seed` parameter -- seed_mesh_3d for the vertex jitter, cell_rd_seed for which
+# cells are nucleated -- and the translator passed neither. So a batch of "three seeds" was three
+# copies of one run: measured on 2026-08-01, seeds 0/1/2 at seed_frac 0.06 gave act_max 0.501,
+# 0.501, 0.501 and red_frac 0.374, 0.374, 0.374 -- bit-identical to three decimal places.
+#
+# Replication is not a nicety here. The campaign's whole objective is to tell "this MECHANISM
+# makes tubes" from "this RUN made a tube", and the only instrument for that is running the same
+# composition again differently. Every spread this campaign has quoted across seeds describes the
+# floating-point reproducibility of one trajectory.
+SEED_SENTINEL = "__RUN_SEED__"
+SEEDED_OPS = ("seed_mesh_3d", "cell_rd_seed")
+
+
+def _seed_the_run(ops, seed_):
+    """Give every stochastic operator this run's seed, and refuse if none would take it.
+
+    ONE seed, shared, because that is what the working specs do. `archive_rounded.py`,
+    `archive_vh_rd_coral.py` and `run_tyssue_fig5.py` all pass the same SEED to seed_mesh_3d and
+    cell_rd_seed. I first offset them per operator, reasoning that the mesh jitter and the
+    nucleation are independent draws -- true, and beside the point: a composition that reproduces
+    an archived run has to draw the same numbers it did, and the archive's convention is shared.
+    Departing from it would have made every reproduction check compare two different experiments,
+    which is the error this campaign keeps finding in other places.
+    """
+    n_seeded = 0
+    for o in ops:
+        if o.get("op") in SEEDED_OPS or o.get("seed") == SEED_SENTINEL:
+            o["seed"] = int(seed_)
+            n_seeded += 1
+    if n_seeded == 0:
+        raise ValueError(
+            "this spec declares general.seed and no operator consumes it, so changing the seed "
+            "cannot change the run. A batch of replicates would be one run repeated -- which is "
+            "what happened for the whole campaign until 2026-08-01. Either add a stochastic "
+            "operator or stop calling the batch replicated.")
+    return n_seeded
+
+
 def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_after=None,
             record_every=1):
     """Compile a CompositionGraph into a runnable Plexus spec dict.
@@ -405,6 +447,7 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
         _assert_params_consumed(graph, node, spec_op)
         ops.append(spec_op)
 
+    _seed_the_run(ops, seed_)
     _assert_rd_stable(ops, DT_GLOBAL, name)
 
     # D3: topology must be recorded on the SAME stride as positions, and this is asserted
