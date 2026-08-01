@@ -57,7 +57,9 @@ def use_tag(tag):
     TAG = tag
     LOGDIR = os.path.join(PLEXUS, "log", "atlas", f"_cluster6_{tag}")
     RUNS = os.path.join(PLEXUS, "log", "atlas", f"_phase6_{tag}")
-    C.PREFIX = f"at6{tag[0]}_"
+    # the WHOLE tag, not its first letter: two tags starting with the same letter
+    # would share a job-name prefix and each would see the other's jobs in `status`.
+    C.PREFIX = f"at6{tag}_"
     C.LOGDIR = LOGDIR
 
 
