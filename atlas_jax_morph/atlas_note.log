@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 13:49
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 14:38
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -784,7 +784,7 @@ LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
 
 
 [2]
-<_state/saturation.png, id=159, 404.712pt x 260.172pt>
+<_state/saturation.png, id=163, 404.712pt x 260.172pt>
 File: _state/saturation.png Graphic file (type png)
 <use _state/saturation.png>
 Package pdftex.def Info: _state/saturation.png  used on input line 189.
@@ -797,7 +797,7 @@ tion.png>]
 [4]
 
 [5]
-<_oracle/runs/smoke/reference.png, id=181, 1107.9547pt x 224.59293pt>
+<_oracle/runs/smoke/reference.png, id=185, 1107.9547pt x 224.59293pt>
 File: _oracle/runs/smoke/reference.png Graphic file (type png)
 <use _oracle/runs/smoke/reference.png>
 Package pdftex.def Info: _oracle/runs/smoke/reference.png  used on input line 3
@@ -880,7 +880,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 743--744
 
 
 [16]
-<_state/phase5_forward.png, id=276, 1019.007pt x 650.43pt>
+<_state/phase5_forward.png, id=280, 1019.007pt x 650.43pt>
 File: _state/phase5_forward.png Graphic file (type png)
 <use _state/phase5_forward.png>
 Package pdftex.def Info: _state/phase5_forward.png  used on input line 818.
@@ -910,7 +910,7 @@ Overfull \hbox (49.55377pt too wide) in paragraph at lines 1009--1020
 
 
 [20]
-<_state/phase6_variance.png, id=303, 896.148pt x 353.85533pt>
+<_state/phase6_variance.png, id=307, 896.148pt x 353.85533pt>
 File: _state/phase6_variance.png Graphic file (type png)
 <use _state/phase6_variance.png>
 Package pdftex.def Info: _state/phase6_variance.png  used on input line 1070.
@@ -920,7 +920,7 @@ Package pdftex.def Info: _state/phase6_variance.png  used on input line 1070.
 [21]
 
 [22 <./_state/phase6_variance.png>]
-<_state/phase6_verdict.png, id=315, 549.252pt x 361.35pt>
+<_state/phase6_verdict.png, id=319, 549.252pt x 361.35pt>
 File: _state/phase6_verdict.png Graphic file (type png)
 <use _state/phase6_verdict.png>
 Package pdftex.def Info: _state/phase6_verdict.png  used on input line 1138.
@@ -943,7 +943,7 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 
 
 [24]
-<_state/regulated_growth.png, id=330, 982.872pt x 592.614pt>
+<_state/regulated_growth.png, id=334, 982.872pt x 592.614pt>
 File: _state/regulated_growth.png Graphic file (type png)
 <use _state/regulated_growth.png>
 Package pdftex.def Info: _state/regulated_growth.png  used on input line 1240.
@@ -951,20 +951,28 @@ Package pdftex.def Info: _state/regulated_growth.png  used on input line 1240.
 
 
 [25 <./_state/regulated_growth.png>]
+<_state/phase6_invert.png, id=345, 1026.234pt x 607.068pt>
+File: _state/phase6_invert.png Graphic file (type png)
+<use _state/phase6_invert.png>
+Package pdftex.def Info: _state/phase6_invert.png  used on input line 1303.
+(pdftex.def)             Requested size: 460.935pt x 272.6686pt.
 
-[26] (./atlas_note.aux)
+
+[26 <./_state/phase6_invert.png>]
+
+[27] (./atlas_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `atlas_note.out' has not changed.
-(rerunfilecheck)             Checksum: 653488C0238FFA09EF892FE3E4E7EEDB;8415.
+(rerunfilecheck)             Checksum: AA750CD43DFAC3CE83CF6F4166ED6A2D;8742.
  ) 
 Here is how much of TeX's memory you used:
- 24027 strings out of 475102
- 452393 string characters out of 5764878
- 870467 words of memory out of 5000000
- 46539 multiletter control sequences out of 15000+600000
+ 24038 strings out of 475102
+ 452650 string characters out of 5764878
+ 870544 words of memory out of 5000000
+ 46548 multiletter control sequences out of 15000+600000
  585805 words of font info for 105 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,650b,611s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -1002,10 +1010,10 @@ ts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
 uper/sftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></
 usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/font
 s/type1/public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (26 pages, 1410260 bytes).
+Output written on atlas_note.pdf (27 pages, 1602086 bytes).
 PDF statistics:
- 538 PDF objects out of 1000 (max. 8388607)
- 412 compressed objects within 5 object streams
- 99 named destinations out of 1000 (max. 500000)
- 291 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 552 PDF objects out of 1000 (max. 8388607)
+ 423 compressed objects within 5 object streams
+ 101 named destinations out of 1000 (max. 500000)
+ 304 words of extra memory for PDF output out of 10000 (max. 10000000)
 
