@@ -476,14 +476,14 @@ test of one property statable without the reference: a conservation law, a sign,
 symmetry. Nothing enters the validated library at this stage.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4 --- Differential validation \hfill \done\ (107 min, 14 of 16)}
+\begin{phasebox}{Phase 4 --- Differential validation \hfill \done\ (16 of 16)}
 Metric and threshold first; then the same initial condition through both implementations; then
 subtract. \textbf{A failure here is the most informative outcome available} --- it is the
 reproduction telling us the contract is wrong, which is the whole reason for choosing a target
 with code.
 \end{phasebox}
 
-\begin{phasebox}{Phase 5 --- The forward figure \hfill \prog\ (it runs)}
+\begin{phasebox}{Phase 5 --- The forward figure \hfill \done}
 \textbf{Forward only, deliberately first.} A composition of the normalized operators --- growth,
 division, mechanics, secretion, diffusion --- run in the Plexus engine and set beside the same
 composition run in theirs. No optimisation, no gradients: this figure exists to show that the
@@ -753,10 +753,21 @@ and re-applied; all five disputes are on the record.
 \section{The forward figure, and the number that does not match}\label{sec:fwd}
 
 \begin{center}
-\includegraphics[width=\textwidth]{../log/atlas/jax_morph_proliferation/strip.png}\\
-{\small\color{grey}Plexus, running operators normalized out of their code: relax + grow + divide,
-their four founders, their parameters, 40 macro-steps. Compare with the reference strip in \S4.}
+\includegraphics[width=\textwidth]{_state/phase5_forward.png}\\
+{\small\color{grey}\textbf{Phase 5, complete.} The same model in both engines: jax-morph above,
+Plexus below, running operators normalized out of their code (relax + grow + divide, their four
+founders, their parameters, 40 macro-steps). Matched frames, one magnification, cells drawn at
+their true radius --- half the physics here is growth, and a scatter of fixed dots would hide the
+quantity being validated. The two rows are centred on their own clusters because the engines seed
+at different coordinates; a window spanning both would compare the seeds rather than the
+morphology. Below: the two observables a stochastic process actually lets you compare.}
 \end{center}
+
+The figure is the phase's deliverable, and it is worth saying exactly what it does and does not
+claim. \textbf{The morphology matches}: both engines jam into a round, confluent cluster of
+uniformly-sized cells, and the radius of gyration --- the cluster's size, and seed-robust ---
+tracks to 9\% over the whole run ($0.651 \to 3.228$ against $0.686 \to 3.518$). \textbf{The counts
+do not}, and were never going to: 82 against 124.
 
 \begin{center}
 \small
@@ -771,10 +782,10 @@ capacity used & 124 of 600 & 82 of 140 & neither run hit its buffer\\
 \end{tabular}
 \end{center}
 
-The shape matches; the population does not. That is the honest state, and it is worth more than a
-figure that agreed. Two things are already ruled out: it is not an array bound (the buffer is five
-times the final count) and it is not an inert operator (every scheduled operator is recorded as
-having acted, on every frame it ran).
+That disagreement is worth more than a figure that agreed. Two things are ruled out immediately:
+it is not an array bound (the buffer is five times the final count) and it is not an inert
+operator (every scheduled operator is recorded as having acted, on every frame it ran). What it
+actually is, \S\ref{sec:p4} settles.
 
 \textbf{What it took to get even this far} is itself a finding. The first run produced
 \emph{zero} divisions in 40 frames, silently: \code{cell\_divide} read the division rate as a
@@ -784,15 +795,20 @@ Two operators from the same atlas disagreed about where a cell's radius lives. N
 That is the class of defect this whole apparatus exists to catch, and it was caught by the acted
 ledger asking one question: \emph{did this operator ever do anything?}
 
-Phase 4 is now running that comparison properly for every mechanism, metric and threshold written
-down first.
+Phase 4 then ran that comparison properly for every mechanism, with the metric and the threshold
+written down first --- and it is what dissolved the number above.
 
 %======================================================================
 \section{Phase 4 --- what the reference says about our operators}\label{sec:p4}
 
 Sixteen differential tests, each one required to write down its metric and its threshold
-\emph{before} running anything. Fourteen passed; two ran out of time twice and are being retried
-with a bigger budget rather than quietly dropped.
+\emph{before} running anything. Fourteen passed on the first pass; the two that ran out of time
+twice were retried with a bigger budget rather than quietly dropped, and both landed:
+\code{gene\_network\_connectionist} at $6.7{\cdot}10^{-6}$ against a $5{\cdot}10^{-3}$ bar, and
+\code{odecontroller} at $2.4{\cdot}10^{-6}$ against $2{\cdot}10^{-4}$. \textbf{Sixteen of
+sixteen.} Every in-scope mechanism is now \emph{validated}, with zero blocked and zero validator
+violations; the two \emph{alias} entries stop at \emph{normalized} by design, since an alias maps
+onto a contract that is already registered and validated and has nothing of its own to test.
 
 \begin{center}
 \footnotesize
@@ -880,6 +896,70 @@ gradient to an operator parameter & \textcolor{bad}{no path --- parameters are f
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection{Since then: the engine itself is differentiable}\label{sec:p6now}
+
+The first item on that list is fixed, and not by a patch. \code{engine.run} now takes an opt-in
+\code{grad=True}: the tick loop's \code{no\_grad} became conditional and the recording path
+detaches, so the trajectory stays a \emph{record} and the gradient reaches the caller through
+\code{H}. Measured through the real engine --- no monkey-patch, no hand-rolled copy of the loop:
+$\partial\,\mathrm{loss}/\partial\,\code{max\_radius} = 0.168$ over 12 frames and 9 real division
+events, reproducing the hand-rolled probe's number exactly. \textbf{One physics, one tape}, which
+is what \code{prototype/inverse\_slime/} had to do without.
+
+The third item --- ``parameters are floats'' --- turned out to deserve a measurement rather than an
+assertion, because \code{Operator.DIFFERENTIABLE} defaults to \code{True} on all 53 registered
+implementations and nothing had ever checked it. Two independent instruments now do, and they
+answer deliberately different questions: \code{diff/audit.py} injects a tensor \emph{past} the
+constructor, so it measures whether the \textbf{maths} is differentiable in a knob;
+\code{diff/certify.py} runs a real \code{config/atlas/} spec through \code{engine.run(grad=True)},
+so it measures whether a knob is learnable \textbf{as the language can express it today}.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r p{9.1cm}@{}}
+\toprule
+\textbf{verdict} & \textbf{n} & \textbf{what it means}\\
+\midrule
+\textcolor{good}{\textbf{learnable}} & 4 &
+end to end through a real spec: \code{grow\_radius.max\_radius},
+\code{morphogen.diffusion}/\code{degradation}, \code{regulate.gamma} --- precisely the operators
+that already store a tunable as a tensor\\
+\textcolor{warn}{\textbf{constructor-blocked}} & 4 &
+the \code{adhere} family. The maths is differentiable; \code{self.eps = float(params.get(...))}
+drops the tape before \code{forward} ever sees it\\
+\textcolor{bad}{\textbf{needs a surrogate}} & 7 &
+\code{agitate} (\code{math.sqrt} on a tensor), \code{apoptose}, \code{cell\_divide},
+\code{relax}\\
+\textcolor{grey}{unconfirmed} & 10 &
+one source only --- reported as unknown, never as passing\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The two-instrument design earned itself.} The synthetic harness invented three defects
+that were its own: an empty neighbour graph condemned the whole interaction family, a division
+that never fired condemned \code{cell\_divide}, and making the level's own tensor the leaf
+condemned every structural operator. Each was caught by the second route disagreeing. And where
+they still disagree, the disagreement \emph{is} the finding: constructor-blocked is exactly the
+gap between ``the maths works'' and ``a spec can say it''.
+
+\textbf{Two corrections to what this note said before.} \code{cell\_divide} is \emph{not} a dead
+end --- once divisions actually fire, both implementations pass a gradient back to the per-cell
+rate ($|\partial\,\mathrm{loss}/\partial\,\code{division\_rate}| = 46.8$), because the
+straight-through estimator works and because jax-morph drives division from a state block the
+gene network writes, not from the operator's own parameter. The Figure~5 path
+loss $\to$ positions $\to$ draw $\to$ \code{division\_rate} $\to$ gene $\to$ \code{regulate} is
+intact. What remains true is the \emph{variance} argument: a straight-through gradient through one
+sampled rollout still optimises against that sample's luck, which is what the trace contract
+addresses. And \code{relax} gives no parameter gradient by \emph{declaration} --- it sets
+\code{DIFFERENTIABLE = False} and says why: the FIRE path runs detached, and the source's
+implicit-function-theorem adjoint is an explicit follow-up.
+
+\textbf{So the single highest-value next step is now scoped by two instruments rather than by
+opinion}: promote the \code{\_tunable} helper --- today a one-off inside one atlas candidate ---
+onto the operator base class, which converts constructor-blocked into learnable without touching
+any physics.
 
 \subsection{And it optimises}
 
