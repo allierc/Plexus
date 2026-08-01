@@ -696,7 +696,7 @@ The disagreement is still written down, and it is still worth reading.
 \end{phasebox}
 
 \begin{phasebox}{Phase 5 --- The first live run: the agents do not talk to each other \hfill \prog}
-\textbf{It ran, and that is the point.} Two rounds, eight simulations, 23 agent calls, \$11, 29
+\textbf{It ran, and that is the point.} Two rounds, eight simulations, 23 agent calls, 29
 minutes of agent time. \textbf{One usable run. Map coverage 0\%.} Nothing was learned about the
 biology --- and the reason turns out to be worth more than the biology would have been.
 
@@ -765,6 +765,18 @@ That also explains the day's other defects, which looked unrelated and are not: 
 among hundreds of lines, an evidence horizon silently absent, a buffer flag raised after the
 compute was spent, a state file grown past reading, a black movie. Each is a correct output with
 no recipient.
+
+\begin{center}
+\includegraphics[width=\linewidth]{figures/agent_figure.png}
+\end{center}
+\vspace{-6pt}
+{\small \textbf{The round, drawn in the order it runs.} Around the rim, each agent hands
+its work to the next and the chain closes --- that half was built and it works. The inside of the
+ring is the half that was not: the arrows that carry a \emph{finding} back to the agent that
+chooses the next edits. There should be a bundle. There is one, added this week. The Supervisor's
+steer, the Interpreter's causal descriptions and Evolution's refinement reach nothing, so a round
+cannot be changed by what the round found. Drawing it is what made the shape obvious: fourteen
+agents, and the only thing they share is the direction of travel.\par}
 
 \subsection*{Fixed}
 
