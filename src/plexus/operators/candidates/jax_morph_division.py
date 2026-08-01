@@ -211,7 +211,16 @@ class CellDivideVolumeConserving(Structural):
         # lineage record we set explicitly below, so skip them here.
         st[slots] = st[parents].clone()
         for name, b in lvl.per_node_buffers():
-            if name in ("born", "mother"):
+            # `state` is itself a registered per-node buffer, so it comes back from
+            # per_node_buffers() -- and writing it here would be an IN-PLACE write on
+            # `lvl.state`, the tensor this operator has just cloned into `st` and is about to
+            # replace. Forward-only that is invisible (the write is superseded a few lines
+            # later); with a gradient it is fatal, because an upstream operator that read a
+            # SLICE of `state` this tick has that view on the tape. `regulate` writing an
+            # integrated `growth_rate` is exactly such an operator, and the composed
+            # sense->regulate->grow spec is what surfaced it. The state copy is already done
+            # on the clone by the line above.
+            if name in ("born", "mother", "state"):
                 continue
             b[slots] = b[parents].clone()
 

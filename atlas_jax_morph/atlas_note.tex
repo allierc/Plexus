@@ -1288,6 +1288,68 @@ already had close a sense $\to$ regulate $\to$ grow loop that Plexus previously 
 and jax-morph's own worked example does not compose either.}
 
 %======================================================================
+\section{Phase 6: a target morphology in, a gene circuit out}\label{sec:invert}
+
+\S\ref{sec:interplay} wrote the circuit by hand. This asks for the \emph{opposite} morphology and
+lets gradient descent find the circuit --- Figure~5's structure, at two parameters instead of a
+network.
+
+\textbf{The target is chosen so the answer cannot be a tweak.} The hand-written activator grows
+the crowded interior fastest. Ask instead that the \textbf{rim} grow fastest, and a cell must grow
+\emph{less} where it senses \emph{more} --- an inhibitor, $W_{in} < 0$. The fit starts from the
+hand-written $W_{in} = +0.35$ and has to cross zero.
+
+\begin{center}
+\includegraphics[width=\textwidth]{_state/phase6_invert.png}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r r r r@{}}
+\toprule
+& $W_{in}$ & growth rate & $r$(sensed, decided) & $r$(dist from centre, growth)\\
+\midrule
+hand-written activator & $+0.35$ & $0.625$--$0.961$ & $+0.995$ & $-0.944$ \ (centre fastest)\\
+\textbf{fitted inhibitor} & $\mathbf{-0.253}$ & $0.377$--$0.652$ & $-0.998$ &
+$\mathbf{+0.959}$ \ (\textbf{rim fastest})\\
+ablated control & $0$ & $0.3034$ everywhere & --- & ---\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{It crossed zero on its own.} 50 Adam steps, two seeds averaged per step, each step a full
+differentiable rollout of the real engine --- growth, adhesion, the morphogen solve, the
+intracellular ODE and the discrete division draw. $W_{in}$: $+0.35 \to -0.253$. The response
+slope $\mathrm{d(growth)}/\mathrm{d(sensed)}$: $+0.19 \to -0.15$, its target. The loss fell three
+orders of magnitude. Nobody told it the sign had to change; that is simply the answer to the
+morphology it was given, and the middle panel is the morphology it produced.
+
+\textbf{Getting there required fixing a differentiability bug that only a COMPOSITION could
+expose.} \code{cell\_divide} copies the mother's state into the daughter slot by looping over the
+set's per-node buffers --- and \code{state} is itself a registered per-node buffer, so that loop
+wrote \emph{in place} into the very tensor the operator had just cloned. Forward-only it is
+invisible (the write is superseded two lines later) and the \code{jax\_morph\_proliferation} run
+never noticed. It becomes fatal the moment an upstream operator holds a live gradient on a slice
+of \code{state} across a division --- which is exactly what \code{regulate} does when it
+integrates \code{growth\_rate}. \textbf{Six mechanisms each validated in isolation; the defect
+lived only in their composition}, which is the argument for running compositions at all.
+
+\textbf{And one modelling lesson, recorded because the loss lied convincingly.} The first
+objective asked for a pointwise target $k_i = k_0 - g(c_i - \bar{c})$, which \emph{looks} like it
+asks for a negative slope. It does not: the population-mean term dominates it, and the fit
+cheerfully drove $W_{in}$ \emph{upward} --- the wrong sign --- because that moved the mean toward
+$k_0$. The loss improved while the morphology got worse. Regressing the slope explicitly, and
+leaving the level to a separate weaker term, is what turned it around.
+
+\textbf{What this is not.} Two parameters, not a gene network; a target on the growth
+\emph{response}, not on a shape directly (the current loss cannot tell a sphere from a dumbbell of
+the same profile). Figure~5 proper is this with more genes and a spatial objective --- but every
+piece of the path is now measured rather than assumed: the engine is differentiable
+(\S\ref{sec:p6now}), the straight-through gradient through division is a sound estimator
+(\S\ref{sec:p6verdict}), and the loop it optimises through is a composition of validated
+operators with an ablation behind it (\S\ref{sec:interplay}).
+
+%======================================================================
 \section{Decided, and what is still open}
 
 \textbf{Decided (31 July).} Run Phases 1--3 straight through, and stop for a joint review before
