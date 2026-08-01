@@ -106,9 +106,19 @@ trustworthy when it vetoed the top two runs of round 2 while reading a camera th
 shrinkage. Its dissent is *recorded as a disagreement*, which is worth reading.
 **Sends to:** Collector
 
+### Collector — code, NOT an agent — TO BUILD
+**Builds the round record** from the files on disk: every analyst reading, the eye-check
+observation, every biologist verdict, every metrologist flag, every critic refusal.
+
+Collection is a `for` loop, not a judgement. Making it an agent is precisely how the Biologist's
+verdict got lost for the whole campaign — **an agent that collects can forget, and its forgetting
+is silent.** Built from disk, a missing input is a visible hole instead of a silence.
+**Sends to:** Interpreter, Meta-review, Supervisor, Archivist
+
 ### If Act 2 produced no evidence
 **The round is ABORTED. It does not advance to Act 3.** It routes back to Act 1 carrying the
-Critic's refusal reasons, so the Proposer can change the candidate set or stop.
+Critic's refusal reasons — **via the Archivist**, which may roll the search back to a better branch
+rather than re-propose inside the same dead envelope.
 
 An aborted round **consumes budget** (the compute was attempted) and is **recorded in full**, but
 **does not increment the round counter and enters no coverage denominator.** Counting it as a
@@ -123,37 +133,61 @@ to Act 1" is an infinite loop that burns a week.
 
 ## Act 3 — Decide (one deliberation, then act)
 
-### Collector — code, NOT an agent — TO BUILD
-**Builds the round record** from the files on disk: every analyst reading, the eye-check
-observation, every biologist verdict, every metrologist flag, every critic refusal.
-
-Collection is a `for` loop, not a judgement. Making it an agent is precisely how the Biologist's
-verdict got lost for the whole campaign — **an agent that collects can forget, and its forgetting
-is silent.** Built from disk, a missing input is a visible hole instead of a silence.
-**Sends to:** Interpreter, Evolution, Meta-review, Supervisor
-
 ### Interpreter — agent — BUILT (return path TO BUILD)
 **Asks:** what happened this round, and why?
 **The causal record.** Kept separate from Meta-review deliberately: merging them turns the
 postmortem into prompt editing and the causal record is what gets lost.
 **Sends to:** Meta-review, Supervisor
 
-### Evolution — agent — BUILT (return path TO BUILD)
-**Asks:** how would the winner be refined?
-**Sends to:** Proposer, Supervisor
-
 ### Meta-review — agent — BUILT (does not yet do the paper's job)
 **Asks:** what should change next round?
 **Owns prompt write-back** — the feedback appended to the other agents' prompts, which is the
 mechanism by which Co-Scientist learns without back-propagation, and the thing our loop has never
-had. Also owns memory of what the batch learned.
+had. **Writes `memory.md`**, the state document.
 **Sends to:** every agent's prompt, Supervisor
 
 ### Supervisor — check — BUILT (steer TO BUILD)
 **Asks:** what runs next, and how much of it?
-**Owns budget, agent allocation, and the 70/30 mixture.** The runtime controller. Meta-review is
-the learning mechanism; these are different jobs and the split is kept.
+**Owns budget, agent allocation, and both 70/30 mixtures.** The runtime controller. Meta-review is
+the learning mechanism, the Archivist is the historian; these are three different jobs and the
+split is what keeps the roster reasonable. **The Archivist advises; the Supervisor decides** —
+otherwise there are two controllers, which is the failure this rebuild removed.
 **Sends to:** Proposer
+
+---
+
+## Cross-run control — outside the acts
+
+### Archivist — agent — TO BUILD
+**Asks:** is the current line worth continuing, or is there a better branch behind us?
+
+**Reads the whole run history** — every round's record, every composition's measured outcome —
+rather than the current batch. This is the role the roster never had, and its absence is why the
+search could drift down a line for rounds at a time with nothing able to say so. It is also the
+only role positioned to catch the Proposer's *"parent 2 is fully PROPOSED"* error: a family is
+explored when its edits produced **evidence**, and only the history knows whether they did.
+
+**Output is a decision, not prose:** `continue` · `roll back to <composition>` · `stop`.
+**Runs between rounds**, and **on every abort** — where it is the reason the abort path is
+actionable at all, since re-proposing inside the same dead envelope is what the Critic just
+refused.
+**Advises the Supervisor; it does not command it.**
+**Sends to:** Supervisor, Proposer
+
+---
+
+## Who writes the two records
+
+Both were written by the **Proposer**, which is a defect: the agent under evaluation was writing
+its own record. That is how `"parent 2 is fully PROPOSED"` was recorded as coverage — territory
+counted because it had been *proposed*, never because anything was *measured*.
+
+| file | kind | written by | why |
+|---|---|---|---|
+| `analysis.md` | append-only log, one entry per round | **Collector** | every field is either measured from disk (parent, edits, result, refused, verdict, surprise — `predict.py` already scores predictions against measurements) or a **quotation** of what an agent said at the time. None of it is new prose. |
+| `memory.md` | state document, rewritten in place | **Meta-review** | it is what a later round needs and cannot re-derive — which is exactly "what should change next round" |
+
+**The Proposer writes neither. It reads both.**
 
 ---
 
@@ -183,7 +217,11 @@ Both rules are properties of a *batch*, so both are checked before compute is sp
 | **Judge** | existed to settle Eye-check against the number. Demoting Eye-check to observation dissolves the dispute. **0 calls.** |
 | **Referee** | ranked by tournament what a certified metric already ranks. **0 calls.** |
 | **Duplicate-check** | merged into the Proposer, which is where the candidate set lives |
+| **Evolution** | asked "what should change next?", and so did Meta-review. Two agents answering one question is not a redundant call, it is a roster nobody can reason about. The surviving split is by **scope**: Meta-review owns *this batch*, the Archivist owns *the whole history*. Local refinement of a winner inside the current branch was the weakest of the three jobs |
 
 Restore either only on a real measurement ambiguity that the metric bank cannot resolve.
 
-**16 roles → 13, and three of the survivors stop being LLM calls.**
+**16 roles → 13**: Judge, Referee, the duplicate check and Evolution out; the **Archivist**
+and the **Collector** in. Eight agents, five deterministic — and the two roles that were most
+responsible for the campaign misreading itself (the record-writer and the historian) are now a
+`for` loop and a role that had never existed.

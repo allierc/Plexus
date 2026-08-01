@@ -208,7 +208,11 @@ no experiments, so we invented the role and the roster had nobody for it to talk
 \textbf{The rule that now governs the roster: a role exists only where it adds information that is
 not already available.} Judgement is slow, expensive and unaccountable; where a question has a
 deterministic answer, code answers it. \textbf{Thirteen roles: eight agents and five deterministic
-checks}, one of which --- the Collector --- was an agent's job and should never have been.
+checks}, one of which --- the Collector --- was an agent's job and should never have been. The
+roster went \textbf{16 $\rightarrow$ 13}: Judge, Referee, Evolution and the duplicate check out;
+the \textbf{Archivist} and the \textbf{Collector} in. The two roles most responsible for the
+campaign misreading itself --- the writer of its own record, and the historian it never had ---
+are now a \code{for} loop and a role that did not exist.
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.88\textwidth]{figures/agents_sheet.png}
@@ -253,12 +257,18 @@ collection is a \code{for} loop, not a judgement} --- and an agent that collects
 silence & \textcolor{warn}{to build}\\
 Interpreter & agent & what happened this round, and why? \textbf{The causal record}, kept separate
 from Meta-review on purpose & runs\\
-Evolution & agent & how would the winner be refined? & runs\\
 Meta-review & agent & what should change next round? \textbf{Owns prompt write-back} --- the
 feedback appended to the other agents' prompts, which is how Co-Scientist learns without
-back-propagation & runs\\
-Supervisor & \textbf{check} & what runs next, and how much? \textbf{Owns budget, allocation and the
-70/30 mixture.} The runtime controller & runs\\
+back-propagation. Writes \code{memory.md} & runs\\
+Supervisor & \textbf{check} & what runs next, and how much? \textbf{Owns budget, allocation and
+both 70/30 mixtures.} The runtime controller & runs\\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{CROSS-RUN control} --- outside the acts, over the whole history.}\\
+\midrule
+\textbf{Archivist} & agent & is the current line worth continuing, or is there a better branch
+behind us? \textbf{Reads the whole run history}, not the current batch. Answers
+\emph{continue} / \emph{roll back to X} / \emph{stop}. \textbf{Advises the Supervisor; does not
+command it} & \textcolor{warn}{to build}\\
 \midrule
 Cedric & human & looks at the pictures; found every defect so far & outside the loop\\
 \bottomrule
@@ -266,10 +276,22 @@ Cedric & human & looks at the pictures; found every defect so far & outside the 
 \end{center}
 
 \vspace{2pt}
-\textbf{Dropped: Judge, Referee, the duplicate check.} The Judge existed to settle the Eye-check
-against the number, and demoting the Eye-check to observation dissolves the dispute; the Referee
-ranked by tournament what a certified metric already ranks. \textbf{Both were called zero times.}
-Either returns only on a real measurement ambiguity the metric bank cannot resolve.
+\textbf{Dropped: Judge, Referee, Evolution, the duplicate check.} The Judge existed to settle the
+Eye-check against the number, and demoting the Eye-check to observation dissolves the dispute; the
+Referee ranked by tournament what a certified metric already ranks. \textbf{Both were called zero
+times.} \textbf{Evolution} was asked \emph{``what should change next?''} --- and so was the
+Meta-review. Two agents answering one question is not a redundant call, it is a roster nobody can
+reason about. The surviving split is by \textbf{scope}: Meta-review over \emph{this batch}, the
+Archivist over \emph{the whole history}; local refinement of a winner inside the current branch was
+the weakest of the three jobs and is the one that went.
+
+\textbf{And the missing role was the historian.} Nothing in the roster ever looked across rounds,
+which is why the search could drift down a line with nothing able to say so --- and why the
+Proposer could record \emph{``parent 2 is fully PROPOSED''}, counting a family as explored because
+it had been \emph{proposed} rather than because anything had been \emph{measured}. Only the history
+knows which. The \textbf{Archivist} is also what makes the abort path actionable: a round with no
+evidence routes back through it, so the loop can roll back to a better branch instead of
+re-proposing inside the envelope the Critic just refused.
 
 \vspace{4pt}
 \textbf{The two mixture rules, each with an owner.} Both are properties of a \emph{batch}, so both

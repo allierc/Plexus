@@ -65,9 +65,7 @@ AGENT_BUDGETS = {
     "reflection":    ( 5,   10,  ["Read"]),                    # reads a batch, emits one review
     "analyst":       ( 4,    8,  ["Read"]),                    # one run, one verdict  (x N)
     "watcher":       ( 3,    4,  []),                          # text -> JSON, no tools
-    "judge":         ( 2,    4,  []),                          # pairwise, no tools
     "interpreter":   ( 6,   20,  ["Read", "Edit", "Write"]),   # appends the causal description
-    "evolution":     ( 5,   12,  ["Read"]),
     "meta_review":   ( 8,   30,  ["Read", "Edit", "Write"]),   # rewrites the distilled section
     "grounder":      ( 4,    8,  ["Read"]),
     # The escalation path's only LLM call. It had no row, so its budget projection silently fell
@@ -644,7 +642,7 @@ def _selftest(tmp="/tmp/llm_meter_selftest"):
     print("\n1. every call is timed and counted, PER ROLE")
     led = BudgetLedger(path=jsonl, round_id=99)
     for role, tmin in (("proposer", 10), ("reflection", 8), ("analyst", 6), ("analyst", 6),
-                       ("analyst", 6), ("watcher", 5), ("judge", 4), ("interpreter", 8),
+                       ("analyst", 6), ("watcher", 5), ("interpreter", 8),
                        ("meta_review", 10)):
         run_agent(role, "hi", ledger=led, timeout_min=tmin, quiet=True)
     with led.timed("grounder"):
@@ -690,9 +688,9 @@ def _selftest(tmp="/tmp/llm_meter_selftest"):
     check("round flagged budget_exceeded", led2.summary()["budget_exceeded"] is True)
     led3 = BudgetLedger(round_id=101, over_budget="skip")
     led3.round_spent = ROUND_LLM_BUDGET_MIN
-    ok3, out3 = run_agent("judge", "hi", ledger=led3, timeout_min=4, quiet=True)
+    ok3, out3 = run_agent("watcher", "hi", ledger=led3, timeout_min=4, quiet=True)
     check("skip policy reports the skip rather than hiding it",
-          ok3 is False and "SKIPPED" in out3 and led3.round["judge"]["skipped"] == 1, out3[:70])
+          ok3 is False and "SKIPPED" in out3 and led3.round["watcher"]["skipped"] == 1, out3[:70])
     check("a skipped round is flagged, not silent", led3.summary()["budget_exceeded"] is True)
 
     print("\n4. the breakdown is persisted for cross-round tracking")
