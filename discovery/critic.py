@@ -139,6 +139,22 @@ def allowed_verb(claim_kind):
 
 
 # ============================================================================ STATIC rules
+DT_GLOBAL_DEFAULT = 0.02        # translate.DT_GLOBAL; kept local so critic imports nothing heavy
+
+
+def _param(graph, node_id, key):
+    """A node's parameter, from the graph's params overlay or the operator's default."""
+    p = (getattr(graph, "params", {}) or {}).get(f"{node_id}.{key}")
+    if p is not None:
+        return p
+    try:
+        from composition_space import OPERATORS
+        op = next(o["op"] for o in graph.ops if o["id"] == node_id)
+        return (OPERATORS[op].get("params") or {}).get(key, {}).get("default")
+    except Exception:
+        return None
+
+
 def check_static(graph, seen_hashes=()):
     """Every static rule, in order. Returns [] if the composition is well-formed."""
     out = []
@@ -173,6 +189,35 @@ def check_static(graph, seen_hashes=()):
                 f"{op} appears {n} times. To change an implementation use `set_impl`, which "
                 f"REPLACES it; `add_op` adds a second instance and the two then run in sequence "
                 f"every frame."))
+
+    # R1c -- REACTION STABILITY. There was a CFL bound on diffusion and none on the reaction,
+    # and round 1 of the rebuilt loop died of the second while satisfying the first: the activator
+    # went 0.01 -> 12.1 -> 1.41e6 -> NaN, SPATIALLY UNIFORM throughout (max spread 3.4e-05 against
+    # a mean of 1.4e6). Uniform blow-up is an ODE exploding; a diffusion instability would have
+    # made a checkerboard. See composition_space.reaction_advance for why the factor is 1/dt.
+    try:
+        from composition_space import REACTION_PER_FRAME_LIMIT, reaction_advance
+
+        # `chi` is the RD timescale and it lives on cell_diffuse in this operator set; the
+        # reaction is what it destabilises. Both are checked so a relocation cannot silence this.
+        for o in graph.ops:
+            if o["op"] not in ("cell_diffuse", "cell_react"):
+                continue
+            chi = _param(graph, o["id"], "chi")
+            if chi is None:
+                continue
+            adv = reaction_advance(chi)
+            if adv > REACTION_PER_FRAME_LIMIT:
+                out.append(Rejection(
+                    "R1c_REACTION_UNSTABLE",
+                    "explicit reaction past its stability limit -- the chemistry diverges, so the "
+                    "run is evidence about an integrator and not about a mechanism",
+                    f"the reaction advances {adv:.1f} per frame against a limit of "
+                    f"{REACTION_PER_FRAME_LIMIT} (chi {chi}, scaled by translate.RD_PER_FRAME). "
+                    f"The engine already steps the reaction once per substep, so any scaling on "
+                    f"top of that is excess. Lower chi."))
+    except Exception:
+        pass
 
     # R2 -- PRECONDITIONS. An operator whose required port type is produced by nothing will
     # silently no-op. This is the rule that prevents FALSE IMPOSSIBILITY claims, and it is the

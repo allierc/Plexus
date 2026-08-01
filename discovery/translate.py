@@ -83,8 +83,28 @@ DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never
 # at its seed value for the whole run and every measured "no pattern" was an artefact of the clock.
 # Scaling reaction AND diffusion together by 1/dt restores one minisite time unit per frame and
 # leaves their RATIO -- the thing that actually selects the Turing wavelength -- untouched.
-# CFL stays satisfied: dt*chi*max(d_a,d_h) = 0.02*65*0.16 = 0.21 <= 1.
-RD_PER_FRAME = 1.0 / DT_GLOBAL
+# CFL: chi*max(d_a,d_h) = 1.3*0.16 = 0.21, against a limit of 0.45.
+# MEASURED 2026-08-01, and this factor is now 1.0. The reasoning that made it 1/dt was right
+# about the disease and wrong about the cure.
+#
+# cell_react and cell_diffuse EMIT a velocity, so the engine integrates them on the MECHANICS
+# SUBSTEP rather than once per frame -- that was D5a, and it was real. The fix multiplied chi and
+# rate by 1/dt to restore one time unit per frame. But there are 1/dt SUBSTEPS in a frame, so the
+# substep clock ALREADY supplies that factor: advancing chi per substep across 1/dt substeps of
+# length dt advances chi per frame, with no scaling at all. Applied on top, the reaction ran 1/dt
+# = 50x too fast.
+#
+# It was invisible while DT_GLOBAL was 1.0, where the two are equal. The D2 reform set one global
+# dt of 0.02 for the mechanics, and the reaction went with it:
+#
+#   chi_spec 1.3 (dt 1.0)   coral_fixed_ball, wk_null_s0   pattern, spatial spread 0.78, stable
+#   chi_spec 65  (dt 0.02)  every round-1 run              act 0.01 -> 12.1 -> 1.41e6 -> NaN by
+#                                                          frame 115, SPATIALLY UNIFORM
+#
+# Same d_a, same d_h, same ratio. A uniform blow-up is an ODE exploding; a diffusion breach would
+# have made a checkerboard. critic.R1c_REACTION_UNSTABLE now bounds this before a run costs
+# anything, and composition_space.reaction_advance is the quantity it bounds.
+RD_PER_FRAME = 1.0
 
 # The growth ceiling must sit ABOVE the division trigger. `morphogen_growth_3d` caps each cell's
 # target volume at vth_frac*v_ref, while `divide_3d` fires at factor*Vbirth -- and vth_frac was

@@ -1,0 +1,65 @@
+{
+ "reasoning": "User input: nothing Pending as of 2026-08-01. Round 1, no evidence, coverage 0%. Anchor on parent 2 (full Okuda coupled route: RD patterning + morphogen growth + monolayer mechanics) as control and probe each mechanism's necessity by single-op ablation, plus the one add that reaches the target-emergent region and one uniform-growth confounder. This isolates which lever the paper's 'coupling patterning and deformation' claim actually rests on.",
+ "mode": "explore",
+ "slots": [
+  {
+   "parent_index": 2,
+   "edit": null,
+   "intent": "control",
+   "claim": "the parent, unchanged -- the control",
+   "metric": "protr_peak",
+   "predicted": "protr_peak 1.5-3.0",
+   "why": "control"
+  },
+  {
+   "parent_index": 2,
+   "edit": {"edit": ["add_op", "shape_energy_3d", "default"], "label": "+shape_energy_3d:default", "yields": "growth-driven emergent (target mechanism)"},
+   "intent": "confirmatory",
+   "territory": "in_paper",
+   "claim": "adding the default shape-energy term pushes the coupled route into the emergent regime and sharpens protrusions.",
+   "metric": "protr_peak",
+   "predicted": "protr_peak >= 2.5 AND ta_n_tubes_final >= 1",
+   "why": "this edit is the labelled transition into the target mechanism; Okuda's coupled case is where tubulation/branching emerge (Figs 5-7)."
+  },
+  {
+   "parent_index": 2,
+   "edit": {"edit": ["add_op", "vesicle_growth", "uniform_ramp"], "label": "+vesicle_growth:uniform_ramp", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "adversarial",
+   "territory": "excursion",
+   "claim": "adding uniform inflation on top of patterned growth dilutes the pattern and flattens protrusions rather than adding to them.",
+   "metric": "protr_peak",
+   "predicted": "protr_peak <= 1.5 AND ta_n_tubes_final <= 1",
+   "why": "Okuda's uncoupled_growth case shows uniform growth alone gives no morphology; stacking it on the coupled route tests whether unpatterned volume swamps the Turing signal -- a combination he never runs."
+  },
+  {
+   "parent_index": 2,
+   "edit": {"edit": ["remove_op", "reconnect_t1_3d0"], "label": "-reconnect_t1_3d", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "adversarial",
+   "territory": "excursion",
+   "claim": "T1 reconnection is NOT necessary for protrusion onset; removing it leaves the initial protrusion largely intact while blocking sustained tube reconnection.",
+   "metric": "protr_peak",
+   "predicted": "protr_peak >= 1.5 AND ta_n_tubes_final <= 1",
+   "why": "the intuitive read is that neighbour exchange is required for tubes; betting against it -- onset is patterning-driven, T1 governs elongation/topology not initiation. A regime Okuda never ablates."
+  },
+  {
+   "parent_index": 2,
+   "edit": {"edit": ["remove_op", "cell_diffuse0"], "label": "-cell_diffuse", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "confirmatory",
+   "territory": "in_paper",
+   "claim": "removing morphogen diffusion abolishes the reaction-diffusion pattern, so growth becomes spatially uniform and no localized protrusion forms.",
+   "metric": "protr_peak",
+   "predicted": "protr_peak <= 1.2 AND ta_n_tubes_final <= 0.5",
+   "why": "directly tests the paper's core 'coupling patterning and deformation' claim -- without diffusion there is no pattern to couple, so morphology must collapse to inflation."
+  },
+  {
+   "parent_index": 2,
+   "edit": {"edit": ["remove_op", "morphogen_growth_3d0"], "label": "-morphogen_growth_3d", "yields": "mechanics-only (no growth)"},
+   "intent": "confirmatory",
+   "territory": "in_paper",
+   "claim": "removing the growth driver leaves only mechanics, which relaxes to a near-spherical vesicle with essentially no protrusion.",
+   "metric": "protr_peak",
+   "predicted": "protr_peak <= 1.0 AND protr_final <= 1.0",
+   "why": "anchors the map's no-growth floor and matches Okuda's arrested/mechanics-only case; deformation requires a growth energy source."
+  }
+ ]
+}

@@ -141,11 +141,12 @@ WRITE {PROPOSAL_FILE} as JSON:
  "mode": "explore" | "robustness",
  "slots": [
    {{"parent_index": 0, "edit": null, "intent": "control",
-     "claim": "the parent, unchanged -- the control",
+     "claim": "the parent, unchanged -- the control", "track": "B",
      "metric": "protr_peak", "predicted": "<a number or range you expect>",
      "why": "control"}},
    {{"parent_index": <int>, "edit": <one entry copied EXACTLY from legal_edits>,
      "intent": "confirmatory" | "adversarial",
+     "track": "A" | "B",
      "territory": "in_paper" | "excursion",
      "claim": "<falsifiable, one sentence>",
      "metric": "protr_peak",
@@ -159,6 +160,19 @@ RULES
  - Slot 0 MUST be the control (edit: null), with intent "control".
  - Aim for ~70% confirmatory / ~30% adversarial across the remaining slots. The control is not
    part of that ratio -- it is a fixed cost of the design, not one of your choices.
+ - EVERY SLOT DECLARES ITS TRACK, and the batch is partitioned between them. This campaign is
+   doing two things at once and a slot that does not know which one it serves will serve neither:
+     "track": "B"  -- REPRODUCE OKUDA. At or near a setting he reports, aimed at one of his
+                      morphologies (undulation / thin tube / thick tube / branching). Success is
+                      that the picture appears. Say WHICH morphology in `claim`.
+     "track": "A"  -- UNDERSTAND THE MECHANISM. Aimed at the MAP, not the picture: what does this
+                      operator do, is it necessary, what happens at the extreme. Success is that
+                      a map cell can state a verdict afterwards, even a negative one.
+   The objective is a MAP, not a target: running only his settings teaches us to reproduce his
+   figures rather than to understand the system, and running only excursions produces
+   understanding of a model nobody has a reason to believe.
+   `track` and `territory` usually agree (B/in_paper, A/excursion) and are NOT the same thing:
+   an in-paper setting can serve Track A when the question is which operator carries the effect.
  - SEPARATELY, aim for ~70% `in_paper` / ~30% `excursion`. This is a DIFFERENT axis from
    confirmatory/adversarial and the two are independent -- an excursion can be confirmatory
    ("at extreme diffusion I expect a flat sheet") and an in-paper slot can be adversarial.

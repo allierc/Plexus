@@ -1148,3 +1148,46 @@ if __name__ == "__main__":
         print("   ", c.line())
 
     print("\ncomposition_space OK")
+
+
+# ============================================================ REACTION STABILITY (the second bound)
+# THERE WAS A CFL BOUND ON DIFFUSION AND NONE ON THE REACTION, and round 1 of the rebuilt loop died
+# of the second while satisfying the first. Measured, not reasoned:
+#
+#   r001c_00_f4907e   chi_spec 65   act 0.01 -> 12.1 -> 1.41e6 -> NaN by frame 115, SPATIALLY
+#                                   UNIFORM the whole way (max spread 3.4e-05 against a mean of
+#                                   1.4e6). A diffusion instability makes a checkerboard; a
+#                                   uniform blow-up is the reaction ODE exploding.
+#   coral_fixed_ball  chi_spec 1.3  patterns, spatial spread 0.78, stable to the last frame.
+#
+# Same d_a, same d_h, same ratio. The one thing that differs is chi in the spec, and it differs by
+# exactly RD_PER_FRAME.
+#
+# WHY IT IS 50x. `translate` emits chi * RD_PER_FRAME = chi/dt, which is the D5a clock fix -- it
+# exists because cell_react EMITs a velocity and is therefore integrated on the MECHANICS substep
+# rather than once per frame. But there are 1/dt substeps in a frame, so the substep clock ALREADY
+# supplies the factor the fix adds. Applied on top, the reaction advances chi/dt per frame instead
+# of chi. At dt=1.0 the two are equal and nothing was visible; at dt=0.02 the reaction runs 50x
+# too fast and explicit Euler on an autocatalytic system does what it must.
+#
+# The bound is therefore on what the engine actually advances per frame, which is the SPEC value.
+REACTION_PER_FRAME_LIMIT = 2.0     # 1.3 patterns and is stable; 65 explodes. Calibrated, not chosen.
+
+
+def reaction_advance(chi, rd_per_frame=None):
+    """How far the reaction advances in one FRAME, as the engine will actually run it.
+
+    The engine applies the reaction once per mechanics substep and there are 1/dt substeps of
+    length dt in a frame, so the substep clock alone advances `chi` per frame. Whatever
+    `translate.RD_PER_FRAME` multiplies on top is pure excess -- which is why it is now 1.0.
+    Stable iff <= REACTION_PER_FRAME_LIMIT.
+    """
+    if not chi:
+        return 0.0
+    if rd_per_frame is None:
+        try:
+            from translate import RD_PER_FRAME
+            rd_per_frame = RD_PER_FRAME
+        except Exception:
+            rd_per_frame = 1.0
+    return float(chi) * float(rd_per_frame)

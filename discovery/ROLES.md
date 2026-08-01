@@ -97,7 +97,7 @@ those words.
 
 ## Act 1 — Propose (before any compute is spent)
 
-### Grounder — agent — TO BUILD (writes to the config today, not to the Proposer)
+### Grounder — agent — BUILT
 **Asks:** what did Okuda actually do?
 **Reads:** the paper, with its own quotes checked
 **Sends to:** Proposer
@@ -132,7 +132,7 @@ whose reviews reach nobody is measuring its own patience.
 **Advises. It cannot refuse.**
 **Sends to:** Proposer, Critic
 
-### Critic — check — BUILT (70/30 gate TO BUILD)
+### Critic — check — BUILT
 **Asks:** can this be *run*?
 Type-legal edits, preconditions met, parameters in range, not already evaluated; post-hoc, whether
 every scheduled operator actually acted. **Owns the in-distribution envelope**: CFL, bounds,
@@ -180,6 +180,38 @@ phenotype from it — which is exactly what happened on `r002c_00`, where five p
 activator had decayed to NaN, and the reading went ahead anyway. Nothing can un-name a phenotype.
 **Sends to:** Reader, Collector
 
+### Diagnostician — agent — BUILT
+**Asks:** why did the **apparatus** fail, and what guard was missing?
+
+The third question, and neither of the other two can answer it:
+
+| | asks | says |
+|---|---|---|
+| Biologist | is the **specimen** a tissue? | *"invalid: the chemistry is extinct"* |
+| Metrologist | does the **instrument** work? | *"this metric is not certified"* |
+| **Diagnostician** | why did the **apparatus** fail? | *"chi is 50× too large, because the clock fix scales it by 1/dt and the engine already steps the reaction per substep"* |
+
+The Biologist's verdict is correct and stops nothing from happening again. Between them those two
+can say a run is worthless and cannot say what to change — so a human did the forensics after every
+crash, which is not autonomy, it is manual work moved later.
+
+**Arithmetic first, one judgement last**, like the Archivist. Code computes: the frame each series
+went non-finite; whether the divergence was **spatial or uniform** (that single distinction is what
+separates a diffusion breach from an exploding ODE); which runs share the signature; and **what
+differs between a failing run and the nearest passing one on disk** — the step that isolated
+`chi 65 vs 1.3` with every other parameter equal.
+
+**Its output is a decision:** `cause`, `evidence`, `guard_to_add`, and `stop | continue`.
+`guard_to_add` must be something a deterministic check could enforce *before* a run costs anything
+— a bound, a required relation. *"Be more careful"* is not a guard, and what it names should end up
+in the Critic.
+
+**It can stop the campaign**, and an unreachable Diagnostician on a diverged batch defaults to
+`stop`: there is no point spending six rounds proving the same integrator wrong.
+**Runs** when any run goes non-finite, or half a round's specimens come back unsound — **before the
+Interpreter**, because a causal story written about a configuration error is worse than none.
+**Sends to:** Critic, Supervisor, Proposer
+
 ### Metrologist — check — BUILT
 **Asks:** which metrics are admissible?
 Certifies instruments against known answers; files defects and retractions. **Owns metric
@@ -216,14 +248,14 @@ certified is not evidence, however sophisticated the code that produced it.
 
 **Sends to:** Collector
 
-### Eye-check — agent — BUILT (demotion TO BUILD)
+### Eye-check — agent — BUILT
 **Asks:** what does the movie show?
 **Observation only. No veto, no score.** It is not trustworthy enough to rank with, and it was not
 trustworthy when it vetoed the top two runs of round 2 while reading a camera that showed growth as
 shrinkage. Its dissent is *recorded as a disagreement*, which is worth reading.
 **Sends to:** Collector
 
-### Collector — code, NOT an agent — TO BUILD
+### Collector — code, NOT an agent — BUILT
 **Builds the round record** from the files on disk: every analyst reading, the eye-check
 observation, every biologist verdict, every metrologist flag, every critic refusal.
 
@@ -250,20 +282,20 @@ to Act 1" is an infinite loop that burns a week.
 
 ## Act 3 — Decide (one deliberation, then act)
 
-### Interpreter — agent — BUILT (return path TO BUILD)
+### Interpreter — agent — BUILT
 **Asks:** what happened this round, and why?
 **The causal record.** Kept separate from Meta-review deliberately: merging them turns the
 postmortem into prompt editing and the causal record is what gets lost.
 **Sends to:** Meta-review, Supervisor
 
-### Meta-review — agent — BUILT (does not yet do the paper's job)
+### Meta-review — agent — BUILT
 **Asks:** what should change next round?
 **Owns prompt write-back** — the feedback appended to the other agents' prompts, which is the
 mechanism by which Co-Scientist learns without back-propagation, and the thing our loop has never
 had. **Writes `memory.md`**, the state document.
 **Sends to:** every agent's prompt, Supervisor
 
-### Supervisor — check — BUILT (steer TO BUILD)
+### Supervisor — check — BUILT
 **Asks:** what runs next, and how much of it?
 **Owns budget, agent allocation, and both 70/30 mixtures.** The runtime controller. Meta-review is
 the learning mechanism, the Archivist is the historian; these are three different jobs and the
@@ -275,7 +307,7 @@ otherwise there are two controllers, which is the failure this rebuild removed.
 
 ## Cross-run control — outside the acts
 
-### Archivist — agent — TO BUILD
+### Archivist — agent — BUILT
 **Asks:** is the current line worth continuing, or is there a better branch behind us?
 
 **Reads the whole run history** — every round's record, every composition's measured outcome —

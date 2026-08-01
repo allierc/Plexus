@@ -39,8 +39,8 @@ STATUSES = ("BUILT", "TO BUILD", "DROPPED")
 # is the claim being tested against it, and a mismatch either way is the finding.
 CODE_ROLES = {
     "grounder": "Grounder", "proposer": "Proposer", "reflection": "Peer-review",
-    "reader": "Reader", "watcher": "Eye-check", "interpreter": "Interpreter",
-    "meta_review": "Meta-review",
+    "reader": "Reader", "archivist": "Archivist", "watcher": "Eye-check", "interpreter": "Interpreter",
+    "meta_review": "Meta-review", "diagnostician": "Diagnostician",
 }
 
 

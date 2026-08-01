@@ -62,6 +62,7 @@ import proposer as P                                                      # noqa
 from metrologist import Certification                                     # noqa: E402
 import archivist as ARCH                                                  # noqa: E402
 import collector as COL                                                   # noqa: E402
+import diagnostician as DIAG                                              # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 LOG = os.path.join(ROOT, "log", "okuda")
@@ -807,7 +808,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         if not dry:
             sup.reg.pose(h)
         posed.append((nm, g, h))
-        print(f"  {nm}  {lbl[:44]:44} {h.intent:13} predict {h.predicted[:40]}")
+        sl["track"] = sl.get("track", "B" if sl.get("territory") == "in_paper" else "A")
+        print(f"  {nm}  {lbl[:40]:40} track {sl['track']}  {h.intent:13} "
+              f"predict {h.predicted[:34]}")
 
     if dry:
         print("\n[round] --dry: configs + hypotheses written, nothing submitted")
@@ -930,6 +933,31 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # THE COLLECTOR RUNS FIRST, and it is code. Everything downstream reads the RECORD rather than
     # rummaging for its own inputs -- which is the whole repair: a finding that is not collected
     # into a visible record disappears, and its disappearance is silent.
+    # THE DIAGNOSTICIAN, before anything is interpreted. A round whose runs diverged has produced
+    # evidence about an integrator, not about biology, and interpreting it is worse than useless:
+    # the Interpreter would write a causal story about a configuration error. It also has standing
+    # to STOP the campaign, because six more rounds cannot re-measure a broken apparatus into a
+    # working one.
+    _names = [nm for nm, _, _ in posed]
+    _bad = [f["run"] for f in (DIAG.failure(n) for n in _names) if f["broke_at"] is not None]
+    _sick = [nm for nm, _g, s, _sc, _oc, _h in rows
+             if (s.get("premises_broken") or [])]
+    if _bad or len(_sick) >= max(1, len(rows)) // 2 + (len(rows) % 2):
+        step(f"Diagnostician: {len(_bad)} run(s) diverged, {len(_sick)} specimen(s) broken")
+        dg = DIAG.diagnose(_names, ledger=ledger,
+                           reason=f"round {rid}: {len(_bad)} diverged, {len(_sick)} unsound")
+        print(f"  [diagnostician] {dg.get('cause','?')}")
+        print(f"      evidence : {dg.get('evidence','')}")
+        print(f"      guard    : {dg.get('guard_to_add','')}")
+        print(f"      action   : {dg.get('action')}")
+        if dg.get("action") == "stop":
+            rec = COL.collect_round(rid, mode, rows, refused=refused, posed=posed, aborted=True)
+            rec["diagnosis"] = {k: v for k, v in dg.items() if k != "table"}
+            rec["steer"] = f"APPARATUS FAULT: {dg.get('cause')} -- guard: {dg.get('guard_to_add')}"
+            COL.write(rec)
+            print("\n[round] STOPPING: the apparatus is at fault, not the biology. Add the guard.")
+            return bk.finish(rid, "apparatus_fault", 3)
+
     act("ACT 3 - DECIDE", f"{len(rows)} run(s) admitted, {len(refused)} refused")
     step("Collector: building the round record from the files on disk")
     record = COL.collect_round(rid, mode, rows, refused=refused, posed=posed)
