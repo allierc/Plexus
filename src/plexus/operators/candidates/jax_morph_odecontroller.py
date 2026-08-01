@@ -71,8 +71,12 @@ _B5 = (35 / 384, 0.0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0.0)        
 _B4 = (5179 / 57600, 0.0, 7571 / 16695, 393 / 640, -92097 / 339200, 187 / 2100, 1 / 40)  # embedded 4th-order
 
 
+# implementation="ode_generic", NOT "connectionist": the concrete paper variant lives in
+# jax_morph_gene_network_connectionist.py (it uses the source's RESCALED sigmoid). Both agents
+# reached for the same implementation label, and the clash was invisible until the modules were
+# imported into ONE interpreter -- which is now part of verify_impl.py.
 @register_operator("regulate", family="fields", set="cell", kind="exchange",
-                   implementation="connectionist")
+                   implementation="ode_generic")
 class Regulate(Exchange):
     """The `connectionist` implementation of the `regulate` contract: a per-cell gene
     circuit with a sigmoid-saturated linear regulatory drive and linear degradation,

@@ -34,12 +34,15 @@
       "also_registered": [
         "regulate"
       ],
+      "implementation": [
+        "connectionist"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "5 passed in 6.34s",
+      "test_note": "5 passed in 5.86s",
       "signature_mismatch": [
-        "reads: record ['gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)', 'sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)'] vs code ['gene', 'sensed_input_fields']",
-        "writes: record ['gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)'] vs code ['gene']"
+        "reads: record ['gene_state', 'sensed_input_fields'] vs code ['gene', 'sensed_input_fields']",
+        "writes: record ['gene_state'] vs code ['gene']"
       ]
     },
     {
@@ -77,12 +80,15 @@
       "also_registered": [
         "regulate"
       ],
+      "implementation": [
+        "neural_ode"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 5.96s",
+      "test_note": "8 passed in 6.14s",
       "signature_mismatch": [
-        "reads: record ['input_specs sensed driver fields u, held fixed over the macro-step', 'output_specs current gene/output state read back as the ODE initial condition', 'tag-prefixed hidden latent field, read only when hidden_size > 0'] vs code ['drive', 'gene']",
-        "writes: record ['output_specs fields as per-dt gene-expression increments (delta)', 'tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0'] vs code ['gene']"
+        "reads: record ['input_specs', 'output_specs', 'tag-prefixed'] vs code ['drive', 'gene']",
+        "writes: record ['output_specs', 'tag-prefixed'] vs code ['gene']"
       ]
     },
     {
@@ -121,12 +127,15 @@
       "also_registered": [
         "regulate"
       ],
+      "implementation": [
+        "mwc"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "6 passed in 6.02s",
+      "test_note": "6 passed in 5.92s",
       "signature_mismatch": [
-        "reads: record ['gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)', 'sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics, held fixed over dt)'] vs code ['gene', 'sensed']",
-        "writes: record ['gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)'] vs code ['gene']"
+        "reads: record ['gene_state', 'sensed_input_fields'] vs code ['gene', 'sensed']",
+        "writes: record ['gene_state'] vs code ['gene']"
       ]
     },
     {
@@ -164,9 +173,12 @@
       "also_registered": [
         "regulate"
       ],
+      "implementation": [
+        "connectionist"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "5 passed in 6.80s",
+      "test_note": "5 passed in 6.28s",
       "signature_mismatch": [
         "reads: record ['driver_inputs', 'gene_state', 'hidden_state'] vs code ['drive', 'gene']",
         "writes: record ['gene_state', 'hidden_state'] vs code ['gene']"
@@ -199,9 +211,12 @@
       "also_registered": [
         "apoptose"
       ],
+      "implementation": [
+        "default"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "6 passed in 6.05s",
+      "test_note": "6 passed in 5.80s",
       "signature_mismatch": []
     },
     {
@@ -240,14 +255,13 @@
       "also_registered": [
         "morphogen"
       ],
+      "implementation": [
+        "free_space_greens_function"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "7 passed in 6.45s",
-      "signature_mismatch": [
-        "reads: record ['alive (source AND receiver liveness mask, applied twice -- undeclared)', 'pos (cell centers; pairwise distances r_ij drive the kernel -- read but NOT declared in state_reads)', 'radius (per-SOURCE finite size a, giving r_eff = max(r, a) and the 3-D (1 + kappa*a) term -- undeclared)', 'secretion_rate (per-cell source rate S, the source_name field -- the only declared read)'] vs code ['alive', 'pos', 'radius', 'secretion_rate']",
-        "writes: record ['chemical (per-cell steady-state screened-diffusion concentration, the field_name; non-heritable, recomputed each step)'] vs code ['chemical']",
-        "maps: record ['pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij, a_j) S_j)'] vs code ['pairwise']"
-      ]
+      "test_note": "7 passed in 6.13s",
+      "signature_mismatch": []
     },
     {
       "id": "division",
@@ -270,13 +284,16 @@
       "reference": "Okuda, S. et al. (2015). Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech. Model. Mechanobiol. 12:627-644.",
       "error": null,
       "also_registered": [],
+      "implementation": [
+        "default",
+        "volume_conserving"
+      ],
       "preexisting": true,
       "test_ok": true,
-      "test_note": "10 passed in 5.99s",
+      "test_note": "10 passed in 5.56s",
       "signature_mismatch": [
         "reads: record ['alive', 'division_axis', 'division_rate', 'position', 'radius'] vs code []",
-        "writes: record ['alive', 'born', 'celltype', 'division_overflow', 'mother', 'position', 'radius'] vs code []",
-        "maps: record ['hazard = per-cell Bernoulli event with probability p = 1 - exp(-clip(division_rate,0,inf)*dt) on a fixed capacity buffer; a committed divider wakes one free slot, the daughter inherits every heritable field and resets the rest to default; a division past capacity is dropped (registered cell_divide stops when the buffer is full, jax-morph drops-and-tallies into division_overflow)', 'lineage = a born flag plus the mother parent-slot index recorded on the woken slot (sentinel -1 elsewhere), reconstructing clonal ancestry that the registered birth flag alone cannot', 'placement = daughter offset by the NEW radius r*m along dir = normalize(orientation_snr*a_hat + isotropic_unit_RMS_noise), so the two daughters end exactly just-touching (centre gap 2*r*m = sum of radii); orientation_snr=0 or a zero division_axis falls back to isotropic placement', \"volume_conservation = both daughters take radius r*m with m = 2^(-1/d) (n_space_dim sets the exponent), halving the mother's d-volume into two equal daughters -- vs registered cell_divide's mass-doubling, where the daughter inherits the mother's radius unchanged\"] vs code []"
+        "writes: record ['alive', 'born', 'celltype', 'division_overflow', 'mother', 'position', 'radius'] vs code []"
       ]
     },
     {
@@ -305,14 +322,16 @@
       "also_registered": [
         "grow_radius"
       ],
+      "implementation": [
+        "default"
+      ],
       "preexisting": true,
       "test_ok": true,
-      "test_note": "9 passed in 6.17s",
+      "test_note": "9 passed in 6.18s",
       "signature_mismatch": [
         "kind: record 'field' vs code 'structural'",
         "reads: record ['growth_rate', 'radius'] vs code []",
-        "writes: record ['radius'] vs code []",
-        "maps: record ['growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)), the closed-form integral of dr/dt = k*(1 - r/R); saturating, monotone, unconditionally stable for any dt, no min/clamp', 'rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step by an upstream controller so gradients flow through it; the sole constructor param is max_radius (a traced, optimizable target)', 'realization = per-cell scalar radius on a point / soft-sphere cell (NO MPM reserve particles); dt-scaling is baked into the returned delta, which is summed with any other radius writers (stable operator-split contribution)'] vs code []"
+        "writes: record ['radius'] vs code []"
       ]
     },
     {
@@ -341,9 +360,12 @@
       "also_registered": [
         "reorient"
       ],
+      "implementation": [
+        "default"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "6 passed in 5.90s",
+      "test_note": "6 passed in 5.69s",
       "signature_mismatch": []
     },
     {
@@ -375,12 +397,56 @@
       "also_registered": [
         "agitate"
       ],
+      "implementation": [
+        "default"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 6.08s",
+      "test_note": "8 passed in 6.22s",
       "signature_mismatch": [
-        "reads: record ['alive (ALIVE) -- masks dead/padded cells in both the delta and the score.', 'position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift is evaluated.', 'potential.state_reads() -- any extra fields the drift potential couples from (empty for a pure bath).'] vs code ['alive', 'pos']",
-        "writes: record ['position (POSITION) -- the dynamic thermal displacement delta; the exogenous noise and the realized displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable and scorable.'] vs code ['pos']"
+        "reads: record ['alive', 'position', 'potential.state_reads'] vs code ['alive', 'pos']",
+        "writes: record ['position'] vs code ['pos']"
+      ]
+    },
+    {
+      "id": "soft_sphere",
+      "contract": "adhere",
+      "module": "src/plexus/operators/candidates/jax_morph_soft_sphere.py",
+      "claimed_kind": "lateral",
+      "claimed_family": "interaction",
+      "imports": true,
+      "registered": true,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "cell",
+      "reads": [
+        "position",
+        "radius",
+        "epsilon"
+      ],
+      "writes": [
+        "position"
+      ],
+      "maps": [],
+      "param_roles": {
+        "epsilon": "repulsion_strength",
+        "mobility": "overdamped_mobility",
+        "epsilon_field": "per_cell_strength_block",
+        "radius": "fallback_cell_radius"
+      },
+      "reference": "jax-morph SoftSphere, physics/mechanics/potentials.py:L315 (pair_energy -> _compact_repulsion(r, sigma, eps, 2.0, 0.5) at :L342; base total_energy/forces at :L228/:L84; sigma = r_i + r_j at :L337); Durian, D. J. (1995) Phys. Rev. Lett. 75:4780 (harmonic soft disks); Deshpande, Mottes et al. (2025) Nat. Comput. Sci. (harmonic SoftSphere ABSENT; paper uses Morse -- SOURCE WINS).",
+      "error": null,
+      "also_registered": [
+        "adhere"
+      ],
+      "implementation": [
+        "soft_sphere"
+      ],
+      "preexisting": false,
+      "test_ok": true,
+      "test_note": "8 passed in 5.72s",
+      "signature_mismatch": [
+        "reads: record ['alive', 'epsilon', 'position', 'radius'] vs code ['epsilon', 'position', 'radius']"
       ]
     },
     {
@@ -414,13 +480,13 @@
       "also_registered": [
         "adhere"
       ],
+      "implementation": [
+        "hertzian"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 6.37s",
-      "signature_mismatch": [
-        "reads: record ['epsilon (per-cell OR shared contact stiffness; read via state_reads only when it is a per-cell field, otherwise a shared scalar)', 'position', 'radius'] vs code ['epsilon', 'position', 'radius']",
-        "maps: record ['contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); PURELY REPULSIVE compact soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail and no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact); a radial pair force integrated overdamped or minimised by the wrapping motion step', 'pairwise radial contact interaction over live non-self cell pairs (dense N x N, half-summed so each unordered pair counts once); force on each cell = -grad of the conservative Hertzian pair energy by autodiff'] vs code []"
-      ]
+      "test_note": "8 passed in 6.39s",
+      "signature_mismatch": []
     },
     {
       "id": "harmonic",
@@ -454,13 +520,15 @@
       "also_registered": [
         "adhere"
       ],
+      "implementation": [
+        "harmonic"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "8 passed in 6.46s",
+      "test_note": "8 passed in 5.87s",
       "signature_mismatch": [
-        "reads: record ['alive', 'coupling field (shared scalar OR per-cell scalar field, here the stiffness k), symmetrised per\\npair by the arithmetic-mean mix rule 0.5*(k_i+k_j)\\n', 'position', 'radius'] vs code ['alive', 'pos', 'radius']",
-        "writes: record ['position'] vs code ['pos']",
-        "maps: record ['pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered\\npair counts once); force on each cell = -grad of the conservative harmonic pair energy by\\nautodiff; size-consistent contact distance sigma = r_i + r_j read from the physical radius\\n(tracks cell growth/division)\\n', 'repulsive core (r < sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell\\nadhesion) from a down-shifted harmonic well hard-truncated at r_c = r_cutoff_frac*sigma; a\\nradial pair force integrated overdamped or minimised by the wrapping dynamics step. This is the\\nadhesion-ON shape of `adhere` (Morse/LennardJones share it; SoftSphere/Hertzian are the\\nadhesion-OFF, purely-repulsive shape of the same contract)\\n'] vs code []"
+        "reads: record ['alive', 'coupling', 'position', 'radius'] vs code ['alive', 'pos', 'radius']",
+        "writes: record ['position'] vs code ['pos']"
       ]
     },
     {
@@ -496,12 +564,14 @@
       "also_registered": [
         "adhere"
       ],
+      "implementation": [
+        "lennard_jones"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "11 passed in 6.20s",
+      "test_note": "11 passed in 6.19s",
       "signature_mismatch": [
-        "reads: record ['alive', 'epsilon (shared scalar OR per-cell scalar StateFieldSpec interaction strength; the field is read\\nonly when epsilon is a per-cell spec, else it is a shared scalar), symmetrised per pair by the\\narithmetic-mean mix rule 0.5*(e_i + e_j)\\n', 'position', 'radius'] vs code ['epsilon', 'position', 'radius']",
-        "maps: record ['contact distance sigma = r_i + r_j (ADDITIVE, size-consistent as cells grow and divide); the\\nLennardJones member is the r_min 12-6 form U = epsilon*((sigma/r)^12 - 2 (sigma/r)^6), minimum\\n-epsilon exactly at contact, its adhesive tail truncated by a sigma-relative smooth C1 cutoff on\\n[r_onset_frac, r_cutoff_frac]*sigma (default 1.5-2.5); adhesive members (Morse, Harmonic,\\nLennardJones) carry the tail, repulsion-only members (SoftSphere, Hertzian) switch it off -- same\\nsignature\\n', 'pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each\\nunordered pair counts once); force on each cell = -grad of the conservative pair energy by\\nautodiff, integrated overdamped / minimised by a wrapping motion or relaxation step\\n'] vs code []"
+        "reads: record ['alive', 'epsilon', 'position', 'radius'] vs code ['epsilon', 'position', 'radius']"
       ]
     },
     {
@@ -537,11 +607,14 @@
       "also_registered": [
         "relax"
       ],
+      "implementation": [
+        "default"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "7 passed in 6.78s",
+      "test_note": "7 passed in 5.87s",
       "signature_mismatch": [
-        "reads: record ['<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g. a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>', 'alive', 'position', 'radius'] vs code ['alive', 'position', 'radius']"
+        "reads: record ['<potential.state_reads', 'alive', 'position', 'radius'] vs code ['alive', 'position', 'radius']"
       ]
     },
     {
@@ -579,16 +652,19 @@
       "also_registered": [
         "mechanosense"
       ],
+      "implementation": [
+        "default"
+      ],
       "preexisting": false,
       "test_ok": true,
-      "test_note": "7 passed in 6.23s",
+      "test_note": "7 passed in 6.08s",
       "signature_mismatch": [
-        "reads: record ['alive', 'displacement', 'position', 'radius', \"the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven; empty for a scalar-parameter potential\"] vs code ['alive', 'pos', 'radius']",
-        "maps: record [\"pairwise radial reduction over live non-self neighbours -- each cell's local mechanical load = the Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) * sum_j r_ij*(dU/dr)(r_ij), the SAME conservative pair law and neighbour sum attraction_repulsion uses for its force, but contracted to a per-cell SCALAR observable (the radial force projected on r_ij) rather than the -grad_i vector that moves cells\", 'per-cell d-ball volume V_i from radius (2 r | pi r^2 | 4/3 pi r^3); Irving-Kirkwood 1/2 bond split; compression-positive / tension-negative sign convention; transient (heritable=False), recomputed each macro-step; pure sensing -- writes only stress and moves nothing -- for downstream mechanotransduction (e.g. stress-gated division)'] vs code []"
+        "reads: record ['alive', 'displacement', 'position', 'radius', 'the'] vs code ['alive', 'pos', 'radius']"
       ]
     }
   ],
-  "collisions": {
+  "collisions": {},
+  "families": {
     "regulate": [
       "gene_network_connectionist",
       "neural_ode",
@@ -596,10 +672,12 @@
       "odecontroller"
     ],
     "adhere": [
+      "soft_sphere",
       "hertzian",
       "harmonic",
       "lennard_jones"
     ]
   },
-  "clean": 2
+  "import_all": "ValueError: operator 'regulate' already has implementation 'connectionist' (RegulateConnectionist)",
+  "clean": 4
 }

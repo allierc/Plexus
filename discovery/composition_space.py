@@ -286,7 +286,13 @@ def hill_alpha_ceiling(a_sw):
 # what the joint conditions in theta_conditions() are for. The box is the reachability envelope;
 # the joint condition is the wall.
 CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 4.0, 0.02, 0.7
-MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.055, 0.062
+# F_DEFAULT IS THE CALIBRATION (finding F012), not a guess. 0.046 with kk 0.062 gives three
+# STABLE spots on a 2000-cell ball, reproducible across three seeds -- stability tested by
+# comparing the count at step 1500 and step 3000, because a pattern still coarsening is not a spot
+# pattern whatever it looks like at the moment you stop. The previous 0.055 sits in Gray-Scott's
+# LABYRINTH regime and coarsens to a single bicontinuous domain at 53% coverage at any run length
+# (F011) -- which is what this campaign has unknowingly been running all along.
+MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.046, 0.062
 A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.2, 6.0, 1.5
 
 D_CEIL = diffusivity_ceiling(CHI_DEFAULT)          # 12.5   -- reaches Okuda's d_h = 10
