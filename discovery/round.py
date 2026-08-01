@@ -779,7 +779,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         print("[round] no candidates -- escalating")
         print(json.dumps(run_escalation(cfg, sup, lm, rid, "the batch builder produced no "
                                         "runnable candidate", ledger=ledger), indent=1))
-        return bk.finish(rid, "no_candidates", 1)
+        return bk.finish(rid, "no_candidates", 5)
 
     # ------------------------------------------------ hypotheses FIRST, then configs
     # CLAIM THE ROUND NUMBER BEFORE POSING ANYTHING.
@@ -1076,7 +1076,7 @@ def _abort(bk, sup, rid, mode, refused, posed, ledger):
         print("  search space or the envelope, not about the biology, and no agent in this loop")
         print("  can discover it. Read campaign/round_records.jsonl and decide.")
         return bk.finish(rid, "aborted_twice_stopped", 3)
-    return bk.finish(rid, "aborted_no_evidence", 1)
+    return bk.finish(rid, "aborted_no_evidence", 5)
 
 
 # --------------------------------------------------------------------------- escalation
