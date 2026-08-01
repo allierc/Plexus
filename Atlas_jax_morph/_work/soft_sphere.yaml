@@ -149,28 +149,72 @@ contract:
   outputs:
   - cell
   reads:
-  - position
+  - pos
   - radius
   - alive
-  - epsilon (per-cell OR shared interaction strength; SoftSphere reads it only when it is a per-cell field)
+  - epsilon
   writes:
-  - position
+  - pos
   maps:
-  - pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each unordered
-    pair counts once); force on each cell = -grad of the conservative SoftSphere pair energy by autodiff;
-    size-consistent contact distance sigma = r_i + r_j read from the physical radius (tracks cell growth/division)
-  - PURELY REPULSIVE compact soft core U = (epsilon/2)(1 - r/sigma)^2 with support exactly [0, sigma)
-    -- no adhesive tail and no cutoff parameter (self-truncating at contact), C1 (force vanishes at contact);
-    a radial pair force integrated overdamped or minimised by the wrapping motion step. This is the adhesion-OFF
-    shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive tail)
-status: implemented
+  - pairwise
+  - PURELY
+status: validated
 module: src/plexus/operators/candidates/jax_morph_soft_sphere.py
 test: tests/test_jax_morph_soft_sphere.py
 evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+  oracle_run: diff_soft_sphere
+  diff_metric: |
+    D_pos = max over ALL 61 frames (t = 0..60) and ALL 19 live cells of the per-cell
+    Euclidean position discrepancy ||x_plx(t,i) - x_ref(t,i)||_2, divided by the contact
+    distance sigma = r_i + r_j = 1.0. UNITS: fractions of sigma (one cell diameter).
+    x_ref is the jax-morph BrownianDynamics(SoftSphere(epsilon=1.0), gamma=1.0, kT=0.0)
+    trajectory -- the reference's OWN overdamped Euler at zero temperature, whose update is
+    exactly dx = dt*F/gamma = dt*(-grad U). x_plx is the Plexus adhere/soft_sphere operator
+    under the engine's overdamped Euler, on a BYTE-IDENTICAL initial condition (a 19-cell
+    mutually-overlapping sunflower at radius 0.5 + 5 dead padding slots), same dt = 0.2, same
+    60 steps, aligned cell-for-cell and frame-for-frame (soft_sphere is gated after_frame:1 so
+    frame 0 is the pristine IC and frame t is the IC after t overdamped steps). Because kT = 0
+    makes the reference deterministic (verified identical across two PRNG keys) and its
+    Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE function of the
+    force law, so D_pos isolates the SoftSphere force F = -grad (eps/2)(1 - r/sigma)^2.
+    Computed by _oracle/scripts/_analyze_soft_sphere.py into log/atlas/soft_sphere/diff.json.
+  threshold: 0.001
+  threshold_why: |
+    1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_soft_sphere.py:77) before the diff was
+    computed. It is ~500x below one cell radius (0.5 sigma) and ~3 orders under the real dynamics
+    the test must resolve (max live displacement 0.669 sigma; gyration grows 1.29 -> 1.68 sigma),
+    so a genuine force-law error CANNOT slip under it: dropping either 1/2 doubles the force, and
+    using sigma = mean instead of sum halves the contact distance -- both diverge by O(sigma),
+    ~1000x the bar. Yet it sits ABOVE the float32 round-off floor of two independent numeric
+    stacks (jax jit-scan vs torch autograd accumulate to ~2.7e-6 sigma over 60 steps), so it is
+    not so tight that only bit-identical arithmetic could pass. Looser would admit a halved-force
+    or mean-sigma reimplementation as "agreement"; tighter would fail on float32 reassociation
+    alone.
+  value: 2.6973983046972182e-06
+  passed: true
+  plexus_run: log/atlas/soft_sphere/
+  scorer: Atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py
+  acted_ledger: |
+    adhere: calls 60 / acted 60, max|delta| 0.37996304 (== oracle force_ic_max 0.37996307 to
+    ~3e-8); inert_operators []; valid_evidence true. The one scheduled operator moved cells every
+    frame -- this is a run, not a still life.
+  corroborators: |
+    All from log/atlas/soft_sphere/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
+    0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
+    x_plx(t) vs x_ref(t-1) scores 0.0788 sigma, ~29000x D_pos -> the frame alignment is genuinely
+    correct, not an accidental match to a shifted trajectory. (3) Single-step IC force residual
+    max_i ||(x_plx(1)-x_plx(0))/dt - F_ref(IC)|| / (eps/sigma) = 6.1e-06 (raw force law before any
+    compounding). (4) Radius-of-gyration trajectory relative error 1.40e-07 (1.68175 vs 1.68175),
+    over a cluster that genuinely MOVED (0.669 sigma). (5) Every DEAD padding slot never moved on
+    either side (0.0 / 0.0): the alive/self mask and the sigma = 0 safe_divide reproduce, no
+    phantom repulsion. (6) D_pos does NOT amplify -- it plateaus at ~2.7e-6 by frame 41 (argframe
+    41) and holds to frame 60, as expected of a contractive overdamped gradient flow.
+  scope: |
+    UNIFORM-radius test: the reference and spec both use radius 0.5, so the candidate exercises
+    sigma = r_i + r_j at EQUAL radii. The headline SUM-vs-mean size-consistency (heterogeneous
+    r_i != r_j) is NOT yet exercised. Next experiment to extend it: seed two distinct per-cell
+    radii on both sides and re-diff -- a mean-instead-of-sum contact rule would then diverge by
+    O(sigma). This validates the IMPLEMENTATION; it does not touch the verdict/dispute axis.
 disputed:
   by: skeptic
   was: new
@@ -183,3 +227,17 @@ disputed:
     the parent PairwisePotential and twins Morse/Harmonic normalize to `alias of attraction_repulsion`,
     SoftSphere (differing only in pair_energy U(r)) must take the same registered target, not a minted
     `adhere`.'
+state_io_notes:
+  reads:
+  - position
+  - epsilon (per-cell OR shared interaction strength; SoftSphere reads it only when it is a per-cell field)
+  writes:
+  - position
+  maps:
+  - pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each unordered
+    pair counts once); force on each cell = -grad of the conservative SoftSphere pair energy by autodiff;
+    size-consistent contact distance sigma = r_i + r_j read from the physical radius (tracks cell growth/division)
+  - PURELY REPULSIVE compact soft core U = (epsilon/2)(1 - r/sigma)^2 with support exactly [0, sigma)
+    -- no adhesive tail and no cutoff parameter (self-truncating at contact), C1 (force vanishes at contact);
+    a radial pair force integrated overdamped or minimised by the wrapping motion step. This is the adhesion-OFF
+    shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive tail)

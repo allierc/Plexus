@@ -169,3 +169,61 @@ source (deliberately -- a fitted constant would teach us nothing). (3) The `epsi
 exercised by the tests. (4) Per-cell VIRIAL PRESSURE (the base's other consumer of this energy) is
 out of scope here, consistent with the sibling entries. Verdict left as the normalizer landed it
 (`new`, `implementation_of: adhere`); implementing does not change it.
+
+---
+
+## DIFFER note -- differential test RAN and PASSED (supersedes "evidence stays null")
+
+The earlier "could not establish" note said there was no reference to diff against because jax is
+absent from the Plexus env. That was wrong about the mechanism: the oracle runs jax-morph in its
+OWN isolated venv (`oracle.py`, jax-morph 0.4.0 / jax 0.11.0, git ace08b8), so a real reference
+trajectory exists. It has now been built and diffed.
+
+**Isolation design.** LennardJones is an ENERGY (writes no state; its whole contract is
+F = -grad U), so it is isolated from every other mechanism and driven by the reference's OWN
+overdamped Langevin step at kT=0: `BrownianDynamics(LennardJones(epsilon=1.0), gamma=1, kT=0)`,
+whose update dx = dt*forces/gamma is exactly the Plexus engine's overdamped Euler of the emitted
+velocity (mobility = 1/gamma = 1). IC = SIX well-separated dumbbell pairs (centres 5 apart,
+> 2.5*sigma, no cross-pair force) at separations [1.15,1.25,1.35,1.50,1.70,2.60]*sigma + 4 dead
+padding slots. A purely-adhesive many-cell blob is geometrically frustrated (collapses into the
+r^-12 core, explicit integrator explodes -- verified in _probe_lj); the dumbbells relax
+monotonically to contact, sweeping the adhesive tail + cutoff ramp + beyond-cutoff, which is the
+LJ-DISCRIMINATING regime the repulsion-only siblings lack.
+
+**Metric / threshold (pre-registered).** D_pos = max over all 101 frames and 12 live cells of
+||x_plx - x_ref||_2 / sigma. Threshold 1.0e-3 sigma, pre-registered at
+`_oracle/scripts/_analyze_lennard_jones.py:83` before the diff was computed.
+
+**Result: D_pos = 0.0 -- PASS (byte-equal).** The Plexus and jax-morph float32 trajectories are
+BYTE-EQUAL over all 101x16x2 positions (np.array_equal True). Verified NOT an aliasing artifact:
+the two arrays are distinct objects, diverge from the SoftSphere negative control by 0.350 sigma,
+and the cells genuinely moved 0.350 sigma. This is the strongest pass in the pair-potential family
+(soft_sphere 2.7e-6, harmonic 7.9e-6, hertzian 1.9e-6 were all non-zero, proving 1e-3 is not a
+bit-identity gate).
+
+**Corroborators.** frame-0 == pristine IC both sides (0.0/0.0); misaligned x_plx(t) vs x_ref(t-1)
+= 0.0268 sigma (27x the bar); per-pair separation trajectory agrees to 0.0 (five pairs -> contact
+1.0, sixth frozen at 2.60); negative control (adhesion-off SoftSphere) diverges 0.350 sigma;
+dead slots frozen 0.0/0.0; the 9.4e-05 single-step "force residual" is an ORACLE-INTERNAL float32
+reassociation (plx and ref steps both differ from the standalone forces(IC) by the SAME 9.4e-07,
+i.e. equal each other); oracle self-guard: 2-cell scan vs analytic r_min force 4.6e-06, force
+exactly -0.0 at contact and beyond 2.5 sigma, kT=0 deterministic across two PRNG keys, first Euler
+step == dt*forces bit-for-bit.
+
+**Acted ledger.** adhere calls 100 / acted 47, moved 2.679 cumulative, valid_evidence true. The
+operator acts through the active phase and falls below the move threshold once the pairs reach
+contact (~frame 42; gyration 8.5795->8.5678 and nn-distance 1.5917->1.2667 both plateau) -- the
+overdamped fixed point, a real run not a still life.
+
+**Scope / what this does NOT prove.** Uniform radius 0.5 (SUM-vs-mean size-consistency at
+heterogeneous r_i != r_j is untested here -- carried on the hertzian twin) and shared epsilon
+(per-cell arithmetic-mean mix confirmed by _probe_eps but not exercised in the trajectory). The
+per-cell VIRIAL pressure the base derives from the same energy is out of scope (separate
+VirialStress mechanism). This validates the IMPLEMENTATION reproduces the reference force + its
+overdamped dynamics to byte equality; it does not touch the verdict (new -> adhere), which stands
+on the signature argument in `why`.
+
+**Runs.** oracle `Atlas_jax_morph/_oracle/runs/diff_lennard_jones/` (reference.npz + summary.json);
+plexus `log/atlas/lennard_jones/` (spec_run.yaml, diag.json, metrics.json/.npz, strip.png,
+movie.mp4); diff `log/atlas/lennard_jones/diff.json`. **Verdict: status validated, D_pos 0.0 <
+1e-3, passed.**

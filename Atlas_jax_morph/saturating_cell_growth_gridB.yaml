@@ -1,0 +1,33 @@
+# Companion spec for the grow_radius differential, Scenario B (heterogeneous 6x6 grid).
+# NOT run through run_spec.py's schedule -- the diff driver builds this Hierarchy, overrides each
+# cell's (radius, growth_rate) from the reference grid (seed_state can only set a UNIFORM value, so
+# per-cell heterogeneity is injected directly), then rolls grow_radius one macro-step at a time with
+# the real engine integration (radius += dt*delta). Positions are irrelevant (growth reads none).
+general:
+  name: saturating_cell_growth_gridB
+  seed: 0
+  n_frames: 20
+  dt: 2.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 36
+    buffer: 36
+    state:
+      pos: { width: 2 }
+      radius: { width: 1, integration: first_order, boundary: free, record: true }
+      growth_rate: { width: 1, integration: none, boundary: free, record: false }
+
+fields: {}
+
+operators:
+  - { op: grow_radius, at: cell, max_radius: 0.6 }
+
+schedule: [grow_radius]
+
+plotting:
+  background: black
+  point_size: 6.0

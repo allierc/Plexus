@@ -132,3 +132,55 @@ the field); (6) **pos not mutated** by forward; (7) `r_cutoff_frac<=1` raises (t
 check); (8) **3-D generic**. Entry updated: `status: implemented`, `module`, `test` set. Evidence
 (`oracle_run`/`diff_metric`) left null — the differential comparison against the jax oracle is the
 CURATOR's pass; I did not run it and did not hard-code any reference number.
+
+---
+
+## Differential (DIFFER pass) — PASS, `status: validated`
+
+**Verdict: the operator reproduces the reference, INCLUDING the adhesive tail.** D_pos = **7.86e-6 σ**
+(threshold 1e-3), a clean pass ~127× below threshold and in the same float32-noise band as the sibling
+soft_sphere differential (2.7e-6), despite ~18× larger forces (force_ref_max 6.96 vs 0.39).
+
+**Metric (fixed BEFORE the run).** D_pos = max over recorded frames t=0..160 and live cells i of
+‖x_plexus[t,i] − x_ref[t,i]‖₂ / σ, on a deterministic overdamped (kT=0) relaxation. Both sides are the
+SAME forward Euler at γ=mobility=1 on a byte-identical float32 IC, so the trajectory is a pure function of
+the force law f(r)=k(σ−r) truncated at r_c — repulsive core + **adhesive tail** + hard C0 cutoff. Pass
+condition = (D_pos ≤ 1e-3) AND (frame-0 == IC exactly on both sides) AND (dead slots never moved).
+
+**The test is built to exercise the one feature that separates harmonic from the already-validated
+purely-repulsive soft_sphere/hertzian: the adhesion.** IC = 19-cell Vogel sunflower (scale 0.5, radius 0.5,
+σ=1.0) with 24 overlapping pairs (r<σ, repulsion) + 92 adhesive pairs (σ≤r<r_c=2.5) + 55 beyond-cutoff — both
+regimes present at t=0. Under adhesion the cluster CONTRACTS to a bounded equilibrium (gyration 1.54→0.64),
+the OPPOSITE of soft_sphere's monotone expansion; the diff tracks that contraction cell-for-cell.
+
+**Negative control (the decisive number).** With k=ε=1, σ=1 the SoftSphere and Harmonic repulsive cores are
+IDENTICAL (f=1−r for r<σ), so on the same IC they differ ONLY in the adhesive tail. Deleting the tail
+(SoftSphere) diverges the trajectory by **1.48 σ = 1480× threshold** (single-step force gap rel 1.02;
+SoftSphere gyration expands to 1.68 vs Harmonic's 0.64). The metric therefore provably resolves the adhesive
+tail — a wrong (purely-repulsive) law lands ~10⁶× above the observed pass value.
+
+**Corroborators all agree.** single-step IC force residual 4.0e-5 (units k·σ); gyration rel-err 2.5e-7;
+adhesion_contracts_cluster true; dead-slot immobility 0.0 (both sides); frame-0==IC exactly (0.0 both);
+misaligned-frame control (plx[t] vs ref[t−1]) 0.26 ≫ D_pos, so the alignment is real not accidental.
+
+**Oracle self-guards (all clean).** jxm BrownianDynamics(kT=0) deterministic at a fixed key AND across two
+keys; jxm.simulate ≈ hand-rolled dx=dt·forces Euler (max dev 5.7e-6, float32); 2-cell radial scan of
+Harmonic.forces vs the analytic k(σ−r)|_{r<r_c} matches to **6e-8**, with force exactly 0 beyond r_c and a
+deepest adhesive pull −1.45 — the reference implements the law the operator claims.
+
+**Numbers & paths.**
+- oracle : `Atlas_jax_morph/_oracle/runs/diff_harmonic/` (reference.npz + summary.json + reference.png);
+  script `_oracle/scripts/harmonic.py`. Model = BrownianDynamics(Harmonic(k=1.0, r_cutoff_frac=2.5), γ=1, kT=0).
+- plexus : `log/atlas/harmonic/` (diag.json valid_evidence=true, adhere acted 160/160 max|Δ| 8.45;
+  metrics.json/.npz, strip.png, diff.json); spec `config/atlas/harmonic.yaml`; trajectory
+  `graphs_data/atlas/harmonic/trajectory.npz`.
+- scorer : `_oracle/scripts/_analyze_harmonic.py` → `log/atlas/harmonic/diff.json`. value 7.8642e-06, passed true.
+- record : evidence.oracle_run=diff_harmonic, evidence.value=7.8642e-06, evidence.passed=true, status=validated.
+
+**Note on the known 124-vs-82 anchor discrepancy.** Out of scope here: this differential ISOLATES the force
+law (no growth, no division, fixed cell count/radii), so the anchor's live-cell-count gap cannot enter — the
+force law itself reproduces bit-for-float. That gap lives in the division/growth mechanisms, not in `adhere`.
+
+**Env gotcha (durable).** `run_spec.py` needs `zarr` (field-recording path, engine.py:792); the
+`particle-graph` conda env lacks it. Use `/workspace/.conda_envs/neural-graph-linux/bin/python` (torch 2.9 +
+zarr 2.18 + plexus) for run_spec and the scorer. The oracle runs in its own pinned jax venv via `oracle.py run`.

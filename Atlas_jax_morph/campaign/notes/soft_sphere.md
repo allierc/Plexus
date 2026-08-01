@@ -220,3 +220,67 @@ backward (the double-`where` guard holds).
 
 **Entry updated:** `status: implemented`, `module:` + `test:` set. Verdict/contract untouched
 (`new` -> `implementation_of: adhere`, as normalized).
+
+---
+
+## Differential test (DIFFER pass -- status -> validated)
+
+**Result: PASS.** `D_pos = 2.70e-06 sigma` << threshold `1.0e-3` (pre-registered before the run).
+The Plexus `adhere/soft_sphere` operator reproduces the jax-morph `SoftSphere` force law and
+overdamped dynamics to the float32 floor of two independent numeric stacks.
+
+**How I made the two comparable.** SoftSphere is a POTENTIAL -- it writes no state; its whole
+contract is the force `F = -grad U`. So I isolated it (no growth, no division -> fixed count, fixed
+radii, fixed slots) and drove it with the reference's OWN overdamped step at zero temperature:
+`BrownianDynamics(SoftSphere(epsilon=1.0), gamma=1.0, kT=0.0)`, whose Euler-Maruyama update at
+kT=0 is exactly `dx = dt*forces/gamma` -- identical to the Plexus engine's overdamped Euler of the
+operator's emitted velocity (`pos += dt*mobility*F`, `mobility == 1/gamma == 1`). So the trajectory
+is a pure function of the force law. IC: a fixed 19-cell mutually-overlapping sunflower cluster
+(min NN 0.65, 36 overlapping pairs at sigma=1), uniform radius 0.5, 5 dead padding slots at the
+origin (to exercise the dead-pair mask + the sigma=0 safe_divide), centred in a free 40x40 world,
+60 steps at dt=0.2. The IC is BYTE-IDENTICAL on both sides (the oracle printed its 6-decimal live
+coords, pasted verbatim into the spec `start:`); `soft_sphere` is gated `after_frame:1` so frame 0
+= the pristine IC and frame t = the IC after t overdamped steps, aligning cell-for-cell,
+frame-for-frame with the reference history s_0..s_60.
+
+**Numbers.**
+- Primary `D_pos = max over 61 frames x 19 live cells of ||x_plx - x_ref||/sigma = 2.70e-06`
+  (threshold 1e-3). Frames 0-4 bit-identical; the discrepancy accumulates slowly and PLATEAUS at
+  ~2.7e-6 by frame 41 (does NOT amplify -- overdamped relaxation is a contractive gradient flow).
+- Alignment verified: frame 0 == IC on both sides (residual 0.0/0.0); the deliberately-MISALIGNED
+  comparison x_plx(t) vs x_ref(t-1) scores 0.0788 (~29000x larger) -> the aligned convention is
+  genuinely correct, not accidental.
+- Single-step IC force residual `max_i ||(x_plx(1)-x_plx(0))/dt - F_ref(IC)|| / (eps/sigma) =
+  6.1e-06` (raw force law before any compounding); run_spec `max|delta| 0.37996304` == oracle
+  `force_ic_max 0.37996307` to ~3e-8.
+- Radius-of-gyration trajectory relative error `1.4e-07` (1.6818 vs 1.6818); cluster genuinely
+  MOVED (max live displacement 0.669 sigma) so there was real repulsive dynamics to disagree on.
+- Every DEAD padding slot never moved on either side (0.0/0.0): the alive/self mask and the
+  sigma=0 safe_divide reproduce; no phantom repulsion.
+- Acted ledger: `adhere` calls 60 / acted 60, max|delta| 0.38, inert_operators [] ->
+  valid_evidence true.
+
+**Determinism / convention pinned first (oracle contract).** The kT=0 trajectory is identical at a
+fixed key AND across two different keys (the noise is truly off); and jxm's BrownianDynamics update
+equals a hand-rolled Euler over `SoftSphere().forces()` to 1.9e-6 (jit-scan vs eager-loop float32
+reassociation of the SAME jax force -- a calibration of the jax-internal float32 floor over this
+60-step run, not a convention error). This pins `dx = dt*forces` so the trajectory diff isolates
+the force law.
+
+**What this certifies (and its scope).** Reproduces the purely-repulsive harmonic law to float32:
+the per-pair 1/2 AND the outer 1/2 (a dropped 1/2 doubles the force -> O(sigma) divergence), the
+compact support / C1 vanishing at contact, the contact distance sigma = 2*r, and the dead/self
+masking. It is a UNIFORM-radius test: the candidate reads a scalar `radius` PARAM (its fallback),
+NOT the per-cell `radius` state block, so the headline SUM-vs-mean size-consistency
+(sigma = r_i + r_j with heterogeneous radii) is NOT exercised. **Next experiment** to extend it:
+give the cell set a per-type `radius` scalar (which registers the `lvl.radius` buffer the candidate
+reads) with two distinct radii, seed the reference with the matching per-cell radii, and diff -- a
+mean-instead-of-sum contact rule would then diverge by O(sigma). This does not touch the
+verdict/dispute (that is the normalizer's axis); it validates the IMPLEMENTATION.
+
+**Paths.**
+- Oracle: `Atlas_jax_morph/_oracle/runs/diff_soft_sphere/` (reference.npz + summary.json);
+  script `Atlas_jax_morph/_oracle/scripts/soft_sphere.py`.
+- Plexus: `config/atlas/soft_sphere.yaml` -> `log/atlas/soft_sphere/` (diag.json, metrics.json,
+  strip.png) + `graphs_data/atlas/soft_sphere/trajectory.npz`.
+- Scorer: `Atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py` -> `log/atlas/soft_sphere/diff.json`.

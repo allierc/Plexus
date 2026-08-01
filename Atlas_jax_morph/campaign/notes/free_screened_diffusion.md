@@ -133,3 +133,68 @@ radius `a` has no paper counterpart, so agreement is a code-vs-code check, not c
 
 **Not done (next role):** the differential run against the oracle — `evidence.*` stays null,
 `status: implemented`.
+
+---
+
+## Differential run (DIFFER)
+
+**Result: `status: validated`. value = 2.51e-07 (relative) < threshold 1.0e-3 -> PASS.**
+
+`morphogen` is a QUASISTATIC pure state->field map: `__call__` ignores dt/key and OVERWRITES the
+`chemical` block with the t=infinity solution, moving no cell. So — unlike the ODEController siblings,
+where a trajectory diff conflates the vector field with the integrator — there is NO integrator and NO
+trajectory to score. The test is the analog of the gene-network `metric_A`: evaluate the reference
+`FreeScreenedDiffusion.__call__` (jax) and the Plexus `MorphogenFreeSpace.forward` (torch) on ONE
+identical fixed state and diff the written field directly. float32 both sides (the reference is NOT run
+in x64), so the number is pure algorithm agreement, not a dtype gap.
+
+**Metric** (fixed BEFORE the run in `diff_free_screened_diffusion.py`): `value = max` over all configs,
+all cells (live AND dead), all species of `|c_plx - c_ref| / max(|c_ref|, 1e-6)` — relative where the
+field is resolvable, floored-absolute where it is ~0 (a near-zero true value cannot manufacture a
+spurious infinite ratio). Gated on finite + every DEAD slot exactly 0.0 on the Plexus side. Four fixed
+configs, each a distinct kernel regime the CODE has and the paper's graph-Laplacian solve does not:
+- **C_anchor** (2-D disk): the anchor's 4 founders, uniform radius 0.5, unit secretion, D=K=1 — the
+  exact geometry the ENGINE run seeds (translation-invariant, so identical pairwise distances).
+- **C2** (2-D disk, adversarial): 12 slots / 9 live, per-cell varied radius, an OVERLAPPING pair
+  (r<a -> r_eff=max(r,a) self/near clamp), 2 species with per-species (D,K), secretion incl. zeros and
+  a **big S=99 on a DEAD slot** (a source-mask bug would be loud).
+- **C3** (3-D sphere, adversarial): species 0 **UNSCREENED (K=0, kappa=0, the deliberately-unfloored
+  exact branch)** + species 1 screened, overlapping pair, dead slots.
+- **C1** (1-D segment, adversarial): 6 live, D=1, K=0.7.
+
+**Measured** (`_oracle/runs/diff_free_screened_diffusion/diff.json`): value 2.51e-07, max_abs 3.58e-07
+— float32 rounding floor, ~4 orders below threshold. Per config: C_anchor 6.7e-08, C2 2.51e-07 (worst;
+argmax at the FAR cell where the field is LARGEST 1.426, i.e. float32 accumulation, not a near-FLOOR
+artefact), C3 1.16e-07, C1 9.7e-08. All finite; every dead slot exactly 0.0 both sides (the S=99 dead
+source emits nothing — the twice-applied alive mask reproduces). The ported Abramowitz-Stegun Bessel
+K0/K1 (torch.special.i0/i1 vs jax jsp.i0/i1), the self/near clamp, the per-species vmap-vs-loop, and the
+K=0 unfloored 3-D branch all reproduce to rounding.
+
+**Threshold** `1.0e-3` (relative), fixed before the run: float32 has ~7 sig-digits (eps ~1.2e-7); a
+dense all-pairs superposition plus (in 2-D) a truncated Bessel series across two INDEPENDENT numeric
+stacks accumulates to an expected faithful-port floor ~1e-5..1e-4, so 1e-3 sits ~1 order above that yet
+~3 orders BELOW the O(1) divergence any STRUCTURAL error would produce (dropped self-term, wrong mask,
+transposed source radius, mis-ported Bessel coefficient, or the paper's graph-Laplacian boundary
+condition). Passing certifies the two methods compute the SAME free-space field; it CANNOT pass a
+graph-Laplacian re-implementation. Tighter 1e-6 is below the two-library float32 floor and unmeetable;
+looser 1e-1 stops distinguishing a faithful port from a ~10% kernel-form error.
+
+**The acted ledger checked first** (`log/atlas/free_screened_diffusion/diag.json`): `morphogen` acted
+1/5 (structural write of `chemical` from zero at frame 0; recomputed identically after, so no further
+state change — acted>=1, NOT inert), `seed_state` 1/1; `inert_operators: []`, `valid_evidence: true`.
+run_spec's position metrics (gyration, nn_distance) are field-INVARIANT here by construction (the solve
+moves no cell), so the field itself is scored by the isolated differ, not by this run — this run's job
+is to prove the operator SCHEDULES and ACTS in the real engine on the matched IC.
+
+**Runs**
+- Oracle (jax venv): `_oracle/runs/diff_free_screened_diffusion/` (reference.npz + summary.json;
+  script `_oracle/scripts/free_screened_diffusion.py`). dt/key-invariance asserted (quasistatic).
+- Score (torch): `diff_free_screened_diffusion.py` -> `.../diff.json`.
+- Engine (torch): spec `config/atlas/free_screened_diffusion.yaml`; evidence
+  `log/atlas/free_screened_diffusion/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
+
+**Verdict stands: `new`, `implementation_of: morphogen`.** The reproduction confirms the FREE-SPACE
+Green's-function method is a faithful implementation of the `morphogen` contract to float32 precision
+across 1-D/2-D/3-D. It does NOT (and cannot) certify the paper's graph-Laplacian sibling — that is a
+different numerical method with different boundaries; the code-vs-paper divergence remains the recorded
+source-wins contradiction, tested here only in that the free-space form reproduces exactly.

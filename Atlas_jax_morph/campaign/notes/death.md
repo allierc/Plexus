@@ -95,3 +95,53 @@ is absent from this env by design -- so `evidence.oracle_run` stays null for the
 Name note: `apoptose`, not `death`, so no clash with the pre-existing efflux-boundary `death`
 operator (candidates/death.py, kind `lateral`) -- a geometric exit-line sink, an unrelated
 mechanism. Candidates are not auto-imported, so nothing registers until the differ/tests import it.
+
+
+## Death -- validated (DIFFER)
+
+**PASS. `status: validated`.** The implemented `apoptose` reproduces the reference `Death` hazard.
+
+**Why not a bit-for-bit trajectory diff.** Death is a discrete Bernoulli event and the JAX
+(`jax.random.bernoulli`) and torch (`torch.rand`) streams are different RNGs, so seed-0-vs-seed-0
+matches nothing stochastic. The paper also ships no death config, and there is no shared IC in the
+smoke/anchor run (which has no death). So the differential is run on a purpose-built PURE-DEATH
+rollout with a matched IC, and measures the one thing a hazard is defined by -- the pooled
+per-macro-step death probability -- which is realization- and record-convention-independent.
+
+**Metric (pre-registered).** `diff_metric = |p_hat_plexus - p_hat_oracle|`, pooled per-macro-step
+death hazard, with `p_hat = (n_active[0] - n_active[-1]) / sum(n_active[:-1])` over the 41 recorded
+frames (no births => every live-count decrement is one committed death => MLE Bernoulli hazard over
+every eligible live-cell-step). `threshold = 3*SE_pooled`, `SE_pooled = sqrt(SE_o^2 + SE_p^2)`,
+`SE = sqrt(p_hat(1-p_hat)/eligible)`. Both decided before reading the result; the band is justified
+not just as a sampling interval but by discrimination -- it is tighter than the gap between the exact
+hazard `1-exp(-lambda*dt)=0.048771` and the linear-approx bug `lambda*dt=0.05` (gap 0.00123), so an
+operator that wrote `p=rate*dt` instead of the source's `-expm1(-rate*dt)` would FAIL this test.
+
+**Matched IC.** Oracle `Model([Death])` and Plexus `config/atlas/death.yaml` both start N0=50000
+live cells at uniform `death_rate = lambda = 0.05`, `dt=1.0`, 40 macro-steps, death the only
+operator. (Death reads no position, so scattered positions in the Plexus box are irrelevant to the
+survival metric.) One caveat handled explicitly: Plexus records AFTER applying each op, so its first
+recorded frame is already post-step-1 (47506, not 50000; the acted ledger shows apoptose acted 41x
+over 41 frames). A frame-index-aligned survival diff would be off-by-one and wrong; the pooled
+hazard is stationary and unbiased on any consecutive-frame window, so it sidesteps this cleanly.
+
+**Numbers.**
+
+| side | p_hat | SE | deaths | eligible cell-steps | vs exact 0.048771 |
+|------|-------|-----|--------|---------------------|-------------------|
+| oracle (jax-morph Death) | 0.048928 | 2.29e-4 | 43236 | 883662 | 0.69 SE |
+| Plexus (apoptose)        | 0.048985 | 2.35e-4 | 41169 | 840445 | 0.91 SE |
+
+`diff = 5.66e-05 = 0.17 * SE_pooled  <=  threshold 0.000986`  ->  **PASS**. Both sides also agree
+with the exact hazard within 1 SE. Acted ledger: `apoptose` calls 41 / acted 41 / inert []
+=> `valid_evidence: true` (checked before any metric).
+
+**Paths.** oracle run `Atlas_jax_morph/_oracle/runs/diff_death/` (script
+`_oracle/scripts/death.py`); Plexus evidence `log/atlas/death/` (spec `config/atlas/death.yaml`);
+differential computed by `_oracle/scripts/_analyze_death.py`.
+
+**Scope (unchanged from implemented).** This validates the forward EFFECT (the source's `replay`):
+the exact hazard form, the `>=0` clip, the retire (occ 1->0), and monotone non-increasing counts.
+It does NOT exercise the trace/`logp` score-function (REINFORCE) layer -- Plexus's engine has no
+counterpart, same as `cell_divide`. The `death` lineage float / divide-then-die ordering are covered
+by the reference-free unit tests, not by this population-level differential.

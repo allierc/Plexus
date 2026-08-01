@@ -196,19 +196,70 @@ contract:
   outputs:
   - cell
   reads:
-  - position
+  - pos
   - radius
   - alive
+  writes:
+  - pos
+  maps: []
+status: validated
+module: src/plexus/operators/candidates/jax_morph_mechanical_relaxation.py
+test: tests/test_jax_morph_mechanical_relaxation.py
+evidence:
+  oracle_run: diff_mechanical_relaxation
+  diff_metric: |
+    D_eq = max over the 4 LIVE cells i of ||x*_plx,i - x*_ref,i||_2 / sigma at the RELAXED
+    EQUILIBRIUM (frame 1, the single quasistatic macro-step). sigma = r_i + r_j = 1.0, so D_eq is
+    in units of contact distance (dimensionless). x*_plx,i is the Plexus engine's frame-1 cell
+    position AFTER the `relax` operator's quasistatic emit v = (x*-x0)/dt has been integrated by
+    the REAL engine (pos += dt*v, dt = 1.0, so the emit lands x* exactly); x*_ref,i is the jax-morph
+    MechanicalRelaxation(Morse) FIRE-to-f_tol equilibrium x*. Both sides share a BYTE-IDENTICAL
+    float32 IC -- a rigid 4-cell diamond compressed to 0.85 sigma, buffer 8 with 4 dead padding
+    slots parked at the origin (so the dead-pair mask and the sigma=0 safe-norm guards are
+    exercised). Corroborated by a gauge-free force-balance cross-check (the operator's OWN Morse
+    energy autodiffed at each side's equilibrium -> |grad U|_inf), a rigid-gauge-removed (Kabsch)
+    D_eq, fixed-point idempotence of the post-frame-1 plateau, frame-0 == IC on both sides, and
+    dead-slot immobility. Oracle: Atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation
+    (reference.npz + summary.json). Plexus: config/atlas/mechanical_relaxation.yaml ->
+    log/atlas/mechanical_relaxation. Analysis: _oracle/scripts/_analyze_mechanical_relaxation.py ->
+    log/atlas/mechanical_relaxation/diff.json.
+  threshold: |
+    1.0e-3 (sigma), pre-registered in _analyze_mechanical_relaxation.py before the diff was
+    computed. It is BRACKETED on both sides. ABOVE: it sits >100x over the ~8e-6 sigma two-solver
+    float32 equilibrium shell -- a force residual f_tol = 2e-4 maps through the local Morse
+    curvature kappa to a position offset f_tol/kappa ~ 4e-6 sigma per side, so two INDEPENDENT
+    JAX-vs-torch FIRE solvers each stopped inside the tolerance can differ by at most ~2 shells,
+    and 1e-3 does not false-fail on legitimate float32 roundoff. BELOW: it sits >100x under the
+    0.1135-sigma relaxation displacement the metric must resolve (the distance the equilibrium sits
+    from the compressed IC), so any operator that fails to reach the same equilibrium basin -- a
+    DYNAMIC force/displacement emit, a missing 1/dt quasistatic factor, or a fixed-step descent that
+    stops short -- lands O(0.1 sigma) away and fails decisively. A looser band (e.g. 1e-2) would
+    begin to admit off-equilibrium creeps whose force residual is 5-50x f_tol.
+  value: 1.91e-06
+  passed: true
+  detail: |
+    D_eq = 1.91e-06 sigma (per-cell {0, 0, 1.9e-6, 0}: only one cell differs, by ~2 float32 ulp)
+    << threshold 1.0e-3 -> PASS with a ~500x margin, and ~6e4x under the 0.1135-sigma relaxation
+    displacement it must resolve. Every corroborator is clean:
+      - force cross-check: |grad U|_inf at the PLEXUS equilibrium = 1.90e-4 <= 5*f_tol (1.0e-3),
+        matching the reference 1.35e-4 (and the oracle's own residual_at_xstar 1.34e-4) -- BOTH
+        sides are genuine force balances of the SAME Morse energy, gauge-independently;
+      - gauge-removed Kabsch D_eq = 1.43e-6 ~ raw D_eq -> no global rigid drift inflates it;
+      - fixed-point plateau = 0.0 on BOTH sides (the equilibrium held exactly over frames 2-6) --
+        the quasistatic no-op the operator must also exhibit once relaxed;
+      - frame 0 == pristine IC on both sides (resid 0.0); dead slots immobile on both (0.0);
+      - misaligned x_plx(eq) vs IC = 0.1135 = relaxation_displacement -> the equilibrium is
+        genuinely reached, not an accidental IC match.
+    Summary observables agree: gyration ref-equilibrium 0.6858 == plexus final 0.68575;
+    mean_nn ref 0.9698 == plexus 0.9698. Acted ledger
+    (log/atlas/mechanical_relaxation/diag.json): relax calls 6 / acted 1 / moved 0.1123 (== the
+    relaxation displacement; it acts once then idempotently emits ~0 on the held equilibrium),
+    seed_state acted, inert_operators [], valid_evidence true -> the scheduled solver genuinely
+    acted.
+state_io_notes:
+  reads:
+  - position
   - '<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g.
     a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>'
   writes:
   - position
-  maps: []
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_mechanical_relaxation.py
-test: tests/test_jax_morph_mechanical_relaxation.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null

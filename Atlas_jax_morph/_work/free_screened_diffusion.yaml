@@ -160,55 +160,55 @@ contract:
   - chemical
   maps:
   - pairwise
-status: implemented
+status: validated
 module: src/plexus/operators/candidates/jax_morph_free_screened_diffusion.py
 test: tests/test_jax_morph_free_screened_diffusion.py
 evidence:
-  oracle_run: null
+  oracle_run: diff_free_screened_diffusion
   diff_metric: |
-    ISOLATED QUASISTATIC FIELD DIFF. `morphogen` is a pure state->field map: dt and key are
-    ignored and the `chemical` block is OVERWRITTEN with the t=infinity solution, so -- unlike the
-    ODEController siblings -- there is NO integrator to conflate and NO trajectory to score. The
-    reference `FreeScreenedDiffusion.__call__` (jax) and the Plexus `MorphogenFreeSpace.forward`
-    (torch) are evaluated on ONE identical fixed state and their written concentration fields
-    compared directly. Both run in float32 (matching the torch engine; the reference is NOT run in
-    x64), so the comparison measures the algorithm, not a dtype gap.
-
-    value = max over all configs, all cells i (live AND dead), all species k of the RELATIVE error
-        rel_ik = |c_plx[i,k] - c_ref[i,k]| / max(|c_ref[i,k]|, FLOOR),   FLOOR = 1e-6,
-    i.e. relative where the reference field is resolvable, floored-absolute where it is ~0 so a
-    near-zero true value cannot manufacture a spurious infinite ratio. Units: dimensionless
-    (concentration ratio). Max ABSOLUTE error and the field magnitude scale are reported alongside.
-
-    Configs (fixed BEFORE the run in _oracle/scripts/free_screened_diffusion.py), each covering a
-    kernel regime the CODE has and the paper's graph-Laplacian method does NOT:
-      C_anchor (2-D disk): the anchor's 4 founders, uniform radius 0.5, uniform unit secretion,
-        D=K=1 -- the exact geometry the ENGINE run seeds (log/atlas/free_screened_diffusion).
-      C2 (2-D disk, adversarial): 12 slots / 9 live, per-cell varied radius, an OVERLAPPING pair
-        (r<a, exercising the r_eff=max(r,a) self/near clamp), 2 species with per-species (D,K),
-        secretion including zeros and a nonzero on a DEAD slot (source-mask test).
-      C3 (3-D sphere, adversarial): 12 slots / 9 live, one species UNSCREENED (K=0, kappa=0, the
-        deliberately-unfloored exact branch) + one screened, an overlapping pair, dead slots.
-      C1 (1-D segment, adversarial): 8 slots / 6 live, D=1, K=0.7.
-    GATED on: every config finite on both sides, AND every DEAD slot exactly 0.0 on both sides
-    (the twice-applied alive mask). Computed by diff_free_screened_diffusion.py reading
-    _oracle/runs/diff_free_screened_diffusion/reference.npz.
+    D_max = max over all four fixed configs (C_anchor = 2-D disk, the anchor's 4 founders; C2 = 2-D
+    disk adversarial; C3 = 3-D sphere adversarial; C1 = 1-D segment adversarial), over all array
+    slots (live AND dead), and over all field species, of the RELATIVE error
+    |c_plx - c_ref| / max(|c_ref|, 1e-6). Here c is the steady-state per-cell chemical concentration
+    (dimensionless field units) written by ONE quasistatic solve on an IDENTICAL matched state
+    (pos, radius, alive, secretion_rate). c_ref is the jax reference FreeScreenedDiffusion field
+    (float32); c_plx is the torch MorphogenFreeSpace field (float32) run on the SAME saved state.
+    There is no integrator, no trajectory and no dt (dt/key asserted inert on both sides -- the
+    field is a t=infinity constraint solve), so the number is pure algorithm agreement. The 1e-6
+    floor makes the ratio relative where the field is resolvable and floored-absolute where it is
+    ~0, so a near-zero true value cannot manufacture a spurious infinite ratio. Gated additionally
+    on all-finite and every DEAD slot being exactly 0.0 on the Plexus side (the twice-applied alive
+    mask). Scored on the saved fields in _oracle/runs/diff_free_screened_diffusion (diff.json) with
+    no re-simulation, so oracle and Plexus cannot drift apart.
   threshold: |
-    1.0e-3 (relative). float32 carries ~7 significant digits (eps ~1.2e-7); the field is a dense
-    all-pairs superposition over N sources PLUS, in 2-D, a truncated Abramowitz-Stegun Bessel
-    series (K0/K1), evaluated by two INDEPENDENT numeric stacks (jax vs torch), so the expected
-    faithful-port floor is ~1e-5..1e-4 relative (accumulated float32 rounding across libraries and
-    the ported i0/i1). 1.0e-3 sits ~1 order above that expected floor (headroom for the two-library
-    accumulation) yet ~3 orders BELOW the O(1) relative divergence any STRUCTURAL error would
-    produce -- a dropped self-term, a wrong alive-mask, a transposed source radius, a mis-ported
-    Bessel coefficient, or the paper's graph-Laplacian solve (a different boundary condition
-    entirely, which this test CANNOT pass). Passing certifies the two numerical methods compute the
-    SAME free-space Green's-function field to float32 precision. A tighter 1e-6 is below the
-    float32 two-library floor and unmeetable by any correct port; a looser 1e-1 would stop
-    distinguishing a faithful port from a ~10% kernel-form error. Fixed before the run (THRESHOLD
-    constant in diff_free_screened_diffusion.py).
-  value: null
-  passed: null
+    1.0e-3 (relative), fixed BEFORE the run. float32 carries ~7 significant digits (eps ~1.2e-7); a
+    dense all-pairs Green's-function superposition -- plus, in 2-D, a truncated Abramowitz-and-Stegun
+    Bessel K0/K1 series -- evaluated across two INDEPENDENT numeric stacks (jax jsp.i0/i1 vs torch
+    special.i0/i1) accumulates to an expected faithful-port floor of ~1e-5..1e-4, so 1e-3 sits about
+    one order above that yet about three orders BELOW the O(1) divergence any STRUCTURAL error would
+    produce (a dropped self/diagonal term, a wrong alive mask, a transposed source-radius axis, a
+    mis-ported Bessel coefficient, or the paper's graph-Laplacian boundary condition in place of the
+    free-space kernel). A tighter 1e-6 is below the two-library float32 floor and no faithful port
+    could meet it (the criterion-no-valid-config-can-meet trap); a looser 1e-1 would stop
+    distinguishing a faithful port from a ~10% kernel-form error. Passing certifies the free-space
+    method reproduces the SAME field; it cannot pass a graph-Laplacian re-implementation.
+  value: 2.508004115497897e-07
+  passed: true
+  result: |
+    PASS by ~4 orders of magnitude: D_max = 2.51e-07 (max_abs 3.58e-07) << threshold 1.0e-3, so the
+    verdict does not hinge on the threshold choice. Per config: C_anchor 6.7e-08, C2 2.51e-07 (the
+    worst; argmax at the FAR-field cell where c is LARGEST, 1.426 -- float32 accumulation, not a
+    near-floor artefact), C3 1.16e-07 (this config includes the deliberately-unfloored K=0 unscreened
+    3-D branch), C1 9.7e-08. All fields finite; every dead slot exactly 0.0 on both sides (the S=99
+    source parked on a DEAD slot emits nothing). The ported A&S Bessel K0/K1, the r_eff=max(r,a)
+    self/near clamp, the per-species vmap-vs-loop, and the twice-applied alive mask all reproduce to
+    float32 rounding. The engine leg (log/atlas/free_screened_diffusion, diag.json) confirms the
+    operator ACTS: `morphogen` writes the `chemical` block from zero on the matched 4-founder geometry
+    (acted 1/5, inert_operators []); run_spec's position-only metrics are field-invariant here because
+    the solve moves no cell, so the field itself is scored by this isolated differ. This certifies the
+    FREE-SPACE Green's-function form as a faithful implementation of the `morphogen` contract to
+    float32 across 1-D/2-D/3-D. It does NOT (and cannot) certify the paper's graph-Laplacian sibling
+    -- the recorded source-wins contradiction stands.
 state_io_notes:
   reads:
   - secretion_rate (per-cell source rate S, the source_name field -- the only declared read)

@@ -1,8 +1,9 @@
 {
-  "threshold": 0.005,
+  "diff_metric": "D_inf = max|engine_gene - reference_gene| over 22 frames x 4 live cells x 3 genes",
+  "threshold": 0.0002,
+  "value": 2.562999725341797e-06,
   "D_max_uniform": 2.4437904357910156e-06,
   "D_max_distinct": 2.562999725341797e-06,
-  "value": 2.562999725341797e-06,
   "passed": true,
   "frame0_engine_ic_maxabs": 0.0,
   "n_frames": 22,

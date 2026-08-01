@@ -139,11 +139,55 @@ contract:
   writes:
   - heading
   maps: []
-status: implemented
+status: validated
 module: src/plexus/operators/candidates/jax_morph_active_brownian_dynamics2_d.py
 test: tests/test_jax_morph_active_brownian_dynamics2_d.py
 evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+  oracle_run: diff_active_brownian_dynamics2_d
+  diff_metric: |
+    D_C = max over t = 1..40 of | C_plexus(t) - C_oracle(t) |, where
+    C(t) = < e(t) . e(0) > is the ensemble orientational autocorrelation of the per-cell
+    heading unit vector e = (cos theta, sin theta), averaged over all N = 20000 cells and
+    computed on the heading trajectory (Plexus: tapped once per macro-step from cell.heading;
+    oracle: reconstructed from active_heading in reference.npz). Dimensionless (a cosine,
+    in [-1, 1]); scored over the 40 post-IC macro-frames t = 1..40 at dt = 1.0. Frame t = 0 is
+    excluded because C(0) = 1 identically on both sides (the shared pristine initial-heading
+    distribution), so it carries no discriminating information. C(t) is the single observable
+    the rotational-diffusion leg controls: it decays as exp(-D_r t), setting the walker's
+    persistence length and its ballistic -> diffusive crossover. The comparison is
+    DISTRIBUTIONAL (JAX and torch draw independent rotational-noise streams, so no pathwise
+    seed-0-vs-seed-0 match exists); the N-cell ensemble average of C(t) is the
+    realization-independent invariant that is compared.
+  threshold: |
+    0.05. The two runs draw INDEPENDENT rotational-noise streams (JAX vs torch), so the test is
+    distributional: each C(t) is a finite-sample (N = 20000) estimate of the same theoretical
+    exp(-D_r t), with per-frame sampling SD ~ 1/sqrt(N) ~ 0.007. 0.05 is ~7x that noise floor,
+    so it is not tripped by RNG. It is also TIGHT: the maximum over t = 1..40 of
+    | exp(-0.1 t) - exp(-0.1(1+d) t) | first crosses 0.05 at an effective-rate error d ~ 15%, so
+    0.05 REJECTS any run whose D_r (hence the sqrt(2 D_r dt) noise-scaling constant -- e.g. a
+    dropped factor of 2, which would double D_r) is off by more than ~15%, while admitting the
+    ~1% agreement two correct finite-sample ABPs actually reach. Written into the plexus diff
+    script BEFORE the plexus side was ever run.
+  value: 0.00929193
+  passed: true
+  detail: |
+    D_C = 0.00929193 at argmax frame t = 27, well under the 0.05 band -- the two independent-RNG
+    ABPs agree to ~1% of the autocorrelation amplitude. Corroborating invariants: effective
+    rotational-diffusion rate D_r_eff = 0.09926 (Plexus) vs 0.10060 (oracle), both within ~1.3% of
+    the input D_r = 0.1, so the sqrt(2 D_r dt) noise-scaling constant is reproduced exactly (a
+    dropped factor of 2 would have put D_r_eff near 0.2 and D_C far over 0.05). Per-step
+    heading-increment variance Var(dtheta) = 0.19989 (Plexus) vs 0.19985 (oracle) vs theory
+    2 D_r dt = 0.2; mean dtheta = -6.3e-4 ~ 0 (zero-drift, as scored). C(t) at t = 5/10/20/40:
+    Plexus 0.607/0.369/0.136/0.020 vs oracle 0.604/0.367/0.138/0.013.
+
+    ACTED-LEDGER RECONCILIATION (read before the metric). run_spec's structural ledger (diag.json)
+    flags reorient INERT -- calls 40, acted 0, valid_evidence:false -- which is a KNOWN instrument
+    blind-spot, NOT a no-op. run_spec fingerprints only the engine-integrated `state` block, and
+    reorient (EMIT=None, like the entire polarity family) WRITES the auxiliary `heading` buffer in
+    place and returns {}, a write that ledger cannot see. The HONEST ledger is the companion diff
+    script's heading tap: reorient acted on 40/40 calls, Var(dtheta) > 0, and the heading
+    autocorrelation decorrelates 1.0 -> 0.020 over the run -- a genuinely inert reorient would leave
+    C(t) == 1 for every t. glide (which run_spec CAN see) acted 41/41, moving positions at speed
+    0.3, so the run is a real spreading ABP cloud (gyration 0.30 -> 7.48). Oracle:
+    _oracle/runs/diff_active_brownian_dynamics2_d (reference.npz + summary.json). Plexus:
+    log/atlas/active_brownian_dynamics2_d (run_spec evidence) + its companion diff_plexus_summary.json.

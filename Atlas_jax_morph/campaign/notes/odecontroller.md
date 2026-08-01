@@ -134,3 +134,56 @@ run jax (deliberately absent from the Plexus env) and did not build the paired O
 oracle uses adaptive Dopri5 at the same rtol; both should converge to the true solution to ~1e-4, so
 tolerance-level agreement is expected, but that is evidence for the validator to produce, not me.
 `evidence`/`status: validated` stay untouched (status advanced only to `implemented`).
+
+## Differential test (DIFFER, 2026-07-31)
+
+**Verdict: `validated`.** The `regulate` base-machinery operator (implementation `ode_generic`,
+connectionist reaction law) reproduces the jax-morph `GeneNetworkConnectionist` reference
+trajectory to solver tolerance.
+
+**Metric (fixed BEFORE running).** `D_inf` = sup-norm |engine_gene - reference_gene| over all 22
+recorded frames (tick 0 = seeded IC, ticks 1..21 = the integrated macro-steps) x 4 live cells x 3
+genes `[gene_hidden, g_out0, g_out1]`, same IC (all genes 0), same frozen drive `u=[0.8,0.3]`, same
+3-gene circuit (W_gene, W_in, b; gamma=1.0), same dt=1.0, 21 steps. Units: gene concentration
+(dimensionless; fixed points O(0.3-0.85)).
+
+**Threshold (principled, not tuned): 2e-4.** Both sides integrate the IDENTICAL RHS with an
+adaptive Dopri5 at rtol=1e-4/atol=1e-6 (reference: diffrax PIDController; operator: a hand-rolled
+DP5(4) at the same tolerances), so two faithful integrations of the same ODE sit apart by at most
+~2*(rtol*|y|+atol) ~ 2e-4 on these O(1) values -- an a-priori bound a CORRECT integrator is
+guaranteed to meet. Tighter than the >= 1e-2 fixed-point shifts the discriminating failure modes
+would cause (logistic vs the algebraic sigmoid; the paper's additive-outside forcing vs the code's
+`W_in@u` inside; a mis-scaled / omitted inc-over-dt increment == double integration), so it
+separates "same circuit to solver tolerance" from "a different circuit".
+
+**Result: PASS, ~80x under the bar.**
+  * `D_max_uniform`  = 2.44e-06  (PRIMARY; the spec run_spec.py executes)
+  * `D_max_distinct` = 2.56e-06  (per-cell distinct drives; corroboration)
+  * engine frame-0 IC max|gene| = 0.0 -> IC aligned exactly.
+  * per-frame error peaks 2.44e-06 mid-trajectory, decays to 0 at the fixed point -- two accurate
+    solvers on a CONTRACTING ODE, not accumulating disagreement.
+
+**The distinct run is the behavioral test of the `maps=[]` verdict.** Four cells given four
+DIFFERENT frozen drives follow four DIFFERENT reference trajectories, each matched to 2.56e-06 with
+zero cross-cell leakage -- the intracellular no-coupling identity that makes `regulate` `new` over
+`signal` (a connectome morphism) is not just structural in the code, it is measured. seed_state
+cannot express a per-cell drive, so this run was stepped through the engine's own `gene += dt*delta`
+(`_integrate`) exactly as `engine.run` does -- the operator as the engine runs it, not a bench rig.
+
+**Paths.**
+  * oracle:  `Atlas_jax_morph/_oracle/runs/diff_odecontroller/` (reference.npz, summary.json, diff.json)
+  * engine:  `log/atlas/odecontroller/` (diag.json acted ledger: regulate acted 19/21 -- the last two
+    near-fixed-point ticks emit a delta below the float32 ledger threshold; convergence, not a
+    no-op; `valid_evidence: true`, no inert operators).
+  * comparison script: `Atlas_jax_morph/_oracle/scripts/_compare_odecontroller.py` (torch env).
+
+**What this validates and what it does NOT.** It validates the BASE ODEController contract end to
+end: the coupled hidden+output `y=concat(hidden,outputs)` block, the frozen-drive quasistatic
+assumption, the algebraic sigmoid, linear degradation, the self-solved adaptive Dopri5 endpoint,
+AND the inc-over-dt EMIT scaling that lets the engine's first-order step recover `y(dt)` -- all
+exercised on the connectionist law (the only concrete law shipped in this module). It does NOT
+separately test the `mwc` or `neural_ode` sibling implementations of `regulate` (their own entries;
+`neural_ode` is an operator-level weight-export diff, not a spec run, since a free-form MLP cannot
+cross the JAX/torch boundary through a YAML spec). The paper-vs-code forcing contradiction is
+recorded as a surprise; the test compares against the running SOURCE (drive inside the sigmoid), and
+the source wins -- as it must.

@@ -103,3 +103,42 @@ What I did NOT reproduce (honest gaps, deliberately):
   symmetry in free space; dt-independent one-step landing; dead cells held fixed). No fitted constants.
 - **Per-cell `alpha` field** (morse well-width as a `StateFieldSpec`) is not supported -- only per-cell
   `epsilon_field`. The source allows either; I judged scope. Note for a reuser.
+
+---
+
+**DIFFER role -- differential test: VALIDATED (`status: validated`).**
+
+*Metric.* `D_eq = max over the 4 LIVE cells of ||x*_plx - x*_ref||_2 / sigma` at the relaxed
+equilibrium (frame 1, the single quasistatic macro-step); `sigma = r_i + r_j = 1.0` (dimensionless).
+`x*_plx` is the engine's frame-1 position after the `relax` operator's quasistatic emit
+`v = (x*-x0)/dt` is integrated (`pos += dt*v`, dt=1.0); `x*_ref` is the jax-morph
+`MechanicalRelaxation(Morse)` FIRE-to-`f_tol` equilibrium. **Threshold `1.0e-3` sigma**, pre-registered
+in `_analyze_mechanical_relaxation.py` before the diff -- bracketed >100x ABOVE the ~8e-6 sigma
+two-solver float32 equilibrium shell (`f_tol/kappa` per side) and >100x BELOW the 0.1135-sigma
+relaxation displacement, so it passes legitimate JAX-vs-torch roundoff yet fails any dynamic-creep /
+missing-1/dt / fixed-step-descent operator that misses the basin.
+
+*Result.* **`D_eq = 1.91e-06` sigma << 1.0e-3 -> PASS** (~500x margin; per-cell `{0,0,1.9e-6,0}`, one
+cell off by ~2 float32 ulp). Corroborators all clean: force cross-check `|grad U|_inf` at the Plexus
+equilibrium `1.90e-4 <= 5*f_tol`, matching reference `1.35e-4` (both are genuine force balances of the
+SAME Morse energy); gauge-removed Kabsch `D_eq 1.43e-6 ~` raw (no rigid drift); fixed-point plateau
+`0.0` both sides (equilibrium held over frames 2-6); frame-0 == IC both (`0.0`); dead slots immobile
+both (`0.0`); misaligned-vs-IC `0.1135 =` relaxation displacement (equilibrium genuinely reached).
+Summary observables agree: gyration ref-equilibrium `0.6858 ==` plexus final `0.68575`; mean_nn
+`0.9698 == 0.9698`.
+
+*Acted ledger* (`log/atlas/mechanical_relaxation/diag.json`): `relax` calls 6 / **acted 1** / moved
+0.1123 (acts once, then idempotently emits ~0 on the held equilibrium -- the quasistatic fixed-point
+signature), `seed_state` acted, `inert_operators []`, `valid_evidence true`. The IC is BYTE-IDENTICAL
+(4-cell diamond, oracle-printed 6-decimal float32; buffer 8 with 4 dead slots at the origin).
+
+*Runs.* Oracle `Atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/` (reference.npz + summary.json);
+Plexus `config/atlas/mechanical_relaxation.yaml` -> `log/atlas/mechanical_relaxation/`
+(diag.json, metrics.json/.npz, spec_run.yaml, strip.png) + `graphs_data/atlas/mechanical_relaxation/`;
+analysis `_oracle/scripts/_analyze_mechanical_relaxation.py` -> `log/atlas/mechanical_relaxation/diff.json`.
+
+*What the diff DOES and does not settle.* It validates the **forward equilibration** -- the FIRE-to-
+tolerance solver plus the quasistatic `(x*-x0)/dt` emit reproduce the reference equilibrium to float32
+solver noise. It does NOT touch the implicit-diff backward (`DIFFERENTIABLE=False`, unchanged from the
+Normalizer's honest gap); that adjoint remains the promotion follow-up and is untested by any
+differential here.

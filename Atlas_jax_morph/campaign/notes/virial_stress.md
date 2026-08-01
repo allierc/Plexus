@@ -107,3 +107,48 @@ properties are verified, but there is no run-vs-reference stress number. One sim
 I differentiate `dU/dr` against a detached leaf clone of `r`, so the *value* is exact and the
 *epsilon*-gradient is preserved, but the position-gradient path through `dU/dr` is dropped (values --
 what the differ compares -- are unaffected).
+
+---
+
+## Differ: `status: validated` — stress_rel_err 7.6e-8 « 1e-4
+
+**Verdict: PASSES.** The Plexus `mechanosense` operator reproduces the jax-morph
+`VirialStress(Morse)` per-cell virial pressure to numerical round-off. The differ answers exactly
+the question the implementer flagged as open: does the hardened reimplementation match the original
+numeric stress? It does.
+
+**The test.** `mechanosense` MOVES NOTHING, so there is no trajectory — the observable IS the
+written scalar on ONE frozen configuration. Oracle (`_oracle/scripts/virial_stress.py` ->
+`_oracle/runs/diff_virial_stress/`) builds one rich byte-identical float32 IC: 5 *isolated* pairs
+at r = 0.7 / 1.0 / 1.3 / 2.0 / 3.0 (compression / well-min / tension / tapered / beyond-cutoff),
+one dense 8-cell sunflower cluster (the multi-neighbour sum), 4 dead padding slots (masking), all
+radius 0.5 so sigma = r_i + r_j = 1.0. The spec `config/atlas/virial_stress.yaml` shares that IC
+cell-for-cell (`seed_state` sets radius 0.5; `mechanosense` reduces Morse eps 3.0 alpha 2.8) and
+run through `plexus.engine` -> `log/atlas/virial_stress/`. Metric = peak-normalized relative stress
+error over the 18 live cells on frame 0, plus a dead-slot |stress| guard and a frames-identical
+guard; pre-registered at 1e-4 / 1e-6 in `_oracle/scripts/_compare_virial_stress.py` (lines 72, 81,
+82).
+
+**Numbers** (`_oracle/runs/diff_virial_stress/compare.json`, `summary.json`):
+
+- PRIMARY engine Morse: **rel 7.61e-8** (max_abs 1.9e-6 on peak 25.06) — 3+ orders under the 1e-4 bar.
+- Dead slots: **0.0 on both sides**; **frames_identical true** (sensor is a still life across all 4 frames).
+- Acted ledger (`log/atlas/virial_stress/diag.json`): `mechanosense` calls 5 / acted 1, moved 0.0;
+  `seed_state` acted; `inert_operators []`; `valid_evidence true`.
+- Oracle internal gates: STEP == `PairwisePotential.virial_pressure` bit-for-bit; PRNG-key-independent.
+- Analytic cross-check (by-hand single-neighbour Morse): max|dev| 3.2e-6 — r=0.7 -> +11.414
+  (compression, sign +), r=1.0 -> 0 (well minimum), r=1.3 -> -1.706 (tension, sign -). The
+  compression-positive convention and 2 d V_i normalization are correct, not merely self-consistent.
+- SUPPLEMENT (direct operator, paths the equal-radius engine run can't reach): all 10 law/radii
+  points pass — 4 other pair laws on the uniform IC (rel <= 1.3e-7) and all 5 laws on a second
+  UNEQUAL-RADII IC (rel <= 3.3e-7), exercising sigma = r_i + r_j and per-cell d-ball V_i.
+
+**Runs:** oracle `_oracle/runs/diff_virial_stress/` · plexus `log/atlas/virial_stress/` · scorer
+`_oracle/scripts/_compare_virial_stress.py` · value 7.610894538878732e-08 · threshold 1e-4 · **passed**.
+
+**Scope / not settled.** Validates the written VALUE across five laws, equal + unequal radii, masking,
+and the sign / normalization / bond-split conventions. It does NOT touch the verdict/dispute axis, nor
+the differentiability claim (d stress / d epsilon) — values, not gradients, are compared, and the
+port detaches the position-gradient path through dU/dr. The SOURCE-vs-PAPER contradiction is
+confirmed as a FORM difference, not resolved numerically: the test scores the code's Irving-Kirkwood
+virial pressure (SOURCE WINS), not the paper's taxicab sigma_i.

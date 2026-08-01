@@ -1,0 +1,35 @@
+{
+  "N_live": 12,
+  "seps_initial": [
+    1.15,
+    1.25,
+    1.35,
+    1.5,
+    1.7,
+    2.6
+  ],
+  "dt": 0.01,
+  "NST": 100,
+  "any_nan_LJ": false,
+  "traj_min_separation_ever": 0.9965171813964844,
+  "pair_sep_initial": [
+    1.1500015258789062,
+    1.25,
+    1.3499984741210938,
+    1.5,
+    1.7000007629394531,
+    2.5999984741210938
+  ],
+  "pair_sep_final": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    2.5999984741210938
+  ],
+  "max_cell_displacement_LJ": 0.35000038146972656,
+  "LJ_vs_SoftSphere_traj_maxdiff_over_sigma": 0.3500518798828125,
+  "SoftSphere_max_cell_displacement": 0.0,
+  "force_ic_max_LJ": 2.5609006881713867
+}

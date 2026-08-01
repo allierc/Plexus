@@ -1,0 +1,37 @@
+{
+  "role": "oracle",
+  "potential": "Hertzian",
+  "x64_enabled": false,
+  "dtype": "float32",
+  "H_n_cells": 7,
+  "H_overlapping_pairs": 11,
+  "H_force_maxabs": 0.8651431798934937,
+  "H_radii": [
+    0.699999988079071,
+    0.5,
+    0.6000000238418579,
+    0.4000000059604645,
+    0.550000011920929,
+    0.44999998807907104,
+    0.6499999761581421
+  ],
+  "H_epsilon": [
+    1.0,
+    2.0,
+    3.0,
+    1.5,
+    2.5,
+    1.2000000476837158,
+    2.200000047683716
+  ],
+  "negative_control_softsphere_vs_hertzian_rel": 0.5213747620582581,
+  "scan_ref_vs_analytic_max": 8.79662274133608e-08,
+  "U_dt": 0.1,
+  "U_T": 40,
+  "U_radius": 0.5,
+  "U_epsilon": 2.0,
+  "U_deterministic_across_keys": 0.0,
+  "U_first_step_vs_dt_forces_max": 2.514570951461792e-08,
+  "U_gyration_first": 0.7985318303108215,
+  "U_gyration_last": 0.9840067625045776
+}

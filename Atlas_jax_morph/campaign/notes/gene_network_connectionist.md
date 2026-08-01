@@ -167,3 +167,53 @@ float32 precision; with the `mwc` (log-occupancy) and `neural_ode` (MLP) sibling
 the drive law under one integration/IO contract, the ODEController subclasses collapse to ONE new
 `regulate` contract — the convergence result the ledger exists to record, not three separate
 mechanisms.
+
+---
+
+# gene_network_connectionist (DIFFER — record completion & independent re-verification)
+
+**Why this addendum exists.** The DIFFER section above recorded a PASS and "`status -> validated`",
+but the evidence never reached the ledger: the merged `atlas_record.yaml` entry (and the working
+copy handed to this pass) still had `status: implemented` and `evidence: {oracle_run, diff_metric,
+threshold, passed} = null`. The prior differ's prose landed; its record edit did not. This pass
+verified the result is genuine and wrote the evidence into the record.
+
+**The artefacts are real and mutually consistent** (this environment has no torch/jax, so the
+engine/score cannot be re-executed here — they ran on the user's machine, dated Jul 31 21:58):
+- Oracle `_oracle/runs/diff_gene_network_connectionist/` — `reference.npz` [21,6,5], `summary.json`,
+  `_provenance.json` (real venv: jax 0.11.0, diffrax 0.7.2, jax-morph 0.4.0 @ sha ace08b8),
+  `diff.json` (value 6.67572e-06, passed true, threshold 0.005, argmax frame17/cell0/gene4).
+- Engine `log/atlas/gene_network_connectionist/` — `diag.json` acted ledger: `regulate` 20/20
+  acted, moved 0.823, `seed_state` 1/1, `inert_operators: []`, `valid_evidence: true`.
+- IC matched: `spec_run.yaml` seed_state gene == oracle `summary.json` gene0_cell0 (float32).
+
+**Independent numpy re-derivation (this differ, in the oracle venv — no torch, pure numpy).** I
+re-integrated the SAME vector field `dg/dt = sigma_alg(g@W_gene^T + u@W_in^T + b) - gamma*g` from
+`reference.npz`'s own g0/u/params and compared to `reference.npz['gene']`:
+- fine RK4(4096) reproduces the reference to **3.09e-06** -> the reference IS a genuine integration
+  of the stated field (not fabricated).
+- RK4-64 engine-replica (self-solve + engine Euler recovery) matches the reference to **3.09e-06**
+  in float64 -> corroborates the torch run's 6.68e-06 (which additionally carries float32 rounding).
+- DISCRIMINATION (pre-registered wrong mechanisms, same harness): logistic sigmoid -> **1.31**,
+  paper's input-OUTSIDE-sigmoid -> **2.38**; both ~2.5 orders past the 5e-3 threshold. The metric
+  genuinely catches the SOURCE-WINS choices; the threshold is principled, not fitted.
+
+**Metric / threshold / value (now in the record).**
+- metric: `max over {frame 0..20, cell 0..5, gene 0..4} |G_eng - G_ref|`, float32 gene units;
+  full end-to-end run_spec.py engine trajectory vs the reference Dopri5 trajectory.
+- threshold: **5.0e-3** (pre-registered in `diff_gene_network_connectionist.py`; integrator-gap +
+  float32-rounding bound, ~5x over the ~1e-3 a-priori ceiling, ~2 orders under any real O(0.5-1)
+  mechanism error).
+- value: **6.67572021484375e-06**  ->  **PASS** (`passed: true`).
+
+**Record change.** Working copy `_work/gene_network_connectionist.yaml`: `status: implemented ->
+validated`; `evidence` filled (oracle_run diff_gene_network_connectionist, diff_metric, threshold,
+value, passed, result). Simulated driver merge + `record.validate` against the frozen baseline:
+**0 violations** for this entry and 0 for the whole record; `regulate` confirmed NOT in the
+registered baseline (R5 clean).
+
+**Verdict stands: `new`, `implementation_of: regulate`, `status: validated`.** The connectionist
+linear-drive vector field is a faithful implementation of the `regulate` contract to float32
+precision; with `mwc` (log-occupancy) and `neural_ode` (MLP) differing only in the drive law under
+one integration/IO contract, the four ODEController entries collapse to ONE new `regulate` contract
+-- the convergence result the ledger exists to record, not four separate mechanisms.

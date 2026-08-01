@@ -104,3 +104,57 @@ masked slots get `dtheta=0`), matching the source's `n_cells`-sized sampling; se
 unit); heading actually rotates; **zero-drift mean + variance = `2 D_r dt`** over 40k cells; variance
 **linear in dt** (Brownian scaling); dead/masked slots unchanged. `evidence.oracle_run` stays null --
 the differential test vs the oracle is the verifier's job.
+
+---
+
+**DIFFER -- `reorient` VALIDATED. D_C = 0.00929 << threshold 0.05 -> PASS.**
+
+**Metric (pre-registered, in the record and baked into the plexus diff script before any plexus
+run).** `D_C = max over t=1..40 of |C_plexus(t) - C_oracle(t)|`, where `C(t) = <e(t).e(0)>` is the
+ensemble orientational autocorrelation of the per-cell heading unit vector `e=(cos theta,sin theta)`
+over all N=20000 cells (dimensionless cosine in [-1,1]). This is the one observable the
+rotational-diffusion leg controls: it decays as `exp(-D_r t)`, setting the walker's persistence
+length and its ballistic->diffusive crossover. `t=0` excluded (C(0)=1 identically on both sides).
+The comparison is DISTRIBUTIONAL: JAX and torch draw independent rotational-noise streams, so no
+pathwise seed-0-vs-seed-0 match exists; the N-cell ensemble average of C(t) is the
+realization-independent invariant.
+
+**Threshold 0.05.** Per-frame sampling SD at N=20000 is `~1/sqrt(N) ~ 0.007`; 0.05 is ~7x that
+floor (not tripped by RNG), yet TIGHT -- `max_t|exp(-0.1 t)-exp(-0.1(1+d)t)|` crosses 0.05 at a
+rate error `d ~ 15%`, so 0.05 rejects any run whose effective `D_r` (hence the `sqrt(2 D_r dt)`
+scaling constant -- e.g. a dropped factor of 2, which doubles D_r) is off by more than ~15%.
+
+**Isolation.** Both sides run the SAME free active-Brownian gas: NoForce (zero drift), kT=0 (no
+translational noise), self-propulsion v0=0.3, N=20000, 40 macro-steps at dt=1.0, uniform initial
+headings -- so the ONLY thing driving the heading is the rotational-diffusion leg. Oracle:
+`ActiveBrownianDynamics2D(None, n_space_dim=2, kT=0.0, rot_diffusion=0.1)`. Plexus:
+`reorient(rot_diffusion=0.1)` + `glide(move_speed=0.3)` from primitives.
+
+**Result.** D_C = 0.00929 at argmax frame t=27 -- the two independent-RNG ABPs agree to ~1% of the
+autocorrelation amplitude. Corroborating: D_r_eff 0.09926 (Plexus) vs 0.10060 (oracle) vs input 0.1
+(both within ~1.3%); Var(dtheta) 0.19989 (Plexus) vs 0.19985 (oracle) vs theory 2 D_r dt = 0.2;
+mean dtheta -6.3e-4 ~ 0 (zero-drift). C(t) at t=5/10/20/40: Plexus 0.607/0.369/0.136/0.020 vs
+oracle 0.604/0.367/0.138/0.013.
+
+**Acted-ledger reconciliation (read BEFORE the metric).** run_spec's structural ledger
+(`log/atlas/active_brownian_dynamics2_d/diag.json`) flags `reorient` INERT (calls 40, acted 0,
+valid_evidence:false). This is a KNOWN instrument blind-spot, NOT a no-op: run_spec fingerprints
+only the engine-integrated `state` block, and `reorient` (EMIT=None, like the whole polarity
+family) WRITES the auxiliary `heading` buffer in place and returns `{}` -- a write that ledger
+cannot see. The HONEST ledger is the companion diff script's heading tap: `reorient` acted on
+**40/40 calls**, Var(dtheta)>0, and C(t) decorrelates 1.0->0.020 (a genuinely inert reorient would
+leave C(t)==1 for all t). `glide` (which run_spec CAN see) acted 41/41, moving positions at speed
+0.3 -- a real spreading ABP cloud (gyration 0.30->7.48).
+
+**Runs.**
+- Oracle: `Atlas_jax_morph/_oracle/runs/diff_active_brownian_dynamics2_d/` (reference.npz +
+  summary.json); script `_oracle/scripts/active_brownian_dynamics2_d.py`.
+- Plexus (run_spec evidence): `log/atlas/active_brownian_dynamics2_d/` (spec_run.yaml, diag.json,
+  metrics.json, metrics.npz, strip.png, movie.mp4); spec
+  `config/atlas/active_brownian_dynamics2_d.yaml`.
+- Plexus differential (heading tap + C(t) metric):
+  `_oracle/scripts/active_brownian_dynamics2_d_plexus.py` ->
+  `log/atlas/active_brownian_dynamics2_d/diff_plexus_summary.json`.
+
+**Verdict: the `reorient` contract reproduces the reference's rotational-diffusion leg.** status ->
+`validated`.

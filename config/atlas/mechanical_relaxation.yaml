@@ -1,0 +1,64 @@
+# Differential for relax (jax-morph MechanicalRelaxation), ISOLATED.
+#
+# The oracle run this mirrors is Atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/:
+# MechanicalRelaxation(Morse(epsilon=3.0, alpha=2.8), max_steps=2000, f_tol=2e-4) run ALONE (no
+# growth, no division) on a rigid 4-cell diamond -- two equilateral triangles sharing an edge,
+# compressed to lattice spacing 0.85 sigma (sigma = r_i+r_j = 1.0, uniform radius 0.5) with a small
+# deterministic jitter -- relaxed to mechanical equilibrium in ONE quasistatic macro-step, then held
+# for 6 frames. MechanicalRelaxation is QUASISTATIC: FIRE runs to a genuine force tolerance and lands
+# the cluster on the equilibrium x* in a single macro-step. The Plexus `relax` operator reproduces
+# that by emitting the quasistatic velocity (x*-x0)/dt, which the engine integrates as
+# pos += dt*v = x* (dt = 1.0, so the emit is exact). The trajectory is therefore a pure function of
+# the FIRE-to-tolerance SOLVER + the quasistatic emit; the Morse force law itself is already
+# validated by the soft_sphere/hertzian differentials, so a per-cell equilibrium diff isolates the
+# equilibration.
+#
+# The `start:` positions are the oracle's live-cell coordinates VERBATIM (6-decimal, printed by
+# _oracle/scripts/mechanical_relaxation.py) so the two sides share a BYTE-IDENTICAL float32 IC.
+# n=4 live + 4 dead padding slots (buffer 8) park the dead slots at the origin (state zeros),
+# matching the oracle, so the dead-pair mask and the sigma=0 safe_divide/safe_norm guards are
+# exercised. relax is gated after_frame:1 so recorded frame 0 = the pristine IC and frame 1 = the
+# relaxed equilibrium x*, aligning cell-for-cell and frame-for-frame with the reference history.
+general:
+  name: mechanical_relaxation
+  seed: 0
+  n_frames: 6
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 4
+    buffer: 8                      # 4 live + 4 dead padding slots (occ=0, parked at origin)
+    # the oracle's 4 live founders (6-decimal, byte-identical to reference.npz p0[:4])
+    start:
+    - [20.020000, 20.009589]
+    - [20.839903, 20.018926]
+    - [20.415195, 20.732967]
+    - [20.444997, 19.243880]
+    # pos + vel make it a 2nd-order set so EMIT="velocity" integrates as pos += dt*v; radius is
+    # seeded by seed_state (relax reads it -> sigma = r_i + r_j), matching the reference state.radius.
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }
+      radius: { width: 1 }
+
+fields: {}
+
+operators:
+  # 0: initial condition. Non-spatial blocks start at zero, and a cell with radius 0 has sigma 0
+  #    (no interaction), so the radius must be seeded before relaxation.
+  - { op: seed_state, at: cell, before_frame: 1, values: { radius: 0.5 } }
+  # A: relax to the Morse mechanical equilibrium (FIRE to f_tol), quasistatic. eps 3.0, alpha 2.8,
+  #    max_steps 2000, f_tol 2e-4 (== the oracle). radius:0.5 is a fallback if no radius state block.
+  #    after_frame:1 so frame 0 = pristine IC (see header).
+  - { op: relax, at: cell, after_frame: 1,
+      potential: morse, epsilon: 3.0, alpha: 2.8, max_steps: 2000, f_tol: 2.0e-4, radius: 0.5 }
+
+schedule: [seed_state, relax]
+
+plotting:
+  background: black
+  point_size: 6.0
