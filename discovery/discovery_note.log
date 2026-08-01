@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 10:38
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 10:43
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -703,19 +703,19 @@ Package pdftex.def Info: figures/agents_sheet.png  used on input line 195.
 
 [4]
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <9> on input line 311.
+(Font)              <9> on input line 295.
 
 
 [5]
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <10.95> on input line 352.
+(Font)              <10.95> on input line 336.
 
-Underfull \hbox (badness 1484) in paragraph at lines 371--373
+Underfull \hbox (badness 1484) in paragraph at lines 355--357
 []|\T1/cmr/m/n/9 Done, and the new bounds are \T1/cmr/m/it/9 de-rived
  []
 
 
-Underfull \hbox (badness 3701) in paragraph at lines 373--373
+Underfull \hbox (badness 3701) in paragraph at lines 357--357
 []|\T1/cmr/m/n/9 Replace the mis-la-belled length-
  []
 
@@ -730,7 +730,7 @@ Underfull \hbox (badness 3701) in paragraph at lines 373--373
 [9]
 
 [10{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
-Overfull \hbox (1.01701pt too wide) in paragraph at lines 637--639
+Overfull \hbox (1.01701pt too wide) in paragraph at lines 621--623
 []\T1/cmr/m/n/10 My work-ing log is \T1/cmtt/m/n/10 SESSION_LOG.md\T1/cmr/m/n/1
 0 ; the find-ings reg-is-ter is \T1/cmtt/m/n/10 findings.py \T1/cmr/m/n/10 and 
 the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
@@ -749,7 +749,7 @@ Package rerunfilecheck Info: File `discovery_note.out' has not changed.
 Here is how much of TeX's memory you used:
  22857 strings out of 475102
  441927 string characters out of 5764878
- 829565 words of memory out of 5000000
+ 830565 words of memory out of 5000000
  45491 multiletter control sequences out of 15000+600000
  575159 words of font info for 69 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
@@ -772,7 +772,7 @@ s/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm-su
 per/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></u
 sr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts
 /type1/public/cm-super/sftt1095.pfb>
-Output written on discovery_note.pdf (11 pages, 1441406 bytes).
+Output written on discovery_note.pdf (11 pages, 1440248 bytes).
 PDF statistics:
  224 PDF objects out of 1000 (max. 8388607)
  163 compressed objects within 2 object streams
