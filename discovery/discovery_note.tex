@@ -7,6 +7,7 @@
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{tcolorbox}
+\tcbuselibrary{breakable}
 \usepackage{tikz}
 \usepackage{graphicx}
 \usepackage[hidelinks]{hyperref}
@@ -35,7 +36,7 @@
 \setlength{\parindent}{0pt}
 \renewcommand{\arraystretch}{1.25}
 
-\newtcolorbox{phasebox}[1]{colback=white,colframe=rule!55,boxrule=0.7pt,
+\newtcolorbox{phasebox}[1]{breakable,colback=white,colframe=rule!55,boxrule=0.7pt,
   arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
   fonttitle=\color{white},colbacktitle=rule}
 
@@ -185,17 +186,10 @@ and it has one catch to its name. That number is the honest measure of Track A.
 %======================================================================
 \section{The team of agents}\label{sec:agents}
 
-\textbf{Nine agents and five checks.} Seven agents run every round; two are written and never
-called, and one of those two is the reason the weekend batch started at the wrong cell count.
-
-\begin{figure}[h]\centering
-%% HELD: the Grounder tile in icons.png was damaged by an edit of mine; awaiting a
-%% regenerated sheet (friendly Grounder + book, biologist Premise gate, ranking Referee).
-%\includegraphics[width=0.86\textwidth]{figures/agents_sheet.png}
-\caption*{\small [figure held --- see note] The team. \textbf{Grounder} and \textbf{Evolution} are written and never called ---
-that is a wiring fault, not a judgement on the role: the Grounder is the only agent that knows what
-the target is, which is exactly why its absence cost us a batch.}
-\end{figure}
+Nine agents read evidence and form a judgement; five checks are deterministic code that simply
+refuses. Seven of the nine run every round, and the two that never run are the interesting ones ---
+the Grounder is the only agent that knows what the target is, and its absence is why a 27-run batch
+started at 150 cells against a paper that says 200. Wiring it is Phase 3(a).
 
 \begin{center}\small
 \begin{tabular}{@{}l p{6.6cm} l l@{}}
@@ -233,12 +227,6 @@ Cedric & looks at the pictures; found every defect so far & --- & outside the lo
 \end{tabular}
 \end{center}
 
-\textbf{Nine agents, five checks --- not fifteen roles.} The old count inflated the roster by listing
-deterministic code beside things that reason. The two dedup routines were the clearest case: ``has
-this composition been tried'' is ten lines inside the Critic, and ``has this operator been requested
-before'' is a dict scan on the escalation path. Neither is an agent, and neither belongs to the
-Proposer --- they act on different objects at different points in the round.
-
 \textbf{On the budget column.} These are what the system would \emph{permit}, not what it takes ---
 timing was only wired on 31 July (nine call sites had been bypassing the stopwatch, and a round once
 reported \code{calls: 0} for a round that made about twenty-five), and no round has run since, so
@@ -254,21 +242,6 @@ there is still no measured baseline. The worst case adds to about two hours, but
 twenty-six calls are the per-run ones and are completely independent: run together, with the next
 proposal starting while the current simulations are still going, the unavoidable serial cost is
 \textbf{four to five minutes}. That work is Phase 3(c).
-
-\textbf{The Grounder is the important one, and I had previously reported it as running.} It is the
-only role that reads Okuda's paper and the wider literature --- its own header lists the reference
-model, the literature index and the vendored corpus --- and it has \textbf{no call site anywhere in
-the pipeline}. Every one of its entry points is exercised only by its own smoke test.
-
-That is not a cosmetic gap. It is why the weekend batch started at 150 cells when Okuda starts at
-200, 2000 and 4000: \emph{nothing in the loop ever asks the paper anything}. The fix is to give it
-the starting conditions alongside the figure targets it already holds, and to call it when a batch
-is built --- so that the faithful share of each batch inherits Okuda's numbers from the paper rather
-than from a default buried in a config file.
-
-\textbf{Evolution} can only ever let the loop \emph{pick} from what it happened to propose, never
-refine it. \textbf{Referee} would rank a batch by tournament instead of by sorting on one number.
-Both are written and idle.
 
 %======================================================================
 \section{What stands between us and the Okuda figure}\label{sec:okuda}
@@ -417,6 +390,17 @@ recorded as separate numbers.
 \textbf{Certification caught two of my own errors} on item 3 --- a curvature normalisation that only
 looked right because the test held cell count fixed, and a test of mine that demanded the wrong
 answer.
+
+\textbf{The phase closes on a green self-test, which it did not have an hour ago.} The composition
+space checks itself in 61 ways, and eight were failing --- silently, since yesterday. Seven were the
+growth-ceiling fix and the chemistry-clock fix diverging from the archived recipes: the space is
+right and the archive is wrong, so both are now \emph{declared} deliberate rather than back-fitted
+into the archive, because rewriting a reference to make a test pass is how it stops being one. The
+eighth was real --- no reference recipe used the new shape-to-chemistry operator, so the recipe
+named for Okuda's route was missing the half that makes it his. It carries it now. And the
+chemistry clock, previously exempt and unchecked, gained a test of its own: both terms must scale
+by exactly $1/\mathrm{dt}$ \emph{and} their ratio must be unchanged, since that ratio is what sets
+the Turing wavelength. \textbf{61 of 61.}
 \end{phasebox}
 \begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \prog\ (1 of 3)}
 \textbf{Ablation is now compulsory} --- \emph{done}, and it is the part that matters. A claim that
