@@ -72,7 +72,23 @@ def _reservoirs(n_cells_seed, frames, growth_headroom=8.0):
     target = max(int(n_cells_seed) * growth_headroom, 2000)
     b = buffer_for(target)
     return b["vertex"], b["cell"], int(target)
-DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never composition-dependent
+# ONE dt for the whole campaign, never composition-dependent (D2) -- and its value is 1.0,
+# because that is the only value any run that ever produced a pattern has used.
+#
+# D2 set it to 0.02 and nothing that patterned was ever re-run to check. coral_fixed_ball and
+# wk_null_s0 -- spatial spread 0.78, stable to the last frame -- carry general.dt 1.0, mech.dt 1.0,
+# relax_iters 30, rate 1.0, chi 1.3. At 0.02 the frame clock and the mechanics clock both moved,
+# and the two guards that bound the reaction were set against each other:
+#
+#   Biologist P5   the reaction must advance ~1 time unit per frame. At dt=0.02 it advances
+#                  dt*rate = 0.02, so 900 frames buy 18 time units where a Gray-Scott pattern
+#                  needs ~500. "No pattern formed" would be a statement about the clock.
+#   Critic R1c     the reaction must not advance more than 2.0 per frame. The 1/dt scaling that
+#                  satisfies P5 at dt=0.02 makes it 65, and the chemistry goes non-finite.
+#
+# Both are right. Neither can be satisfied at dt=0.02, and both are satisfied at 1.0: advance 1.3,
+# CFL 0.208. The contradiction was never between the guards -- it was a dt nothing had validated.
+DT_GLOBAL = 1.0
 
 # D5  THE CHEMISTRY RAN 50x TOO SLOW, AND THE CELLS COULD NEVER DIVIDE.
 # ------------------------------------------------------------------------------------------------
@@ -104,7 +120,7 @@ DT_GLOBAL = 0.02                      # D2: ONE dt for the whole campaign, never
 # Same d_a, same d_h, same ratio. A uniform blow-up is an ODE exploding; a diffusion breach would
 # have made a checkerboard. critic.R1c_REACTION_UNSTABLE now bounds this before a run costs
 # anything, and composition_space.reaction_advance is the quantity it bounds.
-RD_PER_FRAME = 1.0
+RD_PER_FRAME = 1.0 / DT_GLOBAL
 
 # The growth ceiling must sit ABOVE the division trigger. `morphogen_growth_3d` caps each cell's
 # target volume at vth_frac*v_ref, while `divide_3d` fires at factor*Vbirth -- and vth_frac was

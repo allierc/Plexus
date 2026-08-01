@@ -140,7 +140,10 @@ PROVISIONAL_THETA = ("vcap",)   # NOT settled. Metrologist D1d: the clock re-anc
 #
 # WHERE THE NUMBERS COME FROM -- all three limits were re-derived from the operator source and
 # then CONFIRMED by running the operator's own arithmetic (see the smoke test at the bottom).
-ENGINE_DT = 0.02
+# 1.0, matching translate.DT_GLOBAL. It was 0.02, and no run that ever produced a pattern used
+# that value -- coral_fixed_ball and wk_null_s0 both carry dt 1.0. Changed together with
+# DT_GLOBAL; the assertion below is what forces that.
+ENGINE_DT = 1.0
 # ^ MUST equal translate.DT_GLOBAL (D2: one dt for the whole campaign). It cannot be imported at
 #   module scope -- translate imports THIS module -- so it is duplicated and the duplication is
 #   converted into a CHECKED invariant by check_dt_agreement(), called from theta_conditions().
