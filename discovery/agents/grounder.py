@@ -324,25 +324,42 @@ FIGURES = {
 # below -- a run that cannot reach the cell count it is aiming at measures the array, not the
 # tissue, whichever share it belongs to.
 SETUP = {
-    # `n_cells` is where a run STARTS. `grows_to` is where it ENDS, and it is the one the buffer
-    # must be sized from -- sizing from the seed is exactly the mistake that produced 1778. Okuda
-    # is explicit that his largest tissues were "picked up on the growth process", i.e. they are a
-    # destination reached from a smaller seed, not a seeded count.
-    "tubulation": dict(
-        n_cells=200, grows_to=4000, figures=["fig5a", "fig5b", "fig6"],
-        quote="the initial tissue morphology was simply set to be a spherical vesicle of a "
-              "monolayer cell sheet composed of about 200 cells",
-        note="the tubulation and branching cases. Our campaign ran 150."),
-    "undulation": dict(
-        n_cells=2000, grows_to=4000, figures=["fig7"],
-        quote="a spherical vesicle of a monolayer cell sheet composed of about 2,000 cells, "
-              "whose patterns reached steady states",
-        note="the whole-tissue patterning case; this is the ball the ~5-spot count refers to."),
-    "grown": dict(
-        n_cells=4000, grows_to=4000, figures=[],
-        quote="the individual tissues in (b) were composed of about 4,000 cells, which were "
-              "picked up on the growth process",
-        note="a destination, not a start -- the number the buffer has to accommodate."),
+    # WHICH EXPERIMENT A NUMBER BELONGS TO. Corrected 2026-08-01, and the error is worth keeping
+    # on the record: the first version attached the paper's "about 200 cells" to the tubulation
+    # figures. That sentence is real, but it belongs to two EARLIER control experiments -- one on
+    # arrested tissue with no volume growth at all, one with growth made independent of the
+    # molecular concentration. Neither is a coupling run. Figures 5, 6 and 7 are all the SAME
+    # coupling experiment and all start at 2,000 cells. Cedric caught it.
+    #
+    # A quotation is not a citation. The quote was accurate and the mapping was wrong, which is
+    # worse than having no quote at all: it made a tenfold error look verified.
+    "coupled": dict(
+        n_cells=2000, grows_to=4000, figures=["fig5a", "fig5b", "fig6", "fig7"],
+        quote="Coupling patterning and deformation drives undulation, tubulation, and "
+              "branching. [...] The initial tissue morphology was simply set to be a spherical "
+              "vesicle of a monolayer cell sheet composed of about 2,000 cells, whose patterns "
+              "reached steady states.",
+        note="THE campaign case. Tubulation (Fig 5), branching (Fig 6) and undulation (Fig 7) "
+             "are one experiment at one starting size; only chi and gamma differ between them."),
+    "arrested": dict(
+        n_cells=200, grows_to=200, figures=[],
+        quote="we simulated patterning processes while without cell volume growth [...] These "
+              "tissues are composed of about 200 cells",
+        note="A CONTROL, not a morphology run: patterning on tissue that cannot grow. Useful as "
+             "our own no-growth control, never as the starting size for a coupling figure."),
+    "uncoupled_growth": dict(
+        n_cells=200, grows_to=800, figures=[],
+        quote="cell growth rate was set to be constant [...] the initial tissue morphology was "
+              "simply set to be a spherical vesicle of a monolayer cell sheet composed of about "
+              "200 cells",
+        note="The hysteresis experiment: the tissue grows, but growth is INDEPENDENT of the "
+             "morphogen. The other control -- deformation without the coupling."),
+    "diagram": dict(
+        n_cells=2000, grows_to=4000, figures=[],
+        quote="The individual tissues in (b) were composed of about 4,000 cells, which were "
+              "picked up on the growth process.",
+        note="The (chi,gamma) morphology diagram. 4,000 is where the tissues were SAMPLED during "
+             "growth, not where they were seeded -- a destination, and what the buffer must hold."),
 }
 
 # What he reports SEEING, which is what we calibrate against -- his parameter values live in a

@@ -298,16 +298,25 @@ def quarantine_scan(archive=None, log_root=None, ledger_path=None, verbose=True)
 def _ground_starting_conditions(g, sl):
     """Set this slot's starting cell count from the PAPER rather than from a config default.
 
-    Which of Okuda's cases applies depends on what the slot is for: his tubulation and branching
-    figures start at 200 cells, his undulation figure at 2000. The slot says which phenotype it
-    is chasing; absent that, tubulation is the campaign's standing target.
+    All three morphology figures -- tubulation, branching, undulation -- are ONE coupling
+    experiment at ONE starting size (2,000 cells); only chi and gamma separate them. An earlier
+    version of this function chose between 200 and 2,000 by reading the slot's claim text, on the
+    belief that tubulation started at 200. It does not: that number belongs to two control
+    experiments the paper runs first, one on arrested tissue and one with growth decoupled from
+    the morphogen. The quote attached to it was accurate and the mapping was wrong, which is the
+    more dangerous of the two -- it made a tenfold error look verified.
+
+    So there is no case to infer. A slot that declares an explicit `okuda_case` gets it; anything
+    else gets the coupling case, because that is the experiment this campaign exists to reproduce.
 
     Returns the graph unchanged if the composition has no seeding node -- a checkpoint start
     carries its own count and must not be overwritten.
     """
-    from agents.grounder import setup
-    claim = f"{sl.get('claim', '')} {sl.get('why', '')}".lower()
-    case = "undulation" if ("undulation" in claim or "spot" in claim) else "tubulation"
+    from agents.grounder import SETUP, setup
+    case = sl.get("okuda_case", "coupled")
+    if case not in SETUP:
+        print(f"  [grounder] unknown okuda_case {case!r} -- refusing to guess a starting size")
+        return g
     spec = setup(case)
     seeder = next((o for o in g.ops if o["op"] == "seed_mesh_3d"), None)
     if seeder is None:
@@ -316,7 +325,7 @@ def _ground_starting_conditions(g, sl):
     if g.params.get(key) == spec["n_cells"]:
         return g
     sl["grounded"] = (f"n_cells {spec['n_cells']} ({case}) -- Okuda: "
-                      f"\u201c{spec['quote'][:70]}\u2026\u201d")
+                      f"\u201c{spec['quote'][:80]}\u2026\u201d")
     return g.with_params({**g.params, key: spec["n_cells"]})
 
 
