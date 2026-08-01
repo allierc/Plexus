@@ -330,6 +330,47 @@ def _assert_params_consumed(graph, node, spec_op):
             f"had -- refuse it rather than ignore it. (Emitted: {sorted(spec_op)})")
 
 
+
+# The explicit diffusion step is stable only while dt * D <= 1 per unit cell spacing. On the
+# degree-normalised graph Laplacian this operator uses, D is `chi * d`, so the bound is
+# dt * chi * max(d_a, d_h) <= 1. Kept a little under 1: the mesh is not uniform, and a cell with
+# more neighbours than average sees a larger effective coefficient than this average implies.
+CFL_LIMIT = 0.8
+
+
+def _assert_rd_stable(ops, dt, name=""):
+    """Refuse a spec whose diffusion step cannot be integrated stably.
+
+    THE DEFECT THIS CLOSES. This bound lived in a COMMENT in this file, asserting
+    `dt*chi*max(d_a,d_h) = 0.02*65*0.16 = 0.21 <= 1`. It was true when written, against the
+    defaults of the time. The vocabulary has since moved to chi = 4.0 (x50 by the clock fix =
+    200) and d_h = 0.7, and Phase 2 widened d_h to 12.5 so Okuda's phi = 10 would be reachable
+    at all. Nobody re-derived the bound, because a comment cannot be re-derived -- it can only be
+    re-read, and nobody had a reason to.
+
+    The result: 0.02 * 200 * 0.7 = 2.8, four times over. The chemistry goes non-finite within a
+    hundred frames, the Biologist correctly refuses the run, and every composition in that region
+    is unusable -- including `okuda_route`, the recipe named for the target. At the widened
+    ceiling d_h = 12.5 the number is 50.
+
+    A stability limit that is widened by one phase and relied upon by another has to be a CHECK.
+    """
+    d = next((o for o in ops if o.get("op") == "cell_diffuse"), None)
+    if d is None:
+        return
+    chi = float(d.get("chi", 1.0))
+    dmax = max(float(d.get("d_a", 0.0)), float(d.get("d_h", 0.0)))
+    cfl = dt * chi * dmax
+    if cfl > CFL_LIMIT:
+        raise ValueError(
+            f"{name or 'this composition'} is not integrable: dt*chi*max(d_a,d_h) = "
+            f"{dt} * {chi} * {dmax} = {cfl:.2f}, over the {CFL_LIMIT} limit for an explicit "
+            f"step. The chemistry will go non-finite and every number after that is about the "
+            f"solver, not the tissue. Lower chi or the diffusivities, or raise dt -- but note "
+            f"that chi and the reaction rate are BOTH scaled by 1/dt, so raising dt does not "
+            f"help. (working reference: coral_fixed_ball sits at 0.21)")
+
+
 def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_after=None,
             record_every=1):
     """Compile a CompositionGraph into a runnable Plexus spec dict.
@@ -363,6 +404,8 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
         spec_op = emit(graph, node, grow_after)
         _assert_params_consumed(graph, node, spec_op)
         ops.append(spec_op)
+
+    _assert_rd_stable(ops, DT_GLOBAL, name)
 
     # D3: topology must be recorded on the SAME stride as positions, and this is asserted
     # downstream. This is the fix for the phantom "97% hollow" result.
