@@ -42,8 +42,8 @@ SPRITE_MIN_H = 100           # a character is ~170-250 px tall, a printed captio
 # The ring, in the order the round runs. Two lines each: who it is, what it is for.
 RING = [("grounder",    "Grounder",     "reads Okuda"),
         ("proposer",    "Proposer",     "chooses the edits"),
-        ("peer_review", "Peer-review",  "checks the batch"),
-        ("critic",      "Critic",       "refuses the illegal"),
+        ("peer_review", "Peer-review",  "is it worth running?"),
+        ("critic",      "Critic",       "is it runnable?"),
         ("biologist",   "Biologist",    "is it a tissue?"),
         ("metrologist", "Metrologist",  "are metrics trustworthy?"),
         ("analyst",     "Analysts x3",  "read each run"),
@@ -71,6 +71,8 @@ EDGES = [("grounder", "proposer", "flow", ""),
          ("evolution", "supervisor", "flow", ""),
          # the inside of the ring: everything that should come back to the Proposer
          ("critic", "proposer", "wired", "refusals, and why"),
+         ("biologist", "analyst", "wired", "is the specimen sound?"),
+         ("biologist", "meta_review", "wired", "what broke, all round"),
          ("supervisor", "proposer", "missing", "the steer"),
          ("interpreter", "proposer", "missing", "causal descriptions"),
          ("evolution", "proposer", "missing", "the refinement"),
@@ -156,6 +158,13 @@ def build(path=None):
         th = np.pi / 2 - 2 * np.pi * i / n
         pos[key] = (R * np.cos(th) * 1.28, R * np.sin(th))       # widened: labels need the room
 
+    # Every sprite, every caption beneath it, and the summary box. Captions and the box are WIDE,
+    # so each is represented by several points across its span -- a single centre point lets a
+    # label sit happily on the far end of the words it is supposed to avoid.
+    keepout = [xy for xy in pos.values()]
+    keepout += [(xy[0] + dx, xy[1] - 1.0) for xy in pos.values() for dx in (-0.9, 0.0, 0.9)]
+    keepout += [(x, -1.75) for x in (-1.8, -0.9, 0.0, 0.9, 1.8)]
+
     fig, ax = plt.subplots(figsize=(14.0, 10.2))
     fig.patch.set_facecolor("white")
 
@@ -175,7 +184,15 @@ def build(path=None):
             # agents puts it where the arrow is not -- and on a ring, that is on top of whichever
             # sprite the arc bows away from. Every one of these labels landed on a face.
             mx, my = _on_arc((x0, y0), (x1, y1), rad, 0.42)
-            mx, my = mx * 0.80, my * 0.80                        # ease inward, off the rim
+            # EASE INWARD UNTIL IT IS CLEAR. Every chord ends at a node, and a label placed on the
+            # arc lands on somebody's face or caption. Rather than hand-nudging each one -- which
+            # silently rots the moment an edge is added, and two were added the same afternoon --
+            # pull the label toward the centre until it is clear of every sprite and every caption.
+            for _ in range(10):
+                if not any((mx - kx) ** 2 + (my - ky) ** 2 < 1.15 ** 2 for kx, ky in keepout):
+                    break
+                mx, my = mx * 0.88, my * 0.88
+            keepout.append((mx, my))     # and now nothing else may sit on THIS label either
             ax.text(mx, my, lbl, fontsize=11.5, color=col, ha="center", va="center", zorder=5,
                     style="italic" if how == "missing" else "normal",
                     bbox=dict(fc="white", ec="none", pad=1.4, alpha=0.92))
@@ -190,8 +207,12 @@ def build(path=None):
                 linespacing=1.3, bbox=dict(fc="white", ec="none", pad=1.2, alpha=0.9))
 
     miss = sum(1 for e in EDGES if e[2] == "missing")
-    ax.text(0, -1.75, f"THE RETURN PATH\none arrow of five carries a finding back\n"
-                     f"{miss} agents write into the void",
+    # COUNTED, NOT TYPED. The first version of this caption said "one arrow of five", and it was
+    # wrong within the hour -- two more return paths were wired and the picture still claimed one.
+    back = [e for e in EDGES if e[2] in ("wired", "missing")]
+    live = sum(1 for e in back if e[2] == "wired")
+    ax.text(0, -1.75, f"THE RETURN PATH\n{live} of {len(back)} arrows carry a finding back\n"
+                      f"{miss} agents still write into the void",
             fontsize=13, ha="center", va="center", color="#B3261E", linespacing=1.7,
             bbox=dict(fc="white", ec="#B3261E", lw=1.2, pad=7, alpha=0.96))
 

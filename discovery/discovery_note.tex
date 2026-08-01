@@ -205,7 +205,9 @@ cells against a paper that says 2,000. Only the \textbf{Referee} is still idle.}
 \midrule
 Proposer & chooses which mechanism edits to test next; also checks the
 batch against what has already been tried & 1  & not yet & runs\\
-Peer-review & reads the proposed batch before it costs anything & 1  & not yet & runs\\
+Peer-review & judges whether the batch is \emph{worth} the compute: is each prediction
+falsifiable, is the claim already settled, is the stated reason a mechanism or a restatement
+of the edit. It advises; it cannot refuse & 1  & not yet & runs\\
 Analysts ($\times$3) & read one run each, independently, and say what happened & 15 & \textbf{21 s} each & runs\\
 Eye-check & watches the movie; vetoes a number the picture contradicts & 5  & not yet & runs\\
 Judge & second opinion on the top pair & 1  & not yet & runs\\
@@ -220,9 +222,13 @@ Evolution & refines the round's winner, rather than the loop only ever picking o
 \multicolumn{5}{@{}l}{\textbf{Checks} --- deterministic code that refuses. No judgement, no cost.}\\
 \midrule
 Supervisor & holds the objective and the budget; decides when to stop & --- & --- & runs\\
-Critic & type-checks the batch; rejects a causal claim with no ablation;
-refuses a composition already tried & --- & --- & runs\\
-Biologist & refuses a recipe that could not be a tissue & --- & --- & runs\\
+Critic & decides whether a proposal can be \emph{run}: type-legal edits, preconditions met,
+parameters in range, not already evaluated, and afterwards whether every scheduled operator
+actually acted. Rejects a causal claim with no ablation. Every refusal carries a reason code, and
+it cannot be argued with & --- & --- & runs\\
+Biologist & refuses a recipe that could not be a tissue, against the premises written in
+\code{PREMISES.md} --- which it now \emph{reads}, rather than restating. Its verdict goes to the
+Analyst reading that run and its round tally to the Meta-review & --- & --- & runs\\
 Metrologist & certifies instruments; files defects and retractions;
 refuses a duplicate operator request & --- & --- & runs\\
 Referee & rank a batch by tournament, not by sorting on one number
@@ -772,11 +778,13 @@ no recipient.
 \vspace{-6pt}
 {\small \textbf{The round, drawn in the order it runs.} Around the rim, each agent hands
 its work to the next and the chain closes --- that half was built and it works. The inside of the
-ring is the half that was not: the arrows that carry a \emph{finding} back to the agent that
-chooses the next edits. There should be a bundle. There is one, added this week. The Supervisor's
-steer, the Interpreter's causal descriptions and Evolution's refinement reach nothing, so a round
+ring is the half that was not: the arrows that carry a \emph{finding} back to somebody who can act
+on it. There should be a bundle. Three exist, all added this week, and the Supervisor's steer, the
+Interpreter's causal descriptions and Evolution's refinement still reach nothing --- so a round
 cannot be changed by what the round found. Drawing it is what made the shape obvious: fourteen
-agents, and the only thing they share is the direction of travel.\par}
+agents, and the only thing they shared was the direction of travel. The counts in the middle are
+computed from the same list the arrows are drawn from, because the first version of this caption
+said ``one of five'' and was wrong within the hour.\par}
 
 \subsection*{Fixed}
 
@@ -792,6 +800,24 @@ including non-finite values, and one of those makes both bounds non-finite. \tex
 perfectly good and was drawn black because frame 800 diverged.} The artefact reported ``nothing
 happened'' for a run whose first half was fine. Now: finite values only, cells that left the model
 drawn grey rather than white, and the count said out loud.
+
+\textbf{The Biologist now speaks to somebody.} It had been running on every run since it was
+written, and its verdict went to a terminal and to a field of \code{diag.json} that no prompt has
+ever mentioned. On round 2 it broke five premises on the very run whose movie came out black ---
+\emph{the activator had decayed to NaN, the chemistry was extinct} --- and an Analyst read that
+run's numbers and named a phenotype. Two hand-offs now exist: the per-run verdict goes to the
+\textbf{Analyst} that is about to read it, in the document's own words and with a field it must
+fill in saying whether the specimen was sound; and the round-level tally goes to the
+\textbf{Meta-review}, whose whole job is the recurring pattern. Across round 2 that tally reads
+\emph{``P4 broken in 2 of 3 runs''} --- an edit family that cannot hold chemistry, which is a thing
+to stop proposing rather than a thing to keep measuring.
+
+\textbf{And the premises are read from \code{PREMISES.md}}, not retyped beside it. Two documents
+saying the same thing in different words will disagree, and the one that drifts is always the prose
+--- it is the one nothing executes. The titles, grades and stated checks now come from the
+document, and the drift is reported in both directions. It found two immediately: premise~10
+(neighbour exchange is rare) is written down and \textbf{nothing checks it}, and \code{P12} is
+checked on every run and \textbf{appears nowhere in the document}.
 
 \textbf{The two written records have a shape}, checked rather than suggested: an append-only log
 with per-round fields, beside a state document of seven named sections. \code{memory.md} had

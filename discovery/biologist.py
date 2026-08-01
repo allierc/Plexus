@@ -69,6 +69,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 
 import numpy as np
@@ -81,8 +82,86 @@ sys.path.insert(0, os.path.join(ROOT, "prototype", "Tyssue"))
 
 CONFIG_DIR = os.path.join(ROOT, "config", "okuda")
 LOG_DIR = os.path.join(ROOT, "log", "okuda")
+PREMISES_MD = os.path.join(HERE, "PREMISES.md")
 
 SHAPE_INDEX_FLOOR = 2.0 * np.sqrt(np.pi)      # 3.5449 -- a circle. Geometry, not biology.
+
+
+# ------------------------------------------------------------------- the document is the source
+def read_premises(path=PREMISES_MD):
+    """PREMISES.md, parsed. The prose is the definition; this file is only its implementation.
+
+    Two documents saying the same thing in different words is two documents that will disagree,
+    and the one that drifts is always the prose -- it is the one nothing executes. So the titles,
+    grades and stated checks are READ FROM THE DOCUMENT rather than retyped here, and `coverage()`
+    reports both directions of drift. It found two the moment it was written: P12 is checked on
+    every run and appears nowhere in the document, and premise 10 (neighbour exchange is rare) is
+    written down, grades `usual`, and nothing checks it.
+    """
+    out, num, buf = {}, None, []
+
+    def flush():
+        if num is None:
+            return
+        body = "\n".join(buf)
+        f = {}
+        for key, field in (("Check", "check"), ("Constrains", "constrains"),
+                           ("If violated", "violated"), ("Caught", "caught")):
+            m = re.search(rf"\*{key}:\*\s*(.+?)(?=\n\*[A-Z]|\n##|\Z)", body, re.S)
+            if m:
+                f[field] = " ".join(m.group(1).split())
+        out[num] = dict(title=title, grade=grade, **f)
+
+    if not os.path.exists(path):
+        return {}
+    title = grade = None
+    for line in open(path).read().splitlines():
+        m = re.match(r"^##\s+(\d+)\.\s+(.*)$", line)
+        if m:
+            flush()
+            num, buf = m.group(1), []
+            head = m.group(2)
+            g = re.search(r"\*\*(certain|usual)[^*]*\*\*", head)
+            grade = g.group(1) if g else None
+            title = re.sub(r"\s*—?\s*\*\*.*$", "", head).strip(" —")
+            continue
+        if num is not None:
+            if grade is None:                                # a wrapped header: grade on line 2
+                g = re.search(r"^\*\*(certain|usual)", line.strip())
+                if g:
+                    grade = g.group(1)
+                    continue
+            buf.append(line)
+    flush()
+    return out
+
+
+DOC = read_premises()
+
+
+def doc_for(pid):
+    """P3b -> premise 3. Sub-checks share their parent's premise; that is what the letter means."""
+    m = re.match(r"^P(\d+)", str(pid))
+    return DOC.get(m.group(1)) if m else None
+
+
+def coverage():
+    """(documented but unchecked, checked but undocumented). Both are drift; both are reported."""
+    checked = {r.pid for r in _all_pids()}
+    parents = {re.match(r"^P(\d+)", p).group(1) for p in checked if re.match(r"^P(\d+)", p)}
+    return sorted(set(DOC) - parents, key=int), sorted(p for p in checked if not doc_for(p))
+
+
+def _all_pids():
+    """Every premise id this file can emit, by running each check on an empty spec."""
+    out = []
+    for f in STATIC + PASSIVE:
+        try:
+            out.append(f({}) if f in STATIC else f({}, []))
+        except Exception:
+            pass
+    out.append(R("P6", "probe", "a resting vesicle rests", "na", ""))
+    return out
 
 
 # --------------------------------------------------------------------------- result plumbing
@@ -99,8 +178,14 @@ class R:
         return f"{self.pid} {self.status}: {self.detail}"
 
     def as_dict(self):
-        return dict(id=self.pid, tier=self.tier, premise=self.premise, status=self.status,
-                    detail=self.detail, measured=self.measured)
+        d = dict(id=self.pid, tier=self.tier, premise=self.premise, status=self.status,
+                 detail=self.detail, measured=self.measured)
+        doc = doc_for(self.pid)
+        if doc:                      # carry the document's own words, so a reader downstream gets
+            d["grade"] = doc.get("grade")            # the premise as WRITTEN and not as summarised
+            d["stated_check"] = doc.get("check")
+            d["if_violated"] = doc.get("violated") or doc.get("caught")
+        return d
 
 
 def _ops(cfg):
@@ -548,6 +633,81 @@ def check(cfg, series=None, probe=False, device="cpu", mech=None):
     return res
 
 
+def verdict(res, run=""):
+    """The Biologist's finding, in the form another agent can be handed.
+
+    `report()` prints, and printing is where this agent's work has been going: on round 2 it broke
+    five premises on r002c_00 and five on r002c_02 -- the chemistry extinct, the sheet stretched,
+    concentrations non-physical -- and every one of those verdicts went to a terminal and into a
+    field of diag.json that no prompt has ever mentioned. The Analyst then read the numbers off
+    that run and reported a phenotype. This function exists so the finding has a shape that can
+    travel: what broke, in the document's own words, and what it means for anyone reading the run.
+    """
+    broken = [r for r in res if r.status in ("fail", "error")]
+    return {
+        "run": run,
+        "specimen_ok": not broken,
+        "n_checked": sum(1 for r in res if r.status != "na"),
+        "broken": [r.as_dict() for r in broken],
+        "ablations": [r.as_dict() for r in res if r.status == "ablation"],
+        "headline": ("every premise holds" if not broken else
+                     f"{len(broken)} premise(s) broken: " + ", ".join(
+                         f"{r.pid} ({(doc_for(r.pid) or {}).get('title', r.premise)})"
+                         for r in broken)),
+    }
+
+
+def brief(res, run=""):
+    """The same finding as a few lines of prose, for pasting into another agent's prompt."""
+    v = verdict(res, run)
+    if v["specimen_ok"]:
+        return f"BIOLOGIST: all {v['n_checked']} applicable premises hold on this run."
+    out = [f"BIOLOGIST: {v['headline']}.",
+           "A broken premise means the numbers below describe the CONFIGURATION, not a tissue.",
+           "Weigh your reading accordingly, and say so in your verdict."]
+    for b in v["broken"]:
+        out.append(f"  {b['id']} [{b.get('grade') or '?'}] {b.get('premise')}")
+        out.append(f"      measured: {b['detail']}")
+        if b.get("if_violated"):
+            out.append(f"      what it means: {b['if_violated'][:220]}")
+    for a in v["ablations"]:
+        out.append(f"  {a['id']} DECLARED ABLATION -- {a['detail'][:160]}")
+    return "\n".join(out)
+
+
+def round_tally(run_names, log_dir=LOG_DIR):
+    """Across a round: which premises keep breaking. For the Meta-review, whose job is the pattern.
+
+    One run breaking P4 is that run's problem. Five of eight runs breaking P4 is the campaign
+    proposing a family of compositions that cannot hold chemistry, and that is a thing to stop
+    proposing rather than a thing to keep measuring.
+    """
+    seen, runs = {}, 0
+    for name in run_names:
+        p = os.path.join(log_dir, name, "diag.json")
+        if not os.path.exists(p):
+            continue
+        try:
+            j = json.load(open(p))
+        except Exception:
+            continue
+        runs += 1
+        for pid in j.get("premises_broken") or []:
+            seen.setdefault(pid, []).append(name)
+    if not runs:
+        return "BIOLOGIST: no runs with a recorded premise check this round."
+    if not seen:
+        return f"BIOLOGIST: all premises held on every one of the {runs} run(s) this round."
+    lines = [f"BIOLOGIST, across {runs} run(s) this round -- premises broken, most often first:"]
+    for pid, where in sorted(seen.items(), key=lambda kv: -len(kv[1])):
+        doc = doc_for(pid) or {}
+        lines.append(f"  {pid} broken in {len(where)}/{runs}: {doc.get('title', '')}"
+                     f"  [{doc.get('grade') or '?'}]")
+        if len(where) >= max(2, runs // 2) and doc.get("violated"):
+            lines.append(f"      RECURRING -- {doc['violated'][:200]}")
+    return "\n".join(lines)
+
+
 def report(res, name=""):
     order = {"fail": 0, "error": 1, "ablation": 2, "pass": 3, "na": 4}
     mark = {"fail": "FAIL", "error": "ERR ", "ablation": "ABL ", "pass": "ok  ", "na": "--  "}
@@ -564,6 +724,11 @@ def report(res, name=""):
           f"   ({sum(1 for r in res if r.status=='pass')} pass, "
           f"{sum(1 for r in res if r.status=='ablation')} declared ablation, "
           f"{sum(1 for r in res if r.status=='na')} n/a)")
+    unchecked, undocumented = coverage()
+    if unchecked or undocumented:                 # drift between the document and this file, said
+        print(f"  drift vs PREMISES.md: "        # out loud rather than left for someone to notice
+              f"{'premise ' + ', '.join(unchecked) + ' documented but never checked; ' if unchecked else ''}"
+              f"{', '.join(undocumented) + ' checked but not in the document' if undocumented else ''}")
     return n_fail
 
 

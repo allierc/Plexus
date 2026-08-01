@@ -110,6 +110,21 @@ def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None, parallel=True):
     except Exception as e:
         shapes = (f"(trajectory shapes unavailable: {type(e).__name__}: {str(e)[:70]} -- read "
                   f"metrics.png yourself and say so in your verdict)")
+    # WHAT THE BIOLOGIST FOUND. It has been running on every run since it was written, and its
+    # verdict has been going to a terminal and to a field of diag.json that no prompt mentioned.
+    # On round 2 it broke five premises on r002c_00 -- the activator had decayed to NaN, the
+    # chemistry was extinct -- and an Analyst read that run's numbers and named a phenotype.
+    # Handing an analyst a summary without telling it the specimen is broken is asking for a
+    # confident reading of a configuration error.
+    premises = ""
+    try:
+        import biologist as _B
+        _d = json.load(open(os.path.join(out_dir, "diag.json")))
+        _res = [_B.R(p["id"], p["tier"], p["premise"], p["status"], p["detail"], p.get("measured"))
+                for p in _d.get("premises") or []]
+        premises = _B.brief(_res, run_name) if _res else ""
+    except Exception as e:
+        premises = f"(premise verdict unavailable: {type(e).__name__}: {str(e)[:70]})"
     # INDEPENDENT BY DESIGN, SO RUN THEM TOGETHER. Three readings of one run exist precisely
     # because a single LLM reading is not reproducible -- they must not influence one another,
     # and no analyst's prompt depends on another's answer. They were sequential only because
@@ -126,6 +141,9 @@ Work independently. Do not try to agree with anyone.
   mechanics     : {mech}   (force | pressure body-vs-protruding | tension | migration)
   strip         : {os.path.join(out_dir, 'strip.png')}
   curves        : {os.path.join(out_dir, 'metrics.png')}   (every metric vs frame)
+
+IS THIS EVEN A TISSUE? -- the Biologist ran the premises against this run before you read it:
+{premises or "  (no premise check on this run)"}
 
 HOW EACH MEASUREMENT BEHAVED OVER TIME -- classified automatically, not by anyone's judgement:
 {shapes or "  (no trajectory recorded)"}
@@ -157,7 +175,12 @@ Reply with ONLY this JSON, nothing else:
   "forced_or_grown": "forced|grown|unclear",
   "evidence": "<2 sentences citing SPECIFIC numbers or what the caption says>",
   "eye_vs_number": "agree|disagree",
-  "concern": "<anything that looks like an artefact rather than physics, or empty>"}}"""
+  "specimen": "sound|compromised",
+  "concern": "<anything that looks like an artefact rather than physics, or empty>"}}
+
+`specimen` is `compromised` whenever a premise above is broken in a way that touches what you
+just claimed -- an extinct chemistry beneath a "pattern" reading, a stretched sheet beneath a
+"tube". A field forces the question to be answered rather than passed over."""
         prompts.append(prompt)
 
     def _one(prompt):
@@ -252,7 +275,7 @@ additional measurement would determine it."""
 
 
 # ============================================================================ 10. META-REVIEW
-def meta_review(round_id, timeout_min=10, max_chars=4000, ledger=None):
+def meta_review(round_id, timeout_min=10, max_chars=4000, ledger=None, runs=()):
     """Distil recurring patterns and APPEND them to the Proposer's instructions.
 
     Co-Scientist: "feedback applicable to all agents, which is simply appended to their prompts
@@ -263,12 +286,27 @@ def meta_review(round_id, timeout_min=10, max_chars=4000, ledger=None):
     place each time, so it stays a summary rather than becoming a transcript.
     """
     paths = ensure_files()
+    # THE BIOLOGIST'S ROUND TALLY. One run breaking a premise is that run's problem; the same
+    # premise breaking across most of a round is the campaign proposing a family of compositions
+    # that cannot hold a tissue, and THAT is a pattern to carry forward -- which is this agent's
+    # entire job. The per-run verdicts already existed and were read by nobody.
+    tally = ""
+    try:
+        import biologist as _B
+        tally = _B.round_tally(list(runs)) if runs else ""
+    except Exception as e:
+        tally = f"(premise tally unavailable: {type(e).__name__}: {str(e)[:70]})"
     prompt = f"""META-REVIEW after round {round_id}.
 {budget_note(timeout_min, "1) the LEARNED PATTERNS section in instruction.md  2) memory.md")}
 Read:
   analysis log : {paths['analysis']}
   memory       : {paths['memory']}
   knowledge    : {os.path.join(CAMP, 'knowledge.md')}
+
+WHAT THE BIOLOGIST FOUND ACROSS THIS ROUND -- premises are the things we take as known about
+tissue, written in PREMISES.md. A premise broken in most of a round is the strongest pattern
+available to you, and it names the edit family to stop proposing:
+{tally or "  (no premise tally for this round)"}
 
 Find the patterns that RECUR across rounds -- not a summary of what happened, but what a
 proposer should know before choosing the next edit. Especially:
