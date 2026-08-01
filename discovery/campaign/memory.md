@@ -2,6 +2,34 @@
 
 _Revisable. The agent's current model of the problem: what is established, what is open, what to try next._
 
+## META-REVIEW after Round 4 — 2026-08-01
+
+**Round 4 results landed (parent 3 = uniform mechanical growth). surprise 0.00, supervisor pushing adversarial.**
+Only ONE of four slots was valid evidence; the family is near-exhausted for single-op work.
+- **`−vesicle_growth` VALIDATED** → sphere, protr_peak 1.003 (predicted ≤1.5). Growth driver confirmed
+  necessary; static mechanical mesh with no protrusion. Confirmatory ⇒ zero surprise.
+- **CONTROL parent 3 = BUFFER_SATURATED** (n_cells 20804 → NOT EVIDENCE). Predicted a smooth ball
+  (protr_peak 1.0–1.8) but read protr_peak 2.839 / "branched" / 44 tubes — a pure saturation artefact.
+- **`−reconnect_t1_3d` = BUFFER_SATURATED** (n_cells 5204 → NOT EVIDENCE). Lever unreadable.
+- **`=shape_energy_3d:monolayer` = CRASH** (no diag.json, empty `{}`). Impl-swaps join the crash family.
+
+**Recurring patterns a proposer must carry forward (full detail in instruction.md LEARNED PATTERNS):**
+- **Buffer saturation is now the DOMINANT failure of every growth family** — not just growth-magnifying
+  ADDS (R2) but the plain growth+division CONTROL and even a topology-knockout. On any growth-active
+  family only growth-REMOVED slots return valid evidence; to map a grown regime, drop to Loop-II
+  (lower rate / cap count), do NOT keep proposing single-ops that saturate.
+- **Saturated rows: ALL metrics lie** — protr_peak, ta_n_tubes, morphology are artefacts. Ignore the
+  whole row when valid_evidence:false.
+- **Impl-swaps (`set_impl`) crash like bookkeeping-op knockouts** — no diag.json.
+- **Counter-reset artefact recurs every round** (header "round N, 0 runs, coverage 0%"). Real record =
+  the campaign files, not the header.
+- Watcher worked correctly this round ("supports" sphere) — but still unreliable per R2; don't rely on it.
+- Instruction.md LEARNED PATTERNS rewritten in place (<4000 chars): dropped stale vcap numeric detail,
+  added the saturation-dominance + impl-swap-crash + saturated-rows-lie lessons; kept the growth-fed
+  reversal and rejected-metric list compressed.
+
+---
+
 ## PROPOSAL ISSUED — 2026-08-01 R4 — OPEN parent 3 (uniform-inflation, mechanical-growth family)
 
 **Counter reset AGAIN** (header "round 3, 0 runs, coverage 0%, phenotypes {}", solo-effects table
