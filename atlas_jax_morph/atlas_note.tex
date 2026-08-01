@@ -1155,6 +1155,51 @@ So the atlas's first repository has produced, unprompted, a shortlist of what to
 language --- which is what Appendix~E said it was for.
 
 %======================================================================
+\section{The composition worth having: gene regulation $\times$ growth}\label{sec:interplay}
+
+Three of the eight new contracts --- \code{regulate}, \code{morphogen}, \code{mechanosense} ---
+are the \emph{sense and decide} half of a cell. \code{grow\_radius} and \code{cell\_divide} are
+the \emph{act} half, and the language already had those. What \code{regulate} adds is the piece
+that was missing: a per-cell \textbf{internal dynamical state, heritable and integrated}. Before
+it, a Plexus cell was a particle with fixed parameters; with it, a cell is a controller.
+
+The coupling needs no new machinery, which is the point. \code{regulate} reads sensed fields and
+writes the same per-cell blocks --- \code{growth\_rate}, \code{division\_rate},
+\code{secretion\_rate} --- that growth, division and secretion already consume. So the loop
+closes through the ordinary declared-field dataflow:
+
+\begin{center}
+\small
+\code{morphogen} $\to$ \code{chemical} $\to$ \code{regulate} $\to$ \code{growth\_rate} $\to$
+\code{grow\_radius} $\to$ geometry $\to$ \code{morphogen}
+\end{center}
+
+\textbf{Direct morphogen-to-growth is Turing-shaped: the field decides. Inserting \code{regulate}
+makes it programmable} --- the network's weights become the design variables, which is Hiscock's
+framing and exactly what Figure~5 optimises. And the chain is differentiable end to end
+(\S\ref{sec:p6now}): loss $\to$ positions $\to$ division draw $\to$ \code{division\_rate} $\to$
+gene $\to$ \code{regulate}. The loop is not merely runnable, it is \emph{designable}.
+
+\textbf{Two honest qualifications, because this is the claim most worth over-selling.}
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt]
+\item \textbf{Every link is validated; the loop has never been run.} Each atlas spec exercises one
+mechanism in isolation (\code{[seed\_state, regulate]}, \code{[seed\_state, grow\_radius]},
+\code{[seed\_state, morphogen]}); the only composition is the proliferation model, which has no
+gene network in it. Six differential tests do not add up to a demonstration.
+\item \textbf{It is a COMPOSITION, not a fourth contract.} Registering ``gene--growth coupling'' as
+new vocabulary would be exactly the inflated \emph{new} the ledger exists to prevent, and the
+Plexus thesis is that compositions should not need new words. The claim to make is the narrower
+and stronger one: \emph{three new contracts plus the growth the language already had close a
+sense $\to$ regulate $\to$ grow loop that Plexus previously could not express at all.}
+\end{enumerate}
+
+The experiment is one spec --- \code{[seed\_state, morphogen, regulate, grow\_radius,
+cell\_divide, relax]}, six operators, all validated, none new --- and it belongs to Phase 7's
+``compositions the authors did not run'', because jax-morph's own worked example does not compose
+these either.
+
+%======================================================================
 \section{Decided, and what is still open}
 
 \textbf{Decided (31 July).} Run Phases 1--3 straight through, and stop for a joint review before
