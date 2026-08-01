@@ -219,11 +219,76 @@ def check_compile(graph):
         if node["op"] not in T.EMIT:
             out.append(Rejection("C1_NO_EMITTER", "no backend emitter for this operator",
                                  node["op"]))
+    spec = None
     try:
-        T.to_spec(graph, name="_criticcheck", frames=10)
+        spec = T.to_spec(graph, name="_criticcheck", frames=10)
     except Exception as e:
         out.append(Rejection("C2_COMPILE_FAILED", "the composition does not compile",
                              f"{type(e).__name__}: {str(e)[:160]}"))
+    if spec is not None:
+        out.extend(check_reservoir(spec, graph))
+    return out
+
+
+# ============================================================================ THE RESERVOIR GATE
+def check_reservoir(spec, graph=None, frames=None):
+    """Can this run REACH the cell count it is aiming at? Refuse before a GPU is touched.
+
+    THE FAILURE THIS EXISTS TO STOP, twice in one week:
+
+      32-run overnight study   every run ended at exactly 1778 cells. Reported as a finding
+                               ("remarkable"), retracted the next day.
+      27-run weekend battery   every run ended at exactly 1778 cells. Zero valid evidence.
+
+    Both were the same arithmetic. A closed epithelial sheet is trivalent, so Euler fixes
+    V = 2F - 4: a vertex reservoir of size V caps the tissue at (V+4)/2 cells no matter what the
+    biology wants. 3552 vertices give exactly 1778. Neither batch was stopped, because nothing
+    compared the buffer against the destination -- the saturation flag fires AFTER the run, and
+    a flag that fires afterwards tells you what you wasted, not what to avoid.
+
+    This is deliberately NOT a fidelity rule. It does not care whether a run uses Okuda's
+    numbers; the exploratory share of a batch is free to start anywhere. It cares only that
+    wherever a run is going, it can get there -- which is true of a faithful run and a wild one
+    alike. A run that cannot reach its own target measures the array, not the tissue.
+    """
+    from agents.grounder import max_cells_for
+    out = []
+    try:
+        vbuf = int(spec["sets"]["vertex"]["n"])
+        cbuf = int(spec["sets"]["cell"]["n"])
+    except Exception:
+        return [Rejection("C3_NO_RESERVOIR", "the spec declares no reservoir sizes", "")]
+
+    seed_cells = None
+    for o in spec.get("operators", []):
+        if o.get("op") in ("seed_mesh_3d",) and o.get("n_cells"):
+            seed_cells = int(o["n_cells"])
+    if seed_cells is None:
+        return out                      # a checkpoint start carries its own count
+
+    ceiling = max_cells_for(vbuf)
+    target = (spec.get("_run") or {}).get("target_cells")
+    if target is None:
+        return [Rejection(
+            "C3_NO_TARGET",
+            "the run does not say how many cells it is aiming at, so its reservoir cannot be "
+            "checked. No fixed multiple of the seed works: the weekend battery seeded 150 into "
+            "a buffer holding 1778 -- twelve times the seed -- and every run still stopped on it",
+            f"seed={seed_cells}, vertex={vbuf} -> ceiling {ceiling}")]
+
+    if ceiling < int(target):
+        out.append(Rejection(
+            "C3_RESERVOIR_TOO_SMALL",
+            f"aims at {int(target)} cells but the reservoir caps at {ceiling}. The run would "
+            f"stop on the buffer and report it as biology -- this is the arithmetic that voided "
+            f"32 runs on 30 July and 27 more on 31 July",
+            f"seed={seed_cells}, vertex={vbuf} -> (V+4)/2 = {ceiling}, target {int(target)}"))
+    if cbuf < ceiling:
+        out.append(Rejection(
+            "C3_RESERVOIR_INCONSISTENT",
+            f"the cell reservoir ({cbuf}) is smaller than the vertex reservoir allows "
+            f"({ceiling}) -- whichever binds first will do so silently",
+            f"vertex={vbuf}, cell={cbuf}"))
     return out
 
 
