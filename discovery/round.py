@@ -365,6 +365,39 @@ def quarantine_scan(archive=None, log_root=None, ledger_path=None, verbose=True)
 
 # --------------------------------------------------------------------------- LOOP I batch
 
+REVIEWS = os.path.join(CAMP, "peer_review.jsonl")
+
+
+def _save_review(rid, review):
+    os.makedirs(CAMP, exist_ok=True)
+    with open(REVIEWS, "a") as fh:
+        fh.write(json.dumps({"round": rid, **(review or {})}) + "\n")
+
+
+def _last_review():
+    """What Peer-review said about the LAST batch, for the Proposer that writes the next one."""
+    if not os.path.exists(REVIEWS):
+        return None
+    rows = []
+    for line in open(REVIEWS):
+        try:
+            rows.append(json.loads(line))
+        except Exception:
+            continue
+    if not rows:
+        return None
+    r = rows[-1]
+    iss = r.get("issues") or []
+    if not iss and not r.get("verdict"):
+        return None
+    out = [f"On round {r.get('round')}'s batch, the reviewer said: "
+           f"{(r.get('verdict') or '').strip()}"]
+    for i in iss:
+        out.append(f"  slot {i.get('slot')} [{i.get('severity')}]: {i.get('problem')}")
+    out.append("These are the SAME KIND of mistake if you make them again. Do not repeat them.")
+    return "\n".join(out)
+
+
 def _steer_for(sup):
     """The Supervisor's own words about what the next batch should be, or None.
 
@@ -485,9 +518,10 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     refusals = _refusal_summary(sup)
     setup = _paper_setup()
     hist = ARCH.table()
+    prior_review = _last_review()
     ok, slots = P.propose(frontier, cfg, sup.prox, ledger_summary, sup.round + 1,
                           n_slots=n_slots, ledger=ledger, steer=steer, refusals=refusals,
-                          setup=setup, history=hist)
+                          setup=setup, history=hist, review=prior_review)
     if not slots:
         print("[round] the Proposer produced no usable proposal -- NOT falling back to random. "
               "A round with no reasoned proposal is a failed round, not a random one.")
@@ -552,6 +586,13 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     print(f"  [reflection] batch_ok={review.get('batch_ok')} :: {review.get('verdict','')[:200]}")
     for iss in review.get("issues", []):
         print(f"     slot {iss.get('slot')}: [{iss.get('severity')}] {iss.get('problem')}")
+    # THE REVIEW IS KEPT, so the next round's Proposer can be handed it. It was printed and
+    # dropped, and the cost of that was measured across the first two batches of the rebuilt
+    # loop: Peer-review raised the SAME serious issue both times -- a confirmatory floor sitting
+    # inside the control's own predicted band, so a positive cannot be told from the control --
+    # and the Proposer repeated the design error because nothing carried the criticism back.
+    # A reviewer whose reviews reach nobody is a reviewer measuring its own patience.
+    _save_review(rid, review)
     if review.get("batch_ok") is False and any(
             i.get("severity") == "serious" for i in review.get("issues", [])):
         print("  [reflection] SERIOUS issues -- the batch is not run as proposed.")

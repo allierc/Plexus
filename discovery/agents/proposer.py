@@ -81,7 +81,7 @@ def _block(title, body):
 
 
 def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_min=10,
-            ledger=None, steer=None, refusals=None, setup=None, history=None):
+            ledger=None, steer=None, refusals=None, setup=None, history=None, review=None):
     """Ask the agent for a batch. Returns (ok, [slot dicts]).
 
     Slot 0 is ALWAYS the parent unchanged -- the CONTROL. That is the one thing the agent is not
@@ -123,6 +123,9 @@ EVIDENCE SO FAR
         "NOT a reset counter: it means the compositions proposed so far CANNOT BE SIMULATED. "
         "A parent is explored when its edits produced EVIDENCE, never when they were merely "
         "proposed", refusals)}
+{_block("WHAT THE PEER-REVIEWER SAID ABOUT YOUR LAST BATCH. It advises and cannot refuse, so "
+        "these criticisms are only worth the compute they were paid for if you act on them",
+        review)}
 {_block("THE ARCHIVIST, over the whole history. A branch with evidence but no sound specimens "
         "has been measured and has told us nothing about tissue", history)}
 WHAT THE PAPER SAYS (from the Grounder, who read it and checked its own quotes)
