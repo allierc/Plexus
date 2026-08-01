@@ -573,15 +573,40 @@ activator goes to zero. A stability bound does not see that, the Biologist does 
 chemistry was silently extinguished''. \textbf{Finite is not the same as alive}, and a bound that
 only forbids divergence admits a whole region of dead runs.
 
+\textbf{The bound is now two clauses, and both are measured.}
+$\mathrm{CFL} \leq 0.45$ \emph{and} $\chi \leq 3$. The second could not be derived --- it came from
+watching fourteen points on the cluster --- and it exists because there are \emph{two} failure
+modes where the formula only knew about one. Divergence is the one a CFL forbids. Extinction is
+the other: at $\chi = 4$ and $\chi = 6$ the run stays perfectly finite and the activator goes to
+zero. $\chi$ multiplies both diffusivities, so raising it flattens the activator's own gradient as
+fast as the inhibitor's, and past about 3 the local peak cannot outrun its own spreading. A stable
+run that measures nothing is not caught by a stability bound; only the Biologist sees it, and only
+afterwards.
+
+\textbf{The limit sits below the first observed failure, which is conservative on purpose.} The
+measurements do not admit a clean threshold: 0.48 and 0.55 were stable, 0.50 was not --- and the
+0.50 case is $d_h = 10$, so something beyond the product matters, since a large $d_h$ fails where
+a small one survives at the same CFL. Until that term is derived the bound refuses two points known
+to be fine. Refusing a good composition costs a proposal; admitting a divergent one has cost a
+batch and a conclusion, twice.
+
+Checked against all eight measured points: every bad one refused, no bad one admitted.
+
 \textbf{Still to do}
 \begin{itemize}[itemsep=1pt]
-\item \textbf{Replace the single number with the measured region.} The safe band at 300 frames is
-roughly CFL $\leq 0.45$ \emph{and} $\chi \leq 3$, and the second clause is not in any formula.
+\item \textbf{Derive the missing term.} A single product cannot order the failures, and the bound
+is conservative until something explains why $d_h = 10$ behaves differently.
 \item \textbf{The reaction still has no bound}, deliberately --- the candidate was measured and
-refuted --- so a composition can pass the diffusion check and die through the reaction. Two of the
-twenty did exactly that.
-\item \textbf{Longer runs may move the wall.} 300 frames is where these were judged; a run that
-survives 300 and dies at 900 is still a run the gate let through.
+refuted --- so a composition can pass the diffusion check and die through the reaction.
+\item \textbf{Longer runs may move the wall.} These were judged at 300 frames; a run that survives
+300 and dies at 900 is still a run the gate let through.
+\item \textbf{One preset sits on the wrong side.} \code{round\_44\_base} ran healthily as a hand
+config at CFL 0.056 --- 901 frames, 2983 cells, activator 0.993 --- and compiles to 2.8 as a
+composition, because the clock fix scales $\chi$ by 50. Both are true, and they are not the same
+experiment: the archived run's chemistry had a fiftieth of the reaction time the corrected clock
+gives, which is precisely the defect the fix was written for. Keeping it as a trusted reference
+keeps a pre-fix run in the trusted set. \code{validate\_space} is 54/56 on exactly this, and the
+decision is Cedric's.
 \end{itemize}
 
 \textbf{Whose job this is.} The \textbf{Critic}. It is deterministic, it runs before any compute,
