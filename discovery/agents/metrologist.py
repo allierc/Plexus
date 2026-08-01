@@ -269,6 +269,25 @@ class Certification:
 
 
 # ============================================================================ smoke
+def _morphology_certified():
+    """Run the classifier's own self-test. It has known answers, so it can genuinely fail."""
+    import subprocess
+    import sys as _sys
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "..", "prototype", "Tyssue", "morphology.py")
+    p = os.path.abspath(p)
+    if not os.path.exists(p):
+        return False, f"morphology.py not found at {p}"
+    try:
+        r = subprocess.run([_sys.executable, p], capture_output=True, text=True, timeout=600)
+    except Exception as e:
+        return False, f"could not run the classifier self-test: {type(e).__name__}: {e}"
+    if r.returncode != 0 or "CERTIFIED" not in r.stdout:
+        tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or [""]
+        return False, f"the morphology classifier does not certify: {tail[0][:90]}"
+    return True, "morphology classifier certified against shapes with known answers"
+
+
 if __name__ == "__main__":
     import tempfile
 
@@ -297,22 +316,3 @@ if __name__ == "__main__":
               f"re-scorable without re-running: {r.reanalysable}")
         assert "R91a48cf669b7789" in cert.retracted_runs()
         print("\nmetrologist OK")
-
-
-def _morphology_certified():
-    """Run the classifier's own self-test. It has known answers, so it can genuinely fail."""
-    import subprocess
-    import sys as _sys
-    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                     "..", "prototype", "Tyssue", "morphology.py")
-    p = os.path.abspath(p)
-    if not os.path.exists(p):
-        return False, f"morphology.py not found at {p}"
-    try:
-        r = subprocess.run([_sys.executable, p], capture_output=True, text=True, timeout=600)
-    except Exception as e:
-        return False, f"could not run the classifier self-test: {type(e).__name__}: {e}"
-    if r.returncode != 0 or "CERTIFIED" not in r.stdout:
-        tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or [""]
-        return False, f"the morphology classifier does not certify: {tail[0][:90]}"
-    return True, "morphology classifier certified against shapes with known answers"
