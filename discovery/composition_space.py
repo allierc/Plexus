@@ -194,21 +194,37 @@ DIFFUSION_STENCIL_GAIN = {
 
 
 def diffusion_cfl(d_a, d_h, chi, dt=None, stencil_gain=1.0):
-    """The explicit-diffusion CFL number. Stable iff <= DIFFUSION_CFL_LIMIT (== 1)."""
-    dt = ENGINE_DT if dt is None else dt
-    return float(dt) * float(chi) * float(stencil_gain) * max(float(d_a), float(d_h))
+    """The explicit-diffusion CFL number. Stable iff <= DIFFUSION_CFL_LIMIT.
+
+    THE dt CANCELS, and leaving it in made this bound 50x too permissive.
+
+    `translate` emits chi scaled by RD_PER_FRAME = 1/dt -- that is the D5a clock fix, which
+    exists because cell_react and cell_diffuse EMIT=velocity into `chem` and were therefore
+    being integrated on the MECHANICS substep. So the engine receives chi/dt, and the step it
+    actually takes is dt * (chi/dt) * d = chi * d. The dt divides out.
+
+    This function multiplied by dt anyway, against the UNSCALED chi, and so reported 0.056 for
+    a composition whose real number is 2.8. Every ceiling derived from it -- the d_a/d_h box, the
+    chi box -- inherited the same factor of 50 and declared a reachability envelope four times
+    wider than the integrator can carry. `okuda_route`, the recipe named for the target, sat at
+    2.8 and passed. Its chemistry went non-finite within a hundred frames and the Biologist
+    refused every run.
+
+    Measured, not reasoned: coral_fixed_ball is a HAND-written spec at dt=1.0 with chi unscaled,
+    so its true number is 1.0*1.3*0.16 = 0.208, and it runs finite. okuda_route compiles to
+    chi=200, d_h=0.7 and is 2.8. The two agree with this formula and disagree with the old one.
+    """
+    return float(chi) * float(stencil_gain) * max(float(d_a), float(d_h))
 
 
 def diffusivity_ceiling(chi, dt=None, stencil_gain=1.0):
     """Largest d_a/d_h an explicit step can carry at this chi. Computed, never hard-coded."""
-    dt = ENGINE_DT if dt is None else dt
-    return DIFFUSION_CFL_LIMIT / (float(dt) * float(chi) * float(stencil_gain))
+    return DIFFUSION_CFL_LIMIT / (float(chi) * float(stencil_gain))
 
 
 def chi_ceiling(d, dt=None, stencil_gain=1.0):
     """Largest chi an explicit step can carry at this diffusivity."""
-    dt = ENGINE_DT if dt is None else dt
-    return DIFFUSION_CFL_LIMIT / (float(dt) * float(d) * float(stencil_gain))
+    return DIFFUSION_CFL_LIMIT / (float(d) * float(stencil_gain))
 
 
 # ---------------------------------------------------------------- explicit reaction (cell_react)
@@ -285,7 +301,9 @@ def hill_alpha_ceiling(a_sw):
 # sufficient on its own -- a value inside the box can still be unstable in combination. That is
 # what the joint conditions in theta_conditions() are for. The box is the reachability envelope;
 # the joint condition is the wall.
-CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 4.0, 0.02, 0.7
+# The proven point: coral_fixed_ball's chemistry, which runs finite and patterns.
+# Chosen because it is MEASURED to work, not because it is inside a box.
+CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 1.3, 0.08, 0.16
 # F_DEFAULT IS THE CALIBRATION (finding F012), not a guess. 0.046 with kk 0.062 gives three
 # STABLE spots on a 2000-cell ball, reproducible across three seeds -- stability tested by
 # comparing the count at step 1500 and step 3000, because a pattern still coarsening is not a spot
