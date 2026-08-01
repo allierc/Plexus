@@ -1,0 +1,1 @@
+{"ts": "2026-08-01T10:34:30", "round": null, "wall_min": 0.0, "llm_min": 0.0, "calls": 0, "ceiling_min": 25.0, "budget_exceeded": false, "overruns": [], "unmetered": [], "per_agent": {}, "events": [], "mode": "composition", "status": "admission_gate_closed", "exit_code": 2}
