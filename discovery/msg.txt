@@ -1,22 +1,39 @@
-Overnight work is committed and pushed at 72e3d63. Nothing is running.
+Fair — dropping it. Back to the launch question.
 
-The headline
---mode composition could never have completed a round. proposer.propose() requires slot 0 to be intent: "control"; hypothesis.INTENTS didn't contain "control". Two halves of the same protocol disagreed about whether a control exists, and both enforced it with a hard error. Running it attended, as RESUME.md said to, found that plus ten more.
+Everything we've done today has been pre-flight. Here's what I've actually verified stands between you and a week-long unattended run, in the order that matters.
 
-Your Turing + vertex ask
-Both minisite videos reproduce again (cells_end 1778 exactly, which validates the clock migration as every: 2→4, not 2→2). Then the loop ran on the settings — 32 runs, 5 knobs, predictions recorded first:
+Hard blockers — the week fails without these
+1. There is no multi-round driver. I grepped for it: no loop, no --rounds, no scheduler anywhere in discovery/. round.py runs one round and exits. "Runs unattended for weeks" is specified in the design document and not implemented. Something has to invoke rounds repeatedly, survive a failed one, and stop on the terminal verdict.
 
-The activator is diluted to extinction. conserve_amount divides cell.chem by the volume growth ratio every tick: 3.3e-2 → 4.6e-11 → 2.0e-22 at frames 60/200/400. The coral pattern on your front page is a colour map stretched over a dead field — which is why both archived movies have identical diagnostics.
-With the field alive, rho is the shaping lever, not a_sw — at rho=0.05 the shell clefts along the activator bands, corr +0.63 (best in this project; prior best 0.42).
-But: 18 runs with an intact mesh reach at most protr 1.064; all 9 runs with corr > 0.4 have ≥20% folded faces; zero achieve both. Shaping and monolayer integrity are mutually exclusive on this backend. That's a structural limitation, reached by measurement — and it's the same conclusion the earlier campaign reached independently on the SPV backend.
-Filed as OR001 in the operator backlog: force-balance to a residual plus 3D IH/HI reconnection, with an acceptance test today's best setting fails by ~4×.
+2. A crashed round wedges the loop permanently. pose() raises ValueError: hypothesis {hid} already posed (hypothesis.py:176). The round id is sup.round + 1, and sup.round only advances at the end, via sup.observe(). So a round that dies after posing but before finishing leaves the state at the old round → next attempt uses the same id → same hypothesis ids → raises again → forever. One crash on day 2 costs you the remaining five days. This is the single most dangerous thing in the system for unattended operation, and it is invisible in a one-round test.
 
-Two things I got wrong, both retracted in the log
-I claimed the growth cap explained the flat shape — the first test refuted it, but that test ran against the dead field, so the refutation was worthless. Then I claimed the extinction reached the main campaign; submitted the comparison and measured act_max_final = 0.995 with dilution on. Refuted within the hour — I had the feedback sign backwards. The caption "a red region shrinks and disappears" was about the domain (red_frac 0.005), not the amplitude, and I misread it.
+3. The loop currently refuses to start. Instrument gate not certified → admission gate closed. That's correct behaviour, but it means launch is blocked until the labelled set is fixed — and ref_uniform_inflation can't be the rank-0 control at any setting (it's either an exploded buffer or a plain sphere). It needs replacing with the cauliflower recipe, then a re-score.
 
-Also closed
-Supervisor persistence (it reset every process, which killed budget, escalation triggers and cluster freezing); the surprise-rate scorer (three defects, all biasing toward "nothing learned" — the vcap round's famous 0.40 had never actually been written to the ledger, which said 0.00); the escalation path; straggler kill; reel.py; PDF 21→23pp.
+Will silently waste the week
+4. GPU utilisation was ~10% on the one measured round — the Proposer blocks for ~7 min with six GPUs idle. Over a week that is the difference between ~100 rounds and ~1000. Barely worth fixing for a test; the top ROI item for a week.
 
-Round 2's Watcher vetoed the two highest-scoring runs, including the control that three Analysts called a tube. The montage shows why: a small body with a short stub.
+5. No LLM budget ceiling is enforced. run_agent is never called, and the round reported calls: 0 after ~22 real calls. Unbounded spend for seven days.
 
-Next session: round 3 will fire escalation by itself — the Supervisor resumes with dry 1 and its only cluster frozen. Still open: the Proposer blocks the round (~7 min of idle GPUs), analyst calls bypass the LLM budget ledger, and montage tiles aren't on a common spatial scale (labelled, not fixed).
+6. terminal()'s stop verdicts are computed and thrown away — only the ESCALATE prefix is read. The campaign cannot stop on budget or on success; it runs until a human notices.
+
+7. run_id collides across θ variants (params={} at run_one.py:197). A week of parameter sweeps writes a permanently aliased archive.
+
+8. Proximity clustering is degenerate — one cluster, and a second is unreachable by construction. That machinery is the stated antidote to "thirty rounds, four ideas", which is exactly the failure mode a week-long run exists to avoid.
+
+Already fixed today — each would have been fatal over a week
+Q returning a constant; ta_* measuring from the world origin; escalation filing a duplicate operator request every round forever once clusters froze; the frontier discarding the control so the search breeds from ablations of a recipe it no longer holds; the phantom clamp in the study now asserted.
+
+Not a problem
+Disk: 49 TB free, ~520 KB per run — a week is a few GB.
+
+What I'd do, in this order
+Driver + crash recovery (half a day) — a loop that runs rounds, advances the round counter before posing, retries once on failure, and halts on exhausted/budget. Nothing else matters if it wedges.
+Certify the gate (one job + a look) — build the cauliflower control, run it, label it, re-score.
+Budget ceiling + honour the stop verdicts (an hour) — so it stops itself.
+Overlap the Proposer with the cluster runs (an hour) — 10% → usable.
+run_id (ten minutes) — record integrity.
+6–8 can wait for the second week.
+
+One loose end: round_21_gs has been running 22 minutes against ~13 for the others — it's the other saturating run, so probably just slow, but I'll confirm it exits rather than hangs.
+
+Want me to start on the driver?
