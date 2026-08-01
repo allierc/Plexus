@@ -906,8 +906,23 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # ------------------------------------------------ caption the wave (one model load)
     # Must happen BEFORE the Analysts and the Watcher: both read description.txt, and a blind
     # Watcher cannot veto. This is where the cluster's missing `transformers` is worked around.
-    from caption_wave import caption_wave
-    caption_wave(names)
+    # CAPTIONING MUST NOT BE ABLE TO KILL A ROUND. It did: round 1 of the recon batch ran all six
+    # simulations to completion -- every diag.json, movie and metric on disk, every specimen valid
+    # -- and then the round process vanished while the VLM loaded its weights, taking Act 2's
+    # readers and the whole of Act 3 with it. Ten minutes of cluster time and six good runs were
+    # spent, and the round recorded nothing.
+    #
+    # A caption is a CONVENIENCE: the Reader also has the numbers, the curve shapes and the strip.
+    # Losing it costs the Eye-check its input and costs the Reader one of several sources. Losing
+    # the round costs everything. So this is caught, said out loud, and the round continues
+    # without captions -- which is what `description.txt` being absent already means downstream.
+    try:
+        from caption_wave import caption_wave
+        caption_wave(names)
+    except BaseException as e:                       # BaseException: a MemoryError or a SIGKILL
+        step(f"CAPTIONING FAILED ({type(e).__name__}: {str(e)[:80]}) -- continuing WITHOUT "
+             f"captions. The Eye-check has nothing to read and will say so; the Reader still has "
+             f"the numbers, the curve shapes and the strip.")
 
     # ---------------------------------------------------------------- ACT 2: measure, then read
     # `refused` is the other half of the round and used to exist only as terminal output. A round
