@@ -1,9 +1,18 @@
 #!/usr/bin/env python
 """round -- ONE round of the agentic discovery loop, with the real agents.
 
-  Grounder -> Proposer(LLM) -> Critic -> Reflection(LLM) -> hypotheses -> L4
-           -> Analyst xN(LLM) -> Watcher veto(LLM) -> Referee + Judge(LLM)
-           -> truncate -> Interpreter(LLM) -> LeverMap -> Supervisor -> Meta-review(LLM)
+THE ROSTER IS ROLES.md, and `roles.py --check` compares it against this file in both directions.
+
+  ACT 1 propose   Grounder -> Proposer(LLM) -> Peer-review(LLM) -> Critic -> Biologist
+  ACT 2 measure   the batch runs -> Metrologist -> Analyst xN(LLM) -> Eye-check(LLM) -> Collector
+  ACT 3 decide    Interpreter(LLM) -> Meta-review(LLM) -> Supervisor -> next round
+  cross-run       Archivist: reads the whole history, may roll the search back to a better branch
+
+Judge, Referee and Evolution were removed on 1 August. The first two were called ZERO times in
+the live run -- we rank by a certified number, and a tournament of opinions about a measurement
+we already hold is a step backwards. Evolution asked "what should change next?" and so did the
+Meta-review; the surviving split is by SCOPE, Meta-review over this batch and the Archivist over
+the whole history.
 
 TWO MODES, because the campaign needs both and I had only built one:
 
@@ -372,46 +381,6 @@ def _read_batch(posed_rows, ledger):
 
 
 
-def _referee_rank(rows, cfg):
-    """Rank a batch by pairwise tournament (Bradley-Terry) instead of sorting on one score.
-
-    PHASE 3(b). `control.rank_btl` has existed and been self-tested since the loop was built and
-    has never ranked a real batch: the live round sorted on `score_run`, which is a total order
-    imposed by whichever metric the instrument gate happened to admit. A tournament asks each
-    comparison on its own terms and aggregates, so no single number is the ranking.
-
-    The comparator stays ARITHMETIC -- a veto beats everything, then the scalar. Making it an
-    agent would add twenty-odd calls a round to re-decide something already measured; the value
-    here is the aggregation, not another opinion.
-    """
-    from control import rank_btl
-    if len(rows) < 3:
-        return sorted(rows, key=lambda r: -r[3])
-
-    def compare(a, b):
-        # The eye-check does not decide the tournament either -- same reason. A run whose
-        # picture disagrees with its numbers is a run to look at, not a run to lose.
-        if bool(a[2].get("premises_broken")) != bool(b[2].get("premises_broken")):
-            return 0.0 if a[2].get("premises_broken") else 1.0
-        sa, sb = a[3], b[3]
-        if not np.isfinite(sa) and not np.isfinite(sb):
-            return 0.5
-        if not np.isfinite(sa):
-            return 0.0
-        if not np.isfinite(sb):
-            return 1.0
-        return 1.0 if sa > sb else (0.0 if sa < sb else 0.5)
-
-    strength = rank_btl(rows, compare)
-    order = sorted(range(len(rows)), key=lambda i: -strength.get(i, 0.0))
-    ranked = [rows[i] for i in order]
-    naive = sorted(range(len(rows)), key=lambda i: -rows[i][3])
-    if order != naive:
-        print("  [referee] the tournament disagrees with sorting on the scalar -- "
-              "recorded, and the tournament is what the round uses")
-    return ranked
-
-
 def build_composition_batch(sup, cfg, n_slots, ledger):
     """Proposer(LLM) -> Critic -> Reflection(LLM). Returns [(graph, label, hyp_fields)]."""
     frontier = load_frontier()
@@ -778,23 +747,14 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         print(json.dumps(sup.observe([]), indent=1))
         return bk.finish(rid, "no_evidence", 1)
 
-    # ------------------------------------------------ rank (measure) + judge (2nd opinion)
-    # THE REFEREE, which until now existed only in its own self-test. Sorting on one scalar is
-    # a total order imposed by whichever metric happens to be admitted; a tournament asks the
-    # comparison directly and aggregates, so no single number gets to be the ranking. Cheap:
-    # the comparator is arithmetic, not an agent, and rank_btl was already written and tested.
-    rows = _referee_rank(rows, cfg)
-    if len(rows) >= 2:
-        a, b = rows[0], rows[1]
-        w, why_j = A.judge_pair(
-            {"name": a[0], "caption": _cap(a[0]), "metrics": _m(a[2])},
-            {"name": b[0], "caption": _cap(b[0]), "metrics": _m(b[2])}, ledger=ledger)
-        agree = (w >= 0.5)
-        print(f"  [judge] top pair: {'agrees with' if agree else 'DISAGREES with'} the metric "
-              f"ranking -- {why_j[:130]}")
-        if not agree:
-            print("  [judge] eye/number divergence recorded -- this is the signal, not noise")
-
+    # ------------------------------------------------------------------------- rank (measure)
+    # RANKED BY THE ADMITTED NUMBER. The Referee's tournament and the Judge's second opinion were
+    # both removed on 1 August: they were called ZERO times in the live run, and that was not an
+    # accident. Co-Scientist ranks by tournament because it performs no experiments and can only
+    # debate its proposals; we measure, and where a certified number exists a tournament is a
+    # worse ranker than the number. The Judge existed only to settle the Eye-check against that
+    # number, and the Eye-check is now an observation that does not score. See ROLES.md.
+    rows = sorted(rows, key=lambda r: (bool(r[2].get("premises_broken")), -r[3]))
     kept, dropped = truncate(rows, cfg.keep_truncate)
     print(f"\n[rank] kept {len(kept)}, dropped {len(dropped)} (never refined)")
     for nm, g, s, sc, oc, h in rows:
@@ -809,23 +769,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
                     os.path.join(CAMP, "causal_descriptions.md"), ledger=ledger)
 
-    # EVOLUTION. Truncation alone means a winner is never improved -- the loop can only ever
-    # PICK from what the enumerator happened to offer. Refining the best is the other half, and
-    # it is the last agent that was written and never called.
-    if kept:
-        try:
-            best_nm, best_g, best_s = kept[0][0], kept[0][1], kept[0][2]
-            ev = A.evolve(f"{best_g.name_region()} :: {best_nm} :: "
-                          f"{ {k: best_s.get(k) for k in ('protr_peak', 'analyst_consensus')} }",
-                          _ledger_summary(sup, lm), ledger=ledger)
-            if ev:
-                os.makedirs(CAMP, exist_ok=True)
-                with open(os.path.join(CAMP, "evolution.jsonl"), "a") as fh:
-                    fh.write(json.dumps({"round": rid, "on": best_nm, "proposal": ev}) + "\n")
-                print(f"  [evolution] refinement proposed on {best_nm} -- "
-                      f"carried into the next round's frontier")
-        except Exception as e:
-            print(f"  [evolution] FAILED: {type(e).__name__}: {str(e)[:90]}")
+    # EVOLUTION WAS REMOVED on 1 August. It was asked "what should change next?" and so was the
+    # Meta-review, and two agents answering the same question is not redundancy that costs a call
+    # -- it is a roster nobody can reason about. The split that survives is by SCOPE, not by
+    # phrasing: the Meta-review writes the lesson of THIS batch into the next round's prompts,
+    # and the ARCHIVIST (to build) reasons over the WHOLE run history and may roll the search
+    # back to a better branch. Local refinement of a winner inside the current branch was the
+    # weakest of the three jobs and is the one dropped. See ROLES.md.
 
     sup.round = rid - 1          # observe() increments; the claim above already moved it
     rep = sup.observe([(g, s, h.hid) for _, g, s, _, _, h in rows])

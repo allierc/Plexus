@@ -40,8 +40,7 @@ STATUSES = ("BUILT", "TO BUILD", "DROPPED")
 CODE_ROLES = {
     "grounder": "Grounder", "proposer": "Proposer", "reflection": "Peer-review",
     "analyst": "Analysts", "watcher": "Eye-check", "interpreter": "Interpreter",
-    "meta_review": "Meta-review", "evolution": "Evolution",
-    "judge": "Judge", "referee": "Referee",
+    "meta_review": "Meta-review",
 }
 
 
@@ -136,10 +135,13 @@ def check(roles=None):
             bad.append(f"the code calls {name!r} (run_agent({key!r})) and ROLES.md does not "
                        f"describe it")
     for name, r in roles.items():
-        if r.kind != "agent" or r.status == "DROPPED":
+        # A TO BUILD role having no call site is the plan, not a disagreement. Only a role the
+        # document claims is BUILT must actually be wired -- that is the direction of drift that
+        # let three roles sit in the roster for weeks without ever being called.
+        if r.kind != "agent" or r.status != "BUILT":
             continue
         if name not in CODE_ROLES.values():
-            bad.append(f"ROLES.md describes the agent {name!r} and no call site uses it")
+            bad.append(f"ROLES.md says the agent {name!r} is BUILT and no call site uses it")
     # a hand-off must land on somebody
     for a, b in edges(roles):
         if b not in named and b != "every agent's prompt":

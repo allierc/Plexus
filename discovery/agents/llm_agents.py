@@ -361,67 +361,6 @@ of wall clock and changes nothing -- if everything is flagged, nothing is."""
                                 "verdict": "reflection unavailable"}
 
 
-# ============================================================================ EVOLUTION (new)
-def evolve(winner_desc, ledger_summary, timeout_min=8, ledger=None):
-    """REFINE the top-ranked rather than only truncating. Co-Scientist has this; I did not.
-
-    Batch-and-truncate (Robin) prevents depth-first drift, but truncation ALONE means a winner
-    is never improved -- the loop can only ever pick among what the enumerator happened to offer.
-    Co-Scientist's Evolution agent refines the best by synthesis, analogy, literature grounding
-    and simplification. The two are complementary: truncate ACROSS the batch, evolve WITHIN the
-    winner.
-    """
-    prompt = f"""EVOLUTION. Refine the current best composition.
-{budget_note(timeout_min, "1) the JSON proposal")}
-current best:
-{winner_desc}
-
-evidence so far:
-{ledger_summary}
-
-Propose up to THREE refinements, each ONE legal edit, in the spirit of:
-  * SIMPLIFY   -- can an operator be REMOVED with the phenomenon surviving? A simpler
-                  sufficient mechanism is a stronger result than a complicated one.
-  * SYNTHESISE -- combine with a mechanism that worked in a DIFFERENT cluster.
-  * GROUND     -- make it closer to what the reference model actually does.
-
-Reply with ONLY:
-{{"refinements": [{{"edit_label": "<...>", "kind": "simplify|synthesise|ground",
-                   "claim": "<falsifiable>", "predicted": "<...>", "why": "<...>"}}]}}"""
-    ok, out = run_agent("evolution", prompt, ledger=ledger, timeout_min=timeout_min,
-                        allowed_tools=["Read"], quiet=True)
-    return (_first_json(out) or {}).get("refinements", [])
-
-
-# ============================================================================ JUDGE (2nd opinion)
-def judge_pair(a, b, timeout_min=4, ledger=None):
-    """An LLM judge over a PAIR, from the pictures -- Robin's tournament shape.
-
-    Robin ranks by LLM judge because their outcome is not measurable. Ours is, so the METRIC
-    BANK ranks first. This runs alongside it: where the judge and the metric DISAGREE, that
-    disagreement is the eye/number divergence detector -- the failure that has cost this project
-    the most, and the one neither paper faces because their measurement is external.
-    """
-    prompt = f"""JUDGE. Two runs. Which is closer to a clean, sustained TUBE (Okuda Fig. 5)?
-{budget_note(timeout_min, "1) the JSON verdict")}
-A ({a['name']}): caption = {a.get('caption', '')[:700]}
-   metrics = {json.dumps(a.get('metrics', {}))[:400]}
-
-B ({b['name']}): caption = {b.get('caption', '')[:700]}
-   metrics = {json.dumps(b.get('metrics', {}))[:400]}
-
-Judge from the DESCRIPTIONS first; use the numbers only to break a tie. A metric in this project
-has already scored 9.30 on a small bud, so a number that contradicts the picture is the number
-that is wrong.
-
-Reply with ONLY: {{"winner": "A"|"B"|"tie", "why": "<one sentence>"}}"""
-    ok, out = run_agent("judge", prompt, ledger=ledger, timeout_min=timeout_min,
-                        allowed_tools=[], quiet=True)
-    j = _first_json(out) or {}
-    w = j.get("winner", "tie")
-    return (1.0 if w == "A" else 0.0 if w == "B" else 0.5), j.get("why", "")
-
-
 # ============================================================================ helpers
 def _first_json(text):
     if not text:

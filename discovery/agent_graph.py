@@ -71,7 +71,6 @@ def _agents_in(path, txt):
                       ("Biologist", r"biologist\.|premise"),
                       ("Supervisor", r"sup\.observe|Supervisor\("),
                       ("LeverMap", r"lm\.add|LeverMap\("),
-                      ("Referee", r"rank_btl|_referee_rank"),
                       ("Metrologist", r"Certification\("),
                       ("Grounder", r"_ground_starting_conditions|grounder")):
         if re.search(pat, txt):
