@@ -115,7 +115,7 @@ and Track B.
 it used to write both, which put the agent under evaluation in charge of its own record.
 **Sends to:** Peer-review
 
-### Peer-review — agent — BUILT (return path TO BUILD)
+### Peer-review — agent — BUILT
 **Asks:** is this batch *worth* the compute? **Is each prediction FALSIFIABLE, and one the
 Proposer could plausibly be wrong about?** Is the claim already settled by the evidence or the
 reference model? Is the stated reason a mechanism, or a restatement of the edit?
@@ -123,6 +123,12 @@ reference model? Is the stated reason a mechanism, or a restatement of the edit?
 It is the only role whose job is to catch a hypothesis that cannot fail **before** the compute is
 spent — an unfalsifiable prediction survives the Critic (it is perfectly legal) and dies as
 `inconclusive` after ten minutes of simulation.
+
+**Its review is carried to the next round's Proposer.** Measured across the first two batches of
+the rebuilt loop: it raised the *same serious issue both times* — a confirmatory floor sitting
+inside the control's own predicted band, so a positive could not be told from the control — and
+the Proposer repeated the design error because nothing carried the criticism back. A reviewer
+whose reviews reach nobody is measuring its own patience.
 **Advises. It cannot refuse.**
 **Sends to:** Proposer, Critic
 
