@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 13:35
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 13:49
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -943,14 +943,16 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 
 
 [24]
-Overfull \hbox (13.98274pt too wide) in paragraph at lines 1248--1252
-[]\T1/cmr/m/n/10.95 The ex-per-i-ment is one spec --- \T1/cmtt/m/n/10.95 [seed_
-state, morphogen, regulate, grow_radius, cell_divide,
- []
+<_state/regulated_growth.png, id=330, 982.872pt x 592.614pt>
+File: _state/regulated_growth.png Graphic file (type png)
+<use _state/regulated_growth.png>
+Package pdftex.def Info: _state/regulated_growth.png  used on input line 1240.
+(pdftex.def)             Requested size: 460.935pt x 277.92276pt.
 
 
+[25 <./_state/regulated_growth.png>]
 
-[25] (./atlas_note.aux)
+[26] (./atlas_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -959,10 +961,10 @@ Package rerunfilecheck Info: File `atlas_note.out' has not changed.
 (rerunfilecheck)             Checksum: 653488C0238FFA09EF892FE3E4E7EEDB;8415.
  ) 
 Here is how much of TeX's memory you used:
- 24021 strings out of 475102
- 452163 string characters out of 5764878
+ 24027 strings out of 475102
+ 452393 string characters out of 5764878
  870467 words of memory out of 5000000
- 46532 multiletter control sequences out of 15000+600000
+ 46539 multiletter control sequences out of 15000+600000
  585805 words of font info for 105 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,650b,611s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -972,37 +974,38 @@ r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/share
 exlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive
 /texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-
 dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texlive/texmf-dist/fo
-nts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
-ic/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
-onts/cm/cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/
-cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb
-></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/s
-hare/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/tex
-live/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/t
-exmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-di
-st/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/font
-s/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1
-/public/amsfonts/cm/cmsy9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public
-/amsfonts/symbols/msbm10.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi
-1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx0900.pfb></usr/share
-/texmf/fonts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/p
-ublic/cm-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1
-200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/
-texmf/fonts/type1/public/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/pu
-blic/cm-super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm10
-00.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/t
-exmf/fonts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/pub
-lic/cm-super/sfti0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti090
-0.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/te
-xmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/publ
-ic/cm-super/sftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900
-.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/tex
-mf/fonts/type1/public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (25 pages, 1242482 bytes).
+nts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/typ
+e1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm
+/cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pf
+b></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/
+share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/te
+xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/te
+xmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-di
+st/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-dist/font
+s/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1
+/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public
+/amsfonts/cm/cmsy9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfon
+ts/symbols/msbm10.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1095.pf
+b></usr/share/texmf/fonts/type1/public/cm-super/sfbx0900.pfb></usr/share/texmf/
+fonts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/c
+m-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb
+></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/f
+onts/type1/public/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm
+-super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb>
+</usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fo
+nts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-
+super/sfti0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb><
+/usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fon
+ts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
+uper/sftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></
+usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/font
+s/type1/public/cm-super/sftt1095.pfb>
+Output written on atlas_note.pdf (26 pages, 1410260 bytes).
 PDF statistics:
- 527 PDF objects out of 1000 (max. 8388607)
- 406 compressed objects within 5 object streams
- 100 named destinations out of 1000 (max. 500000)
- 286 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 538 PDF objects out of 1000 (max. 8388607)
+ 412 compressed objects within 5 object streams
+ 99 named destinations out of 1000 (max. 500000)
+ 291 words of extra memory for PDF output out of 10000 (max. 10000000)
 
