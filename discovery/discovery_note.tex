@@ -695,70 +695,104 @@ truthful version, since the camera it was reading was showing growth as shrinkag
 The disagreement is still written down, and it is still worth reading.
 \end{phasebox}
 
-\begin{phasebox}{Phase 5 --- The first live run, and what it cost to learn \hfill \prog}
-\textbf{It ran.} Six rounds were authorised, two completed before the lessons below made
-continuing pointless: 23 agent calls, \$11, 29 minutes of agent time, eight simulations. The
-loop proposed, reviewed, submitted, refused, scored, and steered itself --- the whole machine
-turned over for the first time.
+\begin{phasebox}{Phase 5 --- The first live run: the agents do not talk to each other \hfill \prog}
+\textbf{It ran, and that is the point.} Two rounds, eight simulations, 23 agent calls, \$11, 29
+minutes of agent time. \textbf{One usable run. Map coverage 0\%.} Nothing was learned about the
+biology --- and the reason turns out to be worth more than the biology would have been.
 
-\textbf{And it produced one usable run out of eight.} Map coverage 0\%. Nothing was learned
-about the biology. That is the honest headline, and the value of the round is entirely in why.
+\textbf{What the machine got right, unprompted.} The Critic refused every bad run and named the
+reason. The straggler killer cut two runs at 46 minutes against an 11-minute batch median. The
+Supervisor diagnosed its own sterility --- \emph{``surprise 0.00: the batch is confirming what we
+already believe, near-zero information. Push adversarial''} --- and a round with nothing
+admissible said so instead of scoring what it had.
 
-\textbf{What the loop got right, unprompted}
+Every one of those is a correct judgement. \textbf{Not one of them reached another agent.}
+
+\subsection*{The diagnosis: written by somebody, read by nobody}
+
+The Proposer's own reasoning for round 4, verbatim, is the whole case:
+
+\begin{quote}\small
+``Header shows round 3, 0 runs, coverage 0\% \ldots another \textbf{counter-reset artifact}; real
+record = memory.md.''\\[2pt]
+``Those two batches proposed ALL FOUR valid single-op edits on parent 2, so parent 2 is
+\textbf{fully PROPOSED} and \ldots cannot be built on further.''
+\end{quote}
+
+It was handed a summary built only from the lever map, and the lever map is filled \emph{after}
+the Critic --- so a refused run contributes nothing to it. Eight simulations had died of diverged
+chemistry and saturated buffers, and the Proposer was told ``0 runs, coverage 0\%''.
+
+It then drew the only sane conclusion available from an insane input: that the \emph{ledger} was
+broken, and its own prose memory was the real record. And it counted a family as explored because
+it had \textbf{proposed} the edits, not because it had \textbf{measured} anything --- so it moved
+on to a fresh parent believing the previous one was mapped, when nothing had been learned there
+at all.
+
+\textbf{An audit of every hand-off found the same shape seven more times:}
+
+\begin{center}\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{who produces it} & \textbf{what} & \textbf{who receives it}\\
+\midrule
+Critic        & every refusal, with its reason      & \textcolor{bad}{nobody}\\
+Supervisor    & ``push adversarial'', the mix steer  & \textcolor{bad}{the terminal, only}\\
+Interpreter   & \code{causal\_descriptions.md}       & \textcolor{bad}{nobody}\\
+Evolution     & \code{evolution.jsonl}, its refinement & \textcolor{bad}{nobody}\\
+Grounder      & Okuda's starting conditions          & \textcolor{bad}{the config, not the Proposer}\\
+scoreboard    & \code{scoreboard.md}, the headline product & \textcolor{bad}{never written by a round}\\
+lever map     & \code{lever\_map.md}                 & \textcolor{bad}{nobody}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+And the instruction the Proposer works from names three admitted metrics, of which the
+\code{ta\_*} family is \textbf{absent from half the runs on disk} --- so it writes predictions
+that cannot be scored, which resolve \emph{inconclusive} and drop out of the surprise rate
+entirely. The loop is measuring its own information rate with a ruler that discards the
+measurements.
+
+\subsection*{The reason, stated once}
+
+The campaign was built as a set of roles, each with a job, each doing it. What was never built is
+the \emph{wiring}. Every agent writes; almost nothing reads. The result is not a loop but a fan:
+work flows outward from the Proposer and never returns, so the system cannot be corrected by its
+own findings. \textbf{A loop that is told only about its successes cannot avoid repeating its
+failures} --- and this one had no successes to be told about.
+
+That also explains the day's other defects, which looked unrelated and are not: a refusal printed
+among hundreds of lines, an evidence horizon silently absent, a buffer flag raised after the
+compute was spent, a state file grown past reading, a black movie. Each is a correct output with
+no recipient.
+
+\subsection*{Fixed}
+
+\textbf{Refusals are now evidence.} The Proposer receives what ran, what was refused and the
+reason code, with the distinction stated plainly: an empty map beside a non-zero attempt count is
+not a reset counter --- it means the compositions proposed so far \emph{cannot be simulated}, a
+parent is explored when its edits produced evidence and never when they were merely proposed, and
+the refusal codes say what to change.
+
+\textbf{The black movie.} The colour scale is computed once for the whole run --- correctly, since
+a per-frame rescale makes a decaying pattern and a stable one look identical --- but over samples
+including non-finite values, and one of those makes both bounds non-finite. \textbf{Frame 0 was
+perfectly good and was drawn black because frame 800 diverged.} The artefact reported ``nothing
+happened'' for a run whose first half was fine. Now: finite values only, cells that left the model
+drawn grey rather than white, and the count said out loud.
+
+\textbf{The two written records have a shape}, checked rather than suggested: an append-only log
+with per-round fields, beside a state document of seven named sections. \code{memory.md} had
+reached 1904 words across six appended blocks in a file whose purpose is to hold state.
+
+\subsection*{Still to wire}
 \begin{itemize}[itemsep=1pt]
-\item The Critic refused every bad run and said why: chemistry diverged, buffer saturated. None
-of them entered the ledger.
-\item The straggler killer cut two runs at 46 minutes against an 11-minute batch median.
-\item The Supervisor diagnosed its own sterility --- \emph{``surprise 0.00: the batch is
-confirming what we already believe, near-zero information. Push adversarial''} --- and steered
-the next round itself.
-\item The round that produced nothing returned \emph{no admissible evidence} rather than scoring
-what it had.
-\end{itemize}
-
-\textbf{Four defects, each invisible until something was looked at}
-
-\textbf{1. The movies were black, and the first frame was black too.} This is the one Cedric
-asked about, and the answer is worse than a rendering bug. The colour scale is computed once from
-frames sampled across the whole run --- correctly, because a per-frame rescale makes a decaying
-pattern and a stable one look identical, which is how an extinct field passed as coral for
-months. But it was computed over samples \emph{including} non-finite values, and one such value
-makes both bounds non-finite, so every cell in every frame is drawn as nothing. \textbf{Frame~0
-was perfectly good and was drawn black because frame~800 diverged.} The artefact reported
-``nothing happened'' for a run whose first half was fine --- the opposite of the truth, which is
-worse than having no artefact. Fixed: the scale is taken from finite values only, cells that left
-the model are drawn grey rather than white, and the run says on its own output how many there
-were.
-
-\textbf{2. The trajectory analysis had been dead on every run.} The per-frame series records the
-morphology as a word, and the writer that saves the series casts every column to a number. It
-raised on the first one, was caught, printed one line among hundreds, and the run carried on
-without its per-frame table, its plot, its tube metrics, or --- the one that matters --- its
-\emph{evidence horizon}. So peak and final were taken over all frames including any after the
-mesh tore, which is exactly what the horizon exists to prevent.
-
-\textbf{3. The reservoir gate fires one step too late.} Three of eight runs died on the cell
-buffer. The gate refuses a run whose reservoir cannot hold its stated target, and these runs grew
-past a target that was estimated too low. The check is correct and the estimate is not.
-
-\textbf{4. Two files were being written as books.} \code{memory.md} reached 1904 words across six
-appended blocks, in a file whose purpose is to hold \emph{state}. Both files now have a fixed
-shape, checked: an append-only log with per-round fields, beside a state document with seven
-named sections and no eighth.
-
-\textbf{The pattern across all four} --- and across the day --- is one thing said four ways: the
-check existed and fired correctly, and what it produced went nowhere. A refusal printed among
-hundreds of lines, a horizon silently absent, a flag raised after the compute was spent, a record
-grown past reading. \textbf{A check whose output nobody receives is not a check.}
-
-\textbf{What has to be true before it runs again}
-\begin{itemize}[itemsep=1pt]
-\item A swallowed exception around an artefact must be loud. The rule has been written down since
-July and this is the third time it was broken in the same file.
-\item The reservoir target must come from the growth the composition actually asks for, not an
-estimate that three runs in eight exceed.
-\item A round that produces no admissible evidence should say so in the scoreboard, not only in
-the terminal.
+\item The Supervisor's steer into the Proposer's prompt, not the terminal.
+\item The Interpreter's descriptions and Evolution's refinement into the next round's evidence.
+\item The admitted-metric list rebuilt from what runs actually record.
+\item The reservoir target from the growth a composition asks for --- three of eight runs
+outgrew an estimate the gate then correctly refused, one step too late.
+\item The scoreboard written by the round that changes it.
 \end{itemize}
 \end{phasebox}
 

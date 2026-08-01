@@ -986,10 +986,65 @@ def _m(s):
                                   "mech_p_ratio")}
 
 
+def _refusal_summary(sup, n=12):
+    """What was RUN and REFUSED, and why. The half of the evidence the Proposer never saw.
+
+    THE DEFECT THIS CLOSES, diagnosed from the Proposer's own words on 2026-08-01. The lever map
+    is filled AFTER the Critic, so a refused run contributes nothing to it -- and the ledger
+    summary was built from the lever map alone. Eight simulations died (chemistry diverged, cell
+    buffer saturated) and the Proposer was told only "0 runs, coverage 0%".
+
+    It drew the sane conclusion from an insane input. Its own reasoning, verbatim:
+
+        "Header shows round 3, 0 runs, coverage 0% ... another counter-reset artifact;
+         real record = memory.md"
+        "those two batches proposed ALL FOUR valid single-op edits on parent 2, so parent 2
+         is fully PROPOSED and ... cannot be built on further"
+
+    Two failures follow from one omission. It decided the LEDGER was broken and trusted its own
+    prose memory instead -- which is the only evidence it had that anything had happened. And it
+    counted territory as covered by what it PROPOSED rather than what it MEASURED, so it moved to
+    a fresh parent believing the previous one was explored when nothing had been learned there.
+
+    A loop that is told only about its successes cannot avoid repeating its failures. Refusals
+    are evidence: "this composition diverges" is a fact about the space, and an expensive one.
+    """
+    try:
+        rows = [h for h in sup.reg.all() if getattr(h, "outcome", None) == "inconclusive"]
+    except Exception:
+        return ""
+    rows = rows[-n:]
+    if not rows:
+        return ""
+    import collections
+    why = collections.Counter()
+    for h in rows:
+        note = str(getattr(h, "note", "") or "")
+        code = "no diag.json (run died or was killed)"
+        for c in ("P3_CHEMISTRY_DIVERGED", "P2_BUFFER_SATURATED", "P1_INERT_OPERATOR"):
+            if c in note:
+                code = c
+                break
+        why[code] += 1
+    out = ["", f"REFUSED RUNS -- {len(rows)} recent attempts produced NO admissible evidence.",
+           "These are not missing results. They ran, and the Critic rejected them:"]
+    for code, k in why.most_common():
+        out.append(f"  {k:>3} x  {code}")
+    out += ["",
+            "READ THIS CORRECTLY: an empty map beside a non-zero attempt count is NOT a reset",
+            "counter and NOT a lost record. It means the compositions proposed so far cannot be",
+            "simulated. A parent is EXPLORED when its edits produced evidence, never when they",
+            "were merely proposed -- so a family whose whole batch was refused is still unmapped,",
+            "and reproposing near it will be refused for the same reason.",
+            "The refusal codes above say what to change: DIVERGED means the chemistry settings",
+            "leave the integrable region; SATURATED means the run outgrew its cell reservoir."]
+    return "\n".join(out)
+
+
 def _ledger_summary(sup, lm):
     cov = lm.coverage()
     solo = lm.solo()
-    lines = [f"round {sup.round}, {cov['overall']['n_runs']} runs, "
+    lines = [f"round {sup.round}, {cov['overall']['n_runs']} runs WITH ADMISSIBLE EVIDENCE, "
              f"map coverage {cov['overall']['frac']:.0%}",
              f"phenotypes so far: {lm.phenotypes()}", "", "solo effects (Δscore, verdict):"]
     for op, v in sorted(solo.items(), key=lambda kv: -(kv[1].get('delta') or -99))[:10]:
@@ -999,6 +1054,9 @@ def _ledger_summary(sup, lm):
     if inter:
         lines += ["", "interactions found:"]
         lines += [f"  {k}: {v['verdict']} ({v['interaction']:+})" for k, v in inter[:6]]
+    ref = _refusal_summary(sup)
+    if ref:
+        lines.append(ref)
     return "\n".join(lines)
 
 
