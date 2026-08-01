@@ -369,8 +369,24 @@ def analyze(frames, OUT, a_sw=None):
     #
     # `metrics.json` is kept as well: it carries the summary, and the archive already contains
     # runs that only have it.
+    # NUMERIC COLUMNS ONLY. `frame_metrics` records the per-frame morphology as a STRING, and
+    # casting the whole row to float raised on the first one -- which `run_one` caught, printed as
+    # a one-line "tube_analysis unavailable", and carried on. The cost was invisible and total:
+    # no metrics.npz, no metrics.png, no ta_* metrics and NO EVIDENCE HORIZON, on every run since
+    # the label was added. Peak and final were then taken over all frames including any after the
+    # mesh tore, which is the exact behaviour the horizon exists to prevent.
+    #
+    # The labels are not dropped -- they are the Phase 4 arbiter. They are saved as their own
+    # array so the trajectory keeps them without forcing a numeric cast on the rest.
+    def _numeric(key):
+        return all(isinstance(r.get(key), (int, float, bool, np.floating, np.integer))
+                   or r.get(key) is None for r in series)
+    keys = list(series[0].keys()) if series else []
     _cols = {k: np.asarray([r.get(k, np.nan) for r in series], dtype=float)
-             for k in (series[0].keys() if series else ())}
+             for k in keys if _numeric(k)}
+    for k in keys:
+        if k not in _cols:
+            _cols[k] = np.asarray([str(r.get(k, "")) for r in series])
     np.savez(os.path.join(OUT, "metrics.npz"), **_cols)
     fig, ax = plt.subplots(1, 4, figsize=(18.0, 3.4)); fig.patch.set_facecolor("white")
     # the three modes on their own curves; the legacy blend is the faint dashed line behind them,

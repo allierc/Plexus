@@ -1,2 +1,4 @@
 {"t": 1785595798.7117388, "event": "start", "rounds": 2, "batch": 4, "frames": null}
 {"t": 1785595798.802206, "event": "stop", "why": "gates closed", "detail": "{\"substrate_rev\": \"HEAD\", \"admit\": true, \"ladder_failed\": [], \"instrument_gate\": true, \"unresolved_invalidating\": [], \"instrument_gate_live\": false, \"instrument_gate_why\": \"NOT CERTIFIED: the low-rank control(s) are invalid runs -- re-run them below saturation before trusting any admission\"}", "rounds_done": 0}
+{"t": 1785602691.707038, "event": "start", "rounds": 2, "batch": 4, "frames": null}
+{"t": 1785606046.6554453, "event": "round", "n": 1, "exit": 1, "minutes": 55.8, "usd_this_round": 2.02, "note": "", "cost_total": {"calls": 13, "usd": 6.43, "tok_in": 35480, "tok_out": 74272, "turns": 68, "minutes": 17.3}}
