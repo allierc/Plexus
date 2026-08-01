@@ -906,11 +906,20 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # ------------------------------------------------ caption the wave (one model load)
     # Must happen BEFORE the Analysts and the Watcher: both read description.txt, and a blind
     # Watcher cannot veto. This is where the cluster's missing `transformers` is worked around.
-    # CAPTIONING MUST NOT BE ABLE TO KILL A ROUND. It did: round 1 of the recon batch ran all six
-    # simulations to completion -- every diag.json, movie and metric on disk, every specimen valid
-    # -- and then the round process vanished while the VLM loaded its weights, taking Act 2's
-    # readers and the whole of Act 3 with it. Ten minutes of cluster time and six good runs were
-    # spent, and the round recorded nothing.
+    # CAPTIONING MUST NOT BE ABLE TO KILL A ROUND -- and on the recon batch it did NOT, which is
+    # worth writing down because the first diagnosis said it did.
+    #
+    # What actually happened: all six runs completed, caption_wave loaded its weights, and ALL SIX
+    # description.txt files were written with real captions. Then the round process vanished with
+    # no traceback and no further output -- the next `step()` line never printed. The captioner
+    # was the last thing in the log, which made it look like the culprit; it had in fact finished
+    # its job. CAUSE UNKNOWN. It is not memory: the devcontainer had 474 GB free and two 49 GB
+    # A6000s for a 23 GB model.
+    #
+    # The guard below stays, because it is correct on its own terms -- a caption is a convenience
+    # and must never be able to cost a round -- but it is NOT the fix for that failure, and
+    # believing it was would leave the real one in place. This is the exact condition the
+    # Diagnostician exists for and it should be pointed at the next occurrence.
     #
     # A caption is a CONVENIENCE: the Reader also has the numbers, the curve shapes and the strip.
     # Losing it costs the Eye-check its input and costs the Reader one of several sources. Losing
