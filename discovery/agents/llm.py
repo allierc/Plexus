@@ -63,11 +63,20 @@ AGENT_BUDGETS = {
     #                 min  turns  tools
     "proposer":      (10,   40,  ["Read", "Edit", "Write"]),   # reads evidence, writes proposal + log
     "reflection":    ( 5,   10,  ["Read"]),                    # reads a batch, emits one review
-    "analyst":       ( 4,    8,  ["Read"]),                    # one run, one verdict  (x N)
+    # READER, not "analyst": it does not analyse. By the time it is called, every number has
+    # been computed by an instrument the Metrologist certified. It reads those numbers, the
+    # movie caption and the strip, and returns a LABEL. Naming it for a job it does not do is
+    # how the x8 argument got imported without the thing that made the argument true.
+    "reader":        ( 4,    8,  ["Read"]),                    # one run, one label
     "watcher":       ( 3,    4,  []),                          # text -> JSON, no tools
     "interpreter":   ( 6,   20,  ["Read", "Edit", "Write"]),   # appends the causal description
     "meta_review":   ( 8,   30,  ["Read", "Edit", "Write"]),   # rewrites the distilled section
     "grounder":      ( 4,    8,  ["Read"]),
+    # THE ARCHIVIST reads the whole history -- but the history is assembled by code and handed
+    # over as a table, so this is a decision over a page of numbers, not a research task. Small
+    # budget on purpose: an archivist that goes reading logs is re-deriving arithmetic it was
+    # given, and will re-derive it differently every time.
+    "archivist":     ( 6,    6,  ["Read"]),
     # The escalation path's only LLM call. It had no row, so its budget projection silently fell
     # back to DEFAULT_TIMEOUT_MIN -- listed here so the cost table really is complete.
     "operator_request": (8,  8,  ["Read"]),
@@ -641,8 +650,8 @@ def _selftest(tmp="/tmp/llm_meter_selftest"):
 
     print("\n1. every call is timed and counted, PER ROLE")
     led = BudgetLedger(path=jsonl, round_id=99)
-    for role, tmin in (("proposer", 10), ("reflection", 8), ("analyst", 6), ("analyst", 6),
-                       ("analyst", 6), ("watcher", 5), ("interpreter", 8),
+    for role, tmin in (("proposer", 10), ("reflection", 8), ("reader", 6), ("reader", 6),
+                       ("reader", 6), ("watcher", 5), ("interpreter", 8),
                        ("meta_review", 10)):
         run_agent(role, "hi", ledger=led, timeout_min=tmin, quiet=True)
     with led.timed("grounder"):
@@ -652,7 +661,7 @@ def _selftest(tmp="/tmp/llm_meter_selftest"):
     check("wall-clock non-zero", led.round_spent > 0, f"round_min={led.round_spent:.3f}")
     roles = {r["agent"]: r for r in led.breakdown()}
     check("per-role rows exist", len(roles) == 8, f"roles={sorted(roles)}")
-    check("analyst aggregated x3", roles["analyst"]["calls"] == 3)
+    check("reader aggregated x3", roles["reader"]["calls"] == 3)
     check("every role has minutes", all(r["minutes"] > 0 for r in roles.values()))
     check("grounder recorded as local, off the LLM ceiling",
           roles["grounder"]["kind"] == "local"
@@ -698,9 +707,9 @@ def _selftest(tmp="/tmp/llm_meter_selftest"):
     rows = [json.loads(l) for l in open(jsonl)]
     check("jsonl written", len(rows) == 1 and rows[0]["round"] == 99)
     check("per-agent minutes in the jsonl",
-          rows[0]["per_agent"]["analyst"]["calls"] == 3
-          and rows[0]["per_agent"]["analyst"]["minutes"] > 0,
-          json.dumps(rows[0]["per_agent"]["analyst"]))
+          rows[0]["per_agent"]["reader"]["calls"] == 3
+          and rows[0]["per_agent"]["reader"]["minutes"] > 0,
+          json.dumps(rows[0]["per_agent"]["reader"]))
     # both bypasses in part 2 (the warn one and the strict one) land on this round's ledger
     check("unmetered carried into the jsonl", len(rows[0]["unmetered"]) == 2,
           json.dumps(rows[0]["unmetered"]))

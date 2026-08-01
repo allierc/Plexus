@@ -36,6 +36,65 @@ should never have been.
 
 ---
 
+## What the loop is for, and which roles serve which track
+
+The roster above is machinery. It exists for two things at once, and the roles divide between them
+in a way worth stating, because a role that does not know which track it serves will drift.
+
+| | **Track A — understand the mechanism** | **Track B — reproduce Okuda** |
+|---|---|---|
+| the product | a **map**: which operator does what, with what confidence | **the figure**: tube, undulation, branching |
+| measured by | lever-map coverage, and the **surprise rate** | the scoreboard: how many of the four morphologies |
+| served by | the Critic (what is legal), the Reader (what happened), the Archivist (where to search) | the Grounder (what Okuda actually did), the Biologist (is it a tissue at all) |
+| fails by | confirming what we already believe — coverage rises, nothing is learned | producing the picture by hand-tuning, which proves nothing about the method |
+
+**The two 70/30 rules are where the tracks are allocated, and that is their real purpose.**
+`in_paper` slots serve Track B; `excursion` slots serve Track A. Running only Okuda's settings
+teaches us to reproduce his figures rather than to understand the system — the objective is a
+**map, not a target** — and running only excursions produces understanding of a model nobody has
+any reason to believe. 70/30 is the standing answer to how much of each.
+
+The tracks feed each other and neither is subordinate: **the reproduction is the honest test of
+the method, and the method is what makes the reproduction more than hand-tuning.**
+
+---
+
+## The hypothesis: registered before, scored by code, never by an agent
+
+This is the discipline the whole method rests on, and it belongs in the roster because it decides
+what several roles are *for*. Neither Co-Scientist nor Robin does it: their hypotheses are
+generated, reviewed and ranked, but nothing records what was **believed before the evidence
+arrived**, so a prediction cannot be told apart from a rationalisation written afterwards.
+
+**Every slot in every batch carries a falsifiable prediction, written before the run.**
+
+| step | who | what |
+|---|---|---|
+| **register** | **Proposer** | each slot states a `claim`, an `intent` (confirmatory / adversarial / control), a `metric`, and a `predicted` clause containing a **number** — `protr_peak >= 2.0`. Posed to the register *before* anything is submitted, under an id that cannot be overwritten. |
+| **admit the metric** | **Metrologist** | a prediction may only name a metric that has been **certified against known answers**. A prediction on an uncertified metric is not a hypothesis, it is a wish. |
+| **score** | **`predict.py` — CODE** | the prediction is checked against the measurement arithmetically. **No agent decides whether a hypothesis was validated.** |
+| **use** | **Supervisor** | the **surprise rate** — how often the prediction was wrong — drives the next batch's confirmatory/adversarial mixture. |
+
+**Three outcomes, not two.** `confirmed`, `refuted`, and **`inconclusive`** — a prediction the code
+cannot check. Inconclusive is not a soft refutation: it **drops out of the surprise denominator
+entirely**, because a prediction that could not fail teaches nothing and must not be allowed to
+dilute the rate that steers the campaign. The loop refuses to guess: asked once to score 32
+predictions written in a unit it did not recognise, it declined 32 times rather than inventing 32
+confirmations.
+
+**Why the scorer is code and not a role.** A hypothesis scored by an agent is a hypothesis scored
+by the same kind of thing that wrote it. The arithmetic — does 2.7 satisfy `>= 2.0` — is not a
+judgement, and making it one would put the campaign's central measurement, the surprise rate,
+inside a model's discretion. This is the same rule as everywhere else in this document: *where a
+question has a deterministic answer, code answers it.*
+
+**A confirmed prediction is the cheap outcome.** A prediction the Proposer was certain of is nearly
+worthless; the batch is instructed to prefer edits it genuinely cannot call. A round in which
+nothing surprised anyone has bought coverage and no knowledge, and the Collector's entry says so in
+those words.
+
+---
+
 ## Act 1 — Propose (before any compute is spent)
 
 ### Grounder — agent — TO BUILD (writes to the config today, not to the Proposer)
@@ -44,13 +103,26 @@ should never have been.
 **Sends to:** Proposer
 
 ### Proposer — agent — BUILT
-**Asks:** which mechanism edits do we test next?
-**Composes the batch under both mixture rules** (see below)
+**Asks:** which mechanism edits do we test next, and **what do I predict each one will do?**
+
+It does not merely choose edits. **Every slot it writes is a registered hypothesis**: a claim, an
+intent, a named metric and a `predicted` clause containing a number it could be wrong about (see
+above). An edit with no falsifiable prediction buys a GPU-hour and contributes nothing to the map.
+**Composes the batch under both mixture rules**, which is also how it allocates between Track A
+and Track B.
+
+**It writes no record.** `analysis.md` is the Collector's and `memory.md` is the Meta-review's —
+it used to write both, which put the agent under evaluation in charge of its own record.
 **Sends to:** Peer-review
 
 ### Peer-review — agent — BUILT (return path TO BUILD)
-**Asks:** is this batch *worth* the compute? Falsifiable? Already settled? A mechanism, or a
-restatement of the edit?
+**Asks:** is this batch *worth* the compute? **Is each prediction FALSIFIABLE, and one the
+Proposer could plausibly be wrong about?** Is the claim already settled by the evidence or the
+reference model? Is the stated reason a mechanism, or a restatement of the edit?
+
+It is the only role whose job is to catch a hypothesis that cannot fail **before** the compute is
+spent — an unfalsifiable prediction survives the Critic (it is perfectly legal) and dies as
+`inconclusive` after ten minutes of simulation.
 **Advises. It cannot refuse.**
 **Sends to:** Proposer, Critic
 
@@ -83,7 +155,7 @@ places, and the split is by what it can read:**
 
 Prose may follow the verdict as an appendix. It may never stand in place of one. *(A role that
 produces prose instead of a decision drifts into what Judge and Referee became.)*
-**Sends to:** Analysts, Collector
+**Sends to:** Reader, Collector
 
 ---
 
@@ -100,27 +172,32 @@ chemistry, a sheet absorbing area by stretching, a surface passing through itsel
 analysis and an Analyst has already read a specimen whose chemistry was extinct and named a
 phenotype from it — which is exactly what happened on `r002c_00`, where five premises broke, the
 activator had decayed to NaN, and the reading went ahead anyway. Nothing can un-name a phenotype.
-**Sends to:** Analysts, Collector
+**Sends to:** Reader, Collector
 
 ### Metrologist — check — BUILT
 **Asks:** which metrics are admissible?
 Certifies instruments against known answers; files defects and retractions. **Owns metric
 admissibility** — not the Critic.
-**Sends to:** Analysts, Collector
+**Sends to:** Reader, Collector
 
-### Analysts ×3 — agent — BUILT
+### Reader ×1 — agent — BUILT
 **Asks:** what happened in this one run?
 
-**They do not measure. They label.** By the time an Analyst is called, `diag.json`, `metrics.npz`,
+**It does not measure. It labels.** By the time the Reader is called, `diag.json`, `metrics.npz`,
 the curve shapes and the strip have already been computed by instruments the Metrologist certifies
-against known answers. All three see **identical numbers** and cannot disagree about one.
+against known answers. Any number of readers would see **identical numbers** and could not
+disagree about one.
 
 What varies is the *judgement over images and a caption*: `phenotype` (bud / spike / tube),
-`forced_or_grown`, `eye_vs_number`, the concern raised. So **×3 measures PHENOTYPE AMBIGUITY, not
-measurement uncertainty** — a run three readers label three ways is genuinely ambiguous, and that
-is worth recording. It is nearly free: 21 s each, run in parallel.
+`forced_or_grown`, `eye_vs_number`, the concern raised.
 
-**Why this is not Robin's ×8, and must not be described as if it were.** Robin's Finch *writes the
+**Settled at ONE.** More than one would have measured *phenotype ambiguity* — a run three readers
+label three ways is genuinely ambiguous — but that is a much smaller prize than Robin's, and it is not what the
+extra calls were originally bought for. The count is a single config number (`cfg.n_readers`), so
+raising it is one line and not a rebuild. **What we give up, stated plainly:** with one reader
+nothing records when a label was a close call.
+
+**Why this is not Robin's ×8, and was never the same argument.** Robin's Finch *writes the
 analysis code* — it chooses the flow-cytometry gating and the RNA-seq filters, so its eight
 trajectories produce genuinely different NUMBERS and the consensus is over measurements. We took
 measurement away from the Analyst on purpose and gave it to certified instruments, which Robin
@@ -131,8 +208,6 @@ argument for eight does not transfer, and the earlier version of this document b
 measure. That is precisely what the Metrologist exists to prevent — a metric that has not been
 certified is not evidence, however sophisticated the code that produced it.
 
-**Inter-analyst disagreement is recorded from round 1**, or the decision to scale can never be
-made on evidence.
 **Sends to:** Collector
 
 ### Eye-check — agent — BUILT (demotion TO BUILD)

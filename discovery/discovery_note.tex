@@ -215,10 +215,12 @@ campaign misreading itself --- the writer of its own record, and the historian i
 are now a \code{for} loop and a role that did not exist.
 
 \begin{figure}[h]\centering
-\includegraphics[width=0.88\textwidth]{figures/agents_sheet.png}
-\caption*{\small The team, before the 1 August rebuild --- sixteen roles. \textbf{Judge},
-\textbf{Referee} and the duplicate check have since been dropped, and the \textbf{Collector} added;
-the roster is now \code{ROLES.md}, and the code is checked against it.}
+\includegraphics[width=\textwidth]{figures/loop.png}
+\caption*{\small \textbf{The loop after the 1 August rebuild.} Three acts and a cross-run
+controller. Blue is an LLM call, green a deterministic check, orange code that is not an agent at
+all. The roster is \code{ROLES.md} and \code{roles.py -{}-check} compares it against the code in
+both directions. \emph{(The figure still shows Evolution, which has since been removed --- it and
+the Meta-review were both answering ``what should change next?''.)}}
 \end{figure}
 
 \begin{center}\small
@@ -249,11 +251,11 @@ analysis and a phenotype has already been named from a specimen whose chemistry 
 is what happened on \code{r002c\_00}. Nothing can un-name a phenotype & runs\\
 Metrologist & \textbf{check} & which metrics are admissible? Certifies instruments against known
 answers. \textbf{Owns metric admissibility} --- not the Critic & runs\\
-Analysts ($\times$3) & agent & what happened in this one run? \textbf{They do not measure --- they
-label.} All three see identical numbers, already computed by certified instruments, so
-$\times$3 measures \textbf{phenotype ambiguity}, not measurement uncertainty. \emph{Not} Robin's
-$\times$8: their Finch writes the analysis code and so produces different numbers; we took
-measurement away from the Analyst on purpose & \textbf{21 s} each\\
+Reader ($\times$1) & agent & what happened in this one run? \textbf{It does not measure --- it
+labels.} Every number was computed before it was called, by an instrument the Metrologist
+certified, so any number of readers would see the same ones. \emph{Not} Robin's $\times$8: their
+Finch writes the analysis code and so produces different \emph{numbers}. \textbf{Settled at one};
+what we give up is that nothing records a close call & \textbf{21 s}\\
 Eye-check & agent & what does the movie show? \textbf{Observation only --- no veto, no score.}
 Its dissent is recorded as a disagreement & runs\\
 \midrule
@@ -299,6 +301,66 @@ it had been \emph{proposed} rather than because anything had been \emph{measured
 knows which. The \textbf{Archivist} is also what makes the abort path actionable: a round with no
 evidence routes back through it, so the loop can roll back to a better branch instead of
 re-proposing inside the envelope the Critic just refused.
+
+\vspace{4pt}
+\textbf{Where the hypothesis lives, and who decides whether it held.} This is the discipline the
+whole method rests on, and neither paper does it: in Co-Scientist and Robin a hypothesis is
+generated, reviewed and ranked, but nothing records what was \emph{believed before the evidence
+arrived} --- so a prediction cannot be told apart from a rationalisation written afterwards.
+
+\begin{center}\small
+\begin{tabular}{@{}l l p{8.4cm}@{}}
+\toprule
+\textbf{step} & \textbf{who} & \textbf{what}\\
+\midrule
+register & \textbf{Proposer} & every slot states a claim, an intent, a named metric and a
+prediction \emph{containing a number} --- \code{protr\_peak >= 2.0} --- posed under an id that
+cannot be overwritten, before anything is submitted\\
+admit the metric & \textbf{Metrologist} & a prediction may only name a metric certified against
+known answers. A prediction on an uncertified metric is not a hypothesis, it is a wish\\
+catch the uncheckable & \textbf{Peer-review} & the only role whose job is to spot a prediction
+that \emph{cannot fail} before the compute is spent\\
+\textbf{score} & \textbf{code} (\code{predict.py}) & checked against the measurement
+arithmetically. \textbf{No agent decides whether a hypothesis was validated}\\
+use & \textbf{Supervisor} & the \textbf{surprise rate} --- how often the prediction was wrong ---
+drives the next batch's mixture\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Three outcomes, not two}: \emph{confirmed}, \emph{refuted}, and \textbf{inconclusive} --- a
+prediction the code cannot check. Inconclusive is not a soft refutation: it \textbf{drops out of
+the surprise denominator entirely}, because a prediction that could not fail teaches nothing and
+must not dilute the rate that steers the campaign. The scorer is code for the same reason
+everything else here is: a hypothesis scored by an agent is a hypothesis scored by the same kind of
+thing that wrote it, and the surprise rate is too central to sit inside a model's discretion.
+
+\vspace{4pt}
+\textbf{Which roles serve which track.} The roster is machinery; it exists for two things at once,
+and a role that does not know which one it serves will drift.
+
+\begin{center}\small
+\begin{tabular}{@{}l p{5.5cm} p{5.5cm}@{}}
+\toprule
+& \textbf{Track A --- understand the mechanism} & \textbf{Track B --- reproduce Okuda}\\
+\midrule
+the product & a \textbf{map}: which operator does what & \textbf{the figure}: tube, undulation,
+branching\\
+measured by & lever-map coverage, and the surprise rate & the scoreboard: how many of the four
+morphologies\\
+served by & Critic (what is legal), Reader (what happened), Archivist (where to search) &
+Grounder (what Okuda did), Biologist (is it a tissue at all)\\
+fails by & confirming what we already believe & producing the picture by hand-tuning, which proves
+nothing about the method\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The 70/30 in-distribution rule is where the two tracks are allocated, and that is its real
+purpose.} \code{in\_paper} slots serve Track~B; \code{excursion} slots serve Track~A. Running only
+Okuda's settings teaches us to reproduce his figures rather than to understand the system --- the
+objective is a \emph{map, not a target} --- and running only excursions produces understanding of a
+model nobody has a reason to believe.
 
 \vspace{4pt}
 \textbf{The two mixture rules, each with an owner.} Both are properties of a \emph{batch}, so both
@@ -860,19 +922,11 @@ among hundreds of lines, an evidence horizon silently absent, a buffer flag rais
 compute was spent, a state file grown past reading, a black movie. Each is a correct output with
 no recipient.
 
-\begin{center}
-\includegraphics[width=\linewidth]{figures/agent_figure.png}
-\end{center}
-\vspace{-6pt}
-{\small \textbf{The round, drawn in the order it runs.} Around the rim, each agent hands
-its work to the next and the chain closes --- that half was built and it works. The inside of the
-ring is the half that was not: the arrows that carry a \emph{finding} back to somebody who can act
-on it. There should be a bundle. Three exist, all added this week, and the Supervisor's steer, the
-Interpreter's causal descriptions and Evolution's refinement still reach nothing --- so a round
-cannot be changed by what the round found. Drawing it is what made the shape obvious: fourteen
-agents, and the only thing they shared was the direction of travel. The counts in the middle are
-computed from the same list the arrows are drawn from, because the first version of this caption
-said ``one of five'' and was wrong within the hour.\par}
+\textbf{Drawing it is what made the shape obvious.} Every agent's output was plotted against
+whoever read it, and the picture was a fan rather than a loop: work flowed outward from the
+Proposer and almost nothing came back. Fourteen roles, and the only thing they shared was the
+direction of travel. That picture is what turned the repair from ``wire these hand-offs'' into
+``why are there so many hand-offs to wire'' --- which is \S\ref{sec:agents}, and Phase~6.
 
 \subsection*{Fixed}
 
@@ -934,14 +988,64 @@ outgrew an estimate the gate then correctly refused, one step too late.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 6 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 6 --- The rebuilt loop, and its first launch \hfill \prog}
+\textbf{Goal.} Launch the three-act loop of \S\ref{sec:agents} and let it run. Phase~5 diagnosed
+why the old one could not learn; this is the one that is allowed to try.
+
+\subsection*{What was built}
+\begin{itemize}[itemsep=1pt]
+\item \textbf{The Collector} (\code{collector.py}) --- code, not an agent. It assembles the round
+record from the files on disk and \textbf{writes \code{analysis.md}}, which the Proposer used to
+write about itself. Every field is measured or quoted; it composes no prose. It also reports its
+own \emph{holes} --- \code{[collector] HOLE: r003c\_01: the Biologist never ran on it} --- because
+the point of building a record from disk is that a missing input becomes visible rather than
+silent.
+\item \textbf{The Archivist} (\code{archivist.py}) --- the role the roster never had. It reads the
+whole history, answers \emph{continue} / \emph{roll back} / \emph{stop}, and runs on every abort.
+All the arithmetic is done in code and handed over as a table; only the choice is put to a model.
+\item \textbf{The abort path.} A round with no admissible evidence no longer advances to Act~3:
+it is recorded in full, \textbf{does not increment the round counter}, routes back through the
+Archivist, and \textbf{two in a row stop the campaign} with exit code~3, which the driver treats
+as terminal rather than retrying.
+\item \textbf{The three return paths} the Proposer never had: the Supervisor's steer, the Critic's
+refusals \emph{with their reasons}, and the Grounder's starting conditions from the paper --- each
+a prompt section that disappears when empty rather than saying ``none'' in ten lines.
+\item \textbf{Judge, Referee and Evolution deleted} from the code, not merely unwired.
+\textbf{Reader $\times$1}, renamed for what it does. The \textbf{Biologist} now returns a
+categorical verdict --- \emph{invalid} on a \textbf{certain} premise, \emph{ambiguous} on a
+\textbf{usual} one --- decided by the grade in \code{PREMISES.md} rather than by judgement.
+\item \textbf{\code{memory.md} moved to the Meta-review}, on an enforced template. Neither record
+is the Proposer's any more.
+\end{itemize}
+
+\subsection*{What the first cold start found, and it is not good news}
+
+The loop now begins by asking the Archivist where to start, from what is already on disk rather
+than from a seed sphere --- and the first thing it did was read \code{mechanics.npz}, which
+nothing had ever read. \textbf{Across all 62 finished runs in \code{log/okuda}, \code{n\_protruding}
+never once exceeded zero, and \code{protr\_peak} never exceeded 1.13.}
+
+The scalar summary had been reporting ``best sound run: 1.11'', which reads like a result. It is a
+sphere with noise on it. \textbf{This project has never produced a protrusion}, and the number that
+says so was sitting in every run's mechanics file, unread, for the whole campaign. So the cold
+start refuses to name a starting point --- \emph{``there is no measured starting point for a
+campaign whose objective is a tube''} --- and the frontier falls back to the reference recipes as a
+\emph{recorded choice} rather than as a default nobody noticed.
+
+\subsection*{The launch}
+\code{campaign\_loop.py}, unattended, stopping for a closed admission gate, two consecutive aborts,
+or the round budget. What to watch: the budget ledger, the Collector's holes, and whether any run
+ever reports a protruding cell --- which would be the first in the project's history.
+\end{phasebox}
+
+\begin{phasebox}{Phase 7 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
-tube, undulation and branching, at his settings.
+tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 7 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 8 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 

@@ -1,0 +1,58 @@
+{
+  "reasoning": "Two prior batches (pivot + R2) already proposed ALL FOUR valid single-op edits on parent 2 (the reaction-diffusion Okuda route), but no results have landed (header still shows round 3 / 0 runs / 0% coverage), so building further on parent 2 is blocked until data returns. To grow the map independent of that, this batch opens the UNMAPPED parent-3 family = 'uniform inflation' (vesicle_growth + divide_3d + shape_energy_3d + reconnect_t1_3d), the pure MECHANICAL-growth route that COMPLEMENTS parent 2's RD route: together they answer whether a grown morphology needs Turing reaction-diffusion (chi) or just mechanical growth+division. The central falsifiable question is whether ANY single edit breaks 'uniform inflation (no patterning)' into a patterned protrusion. s1 swaps shape_energy to the monolayer implementation (the shell-buckling / undulation route, Okuda Fig 7) betting AGAINST the type system's 'no patterning' label; s2 removes the growth driver to confirm vesicle_growth is necessary for the inflation and to record the family's first solo effect; s3 removes topology relief (reconnect_t1_3d) to test whether T1 transitions matter under isotropic growth. Baseline buffer-saturation risk (growth+division stack) is noted but lower than parent 2's triple-growth stack that saturated in R2, and two of three edits remove ops so they stay safe even if the control saturates.",
+  "mode": "explore",
+  "slots": [
+    {
+      "parent_index": 3,
+      "edit": null,
+      "intent": "control",
+      "territory": "in_paper",
+      "claim": "the parent, unchanged -- uniform inflation gives a smooth near-spherical body with no patterned protrusion",
+      "metric": "protr_peak",
+      "predicted": "protr_peak 1.0-1.8 and ta_n_tubes_final <= 0",
+      "why": "control -- establishes the parent-3 baseline (this family has no recorded baseline yet). Headroom left because protr_peak is noisy at the top and R2's control drifted off its own prediction."
+    },
+    {
+      "parent_index": 3,
+      "edit": {
+        "edit": ["set_impl", "shape_energy_3d0", "monolayer"],
+        "label": "=shape_energy_3d:monolayer",
+        "yields": "uniform inflation (no patterning)"
+      },
+      "intent": "adversarial",
+      "territory": "in_paper",
+      "claim": "swapping shape_energy_3d to the monolayer implementation buckles the uniformly-inflating shell into protrusions (undulation), contradicting the type system's 'no patterning' label",
+      "metric": "protr_peak",
+      "predicted": "protr_peak >= 2.0 and ta_n_tubes_final >= 1",
+      "why": "Okuda Fig 7 undulation (chi=0.1, gamma=100) is a monolayer-shell buckling phenotype; a monolayer surface energy under active growth is the classic buckling condition. The type system predicts NO patterning here, so a >=2.0 protrusion would be a genuine surprise and the single most valuable read in this family. REFUTED if protr_peak < 2.0 (monolayer energy insufficient to pattern isotropic growth; type label confirmed)."
+    },
+    {
+      "parent_index": 3,
+      "edit": {
+        "edit": ["remove_op", "vesicle_growth0"],
+        "label": "-vesicle_growth",
+        "yields": "mechanics-only (no growth)"
+      },
+      "intent": "confirmatory",
+      "territory": "in_paper",
+      "claim": "removing vesicle_growth removes the driver of the inflation, collapsing the body to a static mechanical mesh with no protrusion",
+      "metric": "protr_peak",
+      "predicted": "protr_peak <= 1.5",
+      "why": "Maps the solo necessity of the growth driver in this family (the solo-effects table is empty). Safe edit -- a removal that drops the family into the known mechanics-only region. REFUTED if protr_peak > 1.5 (division alone sustains shape change without vesicle growth)."
+    },
+    {
+      "parent_index": 3,
+      "edit": {
+        "edit": ["remove_op", "reconnect_t1_3d0"],
+        "label": "-reconnect_t1_3d",
+        "yields": "uniform inflation (no patterning)"
+      },
+      "intent": "confirmatory",
+      "territory": "excursion",
+      "claim": "removing T1 topology relief leaves the isotropic-growth shape essentially unchanged -- reconnect_t1_3d is remodeling plumbing, not a shape driver under uniform growth",
+      "metric": "protr_peak",
+      "predicted": "protr_peak 1.0-1.8",
+      "why": "Excursion: Okuda never isolates growth WITHOUT topology relief. Confirmatory bet that isotropic inflation needs no T1 remodeling, so protr_peak stays near control. REFUTED if protr_peak >= 2.0 -- suppressed T1 transitions store growth stress that buckles the shell into protrusions, making reconnect_t1_3d a hidden anti-buckling regulator (Okuda's gamma / deformation-rate axis)."
+    }
+  ]
+}

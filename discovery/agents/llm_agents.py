@@ -52,6 +52,11 @@ from llm import budget_note, ensure_files, read_file, run_agent         # noqa: 
 
 CAMP = llm.CAMPAIGN
 
+# HOW MANY READERS PER RUN. One. See analyse() for why the x8 argument does not transfer, and
+# ROLES.md for what is given up: with a single reader, nothing records that a label was a close
+# call. Raising this is the whole change.
+N_READERS = 1
+
 # EVERY agent call in this file goes through `run_agent(role, ..., ledger=ledger)`, never
 # through `run_claude` directly. That was the defect: run_agent() consulted the BudgetLedger and
 # stopwatch-ed the call, but no call site used it, so a round of ~25 model calls reported
@@ -84,13 +89,20 @@ BREVITY = """BREVITY (this is a budget, not a style note -- wall clock is genera
 - Never shorten a NUMBER, a metric name, or a citation to save words. Cut the prose around them."""
 
 
-def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None, parallel=True):
-    """N INDEPENDENT readings of the SAME run, reconciled by consensus (Robin's 8x Finch).
+def analyse(run_name, out_dir, n=N_READERS, timeout_min=6, ledger=None, parallel=True):
+    """Read ONE run and LABEL it. N is one number, and it is 1 (ROLES.md).
 
-    The point is not redundancy, it is that a single LLM reading is not reproducible: Robin
-    observed their analysis "can vary between runs, even when given identical prompts and data",
-    and used that diversity deliberately. Disagreement between trajectories is recorded, not
-    hidden -- it is the calibration signal for how much any one reading is worth.
+    THIS IS NOT ROBIN'S x8, and the earlier version of this docstring claimed it was. Robin's
+    Finch WRITES THE ANALYSIS CODE -- it chooses the flow-cytometry gating and the RNA-seq
+    filters, so eight trajectories genuinely produce different NUMBERS and the consensus is over
+    measurements. Nothing here measures: by the time this runs, diag.json, metrics.npz, the curve
+    shapes and the strip were computed by instruments the Metrologist certifies against known
+    answers, and every reader would see IDENTICAL numbers.
+
+    What a reader produces is a LABEL -- phenotype, forced_or_grown, eye_vs_number, a concern --
+    and those are judgements over images and a caption. Running N of them would measure PHENOTYPE
+    AMBIGUITY, which is a real quantity but a much smaller prize than the one the x8 argument was
+    imported for. Settled at one; raising N is this one number.
     """
     diag = os.path.join(out_dir, "diag.json")
     desc = os.path.join(out_dir, "description.txt")
@@ -132,7 +144,7 @@ def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None, parallel=True):
     # waiting. Concurrency changes the wall-clock and not one thing about the experiment.
     prompts = []
     for i in range(n):
-        prompt = f"""ANALYST {i + 1} of {n}. Read ONE simulation run and report what happened.
+        prompt = f"""READER {i + 1} of {n}. Read ONE simulation run and report what happened.
 
 Work independently. Do not try to agree with anyone.
 {budget_note(timeout_min, "1) your JSON verdict  2) nothing else")}
@@ -184,7 +196,7 @@ just claimed -- an extinct chemistry beneath a "pattern" reading, a stretched sh
         prompts.append(prompt)
 
     def _one(prompt):
-        ok, out = run_agent("analyst", prompt, ledger=ledger, timeout_min=timeout_min,
+        ok, out = run_agent("reader", prompt, ledger=ledger, timeout_min=timeout_min,
                             quiet=True)
         return _first_json(out) or {"phenotype": "unreadable", "confidence": 0.0}
 
@@ -275,6 +287,15 @@ additional measurement would determine it."""
 
 
 # ============================================================================ 10. META-REVIEW
+def _templates():
+    """The memory.md shape, read from the template file so there is ONE definition of it."""
+    try:
+        import templates as T
+        return T.prompt_block()
+    except Exception as e:
+        return f"(templates unavailable: {type(e).__name__})"
+
+
 def meta_review(round_id, timeout_min=10, max_chars=4000, ledger=None, runs=()):
     """Distil recurring patterns and APPEND them to the Proposer's instructions.
 
@@ -315,13 +336,24 @@ proposer should know before choosing the next edit. Especially:
   * metrics or artefacts that keep misleading us;
   * any composition family that looks exhausted.
 
-Then REWRITE IN PLACE the section of {paths['instruction']} that begins with the marker
+Then do TWO things, and nothing else.
+
+1) REWRITE IN PLACE the section of {paths['instruction']} that begins with the marker
 '<!-- LEARNED PATTERNS -->' (create it at the end of the file if absent). Keep it under
 {max_chars} characters -- it is a distillation, not a transcript. Over a multi-week campaign an
 ever-growing prompt eventually crowds out the task itself, so old patterns that no longer earn
-their place must be DROPPED, not accumulated.
+their place must be DROPPED, not accumulated. This is the prompt write-back, and it is the
+mechanism by which this loop learns at all.
 
-Also append a dated round summary to {paths['memory']}."""
+2) REWRITE {paths['memory']} IN PLACE. It is YOURS now -- the Proposer used to write it, which
+put the agent under evaluation in charge of its own memory. It is a STATE DOCUMENT, not a log:
+the named sections below and no others, each corrected rather than appended to. The history is
+in analysis.md and hypotheses.jsonl, which are append-only and are NOT yours to touch. A line
+earns its place here only if a LATER round needs it and could not re-derive it. memory.md has
+been used as a log and reached 1904 words across six appended blocks; that is the failure this
+shape prevents.
+
+{_templates()}"""
     ok, out = run_agent("meta_review", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
     return ok

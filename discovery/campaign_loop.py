@@ -53,6 +53,13 @@ PY = sys.executable
 # A round that exits with one of these has decided something, and the decision is not "retry".
 TERMINAL_EXITS = {
     2: "the admission gate is closed -- a guard is failing and must be fixed, not retried",
+    # TWO ABORTED ROUNDS IN A ROW. `round.py::_abort` has already routed through the Archivist and
+    # been unable to find a branch worth moving to, which means the Critic's refusal reasons were
+    # not actionable. That is a fact about the search space or the envelope, not about the
+    # biology, and nothing inside the loop can discover it -- so retrying is the one response
+    # guaranteed to be wrong. Without this, "route back to Act 1" burns a week.
+    3: "two aborted rounds in a row -- the refusal reasons are not actionable. Read "
+       "campaign/round_records.jsonl and decide; do not retry.",
 }
 
 
