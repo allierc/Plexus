@@ -2,6 +2,7 @@
 \usepackage[margin=2.4cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{booktabs}
+\usepackage[font=small,labelformat=empty,skip=4pt]{caption}   % \caption* rendered "Figure 1: *"
 \usepackage{array}
 \usepackage{xcolor}
 \usepackage{titlesec}
@@ -186,71 +187,129 @@ and it has one catch to its name. That number is the honest measure of Track A.
 %======================================================================
 \section{The team of agents}\label{sec:agents}
 
-Nine agents read evidence and form a judgement; five checks are deterministic code that simply
-refuses. Eight of the nine now run every round --- the Grounder was wired this session, and until
-then nothing in the loop had ever asked the paper anything, which is why a 27-run batch started at
-150 cells against a paper that says 200. Evolution was wired in the same pass; only the Referee's tournament remains idle.
+\textbf{The roster was rebuilt on 1 August, after an external review, and it is now written down.}
+\code{ROLES.md} is the source of truth --- the same discipline \code{PREMISES.md} has for the
+biology --- and the code is checked against it in both directions by \code{roles.py -{}-check}.
+The campaign had reached \textbf{sixteen roles that nobody could account for}: three had never been
+called once, and the Biologist ran on every single run while talking to nobody. None of that was
+visible, because the roster lived in four places at once --- the code, a table in this note, a
+figure drawn by hand, and everybody's memory. Four descriptions of one thing are three descriptions
+that are wrong.
+
+\textbf{The cause was a mismatch, and it is worth stating plainly.} We took \emph{Co-Scientist's}
+roster and put it on \emph{Robin's} problem. Co-Scientist runs a tournament of hypotheses because
+\textbf{it performs no experiments} --- its evidence is literature, so proposals can only be
+debated. Robin has no tournament and no critic, because it \emph{measures}. We measure. Where a
+number exists, a tournament is a worse ranker than the number, and our Judge and Referee were duly
+called \textbf{zero times} in the live run: there was nothing for them to do. The same gap explains
+the Biologist --- Co-Scientist has no slot for \emph{``the experiment was invalid''} because it has
+no experiments, so we invented the role and the roster had nobody for it to talk to.
+
+\textbf{The rule that now governs the roster: a role exists only where it adds information that is
+not already available.} Judgement is slow, expensive and unaccountable; where a question has a
+deterministic answer, code answers it. \textbf{Thirteen roles: eight agents and five deterministic
+checks}, one of which --- the Collector --- was an agent's job and should never have been.
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.88\textwidth]{figures/agents_sheet.png}
-\caption*{\small The team. Every agent now runs: the \textbf{Grounder} and \textbf{Evolution} were
-written and never called until 1 August, and the Grounder's absence is why a batch started at 150
-cells against a paper that says 2,000. Only the \textbf{Referee} is still idle.}
+\caption*{\small The team, before the 1 August rebuild --- sixteen roles. \textbf{Judge},
+\textbf{Referee} and the duplicate check have since been dropped, and the \textbf{Collector} added;
+the roster is now \code{ROLES.md}, and the code is checked against it.}
 \end{figure}
 
 \begin{center}\small
-\begin{tabular}{@{}l p{5.9cm} l r l@{}}
+\begin{tabular}{@{}l l p{7.3cm} l@{}}
 \toprule
-\multicolumn{5}{@{}l}{\textbf{Agents} --- they read evidence and form a judgement}\\
+\multicolumn{4}{@{}l}{\textbf{ACT 1 --- Propose.} Before a second of compute is spent.}\\
 \midrule
-Proposer & chooses which mechanism edits to test next; also checks the
-batch against what has already been tried & 1  & not yet & runs\\
-Peer-review & judges whether the batch is \emph{worth} the compute: is each prediction
-falsifiable, is the claim already settled, is the stated reason a mechanism or a restatement
-of the edit. It advises; it cannot refuse & 1  & not yet & runs\\
-Analysts ($\times$3) & read one run each, independently, and say what happened & 15 & \textbf{21 s} each & runs\\
-Eye-check & watches the movie; vetoes a number the picture contradicts & 5  & not yet & runs\\
-Judge & second opinion on the top pair & 1  & not yet & runs\\
-Interpreter & writes the causal description into the record & 2  & not yet & runs\\
-Meta-review & distils the round into patterns worth carrying forward & 1  & not yet & runs\\
-\addlinespace
-\textbf{Grounder} & \textbf{reads Okuda's paper; sets each batch's starting conditions from it,
-and refuses to advise if its own quotes do not check out} & 1  & not yet & runs\\
-Evolution & refines the round's winner, rather than the loop only ever picking one
-& 1  & not yet & runs\\
+Grounder & agent & what did Okuda actually do? Reads the paper, with its own quotes checked
+& \textcolor{warn}{to build}\\
+Proposer & agent & which mechanism edits do we test next? Composes the batch under both
+mixture rules & runs\\
+Peer-review & agent & is this batch \emph{worth} the compute --- falsifiable, not already
+settled, a mechanism rather than a restatement of the edit? \textbf{Advises; cannot refuse}
+& runs\\
+Critic & \textbf{check} & can this be \emph{run}? Type-legal, preconditions met, not already
+evaluated, and every scheduled operator actually acted. \textbf{Owns the in-distribution
+envelope}: CFL, bounds, stability, admissible ranges & runs\\
+Biologist & \textbf{check} & could this be a tissue? Against \code{PREMISES.md}, which it reads
+rather than restates. \textbf{Categorical, never prose}: \emph{invalid} on a \textbf{certain}
+premise, \emph{ambiguous} on a \textbf{usual} one & runs\\
 \midrule
-\multicolumn{5}{@{}l}{\textbf{Checks} --- deterministic code that refuses. No judgement, no cost.}\\
+\multicolumn{4}{@{}l}{\textbf{ACT 2 --- Measure.} The batch runs. The only expensive step.}\\
 \midrule
-Supervisor & holds the objective and the budget; decides when to stop & --- & --- & runs\\
-Critic & decides whether a proposal can be \emph{run}: type-legal edits, preconditions met,
-parameters in range, not already evaluated, and afterwards whether every scheduled operator
-actually acted. Rejects a causal claim with no ablation. Every refusal carries a reason code, and
-it cannot be argued with & --- & --- & runs\\
-Biologist & refuses a recipe that could not be a tissue, against the premises written in
-\code{PREMISES.md} --- which it now \emph{reads}, rather than restating. Its verdict goes to the
-Analyst reading that run and its round tally to the Meta-review & --- & --- & runs\\
-Metrologist & certifies instruments; files defects and retractions;
-refuses a duplicate operator request & --- & --- & runs\\
-Referee & rank a batch by tournament, not by sorting on one number
-& --- & --- & \textcolor{warn}{self-test only}\\
+Metrologist & \textbf{check} & which metrics are admissible? Certifies instruments against known
+answers. \textbf{Owns metric admissibility} --- not the Critic & runs\\
+Analysts ($\times$3) & agent & what happened in this one run? Three independent readings, because
+one reading is not reproducible. \textbf{Scale to 5 or 8 only if the measured disagreement demands
+it} & \textbf{21 s} each\\
+Eye-check & agent & what does the movie show? \textbf{Observation only --- no veto, no score.}
+Its dissent is recorded as a disagreement & runs\\
 \midrule
-Cedric & looks at the pictures; found every defect so far & --- & --- & outside the loop\\
+\multicolumn{4}{@{}l}{\textbf{ACT 3 --- Decide.} One deliberation, then act.}\\
 \midrule
-\textbf{one round} & 20 of the 26 calls are the per-run readers, and they are
-independent --- run together, the block costs its slowest call & 26 &
-\textbf{64 s} per run & \\
+Collector & \textbf{code} & builds the round record from the files on disk. \textbf{Not an agent:
+collection is a \code{for} loop, not a judgement} --- and an agent that collects can forget, in
+silence & \textcolor{warn}{to build}\\
+Interpreter & agent & what happened this round, and why? \textbf{The causal record}, kept separate
+from Meta-review on purpose & runs\\
+Evolution & agent & how would the winner be refined? & runs\\
+Meta-review & agent & what should change next round? \textbf{Owns prompt write-back} --- the
+feedback appended to the other agents' prompts, which is how Co-Scientist learns without
+back-propagation & runs\\
+Supervisor & \textbf{check} & what runs next, and how much? \textbf{Owns budget, allocation and the
+70/30 mixture.} The runtime controller & runs\\
+\midrule
+Cedric & human & looks at the pictures; found every defect so far & outside the loop\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textbf{Only the analysts have been measured, and the gap is large.} Timing was wired on 1 August
---- until then nine call sites bypassed the stopwatch, and a round once reported \code{calls: 0}
-for a round that made about twenty-five. Six real analyst calls: \textbf{21 seconds} each against
-a four-minute allowance, and \textbf{7.2 turns} against a cap of 60. So neither the timeout nor
-the turn cap has ever constrained anything, and the ``two hours a round'' arithmetic I put to
-Cedric earlier was a ceiling nothing approaches. The other roles say \emph{not yet} rather than
-carrying their allowance, because an allowance printed in a measurement column is how a ceiling
-becomes a fact.
+\vspace{2pt}
+\textbf{Dropped: Judge, Referee, the duplicate check.} The Judge existed to settle the Eye-check
+against the number, and demoting the Eye-check to observation dissolves the dispute; the Referee
+ranked by tournament what a certified metric already ranks. \textbf{Both were called zero times.}
+Either returns only on a real measurement ambiguity the metric bank cannot resolve.
+
+\vspace{4pt}
+\textbf{The two mixture rules, each with an owner.} Both are properties of a \emph{batch}, so both
+are checked before compute is spent:
+
+\begin{center}\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{rule} & \textbf{composed by} & \textbf{checked by}\\
+\midrule
+70 confirmatory / 30 adversarial & Proposer & Peer-review\\
+70 in-distribution / 30 out-of-distribution & Proposer & \textbf{Critic, deterministically}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\emph{In distribution} means the parameter and solver-validity envelope --- CFL, bounds, stability,
+numerical sanity --- which is checkable without judgement, and is why it is the Critic's. It does
+\emph{not} mean the composition family already explored (the lever map's), nor the regime where the
+metrics are certified (the Metrologist's).
+
+\vspace{4pt}
+\textbf{A round that produces no evidence is ABORTED, and does not advance to Act 3.} It routes
+back to Act 1 carrying the Critic's refusal reasons. It consumes budget and is recorded in full,
+but \textbf{does not increment the round counter and enters no coverage denominator} --- counting
+it as a normal round is exactly how a log came to tell the Proposer \code{coverage 0\%}, from which
+it correctly concluded that its own ledger was broken. \textbf{Two consecutive aborts stop the
+campaign and ask}: a second abort means the refusal reasons were not actionable, which is a fact
+about us rather than about the search, and without that bound ``route back to Act 1'' is a loop
+that burns a week.
+
+\textbf{What the live run actually spent, which is how the roster was judged.} Sixteen calls,
+23.5 minutes: \textbf{Proposer 14.8 min} (63\% of all agent time), Peer-review 2.8, Meta-review
+2.4, Analysts 1.7, and one call each to the Eye-check, Interpreter and Evolution. \textbf{The
+Judge and the Referee were never called at all.} That is the measurement the redesign rests on ---
+not an argument that they were redundant, but a ledger showing they had nothing to do. Timing was
+wired on 1 August; until then nine call sites bypassed the stopwatch and a round once reported
+\code{calls: 0} for a round that made about twenty-five. Six real analyst calls came in at
+\textbf{21 seconds} each against a four-minute allowance and \textbf{7.2 turns} against a cap of
+60, so neither the timeout nor the turn cap has ever constrained anything.
 
 %======================================================================
 \section{What stands between us and the Okuda figure}\label{sec:okuda}
@@ -823,9 +882,21 @@ checked on every run and \textbf{appears nowhere in the document}.
 with per-round fields, beside a state document of seven named sections. \code{memory.md} had
 reached 1904 words across six appended blocks in a file whose purpose is to hold state.
 
+\subsection*{What the diagnosis led to}
+
+Wiring the hand-offs one at a time was the wrong repair, and stopping to ask \emph{why there were
+so many to wire} was the right one. The answer is in \S\ref{sec:agents}: sixteen roles copied from
+a system that runs no experiments. \textbf{The roster was rebuilt --- thirteen roles, three acts,
+Judge and Referee dropped, the Collector made code} --- and the design is written down in
+\code{ROLES.md} so that this decision cannot evaporate the way the Biologist's verdicts did.
+
 \subsection*{Still to wire}
 \begin{itemize}[itemsep=1pt]
+\item \textbf{The Collector} --- the round record, built from disk. Everything below lands on it.
 \item The Supervisor's steer into the Proposer's prompt, not the terminal.
+\item The Grounder into the Proposer's prompt, rather than into the config.
+\item The Critic's deterministic 70/30 in-distribution gate.
+\item The abort path: no evidence $\rightarrow$ back to Act 1, two in a row $\rightarrow$ stop.
 \item The Interpreter's descriptions and Evolution's refinement into the next round's evidence.
 \item The admitted-metric list rebuilt from what runs actually record.
 \item The reservoir target from the growth a composition asks for --- three of eight runs
