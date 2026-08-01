@@ -16,7 +16,12 @@ WHAT IT DECIDES -- three answers, and it must give exactly one:
 
     continue                  the current line is still paying
     roll_back <comp_hash>     a better branch exists behind us; restart the frontier there
-    stop                      no branch left is worth compute
+    stop                      no branch left is worth compute -- and this is a TRACK B verdict,
+                            never a Track A one. Track A never runs out: the operator landscape
+                            always has more of itself to understand, and a composition that
+                            patterns without protruding is a point on the map, not a failure.
+                            A search stops for Track A only when the space itself is exhausted,
+                            which is escalation.py's judgement, not this one's.
 
 IT ADVISES; THE SUPERVISOR DECIDES. Two controllers is the failure this rebuild removed, so this
 returns a recommendation with its evidence, and the Supervisor is free to override it -- in which
@@ -184,10 +189,17 @@ A branch is EXPLORED when its edits produced evidence -- never when they were me
 were on a specimen the Biologist passed. A branch with evidence 4 / sound 0 has been measured
 four times and has told us nothing about tissue.
 
+`serves` says which track a branch can support. A = it runs, it patterns, the Biologist passes it;
+that is a point on the operator map and it is worth having whether or not anything protruded.
+B = it also protruded, so it can carry the reproduction. protr_peak and protrud are TRACK B
+measures and say nothing about a Track A branch.
+
 Decide ONE of:
   continue   the current line is still paying
   roll_back  a better branch exists behind us -- give its composition hash as `target`
-  stop       no branch left is worth compute
+  stop       no branch left is worth compute. THIS IS A TRACK B VERDICT ONLY. Track A never
+             runs out -- there is always more of the operator landscape to understand -- so do
+             not answer `stop` because the picture has not appeared.
 
 Reply with ONLY:
 {{"decision": "continue|roll_back|stop",
@@ -386,29 +398,41 @@ def _mechanics(run_dir, summary):
     return out
 
 
+def _tag_tracks(rows):
+    """Which track each run can serve. Track B needs a protrusion; Track A needs it to WORK."""
+    for r in rows:
+        pat = (r.get("patterned") or 0) > 0.01 and r.get("chem_ok")
+        snd = r["specimen"] in ("valid", "valid (declared)")
+        r["serves"] = ("B" if (pat and snd and (r.get("n_protruding_max") or 0) > 0)
+                       else "A" if (pat and snd) else "-")
+    return rows
+
+
 def log_table(rows=None, top=18):
-    rows = survey_log() if rows is None else rows
+    rows = _tag_tracks(survey_log() if rows is None else rows)
     if not rows:
         return "log/okuda holds no finished run with a composition and an admitted number."
     L = [f"{len(rows)} finished run(s) on disk with a composition and a measured protr_peak.",
          "Sorted by PATTERN first, then soundness, then elongation.",
          "",
-         f"{'run':26}{'pattern':>9}{'chem':>6}{'protr_peak':>11}{'cells':>7}{'relaxed':>9}"
+         f"{'run':26}{'serves':>7}{'pattern':>9}{'chem':>6}{'protr_peak':>11}{'cells':>7}"
          f"{'protrud':>8}  specimen"]
     for r in rows[:top]:
-        L.append(f"{r['run'][:25]:26}{_fmt(r.get('patterned')):>9}"
+        L.append(f"{r['run'][:25]:26}{str(r.get('serves', '?')):>7}{_fmt(r.get('patterned')):>9}"
                  f"{('ok' if r.get('chem_ok') else 'NaN'):>6}"
                  f"{r['protr_peak']:>11.2f}{(r['n_cells_final'] or 0):>7.0f}"
-                 f"{('yes' if r.get('relaxed') else ('no' if r.get('relaxed') is not None else '—')):>9}"
                  f"{(r.get('n_protruding_max') if r.get('n_protruding_max') is not None else '—'):>8}"
                  f"  {r['specimen']}"
                  + (f"  [{', '.join(r['broken'][:3])}]" if r["broken"] else ""))
     sound = [r for r in rows if r["specimen"] in ("valid", "valid (declared)")]
-    npat = sum(1 for r in rows if (r.get("patterned") or 0) > 0.01 and r.get("chem_ok"))
-    L += ["", f"{npat} of {len(rows)} have a LIVE SPATIAL PATTERN with finite chemistry -- the "
-              f"first thing to require of a starting point, because a uniform field is a "
-              f"well-mixed ODE and can never make a shape. `pattern` is the peak spread of the "
-              f"activator across the surface.",
+    npat = sum(1 for r in rows if r["serves"] in ("A", "B"))
+    nb = sum(1 for r in rows if r["serves"] == "B")
+    L += ["", f"`serves` A = usable for TRACK A (understand the operator landscape): it runs, it "
+              f"patterns, the Biologist passes it. B = also usable for TRACK B (reproduce "
+              f"Okuda's figures): it additionally protruded.",
+          f"{npat} of {len(rows)} serve Track A. {nb} serve Track B.",
+          f"protr_peak and protrud are TRACK B measures and say nothing about a Track A starting "
+          f"point -- a composition that patterns without protruding is a point on the map.",
           f"{len(sound)} of {len(rows)} were run on a specimen the Biologist passed.",
           "From mechanics.npz: `f_end` is the mean residual force over the last fifth of the "
           "run, `relaxed` says whether it had STOPPED MOVING by then (a run still relaxing is a "
@@ -445,15 +469,25 @@ def cold_start(ledger=None, timeout_min=6, log_dir=None):
     # FROM, and an Archivist asked to pick the best of sixty failures will pick one. Arithmetic
     # decides this, not the model: if nothing ever protruded, no run on disk is a starting point
     # for a campaign whose objective is a tube.
-    patterned = [r for r in rows if (r.get("patterned") or 0) > 0.01 and r.get("chem_ok")]
+    # WHICH TRACK CAN THIS RUN SERVE? The cold start used to rank every candidate on protr_peak
+    # and n_protruding and then give up when they came back zero across the whole log. Those are
+    # TRACK B measures -- they say whether we made Okuda's picture. Track A asks a different
+    # question, about the landscape of operators, and a composition that RUNS, PATTERNS and holds
+    # a SOUND specimen is good Track A evidence whether or not anything ever protruded.
+    #
+    # Giving up on a Track B criterion is giving up on the very work you do when you cannot yet
+    # make the picture. It is also how a fallback to okuda_route -- whose chemistry explodes --
+    # came to be the starting point three times over.
+    _tag_tracks(rows)
+    patterned = [r for r in rows if r["serves"] in ("A", "B")]
     if not patterned:
         return _record({
             "stage": "cold_start", "start": [], "asked": False,
             "n_on_disk": len(rows), "n_sound": len(sound), "n_protruded": 0,
-            "why": f"NO RUN ON DISK HAS A LIVE SPATIAL PATTERN. Across all {len(rows)} finished "
-                   f"runs the activator never varied across the surface, so none of them is a "
-                   f"Turing system that could make a shape. The frontier falls back to the "
-                   f"reference recipes -- a CHOICE recorded here, not a default nobody noticed."})
+            "why": f"NOT ONE of the {len(rows)} finished runs on disk both patterns and passes "
+                   f"the Biologist, so none is usable even for Track A. The frontier falls back "
+                   f"to the reference recipes -- a CHOICE recorded here, not a default nobody "
+                   f"noticed."})
     tab = log_table(rows)
     rows = patterned + [r for r in rows if r not in patterned]
 
