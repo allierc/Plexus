@@ -189,78 +189,62 @@ and it has one catch to its name. That number is the honest measure of Track A.
 Nine agents read evidence and form a judgement; five checks are deterministic code that simply
 refuses. Eight of the nine now run every round --- the Grounder was wired this session, and until
 then nothing in the loop had ever asked the paper anything, which is why a 27-run batch started at
-150 cells against a paper that says 200. Evolution alone is still written and never called.
+150 cells against a paper that says 200. Evolution was wired in the same pass; only the Referee's tournament remains idle.
 
 \begin{figure}[h]\centering
 \includegraphics[width=0.88\textwidth]{figures/agents_sheet.png}
-\caption*{\small The team. \textbf{Grounder} and \textbf{Evolution} are written and never called ---
-a wiring fault, not a judgement on the role. The Grounder reads the paper and the literature, which
-is exactly why its absence cost a batch. (The Biologist, who refuses a recipe that could not be a
-tissue, has no portrait yet.)}
+\caption*{\small The team. Every agent now runs: the \textbf{Grounder} and \textbf{Evolution} were
+written and never called until 1 August, and the Grounder's absence is why a batch started at 150
+cells against a paper that says 2,000. Only the \textbf{Referee} is still idle.}
 \end{figure}
 
 \begin{center}\small
-\begin{tabular}{@{}l p{6.6cm} l l@{}}
+\begin{tabular}{@{}l p{5.9cm} l r l@{}}
 \toprule
-\multicolumn{4}{@{}l}{\textbf{Agents} --- they read evidence and form a judgement}\\
+\multicolumn{5}{@{}l}{\textbf{Agents} --- they read evidence and form a judgement}\\
 \midrule
 Proposer & chooses which mechanism edits to test next; also checks the
-batch against what has already been tried & 10 min $\times$1 & runs\\
-Peer-review & reads the proposed batch before it costs anything & 5 min $\times$1 & runs\\
-Analysts ($\times$3) & read one run each, independently, and say what happened & 4 min $\times$15 & runs\\
-Eye-check & watches the movie; vetoes a number the picture contradicts & 3 min $\times$5 & runs\\
-Judge & second opinion on the top pair & 2 min $\times$1 & runs\\
-Interpreter & writes the causal description into the record & 6 min $\times$2 & runs\\
-Meta-review & distils the round into patterns worth carrying forward & 8 min $\times$1 & runs\\
+batch against what has already been tried & 1  & not yet & runs\\
+Peer-review & reads the proposed batch before it costs anything & 1  & not yet & runs\\
+Analysts ($\times$3) & read one run each, independently, and say what happened & 15 & \textbf{21 s} each & runs\\
+Eye-check & watches the movie; vetoes a number the picture contradicts & 5  & not yet & runs\\
+Judge & second opinion on the top pair & 1  & not yet & runs\\
+Interpreter & writes the causal description into the record & 2  & not yet & runs\\
+Meta-review & distils the round into patterns worth carrying forward & 1  & not yet & runs\\
 \addlinespace
-\textbf{Grounder} & \textbf{reads Okuda's paper and the literature ---
-the only agent that knows what the target actually is} & 4 min $\times$\textcolor{bad}{\textbf{0}}
-& \textcolor{bad}{\textbf{no call site}}\\
-Evolution & refine the round's winner, rather than only picking one
-& 5 min $\times$0 & \textcolor{warn}{never reached}\\
+\textbf{Grounder} & \textbf{reads Okuda's paper; sets each batch's starting conditions from it,
+and refuses to advise if its own quotes do not check out} & 1  & not yet & runs\\
+Evolution & refines the round's winner, rather than the loop only ever picking one
+& 1  & not yet & runs\\
 \midrule
-\multicolumn{4}{@{}l}{\textbf{Checks} --- deterministic code that refuses. No judgement, no cost.}\\
+\multicolumn{5}{@{}l}{\textbf{Checks} --- deterministic code that refuses. No judgement, no cost.}\\
 \midrule
-Supervisor & holds the objective and the budget; decides when to stop & --- & runs\\
+Supervisor & holds the objective and the budget; decides when to stop & --- & --- & runs\\
 Critic & type-checks the batch; rejects a causal claim with no ablation;
-refuses a composition already tried & --- & runs\\
-Premise gate & refuses a recipe that could not be a tissue & --- & runs\\
+refuses a composition already tried & --- & --- & runs\\
+Biologist & refuses a recipe that could not be a tissue & --- & --- & runs\\
 Metrologist & certifies instruments; files defects and retractions;
-refuses a duplicate operator request & --- & runs\\
+refuses a duplicate operator request & --- & --- & runs\\
 Referee & rank a batch by tournament, not by sorting on one number
-& --- & \textcolor{warn}{self-test only}\\
+& --- & --- & \textcolor{warn}{self-test only}\\
 \midrule
-Cedric & looks at the pictures; found every defect so far & --- & outside the loop\\
+Cedric & looks at the pictures; found every defect so far & --- & --- & outside the loop\\
+\midrule
+\textbf{one round} & 20 of the 26 calls are the per-run readers, and they are
+independent --- run together, the block costs its slowest call & 26 &
+\textbf{64 s} per run & \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textbf{What an agent actually costs --- measured, at last.} The budget column is an
-\emph{allowance}, and until 1 August nothing recorded what was spent: nine call sites bypassed the
-stopwatch, and a round once reported \code{calls: 0} for a round that made about twenty-five. Every
-call now records tokens, turns, seconds and dollars. Six real analyst calls on two runs:
-
-\begin{center}\small
-\begin{tabular}{@{}l r l@{}}
-\toprule
-per analyst call      & \textbf{\$0.41}      & 6 calls, \$2.47 total\\
-turns used            & \textbf{7.2}         & against a cap of 60 --- the cap never binds\\
-wall clock            & \textbf{21 s}        & three analysts in parallel, 64\,s per run\\
-cache hits            & 305\,k vs 172\,k new & 64\% --- why a call is \$0.41 and not \$3\\
-\midrule
-a five-run round      & \textbf{$\approx$\$11} & 26 calls: 15 analysts, 5 eye-checks, 6 others\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Three things follow, and they contradict what I told Cedric before measuring. \textbf{Turns are not
-the lever}: 7.2 used of 60 allowed, so the cap has never once bound, and tightening it would only
-truncate work already paid for. \textbf{Nor are the timeouts}: the allowance for the analyst block
-is four minutes a call and it takes twenty-one seconds, so the ``116 minutes worst case'' was an
-arithmetic ceiling nothing approaches. \textbf{The lever is the number of calls}, because a call
-carries a fixed cost before it does any work --- a call returning the single word ``ok'' still
-reports 2,993 input and 28,868 cache-creation tokens. Fifteen analyst calls is the largest line on
-the board, and two analysts instead of three is a real third off the bill.
+\textbf{Only the analysts have been measured, and the gap is large.} Timing was wired on 1 August
+--- until then nine call sites bypassed the stopwatch, and a round once reported \code{calls: 0}
+for a round that made about twenty-five. Six real analyst calls: \textbf{21 seconds} each against
+a four-minute allowance, and \textbf{7.2 turns} against a cap of 60. So neither the timeout nor
+the turn cap has ever constrained anything, and the ``two hours a round'' arithmetic I put to
+Cedric earlier was a ceiling nothing approaches. The other roles say \emph{not yet} rather than
+carrying their allowance, because an allowance printed in a measurement column is how a ceiling
+becomes a fact.
 
 %======================================================================
 \section{What stands between us and the Okuda figure}\label{sec:okuda}
