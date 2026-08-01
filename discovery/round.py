@@ -655,6 +655,16 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         return bk.finish(rid, "no_candidates", 1)
 
     # ------------------------------------------------ hypotheses FIRST, then configs
+    # CLAIM THE ROUND NUMBER BEFORE POSING ANYTHING.
+    # `pose()` refuses to overwrite a hypothesis id, and ids are f"R{rid}.{slot}.{hash}". The
+    # round counter only advanced at the END, in `sup.observe`, so a round that died after
+    # posing left the counter untouched -- and every retry rebuilt the SAME ids and raised
+    # `hypothesis R3.0.xxxxxx already posed`, forever. One crash on day two would have cost the
+    # rest of the week, silently, and nothing in a week-long run would have been watching.
+    # A spent round is spent: claim the number first, so a retry gets a fresh one.
+    sup.round = rid
+    sup._save()
+
     posed = []
     for i, (g, lbl, sl) in enumerate(cands):
         # F18: names carry round AND mode AND slot. A previous round's config with a matching
@@ -798,6 +808,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         except Exception as e:
             print(f"  [evolution] FAILED: {type(e).__name__}: {str(e)[:90]}")
 
+    sup.round = rid - 1          # observe() increments; the claim above already moved it
     rep = sup.observe([(g, s, h.hid) for _, g, s, _, _, h in rows])
     sup.reg.render_knowledge(os.path.join(CAMP, "knowledge.md"),
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
