@@ -1,0 +1,84 @@
+# regulated_growth -- the composition the atlas was for, and the one jax-morph never runs.
+#
+# Every other spec in config/atlas/ exercises ONE mechanism against the oracle. This one closes
+# the loop between three of them, using only operators that have already passed a differential
+# test, and adding no new vocabulary:
+#
+#     morphogen  ->  chemical  ->  regulate  ->  growth_rate  ->  grow_radius  ->  geometry
+#         ^                                                                            |
+#         +----------------------------------------------------------------------------+
+#
+# Cells secrete a diffusible signal; each cell reads its own local concentration (which is high
+# where cells are crowded, because the field is a superposition over live sources); an
+# intracellular ODE turns that reading into a growth rate; growth and division move the geometry;
+# the geometry changes the field. Nothing here is new -- the whole point is that it is not.
+#
+# HOW THE LOOP CLOSES WITHOUT NEW MACHINERY, which is the finding worth recording. `regulate`
+# integrates whatever block `state:` names, and `grow_radius` reads whatever block `growth_rate:`
+# names. Point the first at the second and the coupling exists -- it is the declared-field
+# dataflow doing exactly the job the atlas classified as `couple` and set aside as "not biology".
+# It is not biology; it is what lets the biology compose. `regulate` here has hidden_size 0, so
+# the evolving vector IS the growth rate: dk/dt = sigma(W_gene*k + W_in*c + b) - gamma*k.
+#
+# WHAT TO LOOK FOR in the acted ledger (diag.json): all five operators acting, and `regulate`
+# with a NON-ZERO max|delta| -- if the chemical never reaches it, the loop is open and the run is
+# a growth model with extra steps.
+general:
+  name: regulated_growth
+  seed: 0
+  n_frames: 40
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 4
+    buffer: 600                      # capacity must never be what stops the run
+    start: [[20.0, 20.0], [21.0, 20.1], [20.5, 20.9], [19.6, 20.7]]
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }
+      radius: { width: 1 }
+      # the block `regulate` integrates AND `grow_radius` reads -- the join of the loop
+      growth_rate: { width: 1, integration: first_order, boundary: free, record: true }
+      division_rate: { width: 1 }
+      secretion_rate: { width: 1 }
+      chemical: { width: 1, record: true }
+
+fields: {}
+
+operators:
+  # 0: initial condition. growth_rate starts at 0 -- every bit of growth in this run is something
+  #    `regulate` decided, not something the spec handed out. That is the control.
+  - { op: seed_state, at: cell, before_frame: 1,
+      values: { radius: 0.35, growth_rate: 0.0, division_rate: 0.06, secretion_rate: 1.0 } }
+  # A: SENSE. Steady screened diffusion, recomputed from the live geometry every macro-step:
+  #    each cell's `chemical` is the superposition of every live source's Green's function, so a
+  #    crowded cell reads a higher concentration than an isolated one.
+  - { op: morphogen, implementation: free_space_greens_function, at: cell,
+      diffusion: 1.0, degradation: 0.35, n_space_dim: 2 }
+  # B: DECIDE. The intracellular ODE, driven by what the cell just sensed. hidden_size 0, so the
+  #    evolving vector is the growth rate itself. W_in > 0: more signal -> faster growth
+  #    (an activator). gamma is the decay that keeps it bounded.
+  #    W_in IS CHOSEN TO KEEP THE CIRCUIT OFF SATURATION. The first attempt used W_in = 2.5, which
+  #    with a sensed concentration of ~2.7 drives the sigmoid to x ~ 6 -- deep in its flat region,
+  #    where a cell reading twice as much signal grows 1% faster. The coupling was real (per-cell
+  #    correlation 0.97) and biologically pointless. At 0.35 the drive spans ~0..0.6, the
+  #    responsive band, and the growth rate varies ~54% across the cluster.
+  - { op: regulate, implementation: ode_generic, at: cell,
+      state: growth_rate, inputs: chemical, hidden_size: 0, gamma: 0.8,
+      W_gene: [[0.0]], W_in: [[0.35]], b: [-0.6] }
+  # C: ACT.
+  - { op: grow_radius, at: cell, max_radius: 0.6 }
+  - { op: cell_divide, implementation: volume_conserving, at: cell, orientation_snr: 0.0 }
+  # D: and the mechanics that turn growth into geometry.
+  - { op: relax, at: cell, potential: morse, epsilon: 3.0, alpha: 2.8,
+      max_steps: 800, f_tol: 1.0e-3 }
+
+schedule: [seed_state, morphogen, regulate, grow_radius, cell_divide, relax]
+
+plotting:
+  background: black
+  point_size: 6.0

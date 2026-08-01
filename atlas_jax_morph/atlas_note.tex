@@ -1231,24 +1231,61 @@ framing and exactly what Figure~5 optimises. And the chain is differentiable end
 (\S\ref{sec:p6now}): loss $\to$ positions $\to$ division draw $\to$ \code{division\_rate} $\to$
 gene $\to$ \code{regulate}. The loop is not merely runnable, it is \emph{designable}.
 
-\textbf{Two honest qualifications, because this is the claim most worth over-selling.}
+\textbf{It runs, and the loop is real.} \code{config/atlas/regulated\_growth.yaml} ---
+\code{[seed\_state, morphogen, regulate, grow\_radius, cell\_divide, relax]}, six operators, all
+previously validated against the authors' code, none new. 40 macro-steps, 4 cells $\to$ 68, every
+operator acting.
 
-\begin{enumerate}[leftmargin=1.4em,itemsep=1pt]
-\item \textbf{Every link is validated; the loop has never been run.} Each atlas spec exercises one
-mechanism in isolation (\code{[seed\_state, regulate]}, \code{[seed\_state, grow\_radius]},
-\code{[seed\_state, morphogen]}); the only composition is the proliferation model, which has no
-gene network in it. Six differential tests do not add up to a demonstration.
-\item \textbf{It is a COMPOSITION, not a fourth contract.} Registering ``gene--growth coupling'' as
-new vocabulary would be exactly the inflated \emph{new} the ledger exists to prevent, and the
-Plexus thesis is that compositions should not need new words. The claim to make is the narrower
-and stronger one: \emph{three new contracts plus the growth the language already had close a
-sense $\to$ regulate $\to$ grow loop that Plexus previously could not express at all.}
-\end{enumerate}
+\begin{center}
+\includegraphics[width=\textwidth]{_state/regulated_growth.png}
+\end{center}
 
-The experiment is one spec --- \code{[seed\_state, morphogen, regulate, grow\_radius,
-cell\_divide, relax]}, six operators, all validated, none new --- and it belongs to Phase 7's
-``compositions the authors did not run'', because jax-morph's own worked example does not compose
-these either.
+\textbf{The pattern is emergent, and nothing in the spec asks for it.} \code{growth\_rate} is
+seeded at \emph{zero}, so every bit of growth in the run is something \code{regulate} decided.
+What comes out is a radial gradient: cells in the crowded interior read a higher concentration
+(the field is a superposition over live sources) and grow at $0.96$, cells on the rim at $0.63$ ---
+a 41\% range, correlated with what each cell sensed at $r = +0.995$. No operator contains the
+words ``centre'' or ``edge''.
+
+\textbf{And the control is what makes that a claim rather than a picture.} Ablate one number ---
+$W_{in} = 0$, the single weight that lets a cell read the field --- and \emph{everything still
+runs}: morphogen still computes a field, regulate still integrates, cells still grow and divide,
+the same 68 of them, and \textbf{the acted ledger is unchanged}. What collapses is the spatial
+structure: \code{growth\_rate} becomes uniform to machine precision at $0.3034$, which is exactly
+the autonomous fixed point $\sigma_{\mathrm{alg}}(b)/\gamma = 0.30342$ the operator's own equation
+predicts when it can see nothing.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r r r r@{}}
+\toprule
+& cells & growth rate & range & $r$(sensed, decided)\\
+\midrule
+loop closed ($W_{in}=0.35$) & 68 & $0.625$--$0.961$ & \textbf{41.4\%} & $\mathbf{+0.995}$\\
+ablated ($W_{in}=0$) & 68 & $0.3034$ & \textbf{0.0\%} & --- (no variance)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{That ablation also exposes a limit of this campaign's own discipline.} The acted ledger
+--- ``did this operator ever do anything?'' --- is what caught the silent zero-division bug in
+\S\ref{sec:fwd}, and it passes the ablated run without complaint. \emph{Acted is not coupled.} A
+ledger can tell you an operator ran; only a control can tell you it mattered.
+
+\textbf{One thing had to be tuned, and it is worth recording as a modelling lesson rather than a
+detail.} The first attempt used $W_{in} = 2.5$. The loop closed --- per-cell correlation $0.97$ ---
+and was biologically pointless: with a sensed concentration around $2.7$ the sigmoid sits at
+$x \approx 6$, deep in saturation, where a cell reading twice as much signal grows 1\% faster. A
+coupling can be statistically perfect and dynamically inert. Choosing the gain so the drive lands
+in the responsive band is what turned a correlation into a morphology.
+
+\textbf{What this does not do} is optimise anything. The gene circuit here is written by hand, not
+fitted; it is Figure~5's forward half, and the inverse half is \S\ref{sec:p6verdict}'s business.
+And it remains a \textbf{composition, not a fourth contract} --- registering ``gene--growth
+coupling'' as new vocabulary would be exactly the inflated \emph{new} the ledger exists to prevent.
+The claim is the narrower and stronger one: \emph{three new contracts plus the growth the language
+already had close a sense $\to$ regulate $\to$ grow loop that Plexus previously could not express,
+and jax-morph's own worked example does not compose either.}
 
 %======================================================================
 \section{Decided, and what is still open}
