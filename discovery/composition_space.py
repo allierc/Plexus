@@ -822,13 +822,27 @@ class CompositionGraph:
         for stage in range(1, max_stage + 1):
             for op in STAGES[stage]:
                 spec = OPERATORS[op]
-                if op in present and not spec["impl_structural"]:
-                    continue                                   # one copy is enough
+                # ONE COPY IS ENOUGH -- FOR EVERY OPERATOR, structural implementations included.
+                #
+                # `impl_structural` was doing two jobs at once: it marks an operator whose
+                # IMPLEMENTATION is a real mechanism choice (so `set_impl` is offered below), and
+                # it was also being read as permission to hold TWO of them. Those are different
+                # claims, and conflating them put a second whole mechanics solver into a spec.
+                #
+                # MEASURED on round 1: the menu offered both `+shape_energy_3d:default` (add) and
+                # `=shape_energy_3d:default` (swap). The Proposer chose `add` and wrote the claim
+                # for `swap` -- "swapping the monolayer shape energy for the default releases the
+                # in-plane constraint" -- and the spec came out with shape_energy_3d TWICE, two
+                # independent relaxation loops of 30 iterations each driving the same vertices.
+                # That composition is not the one the hypothesis is about, so the run could not
+                # have tested it. The previous batch had the same fault in three more slots, on
+                # `shape_to_chem`.
+                #
+                # The way to change an implementation is `set_impl`. If a second instance is ever
+                # genuinely meaningful, that needs its own explicit flag; no operator declares one.
+                if op in present:
+                    continue
                 for impl in spec["impls"]:
-                    if any(o["op"] == op and self.impl_of(o) == impl for o in self.ops):
-                        continue
-                    if op in present and not spec["impl_structural"]:
-                        continue
                     edits.append((("add_op", op, impl), f"+{op}:{impl}"))
         for o in self.ops:                                     # removals
             role = OPERATORS[o["op"]]["role"]

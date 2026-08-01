@@ -150,6 +150,30 @@ def check_static(graph, seen_hashes=()):
         out.append(Rejection("R1_MISSING_ROLE", "a composition needs a substrate and mechanics",
                              f"missing role(s): {sorted(missing)}"))
 
+    # R1b -- ONE OPERATOR OF EACH KIND. A composition holding the same operator twice is not a
+    # richer model, it is two solvers driving the same state and a hypothesis about neither.
+    #
+    # MEASURED on round 1 of the rebuilt loop. `legal_edits` offered both `+shape_energy_3d:default`
+    # and `=shape_energy_3d:default`; the Proposer took the ADD and wrote the claim for the SWAP
+    # ("swapping the monolayer shape energy for the default releases the in-plane constraint").
+    # The spec came out with shape_energy_3d twice -- two independent relaxation loops of thirty
+    # iterations each, driving the same vertices. Whatever that run measured, it was not the
+    # composition the hypothesis named.
+    #
+    # `legal_edits` no longer offers the add, which closes the path this arrived by. This rule
+    # exists because that is only ONE path: a graph can also be hand-written, restored from a
+    # frontier file, or built by an edit sequence nobody enumerated. A guard that lives only in
+    # the generator is a guard against one way of being wrong.
+    from collections import Counter
+    for op, n in Counter(o["op"] for o in graph.ops).items():
+        if n > 1:
+            out.append(Rejection(
+                "R1b_DUPLICATE_OPERATOR",
+                "the same operator twice is two solvers driving one state, not a richer model",
+                f"{op} appears {n} times. To change an implementation use `set_impl`, which "
+                f"REPLACES it; `add_op` adds a second instance and the two then run in sequence "
+                f"every frame."))
+
     # R2 -- PRECONDITIONS. An operator whose required port type is produced by nothing will
     # silently no-op. This is the rule that prevents FALSE IMPOSSIBILITY claims, and it is the
     # single most important thing the Critic does.
