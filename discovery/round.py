@@ -73,6 +73,26 @@ MAP = os.path.join(CAMP, "lever_map.jsonl")
 LLM_TIMING = os.path.join(CAMP, "llm_timing.jsonl")
 
 
+# --------------------------------------------------------------------------- progress
+# WHY BANNERS. A round emits a few hundred lines over twenty minutes and a reader watching the
+# terminal cannot tell "thinking" from "wedged". These print at every act boundary and at every
+# step that takes minutes, with a wall clock, so `tail -f` reads as progress rather than as noise.
+_T0 = [None]
+
+
+def act(title, detail=""):
+    if _T0[0] is None:
+        _T0[0] = time.time()
+    el = time.time() - _T0[0]
+    print(f"\n{'=' * 96}\n>>> {title}   [+{int(el // 60):02d}:{int(el % 60):02d}]"
+          + (f"   {detail}" if detail else "") + f"\n{'=' * 96}", flush=True)
+
+
+def step(msg):
+    el = 0 if _T0[0] is None else time.time() - _T0[0]
+    print(f"    [+{int(el // 60):02d}:{int(el % 60):02d}] {msg}", flush=True)
+
+
 # --------------------------------------------------------------------------- frontier
 def load_frontier(ledger=None):
     """Where the search breeds from. On a COLD campaign, the Archivist chooses it from the log.
@@ -692,6 +712,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     print(f"ROUND {rid}   mode={mode}   campaign={cfg.name}")
     print("=" * 96)
 
+    _T0[0] = time.time()
+    act("ACT 1 - PROPOSE", "before a second of compute is spent")
     _purge_round_configs(rid, mode)    # F18: stale configs must not shadow this round's
     if mode == "theta":
         cands = build_theta_batch(base, param, values, batch)
@@ -745,6 +767,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     if cluster.preflight(verbose=True) is False:
         print("[round] preflight FAILED -- not submitting. Fix the job environment first.")
         return bk.finish(rid, "preflight_failed", 1)
+    act("ACT 2 - MEASURE", f"submitting {len(names)} simulation(s) -- the only expensive step")
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
         print("[round] submission did not land -- aborting rather than scoring nothing")
@@ -753,7 +776,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # up" were indistinguishable. A killed straggler is recorded and its hypothesis is resolved
     # `inconclusive` below (no diag.json), which keeps a degenerate slot out of the surprise rate
     # instead of scoring it as evidence.
+    step(f"{len(ids)} job(s) on the cluster; waiting. Check with `bjobs`.")
     wait = cluster.wait_for_ids(ids, poll=60)
+    step("batch finished; captioning the wave (one model load for all runs)")
     if not wait["ok"]:
         print(f"[round] batch did not complete cleanly: exit={wait['exit']} "
               f"killed={wait['killed']} timed_out={wait['timed_out']} -- scoring what landed")
@@ -769,6 +794,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # that posed eight and admitted one must say so WITH THE REASONS, because "0 runs, coverage
     # 0%" is what the Proposer was handed, and from it drew the only sane conclusion available:
     # that the ledger was broken.
+    step("reading each run: Biologist -> Metrologist -> Reader -> Eye-check")
     rows, refused = [], []
     for nm, g, h in posed:
         d = os.path.join(LOG, nm, "diag.json")
@@ -849,10 +875,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # THE COLLECTOR RUNS FIRST, and it is code. Everything downstream reads the RECORD rather than
     # rummaging for its own inputs -- which is the whole repair: a finding that is not collected
     # into a visible record disappears, and its disappearance is silent.
+    act("ACT 3 - DECIDE", f"{len(rows)} run(s) admitted, {len(refused)} refused")
+    step("Collector: building the round record from the files on disk")
     record = COL.collect_round(rid, mode, rows, refused=refused, posed=posed)
     for hole in COL.holes(record):
         print(f"  [collector] HOLE: {hole}")
 
+    step(f"Interpreter: writing the causal record for {len(kept)} kept run(s)")
     for nm, g, s, sc, oc, h in kept:
         A.interpret(comp_hash(g), g.name_region(), h.edit, s,
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
@@ -871,7 +900,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     sup.reg.render_knowledge(os.path.join(CAMP, "knowledge.md"),
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
+    step("Meta-review: prompt write-back + memory.md")
     A.meta_review(rid, ledger=ledger, runs=[nm for nm, _, _, _, _, _ in rows])
+    step("Archivist: reading the whole history")
 
     # THE ARCHIVIST, over the whole history rather than this batch. It advises; the Supervisor
     # decides. Its recommendation is recorded either way, so an override is visible.
