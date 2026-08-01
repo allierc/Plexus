@@ -34,7 +34,7 @@ class GrazeOperator(Exchange):
         pos = cell.state[:, :2]
         fld = H.fields[self.field_name]
         avail = fld.sample(pos).clamp(min=0.0)                       # stock at each cell
-        want = torch.full_like(avail, self.rate * fld.dt)
+        want = torch.ones_like(avail) * (self.rate * fld.dt)   # tensor-safe fill (see grow_radius)
         take = torch.minimum(avail, want)                            # cannot eat more than present
         if mask is not None:
             take = take * mask.float()

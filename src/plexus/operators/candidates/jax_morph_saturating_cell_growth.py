@@ -149,7 +149,8 @@ class GrowRadius(Lateral):
         # the uniform `rate` param (default 0 -> k=0 -> decay=1 -> dr=0 -> byte-identical no-op).
         k = self._read_scalar(lvl, self.rate_block)
         if k is None:
-            k = torch.full_like(r, self.rate)
+            k = torch.ones_like(r) * self.rate   # ones*p, not full_like(p): `full_like` rejects
+                                                 # a tensor fill value, blocking a learnable rate
 
         if dt <= 0.0:                                               # nothing integrates over a zero step
             return {self.at: torch.zeros_like(r)}

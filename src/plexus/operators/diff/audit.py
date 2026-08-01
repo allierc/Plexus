@@ -76,7 +76,7 @@ def float_attrs(op):
                   if isinstance(v, float) and not k.startswith("_") and k not in NOT_TUNABLE)
 
 
-def build_harness(n=12, buffer=48, dim=2, device="cpu"):
+def build_harness(n=12, buffer=48, dim=2, device="cpu", dt=0.1, rate=0.0):
     """One Hierarchy rich enough that most operators find what they read.
 
     Deliberately generic: not any model's state but a superset of the blocks and buffers the
@@ -135,10 +135,59 @@ def build_harness(n=12, buffer=48, dim=2, device="cpu"):
     H.rng = torch.Generator(device=device).manual_seed(0)
 
     class _Cfg:
-        dt = 0.1
+        pass
+    _Cfg.dt = dt
     H.config = _Cfg()
     H.zero_delta(dim)
     return H
+
+
+def _event_driven(cls):
+    """Operators whose work is gated on a random draw or a discrete event."""
+    return getattr(cls, "KIND", None) in ("structural", "rewire")
+
+
+def _acted(out, H, occ_before):
+    """Did this call do anything at all? Same question `run_spec.py`'s acted ledger asks --
+    a delta that moved something, or a structural operator that woke or retired a slot."""
+    if any(torch.is_tensor(d) and d.numel() and float(d.abs().max()) > 0
+           for d in (out or {}).values()):
+        return True
+    return float(H.level("cell").occ.sum()) != occ_before
+
+
+def _fingerprint(out, H):
+    """A detached signature of everything one forward produced, for a value comparison."""
+    xs = [d.detach().reshape(-1) for d in (out or {}).values()
+          if torch.is_tensor(d) and d.numel()]
+    xs.append(H.level("cell").state.detach().reshape(-1))
+    for f in H.fields.values():
+        if torch.is_tensor(f.grid):
+            xs.append(f.grid.detach().reshape(-1))
+    return torch.cat(xs)
+
+
+def _reads_param(cls, device, key, at, to, required):
+    """Does the forward READ this knob at all, in this configuration?
+
+    A parameter can be CONSTANT for two completely different reasons, and treating them alike is
+    how a harness invents defects. `grow_radius.rate` is the uniform fallback used only when the
+    set has no per-cell `growth_rate` block -- give the harness that block and the knob is never
+    read, which says nothing about whether it is differentiable. Run it twice with two values and
+    compare: identical output means the branch was not taken.
+    """
+    outs = []
+    for scale in (1.0, 1.7):
+        H = build_harness(device=device)
+        params = {"_at": at, "to": to, "from": to, **required}
+        op = cls(params, device)
+        base = float(getattr(op, key))
+        setattr(op, key, base * scale + 0.13)
+        with torch.no_grad():
+            outs.append(_fingerprint(op(H, None), H))
+    if outs[0].shape != outs[1].shape:
+        return True
+    return not torch.equal(outs[0], outs[1])
 
 
 def _verdict(loss, leaf):
@@ -167,16 +216,40 @@ def probe(cls, device="cpu"):
         for at, to in (("cell", "chem"), ("chem", "chem"), ("cell", "cell")):
             H = build_harness(device=device)
             lvl = H.level("cell")
-            lvl.state = lvl.state.detach().clone().requires_grad_(True)
-            state_leaf = lvl.state
-            params = {"_at": at, "to": to, "from": to}
-            for k in getattr(cls, "REQUIRES_PARAMS", []) or []:
-                params[k] = PARAM_DEFAULTS.get(k, 1.0)
+            # The leaf is held SEPARATELY and the level gets a computed copy of it. Mid-rollout
+            # `lvl.state` is never a leaf -- it is the output of the previous tick -- so a
+            # structural operator's in-place write is legal there and merely recorded. Making the
+            # level's own tensor the leaf turns every such write into a RuntimeError and would
+            # report the whole structural family as unexercised.
+            state_leaf = lvl.state.detach().clone().requires_grad_(True)
+            lvl.state = state_leaf * 1.0
+            params_required = {k: PARAM_DEFAULTS.get(k, 1.0)
+                               for k in getattr(cls, "REQUIRES_PARAMS", []) or []}
+            params = {"_at": at, "to": to, "from": to, **params_required}
             try:
                 op = cls(params, device)
                 leaves = {}
                 if promote:
                     for k in float_attrs(op):       # past the constructor, into the forward
+                        t = torch.tensor(float(getattr(op, k)), device=device,
+                                         requires_grad=True)
+                        setattr(op, k, t)
+                        leaves[k] = t
+                occ_before = float(H.level("cell").occ.sum())
+                out = op(H, None)
+                if _acted(out, H, occ_before) or not _event_driven(cls):
+                    break
+                # INERT: a stochastic/structural operator whose event never fired this frame
+                # reports every knob as unread, which is a fact about the draw, not the operator.
+                # Retry at a macro-step long enough that the hazard actually fires.
+                H = build_harness(device=device, dt=5.0)
+                lvl = H.level("cell")
+                state_leaf = lvl.state.detach().clone().requires_grad_(True)
+                lvl.state = state_leaf * 1.0
+                op = cls(params, device)
+                leaves = {}
+                if promote:
+                    for k in float_attrs(op):
                         t = torch.tensor(float(getattr(op, k)), device=device,
                                          requires_grad=True)
                         setattr(op, k, t)
@@ -213,8 +286,18 @@ def probe(cls, device="cpu"):
     if not terms:
         return {"state": ("CONSTANT", 0.0), "params": {}}
     loss = sum(terms)
-    return {"state": _verdict(loss, state_leaf),
-            "params": {k: _verdict(loss, t) for k, t in leaves.items()}}
+    pv = {}
+    for k, t in leaves.items():
+        v, mag = _verdict(loss, t)
+        if v == "CONSTANT":
+            # CONSTANT means one of two very different things. Separate them before reporting.
+            try:
+                v = "CONSTANT" if _reads_param(cls, device, k, at, to, params_required) \
+                    else "NOT-READ"
+            except Exception:
+                pass
+        pv[k] = (v, mag)
+    return {"state": _verdict(loss, state_leaf), "params": pv}
 
 
 def main():
