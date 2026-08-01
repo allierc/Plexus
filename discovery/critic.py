@@ -55,6 +55,89 @@ class Rejection:
         return f"<{self.code}: {self.detail}>"
 
 
+# ============================================================================ BATCH rules
+def _touched_operator(edit):
+    """The operator an edit acts on, or None. Edits look like ('add_op','cell_react','gray_scott')
+    or a string '+cell_react' / '-cell_react' / '=cell_react:tension'."""
+    if isinstance(edit, (tuple, list)) and len(edit) >= 2:
+        return str(edit[1]).split(":")[0]
+    e = str(edit).strip()
+    for p in ("add_op ", "remove_op ", "+", "-", "="):
+        if e.startswith(p):
+            return e[len(p):].split(":")[0].split()[0]
+    return None
+
+
+def _direction(edit):
+    """additive | subtractive | swap | None."""
+    if isinstance(edit, (tuple, list)) and edit:
+        k = str(edit[0])
+        return {"add_op": "additive", "remove_op": "subtractive",
+                "set_impl": "swap"}.get(k)
+    e = str(edit).strip()
+    if e.startswith("+") or e.startswith("add_op"):
+        return "additive"
+    if e.startswith("-") or e.startswith("remove_op"):
+        return "subtractive"
+    if e.startswith("=") or e.startswith("set_impl"):
+        return "swap"
+    return None
+
+
+def check_batch(hypotheses):
+    """ABLATION IS COMPULSORY. Reject the batch if a causal claim arrives without both directions.
+
+    A causal claim needs two things and the campaign has never enforced either. ABLATION answers
+    "is this mechanism necessary" -- run the identical model with it removed and see whether the
+    phenotype dies. The ADDITIVE direction answers "is it sufficient". Either alone is an opinion,
+    and every "X causes Y" on the books so far rests on one of them.
+
+    The precedent for enforcing it already exists and is not controversial: the control is not left
+    to the proposer's taste, it is MANDATED at slot 0 or the proposal is rejected. Ablation gets
+    the same treatment, for the same reason -- the author does not referee their own work.
+
+    Deterministic, and it runs BEFORE any compute is spent. Nothing here needs a model.
+    """
+    out = []
+    by_op = {}
+    for h in hypotheses:
+        op = _touched_operator(getattr(h, "edit", None))
+        d = _direction(getattr(h, "edit", None))
+        if op and d:
+            by_op.setdefault(op, set()).add(d)
+    for h in hypotheses:
+        kind = getattr(h, "claim_kind", "descriptive")
+        op = _touched_operator(getattr(h, "edit", None))
+        if kind not in ("causal", "necessary") or not op:
+            continue
+        dirs = by_op.get(op, set())
+        if kind == "necessary" and "subtractive" not in dirs:
+            out.append(Rejection(
+                "A1_NO_ABLATION",
+                "a necessity claim requires the operator to be REMOVED somewhere in the batch",
+                f"{getattr(h, 'hid', '?')} claims {op} is necessary, but no hypothesis in this "
+                f"batch removes it. Necessity is tested by taking it away, not by adding it. "
+                f"Either add the removal or relabel the claim `sufficient`."))
+        if kind == "causal" and not {"additive", "subtractive"} <= dirs:
+            missing = sorted({"additive", "subtractive"} - dirs)
+            out.append(Rejection(
+                "A1_NO_ABLATION",
+                "a causal claim requires BOTH directions in the same batch",
+                f"{getattr(h, 'hid', '?')} claims {op} causes its phenotype, but the batch only "
+                f"contains {sorted(dirs)} -- missing {missing}. Sufficiency and necessity are "
+                f"different experiments and 'causes' asserts both. Either add the missing "
+                f"direction or relabel the claim "
+                f"{'`necessary`' if 'additive' in missing else '`sufficient`'}."))
+    return out
+
+
+def allowed_verb(claim_kind):
+    """What the Interpreter MAY write. Enforced, so the word cannot outrun the experiment."""
+    return {"causal": "causes", "necessary": "is required for",
+            "sufficient": "is sufficient for", "descriptive": "is associated with"}.get(
+        claim_kind, "is associated with")
+
+
 # ============================================================================ STATIC rules
 def check_static(graph, seen_hashes=()):
     """Every static rule, in order. Returns [] if the composition is well-formed."""
@@ -237,7 +320,8 @@ def legal_menu(graph, max_stage=3, seen_hashes=(), limit=None):
 
 RULES = ["R1_MISSING_ROLE", "R2_UNMET_PRECONDITION", "R3_DANGLING_SLOT", "R4_DANGLING_EDGE",
          "R4_ILLEGAL_LINK", "R4_SLOT_NOT_ON_IMPL", "R5_PARAM_OUT_OF_RANGE", "R6_DUPLICATE",
-         "C1_NO_EMITTER", "C2_COMPILE_FAILED", "P1_INERT_OPERATOR", "P2_BUFFER_SATURATED"]
+         "C1_NO_EMITTER", "C2_COMPILE_FAILED", "P1_INERT_OPERATOR", "P2_BUFFER_SATURATED",
+         "A1_NO_ABLATION"]
 
 
 if __name__ == "__main__":

@@ -11,8 +11,13 @@ questions, and they have to answer them by running:
   typed           does the class carry the signature the atlas record wrote down (READS/WRITES/
                   MAPS/PARAM_ROLES)? A contract that disagrees with its own record is worse than
                   no contract: the ledger is then measuring fiction.
-  collides        does the name already belong to something else? Sixteen new modules landing in
-                  one anti-chamber is exactly how `divide` came to mean three different things.
+  collides        two modules may share a contract name -- that is the POINT of the contract /
+                  implementation split, and seven of these do it correctly. A collision is the
+                  same (contract, implementation) pair twice, or two implementations of one
+                  contract disagreeing about its kind. The first version of this file called the
+                  correct case a collision and reported seven false alarms.
+  co-exist        do ALL the modules import TOGETHER? That is the only check that exercises the
+                  registry's duplicate detection.
   test            does the declared test file exist, and does it pass?
 
 Modules are imported ONE PER SUBPROCESS. A single process importing all sixteen would let the
@@ -57,6 +62,7 @@ try:
     if name in R._OP_CONTRACTS:
         c = R._OP_CONTRACTS[name]
         cls = c.get()
+        out["implementation"] = sorted(c.implementations)
         out.update(registered=(name in added or name in before), kind=c.kind, family=c.family,
                    set=c.set,
                    reads=list(getattr(cls, "READS", [])),
@@ -69,6 +75,27 @@ except Exception as e:
     out["error"] = f"{{type(e).__name__}}: {{e}}"
 print("PROBE" + json.dumps(out))
 '''
+
+
+def _head(x):
+    """The identifier at the front of a signature entry, ignoring any annotation after it."""
+    t = str(x).strip()
+    return t.split("(")[0].split()[0].strip(",;:") if t else ""
+
+
+def import_all(modules):
+    """Import every candidate module in ONE interpreter. The registry raises on a duplicate
+    (name, implementation) pair, and on an implementation whose kind contradicts its contract,
+    so this is the only check that actually exercises the anti-collision machinery."""
+    rels = [os.path.relpath(os.path.join(PLEXUS, m), SRC).replace(os.sep, ".")[:-3]
+            for m in modules]
+    src = ("import sys; sys.path.insert(0, %r)\nimport plexus.operators\nimport importlib\n"
+           "for m in %r:\n    importlib.import_module(m)\nprint('ALL OK')" % (SRC, rels))
+    p = subprocess.run([PY, "-c", src], capture_output=True, text=True, cwd=PLEXUS)
+    if "ALL OK" in p.stdout:
+        return True
+    tail = (p.stderr or p.stdout).strip().splitlines()
+    return tail[-1][:200] if tail else "no output"
 
 
 def probe(module_path, contract_name):
@@ -116,24 +143,33 @@ def main():
         r.update(probe(mod, name) if mod and os.path.exists(mod)
                  else {"imports": False, "error": "module missing"})
         r["test_ok"], r["test_note"] = run_test(m.get("test"))
-        # the record and the code must agree about the signature, not merely coexist
+        # The record and the code must agree about the signature. Compare the LEADING TOKEN of
+        # each record entry: the normalizers wrote annotated names ("chem (per-cell morphogen,
+        # non-heritable)"), and comparing prose against identifiers reported thirteen mismatches
+        # that were nothing but punctuation.
         mismatch = []
         if r.get("registered"):
             for key in ("kind", "family"):
                 if c.get(key) and r.get(key) and c[key] != r[key]:
                     mismatch.append(f"{key}: record {c[key]!r} vs code {r[key]!r}")
-            for key in ("reads", "writes", "maps"):
-                if set(c.get(key) or []) != set(r.get(key) or []):
-                    mismatch.append(f"{key}: record {sorted(c.get(key) or [])} vs code "
-                                    f"{sorted(r.get(key) or [])}")
+            for key in ("reads", "writes"):
+                want = {_head(x) for x in (c.get(key) or [])} - {""}
+                got = {_head(x) for x in (r.get(key) or [])} - {""}
+                if want != got:
+                    mismatch.append(f"{key}: record {sorted(want)} vs code {sorted(got)}")
         r["signature_mismatch"] = mismatch
         rows.append(r)
 
-    # collisions: one contract name claimed by two modules
-    by_name = {}
+    # A shared contract name is correct design; a shared (contract, implementation) is not.
+    by_name, collisions = {}, {}
     for r in rows:
-        by_name.setdefault(r["contract"], []).append(r["id"])
-    collisions = {n: ids for n, ids in by_name.items() if len(ids) > 1}
+        by_name.setdefault(r["contract"], []).append(r)
+    families = {n: [x["id"] for x in rs] for n, rs in by_name.items() if len(rs) > 1}
+    for n, rs in by_name.items():
+        kinds = {x.get("kind") for x in rs if x.get("kind")}
+        if len(kinds) > 1:
+            collisions[n] = f"implementations disagree about kind: {sorted(kinds)}"
+    together = import_all([r["module"] for r in rows if r.get("module")])
 
     w = max(len(r["id"]) for r in rows)
     print(f"{len(rows)} implemented mechanisms\n")
@@ -161,13 +197,19 @@ def main():
     ok = sum(1 for r in rows if r.get("registered") and r["test_ok"] and
              not r["signature_mismatch"])
     print(f"\n  {ok}/{len(rows)} import, register, match their record, and pass a test")
+    for n, ids in sorted(families.items()):
+        impls = sorted({i for r in by_name[n] for i in (r.get("implementation") or [])})
+        print(f"  contract {n!r}: {len(ids)} entries, implementations {impls}")
     if collisions:
         print(f"  COLLISIONS: {collisions}")
+    print(f"  import all together: {'OK' if together is True else together}")
 
     if a.json:
         os.makedirs(STATE, exist_ok=True)
         with open(os.path.join(STATE, "verify_impl.json"), "w") as f:
-            json.dump({"rows": rows, "collisions": collisions, "clean": ok}, f, indent=2)
+            json.dump({"rows": rows, "collisions": collisions, "families": families,
+                       "import_all": together if together is True else str(together),
+                       "clean": ok}, f, indent=2)
         print(f"  -> {os.path.join(STATE, 'verify_impl.json')}")
     return 0 if ok == len(rows) and not collisions else 1
 

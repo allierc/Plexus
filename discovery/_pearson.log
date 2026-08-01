@@ -1,0 +1,26 @@
+PEARSON SWEEP -- looking for STABLE spots, not a moment during coarsening
+target: ~5 spots on 2000 cells, unchanged between step 1500 and 3000
+
+      F      k |  spots@1500 spots@3000   cover  spacing  verdict
+  0.020  0.055 |           -          -       -        -  DEAD
+  0.020  0.060 |           -          -       -        -  DEAD
+  0.020  0.062 |           -          -       -        -  DEAD
+  0.020  0.065 |           -          -       -        -  DEAD
+  0.030  0.055 |           1          1   0.730     0.00  STABLE
+  0.030  0.060 |           9         20   0.334     6.67  coarsening
+  0.030  0.062 |           8         23   0.186     6.34  coarsening
+  0.030  0.065 |           -          -       -        -  DEAD
+  0.037  0.055 |           1          1   0.494     0.00  STABLE
+  0.037  0.060 |           5          2   0.475    11.42  coarsening
+  0.037  0.062 |          11         11   0.372     6.56  STABLE
+  0.037  0.065 |          18         23   0.172     6.61  coarsening
+  0.046  0.055 |           1          4   0.395    12.55  coarsening
+  0.046  0.060 |           1          1   0.677     0.00  STABLE
+  0.046  0.062 |           3          3   0.452    11.54  STABLE  <-- OKUDA RANGE
+  0.046  0.065 |          32         32   0.255     5.71  STABLE
+  0.055  0.055 |          18         18   0.351     4.74  STABLE
+  0.055  0.060 |           1          1   0.507     0.00  STABLE
+  0.055  0.062 |           1          1   0.526     0.00  STABLE
+  0.055  0.065 |          30         30   0.258     5.68  STABLE
+
+-> _pearson.json
