@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 10:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 11:22
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -907,10 +907,16 @@ Overfull \hbox (49.55377pt too wide) in paragraph at lines 947--958
 
 
 [19]
+<_state/phase6_variance.png, id=284, 896.148pt x 353.85533pt>
+File: _state/phase6_variance.png Graphic file (type png)
+<use _state/phase6_variance.png>
+Package pdftex.def Info: _state/phase6_variance.png  used on input line 1008.
+(pdftex.def)             Requested size: 460.935pt x 182.00806pt.
+
 
 [20]
 
-[21]
+[21 <./_state/phase6_variance.png>]
 
 [22] (./atlas_note.aux)
  ***********
@@ -921,10 +927,10 @@ Package rerunfilecheck Info: File `atlas_note.out' has not changed.
 (rerunfilecheck)             Checksum: 73D9CE0E8445771CFB81619F3ABA4E34;7461.
  ) 
 Here is how much of TeX's memory you used:
- 23985 strings out of 475102
- 451455 string characters out of 5764878
+ 23992 strings out of 475102
+ 451685 string characters out of 5764878
  870231 words of memory out of 5000000
- 46507 multiletter control sequences out of 15000+600000
+ 46514 multiletter control sequences out of 15000+600000
  584569 words of font info for 101 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,650b,611s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -961,10 +967,10 @@ xmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/publ
 ic/cm-super/sftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900
 .pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/tex
 mf/fonts/type1/public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (22 pages, 1108521 bytes).
+Output written on atlas_note.pdf (22 pages, 1187654 bytes).
 PDF statistics:
- 489 PDF objects out of 1000 (max. 8388607)
+ 491 PDF objects out of 1000 (max. 8388607)
  376 compressed objects within 4 object streams
  92 named destinations out of 1000 (max. 500000)
- 252 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 257 words of extra memory for PDF output out of 10000 (max. 10000000)
 
