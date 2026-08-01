@@ -1,0 +1,45 @@
+# DIFFER evidence spec: the `apoptose` operator (jax-morph Death) as a pure-death process.
+#
+# The oracle run this mirrors is `Atlas_jax_morph/_oracle/runs/diff_death/` -- Model([Death]),
+# N0 = 50000 cells all live at t=0, UNIFORM death hazard lambda = 0.05 per unit time, 40 macro-
+# steps at dt=1.0, Death the ONLY step. Same initial condition (same N0, lambda, dt, frame count).
+#
+# Death reads no position, so positions are irrelevant to the survival metric; we let them scatter
+# uniformly in the box (the reference does not place them meaningfully either). The observable is
+# the live count n_active(t), which run_spec records per frame.
+#
+# WHY the `rate:` param and not a per-cell `death_rate` state block: `apoptose` reads the hazard
+# from `getattr(lvl, "death_rate")` (a registered BUFFER) or falls back to the scalar `rate`; it
+# does NOT consult `lvl.state_schema`, so a spec-declared `death_rate` state block is invisible to
+# it (see the note -- this is the `_block` fix `cell_divide` has and `apoptose` lacks). A uniform
+# hazard is exactly the reference's IC here (death_rate[:N0] = lambda, uniform), so the `rate` param
+# reproduces it faithfully; the per-cell path is probed separately.
+general:
+  name: death
+  seed: 0
+  n_frames: 40
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 50000
+    # buffer == n: no slot is ever woken (apoptose only retires), so capacity can never be what
+    # stops the run -- the live count is monotone non-increasing by construction.
+    buffer: 50000
+    state:
+      pos: { width: 2 }
+
+fields: {}
+
+operators:
+  # stochastic Bernoulli removal at uniform hazard p = 1 - exp(-clip(rate,0)*dt) per live cell.
+  - { op: apoptose, at: cell, rate: 0.05 }
+
+schedule: [apoptose]
+
+plotting:
+  background: black
+  point_size: 3.0

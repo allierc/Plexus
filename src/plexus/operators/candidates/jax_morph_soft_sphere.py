@@ -128,8 +128,8 @@ class SoftSphere(Lateral):
     EMIT = "velocity"                           # overdamped: velocity = mobility * F, engine-integrated
     INPUTS = ["cell"]
     OUTPUTS = ["cell"]
-    READS = ["position", "radius", "epsilon"]   # epsilon is a shared scalar param unless `epsilon_field` names a per-cell block
-    WRITES = ["position"]                        # emits the contact force as a velocity delta on `pos`
+    READS = ["pos", "radius", "epsilon", "alive"]   # epsilon is a shared scalar param unless `epsilon_field` names a per-cell block
+    WRITES = ["pos"]                        # emits the contact force as a velocity delta on `pos`
     MAPS = []                                    # dense within-set pairwise (N x N); no named gather map
     SUPPORTED_DIMS = [2, 3]                       # dimension-generic (reads D = pos.shape[-1]); energy is D-agnostic
     REQUIRES_PARAMS = []                          # epsilon defaults to 1.0 -- the sole optional coupling, like the source

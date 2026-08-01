@@ -332,6 +332,22 @@ def differ_prompt(mech_id):
 
 ROLE: DIFFER. Decide whether our operator actually reproduces the reference's behaviour.
 
+WHAT ALREADY EXISTS -- do not rebuild it.
+  * `config/atlas/jax_morph_proliferation.yaml` is the ANCHOR spec: the authors' own
+    proliferation composition (relax + grow_radius + cell_divide) on their four founders, and it
+    RUNS. Its evidence folder is `log/atlas/jax_morph_proliferation/`. Start from it: copy it,
+    change the one thing your mechanism needs, keep everything else identical.
+  * The matching oracle run is `Atlas_jax_morph/_oracle/runs/smoke/` (reference.npz +
+    summary.json), same initial condition, 40 macro-steps at dt=1.0.
+  * `run_spec.py` auto-loads the anti-chamber, so a spec may name any atlas operator without
+    promoting it. Non-spatial state blocks start at ZERO: use the `seed_state` harness operator
+    (see `candidates/atlas_seed_state.py`) to set initial conditions, exactly as the anchor does.
+  * A KNOWN OPEN DISCREPANCY, already measured on the anchor: Plexus reaches 124 live cells where
+    the reference reaches 82 (gyration agrees to ~9%: 3.52 vs 3.23). Capacity is not the
+    constraint (buffer 600). If your mechanism is division, growth or relaxation, that number is
+    your problem to explain -- and "the seeds differ" is not an explanation, it is a hypothesis
+    that has to be tested by making the two comparable.
+
 {_where(mech_id)}
 
 THE ENTRY, as it stands:

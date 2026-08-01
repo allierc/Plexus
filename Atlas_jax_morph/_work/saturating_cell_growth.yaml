@@ -118,8 +118,8 @@ why: "Refinement of `cell_grow`, the registered growth primitive. Same biology -
   \ the disagreement is a genuine\npaper/code contradiction, not a normalization choice, and it does not\
   \ change the verdict --\neither reading is still cell growth toward a maximum size.\n"
 contract:
-  name: cell_grow
-  kind: field
+  name: grow_radius
+  kind: lateral
   family: growth
   set: cell
   inputs:
@@ -132,6 +132,51 @@ contract:
   writes:
   - radius
   maps:
+  - growth_law
+  - realization
+  - rate
+status: implemented
+module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
+test: tests/test_jax_morph_saturating_cell_growth.py
+evidence:
+  oracle_run: null
+  diff_metric: |
+    D_max = max over recorded frames t in {0..T} (T = 20 growth steps), live cells i, and both
+    scenarios below, of |radius_plexus[t,i] - radius_ref[t,i]|, in radius length-units. Both
+    trajectories start from the IDENTICAL per-cell initial condition (radius r0, growth_rate k)
+    and evolve under ONLY the growth operator -- NO relaxation, NO division -- so cells hold
+    fixed array slots and the two radius arrays align cell-for-cell, frame-for-frame; dt = 2.0.
+    The reference side is jax-morph SaturatingCellGrowth run alone via jxm.simulate (its s_0..s_T
+    radius history). The Plexus side is grow_radius run alone through the REAL engine
+    integration (radius += dt*delta). Scenario A (PRIMARY, via run_spec.py, the mandated evidence
+    folder log/atlas/saturating_cell_growth/): a UNIFORM IC (every cell r0 = 0.30, k = 0.40,
+    max_radius R = 0.60); the recorded `radius` block is diffed against the matched reference.
+    Scenario B (DISCRIMINATING, a hand-built Hierarchy rolled one macro-step at a time so each
+    cell can carry its own (r0,k)): a 6x6 grid of r0 in {0.05,0.25,0.45,0.59,0.60,0.75} x k in
+    {0.0,0.05,0.15,0.40,1.00,2.50} -- spanning k = 0 (byte no-op), small-k near-linear growth,
+    large-k near-instant saturation (where forward Euler would OVERSHOOT at dt = 2), r0 == R
+    (dr ~ 0) and r0 > R (relaxation DOWN to R, exercising the no-clamp claim). dt = 2.0 (not 1)
+    makes the mean-rate convention observable: the reference ADDS dr = (R-r)(1-exp(-k*dt/R)) once
+    per step, Plexus returns delta = dr/dt and the engine recovers radius += dt*(dr/dt) = dr; at
+    dt = 1 the /dt and *dt would cancel and hide a convention bug. evidence.value = max of the two
+    per-scenario D_max. A negative control (drop the /dt so the engine applies dt*dr) is reported
+    to confirm the metric would catch a wiring defect.
+  threshold: 1.0e-5
+  threshold_rationale: |
+    Both sides evaluate the IDENTICAL elementary closed form dr = (R-r)(1-exp(-k*dt/R)) in
+    float32 (the reference stores float32 -- radius_max_last 0.59999996 in the smoke summary --
+    and the torch engine is float32); the only disagreement sources are (a) float32 exp() differing
+    between XLA and torch by ~1 ULP and (b) Plexus's extra dr/dt then dt*delta round-trip (~1 ULP).
+    The radius map r_{t+1} = R + (r_t-R)exp(-k*dt/R) is a CONTRACTION toward R, so per-frame roundoff
+    is damped, not amplified, and total error stays at a few x 1e-7 on radii ~O(0.6). 1e-5 sits ~30x
+    above that float32 noise floor yet ~1e4x below the O(0.1-1) error a wrong dt-convention (negative
+    control) or a forward-Euler discretization produces at dt = 2 -- so it cannot be met by any
+    incorrect implementation. A looser threshold (e.g. 1e-3) would fail to separate the exact
+    von-Bertalanffy flow from a same-family-but-wrong law and is rejected.
+  value: null
+  passed: null
+state_io_notes:
+  maps:
   - growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)),
     the closed-form integral of dr/dt = k*(1 - r/R); saturating, monotone, unconditionally stable for
     any dt, no min/clamp
@@ -141,11 +186,13 @@ contract:
   - rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step
     by an upstream controller so gradients flow through it; the sole constructor param is max_radius (a
     traced, optimizable target)
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_saturating_cell_growth.py
-test: tests/test_jax_morph_saturating_cell_growth.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+implementation_blocked: 'This is a REFINEMENT of `cell_grow` that cannot be registered as an implementation
+  of it: the shipped `cell_grow` is kind=structural (returns {}, advances a rest volume) and this one
+  is kind=lateral (returns a radius delta), and the registry forbids implementations of one contract from
+  differing in kind -- correctly, since kind is biology. It is therefore parked under the distinct name
+  `grow_radius`. Promoting it means deciding whether `cell_grow` should become lateral, which breaks every
+  existing user of it. That is a language decision, not a code fix.'
+collision_note: registered as `grow_radius`, not `cell_grow` -- see implementation_blocked. The ledger
+  still counts it as a refinement of cell_grow, not as new vocabulary.
+signature_note: kind is `lateral` (it returns a radius delta the engine integrates), not `field`. This
+  is the very difference that blocks registering it as an implementation of `cell_grow`.

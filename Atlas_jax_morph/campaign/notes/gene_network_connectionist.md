@@ -94,3 +94,76 @@ ODEController entries → one `regulate` contract with implementations connectio
 the convergence result the ledger is meant to record.
 
 **Did NOT run** the oracle (differential test is the differ's job; evidence stays null).
+
+---
+
+# gene_network_connectionist (DIFFER)
+
+**Verdict: PASS. `status -> validated`.** The Plexus `regulate:connectionist` operator reproduces
+the reference `GeneNetworkConnectionist` gene trajectory to **float32 rounding** — max abs
+deviation **6.68e-06** over the whole 21-frame x 6-cell x 5-gene run, against a pre-registered
+threshold of **5e-3**.
+
+**Why the test is a DIRECT trajectory comparison, not integrator-matched (the opposite of `mwc`).**
+The `mwc` sibling emits an instantaneous `dg/dt` and lets the engine take ONE crude Euler step over
+`dt=1`, so its differ HAD to integrate the reference under a matched Euler to avoid measuring the
+integrator (its Dopri-vs-Euler one-step gap was 0.48). The connectionist operator instead
+SELF-SOLVES each macro-step with fixed-step RK4 (`substeps=64`) and returns `(g(dt)-g0)/dt`, so the
+engine's `g += dt*delta` recovers an accurate `g(dt)`. That self-solve is a high-accuracy
+integration of the SAME ODE the reference integrates with adaptive Dopri5, so I compare the engine
+trajectory DIRECTLY against the reference's own Dopri5 output — the honest end-to-end question, "does
+our operator reproduce what the reference actually computes?", with no integrator sleight of hand.
+
+**Metric / threshold (both written into the record BEFORE running).**
+`max over {frame 0..20, cell 0..5, gene 0..4} |G_eng - G_ref|`, float32 gene-concentration units.
+`G_ref` = the reference Dopri5 trajectory (`reference.npz['gene']`, rtol=1e-4/atol=1e-6);
+`G_eng` = the engine's recorded `gene` block (RK4-64 self-solve), from `simulation.zarr`. Both
+integrate the byte-identical vector field `dg/dt = sigma_alg(g@W_gene^T + u@W_in^T + b) - gamma*g`
+(verified against `ode.py:277-278`) from an identical `g0`/`u`/params, so the only admissible
+disagreement is the integrator gap + cross-backend float32 rounding. Threshold **5e-3**: the
+reference's rtol=1e-4 over the O(8.8) gene magnitudes bounds the integrator gap at ~1e-3, and it
+does not amplify — at large drive the algebraic sigmoid saturates (`sigma'->0`), the Jacobian goes
+to `-diag(gamma)`, a contraction that damps error toward `g*~sigma/gamma~10`; 5e-3 gives ~5x margin
+over that a-priori ceiling yet stays ~2 orders below the O(0.5-1) divergence any real mechanism error
+would make in a few frames (logistic instead of algebraic sigmoid; input added OUTSIDE the sigmoid
+per the paper vs inside via `W_in`; a spurious cross-cell coupling scaling the drive by N=6; a decay
+sign flip). It certifies formula-identity, not a fitted tolerance.
+
+**Result: 6.68e-06 — even tighter than the 1e-3 integrator bound, because the gap is float32, not
+Dopri5.** For this smooth, contractive ODE Dopri5(rtol=1e-4) actually resolves the solution to near
+float32 precision, so RK4-64 and Dopri5 agree to rounding. The signature confirms it is
+integrator/rounding-limited and NOT a reaction-law error: frame-0 deviation is exactly **0** (the
+shared seeded IC), it grows MONOTONE to **4.8e-06** by the final frame, and the max sits at frame 17,
+cell 0, **gene 4** — the largest gene (~8.4), where float32 rounding is largest (relative 8.0e-07).
+Final cell-0 genes agree component-wise to ~1e-6 (ref `[7.3356, 0.3709, 2.9444, 1.3693, 8.7943]` vs
+eng `[7.3356, 0.3709, 2.9444, 1.3693, 8.7942]`). The 20 compounding macro-steps over 6 cells
+genuinely exercise the recurrent gene->gene coupling, the `W_in` input inside the sigmoid, the
+algebraic sigmoid and per-gene decay — a wrong choice on any of the SOURCE-WINS points would have
+diverged by O(1), not sat at 7e-6.
+
+**Acted ledger checked FIRST** (`log/atlas/gene_network_connectionist/diag.json`): `regulate` 20/20
+calls acted, `moved` 0.823 (nonzero -> the ODE really evolved the gene block); `seed_state` 1/1;
+`inert_operators: []`; `valid_evidence: true`. A metric on an inert operator would be worthless — it
+is not inert.
+
+**Runs**
+- Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_connectionist/`
+  (`reference.npz` + `summary.json`; deterministic at fixed input, `u` frozen across the rollout;
+  script `_oracle/scripts/gene_network_connectionist.py`).
+- Engine (Plexus torch): spec `config/atlas/gene_network_connectionist.yaml`; evidence
+  `log/atlas/gene_network_connectionist/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png);
+  gene trajectory in `graphs_data/atlas/gene_network_connectionist/simulation.zarr`.
+- Score: `python diff_gene_network_connectionist.py score` ->
+  `_oracle/runs/diff_gene_network_connectionist/diff.json` (value 6.676e-06, passed true).
+
+**Same initial condition, confirmed.** Both sides start from the identical `g0` (5-vector) and
+frozen `u` (2-vector) embedded once by `_gen_gene_network_connectionist.py`; the spec's
+`seed_state@frame0` sets the same IC that the oracle's `State.init_empty(...).update(...)` sets, and
+`n_frames=20` records 21 frames = the oracle's `g(0..20 dt)`. Frame-for-frame comparison is valid.
+
+**Verdict stands: `new`, `implementation_of: regulate`.** The reproduction confirms the
+connectionist (linear-drive) vector field is a faithful implementation of the `regulate` contract to
+float32 precision; with the `mwc` (log-occupancy) and `neural_ode` (MLP) siblings differing ONLY in
+the drive law under one integration/IO contract, the ODEController subclasses collapse to ONE new
+`regulate` contract — the convergence result the ledger exists to record, not three separate
+mechanisms.

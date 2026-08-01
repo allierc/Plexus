@@ -131,6 +131,34 @@ module: src/plexus/operators/candidates/jax_morph_death.py
 test: tests/test_jax_morph_death.py
 evidence:
   oracle_run: null
-  diff_metric: null
-  threshold: null
+  diff_metric: |
+    Population SURVIVAL CURVE on a pure-death rollout (the position-independent observable a death
+    process is judged by). A cluster of N0 = 50000 cells, all live at t=0, carrying a UNIFORM death
+    hazard lambda = 0.05 per unit time, is advanced 40 macro-steps at dt = 1.0 with cell death the
+    ONLY operator -- no division/growth/relaxation, so the live count can only fall. For each frame
+    t in 0..40 form the live fraction S(t) = n_alive(t) / N0. The scalar is
+        D = max over t in {0..40} of | S_plexus(t) - S_oracle(t) |
+    the sup-norm gap (dimensionless, live-fraction units 0..1) between the Plexus `apoptose` curve
+    (n_active from log/atlas/death/metrics.npz) and the reference jax-morph `Death` curve
+    (alive.sum(axis=1) from _oracle/runs/diff_death/reference.npz), on the SAME initial condition
+    (same N0, lambda, dt, frame count; positions are irrelevant -- Death reads none). Both curves
+    are independent stochastic realisations of the same Poisson survival law S_true(t)=exp(-lambda*t);
+    the metric asks whether the two implementations sample the SAME process, not whether two RNG
+    streams coincide (they provably cannot -- JAX bernoulli vs torch.rand). Corroborated by an EXACT
+    deterministic check reported alongside (metric D2): the hazard map p(rate,dt)=1-exp(-clip(rate,0)*dt)
+    from the reference `Death._dist` over a grid of rates (incl. negatives) x dt, vs the torch
+    expression `-expm1(-clip(rate,0)*dt)` `apoptose` uses -- D2 = max|p_ref - p_plexus|.
+  threshold: |
+    D <= 0.02 live-fraction units. Derivation, FIXED BEFORE the run from Monte-Carlo noise (not the
+    result): at each frame S is the mean of N0 independent Bernoulli survival indicators, so
+    Var(S) = S(1-S)/N0 <= 0.25/N0; the two curves use independent RNG streams, so
+    Var(S_plx - S_ref) <= 0.5/N0 and the per-frame difference SD <= sqrt(0.5/50000) = 0.0032. The
+    bound 0.02 is ~6.3 SD -- above any plausible fluctuation across the 41 monotone (correlated)
+    frames, yet FAR below the shift a systematic defect makes: a 10% error in lambda already moves
+    S(40)=exp(-2)=0.135 by ~0.05, and a dropped `>=0` clip or a biased sampler moves it further. So
+    0.02 cleanly separates 'same death process' from 'different process', and is not a criterion no
+    valid config could meet -- two correct implementations sit ~1-2 SD (~0.006-0.012) apart. The
+    EXACT hazard-grid corroboration uses D2 <= 1e-6 (a deterministic float32 identity, not a
+    statistical bound).
+  value: null
   passed: null

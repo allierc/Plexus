@@ -83,3 +83,55 @@ numbers hard-coded.
 
 **Not done (next role):** the differential run against the oracle — `evidence.*` stays null,
 `status: implemented`.
+
+---
+
+## Differential run (DIFFER)
+
+**Result: `status: validated`. value = 9.54e-07 < threshold 1.0e-4 -> PASS.**
+
+The comparison is on the per-cell vector field `f`, the contract's only distinguishing content,
+NOT on a raw integrated trajectory. A trajectory diff would conflate `f` with the Axis-A
+integrator: the reference's own adaptive Dopri5 one-macro-step delta sits **0.482** from the
+explicit-Euler step (the diagnostic gap, `diff.json:diagnostic_dopri_vs_euler_one_step`), 3-4
+orders above the 1e-4 threshold — so a raw engine-Euler vs reference-Dopri5 differ would measure
+the solver, not the biology. The metric therefore puts the reference on the ENGINE's own Euler
+step, and additionally probes `f` directly at corners the forward sweep never reaches.
+
+**Metric** `value = max(metric_P, metric_A)`, gated on both adversarial dg batches all-finite:
+- **metric_P (trajectory, matched integrator)** = 1.19e-07. max over all (frame, cell, gene) of
+  `|g_engine - g_ref|`, both sides Euler-stepping the SAME MWC field over 24 macro-steps (dt=1.0)
+  from identical `g0`/`u0`/params (float32). Engine and reference agree to float32 rounding.
+- **metric_A (vector field, adversarial)** = 9.54e-07 (main params 4.77e-07; extreme params
+  9.54e-07). `|dg/dt_torch - dg/dt_jax|` at t=0 on (i) 6 corner-case cell states (negatives,
+  zeros, near-zero, large positives, mixed signs) with a negative driver, and (ii) an EXTREME
+  param set (log_K at the float32 underflow clip -> K~1.2e-38 so g/K overflows, mixed-sign large
+  H) that exercises the `finfo.max` overflow guard and the (+inf)+(-inf)=NaN it prevents. Both
+  dg batches finite -> the guard holds; the clamp/raw-decay asymmetry reproduces to rounding.
+
+**Threshold** `1.0e-4`, fixed BEFORE the run (`diff_gene_network_mwc.py` THRESHOLD constant): ~2
+orders above the float32 floor for these O(0.1-1) magnitudes (measured ~1e-6) yet ~4 orders below
+both the vector-field scale (max|dg|~5-7) and the Dopri-vs-Euler gap (0.482). Passing certifies
+same `f`; immune to the integrator. Looser 1e-2 would stop distinguishing `f`-agreement from a
+small drive-law error; tighter 1e-8 is below float32 rounding and unmeetable.
+
+**The acted ledger checked first** (`log/atlas/gene_network_mwc/diag.json`): `regulate` 25/25 calls
+acted, moved 1.754 (nonzero -> the ODE genuinely evolved the gene block); `seed_state` 1/1;
+`valid_evidence: true`. A metric on an inert operator would be worthless — it is not inert.
+
+**Runs**
+- Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_mwc/`
+  (`reference.npz` + `summary.json`; script `_oracle/scripts/gene_network_mwc.py`).
+- Engine (Plexus torch): spec `config/atlas/gene_network_mwc.yaml`; evidence
+  `log/atlas/gene_network_mwc/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
+- Score: `diff_gene_network_mwc.py score` -> `_oracle/runs/diff_gene_network_mwc/diff.json`.
+
+**Note for a re-run.** `diff_gene_network_mwc.py` loads the candidate operator by file path and
+`@register_operator` runs at exec time, raising on a second registration of `regulate:mwc`; the
+module load is now cached (`_OP_MODULE`) so the two adversarial evaluations reuse one import.
+
+**Verdict stands: `new`, `implementation_of: regulate`.** The reproduction confirms the third
+ODEController vector field (MWC log-occupancy) is a faithful implementation of the same `regulate`
+contract as its connectionist/neural-ODE siblings — the differential test measures `f`-agreement,
+and `f` agrees to float32 rounding. The code-only MWC drive (paper eq. 4 is the linear form)
+reproduces exactly, overflow guard and clamp/raw-decay asymmetry included.

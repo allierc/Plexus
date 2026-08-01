@@ -97,9 +97,9 @@ class RegulateConnectionist(Exchange):
     # gene state + its fixed sensed drive and writes the gene state. MAPS=[] is load-bearing:
     # no incidence map, no neighbour edge -- each cell integrates in isolation (the
     # intracellular identity that distinguishes `regulate` from the lateral `signal`).
-    INPUTS = ["cell", "sensed_input_fields"]
+    INPUTS = ["cell", "drive"]
     OUTPUTS = ["cell"]
-    READS = ["gene", "sensed_input_fields"]   # evolving gene vector g (state) + fixed driver u (read-only)
+    READS = ["gene", "drive"]   # evolving gene vector g (state) + fixed driver u (read-only)
     WRITES = ["gene"]                         # the dt-increment of the gene vector
     MAPS = []                                 # intracellular: no gather/scatter, zero cell-to-cell coupling
     SUPPORTED_DIMS = [2, 3]                    # acts on per-cell state; ignores spatial dimension

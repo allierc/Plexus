@@ -1,0 +1,50 @@
+# DIFFER, morphogen:free_space_greens_function -- the ENGINE leg of the differential test.
+#
+# The numeric field diff is done ISOLATED (diff_free_screened_diffusion.py: torch operator vs the
+# jax reference on ONE matched state), because `morphogen` is a quasistatic pure state->field map --
+# dt/key ignored, no integrator, no trajectory, moves no cell -- so run_spec.py's position-based
+# metrics (gyration, nn_distance) are field-INVARIANT here and cannot score the field. THIS run
+# exists to prove the operator ACTS in the real Plexus engine on the matched initial condition: the
+# acted ledger (diag.json) shows `morphogen` writing the `chemical` block from zero, on the SAME
+# 4-founder geometry as the oracle's C_anchor config (the field is translation-invariant, so the
+# world-frame founders here have pairwise distances identical to C_anchor's local-frame founders).
+general:
+  name: free_screened_diffusion
+  seed: 0
+  n_frames: 4
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 4
+    buffer: 8
+    # The anchor's four founders, in the world frame. Free space + translation invariance => the
+    # steady field these produce is identical to the oracle's C_anchor (local-frame) field.
+    start: [[20.0, 20.0], [21.0, 20.1], [20.5, 20.9], [19.6, 20.7]]
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }
+      radius: { width: 1 }
+      secretion_rate: { width: 1 }
+      chemical: { width: 1 }
+
+fields: {}
+
+operators:
+  # 0: initial condition -- a cell with radius 0 is a zero-size source; every live cell secretes at
+  #    unit rate. Non-spatial blocks start at zero, so seed radius and the source rate S.
+  - { op: seed_state, at: cell, before_frame: 1,
+      values: { radius: 0.5, secretion_rate: 1.0 } }
+  # A: the morphogen field -- overwrite `chemical` with the steady screened-diffusion (modified
+  #    Helmholtz) concentration superposed from every live source's free-space Green's function.
+  - { op: morphogen, implementation: free_space_greens_function, at: cell,
+      diffusion: 1.0, degradation: 1.0, n_space_dim: 2 }
+
+schedule: [seed_state, morphogen]
+
+plotting:
+  background: black
+  point_size: 6.0

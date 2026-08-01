@@ -1,0 +1,83 @@
+{
+  "gene_network_connectionist": [
+    "reads: ['gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)', 'sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)'] -> ['gene', 'drive']",
+    "writes: ['gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)'] -> ['gene']",
+    "inputs: ['cell', 'sensed_input_fields'] -> ['cell', 'drive']"
+  ],
+  "neural_ode": [
+    "reads: ['input_specs sensed driver fields u, held fixed over the macro-step', 'output_specs current gene/output state read back as the ODE initial condition', 'tag-prefixed hidden latent field, read only when hidden_size > 0'] -> ['input_specs', 'output_specs']",
+    "writes: ['output_specs fields as per-dt gene-expression increments (delta)', 'tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0'] -> ['output_specs']"
+  ],
+  "gene_network_mwc": [
+    "reads: ['gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)', 'sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics, held fixed over dt)'] -> ['gene', 'drive']",
+    "writes: ['gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)'] -> ['gene']",
+    "inputs: ['cell', 'sensed_input_fields'] -> ['cell', 'drive']"
+  ],
+  "odecontroller": [
+    "reads: ['driver_inputs', 'gene_state', 'hidden_state'] -> ['drive', 'gene', 'hidden']",
+    "writes: ['gene_state', 'hidden_state'] -> ['gene', 'hidden']"
+  ],
+  "free_screened_diffusion": [
+    "reads: ['secretion_rate (per-cell source rate S, the source_name field -- the only declared read)', 'pos (cell centers; pairwise distances r_ij drive the kernel -- read but NOT declared in state_reads)', 'radius (per-SOURCE finite size a, giving r_eff = max(r, a) and the 3-D (1 + kappa*a) term -- undeclared)', 'alive (source AND receiver liveness mask, applied twice -- undeclared)'] -> ['secretion_rate', 'pos', 'radius', 'alive']",
+    "writes: ['chemical (per-cell steady-state screened-diffusion concentration, the field_name; non-heritable, recomputed each step)'] -> ['chem']",
+    "maps: ['pairwise (dense all-pairs cell -> cell distance-kernel superposition c_i = sum_j alive_j G(r_ij, a_j) S_j)'] -> ['pairwise']"
+  ],
+  "division": [
+    "reads: ['division_rate', 'division_axis', 'radius', 'position', 'alive'] -> ['division_rate', 'division_axis', 'radius', 'pos', 'alive']",
+    "writes: ['position', 'radius', 'alive', 'celltype', 'born', 'mother', 'division_overflow'] -> ['pos', 'radius', 'alive', 'celltype', 'born', 'mother', 'division_overflow']",
+    "maps: ['hazard = per-cell Bernoulli event with probability p = 1 - exp(-clip(division_rate,0,inf)*dt) on a fixed capacity buffer; a committed divider wakes one free slot, the daughter inherits every heritable field and resets the rest to default; a division past capacity is dropped (registered cell_divide stops when the buffer is full, jax-morph drops-and-tallies into division_overflow)', \"volume_conservation = both daughters take radius r*m with m = 2^(-1/d) (n_space_dim sets the exponent), halving the mother's d-volume into two equal daughters -- vs registered cell_divide's mass-doubling, where the daughter inherits the mother's radius unchanged\", 'placement = daughter offset by the NEW radius r*m along dir = normalize(orientation_snr*a_hat + isotropic_unit_RMS_noise), so the two daughters end exactly just-touching (centre gap 2*r*m = sum of radii); orientation_snr=0 or a zero division_axis falls back to isotropic placement', 'lineage = a born flag plus the mother parent-slot index recorded on the woken slot (sentinel -1 elsewhere), reconstructing clonal ancestry that the registered birth flag alone cannot'] -> ['hazard', 'volume_conservation', 'placement', 'lineage']"
+  ],
+  "saturating_cell_growth": [
+    "maps: ['growth_law = von Bertalanffy exact flow dr = (max_radius - radius)*(1 - exp(-growth_rate*dt/max_radius)), the closed-form integral of dr/dt = k*(1 - r/R); saturating, monotone, unconditionally stable for any dt, no min/clamp', 'realization = per-cell scalar radius on a point / soft-sphere cell (NO MPM reserve particles); dt-scaling is baked into the returned delta, which is summed with any other radius writers (stable operator-split contribution)', 'rate source = per-cell heritable state field growth_rate (default 0.0), rewritten each macro-step by an upstream controller so gradients flow through it; the sole constructor param is max_radius (a traced, optimizable target)'] -> ['growth_law', 'realization', 'rate']"
+  ],
+  "brownian_dynamics": [
+    "reads: ['position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift is evaluated.', 'alive (ALIVE) -- masks dead/padded cells in both the delta and the score.', 'potential.state_reads() -- any extra fields the drift potential couples from (empty for a pure bath).'] -> ['pos', 'alive']",
+    "writes: ['position (POSITION) -- the dynamic thermal displacement delta; the exogenous noise and the realized displacement are also recorded as ephemeral per-macro-step trace fields so the step stays pathwise-differentiable and scorable.'] -> ['pos']",
+    "inputs: ['kT (thermal_energy / cellular temperature) -- the one knob that turns the bath on; sets std = sqrt(2 kT dt / gamma). kT=0 -> no agitation, degenerates to pure relaxation.', 'gamma (translational_drag) -- mobility 1/gamma; also sits under the noise sqrt, coupling amplitude to friction via the Einstein / fluctuation-dissipation relation D = kT/gamma.', 'dt (macro-step size, engine-supplied) -- the noise scales as sqrt(dt) (Wiener), NOT dt; the drift scales as dt.', 'potential (a SEPARATE pluggable pair-potential contract, engine-integrated) -- supplies the deterministic drift F/gamma this walk rides on; pass None for a pure thermal gas.'] -> ['kT', 'gamma', 'dt', 'potential']",
+    "outputs: ['a dynamic dt-scaled position delta (a per-cell Gaussian Wiener increment), summed across dynamic writers by the model.'] -> ['a']"
+  ],
+  "no_force": [
+    "writes: ['position'] -> ['pos']"
+  ],
+  "pairwise_potential": [
+    "reads: ['position', 'radius', 'alive', 'displacement', 'coupling field (shared scalar OR per-cell scalar field, e.g. epsilon / alpha / k), symmetrised per pair by the arithmetic-mean mix rule'] -> ['pos', 'radius', 'alive', 'displacement', 'coupling']",
+    "writes: ['position'] -> ['pos']",
+    "maps: [\"pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered pair counts once); force on each cell = -grad of a conservative radial pair energy by autodiff, the concrete well SHAPE supplied by a subclass's pair_energy (repulsive core +/- adhesive tail)\", 'contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); a per-cell coupling symmetrised per pair by the arithmetic-mean mix; a conservative radial pair force integrated overdamped or minimised by the wrapping motion step'] -> ['pairwise', 'contact']"
+  ],
+  "morse": [
+    "reads: ['position', 'radius', 'alive', 'coupling field (shared scalar OR per-cell scalar field, e.g. epsilon / alpha), symmetrised per pair by the arithmetic-mean mix rule'] -> ['pos', 'radius', 'alive', 'coupling']",
+    "writes: ['position'] -> ['pos']",
+    "maps: ['pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered pair counts once); force on each cell = -grad of the conservative Morse pair energy by autodiff', 'contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); repulsive core (excluded volume) + adhesive tail (cell-cell adhesion); a radial pair force integrated overdamped or minimised'] -> ['pairwise', 'contact']"
+  ],
+  "soft_sphere": [
+    "reads: ['position', 'radius', 'alive', 'epsilon (per-cell OR shared interaction strength; SoftSphere reads it only when it is a per-cell field)'] -> ['pos', 'radius', 'alive', 'epsilon']",
+    "writes: ['position'] -> ['pos']",
+    "maps: ['pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each unordered pair counts once); force on each cell = -grad of the conservative SoftSphere pair energy by autodiff; size-consistent contact distance sigma = r_i + r_j read from the physical radius (tracks cell growth/division)', 'PURELY REPULSIVE compact soft core U = (epsilon/2)(1 - r/sigma)^2 with support exactly [0, sigma) -- no adhesive tail and no cutoff parameter (self-truncating at contact), C1 (force vanishes at contact); a radial pair force integrated overdamped or minimised by the wrapping motion step. This is the adhesion-OFF shape of adhere (Hertzian shares it; Morse/LennardJones/Harmonic add the attractive tail)'] -> ['pairwise', 'PURELY']"
+  ],
+  "hertzian": [
+    "reads: ['position', 'radius', 'epsilon (per-cell OR shared contact stiffness; read via state_reads only when it is a per-cell field, otherwise a shared scalar)'] -> ['pos', 'radius', 'epsilon']",
+    "writes: ['position'] -> ['pos']",
+    "maps: ['pairwise radial contact interaction over live non-self cell pairs (dense N x N, half-summed so each unordered pair counts once); force on each cell = -grad of the conservative Hertzian pair energy by autodiff', 'contact distance sigma = r_i + r_j (additive, size-consistent as cells grow); PURELY REPULSIVE compact soft core U = (2/5) eps (1 - r/sigma)^(5/2) with support exactly [0, sigma) -- no adhesive tail and no cutoff parameter (self-truncating at contact), C2 (force AND its slope vanish at contact); a radial pair force integrated overdamped or minimised by the wrapping motion step'] -> ['pairwise', 'contact']"
+  ],
+  "harmonic": [
+    "reads: ['position', 'radius', 'alive', 'coupling field (shared scalar OR per-cell scalar field, here the stiffness k), symmetrised per\\npair by the arithmetic-mean mix rule 0.5*(k_i+k_j)\\n'] -> ['pos', 'radius', 'alive', 'coupling']",
+    "writes: ['position'] -> ['pos']",
+    "maps: ['pairwise radial interaction over live non-self pairs (dense N x N, half-summed so each unordered\\npair counts once); force on each cell = -grad of the conservative harmonic pair energy by\\nautodiff; size-consistent contact distance sigma = r_i + r_j read from the physical radius\\n(tracks cell growth/division)\\n', 'repulsive core (r < sigma, excluded volume) + adhesive tail (sigma < r < r_c, cell-cell\\nadhesion) from a down-shifted harmonic well hard-truncated at r_c = r_cutoff_frac*sigma; a\\nradial pair force integrated overdamped or minimised by the wrapping dynamics step. This is the\\nadhesion-ON shape of `adhere` (Morse/LennardJones share it; SoftSphere/Hertzian are the\\nadhesion-OFF, purely-repulsive shape of the same contract)\\n'] -> ['pairwise', 'repulsive']"
+  ],
+  "lennard_jones": [
+    "reads: ['position', 'radius', 'alive', 'epsilon (shared scalar OR per-cell scalar StateFieldSpec interaction strength; the field is read\\nonly when epsilon is a per-cell spec, else it is a shared scalar), symmetrised per pair by the\\narithmetic-mean mix rule 0.5*(e_i + e_j)\\n'] -> ['pos', 'radius', 'alive', 'epsilon']",
+    "writes: ['position'] -> ['pos']",
+    "maps: ['pairwise radial interaction over live non-self cell pairs (dense N x N, half-summed so each\\nunordered pair counts once); force on each cell = -grad of the conservative pair energy by\\nautodiff, integrated overdamped / minimised by a wrapping motion or relaxation step\\n', 'contact distance sigma = r_i + r_j (ADDITIVE, size-consistent as cells grow and divide); the\\nLennardJones member is the r_min 12-6 form U = epsilon*((sigma/r)^12 - 2 (sigma/r)^6), minimum\\n-epsilon exactly at contact, its adhesive tail truncated by a sigma-relative smooth C1 cutoff on\\n[r_onset_frac, r_cutoff_frac]*sigma (default 1.5-2.5); adhesive members (Morse, Harmonic,\\nLennardJones) carry the tail, repulsion-only members (SoftSphere, Hertzian) switch it off -- same\\nsignature\\n'] -> ['pairwise', 'contact']"
+  ],
+  "mechanical_relaxation": [
+    "reads: ['position', 'radius', 'alive', '<potential.state_reads(): any per-cell coupling field the potential sources its params from, e.g. a StateFieldSpec epsilon when adhesion is field-driven; empty for NoForce and scalar-coupling potentials>'] -> ['pos', 'radius', 'alive']",
+    "writes: ['position'] -> ['pos']"
+  ],
+  "virial_stress": [
+    "reads: ['position', 'radius', 'alive', 'displacement', \"the potential's coupling field(s) (e.g. a per-cell epsilon), when the pair law is field-driven; empty for a scalar-parameter potential\"] -> ['pos', 'radius', 'alive', 'displacement', 'the']",
+    "maps: [\"pairwise radial reduction over live non-self neighbours -- each cell's local mechanical load = the Irving-Kirkwood virial pressure p_i = -(1/(2 d V_i)) * sum_j r_ij*(dU/dr)(r_ij), the SAME conservative pair law and neighbour sum attraction_repulsion uses for its force, but contracted to a per-cell SCALAR observable (the radial force projected on r_ij) rather than the -grad_i vector that moves cells\", 'per-cell d-ball volume V_i from radius (2 r | pi r^2 | 4/3 pi r^3); Irving-Kirkwood 1/2 bond split; compression-positive / tension-negative sign convention; transient (heritable=False), recomputed each macro-step; pure sensing -- writes only stress and moves nothing -- for downstream mechanotransduction (e.g. stress-gated division)'] -> ['pairwise']"
+  ],
+  "declared_field_dataflow_validation": [
+    "reads: ['position', 'radius', 'celltype', 'alive', 't'] -> ['pos', 'radius', 'celltype', 'alive', 't']"
+  ]
+}

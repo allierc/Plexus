@@ -1,0 +1,31 @@
+{
+  "N": 16,
+  "n_in": 2,
+  "width": 8,
+  "depth": 2,
+  "dts": [
+    0.5,
+    1.0,
+    2.0
+  ],
+  "configs": {
+    "A": {
+      "hidden": 0,
+      "n_out": 3,
+      "n_gene": 3,
+      "ref_vs_true_dt0.5": 6.274084900270704e-05,
+      "ref_vs_true_dt1.0": 0.00021203648902234917,
+      "ref_vs_true_dt2.0": 0.0009894296825163629
+    },
+    "B": {
+      "hidden": 2,
+      "n_out": 2,
+      "n_gene": 4,
+      "ref_vs_true_dt0.5": 1.7883920560679556e-05,
+      "ref_vs_true_dt1.0": 0.00013370235326615187,
+      "ref_vs_true_dt2.0": 0.0002170449055777235
+    }
+  },
+  "determinism_ok": true,
+  "reference_vs_truth_max": 0.0009894296825163629
+}

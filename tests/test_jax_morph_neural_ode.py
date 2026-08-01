@@ -78,6 +78,9 @@ def _op(**params):
 
 def test_registration_shared_contract():
     """neural_ode and connectionist are two implementations of the ONE `regulate` contract."""
+    # Import the sibling explicitly. Asserting on an implementation that some OTHER module
+    # registers makes the result depend on import order -- the test then measures the runner.
+    import plexus.operators.candidates.jax_morph_gene_network_connectionist  # noqa: F401
     c = get_contract("regulate")
     assert c.kind == "exchange" and c.family == "fields" and c.set == "cell"
     assert {"neural_ode", "connectionist"} <= set(c.implementations)

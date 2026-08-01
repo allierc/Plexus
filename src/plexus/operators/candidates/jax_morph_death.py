@@ -119,5 +119,12 @@ class Apoptose(Structural):
         # EFFECT: flip alive -> dead by retiring the slot (occ 1 -> 0). The slot is NOT freed within
         # the step -- cell_divide reuses `occ == 0` slots only on a LATER macro-step, so under the
         # divide-then-die ordering the death record survives for lineage reconstruction.
-        lvl.occ[die] = 0.0
+        # occ is CLONED before the write. `grow_radius` multiplies its delta by
+        # `lvl.occ[:, None]`, so the live mask is on the autograd tape; mutating it in
+        # place invalidates that multiply and the whole rollout stops being
+        # differentiable. Found by grad_probe.py, not by any forward run -- a forward run
+        # cannot tell the two apart.
+        occ = lvl.occ.clone()
+        occ[die] = 0.0
+        lvl.occ = occ
         return {}

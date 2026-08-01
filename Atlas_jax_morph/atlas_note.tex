@@ -101,17 +101,24 @@ the wrong thing.
 %======================================================================
 \section{Where we actually are}
 
-\textbf{Phase 0 is finished, and this note is its boundary.} Everything built today is an
-instrument. Not one line of it is a claim about biology, and that is deliberate --- it is the
-direct inheritance from the other folder, where three of the four measurements the loop relied on
-turned out to be broken after two days of confident reporting.
+\textbf{Phases 0 to 3 are done.} Every one of the 24 mechanisms has been read at source,
+normalized into a typed Plexus contract, attacked by a skeptic, and --- where it was new or a
+refinement --- implemented as a Plexus operator with a test. Sixteen operator modules exist,
+\textbf{all sixteen import, register the implementation their record claims, agree with their
+recorded signature, pass a test, and co-exist in one registry}.
 
-One agent call has been made: a single excavator on a single mechanism, run to prove the plumbing
-end to end before twenty-four of them run unattended. It worked, it took 6.3 minutes, and it
-found something in the target that matters (\S6).
+\textbf{The first ledger is in.} Eight genuinely new contracts, six further implementations of
+them, two aliases of things we already had, two refinements, six entries with no biology to
+extract. And the forward composition RUNS: the authors' proliferation model, rebuilt from those
+operators, grows a jammed cluster from 4 cells to 124 --- against their 82. That last disagreement
+is the most useful number the atlas has produced, and \S8 is about it.
 
-\textbf{The belief register for jax-morph is otherwise empty}, and it should be. Twenty-three of
-the twenty-four mechanisms have not been read.
+\begin{center}
+\includegraphics[width=0.62\textwidth]{_state/saturation.png}\\
+{\small\color{grey}The measurement, as far as it goes. The dotted line is the world in which every
+mechanism is new vocabulary; the steps are what actually happened. One repository cannot show
+saturation --- the second and third can.}
+\end{center}
 
 %======================================================================
 \section{Why a target with code changes everything}
@@ -366,7 +373,7 @@ term with its page number.\\
 \end{tabular}
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Read all 24 mechanisms \hfill \todo\ ($\sim$2.5 h, local)}
+\begin{phasebox}{Phase 1 --- Read all 24 mechanisms \hfill \done\ (36 min, 24 of 24)}
 The excavator on every mechanism: what it does to the state, its equations, the role of every knob,
 and a \code{surprises} list --- the implicit units, orderings, guards and magic constants a
 reimplementer gets wrong. On the single call already made this took 6.3 minutes, so the phase is
@@ -378,7 +385,7 @@ zero blocked. \textbf{What I will be watching:} whether each entry states what i
 the last campaign got into trouble --- and the one call so far did this well, unprompted.
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \todo\ ($\sim$4 h)}
+\begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \done\ (73 min)}
 Each mechanism becomes a typed Plexus contract with a verdict; the skeptic then tries to break each
 verdict; refuted ones go round again with the refutation in front of them.
 
@@ -391,20 +398,20 @@ entries will be the three architectural ones, and those improve the language rat
 biological vocabulary. If that is wrong I want it to be wrong loudly, so it is written here.
 \end{phasebox}
 
-\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \todo\ ($\sim$1 day)}
+\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \done\ (56 min + reconciliation)}
 Every \emph{new} and every \emph{refinement} becomes a Plexus operator in the anti-chamber, with a
 test of one property statable without the reference: a conservation law, a sign, a limit, a
 symmetry. Nothing enters the validated library at this stage.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4 --- Differential validation \hfill \todo\ ($\sim$1 day)}
+\begin{phasebox}{Phase 4 --- Differential validation \hfill \fl}
 Metric and threshold first; then the same initial condition through both implementations; then
 subtract. \textbf{A failure here is the most informative outcome available} --- it is the
 reproduction telling us the contract is wrong, which is the whole reason for choosing a target
 with code.
 \end{phasebox}
 
-\begin{phasebox}{Phase 5 --- The forward figure \hfill \todo\ ($\sim$1 day)}
+\begin{phasebox}{Phase 5 --- The forward figure \hfill \prog\ (it runs)}
 \textbf{Forward only, deliberately first.} A composition of the normalized operators --- growth,
 division, mechanics, secretion, diffusion --- run in the Plexus engine and set beside the same
 composition run in theirs. No optimisation, no gradients: this figure exists to show that the
@@ -528,6 +535,210 @@ image --- so it checked the rules by hand and the driver validated afterwards. T
 but it means an agent cannot iterate against the validator inside one call, which will cost extra
 round-trips in Phase 2.
 \end{enumerate}
+
+%======================================================================
+\section{Phases 1--3 report --- 31 July, 22:30}\label{sec:p13report}
+
+\emph{Three phases, about three and a half hours of agent time, six agents at once. What follows
+is what came back, including the parts where the loop was wrong about itself.}
+
+\subsection{Phase 1 --- what 24 readings found}
+
+Twenty-four excavations, 36 minutes wall clock, nothing blocked. The entries carry the update
+equations, the role of every knob, the state each step really touches, and a \code{surprises}
+list. Three findings are worth your time:
+
+\begin{itemize}
+\item \textbf{Two mechanisms in the code are not in the paper at all.} \code{Death} --- the words
+``death'', ``apoptosis'' and ``necrosis'' appear zero times in the paper, whose forward model is
+explicitly ``division, growth, mechanical stress sensing, and morphogen excretion and detection''.
+And \code{ActiveBrownianDynamics2D}, self-propulsion with rotational diffusion, which the paper's
+passive, noise-free methods never mention. The library ships capability the publication does not
+claim. \emph{Recording that is only possible because we chose a target with code.}
+\item \textbf{The code generalises the paper where the paper was specific.} Their Methods define
+relaxation as \emph{deterministic} gradient descent on a Morse potential. The source implements a
+Langevin step in which \code{kT=0} \emph{is} that gradient descent and \code{kT>0} is the thermal
+regime one appendix experiment used. One operator, two papers' worth of behaviour --- and the
+unification is the code's, not the text's.
+\item \textbf{Division hides a dimension-dependent physics constant in what looks like a shape
+argument.} The volume-halving factor is $2^{-1/d}$, so \code{n\_space\_dim} silently sets how much
+a cell shrinks when it divides. A reimplementer who hard-codes $1/2$ breaks volume conservation
+and will never see an error.
+\end{itemize}
+
+\subsection{Phase 2 --- the first ledger, and a prediction that was half wrong}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r p{8.6cm}@{}}
+\toprule
+\textbf{verdict} & \textbf{n} & \textbf{what it means}\\
+\midrule
+new contract & 8 & \code{adhere}, \code{agitate}, \code{apoptose}, \code{mechanosense},
+\code{morphogen}, \code{regulate}, \code{relax}, \code{reorient}\\
+implementation & 6 & a second, third or fourth numerical realisation of one of those eight\\
+alias & 2 & already in the language (both to \code{attraction\_repulsion})\\
+refinement & 2 & \code{cell\_divide} and \code{cell\_grow} must widen to admit these\\
+out of scope & 6 & no biology to extract: integration, plumbing, a null potential\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{I predicted, in writing, before the phase ran:} the pairwise potentials would collapse to
+one contract with several implementations, and the genuinely new entries would be the three
+architectural ones.
+
+\textbf{Half right, and the wrong half is the interesting one.} The potentials did collapse ---
+four of the five are implementations of a single \code{adhere} contract. But every architectural
+entry came back \emph{out of scope}, not new: the operator split, the time-scale taxonomy, the
+dataflow contract and the stochastic trace are how their framework is built, not biology it
+models. The genuinely new vocabulary is biological instead --- a cell regulating itself, dying,
+sensing its own mechanical load. I would have bet the other way.
+
+\textbf{The skeptic earned its place.} It challenged 5 of 23 verdicts, and all five were in the
+same neighbourhood: the pairwise potentials, where the line between ``same contract, different
+numerics'' and ``different contract'' is genuinely hard. Two aliases became new contracts on the
+second pass; one new contract became a refinement.
+
+\subsection{Phase 3 --- and what verification found afterwards}
+
+Sixteen operator modules. Then an independent sweep -- import each in its own interpreter, check
+it registers what the record claims, compare its typed signature to the record, run its test, and
+import all sixteen \emph{together}. The first sweep reported \textbf{2 of 16 clean}. After
+reconciliation it reports \textbf{16 of 16}. What lay between:
+
+\begin{itemize}
+\item \textbf{Two agents chose the same implementation label} (\code{connectionist}) for two
+different vector fields on the same contract. Invisible in isolation; the registry rejects it the
+moment both are imported into one process, which is why importing them all together is now part
+of the sweep.
+\item \textbf{Five modules declared they read \code{position}.} A Plexus set stores \code{pos}. A
+declared state block that does not exist is a signature nobody can ever check.
+\item \textbf{Two operators masked dead cells and did not declare reading \code{alive}} --- a
+performed read that the type does not mention.
+\item \textbf{One refinement could not be built at all}, and the module says so instead of routing
+around it: the shipped \code{cell\_grow} is \emph{structural} (it advances a rest volume and
+returns nothing) while the jax-morph law is \emph{lateral} (it returns a radius increment), and
+the registry rightly refuses two implementations of one contract that disagree about kind ---
+kind is biology. It is parked as \code{grow\_radius}. Promoting it means changing what
+\code{cell\_grow} is, which breaks its existing users. \emph{That is the language decision I
+flagged as open at the last boundary, arriving as a concrete case.}
+\end{itemize}
+
+\subsection{Where the loop was wrong about itself}
+
+Four defects in my own machinery, all found by running it, all fixed:
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{The ledger counted rows, not contracts.} Four control steps normalize to one
+\code{regulate}; counting each as new vocabulary inflated the headline number from 8 to 11 --- a
+36\% overstatement of exactly the quantity the atlas exists to measure. It now counts distinct
+contracts and reports repeats as \emph{implementations}, which is the outcome
+\code{plexus2.tex} calls the good one.
+\item \textbf{The reading agents had no \code{Write} tool.} Five calls ended by politely asking a
+human to approve a file write, in a headless subprocess with nobody listening. The retry recovered
+all five; a tool list that turns work into a question is still a bad tool list.
+\item \textbf{The integrity check ate the work it was protecting.} I gave the driver an in-memory
+mirror of the record and told it to treat any deviation as tampering. With two driver processes
+running, each innocent commit looked like tampering to the other, and one of them ``restored'' a
+stale snapshot over a correct normalization. A record shared by several processes needs a lock in
+the filesystem, not a copy in one process's memory.
+\item \textbf{The skeptic's refutations were being silently erased} by that same mirror --- the
+loop's one adversarial check, undone by its own integrity check. Recovered from the skeptic's log
+and re-applied; all five disputes are on the record.
+\end{enumerate}
+
+%======================================================================
+\section{The forward figure, and the number that does not match}\label{sec:fwd}
+
+\begin{center}
+\includegraphics[width=\textwidth]{../log/atlas/jax_morph_proliferation/strip.png}\\
+{\small\color{grey}Plexus, running operators normalized out of their code: relax + grow + divide,
+their four founders, their parameters, 40 macro-steps. Compare with the reference strip in \S4.}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r r l@{}}
+\toprule
+& \textbf{Plexus} & \textbf{reference} & \\
+\midrule
+live cells, 4 $\to$ & \textbf{124} & \textbf{82} & \textcolor{bad}{51\% high}\\
+radius of gyration & 0.686 $\to$ 3.518 & 0.651 $\to$ 3.228 & agrees to 9\%\\
+capacity used & 124 of 600 & 82 of 140 & neither run hit its buffer\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The shape matches; the population does not. That is the honest state, and it is worth more than a
+figure that agreed. Two things are already ruled out: it is not an array bound (the buffer is five
+times the final count) and it is not an inert operator (every scheduled operator is recorded as
+having acted, on every frame it ran).
+
+\textbf{What it took to get even this far} is itself a finding. The first run produced
+\emph{zero} divisions in 40 frames, silently: \code{cell\_divide} read the division rate as a
+Level buffer while the spec --- and the growth operator standing next to it --- kept it as a state
+block. So it read its own default of zero, and the run completed, and the movie looked plausible.
+Two operators from the same atlas disagreed about where a cell's radius lives. Nothing raised.
+That is the class of defect this whole apparatus exists to catch, and it was caught by the acted
+ledger asking one question: \emph{did this operator ever do anything?}
+
+Phase 4 is now running that comparison properly for every mechanism, metric and threshold written
+down first.
+
+%======================================================================
+\section{Phase 6 is already possible --- the gradient survives}\label{sec:grad}
+
+You asked for Figure~5 by differentiability, and called it an expected feature of Plexus~2 rather
+than a bonus. So before Phase 4 finished I tested the one precondition nobody had: \emph{does a
+gradient survive a Plexus rollout at all?}
+
+It did not, for three reasons, and all three are now fixed or named:
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{The engine discards every gradient by construction.} \code{engine.run} wraps its
+whole tick loop in \code{no\_grad}. Sensible for forward generation, fatal for the inverse half.
+Lifting it is one opt-in argument, not a re-implementation --- which matters, because
+\code{prototype/inverse\_slime/} had to keep a \emph{second} differentiable copy of the physics in
+step with the engine by hand. One physics, one tape, is worth having.
+\item \textbf{A division event killed the tape.} Waking a daughter wrote the occupancy vector
+\emph{in place}, and the growth operator multiplies its increment by that same vector --- so
+autograd refused the multiply it had already recorded. The fix is the discipline JAX imposes on
+the reference for free and torch lets us skip: write a clone, publish the clone. A forward run
+cannot tell the two apart, which is exactly why nobody would have found this without asking for a
+gradient.
+\item \textbf{A parameter gradient still does not flow}, because our tunables are Python floats
+baked in at construction. This is not a bug so much as an unmade decision, and the reference
+states the rule outright: \emph{store as an array anything you want to learn}. That is a Plexus
+language change, and it is the next thing Phase 6 needs.
+\end{enumerate}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l l@{}}
+\toprule
+\textbf{measured with \code{grad\_probe.py}} & \textbf{result}\\
+\midrule
+gradient to the initial state, 6 frames & flows, $|\nabla| = 1.19$\\
+each operator alone (seed, relax, grow, divide) & all four flow\\
+all four together, before the fix & \textcolor{bad}{tape broken at the first division}\\
+all four together, after the fix & flows, $|\nabla| = 1.79$\\
+\textbf{20 frames through 23 real division events} & \textbf{flows}, $|\nabla| = 3.21$, 4 $\to$ 27 cells\\
+gradient to an operator parameter & \textcolor{bad}{no path --- parameters are floats}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{And here the two halves of the atlas meet.} Phase~2 classified jax-morph's four
+architectural mechanisms --- the operator split, the time-scale taxonomy, the declared dataflow,
+the stochastic trace/replay/score contract --- as \emph{out of scope}, because none of them models
+any biology. That was the right call and it is only half the story: those four are precisely the
+infrastructure the \emph{inverse} half of Plexus turns out to need. The trace contract in
+particular is how the reference gets a gradient through a discrete division at all, and it is the
+thing standing between us and a faithful Figure~5.
+
+So the atlas's first repository has produced, unprompted, a shortlist of what to add to the
+language --- which is what Appendix~E said it was for.
 
 %======================================================================
 \section{Decided, and what is still open}

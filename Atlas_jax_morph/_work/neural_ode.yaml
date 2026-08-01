@@ -136,18 +136,68 @@ contract:
   outputs:
   - cell
   reads:
+  - gene
+  - drive
+  writes:
+  - gene
+  maps: []
+status: validated
+module: src/plexus/operators/candidates/jax_morph_neural_ode.py
+test: tests/test_jax_morph_neural_ode.py
+evidence:
+  oracle_run: diff_neural_ode
+  diff_metric: |
+    D_max = max over cells (N=16), evolving-state components, macro-step dt in {0.5, 1.0, 2.0}, and
+    both circuit shapes (A: hidden=0, out=3; B: hidden=2, out=2) of |y_plexus(dt) - y_ref(dt)|, in
+    gene-concentration units. y_plexus(dt) is the torch operator's macro-step endpoint, obtained by
+    running its returned delta through the REAL engine _integrate (gene += dt*delta); y_ref(dt) is
+    the JAX reference ODEController one-step endpoint y0 + increment. Both sides integrate the
+    BIT-IDENTICAL MLP vector field -- the reference's per-layer weights are exported from JAX and
+    reloaded verbatim into torch, and net-equality is verified to ~1e-12 on a random probe, so the
+    field is provably identical and any endpoint gap is the INTEGRATOR alone -- with adaptive Dopri5
+    at rtol=1e-4/atol=1e-6 from the same g0, u0 over [0, dt]. Computed in float64 so that float32
+    roundoff cannot masquerade as a defect. Driver: Atlas_jax_morph/diff_neural_ode.py; artefact
+    log/atlas/neural_ode/diff.json.
+  threshold: |
+    3.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the cross-run comparison from solver
+    physics, not from the observed number. Both sides evaluate the identical vector field, so the
+    only possible disagreement is substep-sequence jitter between two independent adaptive Dopri5
+    controllers (diffrax PIDController vs the operator's hand-rolled I-controller), each bounded by
+    its truncation-from-truth at rtol=1e-4. The reference's own worst-case distance from a
+    machine-accuracy (rtol=1e-10) endpoint is MEASURED at 9.9e-4 (dt=2, config A, summary.json); by
+    the triangle inequality two such rtol=1e-4 integrations agree to within ~2e-3, so 3e-3 (~3x the
+    measured reference truncation) is the tightest bound a correct operator with a legitimately
+    different adaptive integrator can be held to. A tighter 1e-3 would risk a false fail from
+    integrator jitter alone -- the criterion-no-valid-config-can-meet trap. The pre-registered
+    negative control (drop the /dt mean-rate conversion: endpoint = g0 + delta) lands O(0.1) away at
+    dt=2, so 3e-3 still rejects a genuine wiring bug by >30x.
+  value: 2.220446049250313e-16
+  passed: true
+  result: |
+    PASS by ~13 orders of magnitude. D_max = 2.2e-16 (machine epsilon) << threshold 3e-3, so the
+    verdict does NOT hinge on the threshold choice -- it holds under any principled bound down to
+    float64 roundoff. net-equality = 0.0 (the torch MLP reproduces the exported JAX MLP EXACTLY),
+    so the field is bit-identical and the endpoint agreement is the INTEGRATOR. Notably
+    plexus_vs_truth == reference_vs_truth to ~15 digits (dt=2/A: 9.8942968251614e-4 vs
+    9.8942968251636e-4): both adaptive Dopri5 controllers -- diffrax PIDController and the operator's
+    hand-rolled I-controller -- take the SAME accept/reject substep sequence on this field, so they
+    diverge from machine-truth IDENTICALLY and from each other by ~0. The pre-registered negative
+    control (drop the /dt mean-rate conversion) lands 0.408 (A) / 0.252 (B) from the reference at
+    dt=2 -- >100x the threshold -- confirming the metric would catch a genuine wiring error. Driver
+    log/atlas/neural_ode/diff.json; oracle _oracle/runs/diff_neural_ode/ (reference.npz, provenance).
+    CAVEAT (recorded, not a defect): this is an OPERATOR-LEVEL differential, not a run_spec.py
+    trajectory. NeuralODE appears in NO reference composition and a free-form MLP cannot cross the
+    JAX/torch boundary through a YAML spec, so the only faithful way to give both sides the SAME
+    operator is to export the reference's exact weights and reload them verbatim -- which is what was
+    done. The delta is still consumed by the REAL engine _integrate (gene += dt*delta), so the
+    macro-step wiring (velocity-emit, first-order gene block, /dt convention) is exercised end to end.
+state_io_notes:
+  reads:
   - input_specs sensed driver fields u, held fixed over the macro-step
   - output_specs current gene/output state read back as the ODE initial condition
   - tag-prefixed hidden latent field, read only when hidden_size > 0
   writes:
   - output_specs fields as per-dt gene-expression increments (delta)
   - tag-prefixed hidden latent field as a per-dt increment, only when hidden_size > 0
-  maps: []
-status: implemented
-module: src/plexus/operators/candidates/jax_morph_neural_ode.py
-test: tests/test_jax_morph_neural_ode.py
-evidence:
-  oracle_run: null
-  diff_metric: null
-  threshold: null
-  passed: null
+signature_note: the normalizer wrote the CONSTRUCTOR arguments (input_specs / output_specs) into the typed
+  signature; the signature names STATE BLOCKS, which are `gene` and `drive`.

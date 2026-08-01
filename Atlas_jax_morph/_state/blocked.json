@@ -1,1 +1,14 @@
-{}
+{
+  "odecontroller": {
+    "role": "differ",
+    "problems": [
+      "the agent call failed or timed out"
+    ]
+  },
+  "gene_network_connectionist": {
+    "role": "differ",
+    "problems": [
+      "the agent call failed or timed out"
+    ]
+  }
+}

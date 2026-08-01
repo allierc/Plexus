@@ -1,0 +1,78 @@
+differ: 16 mechanisms, 4 at a time -- gene_network_connectionist, neural_ode, gene_network_mwc, odecontroller, death, free_screened_diffusion, division, saturating_cell_growth, active_brownian_dynamics2_d, brownian_dynamics, soft_sphere, hertzian, harmonic, lennard_jones, mechanical_relaxation, virial_stress
+
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Error: Reached max turns (40)
+  REVERTED  differ/odecontroller after 14.2 min:
+    - the agent call failed or timed out
+  handing the violations back to odecontroller, once.
+Error: Reached max turns (40)
+  REVERTED  differ/gene_network_connectionist after 19.1 min:
+    - the agent call failed or timed out
+  handing the violations back to gene_network_connectionist, once.
+Error: Reached max turns (40)
+  REVERTED  differ/gene_network_mwc after 20.7 min:
+    - the agent call failed or timed out
+  handing the violations back to gene_network_mwc, once.
+Error: Reached max turns (40)
+  REVERTED  differ/neural_ode after 21.1 min:
+    - the agent call failed or timed out
+  handing the violations back to neural_ode, once.
+Everything is complete and verified. Summary of what I did:
+
+## Outcome: `regulate:mwc` → **validated** (PASS)
+
+The prior turn had produced all the scaffolding (oracle run, engine run, spec) but died mid-re-run. The cause: `diff_gene_network_mwc.py` had been edited to call `_load_operator_module()` **twice** (once per adversarial batch), and the second module exec re-triggered `@register_operator("regulate", …mwc)` → `ValueError: already has implementation 'mwc'`. That's what "the agent call failed or timed out." I fixed it by caching the module load (`_OP_MODULE`), then re-ran the score to confirm the numbers are real and reproducible.
+
+**The differential test** compares the per-cell vector field `f` (the contract's only distinguishing content), not a raw trajectory — because the reference self-solves with adaptive Dopri5 while the engine takes one explicit-Euler step, an Axis-A gap of **0.482** per macro-step that would otherwise swamp the biology.
+
+| component | value |
+|---|---|
+| metric_P — trajectory, matched Euler (24 steps, identical g0/u0/params) | 1.19e-07 |
+| metric_A — adversarial `f` at t=0 (corner cases + overflow-guard extreme params) | 9.54e-07 |
+| both adversarial dg finite (overflow guard holds) | ✓ |
+| **value = max** | **9.54e-07** |
+| **threshold** (fixed pre-run) | **1.0e-4** |
+
+Threshold justification: ~2 orders above the float32 floor (~1e-6 measured) yet ~4 orders below both the field scale (max|dg|~5–7) and the Dopri-vs-Euler gap (0.482) — so PASS certifies *same `f`*, immune to the integrator.
+
+**Acted ledger checked first:** `regulate` acted 25/25, moved 1.754 (not inert); `valid_evidence: true`.
+
+## Products
+- **Working copy** `_work/gene_network_mwc.yaml`: `status: validated`; `evidence` filled (oracle_run `diff_gene_network_mwc`, diff_metric, threshold w/ justification, metric_P/metric_A, dopri gap, value 9.54e-07, passed true). Verified: parses as valid YAML, and the merged record passes **all 12 record.py rules — 0 violations** (`validated: 1`).
+- **Note** `campaign/notes/gene_network_mwc.md`: appended the DIFFER section (numbers, both run paths, the re-run caveat, verdict).
+
+**Verdict stands:** `new`, `implementation_of: regulate`. The MWC (code-only; paper eq. 4 is the linear form) vector field reproduces the reference to float32 rounding.
+  committed  differ/gene_network_mwc  (6.6 min)
+Everything is coherent and complete. Let me give a final summary.
+
+## Done — `neural_ode` differentially validated
+
+**Verdict: `validated`.** The differential test passed by ~13 orders of magnitude.
+
+### What was the situation
+The oracle side had already run in a prior session (`_oracle/runs/diff_neural_ode/` with `reference.npz` + provenance), and a well-reasoned torch-side driver `diff_neural_ode.py` existed — but the evidence was never recorded and the metric never computed (my prior invocation timed out at the agent level, not the science level). No `log/atlas/neural_ode/` existed.
+
+### What I did, in the required order
+1. **Registered metric + threshold in the record first** (`_work/neural_ode.yaml`), before the cross-run comparison:
+   - `diff_metric`: `D_max = max over cells (N=16), evolving components, dt∈{0.5,1,2}, both circuit shapes of |y_plexus(dt) − y_ref(dt)|`, in gene-concentration units, float64.
+   - `threshold`: **3.0e-3**, justified a priori. The prior draft hardcoded `1e-3`, but the oracle's own summary shows the reference is already **9.9e-4** from machine-truth at dt=2 — two independent adaptive Dopri5 controllers of the identical field can sit ~1e-3 from truth on opposite sides, so 1e-3 risks a false fail from integrator jitter (the "criterion no valid config can meet" trap). 3e-3 ≈ 3× the measured reference truncation, tightest defensible bound, still rejects the negative control by >30×. Updated the driver's hardcoded threshold to match.
+2. **Ran the driver** (`/workspace/.conda_envs/MPM-pytorch/bin/python`, after a one-line `torch.set_grad_enabled(False)` fix since the operator is `DIFFERENTIABLE=True`) → wrote `log/atlas/neural_ode/diff.json`.
+3. **Recorded evidence** and set `status: validated`.
+
+### The result
+- **D_max = 2.22e-16** (machine epsilon) vs threshold 3e-3 — the verdict doesn't hinge on the threshold.
+- **net-equality = 0.0** — the torch MLP reproduces the exported JAX MLP bit-for-bit, so the endpoint match is purely the integrator.
+- `plexus_vs_truth == reference_vs_truth` to ~15 digits — both controllers take the *same* substep sequence; they diverge from truth identically and from each other by ~0.
+- **Negative control** (drop the `/dt` mean-rate conversion): 0.408 / 0.252 from reference at dt=2 — >100× the threshold, so the metric would catch a genuine wiring bug.
+
+### The one honest caveat (recorded, not a defect)
+This is an **operator-level** differential, not a `run_spec.py` trajectory. NeuralODE appears in no reference composition and no paper equation, and a free-form MLP cannot cross the JAX/torch boundary through a YAML spec — a `run_spec.py` run would compare two independently-initialised fields and measure nothing. So the only faithful test exports the reference's exact weights and reloads them verbatim, then drives the operator's delta through the **real engine `_integrate`** (`gene += dt*delta`), exercising the macro-step wiring end to end. R10 verified passing; YAML parses clean.
+  committed  differ/neural_ode  (8.1 min)
+Error: Reached max turns (40)
+  REVERTED  differ/odecontroller after 16.2 min:
+    - the agent call failed or timed out
+  BLOCKED   odecontroller -- twice reverted at differ. Left for a human, not skipped.
+Done. The differential test is complete and the entry validates.

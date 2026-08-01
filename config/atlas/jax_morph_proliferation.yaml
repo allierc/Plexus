@@ -1,0 +1,58 @@
+# Phase 5, the FORWARD figure: the authors' proliferation composition, in Plexus.
+#
+# The oracle run this mirrors is `Atlas_jax_morph/_oracle/runs/smoke/` --
+# MechanicalRelaxation(Morse) + SaturatingCellGrowth + Division, 4 founder cells, 40 macro-steps
+# at dt=1.0, capacity 140. Same initial condition, same parameters, same number of frames; the
+# operators are the ones normalized out of their code in Phases 1-3, not a re-implementation
+# fitted to their output.
+#
+# `buffer` is the capacity the reference calls `capacity`: 4 cells are live at t=0 and division
+# wakes dormant slots. If it is ever exhausted the run has hit an ARRAY BOUND, not a biological
+# limit -- run_spec.py reports it and the evidence is void.
+general:
+  name: jax_morph_proliferation
+  seed: 0
+  n_frames: 40
+  dt: 1.0
+  boundary: free
+  dim: 2
+  world: [40.0, 40.0]
+
+sets:
+  cell:
+    n: 4
+    # 600, not the reference's 140: capacity must never be what stops the run. The first pass
+    # reached 125 of 140 -- close enough that the number could have been an array bound rather
+    # than the biology, and there would have been no way to tell from the trajectory.
+    buffer: 600
+    # The oracle's four founders, translated to the middle of our world box. The reference has
+    # no box at all; the offset is a translation, and every metric compared across the two is
+    # translation-invariant.
+    start: [[20.0, 20.0], [21.0, 20.1], [20.5, 20.9], [19.6, 20.7]]
+    # A set that declares `state:` gets ONLY those blocks -- pos and vel are not implied.
+    state:
+      pos: { width: 2 }
+      vel: { width: 2 }
+      radius: { width: 1 }
+      growth_rate: { width: 1 }
+      division_rate: { width: 1 }
+
+fields: {}
+
+operators:
+  # 0: initial condition. Non-spatial blocks start at zero, and a cell with radius 0 cannot grow.
+  - { op: seed_state, at: cell, before_frame: 1,
+      values: { radius: 0.5, growth_rate: 0.4, division_rate: 0.08 } }
+  # A: pack to mechanical equilibrium under an adhesive pair potential (quasistatic in the
+  #    reference; a relaxation operator here).
+  - { op: relax, at: cell, potential: morse, epsilon: 3.0, alpha: 2.8, max_steps: 800, f_tol: 1.0e-3 }
+  # B: grow toward the maximum radius (von Bertalanffy, exact flow)
+  - { op: grow_radius, at: cell, max_radius: 0.6 }
+  # C: stochastic, volume-conserving division into a free slot
+  - { op: cell_divide, implementation: volume_conserving, at: cell, orientation_snr: 0.0 }
+
+schedule: [seed_state, relax, grow_radius, cell_divide]
+
+plotting:
+  background: black
+  point_size: 6.0
