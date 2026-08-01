@@ -103,6 +103,25 @@ TERRITORY_TARGET = 0.70          # fraction of MECHANISM slots that should sit i
 TERRITORY_LOW, TERRITORY_HIGH = 0.55, 0.85
 OUTCOMES = ("confirmed", "refuted", "inconclusive")
 
+# WHAT KIND OF CLAIM IS THIS. The distinction is not pedantry -- it is the difference between an
+# experiment and an anecdote, and it decides what the Interpreter is ALLOWED to write.
+#
+#   sufficient   "adding X produces the phenotype".  Tested by the ADDITIVE direction alone: run
+#                the base, run base+X, compare. The control at slot 0 already supplies the
+#                "without", so this is enforceable today.
+#   necessary    "without X the phenotype dies".     Tested by the SUBTRACTIVE direction: take a
+#                composition that HAS X and remove it. Nothing in the campaign has ever required
+#                this, which is why no necessity claim on the books is actually supported.
+#   causal       both. The strongest claim, and it costs two runs, and it may not be asserted
+#                from one of them.
+#
+# The Interpreter may write "causes" only for `causal`. For `sufficient` the word is "sufficient";
+# for `necessary` it is "required". A claim that arrives labelled `causal` without both directions
+# present in the same batch is REJECTED by the Critic before any compute is spent -- the same
+# treatment the mandatory control already gets, and for the same reason: the author does not
+# referee their own work.
+CLAIM_KINDS = ("sufficient", "necessary", "causal", "descriptive")
+
 # Supervisor control band on the surprise rate (see module docstring).
 SURPRISE_TARGET = 0.30
 SURPRISE_LOW = 0.10
@@ -122,6 +141,7 @@ class Hypothesis:
     predicted: str                 # e.g. "Q > 0.5"  -- recorded before the run
     rationale: str = ""
     territory: str = "in_paper"    # in_paper | excursion -- see TERRITORIES
+    claim_kind: str = "descriptive"  # sufficient | necessary | causal -- see CLAIM_KINDS
     grounding: list = field(default_factory=list)   # citations from the Grounder
     round_id: int = 0
     t_posed: float = field(default_factory=time.time)
@@ -137,6 +157,8 @@ class Hypothesis:
             raise ValueError(f"intent {self.intent!r} not in {INTENTS}")
         if self.territory not in TERRITORIES:
             raise ValueError(f"territory {self.territory!r} not in {TERRITORIES}")
+        if self.claim_kind not in CLAIM_KINDS:
+            raise ValueError(f"claim_kind {self.claim_kind!r} not in {CLAIM_KINDS}")
         if not self.predicted:
             raise ValueError("a hypothesis without a recorded prediction is not a hypothesis; "
                              "the prediction MUST exist before the run")

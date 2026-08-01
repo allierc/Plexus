@@ -1,0 +1,18 @@
+[
+ {
+  "chi": 1.3,
+  "rd_rate": 1.0,
+  "steps": 3000,
+  "n_spots": 1,
+  "spacing": null,
+  "a_max": 0.40606867953666403
+ },
+ {
+  "chi": 2.6,
+  "rd_rate": 1.0,
+  "steps": 3000,
+  "n_spots": 1,
+  "spacing": null,
+  "a_max": 0.41024331716813367
+ }
+]
