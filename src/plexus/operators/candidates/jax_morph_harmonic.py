@@ -130,11 +130,11 @@ class AdhereHarmonic(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")                        # the set this acts on (engine-injected)
-        self.k = float(params.get("k", 1.0))                       # spring stiffness (scalar fallback / uniform)
+        self.k = self.tunable(params.get("k"), 1.0)                       # spring stiffness (scalar fallback / uniform)
         self.k_field = params.get("k_field", None)                 # optional per-cell stiffness field (block or buffer)
-        self.r_cutoff_frac = float(params.get("r_cutoff_frac", 2.5))  # cutoff as a multiple of contact distance sigma
-        self.mobility = float(params.get("mobility", 1.0))         # 1/gamma: force -> overdamped drift velocity
-        self.radius0 = float(params.get("radius", 0.5))            # uniform fallback radius if the set carries no `radius`
+        self.r_cutoff_frac = self.tunable(params.get("r_cutoff_frac"), 2.5)  # cutoff as a multiple of contact distance sigma
+        self.mobility = self.tunable(params.get("mobility"), 1.0)         # 1/gamma: force -> overdamped drift velocity
+        self.radius0 = self.tunable(params.get("radius"), 0.5)            # uniform fallback radius if the set carries no `radius`
         # faithful construction check: the clamp must sit BEYOND contact, else the "finite range"
         # is empty and the down-shift is ill-defined (source raises the same way).
         if not self.r_cutoff_frac > 1.0:

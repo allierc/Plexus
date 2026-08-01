@@ -148,10 +148,10 @@ class SoftSphere(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
-        self.epsilon = float(params.get("epsilon", 1.0))          # shared repulsion strength (default 1.0)
+        self.epsilon = self.tunable(params.get("epsilon"), 1.0)          # shared repulsion strength (default 1.0)
         self.eps_field = params.get("epsilon_field", None)        # optional per-cell strength block/buffer name
-        self.mobility = float(params.get("mobility", 1.0))        # overdamped mobility 1/gamma (velocity = mobility*F)
-        self.radius0 = float(params.get("radius", 0.5))           # fallback uniform radius if no `radius` buffer
+        self.mobility = self.tunable(params.get("mobility"), 1.0)        # overdamped mobility 1/gamma (velocity = mobility*F)
+        self.radius0 = self.tunable(params.get("radius"), 0.5)           # fallback uniform radius if no `radius` buffer
         # the compact-repulsion constants are FIXED by the harmonic soft-sphere law, not tunables:
         self._exponent = 2.0                                      # energy ~ overlap^2 (harmonic core)
         self._prefactor = 0.5                                     # 1/2 = 1/exponent -> force coefficient = eps/sigma

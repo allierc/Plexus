@@ -155,13 +155,13 @@ class LennardJones(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
-        self.epsilon = float(params.get("epsilon", 1.0))          # shared well depth (default 1.0)
+        self.epsilon = self.tunable(params.get("epsilon"), 1.0)          # shared well depth (default 1.0)
         self.eps_field = params.get("epsilon_field", None)        # optional per-cell well-depth block/buffer name
-        self.mobility = float(params.get("mobility", 1.0))        # overdamped mobility 1/gamma (velocity = mobility*F)
-        self.radius0 = float(params.get("radius", 0.5))           # fallback uniform radius if no `radius` buffer
+        self.mobility = self.tunable(params.get("mobility"), 1.0)        # overdamped mobility 1/gamma (velocity = mobility*F)
+        self.radius0 = self.tunable(params.get("radius"), 0.5)           # fallback uniform radius if no `radius` buffer
         # sigma-relative smooth-cutoff window (multiples of the contact distance), as in the source:
-        self.r_onset_frac = float(params.get("r_onset_frac", 1.5))    # S = 1 inside this (tail untouched)
-        self.r_cutoff_frac = float(params.get("r_cutoff_frac", 2.5))  # energy exactly 0 beyond this
+        self.r_onset_frac = self.tunable(params.get("r_onset_frac"), 1.5)    # S = 1 inside this (tail untouched)
+        self.r_cutoff_frac = self.tunable(params.get("r_cutoff_frac"), 2.5)  # energy exactly 0 beyond this
         if not self.r_onset_frac < self.r_cutoff_frac:            # the source's construction-time check
             raise ValueError(
                 f"LennardJones needs r_onset_frac < r_cutoff_frac for a smooth cutoff window, "
