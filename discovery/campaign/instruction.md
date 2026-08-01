@@ -29,49 +29,55 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 
 <!-- LEARNED PATTERNS -->
 ## Learned patterns
-_Distilled across rounds. Updated R2 (2026-07-30). Drop entries once they stop earning space._
+_Distilled across rounds. Updated R4 (2026-08-01). Drop entries once they stop earning space._
 
 **Edits that keep failing — do not repropose:**
-- **Parameter sweeps disguised as hypotheses.** R1 burned 4/5 slots on ONE composition at five
-  `vcap` values → surprise 0.00, 92/8 drift. Numbers are not a hypothesis; change composition
-  identity or routing every slot. "unknown -- sensitivity sweep" predictions earn zero info.
-- **Growth-MAGNIFYING additions blow the cell buffer.** R2 `+vesicle_growth:uniform_ramp` hit
-  n_cells 15002 → P2_BUFFER_SATURATED → NOT EVIDENCE (slot wasted). Any op that multiplies cell
-  count (uniform growth ramps, aggressive division) risks saturation — check the count budget or
-  it returns invalid.
-- **Removing bookkeeping ops crashes the run.** R2 `−cell_geometry_3d` produced NO diag.json.
-  cell_geometry_3d is load-bearing plumbing, not a driver — do not knock it out.
-- **Division additions go numerically unstable late.** R2 `+divide_3d:hertwig` → force spikes
-  1→66, tension→1.65, body fragments, "degenerate" (ta_n_tubes=1 was a collapse artefact). Big
-  division events blow up in the last ~50 frames; treat any late force/tension spike as instability.
+- **BUFFER SATURATION is the dominant failure of every growth family.** R4 parent-3: the plain
+  CONTROL saturated (n_cells 20804 → NOT EVIDENCE) AND `−reconnect_t1_3d` saturated (5204 → NOT
+  EVIDENCE); only the growth-OFF slot (`−vesicle_growth`) returned valid_evidence. RULE: on any
+  family with growth+division active, growth-ON slots saturate → invalid. Single-op can cleanly
+  measure only growth-REMOVED states. To map a GROWN regime you MUST drop to Loop-II (lower growth
+  rate / cap cell count), not add single-ops. (R2 `+vesicle_growth:uniform_ramp` also hit 15002.)
+- **Impl-swaps crash — no diag.json.** R4 `=shape_energy_3d:monolayer` → empty `{}`. Joins the
+  crash family with `−cell_geometry_3d` / `−cell_adjacency` (load-bearing plumbing). Do not swap
+  implementations and do not knock out bookkeeping ops.
+- **Division additions go numerically unstable late.** `+divide_3d:hertwig` → force 1→66,
+  tension→1.65, body fragments in the last ~50 frames. Treat any late force/tension spike as blowup.
+- **Parameter sweeps disguised as hypotheses.** vcap×5 on one composition → surprise 0.00, 92/8
+  drift. Numbers are not a hypothesis; change composition identity/routing every slot.
 
-**Predictions that were wrong (map is miscalibrated here):**
-- **THE PROTRUSION IS GROWTH-FED, NOT PURELY FORCED (R2 🔥 surprise).** The R1/R2 "forced not
-  grown" verdict is REFUTED. `−morphogen_growth_3d` COLLAPSED protr_peak 4.03→1.026 (sphere,
-  p_ratio 0); `−extrude` ALSO collapsed it →1.385 (sphere). BOTH are NECESSARY — it is a
-  growth-fed forced extrusion, not either alone. Do not treat extrude as "the" forcing op or
-  growth as dispensable; expect knockout of either core driver to give a sphere.
-- **vcap is NOT a monotone protrusion knob** — protr_peak {2.19,4.03,1.73,2.24,3.22}, peaks at
-  0.75. **High protr_peak ≠ stable tube** — vcap 0.75 peaked 4.03 yet Q_drop 0.69; always read Q_drop.
-- **protr_peak is NOISY at the top; don't predict a tight band.** R2 CONTROL predicted 1.7–4.0,
-  landed 4.03 → BASELINE DRIFT (its own prediction failed). Single-run diffs against a drifting
-  control are unreliable; leave headroom in control predictions and prefer large expected effects.
+**Predictions repeatedly WRONG (map miscalibrated):**
+- **Growth+division controls do NOT stay smooth — they saturate.** R4 parent-3 control predicted
+  protr_peak 1.0–1.8 smooth ball; landed saturated 2.839 "branched" 44 tubes. Expect any grown
+  control to trip the buffer, not hold a low-protr ball.
+- **The protrusion is GROWTH-FED, not purely forced** (R2 surprise). `−morphogen_growth_3d` AND
+  `−extrude` BOTH collapse protr_peak → sphere (~1.0–1.4); both necessary. `−vesicle_growth`
+  likewise → sphere 1.003 (R4). Knockout of any core growth/force driver → sphere.
+- **protr_peak is NOISY at the top; don't predict tight bands.** Leave headroom; prefer large
+  expected effects over single-run diffs vs a drifting control.
 
 **Metrics/artefacts that keep misleading:**
-- **"Body shrinks / mass sucked into the protrusion"** — flagged in every forced slot. A thin
-  filament off a shrinking sphere is forced-drainage/render-rescale, not tubulogenesis.
-- **ta_aspect_len_over_diam, ta_tube_len_final, retention** stay REJECTED (read 9–35 on buds the
-  admitted protr_peak scored 1.0–3.2). **analyst_consensus="tube" is not proof** — the "tube"
-  slots were the extreme-p_ratio shrinking-body ones. mech_p_ratio is DIAGNOSTIC only (~1 grown,
-  ~3 forced, ≥40 degenerate), never a scoring clause.
-- **watcher gate is UNRELIABLE, not inert.** R1: no_caption everywhere. R2: it flipped to
-  FALSE-NEGATIVE — CONTRADICTS/blocks on genuine growing structures (blocked control tube AND the
-  hertwig growth). Do not let a watcher CONTRADICT overturn admitted-metric evidence either way.
+- **On any row flagged valid_evidence:false / NOT EVIDENCE (saturated), ALL metrics LIE — ignore
+  the whole row.** R4 saturated control read protr_peak 2.839, 44 tubes, tube_len 89 = pure
+  saturation artefact, not patterning. Never read morphology off a saturated slot.
+- **ta_aspect_len_over_diam, ta_tube_len, retention** REJECTED (9–35 on buds). analyst "tube"
+  consensus + "body shrinks" = forced-drainage artefact, not tubulogenesis. mech_p_ratio is
+  DIAGNOSTIC only (~1 grown, ~3 forced, ≥40 degenerate), never a scoring clause.
+- **watcher is unreliable** — R2 false-CONTRADICTS on real structures; R4 it worked ("supports"
+  sphere). Do not let a watcher verdict overturn admitted-metric evidence either way.
+- **Counter-reset artefact every round** — header shows "round N, 0 runs, coverage 0%,
+  phenotypes {}". Ignore it; the real record is memory.md / analysis.md / knowledge.md.
 
-**Composition families looking exhausted:**
-- **vcap sweep on C5e315998af4/round_40_mc8** — forced spikes across vcap ∈[0,3], no grown regime.
-  Switch operators/routing. The two core drivers (extrude, morphogen_growth_3d) are now mapped as
-  jointly necessary; next map their DIFFERENTIAL/routing, not more solo knockouts of each.
+**Composition families exhausted / near-exhausted:**
+- **parent 1** (round-33 forced / vcap base): forced spikes only, no grown regime; extrude +
+  morphogen_growth_3d mapped jointly necessary. DONE.
+- **parent 3** (uniform mechanical growth): single-op is near-dead — control saturates, monolayer
+  swap crashes, only `−vesicle_growth` valid (confirmatory). Further mapping needs Loop-II rate/cap.
+- **parent 2** (RD Okuda route): all 4 valid single-op edits already PROPOSED
+  (+shape_energy_3d:default, −reconnect_t1_3d, −cell_diffuse, −morphogen_growth_3d) — do NOT
+  re-propose; read its results before building on it.
 
-**Standing steer:** supervisor holds ~70/30 conf/adv (surprise 0.33 = productive band). Prefer
-edits whose outcome you genuinely cannot call.
+**Standing steer:** ~70/30 conf/adv (surprise 0.33 = productive; R4 hit 0.00 = drift). Removing a
+known driver is confirmatory & zero-surprise; the genuinely uncallable edits on growth families
+tend to saturate/crash — so the live frontier is Loop-II grown-regime tuning, not more single-op
+knockouts.

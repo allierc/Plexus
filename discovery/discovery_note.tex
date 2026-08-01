@@ -695,39 +695,71 @@ truthful version, since the camera it was reading was showing growth as shrinkag
 The disagreement is still written down, and it is still worth reading.
 \end{phasebox}
 
-\begin{phasebox}{Phase 5 --- The experiment \hfill \textcolor{bad}{\textbf{ATTEMPTED --- VOID}}}
-\textbf{A 27-run batch ran on 31 July and produced no evidence at all.} Four shape features,
-two directions each, three seeds, plus three nulls --- the first batch in the campaign whose every
-instrument had been certified before it ran, and built to satisfy the ablation rule of Phase~3.
+\begin{phasebox}{Phase 5 --- The first live run, and what it cost to learn \hfill \prog}
+\textbf{It ran.} Six rounds were authorised, two completed before the lessons below made
+continuing pointless: 23 agent calls, \$11, 29 minutes of agent time, eight simulations. The
+loop proposed, reviewed, submitted, refused, scored, and steered itself --- the whole machine
+turned over for the first time.
 
-\textbf{All 27 runs ended at exactly 1778 cells}, flagged \code{saturated}, \code{valid\_evidence:
-false}. That is the same ceiling that voided the overnight study the day before, in the same
-document, for the same reason. The launcher set no cell count and no buffer, so it inherited the
-default that produces 1778.
+\textbf{And it produced one usable run out of eight.} Map coverage 0\%. Nothing was learned
+about the biology. That is the honest headline, and the value of the round is entirely in why.
 
-\textbf{What this says, and it is not that the fix failed.} The flag worked --- every run is
-correctly marked as non-evidence, which is exactly what Phase~0 item~12 was for. What is missing is
-one step earlier: \emph{nothing refused to start}. Detecting a spent batch afterwards and preventing
-it are different jobs, and only the first is built.
+\textbf{What the loop got right, unprompted}
+\begin{itemize}[itemsep=1pt]
+\item The Critic refused every bad run and said why: chemistry diverged, buffer saturated. None
+of them entered the ledger.
+\item The straggler killer cut two runs at 46 minutes against an 11-minute batch median.
+\item The Supervisor diagnosed its own sterility --- \emph{``surprise 0.00: the batch is
+confirming what we already believe, near-zero information. Push adversarial''} --- and steered
+the next round itself.
+\item The round that produced nothing returned \emph{no admissible evidence} rather than scoring
+what it had.
+\end{itemize}
 
-It also broke this phase's own stated rule --- \emph{no experiment until every instrument it will be
-read with exists and has been proved to work} --- while Phase~0 still had two open items. Stating a
-rule and then not being stopped by it is the same class of problem as the buffer: a check that
-exists in prose but not in code.
+\textbf{Four defects, each invisible until something was looked at}
 
-\textbf{Before it is re-run:} a pre-launch gate that refuses any batch whose buffer cannot hold the
-cell count it is aiming at. It is arithmetic, it costs nothing, and it applies to faithful and
-exploratory runs alike.
+\textbf{1. The movies were black, and the first frame was black too.} This is the one Cedric
+asked about, and the answer is worse than a rendering bug. The colour scale is computed once from
+frames sampled across the whole run --- correctly, because a per-frame rescale makes a decaying
+pattern and a stable one look identical, which is how an extinct field passed as coral for
+months. But it was computed over samples \emph{including} non-finite values, and one such value
+makes both bounds non-finite, so every cell in every frame is drawn as nothing. \textbf{Frame~0
+was perfectly good and was drawn black because frame~800 diverged.} The artefact reported
+``nothing happened'' for a run whose first half was fine --- the opposite of the truth, which is
+worse than having no artefact. Fixed: the scale is taken from finite values only, cells that left
+the model are drawn grey rather than white, and the run says on its own output how many there
+were.
 
-\textbf{What changes otherwise.} Several seed spots rather than one, so a run carries its own
-replication. Baseline growth above zero --- cells grow by taking up nutrients, and a protrusion
-drawn from existing material is an ablation, not a setting. Chemistry brought inside the search: the
-whole Turing half currently sits outside the loop's reach because the stage curriculum was written
-when the objective was ``find a tube''. And the starting conditions taken from the Grounder rather
-than from a default.
+\textbf{2. The trajectory analysis had been dead on every run.} The per-frame series records the
+morphology as a word, and the writer that saves the series casts every column to a number. It
+raised on the first one, was caught, printed one line among hundreds, and the run carried on
+without its per-frame table, its plot, its tube metrics, or --- the one that matters --- its
+\emph{evidence horizon}. So peak and final were taken over all frames including any after the
+mesh tore, which is exactly what the horizon exists to prevent.
 
-\textbf{Runs locally.} Two GPUs; a 260-frame run takes 52 seconds. The cluster is not needed and is
-currently off.
+\textbf{3. The reservoir gate fires one step too late.} Three of eight runs died on the cell
+buffer. The gate refuses a run whose reservoir cannot hold its stated target, and these runs grew
+past a target that was estimated too low. The check is correct and the estimate is not.
+
+\textbf{4. Two files were being written as books.} \code{memory.md} reached 1904 words across six
+appended blocks, in a file whose purpose is to hold \emph{state}. Both files now have a fixed
+shape, checked: an append-only log with per-round fields, beside a state document with seven
+named sections and no eighth.
+
+\textbf{The pattern across all four} --- and across the day --- is one thing said four ways: the
+check existed and fired correctly, and what it produced went nowhere. A refusal printed among
+hundreds of lines, a horizon silently absent, a flag raised after the compute was spent, a record
+grown past reading. \textbf{A check whose output nobody receives is not a check.}
+
+\textbf{What has to be true before it runs again}
+\begin{itemize}[itemsep=1pt]
+\item A swallowed exception around an artefact must be loud. The rule has been written down since
+July and this is the third time it was broken in the same file.
+\item The reservoir target must come from the growth the composition actually asks for, not an
+estimate that three runs in eight exceed.
+\item A round that produces no admissible evidence should say so in the scoreboard, not only in
+the terminal.
+\end{itemize}
 \end{phasebox}
 
 \begin{phasebox}{Phase 6 --- The demonstration \hfill \todo}

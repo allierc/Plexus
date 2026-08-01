@@ -532,9 +532,37 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
         pass
 
     T = len(fr)
+    # ONE COLOUR SCALE FOR THE RUN, FROM FINITE VALUES ONLY.
+    # The scale is computed once and applied to every frame, which is right -- a per-frame
+    # rescale makes a decaying pattern and a stable one look identical, and that is how the
+    # coral movie hid an extinct field for months. But it was computed with np.percentile over
+    # samples INCLUDING any NaN, and a single NaN anywhere makes both bounds NaN, so col()
+    # returns NaN for every cell in EVERY frame. Frame 0 is perfectly good and is drawn black
+    # because frame 800 diverged. The movie then reports "nothing happened" for a run whose
+    # first half was fine -- the artefact says the opposite of the truth, which is worse than
+    # having no artefact.
     asamp = np.concatenate([fr[t][2] for t in np.unique(np.linspace(0, T - 1, 12).astype(int))])
-    lo, hi = float(np.percentile(asamp, 5)), float(np.percentile(asamp, 99) + 1e-6)
-    col = lambda a: np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)
+    finite = asamp[np.isfinite(asamp)]
+    if finite.size:
+        lo, hi = float(np.percentile(finite, 5)), float(np.percentile(finite, 99) + 1e-6)
+    else:
+        lo, hi = 0.0, 1.0
+    n_bad = int(asamp.size - finite.size)
+    if n_bad:
+        # Say it on the artefact itself. A viewer must not have to know the run diverged to
+        # read the movie correctly, and a caption is the only place that survives being looked at.
+        print(f"[{name}] ⚠ {n_bad}/{asamp.size} sampled activator values are non-finite -- the "
+              f"colour scale is taken from the finite ones and NON-FINITE CELLS ARE DRAWN GREY. "
+              f"Frames after divergence are not a morphology.", flush=True)
+
+    def col(a):
+        a = np.asarray(a, float)
+        out = np.clip((a - lo) / (hi - lo + 1e-9), 0, 1)
+        # NaN is not zero. Zero is white (no activator) and would read as a healthy resting
+        # cell; the truth is "this cell left the model", so it gets its own value and the
+        # renderer paints it grey rather than silently white.
+        out[~np.isfinite(a)] = np.nan
+        return out
 
     # ---- ONE box, computed once, held for every frame of both artefacts and both viewpoints.
     L3 = run_box(fr)
