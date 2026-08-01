@@ -577,6 +577,28 @@ class Operator(nn.Module):
         self.params = params or {}
         self.device = device
 
+    def tunable(self, value, default=None):
+        """Read a knob so that a LEARNABLE one survives construction.
+
+        Every operator in the library writes `self.rate = float(params.get("rate", 0.0))`, and
+        that `float()` is where the inverse half of Plexus dies: a spec may hand in a tensor with
+        `requires_grad`, and the constructor silently casts the tape away before `forward` ever
+        sees it. Two independent instruments (`operators/diff/audit.py` past the constructor,
+        `operators/diff/certify.py` through a real spec) disagreed on exactly this set of knobs,
+        and the gap between them WAS the coercion.
+
+        The reference states the rule outright -- *store as an array anything you want to learn* --
+        so: pass a tensor through untouched (moved to the device, tape intact), and coerce
+        anything else to a float exactly as before. A forward run cannot tell the difference,
+        which is why this is safe to apply to an operator whose numbers are already validated.
+
+            self.epsilon = self.tunable(params.get("epsilon"), 1.0)
+        """
+        v = default if value is None else value
+        if isinstance(v, torch.Tensor):
+            return v.to(self.device)
+        return float(v)
+
     def forward(self, H: Hierarchy, mask: Optional[torch.Tensor] = None) -> dict[str, torch.Tensor]:
         raise NotImplementedError
 
