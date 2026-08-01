@@ -178,8 +178,15 @@ def main():
     ap.add_argument("--tag", default=None, help="name this sweep; keeps its artefacts separate")
     ap.add_argument("--tail", type=int, default=0,
                     help="Polyak-average the last N steps instead of taking the final value")
+    # A queue query is only as good as the prefix it filters on: changing the naming scheme
+    # between a submit and a status made a healthy 32-job batch read as "queue empty", which is
+    # the same false-completion this machinery was hardened against -- just self-inflicted.
+    ap.add_argument("--prefix", default=None,
+                    help="override the job-name prefix (for a batch submitted under an old one)")
     a = ap.parse_args()
     use_tag(a.tag)
+    if a.prefix:
+        C.PREFIX = a.prefix
 
     if a.cmd == "submit":
         if not C.preflight(verbose=True):
