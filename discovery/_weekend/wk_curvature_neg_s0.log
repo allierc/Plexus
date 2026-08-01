@@ -13,3 +13,10 @@ premise check -- wk_curvature_neg_s0 (static, pre-run)
 [engine] sets:      vertex(3552)  cell(1800)
 [engine] fields:    —
 [engine] operators: growth: seed_mesh_3d, cell_rd_seed, morphogen_growth_3d, divide_3d, topo_snapshot_3d   hierarchy: cell_geometry_3d   topology: cell_adjacency, reconnect_t1_3d   fields: cell_diffuse, cell_react, shape_to_chem   mechanics: shape_energy_3d
+[wk_curvature_neg_s0] tube_analysis unavailable: ValueError: could not convert string to float: 'sphere'
+[wk_curvature_neg_s0] 🔴 SATURATED: 1778 cells vs buffer 1800. This run is NOT evidence -- raise the buffer or bound proliferation.
+[wk_curvature_neg_s0] ⚠ no evidence horizon (no metrics.npz (tube_analysis did not run)) -- peak/final are taken over ALL 401 frames, which is the un-truncated behaviour
+[wk_curvature_neg_s0] mechanics: p_tube/p_body = 0.0 (~3 = forced protrusion, ~1 = growth-driven equilibrium)
+[wk_curvature_neg_s0] {"saturated": true, "inert_operators": [], "retention": 0.971, "valid_evidence": false, "protr_final": 1.042, "protr_peak": 1.073, "horizon_frame": null, "horizon_why": "no metrics.npz (tube_analysis did not run)", "first_damage_frame": null, "valid_frac": 1.0, "protr_peak_untruncated": 1.073, "protr_final_untruncated": 1.042, "n_cells_final": 1778, "red_frac_final": 0.35, "act_max_final": 0.945, "frames": 401, "wall_s": 191.8, "mech_force_mean": 28.1565, "mech_p_body": 3.5446, "mech_p_tube": 0.0, "mech_p_ratio": 0.0, "mech_tension_mean": 6.1592, "mech_migration": 0.51828}
+[wk_curvature_neg_s0] D4 ok: all 12 scheduled operators acted ({'seed_mesh_3d': 1, 'cell_rd_seed': 3, 'cell_adjacency': 74} ...)
+[wk_curvature_neg_s0] camera: FIXED Lbox=18.139 for all 401 frames and both views (per-frame autofit would have run 5.345 -> 18.072, x3.38: that rescaling is what hid growth)
