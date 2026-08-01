@@ -1,0 +1,209 @@
+id: gene_network_connectionist
+order: 1
+raw_name: GeneNetworkConnectionist
+raw_kind: step (ODEController)
+code_path: papers/jax-morph/jax_morph/control/ode.py:L202
+paper_section: p. 10, Materials and Methods, "Genetic regulatory interactions" (dg_i/dt = phi(sum_j W_ij
+  g_j + b_i) + I_i - k_i g_i); model inspired by Hiscock 2019 [ref 24]. Guides do not describe it.
+summary: A per-cell continuous-time gene regulatory circuit. Each cell holds a vector of gene concentrations
+  (optional hidden/intermediate genes concatenated ahead of the observed output genes); every macro-step
+  it integrates dg/dt = sigmoid(W_gene*g + W_in*u + b) - gamma*g, where u are the cell's fixed sensed
+  inputs, and writes back the resulting per-gene concentration change as a sparse state delta. It is the
+  decision function that turns sensed chemistry/mechanics into gene outputs that downstream steps read
+  to set division/secretion behavior.
+equations: "CODE (authoritative; ode.py:L261-278 vector_field, integrated by ODEController.__call__ L161-199):\n\
+  \  g            = evolving = concat([hidden, outputs])  # per-cell gene concentrations (n_cells, n_gene)\n\
+  \  u            = inputs                                 # packed fixed driver fields (n_cells, in_size)\n\
+  \  drive        = g @ W_gene.T + u @ W_in.T + b\n  dg/dt        = sigma_alg(drive) - gamma * g\n  sigma_alg(x)\
+  \ = 0.5 + 0.5 * x / sqrt(1 + x^2)          # rescaled/algebraic sigmoid (_rescaled_sigmoid),\n     \
+  \                                                   # NOT logistic; range (0,1), sigma_alg(0)=0.5\n\
+  n_gene = hidden_size + out_size. Integrated over one macro-step by diffrax Dopri5 (PIDController\nrtol=1e-4,\
+  \ atol=1e-6, dt0=dt) from t=0 to t=dt; the step emits the SPARSE DELTA y(dt)-y(0) per\nhidden/output\
+  \ field (summed in the dynamic phase), never the updated state. The vector field is\nautonomous (t unused)\
+  \ and u is a fixed snapshot for the whole step.\n\nPAPER (p. 10, \"Genetic regulatory interactions\"\
+  ; inspired by Hiscock 2019 [24]):\n  dg_i/dt = phi( sum_j W_ij g_j + b_i ) + I_i - k_i g_i\ng_i expression\
+  \ level; W_ij regulatory influence of gene j on i; b_i basal transcription; k_i\ndegradation; I_i a\
+  \ forcing signal from ONE sensed input; phi a saturating sigmoid.\n\nCONTRADICTION (source wins): the\
+  \ paper ADDS the sensed input I_i linearly OUTSIDE the sigmoid; the\ncode MIXES inputs through a full\
+  \ trainable matrix W_in INSIDE the sigmoid. The paper's I_i is a\ndirect per-gene additive forcing;\
+  \ the code's W_in is an (n_gene x in_size) learnable coupling. The\ncode therefore saturates the input\
+  \ drive together with the regulatory drive, whereas the paper's\ninput forcing is unsaturated.\n"
+params:
+  input_specs: 'sensor_field_bindings: the fixed per-cell driver fields (u) the circuit senses (e.g. chemical
+    / mechanical inputs). Their flattened widths sum to in_size. Static field-spec tuple; held constant
+    across the macro-step integration.'
+  output_specs: 'output_gene_field_bindings: the observed gene-concentration fields written back to state
+    -- the action-modifying ("red") output genes. Widths sum to out_size. Static field-spec tuple.'
+  hidden_size: 'latent_regulator_count: number of intermediate ("blue") hidden genes carried in a heritable
+    {tag}_hidden field of shape (hidden_size,); 0 gives a pure-output circuit with no hidden field. Static;
+    must be >= 0.'
+  W_gene: 'regulatory_coupling_matrix (n_gene x n_gene): signed excitatory/inhibitory influence W_ij of
+    gene j on gene i, n_gene = hidden_size + out_size. Trainable; None -> zeros, shape-validated.'
+  W_in: 'input_sensitivity_matrix (n_gene x in_size): trainable coupling of each sensed input to each
+    gene, applied INSIDE the sigmoid. Trainable; None -> zeros, shape-validated.'
+  b: 'basal_production_bias (n_gene): per-gene transcription drive absent regulation (bias into the sigmoid).
+    Trainable; None -> zeros, shape-validated.'
+  gamma: 'degradation_rate: scalar or per-gene (n_gene) linear decay rate applied to every evolving gene
+    (including hidden). Default 0.1. Stored verbatim -- NOT passed through _resolve_param, so it is NOT
+    shape-checked or zero-defaulted, unlike W_gene/W_in/b.'
+  tag: 'state_namespace: string prefix for the latent hidden field name ({tag}_hidden), default "gene".
+    Bookkeeping only; no physical role.'
+state_io:
+  reads:
+  - input_specs -- the driver fields u (declared via ODEController.state_reads()); read as a fixed snapshot.
+  writes:
+  - output_specs -- per-gene concentration increments (the observed output genes).
+  - '{tag}_hidden of shape (hidden_size,) -- emitted ONLY when hidden_size > 0 (heritable latent regulator
+    state).'
+surprises:
+- 'Input placement contradicts the paper: code feeds sensed inputs THROUGH the sigmoid via W_in (sigma(W_gene*g
+  + W_in*u + b)); the paper adds a per-gene forcing I_i OUTSIDE the sigmoid. A reimplementer coding from
+  the paper equation would get different saturation and different gradients.'
+- The sigmoid is the ALGEBRAIC/rescaled sigmoid 0.5 + 0.5*x/sqrt(1+x^2), not the logistic 1/(1+exp(-x)).
+  Notably the sibling GeneNetworkMWC in the SAME file uses jax.nn.sigmoid (logistic) -- the two gene circuits
+  do not share a sigmoid.
+- Default parameters are NOT a no-op. W_gene/W_in/b default to zeros but gamma defaults to 0.1, so drive=0
+  -> production=sigma_alg(0)=0.5 and dg/dt = 0.5 - 0.1*g, driving every gene to steady state g*=5.0. An
+  "inert" circuit still evolves the state.
+- gamma is the only regulatory parameter not routed through _resolve_param, so unlike the weight matrices
+  it is never shape-validated and a shape-mismatched gamma would broadcast silently.
+- The step returns a SPARSE DELTA (integrated endpoint minus start), consistent with the dynamic-phase
+  contract where deltas are summed. Returning a full updated field instead would double-apply the state.
+- Inputs u are a FIXED quasistatic snapshot for the entire macro-step and the vector field is autonomous
+  (t and the PRNG key are both explicitly discarded). Chemistry is treated as steady-state within a step.
+- Evolving order is [hidden, outputs] and W_gene is full (n_gene x n_gene), so hidden genes both regulate
+  and are regulated by all genes, and gamma decays hidden genes too. W_gene index meaning depends on this
+  concatenation order.
+- _rescaled_sigmoid deliberately clips x to the dtype's finite range and rescales x*x to avoid float32
+  overflow/NaN at large |drive|; a naive x/sqrt(1+x^2) can overflow before the ODE solver would otherwise
+  diverge.
+verdict: new
+of: null
+implementation_of: regulate
+why: 'No registered contract expresses a per-cell INTERNAL regulatory dynamical system: a heritable
+
+  gene-state vector whose autonomous per-cell ODE (dense recurrent gene->gene coupling through a
+
+  saturating nonlinearity + linear decay + a learnable drive from SENSED external fields) is
+
+  integrated over the macro-step to emit the action-setting outputs that division / secretion /
+
+  adhesion steps read. The closest registered contract is `signal` -- a first-order recurrent
+
+  network ODE (its own MECHANISM_TAGS include "recurrent"), with the same -decay + bias +
+
+  saturated-weighted-drive skeleton. But `signal` is LATERAL: its recurrence runs BETWEEN nodes
+
+  across a fixed connectome EDGE-SET, and its typed signature is load-bearing on that topology --
+
+  INPUTS ["neuron","synapse"], MAPS ["pre","post"], REQUIRES_PARAMS ["edge_set"], activation on
+
+  the PRESYNAPTIC input. The gene circuit has NO edge set and NO cross-cell coupling: W_gene is a
+
+  dense WITHIN-cell gene->gene matrix applied independently per cell (vmap), the sigmoid wraps the
+
+  WHOLE production drive, and the environmental drive enters via W_in on sensed FIELDS -- a term
+
+  `signal` has no place for. Widening `signal` to admit it would force MAPS / edge_set to become
+
+  optional and add a field-input coupling, i.e. delete the "connectome signalling across a
+
+  connectome" that IS the contract for its only user (a neuron network), converting a lateral
+
+  graph operator into a per-cell field->state controller. That is a different contract, not a
+
+  widening. Near-misses that also fail: `sense` / `chemotax` (exchange/fields) read a field into
+
+  cell state but carry no internal heritable state and no recurrent dynamics; `pacemaker` is a
+
+  per-cell internal temporal SOURCE but a fixed-form oscillator with no input coupling and no
+
+  learnable regulatory matrix. So: `new`. This class is the CONNECTIONIST (linear-drive)
+
+  implementation of the contract; GeneNetworkMWC (thermodynamic log-occupancy drive) and NeuralODE
+
+  (black-box MLP vector field) are sibling implementations of the SAME `regulate` contract, so the
+
+  three ODEController subclasses collapse to ONE new contract, not three -- the convergence result
+
+  the ledger is meant to record.
+
+  '
+contract:
+  name: regulate
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  - drive
+  outputs:
+  - cell
+  reads:
+  - gene
+  - drive
+  writes:
+  - gene
+  maps: []
+status: validated
+module: src/plexus/operators/candidates/jax_morph_gene_network_connectionist.py
+test: tests/test_jax_morph_gene_network_connectionist.py
+evidence:
+  oracle_run: diff_gene_network_connectionist
+  diff_metric: |
+    max over {frame 0..20, cell 0..5, gene 0..4} of |G_eng - G_ref|, in float32 gene-concentration
+    units. G_ref = the reference GeneNetworkConnectionist Dopri5 trajectory
+    (_oracle/runs/diff_gene_network_connectionist/reference.npz['gene']; diffrax PIDController
+    rtol=1e-4 atol=1e-6). G_eng = the Plexus ENGINE's recorded per-cell `gene` block from
+    graphs_data/atlas/gene_network_connectionist/simulation.zarr, where regulate:connectionist
+    self-solves each macro-step with fixed-step RK4 (substeps=64) and returns (g(dt)-g0)/dt so the
+    engine's g += dt*delta recovers g(dt). Both sides integrate the byte-identical vector field
+    dg/dt = sigma_alg(g @ W_gene^T + u @ W_in^T + b) - gamma*g, with sigma_alg(x) = 0.5 + 0.5*x/
+    sqrt(1+x^2), from an identical seeded g0 (5-vector), a frozen u (2-vector) and identical params,
+    all emitted by ONE generator (_gen_gene_network_connectionist.py) so the two sides cannot drift
+    apart. Arrays are 21 frames x 6 cells x 5 genes; frame k = g(k*dt); this is a full end-to-end
+    run_spec.py engine trajectory, NOT an operator-level probe. Driver
+    atlas_jax_morph/diff_gene_network_connectionist.py; artefact
+    _oracle/runs/diff_gene_network_connectionist/diff.json.
+  threshold: |
+    5.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the run from integrator physics, not
+    from the observed number. Both sides integrate the identical vector field from an identical IC,
+    so the only admissible disagreement is the integrator gap (fixed-step RK4-64 vs adaptive Dopri5
+    rtol=1e-4) plus cross-backend float32 rounding. The reference rtol=1e-4 over the O(8.8) gene
+    magnitudes bounds per-step truncation at ~1e-3 and it does NOT amplify: at large drive the
+    algebraic sigmoid saturates (sigma'->0), the Jacobian tends to -diag(gamma), a contraction that
+    damps error toward g* ~ sigma/gamma ~ 10. 5e-3 gives ~5x margin over that a-priori ceiling yet
+    stays ~2 orders below the O(0.5-1) divergence any real mechanism error makes within a few frames
+    (logistic instead of the algebraic sigmoid; input added OUTSIDE the sigmoid per the paper vs
+    inside via W_in; a decay sign flip). A tighter 1e-3 would risk a false fail from the honest
+    integrator gap -- the criterion-no-valid-config-can-meet trap. It certifies formula-identity,
+    not a fitted tolerance.
+  value: 6.67572021484375e-06
+  passed: true
+  result: |
+    PASS by ~3 orders of magnitude. max|dev| = 6.68e-6 (float32 rounding, not Dopri5 truncation) <<
+    threshold 5e-3, so the verdict does not hinge on the threshold choice. The signature confirms it
+    is integrator/rounding-limited, not a reaction-law error: frame-0 deviation is EXACTLY 0 (the
+    shared seeded IC), grows MONOTONE to 4.8e-6 by the final frame, and the max sits at frame 17,
+    cell 0, gene 4 -- the largest gene (~8.4), where float32 rounding is largest (relative 8.0e-7).
+    Final cell-0 genes agree component-wise to ~1e-6 (ref [7.3356, 0.3709, 2.9444, 1.3693, 8.7943]
+    vs eng [7.3356, 0.3709, 2.9444, 1.3693, 8.7942]). INDEPENDENTLY reproduced by this differ in
+    pure numpy (oracle venv, no torch): a fine RK4(4096) reproduces reference.npz to 3.1e-6 (the
+    reference IS a genuine integration of the stated field), and an RK4-64 engine-replica matches the
+    reference to 3.1e-6 in float64 -- corroborating the torch number. The pre-registered
+    discriminators, run in that same numpy harness, blow past the threshold: the WRONG logistic
+    sigmoid lands 1.31 from the reference and the paper's input-OUTSIDE-sigmoid form lands 2.38
+    (~2.5 orders over 5e-3), so the metric genuinely catches the SOURCE-WINS mechanism choices.
+    Acted ledger checked FIRST (log/atlas/gene_network_connectionist/diag.json): regulate 20/20
+    calls acted, moved 0.823 (the ODE really evolved the gene block), seed_state 1/1,
+    inert_operators [], valid_evidence true -- the metric is on a live operator, not an inert one.
+    Score driver _oracle/runs/diff_gene_network_connectionist/diff.json; engine evidence
+    log/atlas/gene_network_connectionist/.
+state_io_notes:
+  reads:
+  - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)
+  - sensed_input_fields (the fixed quasistatic driver snapshot u; chemistry / mechanics)
+  writes:
+  - gene_state (per-cell concentration DELTAS for the hidden and output gene fields over dt)
+  inputs:
+  - sensed_input_fields

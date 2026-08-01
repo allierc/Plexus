@@ -1,6 +1,6 @@
 # Differential for relax (jax-morph MechanicalRelaxation), ISOLATED.
 #
-# The oracle run this mirrors is Atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/:
+# The oracle run this mirrors is atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/:
 # MechanicalRelaxation(Morse(epsilon=3.0, alpha=2.8), max_steps=2000, f_tol=2e-4) run ALONE (no
 # growth, no division) on a rigid 4-cell diamond -- two equilateral triangles sharing an edge,
 # compressed to lattice spacing 0.85 sigma (sigma = r_i+r_j = 1.0, uniform radius 0.5) with a small

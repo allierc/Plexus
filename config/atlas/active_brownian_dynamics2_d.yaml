@@ -1,7 +1,7 @@
 # Differential test for `reorient` -- the rotational-diffusion leg of jax-morph's
 # ActiveBrownianDynamics2D, run in the Plexus engine as the ISOLATED free active-Brownian gas.
 #
-# The oracle this mirrors is `Atlas_jax_morph/_oracle/runs/diff_active_brownian_dynamics2_d/`:
+# The oracle this mirrors is `atlas_jax_morph/_oracle/runs/diff_active_brownian_dynamics2_d/`:
 #   ActiveBrownianDynamics2D(None, n_space_dim=2, kT=0.0, rot_diffusion=0.1), active_speed=0.3,
 #   N=20000 cells, 40 macro-steps at dt=1.0, uniform initial headings.
 # Here the SAME free ABP is built from primitives: `reorient` rotationally diffuses the heading

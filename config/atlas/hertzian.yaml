@@ -1,6 +1,6 @@
 # Differential for adhere:hertzian (jax-morph Hertzian), ISOLATED -- Scenario U (uniform trajectory).
 #
-# The oracle run this mirrors is Atlas_jax_morph/_oracle/runs/diff_hertzian/ (scenario U): jax-morph
+# The oracle run this mirrors is atlas_jax_morph/_oracle/runs/diff_hertzian/ (scenario U): jax-morph
 # BrownianDynamics(Hertzian(epsilon=2.0), kT=0, gamma=1) run on a 7-cell overlapping cluster with
 # UNIFORM radius 0.5, 40 macro-steps at dt=0.1. kT=0 makes it deterministic overdamped forward Euler
 # Dx = dt*forces -- byte-identical to the Plexus engine's EMIT=velocity path v=out; x += dt*v at
