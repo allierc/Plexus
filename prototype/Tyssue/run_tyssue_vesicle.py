@@ -112,7 +112,9 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
     misleading grey faces", and "maybe use a green colour for dividing cells".)
 
         white -> red   the activator level. This is the measurement.
-        GREEN          the cell divided recently. Benign and expected.
+        GREEN WASH     the cell divided recently. Benign and expected. It is BLENDED over the
+                       activator colour rather than replacing it, so a just-divided cell still
+                       shows how lit it is -- pale green when quiet, olive-to-amber when active.
         MAGENTA        the cell is genuinely BROKEN -- under-connected, or its ring is not a
                        polygon. An alarm. If nothing is broken this colour never appears.
 
@@ -140,7 +142,14 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
     if act is None:
         act = np.zeros(len(polys))                              # activation = 0 -> white (Goal 2 RD lights the red)
     cmap = plt.cm.Reds
-    C_DIVIDED = (0.16, 0.78, 0.36, 1.0)                         # green  -- just divided, benign
+    # GREEN IS A WASH, NOT A REPLACEMENT. It used to overwrite the cell's colour outright, so a
+    # just-divided cell showed as flat green and its ACTIVATOR became invisible for the four
+    # frames it counted as recent -- exactly the cells where the chemistry is most worth seeing,
+    # since division is what dilutes it. Blended at DIVIDED_ALPHA the green tints the white->red
+    # ramp instead of hiding it: a quiet daughter reads pale green, an active one olive-to-amber,
+    # and "this cell just divided" and "this cell is lit" are legible at the same time.
+    C_DIVIDED = (0.16, 0.78, 0.36)                              # green  -- just divided, benign
+    DIVIDED_ALPHA = 0.45                                        # enough to read, not enough to hide
     C_BROKEN = (1.00, 0.10, 0.85, 1.0)                          # magenta -- not a cell any more
     # STRUCTURAL CLASS, an alternative colouring (`classes=` overrides the activator LUT).
     # Chosen not to collide with anything already meaningful: the activator ramp is white->red,
@@ -154,7 +163,8 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
         base = (C_CLASS.get(int(classes[f]), C_CLASS[-1]) if classes is not None and f < len(classes)
                 else cmap(float(np.clip(act[f], 0.0, 1.0))))
         if divided is not None and f < len(divided) and divided[f]:
-            base = C_DIVIDED
+            base = tuple((1.0 - DIVIDED_ALPHA) * np.array(base[:3])
+                         + DIVIDED_ALPHA * np.array(C_DIVIDED)) + (1.0,)
         if broken is not None and f < len(broken) and broken[f]:
             base = C_BROKEN                                      # alarm wins over everything
         bp = ap * inner                                          # basal ring (apical scaled toward the sphere centre)
