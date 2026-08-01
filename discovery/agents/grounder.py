@@ -375,16 +375,43 @@ OBSERVED = {
 }
 
 # Table 1, normalised. Quoted so a fixture can assert them rather than a person retyping them.
+# The one sentence that fixes all four normalisation constants, verbatim.
+NORMALISATION_SENTENCE = ("normalized values of several physical parameters are given as vref = 1, ρu = 1, κs = 0.2, and ηc = 0.25")
+
 TABLE1 = {
-    "alpha_hill":  (10.0,  "Hill coefficient in growth rate"),
-    "rho_sw":      (0.5,   "switching concentration for growth rate"),
-    "phi_inhib":   (10.0,  "diffusivity of inhibitor"),
-    "tau_cycle":   (50.0,  "cell cycle, in units of eta_c/kappa_s"),
-    "kappa_s":     (0.2,   "normalised surface energy"),
-    "eta_c":       (0.25,  "normalised cell friction"),
-    "v_ref":       (1.0,   "reference cell volume -- defines the unit of length"),
-    "gamma_range": ((0.01, 100.0), "time characteristics of patterning -- VARIED"),
-    "chi_range":   ((0.001, 0.1),  "spatial characteristics of patterning -- VARIED"),
+    # EVERY VALUE CARRIES THE ROW IT WAS READ FROM, and `verify_table1()` checks that the paper's
+    # table really does put that number next to that description. SETUP was corrected on
+    # 2026-08-01 after a real quote was attached to the wrong experiment; this register was
+    # transcribed in the same reading session and had NO quotes at all -- nine numbers with
+    # nothing to check them against. A transcription error here is invisible and would propagate
+    # into every run claiming to be "at Okuda's settings".
+    #
+    # `row` is the paper's own wording, in the order the table prints it: description, then value.
+    "alpha_hill":  dict(value=10.0,  row="Hill coefficient in growth rate 10",
+                        note="the sharpness of a cell's growth response. OUTSIDE our old 1-8 "
+                             "search box; widened in Phase 2."),
+    "rho_sw":      dict(value=0.5,   row="Switching concentration for growth rate 0.5",
+                        note="the activator level at which growth switches on."),
+    "phi_inhib":   dict(value=10.0,  row="Diffusivity of inhibitor 10",
+                        note="OUTSIDE our old 0.1-2 box; widened in Phase 2. The paper ALSO "
+                             "derives it as phi ~ (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s), which "
+                             "evaluates to 9.0 -- it writes 'phi ~', so the table's 10 is the "
+                             "set value and 9 is the design intent. Checked, not reconciled: "
+                             "see verify_table1's derived-value note."),
+    "tau_cycle":   dict(value=50.0,  row="Cell cycle 50",
+                        note="in units of eta_c/kappa_s = 1.25, so 62.5 time units."),
+    "kappa_s":       dict(value=0.2, quote=NORMALISATION_SENTENCE,
+                        note="normalisation constant, stated in the text as well as the table."),
+    "eta_c":         dict(value=0.25, quote=NORMALISATION_SENTENCE,
+                        note="cell friction; sets the unit of time with kappa_s."),
+    "v_ref":         dict(value=1.0, quote=NORMALISATION_SENTENCE,
+                        note="reference cell volume; defines the unit of length."),
+    "rho_u":         dict(value=1.0, quote=NORMALISATION_SENTENCE,
+                        note="reference morphogen concentration; defines the unit of amount."),
+    "gamma_range": dict(value=(0.01, 100.0), row="Time characteristics of patterning 0.01-100",
+                        note="VARIED across the figures -- one of the two axes of the diagram."),
+    "chi_range":   dict(value=(0.001, 0.1),  row="Spatial characteristics of patterning 0.001-0.1",
+                        note="VARIED. NOT the same quantity as our `chi` (finding F009)."),
 }
 
 # Two regime INEQUALITIES, which are what actually define his setting. Worth asserting rather than
@@ -519,6 +546,70 @@ def setup_provenance():
     return out
 
 
+
+def verify_table1():
+    """Every Table 1 value must sit beside its description in the paper's own table.
+
+    SETUP's guard asks WHERE a quote comes from, because its failure mode was a real sentence in
+    the wrong place. This register's failure mode is different and simpler: a number typed wrong.
+    So the check is different -- find the row's description in the paper and require the value we
+    recorded to be the number printed next to it.
+
+    The paper's table extracts as `<description> <value> <units> (<equations>)`, so the test is
+    that our value appears in the short window immediately after the description. Ranges are
+    written with an en-dash in the PDF and a hyphen in source, so both are accepted; that is a
+    typography difference, not a disagreement about a number.
+
+    Returns (failures, notes). A note is a real discrepancy the paper itself carries -- phi is
+    tabulated as 10 and derived as 9.0 from the paper's own formula -- and is reported rather
+    than silently reconciled, because choosing one for the campaign is a decision, not a lookup.
+    """
+    t = re.sub(r"[\u2013\u2014]", "-", _paper_text())
+    bad, notes = [], []
+    for name, e in TABLE1.items():
+        if "row" not in e:                       # verified by its sentence instead
+            q = re.sub(r"\s+", " ", e["quote"])
+            if q not in re.sub(r"\s+", " ", _paper_text()):
+                bad.append(f"{name}: its quote is not in the paper verbatim")
+            elif str(e["value"]).rstrip("0").rstrip(".") not in q:
+                bad.append(f"{name}: {e['value']} does not appear in the sentence it cites")
+            continue
+        row = re.sub(r"[\u2013\u2014]", "-", e["row"])
+        desc = row.rsplit(" ", 1)[0] if not row.count("=") else row.split("=")[0].strip()
+        at = t.find(desc)
+        if at < 0:
+            bad.append(f"{name}: its table row is not in the paper: {desc[:52]!r}")
+            continue
+        window = t[at + len(desc):at + len(desc) + 40]
+        v = e["value"]
+        fmt = lambda x: str(int(x)) if float(x).is_integer() else str(x)   # noqa: E731
+        wanted = f"{fmt(v[0])}-{fmt(v[1])}" if isinstance(v, tuple) else fmt(v)
+        # THE FIRST NUMBER AFTER THE DESCRIPTION, not any number in the neighbourhood. A
+        # substring test passed `alpha_hill = 8` -- the paper prints "Hill coefficient in growth
+        # rate 10 1 (8)", where the (8) is a cross-reference to Equation 8. So a check that only
+        # asked "does 8 appear nearby" accepted the exact value our old search box was wrong
+        # about. The value has to be the number in the VALUE COLUMN.
+        m = re.match(r"\s*(\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?)", window)
+        printed = m.group(1) if m else None
+        if printed != wanted:
+            bad.append(f"{name}: recorded {wanted}, but the paper's value column reads "
+                       f"{printed!r} after {desc[:34]!r}")
+        if e.get("quote"):
+            q = re.sub(r"\s+", " ", e["quote"]).replace("rho_u", "\u03c1u") \
+                  .replace("kappa_s", "\u03bas").replace("eta_c", "\u03b7c")
+            if q not in re.sub(r"\s+", " ", _paper_text()):
+                bad.append(f"{name}: its quote is not in the paper verbatim")
+    # the paper's own derived value for phi, checked against its own table
+    k, e_c, vr = TABLE1["kappa_s"]["value"], TABLE1["eta_c"]["value"], TABLE1["v_ref"]["value"]
+    phi_derived = (3 * vr ** (1 / 3)) ** 2 / (4 * e_c / (5 * k))
+    if abs(phi_derived - TABLE1["phi_inhib"]["value"]) > 1e-6:
+        notes.append(f"phi: tabulated {TABLE1['phi_inhib']['value']}, but the paper's own formula "
+                     f"(3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives {phi_derived:.3f}. The paper "
+                     f"writes 'phi ~', so both are its own; which one the campaign uses is a "
+                     f"decision and must be made explicitly, not inherited.")
+    return bad, notes
+
+
 def buffer_for(target_cells, margin=1.30):
     """Reservoir sizes that can actually HOLD `target_cells`. Not advice -- arithmetic.
 
@@ -540,7 +631,8 @@ def max_cells_for(vertex_buffer):
 
 
 def setup(case=None):
-    """Okuda's starting conditions. `case` in {tubulation, undulation, grown}, or all of them."""
+    """Okuda's starting conditions, certified against the paper before they are handed over."""
+    _require_certified()
     if case is None:
         return {"cases": SETUP, "observed": OBSERVED, "table1": TABLE1, "regime": REGIME}
     s = dict(SETUP[case])
@@ -626,3 +718,45 @@ if __name__ == "__main__":
     for c in r.get("prior_art", [])[:4]:
         print(f"  prior art: {c}")
     print("\ngrounder OK")
+
+
+# ============================================================================ the standing gate
+def certify(verbose=True):
+    """Both registers, checked against the paper. Called before the Grounder advises anything.
+
+    A guard nobody runs is the condition this agent was in yesterday morning: written, correct,
+    and never invoked. So this is called from `setup()` -- the one entry point the round uses --
+    and a failure REFUSES rather than warns. Being unable to prove where a number came from is
+    not a reason to use it anyway.
+    """
+    bad_s = verify_setup()
+    bad_t, notes = verify_table1()
+    if verbose:
+        for b in bad_s + bad_t:
+            print(f"  [grounder] REFUSED: {b}")
+        for n in notes:
+            print(f"  [grounder] note: {n}")
+    return bad_s + bad_t, notes
+
+
+_CERTIFIED = {}
+
+
+def _require_certified():
+    """Certify once per process, and refuse to advise if the registers do not check out."""
+    if "ok" not in _CERTIFIED:
+        bad, _ = certify(verbose=True)
+        _CERTIFIED["ok"] = not bad
+        _CERTIFIED["why"] = bad
+    if not _CERTIFIED["ok"]:
+        raise ValueError("the Grounder's registers do not match the paper, so it will not "
+                         "advise: " + "; ".join(_CERTIFIED["why"][:3]))
+
+
+if __name__ == "__main__":
+    import sys as _s
+    bad, notes = certify()
+    print(f"\n  SETUP  : {len(SETUP)} entries")
+    print(f"  TABLE1 : {len(TABLE1)} values")
+    print(f"\n  {'REFUSED -- ' + str(len(bad)) + ' problem(s)' if bad else 'CERTIFIED'}")
+    _s.exit(1 if bad else 0)
