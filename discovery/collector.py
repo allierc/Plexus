@@ -163,69 +163,66 @@ def write(rec, analysis=ANALYSIS, records=RECORDS):
 
 
 def render(rec):
-    """The analysis.md entry, on TEMPLATE_analysis.md's fields. Measured or quoted, never prose."""
+    """The analysis.md entry, on TEMPLATE_analysis.md's fields. Measured or quoted, never prose.
+
+    One block per slot plus a round summary, following the connectome-gnn-cx exploration log:
+    Node/parent carries the ANCESTRY, Mutation the DIFF, `Hypothesis tested` is quoted verbatim
+    as it was posed, and the Verdict must cite the number that settled it.
+    """
     R, runs = rec, rec["runs"]
-    head = (f"ABORTED — NO ADMISSIBLE EVIDENCE" if R["aborted"] else
-            _headline(runs))
-    L = [f"## Round {R['round']} ({R['mode']}, {R['when']}) — {head}", ""]
-
-    parents = sorted({r.get("comp_hash", MISSING) for r in runs}) or [MISSING]
-    intents = [r.get("intent", MISSING) for r in runs]
-    n_adv = sum(1 for i in intents if i == "adversarial")
-    L += [f"**Parent**: {', '.join(parents[:3])}",
-          f"**Edits**: {R['n_posed']} posed, {R['n_evidence']} produced evidence, "
-          f"{R['n_refused']} refused — {len(intents) - n_adv} confirmatory / {n_adv} adversarial",
-          ""]
-
-    L += ["| Slot | Run | Edit | Track | Intent | Prediction | Specimen | Phenotype | Outcome |",
-          "| ---: | --- | ---- | ----- | ------ | ---------- | -------- | --------- | ------- |"]
+    L = []
     for i, r in enumerate(runs):
-        L.append(f"| {i} | `{r['run']}` | {_cell(r.get('edit'))} | {r.get('track', '-')} "
-                 f"| {r.get('intent', MISSING)} "
-                 f"| {_cell(r.get('predicted'))} | **{r['specimen']}** "
-                 f"| {r['analyst_consensus']} | {r.get('outcome', '—')} |")
-    L.append("")
-
-    # QUOTED, not composed: the Proposer's own stated reason, as written at propose time.
-    why = [r.get("rationale") for r in runs if r.get("rationale") not in (None, MISSING)]
-    L += [f"**Why these** (quoted from the Proposer): "
-          f"{why[0][:220] if why else MISSING}", ""]
-
-    L.append("**Result**:")
-    for r in runs:
-        m = ", ".join(f"{k} {v:.2f}" for k, v in (r["metrics"] or {}).items()
-                      if isinstance(v, (int, float)))
-        L.append(f"- `{r['run']}` {m or 'no admitted metric'} — specimen **{r['specimen']}**"
-                 + (f", premises broken: {', '.join(r['premises_broken'])}"
-                    if r["premises_broken"] else ""))
-    L.append("")
-
-    L += [f"**Refused**: " + ("; ".join(f"`{x['run']}` {x['why']}" for x in R["refused"])
-                             if R["refused"] else "none"), ""]
+        L += [f"## Round {R['round']} — slot {i}: {r.get('outcome', 'inconclusive')}", "",
+              f"Node: id={r.get('comp_hash', MISSING)}, parent={r.get('parent', 'none')}",
+              f"Track: {r.get('track', '-')}",
+              f'Hypothesis tested: "{r.get("predicted", MISSING)}"',
+              f"Config: {r['run']}"
+              + (f", {', '.join(f'{k}={v}' for k, v in (r.get('config') or {}).items())}"
+                 if r.get("config") else ""),
+              f"Measured: " + (", ".join(f"{k}={v:.4g}" for k, v in (r["metrics"] or {}).items()
+                                         if isinstance(v, (int, float))) or "no admitted metric"),
+              f"Specimen: {r['specimen']}" + (f" — {', '.join(r['premises_broken'])}"
+                                              if r["premises_broken"] else " — all hold"),
+              f"Reader: phenotype={r['analyst_consensus']}, "
+              f"specimen={r.get('analyst_specimen', MISSING)}",
+              f"Eye-check: {'DISAGREES — ' + r['eye_why'] if r['eye_disagrees'] else r['eye_verdict']}",
+              f"Mutation: {_cell(r.get('edit')) if r.get('intent') != 'control' else 'none (control)'}",
+              f"Verdict: {_verdict(r)}",
+              f"Next: parent={r.get('comp_hash', MISSING)}", ""]
 
     spec = R["specimens"]
-    bad = spec.get("invalid", 0) + spec.get("ambiguous", 0)
-    L += [f"**Verdict**: " + ("NO EVIDENCE — the round produced nothing admissible, which is a "
-                              "result about the apparatus and not a failed round."
-                              if R["aborted"] else
-                              f"{R['n_evidence']} run(s) admitted; "
-                              f"{bad} of them on a specimen that was not sound "
-                              f"({', '.join(f'{v}: {n}' for v, n in spec.items())})"), ""]
-
-    surprises = [r["run"] for r in runs if r.get("surprise")]
     nc, ns = R.get("n_checkable", 0), R.get("n_surprise", 0)
-    rate = f"{ns}/{nc}" if nc else "0/0"
-    incon = R.get("outcomes", {}).get("inconclusive", 0)
-    L += [f"**Surprise**: {rate} of the checkable predictions were wrong"
-          + (f" ({', '.join(surprises)})" if surprises else
-             " — a round that only confirms has bought coverage and no knowledge")
-          + (f". {incon} prediction(s) were INCONCLUSIVE and are excluded from that rate: "
-             f"a prediction that could not fail must not dilute it." if incon else "."), ""]
-    if R["eye_disagreements"]:
-        L += [f"**Eye-check disagreed** (recorded, never scored): "
-              f"{', '.join(R['eye_disagreements'])}", ""]
-    L += [f"**Next**: {R['steer']}", ""]
+    L += [f"## Round {R['round']} — summary", "",
+          f"Posed: {R['n_posed']}   Evidence: {R['n_evidence']}   Refused: {R['n_refused']}"
+          + (f" ({'; '.join(x['why'][:40] for x in R['refused'])})" if R["refused"] else ""),
+          f"Surprise: {ns}/{nc}" + (" — a round that only confirms has bought coverage and no "
+                                    "knowledge" if nc and not ns else ""),
+          f"Tracks: {sum(1 for r in runs if r.get('track') == 'A')} Track A, "
+          f"{sum(1 for r in runs if r.get('track') == 'B')} Track B",
+          f"Specimens: {', '.join(f'{v} {n}' for v, n in spec.items()) or 'none'}",
+          f"Frontier after: {', '.join(sorted({r.get('comp_hash', '?') for r in runs}))}",
+          f"Diagnosis: " + (f"{R['diagnosis'].get('cause')} — guard: "
+                            f"{R['diagnosis'].get('guard_to_add')}"
+                            if R.get("diagnosis") else "not called"),
+          f"Steer: {R['steer']}", ""]
+    if R["aborted"]:
+        L.insert(0, f"## Round {R['round']} — ABORTED, no admissible evidence\n")
     return "\n".join(L)
+
+
+def _verdict(r):
+    """supported | falsified | partial | inconclusive, WITH the number that settled it."""
+    oc = r.get("outcome") or "inconclusive"
+    word = {"confirmed": "supported", "refuted": "falsified"}.get(oc, oc)
+    m = r["metrics"] or {}
+    num = ", ".join(f"{k}={v:.3g}" for k, v in m.items() if isinstance(v, (int, float)))
+    if r["specimen"] in ("invalid", "ambiguous"):
+        return (f"inconclusive — specimen {r['specimen']}, so {num or 'the numbers'} describe the "
+                f"configuration and not a tissue")
+    if oc == "inconclusive":
+        return (f"inconclusive — the prediction could not be checked; it leaves the surprise "
+                f"denominator and buys nothing. Measured {num or 'nothing admitted'}")
+    return f"{word} — measured {num or 'nothing admitted'} against \"{r.get('predicted', '?')}\""
 
 
 def _headline(runs):

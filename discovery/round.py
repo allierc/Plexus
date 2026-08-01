@@ -602,6 +602,42 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
 
 
 # --------------------------------------------------------------------------- LOOP II batch
+def build_recon_batch(sup, cfg, n_slots, ledger):
+    """ROUND 0: re-measure specs already on disk. No edits, no hypotheses, no predictions.
+
+    The specs are copied VERBATIM into this round's config names. Nothing is grounded, nothing is
+    swapped: the point is to learn what these compositions do under the instruments as they are
+    now, and a spec altered on the way in would answer a different question.
+
+    Every slot is posed with intent `recon` and `predicted` unstated, so `predict.score` resolves
+    it `inconclusive` and it drops out of the surprise denominator -- which is correct. There is
+    nothing to be surprised by in a replay, and a prediction attached to one would be a prediction
+    about our own past arithmetic.
+    """
+    import shutil
+    import composition_space as CS
+    tab = ARCH.log_table(top=24)
+    ok, choice = P.choose_specs(tab, n=n_slots, ledger=ledger)
+    names = choice.get("runs") or []
+    print(f"  [recon] the Proposer chose {len(names)}: {', '.join(names)}")
+    print(f"  [recon] why: {choice.get('why','')[:200]}")
+
+    out = []
+    for i, run in enumerate(names[:n_slots]):
+        src = os.path.join(LOG, run, "spec_run.yaml")
+        if not os.path.exists(src):
+            print(f"  [recon] {run}: no spec on disk -- skipped")
+            continue
+        out.append((run, src, {"intent": "recon", "track": "A",
+                               "claim": f"re-measure {run} under the current instruments",
+                               "metric": "protr_peak", "predicted": "unstated",
+                               "why": choice.get("why", ""), "territory": "in_paper",
+                               "source_run": run}))
+    if not out:
+        print("  [recon] no usable spec was chosen -- a recon round with nothing to replay")
+    return out
+
+
 def build_theta_batch(base_name, param, values, n_slots, predictions=None, intents=None):
     """A parameter sweep of ONE composition. The hash is constant BY CONSTRUCTION.
 
@@ -773,6 +809,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     _purge_round_configs(rid, mode)    # F18: stale configs must not shadow this round's
     if mode == "theta":
         cands = build_theta_batch(base, param, values, batch)
+    elif mode == "recon":
+        cands = build_recon_batch(sup, cfg, batch, ledger)
     else:
         cands = build_composition_batch(sup, cfg, batch, ledger)
     if not cands:
@@ -793,7 +831,31 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     sup._save()
 
     posed = []
-    for i, (g, lbl, sl) in enumerate(cands):
+    if mode == "recon":
+        # THE SPEC IS COPIED VERBATIM. No grounding, no translate: a spec altered on the way in
+        # answers a different question than the one this round is asking.
+        import shutil
+        for i, (run, src, sl) in enumerate(cands):
+            nm = f"r{rid:03d}n_{i:02d}_{run[:14]}"
+            dst = os.path.join(ROOT, "config", "okuda", f"{nm}.yaml")
+            shutil.copyfile(src, dst)
+            h = Hypothesis(hid=f"R{rid}.{i}.recon", comp_hash=f"RECON_{run[:20]}",
+                           parent_hash=None, edit=f"replay {run}",
+                           # A replay IS a control in the strict sense -- the composition
+                           # unmodified -- and `intent` is a closed set for good reason: it is
+                           # what the confirmatory/adversarial mixture is computed from, and a
+                           # fourth value would silently leave that arithmetic.
+                           intent="control",
+                           claim=sl["claim"], metric=sl["metric"], predicted="unstated",
+                           rationale=sl.get("why", ""), round_id=rid)
+            if not dry:
+                sup.reg.pose(h)
+            posed.append((nm, None, h))
+            print(f"  {nm}  replay {run:24} track A  control       no prediction")
+        if dry:
+            print("\n[round] --dry: recon configs written, nothing submitted")
+            return bk.finish(rid, "dry", 0)
+    for i, (g, lbl, sl) in enumerate([] if mode == "recon" else cands):
         # F18: names carry round AND mode AND slot. A previous round's config with a matching
         # name could otherwise be picked up by a job -- silently running the wrong experiment.
         nm = f"r{rid:03d}{mode[0]}_{i:02d}_{comp_hash(g)[1:7]}"
@@ -907,7 +969,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         if summ.get("Q_stale"):
             why = f"{why} | {summ['Q_stale_reason']}"
         sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm], note=why)
-        lm.add(comp_hash(g), g, an["analyst_consensus"], sc if np.isfinite(sc) else -1.0, summ, nm)
+        if g is not None:
+            lm.add(comp_hash(g), g, an["analyst_consensus"], sc if np.isfinite(sc) else -1.0,
+                   summ, nm)
         rows.append((nm, g, summ, sc, outcome, h))
 
     if not rows:
@@ -1274,7 +1338,7 @@ def _ledger_summary(sup, lm):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["composition", "theta"], default="composition")
+    ap.add_argument("--mode", choices=["composition", "theta", "recon"], default="composition")
     ap.add_argument("--frames", type=int, default=900)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--base", default="round_40_mc8")

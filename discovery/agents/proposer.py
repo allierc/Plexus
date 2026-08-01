@@ -275,3 +275,56 @@ def _ground(cfg, k=3):
         return "\n".join(lines)
     except Exception as e:
         return f"(grounder unavailable: {type(e).__name__})"
+
+
+# ============================================================ RECONNAISSANCE (round 0 of a campaign)
+def choose_specs(table, n=6, timeout_min=6, ledger=None):
+    """Pick N runs already on disk to re-measure. NO hypotheses, NO predictions.
+
+    WHY A ROUND WITH NO HYPOTHESIS IS STILL A ROUND. The campaign has 63 finished runs and 46 of
+    them serve Track A -- they run, they pattern, the Biologist passes them -- and it has been
+    starting from the reference recipes instead, three times over, because the cold start ranked
+    them on protrusion and found zeros. Meanwhile every number on disk was taken with at least one
+    instrument since proved wrong: the black-movie colour scale, the seed-sphere Q, the uncertified
+    metrics, the reaction that diverges.
+
+    So the first round LOOKS. It re-measures existing specs, unmodified, with the instruments as
+    they are now. That is not a hypothesis test and must not pretend to be one -- there is nothing
+    to be surprised by, and a prediction attached to a replay would be a prediction about our own
+    past arithmetic. The product is a frontier of compositions we have actually seen work, and a
+    set of numbers we are entitled to believe.
+    """
+    prompt = f"""ROUND 0: RECONNAISSANCE. Choose {n} runs already on disk to RE-MEASURE.
+
+{budget_note(timeout_min, "1) the JSON choice")}
+{BREVITY}
+
+You are NOT proposing experiments and you will NOT write predictions. Every number below was
+taken with at least one instrument since proved wrong, so the job is to re-measure a good spread
+of what we already have, with the instruments as they are now, and end up with a frontier of
+compositions we have actually seen work.
+
+{table}
+
+Choose {n} runs. What makes a good set:
+  * they SERVE TRACK A -- they run, they pattern, the Biologist passes them. That is the bar for
+    a starting point. `protr_peak` and `protrud` are TRACK B measures and are not the bar here:
+    a composition that patterns without protruding is a point on the operator map.
+  * they are DIFFERENT FROM EACH OTHER. Six variations of one composition is one starting point,
+    not six. Spread across compositions, regions and parameter regimes.
+  * prefer a live pattern (`pattern` high) over elongation, and a sound specimen over both.
+
+Reply with ONLY:
+{{"runs": ["<run name>", ...],
+  "why": "<<=50 words: what this set spans, and what it deliberately leaves out>"}}"""
+    ok, out = run_agent("proposer", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=["Read"])
+    import re as _re
+    for m in _re.finditer(r"\{.*?\}", out or "", _re.S):
+        try:
+            d = json.loads(m.group(0))
+        except Exception:
+            continue
+        if isinstance(d.get("runs"), list) and d["runs"]:
+            return ok, d
+    return False, {"runs": [], "why": "the proposer named no runs"}
