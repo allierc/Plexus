@@ -832,7 +832,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     sup.reg.render_knowledge(os.path.join(CAMP, "knowledge.md"),
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
-    A.meta_review(rid, ledger=ledger)
+    A.meta_review(rid, ledger=ledger, runs=[nm for nm, _, _, _, _, _ in rows])
     # THE CONTROL IS ALWAYS RETAINED, whatever it scored.
     # `kept` is a RANKING product, and a Watcher veto sets the score to -inf -- so in round 2 the
     # control (the parent, unchanged, protr_peak 4.03) was vetoed, fell out of `kept`, and the
