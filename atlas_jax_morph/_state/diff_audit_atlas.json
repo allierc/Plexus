@@ -11,7 +11,7 @@
         "k": "GRAD",
         "mobility": "GRAD",
         "r_cutoff_frac": "CONSTANT",
-        "radius0": "CONSTANT"
+        "radius0": "NOT-READ"
       },
       "fittable": true
     },
@@ -91,9 +91,9 @@
       "state_grad": 1.7722722986945882e-06,
       "params": {
         "a": "GRAD",
-        "noise": "CONSTANT",
-        "r": "CONSTANT",
-        "softness": "CONSTANT"
+        "noise": "NOT-READ",
+        "r": "NOT-READ",
+        "softness": "NOT-READ"
       },
       "fittable": true
     },
@@ -105,7 +105,7 @@
       "state": "GRAD",
       "state_grad": 2811.67822265625,
       "params": {
-        "rate": "CONSTANT"
+        "rate": "NOT-READ"
       },
       "fittable": false
     },
@@ -117,7 +117,7 @@
       "state": "CONSTANT",
       "state_grad": 0.0,
       "params": {
-        "k": "CONSTANT"
+        "k": "NOT-READ"
       },
       "fittable": false
     },
@@ -127,13 +127,13 @@
       "kind": "structural",
       "declared": true,
       "state": "GRAD",
-      "state_grad": 2811.67822265625,
+      "state_grad": 2828.94482421875,
       "params": {
-        "max_occ": "CONSTANT",
-        "offset": "CONSTANT",
-        "rate": "CONSTANT"
+        "max_occ": "NOT-READ",
+        "offset": "GRAD",
+        "rate": "NOT-READ"
       },
-      "fittable": false
+      "fittable": true
     },
     {
       "op": "cell_divide",
@@ -141,11 +141,11 @@
       "kind": "structural",
       "declared": true,
       "state": "GRAD",
-      "state_grad": 2811.67822265625,
+      "state_grad": 2820.076416015625,
       "params": {
-        "orientation_snr": "CONSTANT",
-        "radius0": "CONSTANT",
-        "rate": "CONSTANT"
+        "orientation_snr": "NOT-READ",
+        "radius0": "NOT-READ",
+        "rate": "NOT-READ"
       },
       "fittable": false
     },
@@ -157,13 +157,13 @@
       "state": "GRAD",
       "state_grad": 2811.67822265625,
       "params": {
-        "aniso": "CONSTANT",
-        "offset": "CONSTANT",
-        "prestretch": "CONSTANT",
+        "aniso": "NOT-READ",
+        "offset": "NOT-READ",
+        "prestretch": "NOT-READ",
         "rate": "CONSTANT",
-        "stress_gain": "CONSTANT",
-        "target": "CONSTANT",
-        "tip": "CONSTANT"
+        "stress_gain": "NOT-READ",
+        "target": "NOT-READ",
+        "tip": "NOT-READ"
       },
       "fittable": false
     },
@@ -187,9 +187,9 @@
       "state": "GRAD",
       "state_grad": 9.550379753112793,
       "params": {
-        "chirality": "CONSTANT",
+        "chirality": "NOT-READ",
         "k": "GRAD",
-        "noise": "CONSTANT",
+        "noise": "NOT-READ",
         "v0": "GRAD"
       },
       "fittable": true
@@ -239,7 +239,7 @@
       "state_grad": 25.712230682373047,
       "params": {
         "k": "GRAD",
-        "noise": "CONSTANT"
+        "noise": "NOT-READ"
       },
       "fittable": true
     },
@@ -251,7 +251,7 @@
       "state": "CONSTANT",
       "state_grad": 0.0,
       "params": {
-        "noise": "CONSTANT"
+        "noise": "NOT-READ"
       },
       "fittable": false
     },
@@ -263,7 +263,7 @@
       "state": "CONSTANT",
       "state_grad": 0.0,
       "params": {
-        "g": "CONSTANT",
+        "g": "NOT-READ",
         "gx": "ZERO",
         "gy": "GRAD"
       },
@@ -278,7 +278,7 @@
       "state_grad": 5.317354679107666,
       "params": {
         "max_radius": "GRAD",
-        "rate": "CONSTANT"
+        "rate": "NOT-READ"
       },
       "fittable": true
     },
@@ -290,13 +290,13 @@
       "state": "GRAD",
       "state_grad": 1826.28955078125,
       "params": {
-        "a_max": "CONSTANT",
+        "a_max": "NOT-READ",
         "drag": "GRAD",
         "dx": "GRAD",
         "inv_dx": "GRAD",
-        "surface_tension": "CONSTANT",
-        "vmax": "CONSTANT",
-        "wall_contact": "CONSTANT",
+        "surface_tension": "NOT-READ",
+        "vmax": "NOT-READ",
+        "wall_contact": "NOT-READ",
         "wall_damp": "CONSTANT"
       },
       "fittable": true
@@ -309,7 +309,7 @@
       "state": "GRAD",
       "state_grad": 2763.33642578125,
       "params": {
-        "default_radius": "CONSTANT",
+        "default_radius": "NOT-READ",
         "degradation": "GRAD",
         "diffusion": "GRAD"
       },
@@ -324,7 +324,7 @@
       "state_grad": 0.0,
       "params": {
         "k": "ZERO",
-        "ring": "CONSTANT"
+        "ring": "NOT-READ"
       },
       "fittable": false
     },
@@ -359,9 +359,9 @@
       "state": "GRAD",
       "state_grad": 2811.67822265625,
       "params": {
-        "duration": "CONSTANT",
-        "period": "CONSTANT",
-        "phase": "CONSTANT"
+        "duration": "NOT-READ",
+        "period": "NOT-READ",
+        "phase": "NOT-READ"
       },
       "fittable": false
     },
@@ -373,8 +373,8 @@
       "state": "GRAD",
       "state_grad": 2811.67822265625,
       "params": {
-        "r_max": "CONSTANT",
-        "r_min": "CONSTANT"
+        "r_max": "NOT-READ",
+        "r_min": "NOT-READ"
       },
       "fittable": false
     },
@@ -406,7 +406,7 @@
       "kind": "exchange",
       "declared": true,
       "state": "GRAD",
-      "state_grad": 0.5825979709625244,
+      "state_grad": 0.2497289478778839,
       "params": {
         "atol": "CONSTANT",
         "rtol": "CONSTANT"
@@ -421,9 +421,9 @@
       "state": "GRAD",
       "state_grad": 3.173081874847412,
       "params": {
-        "atol": "CONSTANT",
+        "atol": "NOT-READ",
         "gamma": "GRAD",
-        "rtol": "CONSTANT"
+        "rtol": "NOT-READ"
       },
       "fittable": true
     },
@@ -435,11 +435,11 @@
       "state": "CONSTANT",
       "state_grad": 0.0,
       "params": {
-        "alpha": "CONSTANT",
+        "alpha": "NOT-READ",
         "epsilon": "CONSTANT",
-        "f_tol": "CONSTANT",
-        "r_cutoff_frac": "CONSTANT",
-        "r_onset_frac": "CONSTANT",
+        "f_tol": "NOT-READ",
+        "r_cutoff_frac": "NOT-READ",
+        "r_onset_frac": "NOT-READ",
         "radius0": "CONSTANT"
       },
       "fittable": false
@@ -452,7 +452,7 @@
       "state": "CONSTANT",
       "state_grad": 0.0,
       "params": {
-        "g": "CONSTANT",
+        "g": "NOT-READ",
         "gx": "ZERO",
         "gy": "ZERO"
       },
@@ -495,9 +495,9 @@
       "state_grad": 1.7722722986945882e-06,
       "params": {
         "a": "GRAD",
-        "noise": "CONSTANT",
-        "r": "CONSTANT",
-        "softness": "CONSTANT"
+        "noise": "NOT-READ",
+        "r": "NOT-READ",
+        "softness": "NOT-READ"
       },
       "fittable": true
     },
@@ -509,9 +509,9 @@
       "state": "GRAD",
       "state_grad": 9.550379753112793,
       "params": {
-        "chirality": "CONSTANT",
+        "chirality": "NOT-READ",
         "k": "GRAD",
-        "noise": "CONSTANT",
+        "noise": "NOT-READ",
         "v0": "GRAD"
       },
       "fittable": true
@@ -601,7 +601,7 @@
     {
       "op": "mechanosense",
       "impl": "default",
-      "why": "RuntimeError: a view of a leaf Variable that requires grad is being used in an in-place operation."
+      "why": "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace ope"
     },
     {
       "op": "mpm_gather",
