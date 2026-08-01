@@ -31,7 +31,9 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
 import llm
-from llm_agents import BREVITY                                                       # noqa: E402
+from llm_agents import BREVITY
+import templates as _T
+TEMPLATES = _T.prompt_block()                                                       # noqa: E402
 from llm import CAUSALITY_RULE, budget_note, ensure_files, read_file, run_agent  # noqa: E402
 
 PROPOSAL_FILE = os.path.join(llm.CAMPAIGN, "proposal.json")
@@ -94,9 +96,13 @@ def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_mi
 THE TWO FILES ARE APPENDED TO, NOT REWRITTEN. Add your round's entry; leave every earlier entry
 untouched. Re-emitting a file that is already 13 kB costs more wall clock than the thinking did,
 and the campaign's whole record is in those files -- rewriting one risks losing it to save nothing.
-  analysis.md  <=150 words for this round: what the evidence says, and why THESE slots.
-  memory.md    only what a LATER round needs and could not re-derive. Usually 0-2 lines. If
-               nothing this round changes what a future round should do, write nothing.
+  analysis.md  APPEND one entry in the template shape below. Never touch an earlier entry.
+  memory.md    REWRITE the named sections in place. Add no new section. It is a STATE
+               document, not a log -- a line belongs there only if a LATER round needs it and
+               could not re-derive it. It has been used as a log and reached 1904 words across
+               six appended "PROPOSAL ISSUED" blocks; that is the failure this shape prevents.
+
+{TEMPLATES}
 Read these, in this order:
   instructions : {paths['instruction']}
   memory       : {paths['memory']}
