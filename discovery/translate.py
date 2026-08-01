@@ -280,6 +280,56 @@ EMIT = {
 
 
 # --------------------------------------------------------------------------- graph -> spec
+
+# Params the emitter renames on the way out, so "set but not emitted" is not a lie about them.
+_ALIASED = {"alpha": "hill", "rd_rate": "rate", "mono_gamma": "gamma", "l_th": "l_th_frac"}
+
+
+def _assert_params_consumed(graph, node, spec_op):
+    """A parameter that was SET and is not passed to the engine must not be silently dropped.
+
+    THE DEFECT THIS CLOSES, found by the pre-launch on 1 August. `cell_react` accepts `F` and
+    `kk` -- they are Gray-Scott's parameters -- and the emitter forwards them only when the
+    implementation IS Gray-Scott. Setting them on a Gierer-Meinhardt node was accepted by the
+    vocabulary, accepted by the Critic, recorded in the composition, and then discarded at
+    translation with nothing said. The run that followed produced NaN chemistry, and the
+    composition on record claims a calibration that never reached the engine.
+
+    That is the same family as the inert-operator defect (D4): the difference between "this
+    setting did not work" and "this setting was never applied" is the difference between a result
+    and a fiction, and only the second one is silent. An operator whose implementation cannot
+    consume a parameter must REFUSE it, not ignore it.
+    """
+    from composition_space import OPERATORS
+    nid = node["id"]
+    defaults = OPERATORS.get(node["op"], {}).get("params", {})
+    # Only a DELIBERATE setting can be a lie. `graph.params` also carries vocabulary defaults,
+    # and a default sitting unused on an implementation that ignores it is harmless noise --
+    # `cell_react` offers Gray-Scott's F and Gierer-Meinhardt's mu_h from one contract, and
+    # whichever implementation is chosen leaves the other's defaults untouched. What must never
+    # pass is a value someone CHANGED and the engine never saw.
+    set_here = set()
+    for k, v in graph.params.items():
+        if not k.startswith(nid + ".") or k.startswith("_"):
+            continue
+        name = k.split(".", 1)[1]
+        d = defaults.get(name)
+        if d is None or v != d[2]:
+            set_here.add(name)
+    if not set_here:
+        return
+    emitted = set(spec_op) | {_ALIASED.get(k, k) for k in spec_op}
+    reverse = {v: k for k, v in _ALIASED.items()}
+    emitted |= {reverse[k] for k in spec_op if k in reverse}
+    dropped = sorted(p for p in set_here if p not in emitted and _ALIASED.get(p, p) not in emitted)
+    if dropped:
+        raise ValueError(
+            f"{node['op']}:{graph.impl_of(node)} was given {', '.join(dropped)}, and its emitter "
+            f"does not pass {'them' if len(dropped) > 1 else 'it'} to the engine. A parameter "
+            f"that is set and then discarded makes the composition claim a setting the run never "
+            f"had -- refuse it rather than ignore it. (Emitted: {sorted(spec_op)})")
+
+
 def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_after=None,
             record_every=1):
     """Compile a CompositionGraph into a runnable Plexus spec dict.
@@ -310,7 +360,9 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
         emit = EMIT.get(node["op"])
         if emit is None:
             raise ValueError(f"no backend emitter for operator {node['op']!r}")
-        ops.append(emit(graph, node, grow_after))
+        spec_op = emit(graph, node, grow_after)
+        _assert_params_consumed(graph, node, spec_op)
+        ops.append(spec_op)
 
     # D3: topology must be recorded on the SAME stride as positions, and this is asserted
     # downstream. This is the fix for the phantom "97% hollow" result.
