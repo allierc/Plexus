@@ -593,7 +593,7 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     # inside the control's own predicted band, so a positive cannot be told from the control --
     # and the Proposer repeated the design error because nothing carried the criticism back.
     # A reviewer whose reviews reach nobody is a reviewer measuring its own patience.
-    _save_review(rid, review)
+    _save_review(sup.round + 1, review)   # the round id is claimed after this returns
     if review.get("batch_ok") is False and any(
             i.get("severity") == "serious" for i in review.get("issues", [])):
         print("  [reflection] SERIOUS issues -- the batch is not run as proposed.")
