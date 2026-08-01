@@ -30,7 +30,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
-import llm                                                       # noqa: E402
+import llm
+from llm_agents import BREVITY                                                       # noqa: E402
 from llm import CAUSALITY_RULE, budget_note, ensure_files, read_file, run_agent  # noqa: E402
 
 PROPOSAL_FILE = os.path.join(llm.CAMPAIGN, "proposal.json")
@@ -88,6 +89,14 @@ def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_mi
 
     prompt = f"""ROUND {round_id}: propose the next batch of {n_slots} experiments.
 {budget_note(timeout_min, "1) proposal.json  2) an entry appended to analysis.md  3) memory.md")}
+{BREVITY}
+
+THE TWO FILES ARE APPENDED TO, NOT REWRITTEN. Add your round's entry; leave every earlier entry
+untouched. Re-emitting a file that is already 13 kB costs more wall clock than the thinking did,
+and the campaign's whole record is in those files -- rewriting one risks losing it to save nothing.
+  analysis.md  <=150 words for this round: what the evidence says, and why THESE slots.
+  memory.md    only what a LATER round needs and could not re-derive. Usually 0-2 lines. If
+               nothing this round changes what a future round should do, write nothing.
 Read these, in this order:
   instructions : {paths['instruction']}
   memory       : {paths['memory']}
@@ -105,7 +114,7 @@ ill-typed, everything with an unmet precondition, and everything with a dangling
 {CAUSALITY_RULE}
 WRITE {PROPOSAL_FILE} as JSON:
 {{
- "reasoning": "<what the evidence suggests, in 3-6 sentences>",
+ "reasoning": "<what the evidence suggests, <=80 words>",
  "mode": "explore" | "robustness",
  "slots": [
    {{"parent_index": 0, "edit": null, "intent": "control",
