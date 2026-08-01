@@ -500,121 +500,100 @@ well-separated times. Twenty settings; the winner gives three spots that stay th
 three independent runs, and is frozen as the default.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4b --- Numerical stability: can a spec be integrated at all? \hfill \prog}
-\textbf{Why this became a phase, mid-flight.} The pre-launch stopped on a control whose chemistry
-went non-finite. Chasing it found a stability bound that had been \textbf{50 times too permissive}
-for as long as the campaign has existed --- and every ceiling derived from it inherited the same
-factor, so the search box advertised a region the integrator cannot enter.
+\begin{phasebox}{Phase 4b --- Can the chemistry be simulated at all? \hfill \prog}
+\textbf{Why this became a phase, mid-flight.} The pre-launch stopped on a run whose chemistry
+turned to infinities within a hundred frames. Chasing that found the rule which exists to prevent
+exactly this, and it had been \textbf{fifty times too generous} for as long as the campaign has
+existed.
 
-\textbf{The arithmetic.} An explicit diffusion step is stable while
-$\mathrm{dt}\cdot\chi\cdot\max(d_a,d_h)$ stays below one. \code{translate} scales $\chi$ by
-$1/\mathrm{dt}$ --- that is the clock fix, which exists because the chemistry was being integrated
-on the mechanics substep --- so the engine steps $\mathrm{dt}\cdot(\chi/\mathrm{dt})\cdot d$, and
-the $\mathrm{dt}$ cancels. The check multiplied by it anyway, against the \emph{unscaled} $\chi$,
-and so reported \textbf{0.056} for a composition whose real number is \textbf{2.8}.
+\textbf{What the rule is for.} Two chemicals sit on the cell sheet: one that builds up and makes
+more of itself, and one that spreads further and suppresses it. The simulation moves them a little
+at a time. If a single step moves too much at once, the arithmetic runs away and every number
+becomes infinite --- and everything measured afterwards describes the solver rather than the
+tissue. There is a standard condition for how much movement per step is too much. It depends on
+two settings: a \emph{spreading multiplier} that scales both chemicals together, and how far the
+suppressing chemical travels.
 
-\textbf{Why nobody saw it.} The bound was a \emph{comment}: ``CFL stays satisfied:
-$0.02 \times 65 \times 0.16 = 0.21$''. True when written. Then the defaults moved and Phase 2
-widened the diffusivity box to reach Okuda's $\varphi = 10$, and the arithmetic in the comment
-quietly stopped describing the code. A comment cannot be re-derived --- only re-read, and nobody
-had cause to re-read it. \emph{A limit that one phase widens and another relies on has to be a
-check.}
+\textbf{What went wrong.} The condition was written down as a \emph{comment}, worked out once, for
+the settings of the day. Then the defaults changed, and Phase 2 deliberately widened the range so
+Okuda's own values would be reachable at all --- and the arithmetic in the comment quietly stopped
+describing the code. A comment cannot be re-derived. It can only be re-read, and nobody had cause
+to re-read it. On top of that it counted one factor twice, reporting a fiftieth of the true figure.
 
-\textbf{What it cost.} \code{okuda\_route} --- the recipe named for the target --- sat at 2.8 and
-passed every gate. Its chemistry diverged within a hundred frames, and the Biologist refused every
-run that used it. That refusal is how this was found at all: the premise gate caught a defect no
-metric would have shown.
+\textbf{What it cost.} \code{okuda\_route} --- the recipe named for the target --- was four times
+past the safe limit and passed every check in the system. Its chemistry died within a hundred
+frames, and the Biologist refused every run that used it. That refusal is the only reason this was
+found: no metric would have shown it, because there were no numbers left to look at.
 
-\textbf{Done}
-\begin{itemize}[itemsep=1pt]
-\item The bound is computed, not commented: \code{diffusion\_cfl} and both ceilings drop the
-cancelled $\mathrm{dt}$, and \code{translate} refuses a spec whose \emph{emitted} values breach it.
-\item Defaults moved to \code{coral\_fixed\_ball}'s point --- chosen because it is \emph{measured}
-to run, not because it sits inside a box.
-\item \code{cfl\_audit.py}: every spec in the repository, on both paths that produce one. 52 of 54
-hand-written configs are stable; the two that are not are the two that break, and the one which
-actually ran went non-finite exactly as predicted.
-\end{itemize}
-
-\textbf{Then it was certified against the engine, and the corrected bound is still wrong.}
-Twenty specs on the cluster, 300 frames each, sweeping across the predicted wall. An argument
-about where a limit lies is worth nothing until the boundary it predicts is the boundary the
-engine has --- and it is not:
+\textbf{Then it was tested against the engine, and the corrected rule was still wrong.} Twenty
+runs on the cluster, three hundred frames each, across the predicted boundary. An argument about
+where a limit lies is worth nothing until the boundary it predicts is the one the engine has:
 
 \begin{center}\small
-\begin{tabular}{@{}r r r l l@{}}
+\begin{tabular}{@{}r r l l@{}}
 \toprule
-\textbf{CFL} & $\chi$ & $d_h$ & \textbf{measured} & \\
+\textbf{spreading} & \textbf{suppressor} & \textbf{what actually happened} & \\
+\textbf{multiplier} & \textbf{range} & & \\
 \midrule
-0.10 & 0.01 & \textbf{10} & finite, patterns & \textbf{Okuda's $\varphi = 10$ IS reachable}\\
-0.16 & 0.08 & 2   & finite, patterns & \\
-0.21--0.55 & 1.3 & 0.16--0.42 & finite, patterns & the working band\\
-0.48 & 3 & 0.16 & finite, patterns & \\
+0.01 & 10   & healthy pattern & \textbf{Okuda's own value works}\\
+1.3  & 0.16--0.42 & healthy pattern & the working band\\
+3    & 0.16 & healthy pattern & \\
 \midrule
-0.50 & 0.05 & 10  & \textcolor{bad}{non-finite} & predicted stable\\
-0.64 & 4 & 0.16   & \textcolor{warn}{finite but INERT} & the activator dies; P4\\
-0.65 & 1.3 & 0.5  & \textcolor{bad}{non-finite} & \\
-0.96 & 6 & 0.16   & \textcolor{warn}{finite but INERT} & every cell activated; P4\\
+0.05 & 10   & \textcolor{bad}{infinities} & predicted safe\\
+1.3  & 0.5  & \textcolor{bad}{infinities} & \\
+4    & 0.16 & \textcolor{warn}{fine, but dead} & no pattern at all\\
+6    & 0.16 & \textcolor{warn}{fine, but dead} & \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Two things follow, and both were wrong in what I told Cedric an hour earlier.
+\textbf{Two corrections to what I had told Cedric an hour earlier.} First, \textbf{Okuda's setting
+is reachable}. I had said it was not, and had begun writing that the model might need a different
+kind of solver. That came from a short probe on the wrong side of a boundary I had not yet located.
+Second, \textbf{one number cannot express the limit}, because there are two ways to fail and it
+only knows about one. Running away is the one it forbids. The other is that the chemicals spread so
+readily that the pattern smears out and dies: the simulation stays perfectly well behaved and
+measures nothing. \textbf{Well behaved is not the same as alive.}
 
-\textbf{Okuda's $\varphi = 10$ is reachable after all.} At $\chi = 0.01$ it runs finite and
-patterns. I had inferred from a short probe that it was not, and said so. The probe was 80 frames
-and tested $\chi = 0.05$, which does fail --- the wall for $d_h = 10$ sits between 0.01 and 0.05,
-and I had generalised from the wrong side of it.
+\textbf{The rule is now two conditions, and both were measured rather than derived.} The step size
+must be under the limit, \emph{and} the spreading multiplier must stay under three. The second has
+no formula behind it --- it came from watching fourteen settings run. It exists because the
+multiplier scales both chemicals at once, so turning it up flattens the self-reinforcing chemical's
+own peak as fast as it spreads the suppressor, and past about three the peak cannot outrun its own
+spreading.
 
-\textbf{One number cannot express this wall.} At $\chi = 1.3$ the chemistry survives to CFL 0.55
-and dies at 0.65; at $\chi = 0.05$ it dies at 0.50. And there is a \emph{second} failure mode the
-CFL says nothing about: at $\chi = 4$ and $\chi = 6$ the run stays perfectly finite and the
-activator goes to zero. A stability bound does not see that, the Biologist does --- P4, ``the
-chemistry was silently extinguished''. \textbf{Finite is not the same as alive}, and a bound that
-only forbids divergence admits a whole region of dead runs.
+\textbf{The limit sits below the first failure we saw, which is conservative on purpose.} The
+measurements do not fall either side of a clean line: two settings above it were fine and one below
+it was not, and the odd one out is the case where the suppressor travels furthest --- so something
+beyond the two settings matters, and has not been identified. Until it is, the rule refuses two
+combinations known to be perfectly good. Refusing a good proposal costs a proposal. Admitting a
+divergent one has cost a batch and a conclusion, twice.
 
-\textbf{The bound is now two clauses, and both are measured.}
-$\mathrm{CFL} \leq 0.45$ \emph{and} $\chi \leq 3$. The second could not be derived --- it came from
-watching fourteen points on the cluster --- and it exists because there are \emph{two} failure
-modes where the formula only knew about one. Divergence is the one a CFL forbids. Extinction is
-the other: at $\chi = 4$ and $\chi = 6$ the run stays perfectly finite and the activator goes to
-zero. $\chi$ multiplies both diffusivities, so raising it flattens the activator's own gradient as
-fast as the inhibitor's, and past about 3 the local peak cannot outrun its own spreading. A stable
-run that measures nothing is not caught by a stability bound; only the Biologist sees it, and only
-afterwards.
-
-\textbf{The limit sits below the first observed failure, which is conservative on purpose.} The
-measurements do not admit a clean threshold: 0.48 and 0.55 were stable, 0.50 was not --- and the
-0.50 case is $d_h = 10$, so something beyond the product matters, since a large $d_h$ fails where
-a small one survives at the same CFL. Until that term is derived the bound refuses two points known
-to be fine. Refusing a good composition costs a proposal; admitting a divergent one has cost a
-batch and a conclusion, twice.
-
-Checked against all eight measured points: every bad one refused, no bad one admitted.
+Checked against all eight settings that were run: every bad one refused, no bad one admitted.
 
 \textbf{Still to do}
 \begin{itemize}[itemsep=1pt]
-\item \textbf{Derive the missing term.} A single product cannot order the failures, and the bound
-is conservative until something explains why $d_h = 10$ behaves differently.
-\item \textbf{The reaction still has no bound}, deliberately --- the candidate was measured and
-refuted --- so a composition can pass the diffusion check and die through the reaction.
-\item \textbf{Longer runs may move the wall.} These were judged at 300 frames; a run that survives
-300 and dies at 900 is still a run the gate let through.
-\item \textbf{One preset sits on the wrong side.} \code{round\_44\_base} ran healthily as a hand
-config at CFL 0.056 --- 901 frames, 2983 cells, activator 0.993 --- and compiles to 2.8 as a
-composition, because the clock fix scales $\chi$ by 50. Both are true, and they are not the same
-experiment: the archived run's chemistry had a fiftieth of the reaction time the corrected clock
-gives, which is precisely the defect the fix was written for. Keeping it as a trusted reference
-keeps a pre-fix run in the trusted set. \code{validate\_space} is 54/56 on exactly this, and the
-decision is Cedric's.
+\item \textbf{Find the missing term.} Two settings cannot order the failures on their own, and the
+rule stays conservative until something explains the case that breaks the pattern.
+\item \textbf{The reaction has no limit at all}, on purpose --- a candidate was proposed, measured
+and refuted --- so a recipe can pass this check and still die through the reaction instead.
+\item \textbf{Longer runs may move the boundary.} These were judged at three hundred frames. A run
+that survives three hundred and dies at nine hundred is still a run the gate let through.
+\item \textbf{One trusted recipe sits on the wrong side.} \code{round\_44\_base} ran healthily by
+hand --- nine hundred frames, three thousand cells, a strong pattern --- and is four times past the
+limit when rebuilt as a composition, because the clock repair speeds its chemistry up fiftyfold.
+Both are true, and they are not the same experiment: the archived run had a fiftieth of the
+reaction time the repair gives, which is the very defect the repair was written for. Keeping it as
+a reference keeps a pre-repair run among the trusted ones. The self-test sits at 54 of 56 on
+exactly this, and the decision is Cedric's.
 \end{itemize}
 
 \textbf{Whose job this is.} The \textbf{Critic}. It is deterministic, it runs before any compute,
-and it already refuses a composition that is illegal, unrunnable or already tried --- ``cannot be
-integrated'' is the same kind of statement. It is not the Metrologist's, who certifies that an
-\emph{instrument} measures what it claims, and not the Biologist's, who asks whether the
-\emph{specimen} is a tissue. This one is about whether the arithmetic can be performed, which is a
-property of the proposal, and the proposal is what the Critic reads.
+and it already refuses a recipe that is illegal, unrunnable or already tried --- ``cannot be
+simulated'' is the same kind of statement. Not the Metrologist, who certifies that an
+\emph{instrument} measures what it claims, and not the Biologist, who asks whether the
+\emph{specimen} is a tissue. This one asks whether the arithmetic can be carried out at all, which
+is a property of the proposal, and the proposal is what the Critic reads.
 \end{phasebox}
 
 \begin{phasebox}{Phase 4c --- Multi-spot initialisation: several tubes, not one \hfill \prog}
