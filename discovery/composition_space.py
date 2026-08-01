@@ -313,6 +313,18 @@ CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 1.3, 0.08, 0.16
 MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.046, 0.062
 A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.2, 6.0, 1.5
 
+# MEASURED CEILINGS, from the 2026-08-01 certification sweep on L4 (cfl_certify + 14 cluster
+# runs at 300 frames). The divergence wall sits below the formula's 1.0 -- points at CFL 0.50 and
+# 0.65 went non-finite -- so the limit is set where the engine was actually observed to hold.
+# SET BELOW THE FIRST OBSERVED FAILURE, and deliberately conservative. The measured points do
+# not admit a single clean threshold: 0.48 and 0.55 were stable, 0.50 was not. The 0.50 failure
+# is the d_h = 10 case, so something beyond the product matters -- large d_h fails at a CFL that
+# small d_h survives. Until that term is derived, the bound sits under the lowest failure and
+# refuses two points known to be fine. Refusing a good composition costs a proposal; admitting a
+# divergent one costs a batch and, twice already, a conclusion.
+DIFFUSION_CFL_LIMIT = 0.45
+CHI_PATTERN_CEIL = 3.0          # measured: patterns at chi <= 3, finite-but-dead at 4 and 6
+
 D_CEIL = diffusivity_ceiling(CHI_DEFAULT)          # 12.5   -- reaches Okuda's d_h = 10
 CHI_CEIL = chi_ceiling(D_H_DEFAULT)                # 71.4
 RD_RATE_CEIL = float("inf")     # ABSENT: no reaction bound survived measurement (see above)
@@ -704,12 +716,31 @@ class CompositionGraph:
                 d_a, d_h = self.theta(nid, "d_a"), self.theta(nid, "d_h")
                 chi = self.theta(nid, "chi")
                 cfl = diffusion_cfl(d_a, d_h, chi, stencil_gain=gain)
+                # THE SECOND CLAUSE, and it is not in any formula. Certified on the cluster
+                # 2026-08-01, 300 frames, 14 points around the predicted wall: the chemistry
+                # survives to CFL 0.55 at chi = 1.3 and dies at 0.65, but at chi = 4 and chi = 6
+                # the run stays perfectly FINITE while the activator goes to zero. A CFL bound
+                # cannot see that -- it forbids divergence, and this is extinction. Two failure
+                # modes, one of which the Biologist catches after the fact (P4) and the other
+                # before. Only the second was ever checked.
+                #
+                # chi multiplies BOTH diffusivities, so raising it flattens the activator's own
+                # gradient as fast as the inhibitor's: past ~3 the local peak cannot outrun its
+                # own spreading and the pattern decays wherever it starts. Measured, not derived.
+                if chi > CHI_PATTERN_CEIL:
+                    out.append(ThetaCondition(
+                        "T1b_PATTERN_EXTINGUISHED",
+                        "the chemistry stays finite and goes DEAD -- above this chi the activator "
+                        "diffuses away faster than it can autocatalyse, so the run is stable and "
+                        "measures nothing",
+                        f"chi = {chi:g} > {CHI_PATTERN_CEIL:g}; measured act_max 0.0 at chi 4 and "
+                        f"chi 6 (both finite, both P4), against 0.40-0.55 at chi <= 3", True))
                 if cfl > DIFFUSION_CFL_LIMIT:
                     out.append(ThetaCondition(
                         "T1_DIFFUSION_UNSTABLE",
                         "explicit diffusion past its CFL limit -- chem diverges, so the run is "
                         "evidence about an integrator, not a mechanism",
-                        f"dt*chi*max(d_a,d_h)*gain = {ENGINE_DT}*{chi:g}*{max(d_a, d_h):g}"
+                        f"chi*max(d_a,d_h)*gain = {chi:g}*{max(d_a, d_h):g}"
                         f"*{gain:g} = {cfl:.4g} > {DIFFUSION_CFL_LIMIT} "
                         f"(max diffusivity here is {diffusivity_ceiling(chi, stencil_gain=gain):.4g})",
                         derived))
