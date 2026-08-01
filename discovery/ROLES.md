@@ -110,11 +110,29 @@ admissibility** — not the Critic.
 
 ### Analysts ×3 — agent — BUILT
 **Asks:** what happened in this one run?
-Three independent readings, because a single reading is not reproducible. Start at three: enough
-to measure whether the readings are stable and whether consensus means anything. **Scale to 5 or 8
-only if the measured disagreement rate demands it** — Robin needed eight for a different setting,
-and that is not a reason.
-**Inter-analyst disagreement is recorded from round 1**, or the decision to scale can never be made.
+
+**They do not measure. They label.** By the time an Analyst is called, `diag.json`, `metrics.npz`,
+the curve shapes and the strip have already been computed by instruments the Metrologist certifies
+against known answers. All three see **identical numbers** and cannot disagree about one.
+
+What varies is the *judgement over images and a caption*: `phenotype` (bud / spike / tube),
+`forced_or_grown`, `eye_vs_number`, the concern raised. So **×3 measures PHENOTYPE AMBIGUITY, not
+measurement uncertainty** — a run three readers label three ways is genuinely ambiguous, and that
+is worth recording. It is nearly free: 21 s each, run in parallel.
+
+**Why this is not Robin's ×8, and must not be described as if it were.** Robin's Finch *writes the
+analysis code* — it chooses the flow-cytometry gating and the RNA-seq filters, so its eight
+trajectories produce genuinely different NUMBERS and the consensus is over measurements. We took
+measurement away from the Analyst on purpose and gave it to certified instruments, which Robin
+cannot do because they have no ground truth to certify against. Having made that choice, Robin's
+argument for eight does not transfer, and the earlier version of this document borrowed it anyway.
+
+**The rejected third option, named so it is not drifted into:** letting an Analyst invent its own
+measure. That is precisely what the Metrologist exists to prevent — a metric that has not been
+certified is not evidence, however sophisticated the code that produced it.
+
+**Inter-analyst disagreement is recorded from round 1**, or the decision to scale can never be
+made on evidence.
 **Sends to:** Collector
 
 ### Eye-check — agent — BUILT (demotion TO BUILD)
