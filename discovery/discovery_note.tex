@@ -500,7 +500,7 @@ well-separated times. Twenty settings; the winner gives three spots that stay th
 three independent runs, and is frozen as the default.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4b --- Can the chemistry be simulated at all? \hfill \prog}
+\begin{phasebox}{Phase 4b --- Can the chemistry be simulated at all? \hfill \dn}
 \textbf{Why this became a phase, mid-flight.} The pre-launch stopped on a run whose chemistry
 turned to infinities within a hundred frames. Chasing that found the rule which exists to prevent
 exactly this, and it had been \textbf{fifty times too generous} for as long as the campaign has
@@ -596,7 +596,7 @@ simulated'' is the same kind of statement. Not the Metrologist, who certifies th
 is a property of the proposal, and the proposal is what the Critic reads.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4c --- Multi-spot initialisation: several tubes, not one \hfill \prog}
+\begin{phasebox}{Phase 4c --- Multi-spot initialisation, and replication \hfill \dn}
 \textbf{Why.} Cedric: \emph{``did you forget to run multiple tubes from now on, not a single
 one''}. He is right, and the note already said so --- one protrusion per run is a single sample,
 and you cannot tell ``this mechanism makes tubes'' from ``this run made a tube''. Several spots
@@ -654,6 +654,35 @@ after  & 0.501,\ 0.447,\ 0.483 & 0.407,\ 0.379,\ 0.374 & 1.006,\ 1.006,\ 1.005\\
 
 That last row is what a difference between two compositions now has to beat to mean anything. It
 did not exist yesterday, and every claim made without it was comparing single samples.
+\end{phasebox}
+
+\begin{phasebox}{Phase 4d --- The picture stops voting \hfill \dn}
+\textbf{Cedric's call, and it removes what had been blocking the loop.} The metric bank was
+certified by making numbers reproduce labels written from the \emph{movies}, and a vision model's
+reading of a movie could drop a run out of the ranking entirely. Movies stay --- the model still
+watches every run, and a disagreement between the picture and the numbers is the only signal in
+the loop that comes from looking at shape rather than at numbers. What they no longer do is
+\emph{decide}.
+
+\textbf{Two reasons beyond the call.} The veto was circular: the eye-check was handed the
+analysts' consensus --- a label derived from the same caption it then read --- so it could catch a
+summariser drifting from a caption and could not catch numbers disagreeing with reality, which is
+what it was credited with. And the camera was broken for the whole period the veto was trusted:
+one fixed viewpoint, and a zoom re-fitted to the tissue every frame, so growth was drawn as
+shrinkage and a tube could sit behind the body. A gate reading a broken instrument is worse than
+no gate.
+
+\textbf{What arbitrates instead.} The morphology classifier, which answers \emph{which of Okuda's
+shapes is this} from geometry and is certified against shapes whose answer is known by
+construction --- a built sphere is a sphere, nine built bumps are an undulation, an extruded tube
+is a tube, a forked one is branched, and a self-intersecting shell is refused a label at all.
+Nobody's opinion enters. Alongside it, the Biologist: a run that fails a premise is not a tissue
+and cannot calibrate an instrument.
+
+\textbf{What this costs, honestly.} The eye-check vetoing the top two runs of round 2 was reported
+as the system's best moment. It becomes a \emph{recorded disagreement} instead --- which is the
+truthful version, since the camera it was reading was showing growth as shrinkage at the time.
+The disagreement is still written down, and it is still worth reading.
 \end{phasebox}
 
 \begin{phasebox}{Phase 5 --- The experiment \hfill \textcolor{bad}{\textbf{ATTEMPTED --- VOID}}}

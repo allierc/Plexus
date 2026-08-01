@@ -146,8 +146,50 @@ def _separates(vals, ranks):
     return worst > spread, f"min gap {worst:+.3f} vs within-class spread {spread:.3f}"
 
 
+MORPHOLOGY_RANK = {"sphere": 0, "undulation": 1, "tube": 2, "branched": 3}
+
+
+def computed_labels():
+    """The ground truth, COMPUTED. Replaces the eye labels this gate used to rank against.
+
+    WHY THE EYE STOPPED BEING THE ARBITER (Cedric, 2026-08-01). Movies stay -- the vision model
+    still describes every run, and a disagreement between the picture and the numbers is the only
+    signal in the loop that comes from looking at SHAPE. What movies no longer do is decide.
+    Two reasons:
+
+      the veto was circular. `watch()` was handed the analysts' consensus -- a label derived from
+      the same caption it then read -- so it could catch a summariser drifting from a caption and
+      could not catch numbers disagreeing with reality, which is what it was credited with.
+
+      the camera was broken for the whole period the veto was trusted: one fixed viewpoint, and a
+      zoom re-fitted to the tissue every frame, so growth was drawn as SHRINKAGE and a tube could
+      sit behind the body. A gate reading a broken instrument is worse than no gate.
+
+    `morphology.classify` is a better arbiter than an eye label, not merely a cheaper one: it is
+    certified against shapes whose answer is known BY CONSTRUCTION -- a built sphere is a sphere,
+    nine built bumps are an undulation, an extruded tube is a tube, a forked one is branched --
+    and it refuses to label a self-intersecting shell at all. Nobody's opinion enters.
+    """
+    out = {}
+    for row in LABELLED:
+        d = os.path.join(LOG, row["config"], "diag.json")
+        if not os.path.exists(d):
+            continue
+        try:
+            j = json.load(open(d))
+        except Exception:
+            continue
+        m = (j.get("summary", {}) or {}).get("morphology") or j.get("morphology")
+        if isinstance(m, dict):
+            m = m.get("morphology")
+        if m in MORPHOLOGY_RANK:
+            out[row["config"]] = m
+    return out
+
+
 def score():
     scores = load_scores()
+    computed = computed_labels()
     have = [r for r in LABELLED if r["config"] in scores]
     missing = [r["config"] for r in LABELLED if r["config"] not in scores]
 
@@ -176,6 +218,18 @@ def score():
             print(f"  {c:26} ran {f} frames -- the label does not describe this run")
 
     # ------------------------------------------------------------------ validity
+    # A run failing a premise is not a tissue and cannot calibrate an instrument. That check,
+    # and the computed morphology, are what this gate now rests on -- both refuse rather than
+    # judge, and neither depends on a camera.
+    if computed:
+        print(f"\n--- COMPUTED MORPHOLOGY (the arbiter; {len(computed)} of {len(have)} runs) ---")
+        for c, m in computed.items():
+            eye = next((r["eye"] for r in have if r["config"] == c), "?")
+            flag = "" if MORPHOLOGY_RANK.get(m) is not None else "  (unclassifiable)"
+            print(f"  {c:26} computed {m:12} eye said {eye}{flag}")
+    else:
+        print("\n  NO COMPUTED MORPHOLOGY on disk yet -- falling back to the eye labels, which "
+              "is the arrangement being retired. Re-run the labelled set to certify properly.")
     invalid = {r["config"]: validity(scores[r["config"]]) for r in have}
     invalid = {c: v for c, v in invalid.items() if v}
     valid = [r for r in have if r["config"] not in invalid]
