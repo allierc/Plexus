@@ -280,7 +280,7 @@ class Relax(Lateral):
 
         radius = getattr(lvl, "radius", None)
         if radius is None:
-            radius = torch.full((n,), self.radius0, device=dev)
+            radius = torch.ones(n, device=dev) * self.radius0  # ones*p, not full(p): `full` rejects a tensor fill value, blocking a learnable knob
         radius = radius.reshape(n).to(dev)
         sigma = radius[:, None] + radius[None, :]                   # [N, N] contact distance r_i + r_j
 
