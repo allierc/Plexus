@@ -38,14 +38,28 @@ MEMORY = os.path.join(CAMP, "memory.md")
 # Fields every analysis entry must carry. Chosen because each one is a thing a later reader
 # needs and cannot reconstruct: what was tried, what was predicted BEFORE it ran, what came
 # back, what was refused and why, and the rule that decides the next round.
-ENTRY_FIELDS = ["Parent", "Edits", "Why these", "Result", "Refused", "Verdict", "Surprise", "Next"]
+# Every field of an entry, and each is something a later reader needs and cannot reconstruct.
+# `Node`/`Mutation` carry the ANCESTRY and the DIFF -- without them a reader cannot tell a line
+# of descent from a scatter of attempts. `Hypothesis tested` is quoted verbatim as posed, because
+# a hypothesis paraphrased after the evidence is a rationalisation. `Verdict` must cite the
+# number that settled it.
+ENTRY_FIELDS = ["Node", "Track", "Hypothesis tested", "Config", "Measured", "Specimen",
+                "Mutation", "Verdict", "Next"]
 
 # memory.md's sections. Fixed, so the file cannot grow a new one every round.
-MEMORY_SECTIONS = ["Loop semantics", "Known traps", "Frontier and parent",
-                   "Stability envelope", "Lessons", "Current state", "Next action"]
+# The sections memory.md must have, and only these. "Lessons" and "Current state" were prose
+# buckets that absorbed anything; what replaced them is the distinction that matters -- a claim
+# is ESTABLISHED (it survived a round it could have failed in, and carries the number that
+# established it) or it is OPEN, and the two are never mixed. The two tracks are separate
+# sections for the same reason a slot declares its track: a campaign that cannot say which of
+# its two jobs it advanced this round has not advanced either.
+MEMORY_SECTIONS = ["Abstract", "What is ESTABLISHED", "What is OPEN", "Known traps", "Frontier and parent",
+                   "Stability envelope", "Track A — the map", "Track B — the figure",
+                   "Next action"]
 
 MAX_ENTRY_WORDS = 400          # one round's entry; the tables are exempt
 MAX_MEMORY_WORDS = 900         # the whole state document
+MAX_ABSTRACT_SENTENCES = 3     # the head of memory.md, read first and most often
 
 
 def _words(t):
@@ -63,15 +77,16 @@ def check_analysis(path=ANALYSIS):
         return ["no `## Round N` entries -- the file has no per-round structure at all"]
     for e in entries:
         head = e.splitlines()[0][:60]
-        missing = [f for f in ENTRY_FIELDS if f"**{f}**" not in e]
+        missing = [f for f in ENTRY_FIELDS if f"{f}:" not in e]
         if missing:
             out.append(f"entry {head!r}: missing {', '.join(missing)}")
         w = _words(e)
         if w > MAX_ENTRY_WORDS:
             out.append(f"entry {head!r}: {w} words, over the {MAX_ENTRY_WORDS} budget")
         # a prediction with no number cannot be checked, which is the whole protocol
-        if "**Edits**" in e and not re.search(r"\d", e.split("**Why these**")[0]):
-            out.append(f"entry {head!r}: no number anywhere in its predictions")
+        if "Verdict:" in e and not re.search(r"\d", e.split("Verdict:")[1][:200]):
+            out.append(f"entry {head!r}: the Verdict cites no number -- a verdict without the "
+                       f"measurement that settled it is an opinion")
     return out
 
 
@@ -89,6 +104,16 @@ def check_memory(path=MEMORY):
     if extra:
         out.append(f"unexpected section(s): {', '.join(extra)} -- memory has a FIXED set; a new "
                    f"one means the file is being used as a log")
+    # THE ABSTRACT IS THREE SENTENCES. It is the first thing read and the most often read, and
+    # an abstract that grows is a summary that has stopped summarising.
+    m = re.search(r"^##\s+Abstract\s*$(.*?)^##", txt, re.M | re.S)
+    if m:
+        body = re.sub(r"<!--.*?-->", "", m.group(1), flags=re.S).strip()
+        n = len([x for x in re.split(r"(?<=[.!?])\s+", body) if x.strip()])
+        if body and n > MAX_ABSTRACT_SENTENCES:
+            out.append(f"the Abstract runs to {n} sentences; it is "
+                       f"{MAX_ABSTRACT_SENTENCES}. A campaign that cannot state its position in "
+                       f"three has not understood its position")
     w = _words(txt)
     if w > MAX_MEMORY_WORDS:
         out.append(f"{w} words, over the {MAX_MEMORY_WORDS} budget -- memory is a state "

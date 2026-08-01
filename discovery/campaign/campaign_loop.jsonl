@@ -1,2 +1,0 @@
-{"t": 1785621621.8545642, "event": "start", "rounds": 8, "batch": 6, "frames": null}
-{"t": 1785621935.637901, "event": "round", "n": 1, "exit": 5, "minutes": 5.1, "usd_this_round": 1.04, "note": "", "cost_total": {"calls": 54, "usd": 20.69, "tok_in": 129310, "tok_out": 262148, "turns": 174, "minutes": 60.6}}
