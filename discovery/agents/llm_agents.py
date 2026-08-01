@@ -64,7 +64,7 @@ CAMP = llm.CAMPAIGN
 
 
 # ============================================================================ 7. ANALYST x N
-def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None):
+def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None, parallel=True):
     """N INDEPENDENT readings of the SAME run, reconciled by consensus (Robin's 8x Finch).
 
     The point is not redundancy, it is that a single LLM reading is not reproducible: Robin
@@ -90,7 +90,12 @@ def analyse(run_name, out_dir, n=3, timeout_min=6, ledger=None):
     except Exception as e:
         shapes = (f"(trajectory shapes unavailable: {type(e).__name__}: {str(e)[:70]} -- read "
                   f"metrics.png yourself and say so in your verdict)")
-    reads = []
+    # INDEPENDENT BY DESIGN, SO RUN THEM TOGETHER. Three readings of one run exist precisely
+    # because a single LLM reading is not reproducible -- they must not influence one another,
+    # and no analyst's prompt depends on another's answer. They were sequential only because
+    # this was written as a `for` loop, which on a five-run round spends an hour of allowance
+    # waiting. Concurrency changes the wall-clock and not one thing about the experiment.
+    prompts = []
     for i in range(n):
         prompt = f"""ANALYST {i + 1} of {n}. Read ONE simulation run and report what happened.
 
@@ -133,9 +138,19 @@ Reply with ONLY this JSON, nothing else:
   "evidence": "<2 sentences citing SPECIFIC numbers or what the caption says>",
   "eye_vs_number": "agree|disagree",
   "concern": "<anything that looks like an artefact rather than physics, or empty>"}}"""
+        prompts.append(prompt)
+
+    def _one(prompt):
         ok, out = run_agent("analyst", prompt, ledger=ledger, timeout_min=timeout_min,
-                            allowed_tools=["Read"], quiet=True)
-        reads.append(_first_json(out) or {"phenotype": "unreadable", "confidence": 0.0})
+                            quiet=True)
+        return _first_json(out) or {"phenotype": "unreadable", "confidence": 0.0}
+
+    if parallel and n > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=n) as ex:
+            reads = list(ex.map(_one, prompts))
+    else:
+        reads = [_one(p) for p in prompts]
 
     phen = [r.get("phenotype") for r in reads if r.get("phenotype")]
     consensus = max(set(phen), key=phen.count) if phen else "unreadable"

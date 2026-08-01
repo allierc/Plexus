@@ -329,6 +329,87 @@ def _ground_starting_conditions(g, sl):
     return g.with_params({**g.params, key: spec["n_cells"]})
 
 
+
+def _read_one(nm, out_dir, ledger):
+    """Three analysts and the eye-check for one run. The analysts run CONCURRENTLY.
+
+    PHASE 3(c). Twenty of a round's twenty-six agent calls are per-run, and they are completely
+    independent of one another -- three analysts reading the same run cannot influence each
+    other, that is the entire reason there are three. They ran one after another because the
+    code was written as a loop, not for any reason to do with the science, and on a five-run
+    round that is sixty minutes of allowance spent serially.
+
+    The eye-check still runs AFTER, because it is not independent: it is handed the analysts'
+    consensus and asked whether the movie supports it. Parallelising a dependency would not be
+    an optimisation, it would be a different experiment.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    an = A.analyse(nm, out_dir, n=3, ledger=ledger, parallel=True)
+    wa = A.watch(nm, out_dir, an["analyst_consensus"], ledger=ledger)
+    return an, wa
+
+
+def _read_batch(posed_rows, ledger):
+    """Every run's readers, across the whole batch, at once. Returns {name: (analysis, watch)}.
+
+    The batch dimension is independent too: run A's analysts have nothing to say to run B's. So
+    the whole block costs the time of its slowest single call rather than the sum of twenty.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    out = {}
+    if not posed_rows:
+        return out
+    with ThreadPoolExecutor(max_workers=min(8, len(posed_rows))) as ex:
+        futs = {ex.submit(_read_one, nm, d, ledger): nm for nm, d in posed_rows}
+        for f in futs:
+            nm = futs[f]
+            try:
+                out[nm] = f.result()
+            except Exception as e:
+                print(f"  [read] {nm} FAILED: {type(e).__name__}: {str(e)[:90]}")
+                out[nm] = None
+    return out
+
+
+
+def _referee_rank(rows, cfg):
+    """Rank a batch by pairwise tournament (Bradley-Terry) instead of sorting on one score.
+
+    PHASE 3(b). `control.rank_btl` has existed and been self-tested since the loop was built and
+    has never ranked a real batch: the live round sorted on `score_run`, which is a total order
+    imposed by whichever metric the instrument gate happened to admit. A tournament asks each
+    comparison on its own terms and aggregates, so no single number is the ranking.
+
+    The comparator stays ARITHMETIC -- a veto beats everything, then the scalar. Making it an
+    agent would add twenty-odd calls a round to re-decide something already measured; the value
+    here is the aggregation, not another opinion.
+    """
+    from control import rank_btl
+    if len(rows) < 3:
+        return sorted(rows, key=lambda r: -r[3])
+
+    def compare(a, b):
+        if bool(a[2].get("watcher_blocks")) != bool(b[2].get("watcher_blocks")):
+            return 0.0 if a[2].get("watcher_blocks") else 1.0
+        sa, sb = a[3], b[3]
+        if not np.isfinite(sa) and not np.isfinite(sb):
+            return 0.5
+        if not np.isfinite(sa):
+            return 0.0
+        if not np.isfinite(sb):
+            return 1.0
+        return 1.0 if sa > sb else (0.0 if sa < sb else 0.5)
+
+    strength = rank_btl(rows, compare)
+    order = sorted(range(len(rows)), key=lambda i: -strength.get(i, 0.0))
+    ranked = [rows[i] for i in order]
+    naive = sorted(range(len(rows)), key=lambda i: -rows[i][3])
+    if order != naive:
+        print("  [referee] the tournament disagrees with sorting on the scalar -- "
+              "recorded, and the tournament is what the round uses")
+    return ranked
+
+
 def build_composition_batch(sup, cfg, n_slots, ledger):
     """Proposer(LLM) -> Critic -> Reflection(LLM). Returns [(graph, label, hyp_fields)]."""
     frontier = load_frontier()
@@ -642,8 +723,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             print(f"  [critic] {nm} is not evidence: {post}")
             continue
         out_dir = os.path.join(LOG, nm)
-        an = A.analyse(nm, out_dir, n=3, ledger=ledger)
-        wa = A.watch(nm, out_dir, an["analyst_consensus"], ledger=ledger)
+        an, wa = _read_one(nm, out_dir, ledger)
         summ.update({k: v for k, v in an.items() if k != "analyst_reads"})
         summ.update(wa)
         if wa.get("watcher_blocks"):
@@ -670,7 +750,11 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         return bk.finish(rid, "no_evidence", 1)
 
     # ------------------------------------------------ rank (measure) + judge (2nd opinion)
-    rows.sort(key=lambda r: -r[3])
+    # THE REFEREE, which until now existed only in its own self-test. Sorting on one scalar is
+    # a total order imposed by whichever metric happens to be admitted; a tournament asks the
+    # comparison directly and aggregates, so no single number gets to be the ranking. Cheap:
+    # the comparator is arithmetic, not an agent, and rank_btl was already written and tested.
+    rows = _referee_rank(rows, cfg)
     if len(rows) >= 2:
         a, b = rows[0], rows[1]
         w, why_j = A.judge_pair(
@@ -695,6 +779,24 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         A.interpret(comp_hash(g), g.name_region(), h.edit, s,
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
                     os.path.join(CAMP, "causal_descriptions.md"), ledger=ledger)
+
+    # EVOLUTION. Truncation alone means a winner is never improved -- the loop can only ever
+    # PICK from what the enumerator happened to offer. Refining the best is the other half, and
+    # it is the last agent that was written and never called.
+    if kept:
+        try:
+            best_nm, best_g, best_s = kept[0][0], kept[0][1], kept[0][2]
+            ev = A.evolve(f"{best_g.name_region()} :: {best_nm} :: "
+                          f"{ {k: best_s.get(k) for k in ('protr_peak', 'analyst_consensus')} }",
+                          _ledger_summary(sup, lm), ledger=ledger)
+            if ev:
+                os.makedirs(CAMP, exist_ok=True)
+                with open(os.path.join(CAMP, "evolution.jsonl"), "a") as fh:
+                    fh.write(json.dumps({"round": rid, "on": best_nm, "proposal": ev}) + "\n")
+                print(f"  [evolution] refinement proposed on {best_nm} -- "
+                      f"carried into the next round's frontier")
+        except Exception as e:
+            print(f"  [evolution] FAILED: {type(e).__name__}: {str(e)[:90]}")
 
     rep = sup.observe([(g, s, h.hid) for _, g, s, _, _, h in rows])
     sup.reg.render_knowledge(os.path.join(CAMP, "knowledge.md"),
