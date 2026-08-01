@@ -1018,24 +1018,76 @@ categorical verdict --- \emph{invalid} on a \textbf{certain} premise, \emph{ambi
 is the Proposer's any more.
 \end{itemize}
 
-\subsection*{What the first cold start found, and it is not good news}
+\subsection*{What the cold start found, and what it cost to misread it}
 
-The loop now begins by asking the Archivist where to start, from what is already on disk rather
-than from a seed sphere --- and the first thing it did was read \code{mechanics.npz}, which
-nothing had ever read. \textbf{Across all 62 finished runs in \code{log/okuda}, \code{n\_protruding}
-never once exceeded zero, and \code{protr\_peak} never exceeded 1.13.}
+The loop now begins by asking the Archivist where to start from what is on disk. The first thing
+it did was read \code{mechanics.npz}, which nothing had ever read: \textbf{across all 63 finished
+runs, \code{n\_protruding} never once exceeded zero and \code{protr\_peak} never exceeded 1.13.}
+The summary had been reporting ``best sound run 1.11'', which reads like a result and is a sphere
+with noise on it. \textbf{This project has never produced a protrusion}, and the number saying so
+sat in every run's mechanics file, unread, for the whole campaign.
 
-The scalar summary had been reporting ``best sound run: 1.11'', which reads like a result. It is a
-sphere with noise on it. \textbf{This project has never produced a protrusion}, and the number that
-says so was sitting in every run's mechanics file, unread, for the whole campaign. So the cold
-start refuses to name a starting point --- \emph{``there is no measured starting point for a
-campaign whose objective is a tube''} --- and the frontier falls back to the reference recipes as a
-\emph{recorded choice} rather than as a default nobody noticed.
+\textbf{Then it gave up --- and that was the expensive mistake, and it was ours.} It ranked every
+candidate on \code{protr\_peak} and \code{n\_protruding}, found zeros, and fell back to
+\code{okuda\_route}. Those are \textbf{Track~B} measures: they say whether we made Okuda's picture.
+\textbf{Track~A asks a different question}, about the landscape of operators, and a composition
+that runs, patterns and holds a sound specimen is a point on that map whether or not anything
+protruded. Judging a Track~A starting point by a Track~B criterion, and then treating a Track~B
+zero as the end of the road, is how the fallback recipe became the starting point three separate
+times. \textbf{Measured on the corrected ranking: 46 of 63 runs serve Track~A.} The campaign had
+46 usable starting points and was reporting that it had none. \emph{Track~A does not run out} ---
+so \code{stop} is now stated as a Track~B verdict only.
 
-\subsection*{The launch}
-\code{campaign\_loop.py}, unattended, stopping for a closed admission gate, two consecutive aborts,
-or the round budget. What to watch: the budget ledger, the Collector's holes, and whether any run
-ever reports a protruding cell --- which would be the first in the project's history.
+\subsection*{Three defects the batches themselves surfaced}
+
+\textbf{Two operators where one was meant.} \code{impl\_structural} marked an operator whose
+implementation is a real mechanism choice \emph{and} was read as permission to hold two of them,
+so the menu offered both \code{+shape\_energy\_3d:default} and \code{=shape\_energy\_3d:default}.
+The Proposer took the add and wrote the claim for the swap; the spec came out with two whole
+mechanics solvers driving the same vertices. Closed in the generator and, separately, in the
+Critic --- a guard that lives only in the generator is a guard against one way of being wrong.
+
+\textbf{A stale proposal, silently adopted.} \code{proposal.json} was six seconds older than the
+process that read it. The harness's read-before-write rule blocked the overwrite, the agent read
+the file and reported \emph{``already holds a complete, valid Round-1 proposal \ldots\ no rewrite
+is needed''}, then verified it against every rule and ran it. The guard against clobbering had
+become a mechanism for inheriting stale work. The file is now deleted before the call, so there is
+nothing to inherit.
+
+\textbf{And the one that killed the batch.} The activator went $0.01 \to 1.41\times10^{6} \to$
+NaN \textbf{while spatially uniform} --- spread $3.4\times10^{-5}$ against a mean of $1.4\times
+10^{6}$. A diffusion breach makes a checkerboard; a uniform blow-up is an ODE exploding. The CFL
+was 0.208 against a limit of 0.45 and was never the problem. There was a bound on diffusion and
+\textbf{none on the reaction}. One probe at \code{dt=1.0} disproved the clock theory that looked
+obvious, and the discriminator is single-variable across three runs: \code{gierer\_meinhardt}
+explodes, \code{gray\_scott} patterns --- and \code{okuda\_route}, the recipe named for the target,
+carries the former.
+
+\subsection*{The Diagnostician, and why it is a role}
+
+Cedric's objection, and it is correct: \emph{``we cannot launch, crash, and do this every time''}.
+Every one of those diagnoses was done by hand. The Biologist can say a specimen is invalid and the
+Metrologist that an instrument is uncertified; \textbf{neither can say why the apparatus failed},
+so a human did the forensics after every crash --- which is not autonomy, it is manual work moved
+later. The \textbf{Diagnostician} computes when each series went non-finite, whether the divergence
+was \emph{spatial or uniform}, which runs share the signature, and \textbf{what differs between a
+failing run and the nearest passing one} --- the step that isolated \code{chi 65 vs 1.3} with every
+other parameter equal. It returns \code{cause}, \code{evidence}, \code{guard\_to\_add} and
+\code{stop|continue}, runs \emph{before} the Interpreter, and can halt the campaign.
+
+\subsection*{The launch: reconnaissance first}
+
+The first round \textbf{sets no hypotheses}. The Proposer picks six specs already on disk from the
+Archivist's ranked table and they are re-run \emph{verbatim} --- no edits, no predictions, intent
+\code{control}, resolving \code{inconclusive} so they leave the surprise denominator. There is
+nothing to be surprised by in a replay, and a prediction attached to one would be a prediction
+about our own past arithmetic. Every number we hold was taken with at least one instrument since
+proved wrong; the product of this round is a frontier of compositions we have \emph{seen work},
+measured with instruments we are entitled to believe. It cost one agent call and 34 seconds to
+submit.
+
+\textbf{What to watch}: whether the chemistry stays finite, the Collector's holes, and whether any
+run reports a protruding cell --- which would be the first in the project's history.
 \end{phasebox}
 
 \begin{phasebox}{Phase 7 --- The demonstration \hfill \todo}
