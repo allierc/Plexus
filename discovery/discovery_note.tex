@@ -500,6 +500,62 @@ well-separated times. Twenty settings; the winner gives three spots that stay th
 three independent runs, and is frozen as the default.
 \end{phasebox}
 
+\begin{phasebox}{Phase 4b --- Numerical stability: can a spec be integrated at all? \hfill \prog}
+\textbf{Why this became a phase, mid-flight.} The pre-launch stopped on a control whose chemistry
+went non-finite. Chasing it found a stability bound that had been \textbf{50 times too permissive}
+for as long as the campaign has existed --- and every ceiling derived from it inherited the same
+factor, so the search box advertised a region the integrator cannot enter.
+
+\textbf{The arithmetic.} An explicit diffusion step is stable while
+$\mathrm{dt}\cdot\chi\cdot\max(d_a,d_h)$ stays below one. \code{translate} scales $\chi$ by
+$1/\mathrm{dt}$ --- that is the clock fix, which exists because the chemistry was being integrated
+on the mechanics substep --- so the engine steps $\mathrm{dt}\cdot(\chi/\mathrm{dt})\cdot d$, and
+the $\mathrm{dt}$ cancels. The check multiplied by it anyway, against the \emph{unscaled} $\chi$,
+and so reported \textbf{0.056} for a composition whose real number is \textbf{2.8}.
+
+\textbf{Why nobody saw it.} The bound was a \emph{comment}: ``CFL stays satisfied:
+$0.02 \times 65 \times 0.16 = 0.21$''. True when written. Then the defaults moved and Phase 2
+widened the diffusivity box to reach Okuda's $\varphi = 10$, and the arithmetic in the comment
+quietly stopped describing the code. A comment cannot be re-derived --- only re-read, and nobody
+had cause to re-read it. \emph{A limit that one phase widens and another relies on has to be a
+check.}
+
+\textbf{What it cost.} \code{okuda\_route} --- the recipe named for the target --- sat at 2.8 and
+passed every gate. Its chemistry diverged within a hundred frames, and the Biologist refused every
+run that used it. That refusal is how this was found at all: the premise gate caught a defect no
+metric would have shown.
+
+\textbf{Done}
+\begin{itemize}[itemsep=1pt]
+\item The bound is computed, not commented: \code{diffusion\_cfl} and both ceilings drop the
+cancelled $\mathrm{dt}$, and \code{translate} refuses a spec whose \emph{emitted} values breach it.
+\item Defaults moved to \code{coral\_fixed\_ball}'s point --- chosen because it is \emph{measured}
+to run, not because it sits inside a box.
+\item \code{cfl\_audit.py}: every spec in the repository, on both paths that produce one. 52 of 54
+hand-written configs are stable; the two that are not are the two that break, and the one which
+actually ran went non-finite exactly as predicted.
+\end{itemize}
+
+\textbf{Still to do}
+\begin{itemize}[itemsep=1pt]
+\item \textbf{Reachability.} At the corrected bound, Okuda's $\varphi = 10$ needs $\chi \leq 0.08$.
+Whether his regime is reachable at all with an explicit step is now an open question, and the
+honest answer may be that it needs an implicit one.
+\item \textbf{The reaction has no bound at all}, deliberately --- the candidate was measured and
+refuted. So a composition can still be refused by the diffusion check and diverge through the
+reaction, and only the Biologist will notice.
+\item \textbf{One preset does not compile} (\code{round\_44\_base}), for reasons unrelated to
+stability. \code{validate\_space} sits at 54/56 on it.
+\end{itemize}
+
+\textbf{Whose job this is.} The \textbf{Critic}. It is deterministic, it runs before any compute,
+and it already refuses a composition that is illegal, unrunnable or already tried --- ``cannot be
+integrated'' is the same kind of statement. It is not the Metrologist's, who certifies that an
+\emph{instrument} measures what it claims, and not the Biologist's, who asks whether the
+\emph{specimen} is a tissue. This one is about whether the arithmetic can be performed, which is a
+property of the proposal, and the proposal is what the Critic reads.
+\end{phasebox}
+
 \begin{phasebox}{Phase 5 --- The experiment \hfill \textcolor{bad}{\textbf{ATTEMPTED --- VOID}}}
 \textbf{A 27-run batch ran on 31 July and produced no evidence at all.} Four shape features,
 two directions each, three seeds, plus three nulls --- the first batch in the campaign whose every
