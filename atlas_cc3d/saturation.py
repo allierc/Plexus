@@ -73,8 +73,15 @@ def classify(mech: dict, baseline: dict) -> str:
     return verdict                            # alias / refinement, as recorded
 
 
-def ledger(doc: dict, baseline: dict) -> dict:
+def ledger(doc: dict, baseline: dict, priors: dict | None = None) -> dict:
     """The per-mechanism table plus the cumulative curve, in inspection order.
+
+    `priors` maps a contract name -> "<repository>:<mechanism>" for every contract an EARLIER
+    atlas already counted as new. Without it the ledger's `implementation` class only sees a
+    contract claimed twice WITHIN one run, and the second repository re-counts as `new` every
+    contract the first one introduced -- inflating exactly the number this instrument exists to
+    protect. That defect is invisible at n=1 and appears the moment there is an n=2, which is why
+    it is fixed here rather than in the first campaign.
 
     Inspection order is `order:` if the record gives one, else the order the mechanisms appear
     in the file. It matters: the curve is a statement about *the order things were found*, and
@@ -87,7 +94,10 @@ def ledger(doc: dict, baseline: dict) -> dict:
     rows, cum_new, curve = [], 0, []
     counts = {c: 0 for c in CLASSES}
     disputed = []
-    seen_new = {}                     # contract name -> the mechanism that first introduced it
+    # contract name -> the mechanism that first introduced it. Pre-seeded from earlier atlases so
+    # a second sighting reads as `implementation` (of that repository) rather than as new vocabulary.
+    seen_new = dict(priors or {})
+    prior_names = set(seen_new)
     for i, m in enumerate(mechs, 1):
         cls = classify(m, baseline)
         cname = (m.get("contract") or {}).get("name")
@@ -104,6 +114,7 @@ def ledger(doc: dict, baseline: dict) -> dict:
             cum_new += 1
         rows.append({"n": i, "id": m.get("id"), "raw_name": m.get("raw_name"),
                      "class": cls, "contract": cname,
+                     "prior": cname in prior_names,
                      "of": m.get("of") or (seen_new.get(cname) if cls == "implementation"
                                            else None),
                      "status": m.get("status", "candidate")})
@@ -117,6 +128,7 @@ def ledger(doc: dict, baseline: dict) -> dict:
         "counts": counts,
         "scored": scored,
         "yield_new_per_mechanism": (cum_new / scored) if scored else None,
+        "priors": sorted(prior_names),
         "new_contracts": sorted(seen_new),
         "curve": curve,
         "rows": rows,
@@ -206,6 +218,9 @@ def main():
     ap.add_argument("--record", default=os.path.join(HERE, "atlas_record.yaml"))
     ap.add_argument("--plot", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--prior", action="append", default=[],
+                    help="an earlier atlas_record.yaml; its `new` contracts are already spoken "
+                         "for, so a second sighting here is an implementation, not new vocabulary")
     a = ap.parse_args()
 
     if a.selftest:
@@ -213,7 +228,18 @@ def main():
 
     import record
     import registry_view
-    led = ledger(record.load(a.record), registry_view.load())
+    priors = {}
+    for p in a.prior:
+        pdoc = record.load(p)
+        repo = str(pdoc.get("repository") or os.path.basename(os.path.dirname(p)))
+        for pm in pdoc.get("mechanisms") or []:
+            nm = (pm.get("contract") or {}).get("name")
+            if pm.get("verdict") == "new" and nm and nm not in priors:
+                priors[nm] = f"{repo}:{pm.get('id')}"
+    if priors:
+        print(f"[saturation] {len(priors)} contract(s) already claimed by earlier atlases: "
+              f"{', '.join(sorted(priors))}\n")
+    led = ledger(record.load(a.record), registry_view.load(), priors)
     print(render(led))
     os.makedirs(STATE, exist_ok=True)
     with open(OUT_JSON, "w") as f:

@@ -89,7 +89,7 @@ The prediction --- made before running anything, and the reason this note exists
 \code{TRANSFER.md}.
 
 %======================================================================
-\section{Phase 0 --- what transferred, measured rather than asserted}
+\section{What transferred, measured rather than asserted}
 
 \code{STATUS.md} in the jax-morph atlas claimed $\sim$60\% of the Python was instrument and would
 copy as-is. Forking it is the test of that claim, and it came out slightly better than claimed.
@@ -102,8 +102,9 @@ copy as-is. Forking it is the test of that claim, and it came out slightly bette
 \midrule
 \code{record.py} & \textcolor{good}{none} & schema, ladder and the twelve rules are about the
 record, not the target. Self-test passes unchanged.\\
-\code{saturation.py} & \textcolor{good}{none} & the ledger scores against the frozen baseline;
-nothing in it knows what a cell is. Self-test passes.\\
+\code{saturation.py} & \textcolor{good}{none} & to \emph{transfer}: the ledger scores against the
+frozen baseline and nothing in it knows what a cell is. It was later \emph{extended} --- see
+\S\ref{sec:gap} --- but that is a defect the second repository exposed, not a porting cost.\\
 \code{atlas.py} & \textcolor{good}{none} & blast radius, rung, commit-or-revert --- all
 \code{HERE}-relative.\\
 \code{registry\_view.py} & \textcolor{good}{none} & reads \code{plexus.operators}. Produced the
@@ -121,61 +122,154 @@ by construction: the reference, its mechanism scan, its PDF.\\
 that the apparatus is a method rather than a one-off, and it cost about ten minutes to establish.
 
 %======================================================================
-\section{The oracle --- where the risk actually is}
+\section{The oracle --- where the risk actually is}\label{sec:oracle}
 
-\code{TRANSFER.md} predicted the oracle would be the largest risk and a \emph{target} risk rather
-than a \emph{procedure} risk. It is, and here is the state of it.
+\code{TRANSFER.md} predicted the oracle would be the largest risk, and a \emph{target} risk rather
+than a \emph{procedure} risk. It is.
 
 \begin{center}
 \small
-\begin{tabular}{@{}l l p{8.2cm}@{}}
+\begin{tabular}{@{}l l p{8.4cm}@{}}
 \toprule
 \textbf{gate} & \textbf{state} & \\
 \midrule
 installs & \dn & CompuCell3D 4.10.0 from its own conda channel into an isolated environment
 (\code{/workspace/.conda\_envs/cc3d-oracle}), py312.\\
-imports & \dn & after supplying \code{libGL} (conda-forge \code{libgl-devel}); the container is
+imports & \dn & after supplying \code{libGL} (conda-forge \code{libgl-devel}) --- the container is
 headless and CompuCell3D links its graphics stack unconditionally.\\
-pure-Python model definition & \dn & \code{cc3d.core.PyCoreSpecs} --- a simulation can be built
-without XML, which is what makes a scriptable oracle possible at all.\\
+model definable in Python & \dn & \code{cc3d.core.PyCoreSpecs}: a simulation can be built without
+XML, which is what makes a scriptable oracle possible at all.\\
 seed exposed & \dn & \code{PottsCore(random\_seed=...)}, so determinism is at least
 \emph{expressible}.\\
-headless run & \textcolor{bad}{\textbf{BLOCKED}} & see below.\\
-deterministic at a fixed seed & \ns & cannot be tested until it runs.\\
+runs headless & \textcolor{bad}{\textbf{BLOCKED}} & a bug in 4.10.0, below.\\
+deterministic at a fixed seed & \ns & untestable until it runs.\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textbf{The blocker is a bug in CompuCell3D 4.10.0, not in the plan.} Driving it from
-\code{PyCoreSpecs} through \code{service\_cc3d} reaches
-\code{persistent\_globals.get\_custom\_settings\_path()}, which does
-\code{Path(custom\_settings\_source)} where \code{custom\_settings\_source} is the \emph{list of
-specs} rather than a simulation file path:
+\textbf{The blocker is in CompuCell3D, not in the plan.} Driving it from \code{PyCoreSpecs} through
+\code{service\_cc3d} reaches \code{persistent\_globals.get\_custom\_settings\_path()}, which calls
+\code{Path(custom\_settings\_source)} where that value is the \emph{list of specs} rather than a
+simulation file path:
 
 \begin{center}
 \small\code{TypeError: argument should be a str or an os.PathLike object ... not 'list'}
 \end{center}
 
-Three ways out, in the order they will be tried: an earlier release (4.9.0 / 4.8.0) where the
-pure-Python path may predate the regression; the \code{.cc3d} project-file route via
-\code{cc3d\_runScript.sh}, which is the officially supported headless entry point and does not
-touch that code path; or setting the custom-settings path explicitly before the call.
+Three routes, in the order they will be tried: an earlier release (4.9.0 / 4.8.0) that may predate
+the regression; the \code{.cc3d} project-file route via \code{cc3d\_runScript.sh}, which is the
+officially supported headless entry point and never touches that code path; or setting the
+custom-settings path explicitly before the call.
 
-\textbf{Nothing downstream can be trusted until this gate passes}, and that is the whole
-discipline: jax-morph was chosen \emph{because} it ran, and the note said so. A target that cannot
-be run reduces the atlas to the Okuda situation --- wrong operator, wrong parameter or wrong
-reading, with no way to tell which.
+\textbf{Nothing downstream can be trusted until this gate passes.} jax-morph was chosen
+\emph{because} it ran, and the first note said so in its own Phase 0: a target that cannot be run
+reduces the atlas to the Okuda situation --- wrong operator, wrong parameter or wrong reading of a
+figure, with no way to tell which.
 
 %======================================================================
-\section{What is not started}
+\section{The phases}
 
-Phases 1--7. The mechanism inventory, the specs, the differential tests and the ledger all wait on
-the oracle gate. \textbf{The one thing worth doing before it passes} is the instrument gap
-\code{TRANSFER.md} identifies: the ledger's \code{implementation} class detects a contract claimed
-twice \emph{within} one run, not \emph{across} runs --- so a CompuCell3D mechanism matching a
-jax-morph \emph{candidate} would read as \code{new} when it is really a second sighting. That is a
-defect that only becomes visible at the second repository, which is exactly the kind of thing this
-exercise exists to surface.
+Seven stages, the same ladder as the first atlas. \textbf{I stop at the end of each one and wait
+for you.} What differs is not the procedure but what each stage has to mean when a cell is a
+region of a lattice rather than a point.
+
+\begin{phasebox}{Phase 0 --- Instruments and the oracle \hfill \prog}
+\textbf{Goal.} Make every later measurement trustworthy before taking one.
+
+The instruments came across for free (\S2). \textbf{The oracle is the phase}, and it is where the
+risk always was: install, import, run headless, and be deterministic at a fixed seed. Four of
+those six gates pass; the fifth blocks (\S\ref{sec:oracle}) and the sixth cannot be tested until it does.
+
+\textbf{Stop condition:} the authors' own model runs twice from one seed and is bit-identical.
+Until that holds, a later disagreement is unattributable --- their noise or our error, with no way
+to separate them.
+\end{phasebox}
+
+\begin{phasebox}{Phase 1 --- Read every mechanism \hfill \ns}
+The excavator on each mechanism: what it does to the state, its equations, the role of every knob,
+and the \code{surprises} a reimplementer gets wrong.
+
+\textbf{What is different here.} jax-morph's mechanisms were 20 classes plus 4 architectural
+contracts a scan could not see. CompuCell3D's are \emph{plugins} and \emph{steppables} declared
+through XML or \code{PyCoreSpecs} --- a different extraction problem, and one where the
+scan-versus-hand split will fall in a different place. \textbf{The 4 hand-added entries were among
+the most interesting things the first atlas found}; expecting an automatic scan to be sufficient
+here would be repeating a mistake we already know about.
+\end{phasebox}
+
+\begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \ns}
+Each mechanism becomes a typed Plexus contract with a verdict, then the skeptic tries to break it.
+
+\textbf{The prediction is already on the record} (\code{TRANSFER.md}): the \emph{biological}
+mechanisms --- growth, division, death, chemotaxis, secretion, diffusion --- should come back
+largely \code{alias} or \code{implementation} of contracts the first atlas already registered,
+while the \emph{representational} ones --- cell-as-domain, the Metropolis acceptance rule, contact
+energy over shared boundary, volume and surface constraints --- should be genuinely new. If that
+splits as predicted, the conclusion is that \emph{the biological vocabulary is converging while
+the representational vocabulary is not}.
+\end{phasebox}
+
+\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \ns}
+Every \code{new} and every \code{refinement} becomes a Plexus operator in the anti-chamber, with a
+test of one property statable without the reference: a conservation law, a sign, a limit, a
+symmetry.
+
+\textbf{The open question this phase will force.} Plexus's \code{cell} set is points with per-cell
+state. A Potts cell is a \emph{set of lattice sites}. Either that is expressible as an existing
+set with a different map, or the language needs a representation it does not have --- and finding
+out which is worth more than any individual operator here.
+\end{phasebox}
+
+\begin{phasebox}{Phase 4 --- Differential validation \hfill \ns}
+Metric and threshold written down \emph{first}; then the same initial condition through both
+implementations; then subtract.
+
+\textbf{This is the phase most likely to break, and the reason this target was chosen.} Every
+differential test in the first atlas was a subtraction of per-cell arrays. Here there is no
+per-cell equation to compare and the dynamics are a Metropolis chain, so a matched trajectory is
+not even meaningful --- the same argument that made the division differ compare a pooled
+\emph{hazard} instead of cell counts, but now applying to the whole framework rather than one
+operator. The tests will have to be \textbf{distributional}: equilibrium sorted-boundary length,
+volume distribution, contact-energy spectrum.
+\end{phasebox}
+
+\begin{phasebox}{Phase 5 --- The forward figure \hfill \ns}
+One headline result of the paper reproduced inside Plexus out of normalized operators, and set
+\emph{beside} the reference rather than described next to it. Cell sorting is the obvious
+candidate: it is CompuCell3D's canonical demonstration and its outcome is a topology, not a
+trajectory.
+\end{phasebox}
+
+\begin{phasebox}{Phase 6 --- Differentiability \hfill \ns}
+\textbf{Probably not applicable, and saying why is the result.} The first atlas's Phase 6 rested on
+the forward model being differentiable. A Metropolis acceptance is a discrete accept/reject on an
+energy difference --- there is no pathwise gradient through it at all, and the straight-through
+trick that carried the division draw does not obviously transfer. If Plexus can express Potts
+dynamics forward but not inversely, that is a real and reportable limit of the language.
+\end{phasebox}
+
+\begin{phasebox}{Phase 7 --- Promotion, and the joint ledger \hfill \ns}
+The measurement only becomes an argument here: the cumulative-new curve across \emph{two}
+repositories. Flat means the language is saturating; still climbing means it is not.
+\end{phasebox}
+
+%======================================================================
+\section{An instrument defect only the second repository could reveal --- fixed}\label{sec:gap}
+
+\code{saturation.py} classifies a mechanism \code{implementation} when it reaches a contract
+\emph{this run} has already counted as new. At $n=1$ that is complete. At $n=2$ it is wrong: every
+contract the first atlas introduced would be counted as new \emph{again} by the second, inflating
+precisely the number the instrument exists to protect.
+
+\textbf{The fix is a \code{-{}-prior} flag}: an earlier \code{atlas\_record.yaml} pre-seeds the
+"already spoken for" set, so a second sighting reads as an implementation \emph{of that
+repository} rather than as new vocabulary. Checked by feeding jax-morph's record back to itself ---
+its 8 new contracts all demote and it scores \textbf{NEW 0, implementation 14}, which is the
+correct answer for a repository measured against itself.
+
+Applied to \emph{both} campaigns' copies, so the instrument stays one instrument. That is the whole
+value of a second target arriving before the first is promoted: \textbf{the defect was invisible
+at $n=1$ and structural at $n=2$}, and it would have silently doubled the headline number.
 
 \vspace{6pt}
 \hrule
