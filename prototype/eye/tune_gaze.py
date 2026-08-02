@@ -68,8 +68,18 @@ def identify(curves, dt, ridge=1e-3):
     w = np.einsum("tm,tmk->tk", act, axis)             # [T,3] in (x, y, z)
     u = np.stack([w[:, 1], -w[:, 0], w[:, 2]], 1)      # -> (horizontal, vertical, torsion)
 
-    gd = np.gradient(g, h, axis=0)
-    gdd = np.gradient(gd, h, axis=0)
+    # Differentiating a strided, noisy signal TWICE amplifies its noise by ~1/h^2, which is
+    # what an R^2 of 0.35 on the first attempt was really measuring. Savitzky-Golay fits a local
+    # polynomial and reads the derivatives off it, so the second derivative is taken from the
+    # fit rather than from successive differences.
+    from scipy.signal import savgol_filter
+    win = int(min(max(9, 2 * (len(g) // 40) + 1), (len(g) // 2) * 2 - 1))
+    win = win if win % 2 else win + 1
+    gs = savgol_filter(g, win, 3, axis=0)
+    gd = savgol_filter(g, win, 3, deriv=1, delta=h, axis=0)
+    gdd = savgol_filter(g, win, 3, deriv=2, delta=h, axis=0)
+    us = savgol_filter(u, win, 3, axis=0)
+    g, u = gs, us
     out = []
     for k in range(3):
         X = np.stack([u[:, k], -gd[:, k], -g[:, k]], 1)
@@ -188,14 +198,46 @@ def main():
                        w_act=a.w_act)
     l1, tr1 = rollout([torch.tensor(x) for x in gains], plant, axes0, program, n_frames, h, tau)
 
+    # Is the loop even able to ask for more? If the agonist is already pinned at 1.0 for most
+    # of every hold, no gain can help: the residual is MECHANICAL, not a control problem, and
+    # the honest thing for this tool to do is say so rather than report a tuned number.
+    sat = float((cur["act"].max(1) > 0.98).mean())
+    # VERIFY THE INSTRUMENT BEFORE TRUSTING THE MEASUREMENT. A good R^2 on theta_ddot only says
+    # the model tracks the TRANSIENTS; the quantity we want to tune away is the STANDING error,
+    # which lives in the steady state theta_ss = B u / K. So the surrogate is asked to reproduce
+    # the excursion the real eye actually made, under the gains the real eye actually used. If
+    # it does not, its advice about the standing error is worthless, whatever its R^2.
+    amp_real = np.abs(cur["gaze"]).max(0)
+    amp_surr = tr0.detach().abs().max(0).values.numpy()
+    fid = float(np.mean(np.minimum(amp_surr, amp_real) / np.maximum(amp_surr, amp_real).clip(1e-6)))
     names = ["kp", "ki", "kd", "gain", "tonic"]
-    print("\n[tune] surrogate tracking loss  {:.3f} -> {:.3f}  ({:.1f}x better)".format(
-        float(l0), float(l1), float(l0) / max(float(l1), 1e-9)))
+    gainx = float(l0) / max(float(l1), 1e-9)
+    print("\n[tune] surrogate tracking loss  {:.3f} -> {:.3f}  ({:.3f}x better)".format(
+        float(l0), float(l1), gainx))
+    print(f"[tune] agonist saturated (act > 0.98) on {100 * sat:.0f}% of frames")
+    print("[tune] amplitude h/v/t  real {:.1f}/{:.1f}/{:.1f}  surrogate {:.1f}/{:.1f}/{:.1f} deg"
+          "   (fidelity {:.2f})".format(*amp_real, *amp_surr, fid))
+    if fid < 0.6:
+        print("[tune] VERDICT: the surrogate is NOT a usable instrument for this question.\n"
+              "       Its R^2 is on theta_ddot, i.e. on the transients; the standing error we\n"
+              "       want to tune away lives in the steady state theta_ss = B u / K, and the\n"
+              "       fit does not reproduce the excursion the real eye made. Tuning gains on\n"
+              "       it would be optimising against a model that disagrees with the thing it\n"
+              "       is a model of. Fix the identification (excite the plant with a sweep, fit\n"
+              "       the steady state explicitly) before believing any tuned number.")
+    elif gainx < 1.05:
+        print("[tune] VERDICT: retuning buys nothing -- the eye is stopping where the MECHANICS\n"
+              "       stops it, not where the controller does.")
     for n, a0, a1 in zip(names, init, gains):
         print(f"        {n:<6} {a0:.4f}  ->  {a1:.4f}")
     out = {"plant": plant, "init": dict(zip(names, [float(x) for x in init])),
-           "tuned": dict(zip(names, gains)),
-           "surrogate_loss": {"before": float(l0), "after": float(l1)}}
+           "tuned": dict(zip(names, gains)), "agonist_saturated_frac": sat,
+           "surrogate_loss": {"before": float(l0), "after": float(l1), "ratio": gainx},
+           "amplitude_deg": {"real": [float(x) for x in amp_real],
+                             "surrogate": [float(x) for x in amp_surr]},
+           "surrogate_fidelity": fid,
+           "conclusion": ("surrogate-not-usable" if fid < 0.6 else
+                          "control-limited" if gainx >= 1.05 else "mechanics-limited")}
     with open(os.path.join(a.run_dir, "tuned_gains.json"), "w") as f:
         json.dump(out, f, indent=2)
     print(f"[tune] -> {os.path.join(a.run_dir, 'tuned_gains.json')}")
