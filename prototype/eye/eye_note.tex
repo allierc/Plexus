@@ -292,6 +292,53 @@ horizontal / vertical / torsion, against $10$--$20^\circ$ for every earlier conf
 \color{black}\normalsize
 
 %======================================================================
+\section{Gradient descent on the controller --- and why it was refused}
+
+\code{tune\_gaze.py} follows \code{inverse\_slime}: differentiating the MPM rollout is exactly
+the cost Plexus\,2 warns about (memory scales as points $\times$ steps), so it never rolls out.
+It identifies a reduced plant --- $\ddot\theta = Bu - C\dot\theta - K\theta$ per axis, with
+$u=\sum_m a_m \hat{\mathbf a}_m$ read straight from the archived run --- by one ridge
+least-squares fit, then runs Adam on $(k_p,k_i,k_d,\text{gain},\text{tonic})$ over that
+differentiable surrogate.
+
+It works mechanically, and the answer is negative, twice over.
+
+\textbf{First the derivatives were the problem, not the model.} The initial fit gave
+$R^2 = 0.28$--$0.40$ on $\ddot\theta$. Differentiating a strided, noisy signal twice amplifies
+its noise by $\sim h^{-2}$; reading the derivatives off a local Savitzky--Golay polynomial
+instead raised it to $0.48$--$0.72$ with no change to the model.
+
+\textbf{Then the model was the problem.} Tuning still bought $1.008\times$. The first
+explanation offered --- ``the drive must be saturated'' --- was wrong, and the tool's own
+diagnostic said so: the agonist sits above $0.98$ on only 6\% of frames. So the surrogate was
+asked to reproduce the excursion the real eye actually made, under the gains it actually used:
+
+\begin{center}\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+peak excursion & horizontal & vertical & torsion \\
+\midrule
+real            & $17.0^\circ$ & $9.0^\circ$ & $2.8^\circ$ \\
+surrogate       & $\ \ 1.7^\circ$ & $3.0^\circ$ & $2.2^\circ$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
+\textbf{The instrument failed its own check, so the measurement was thrown away.} A good $R^2$
+on $\ddot\theta$ certifies the \emph{transients}; the standing error we wanted to tune away
+lives in the steady state $\theta_{ss}=Bu/K$, and the fit misses the real excursion by a factor
+of ten in the horizontal. Tuning gains on it would be optimising against a model that disagrees
+with the thing it is a model of. \code{tune\_gaze} now runs this fidelity test and refuses to
+report a tuned number when it fails --- which is the discipline the Plexus\,2 paper puts first:
+verify the instrument before trusting the measurement.
+\end{tcolorbox}
+
+The fix is known and not yet done: excite the plant with a frequency sweep rather than a
+staircase, and fit the steady state explicitly instead of hoping it falls out of an
+acceleration fit.
+
+%======================================================================
 \section{The movie}
 
 Eight panels, black ground, lower-case labels, one shared time cursor.
@@ -324,8 +371,10 @@ torsion, so the iridophore specks are what make the roll visible at all.
 
 \textbf{Settled.} The decomposition into sets; the emergent muscle-action table; the two-body
 grid coupling via a new \emph{implementation} of an existing contract; the deformable ovoid in a
-spherical cup with a torque-free fat suspension; the metric suite and the archive discipline
-(every trial keeps its own spec, movie and numbers).
+spherical cup with a torque-free fat suspension; the orbital pulley and the $A/E$ ceiling it
+raises ($0.28$ clean, $0.32$ folds); the globe radius as a metric, an acceptance check and a
+term in the objective, so ``it hit the angle'' can no longer be bought by crushing the eye; and
+the archive discipline --- twenty-five trials, each keeping its own spec, movie and numbers.
 
 \textbf{Open.} Reaching the commanded angle rather than about 60\% of it. Six rounds each found a real mechanism and a real ceiling, and the
 configuration that survives all of them (t21) is stable, holds together, contracts realistically
@@ -343,12 +392,8 @@ driven back and forth three times) and the zebrafish \code{okr} program at movie
 \item Let the video-captioning VLM watch the result cold and see whether it reports a rolling
 eye. That is the dynamics-watching critic the Plexus\,2 paper names as a required agent, and
 this is a cheap, honest test of it.
-\item \code{tune\_gaze.py} --- gradient descent on the rotation controller, built but not yet
-swept. Differentiating the MPM rollout is exactly the cost Plexus\,2 warns about (memory scales
-as points $\times$ steps), so it takes the \code{inverse\_slime} route instead: identify the
-second-order rotational plant by ridge least squares from an archived run (teacher-forced, one
-step, no rollout), run Adam on $(k_p,k_i,k_d,\text{gain},\text{tonic})$ over that
-differentiable surrogate, and verify the result back in the full simulation.
+\item Repair the surrogate identification (\S6): sweep excitation, explicit steady-state fit.
+Only then is controller tuning a question worth asking.
 \item A real inverse pass: given only the observed gaze trace, recover the six insertion
 geometries. Loop~II on a system whose ground truth we wrote down ourselves.
 \end{enumerate}
