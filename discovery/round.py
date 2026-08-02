@@ -81,6 +81,29 @@ LLM_TIMING = os.path.join(CAMP, "llm_timing.jsonl")
 _T0 = [None]
 
 
+TRACE = os.path.join(CAMP, "trace.log")
+
+
+def trace(where):
+    """A breadcrumb that survives the process dying without a traceback.
+
+    The recon round vanished after captioning with no exception and no further output, so the
+    only thing known was "somewhere after the last print". stdout was not enough: it is buffered
+    through nohup, and a SIGKILL takes whatever has not been flushed. This writes and FSYNCS a
+    line per step, so the last line in trace.log is the last thing that actually ran.
+    """
+    line = f"{time.strftime('%H:%M:%S')}  {where}"
+    print(f"  [trace] {where}", flush=True)
+    try:
+        os.makedirs(CAMP, exist_ok=True)
+        with open(TRACE, "a") as fh:
+            fh.write(line + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+    except Exception:
+        pass
+
+
 def act(title, detail=""):
     if _T0[0] is None:
         _T0[0] = time.time()
@@ -925,9 +948,12 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # Losing it costs the Eye-check its input and costs the Reader one of several sources. Losing
     # the round costs everything. So this is caught, said out loud, and the round continues
     # without captions -- which is what `description.txt` being absent already means downstream.
+    trace("about to import caption_wave")
     try:
         from caption_wave import caption_wave
+        trace("caption_wave imported; calling it")
         caption_wave(names)
+        trace("caption_wave RETURNED")
     except BaseException as e:                       # BaseException: a MemoryError or a SIGKILL
         step(f"CAPTIONING FAILED ({type(e).__name__}: {str(e)[:80]}) -- continuing WITHOUT "
              f"captions. The Eye-check has nothing to read and will say so; the Reader still has "
@@ -938,6 +964,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # that posed eight and admitted one must say so WITH THE REASONS, because "0 runs, coverage
     # 0%" is what the Proposer was handed, and from it drew the only sane conclusion available:
     # that the ledger was broken.
+    trace("past captioning; entering the reading loop")
     step("reading each run: Biologist -> Metrologist -> Reader -> Eye-check")
     rows, refused = [], []
     for nm, g, h in posed:
@@ -958,7 +985,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             refused.append((nm, f"critic post-hoc: {post}"))
             continue
         out_dir = os.path.join(LOG, nm)
+        trace(f"reading {nm}")
         an, wa = _read_one(nm, out_dir, ledger)
+        trace(f"read {nm} OK")
         summ.update({k: v for k, v in an.items() if k != "analyst_reads"})
         summ.update(wa)
         # THE EYE-CHECK NO LONGER BLOCKS. Its verdict is recorded and carried into the record,
@@ -1026,6 +1055,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # the Interpreter would write a causal story about a configuration error. It also has standing
     # to STOP the campaign, because six more rounds cannot re-measure a broken apparatus into a
     # working one.
+    trace("reading loop done; entering Act 3")
     _names = [nm for nm, _, _ in posed]
     _bad = [f["run"] for f in (DIAG.failure(n) for n in _names) if f["broke_at"] is not None]
     _sick = [nm for nm, _g, s, _sc, _oc, _h in rows
@@ -1048,7 +1078,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
 
     act("ACT 3 - DECIDE", f"{len(rows)} run(s) admitted, {len(refused)} refused")
     step("Collector: building the round record from the files on disk")
+    trace("Collector: building the record")
     record = COL.collect_round(rid, mode, rows, refused=refused, posed=posed)
+    trace("Collector done")
     for hole in COL.holes(record):
         print(f"  [collector] HOLE: {hole}")
 
