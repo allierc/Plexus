@@ -26,3 +26,10 @@
 ------------------------------------------------------------------------------------------------
   ⚠ [loop] round 3 exited 5 after 4.5 min wall, 3.6 min of agents
 [loop] STOPPING -- two rounds in a row produced no admissible evidence. That is a problem with the batch or the instruments, not bad luck.
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- removed 10 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
