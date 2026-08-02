@@ -543,8 +543,22 @@ class Divide3D(Structural):
                     ba = np.mean(rc, 0); nba = float(np.linalg.norm(ba))
                     if nba > 1e-6:
                         bud_axis = ba / nba
+        blocked = 0                     # divisions the RESERVOIR refused, not the biology
         for f in cand:
-            if len(pos) + 2 > buf:                                # respect the vertex buffer
+            if len(pos) + 2 > buf:
+                # THE VERTEX BUFFER IS FULL. Counted and reported, never silent.
+                #
+                # This `break` used to be the whole story: division simply stopped and nothing
+                # said why. `wk_pressure_pos_s0` grew 150 -> 1778 cells by frame 323 of 900 and
+                # then added ZERO for the remaining 575 frames, because 1778 is exactly the
+                # (V+4)/2 cap of a buffer sized for a 150-cell start. Two thirds of that run
+                # measured a full array, every specimen check passed it, and the only thing that
+                # ever noticed was Cedric watching the green stop two seconds into the movie.
+                #
+                # A run truncated by its own reservoir is not evidence about growth, and the
+                # difference between "the tissue stopped dividing" and "the tissue was not
+                # ALLOWED to divide" is the difference between a result and an artefact.
+                blocked = len(cand) - len(daughter_mothers)
                 break
             r = rings[f]
             P = np.array([pos[v] for v in r]); c = P.mean(0)      # LONG-AXIS (Hertwig) split: septum perpendicular
@@ -579,6 +593,15 @@ class Divide3D(Structural):
         if ndone == 0:
             m["age"] = torch.as_tensor(np.asarray(age), dtype=dt, device=dev)   # persist ageing even without division
             m["ndiv"] = torch.as_tensor(np.asarray(ndiv), dtype=dt, device=dev)
+        # RESERVOIR PRESSURE, reported every frame it bites. `div_blocked` is how many cells
+        # wanted to divide this frame and were refused for want of room; `buf_full` says the
+        # array is at its ceiling. Both travel with the mesh so run_one can record them.
+        m["div_blocked"] = int(blocked)
+        m["buf_full"] = bool(len(pos) + 2 > buf)
+        if blocked:
+            print(f"[divide_3d] RESERVOIR FULL: {blocked} division(s) refused for want of vertex "
+                  f"buffer ({len(pos)}/{buf}). This run is capped by its array, not by its "
+                  f"biology -- every later measurement describes the reservoir.", flush=True)
             return {}
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
         A0a = np.array([A0[i] for i in keep], np.float64)
