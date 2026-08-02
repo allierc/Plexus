@@ -193,7 +193,41 @@ own cell-sorting model runs twice from one seed and is bit-identical. Until that
 disagreement would have been unattributable between their noise and our error. It holds.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Read every mechanism \hfill \ns}
+\begin{phasebox}{Phase 0 --- what actually happened \hfill \done}
+\footnotesize
+\begin{tabular}{@{}l l p{8.4cm}@{}}
+\toprule
+& \textbf{state} & \textbf{the issue found, and what was interesting}\\
+\midrule
+instruments & \dn & Five of seven needed \textbf{zero edits} --- \code{record.py},
+\code{saturation.py}, \code{atlas.py}, \code{registry\_view.py}, \code{agents/}. Both self-tests
+pass from the new folder and the same 52-contract baseline is reproduced, so the two campaigns are
+scored against one ruler.\\
+oracle installs & \dn & CompuCell3D 4.10.0 from its own conda channel, isolated env, py312.\\
+oracle imports & \dn & needed \code{libGL}: the container is headless and CompuCell3D links its
+graphics stack unconditionally.\\
+isolation & \dn & the Plexus interpreter cannot \code{import cc3d}. Checked, not assumed.\\
+headless run & \dn & \textbf{Three upstream defects had to be routed around.} The advertised
+pure-Python route (\code{PyCoreSpecs} $\to$ \code{service\_cc3d}) passes the specs \emph{list}
+where a file is expected --- \code{Path(<list>)}, then \code{os.path.isfile(<list>)}. CC3D
+\code{exec}s the project script with its own globals, so a steppable class in that file raises
+\code{NameError} at registration. And the output directory may not sit inside the project. The way
+through: generate CC3DML \emph{from} \code{PyCoreSpecs}, write a real \code{.cc3d} project, run
+\code{cc3d/run\_script.py}.\\
+determinism & \dn & two runs at seed 42 bit-identical across id, type, volume, surface and centre
+of mass; seed 7 differs. \textbf{The first attempt compared a dump whose \code{xCOM}/\code{yCOM}
+were all zero} because \code{CenterOfMassPlugin} was not enabled --- a weaker test than it looked,
+so the plugin was added and the check re-run.\\
+\bottomrule
+\end{tabular}
+
+\textbf{And a diagnostic mistake worth recording.} Two runs appeared to produce \emph{no output}
+and were reported as hangs at import. They were not: piping an unbuffered process through
+\code{grep} buffers its output, which is lost when the process is killed on timeout. The marks
+existed; the pipe ate them.
+\end{phasebox}
+
+\begin{phasebox}{Phase 1 --- Read every mechanism \hfill \prog}
 The excavator on each mechanism: what it does to the state, its equations, the role of every knob,
 and the \code{surprises} a reimplementer gets wrong.
 
@@ -203,6 +237,48 @@ through XML or \code{PyCoreSpecs} --- a different extraction problem, and one wh
 scan-versus-hand split will fall in a different place. \textbf{The 4 hand-added entries were among
 the most interesting things the first atlas found}; expecting an automatic scan to be sufficient
 here would be repeating a mistake we already know about.
+\end{phasebox}
+
+\begin{phasebox}{Phase 1 --- what actually happened \hfill \prog\ (11 of 35)}
+\textbf{The inventory is complete and it is bigger than the first atlas's:} \textbf{35
+mechanisms}, against jax-morph's 24. Thirty come from \code{cc3d.core.PyCoreSpecs} --- the
+framework's \emph{own} registry of what a model can switch on, which is a better source than a
+syntax-tree scan because it is the project's index rather than our reading of it.
+
+\textbf{Five were added by hand, and they are the interesting ones.} The first atlas found that 4
+of its 24 were not classes; here the same is true and more so, because a Cellular Potts model's
+defining commitments are not plugins:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}l p{9.3cm}@{}}
+\toprule
+\code{cell\_as\_lattice\_domain} & a cell is a set of lattice sites sharing an id; volume is a
+count, position a derived centroid\\
+\code{metropolis\_acceptance} & $P = 1$ if $\Delta E \le 0$ else $e^{-\Delta E/T}$ --- discrete,
+stochastic, and with no pathwise derivative\\
+\code{energy\_sum\_composition} & mechanisms compose by \emph{adding energy terms}, not by
+operator splitting. The direct counterpart of jax-morph's Lie--Trotter split, and the contrast is
+itself a finding\\
+\code{mcs\_time\_unit} & one MCS is one attempted copy per site. \textbf{There is no \code{dt}}\\
+\code{pixel\_neighbourhood} & the model's relation is a lattice adjacency, not an edge set built
+from positions\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Eleven are at \emph{inspected}; twenty-four are not, and the record says so.} A mechanism
+is only moved off \code{candidate} where there is something to point at: the six with a measured
+run \emph{and} an ablation in \code{log/atlas\_cc3d/}, plus the five architectural entries. Naming
+a plugin is not reading it. The validator agrees --- 0 violations, and
+\code{R3\_code\_path} is checkable because every entry carries a real \code{file:line} rather than
+a dotted module name.
+
+\textbf{What the six runs already establish}, each with its control (see \S\ref{sec:demos}): every
+CPM mechanism here is an \emph{energy term}, not an update. None of them writes state; they change
+only the probability that a proposed pixel copy is accepted. That is a structural fact about the
+whole framework, and it is what Phase 2 will have to normalize against a language whose operators
+return deltas.
 \end{phasebox}
 
 \begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \ns}
@@ -260,6 +336,52 @@ dynamics forward but not inversely, that is a real and reportable limit of the l
 The measurement only becomes an argument here: the cumulative-new curve across \emph{two}
 repositories. Flat means the language is saturating; still climbing means it is not.
 \end{phasebox}
+
+%======================================================================
+\section{Six mechanisms, each beside its ablation}\label{sec:demos}
+
+Reference runs, not Plexus runs --- Phases 2--4 have not started, and every artefact says so on
+its face. They exist to prove the oracle is real and readable, and to put each mechanism's
+observable in the currency Phase 4 will need.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l l r r@{}}
+\toprule
+\textbf{mechanism} & \textbf{observable} & \textbf{mechanism ON} & \textbf{ablated}\\
+\midrule
+\code{contact\_adhesion} & heterotypic boundary & $290 \to 167$ \ (-42\%) & $290 \to 388$ \ (+34\%)\\
+\code{volume\_constraint} & mean volume & $25 \to 59.4$ \ (+138\%) & $25 \to 0$ \ (-100\%)\\
+\code{surface\_constraint} & mean perimeter & $20 \to 19.3$ \ (-3\%) & $20 \to 22.8$ \ (+14\%)\\
+\code{chemotaxis} & mean $x$ (source at wall) & $15 \to 18$ \ (+20\%) & $15 \to 14.8$ \ (-1\%)\\
+\code{growth\_mitosis} & live cells & $37 \to 296$ \ (+700\%) & $37 \to 37$ \ (0\%)\\
+\code{external\_potential} & mean $x$ & $32 \to 57.6$ \ (+80\%) & $32 \to 32.2$ \ (+0.5\%)\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\includegraphics[width=\textwidth]{../log/atlas_cc3d/contact_adhesion/strip.png}\\
+{\small\color{grey}Cell sorting, mechanism above its ablation on matched frames. Colour is cell
+type; the seams are cell borders drawn from the id lattice, because colouring by type alone
+renders a one-type tissue as a solid block and makes the cells --- the entire subject of a Potts
+model --- invisible.}
+\end{center}
+
+\textbf{Every ablation separates, and several reverse rather than merely weaken}: sorting becomes
+mixing, the perimeter grows instead of shrinking, and without a volume constraint the cells do not
+just relax --- they dissolve.
+
+\textbf{Every observable is a population or topology statistic, never a trajectory.} That is
+forced rather than stylistic. A Potts model is a Metropolis chain, so a matched trajectory is not
+a meaningful object and Phase 4 will have to compare distributions --- the same argument that made
+the first atlas's division differ compare a pooled \emph{hazard} instead of cell counts, now
+applying to an entire framework.
+
+\textbf{Four defects were fixed rather than shipped}, each found by looking at the output: type-level
+volume parameters silently disabling per-cell growth; type-colouring hiding every cell; a
+chemotaxis strength that transported cells into the wall and destroyed them; and the
+\code{PyCoreSpecs} API not being spelled like CC3DML.
 
 %======================================================================
 \section{An instrument defect only the second repository could reveal --- fixed}\label{sec:gap}
