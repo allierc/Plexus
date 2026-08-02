@@ -1,6 +1,6 @@
 """saturation -- the measurement the atlas exists to make.
 
-plexus2.tex App. E.1: *"If the decomposition of a sufficiently broad collection of biological
+plexus2.tex App. "Building the Plexus operator atlas": *"If the decomposition of a sufficiently broad collection of biological
 simulation frameworks converges toward a compact and reusable operator vocabulary, then the
 proposed operator algebra constitutes a meaningful intermediate representation for biological
 modelling. Conversely, repeated discovery of genuinely new operator families indicates that the
@@ -23,7 +23,7 @@ The fourth class was not in the plan; the first real ledger produced it. Four of
 control steps -- three gene-network variants and their shared base -- all normalize to one
 contract, `regulate`. Counting them as four new contracts would have inflated the headline number
 by 36% on the very measurement the atlas exists to make, and it is exactly the outcome plexus2.tex
-App. E.1 calls the GOOD one: "the first outcome strengthens numerical diversity". The curve counts
+App. "Building the Plexus operator atlas" calls the GOOD one: "the first outcome strengthens numerical diversity". The curve counts
 DISTINCT contracts.
 
 The comparison is against `plexus.operators` and nothing else. Unreviewed code in `prototype/` or

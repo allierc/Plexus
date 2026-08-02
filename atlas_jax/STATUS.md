@@ -14,7 +14,7 @@ Two ways to grow the Plexus vocabulary. **Discovery** (`discovery/`) searches fo
 nobody wrote down. **Atlas** (here) takes a published system *whose code exists*, decomposes it
 into the Plexus operator algebra, and measures whether that algebra is converging.
 
-The measurement is the deliverable, and it is falsifiable (plexus2.tex App. E.1): if decomposing a
+The measurement is the deliverable, and it is falsifiable (plexus2.tex App. "Building the Plexus operator atlas"): if decomposing a
 broad collection of frameworks converges on a compact reusable vocabulary, the algebra is a real
 intermediate representation; if every framework yields new operator families, the language is
 incomplete.

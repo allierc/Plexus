@@ -124,47 +124,39 @@ surprises:
 verdict: new
 of: null
 implementation_of: null
-why: |
-  new: no registered contract covers an elastic set-point on a cell's SIZE -- a per-cell
-  quadratic energy lambda_V*(V - V_target)^2 on the site COUNT, returned as a dE into the
-  Metropolis accept and writing nothing. The closest promoted operators are cell_grow
-  (structural/growth) and this term's geometric twin membrane_tension (the `surface` entry,
-  normalized `new` in this same atlas).
-
-  - cell_grow operates on volume but from the OPPOSITE direction: it WRITES the rest/target
-    volume forward by a logistic law (a state-writing update, kind structural). volume_elasticity
-    writes nothing -- it returns the energy dE that resists any deviation of the CURRENT site
-    count from that target. Widening cell_grow to absorb it would fuse a state-writing growth
-    rule with a non-writing energy term (incompatible state_io) and erase the very read/write
-    distinction this campaign is measuring. So NOT a refinement or alias of cell_grow.
-
-  - THE LIVE ALTERNATIVE, discharged here because the sibling entries defer to this one: the
-    `surface` (membrane_tension, order 27) and `elongate` (LengthConstraint, order 18) entries
-    both record that their `new` verdict turns on how Volume normalizes, because Volume, Surface
-    and Length are the SAME functional object -- lambda*(moment - target)^2 on a per-cell
-    geometric moment, each returning dE to the same Metropolis accept -- differing only in WHICH
-    moment they read (0th = site count, 1st = boundary count, 2nd = inertia axis). One could
-    lump them into a single generic constrain_moment(cell, order, target, lambda) contract of
-    which volume_elasticity would be the 0th-moment implementation. I REJECT the lump, on the
-    criterion Plexus actually uses for implementation_of: implementations of a contract are
-    INTERCHANGEABLE alternatives reading the same inputs and encoding the same biology (Morse /
-    SoftSphere / Hertzian all compute one adhesion force from a pair distance -- you pick one).
-    Volume, Surface and Length are NOT interchangeable: they read DIFFERENT trackers
-    (VolumeTracker's site count vs SurfaceTracker's boundary count vs the inertia tensor), encode
-    DIFFERENT biophysics (bulk incompressibility vs cortical/membrane tension vs anisotropy), and
-    COMPOSE -- a CPM cell runs all three at once, each doing a distinct job, never one instead of
-    another. Shared mathematical form is not a shared contract: the promoted language already
-    keeps gravity, mpm_spin, mpm_anchor, active_force and active_stress as five distinct
-    lateral/mechanics contracts despite a common energy/force shape, precisely because they act
-    on different quantities. So volume_elasticity is its own contract, membrane_tension is its
-    own, and neither is implementation_of the other. Collapsing "any quadratic on any moment"
-    into one contract would be the naming DEflation this campaign must avoid as much as inflation.
-    Consequence for the ledger: Volume lands on a distinct promoted contract, NOT a moment-generic
-    one -- which under the `surface` skeptic's own stated rule leaves membrane_tension `new`.
-
-  - The jax-morph proposals `relax` / `regulate` are generic relaxation / homeostasis verbs,
-    not a volume-elasticity energy; no prior atlas proposed this specific contract, so this is
-    its FIRST sighting (implementation_of: null).
+why: "new: no registered contract covers an elastic set-point on a cell's SIZE -- a per-cell\nquadratic\
+  \ energy lambda_V*(V - V_target)^2 on the site COUNT, returned as a dE into the\nMetropolis accept and\
+  \ writing nothing. The closest promoted operators are cell_grow\n(structural/growth) and this term's\
+  \ geometric twin membrane_tension (the `surface` entry,\nnormalized `new` in this same atlas).\n\n-\
+  \ cell_grow operates on volume but from the OPPOSITE direction: it WRITES the rest/target\n  volume\
+  \ forward by a logistic law (a state-writing update, kind structural). volume_elasticity\n  writes nothing\
+  \ -- it returns the energy dE that resists any deviation of the CURRENT site\n  count from that target.\
+  \ Widening cell_grow to absorb it would fuse a state-writing growth\n  rule with a non-writing energy\
+  \ term (incompatible state_io) and erase the very read/write\n  distinction this campaign is measuring.\
+  \ So NOT a refinement or alias of cell_grow.\n\n- THE LIVE ALTERNATIVE, discharged here because the\
+  \ sibling entries defer to this one: the\n  `surface` (membrane_tension, order 27) and `elongate` (LengthConstraint,\
+  \ order 18) entries\n  both record that their `new` verdict turns on how Volume normalizes, because\
+  \ Volume, Surface\n  and Length are the SAME functional object -- lambda*(moment - target)^2 on a per-cell\n\
+  \  geometric moment, each returning dE to the same Metropolis accept -- differing only in WHICH\n  moment\
+  \ they read (0th = site count, 1st = boundary count, 2nd = inertia axis). One could\n  lump them into\
+  \ a single generic constrain_moment(cell, order, target, lambda) contract of\n  which volume_elasticity\
+  \ would be the 0th-moment implementation. I REJECT the lump, on the\n  criterion Plexus actually uses\
+  \ for implementation_of: implementations of a contract are\n  INTERCHANGEABLE alternatives reading the\
+  \ same inputs and encoding the same biology (Morse /\n  SoftSphere / Hertzian all compute one adhesion\
+  \ force from a pair distance -- you pick one).\n  Volume, Surface and Length are NOT interchangeable:\
+  \ they read DIFFERENT trackers\n  (VolumeTracker's site count vs SurfaceTracker's boundary count vs\
+  \ the inertia tensor), encode\n  DIFFERENT biophysics (bulk incompressibility vs cortical/membrane tension\
+  \ vs anisotropy), and\n  COMPOSE -- a CPM cell runs all three at once, each doing a distinct job, never\
+  \ one instead of\n  another. Shared mathematical form is not a shared contract: the promoted language\
+  \ already\n  keeps gravity, mpm_spin, mpm_anchor, active_force and active_stress as five distinct\n\
+  \  lateral/mechanics contracts despite a common energy/force shape, precisely because they act\n  on\
+  \ different quantities. So volume_elasticity is its own contract, membrane_tension is its\n  own, and\
+  \ neither is implementation_of the other. Collapsing \"any quadratic on any moment\"\n  into one contract\
+  \ would be the naming DEflation this campaign must avoid as much as inflation.\n  Consequence for the\
+  \ ledger: Volume lands on a distinct promoted contract, NOT a moment-generic\n  one -- which under the\
+  \ `surface` skeptic's own stated rule leaves membrane_tension `new`.\n\n- The jax-morph proposals `relax`\
+  \ / `regulate` are generic relaxation / homeostasis verbs,\n  not a volume-elasticity energy; no prior\
+  \ atlas proposed this specific contract, so this is\n  its FIRST sighting (implementation_of: null).\n"
 contract:
   name: volume_elasticity
   kind: lateral
