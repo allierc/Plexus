@@ -159,6 +159,15 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                          f"starts. Fix it, or declare it under _premises.waive with a reason.")
 
     t0 = time.time()
+    # Carry the composition into the RUN's folder, next to its spec: that is where the Archivist
+    # reads from, and a graph it cannot rebuild is a starting point it cannot use.
+    try:
+        import shutil as _sh
+        _c = cfg_path.replace(".yaml", ".composition.json")
+        if os.path.exists(_c):
+            _sh.copyfile(_c, os.path.join(out_dir, "composition.json"))
+    except Exception:
+        pass
     sim = S.load(cfg_path)
     Hf, out = engine_run(sim, device=device)
     wall = time.time() - t0

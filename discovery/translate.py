@@ -32,6 +32,7 @@ D3  recording-stride mismatch.  Vertex positions and mesh topology were recorded
 from __future__ import annotations
 
 import copy
+import json
 import os
 
 import yaml
@@ -553,6 +554,19 @@ def write_config(graph, name, out_dir=None, **kw):
     os.makedirs(out_dir, exist_ok=True)
     cfg = to_spec(graph, name=name, **kw)
     cfg["_discovery"]["comp_hash"] = comp_hash(graph)
+    # THE COMPOSITION, BESIDE THE SPEC. A spec records operators and their implementations but
+    # NOT the connections between them, so a graph cannot be rebuilt from one -- which is why the
+    # Archivist, having correctly named the three best starting points on disk, had to report
+    # "no composition.json -- its spec cannot be rebuilt as a graph" for all three and fall back
+    # to the reference recipes. It knew where to start and could not get there.
+    #
+    # Writing it costs a few hundred bytes and makes every run from here on a candidate parent.
+    # The 63 already on disk stay unreachable; that is the price of not having done this earlier.
+    try:
+        json.dump({"ops": graph.ops, "conns": graph.conns, "params": graph.params},
+                  open(os.path.join(out_dir, f"{name}.composition.json"), "w"), indent=1)
+    except Exception as e:
+        print(f"[translate] could not record the composition for {name}: {type(e).__name__}")
     path = os.path.join(out_dir, f"{name}.yaml")
     with open(path, "w") as fh:
         yaml.safe_dump(cfg, fh, sort_keys=False)
