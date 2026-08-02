@@ -89,13 +89,18 @@ def _heartbeat(name, t0, every=10):
         if tick % every and tick:
             return
         try:
-            nc = None
+            # THE LIVE COUNT, from the mesh -- `H.level("cell").n` is the RESERVOIR SIZE, so the
+            # first heartbeats reported 138888 cells for a run holding a few thousand. A progress
+            # line that reports the array it was given, instead of what it has built, says
+            # nothing and looks like everything.
+            nc = nv = None
             try:
-                nc = int(H.level("cell").n)
+                m = getattr(H.level("vertex"), "_mesh", None) or {}
+                nc, nv = int(m["nF"]), int(m["Nv"])
             except Exception:
                 pass
             with open(path, "w") as fh:
-                json.dump({"frame": int(tick), "n_cells": nc,
+                json.dump({"frame": int(tick), "n_cells": nc, "n_vertices": nv,
                            "elapsed_s": round(time.time() - t0, 1)}, fh)
                 fh.flush()
                 os.fsync(fh.fileno())
